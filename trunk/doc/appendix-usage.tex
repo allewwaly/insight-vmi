@@ -1,0 +1,64 @@
+\section{Usage Instructions}
+\begin{description}
+    \item[Compilation]
+	Adjust the path to the kernel source in your \texttt{Makefile}.
+	Then, use the \texttt{make} command to compile the C modules required by the python package.
+    \item[Kernel Preparation]
+        A kernel image with debug symbols must be compiled or obtained.
+        Afterwards \texttt{objdump} can be used to extract the debug-symbols in a textual format readable by the tool.
+        Pay attention to use a recent version of objdump, as older ones might fail to read debug-symbols.
+        Next, the type\_parser script is used to create the initial cleaned-up data model.
+        As noted earlier this last step may take some time.
+        It will save its results in the data.dumpc file, which is later used to quick load the data model.
+        \begin{lstlisting}[frame=single,caption=Initialisation Workflow,label=lst:workflow]
+ # objdump -g vmlinux > vmlinux.dbgdump
+ # python type_parser.py init vmlinux.dbgdump
+        \end{lstlisting}
+    \item[Additional Information Acquirement]
+	Certain information is not available in the kernel’s debug symbols.
+	Linked lists have been implemented and require an additional setup step to work correctly:
+        \begin{lstlisting}[frame=single,caption=Linked List Initialisation Workflow,label=lst:workflow]
+ # python type_relater.py /path/to/compiled/kernel/source meta_info.dump > /dev/null
+        \end{lstlisting}
+    \item[Memory Unlocking]
+        In order to access the \texttt{/dev/mem} device without any restrictions, the supplied memunlocker kernel module needs to 		be loaded: \begin{lstlisting}[frame=single,caption=Unblocking /dev/mem,label=lst:unlocking]
+ # sudo insmod memunlocker/memunlocker.ko
+         \end{lstlisting}
+    \item[Using the Shell]
+	Interactive kernel symbol exploration can be done via the python shell. First of all the precalculated debug symbol data 		has to be loaded. Then a memory image (can be the \texttt{/dev/mem} device or a physical memory dump of a virtual machine) 		is mapped using the memory.c python plugin.
+	\begin{lstlisting}[frame=single,caption=Starting up interactive shell,label=lst:shellstartup]
+ # python
+ >>> from tools import *
+ >>> types, names, addresses = init(memory_image, parents=True, linked_lists=True)
+ >>> it = kernel_name('init_task')
+ >>> init = it.children.next
+ >>> init
+ <Memory <c_types.Struct instance 'task_struct'> @0xffff88001ccc8000>
+ >>> init.pid
+ <Memory <c_types.Member instance 'pid'> @0xffff88001ccc8268>
+ >>> print init.pid
+ 1
+ >>> 
+	\end{lstlisting}	
+
+    \item[Symbol Comparision]
+	In order to be able to compare a symbol at different time snapshots, a second memory dump has to be mapped. 
+	Then the location of the level 4 page table directory has to be published to the memory python module.
+	\begin{lstlisting}[frame=single,caption=Mapping a second memory image,label=lst:map]
+ >>> memory.map(second_image, filesize, mapsize (usual same as filesize), 1)
+
+ >>> pgt = kernel_name('__ksymtab_init_level4_pgt')
+ >>> memory.set_init_level4_pgt(int(pgt.value.get_value()))
+	\end{lstlisting}
+	If everything is set up symbols can be compared by first getting a reference with \texttt{ref = kernel\_name('symbol')} and 		then using the \texttt{memory\_manager's} \texttt{.memcmp()} functionality: \texttt{ref.memcmp()}.
+	For a complete example see \texttt{diff.py}.
+    \item[Report generation]
+	Several components are capable of generating (more or less) detailed reports on actions and failures.
+	This information will be of great use for improving the tool and debugging errors it might have made.
+        \begin{lstlisting}[frame=single,caption=Generating Reports,label=lst:workflow]
+ # python troubles.py           > reports/trouble-areas.xml
+ # python type_relater.py /path/to/kernel/source meta_info.dump \
+                                > reports/linked-lists-parsing.xml
+ # python tools/linked_lists.py > reports/linked-lists-autoassociate.xml
+        \end{lstlisting}
+\end{description}

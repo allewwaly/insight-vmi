@@ -1,0 +1,76 @@
+\documentclass[12pt,german,a4paper]{scrartcl}
+\linespread{1.2}
+\usepackage{graphicx,url}
+\usepackage{tikz,fancyhdr} 
+\usepackage[sort&compress]{natbib}
+\usepackage{color}
+
+%\include{draft}
+%\usepackage[ngerman]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[pdftex,plainpages=false,pdfpagelabels]{hyperref}
+
+\usepackage{listings} %quelltext-listings
+\lstset{basicstyle=\ttfamily\scriptsize}
+
+\definecolor{blue}{rgb}{0.2,0.3,0.5}
+\addtokomafont{section}{\color{blue}}
+\addtokomafont{subsection}{\color{blue}}
+\addtokomafont{subsubsection}{\color{blue}}
+
+\hypersetup{
+    pdftitle={Memory Tool Documentation},
+    pdfauthor={Hagen Fritsch and Dominik Meyer}
+}
+
+\title{Memory Tool Documentation}
+	
+\newcommand{\q}[1]{\glqq{#1}\grqq}
+%\newcommand{\citet}{\emcite}
+
+\begin{document}
+%titelseite und inhalt
+\pagenumbering{roman}
+\thispagestyle{empty}
+\begin{center}
+	\sffamily {\huge \textbf{\color{blue} Memory Tool Documentation}}
+	\begin{flushleft}
+		Hagen Fritsch \texttt{\small <fritsch+mdp@in.tum.de>} \hfill
+		Technische Universität München \\
+		Dominik Meyer  \texttt{\small <meyerd@in.tum.de>} \hfill August 1st, 2009
+	\end{flushleft}
+\end{center}
+
+%\setcounter{page}{2}
+%\thispagestyle{empty}
+\tableofcontents{}
+%\listoftables
+
+%\newpage
+\pagenumbering{arabic}
+
+%%%%%%%%%%%%%%%%%%%%
+\vfill
+\section*{Abstract}
+The goal of the project is to compare two memory images of one virtual machine and extract a high-level view
+of changes in kernel data structures, which is achieved through structured and typed memory based inspection
+on debug-symbols of the Linux kernel.
+The results of the comparison shall be the base for a machine-learning approach to identify
+malicious behaviour based solely on passive memory observation.
+
+	\include{ch0-intro}
+	\include{ch1-data-acquirement}
+	\include{ch2-kernel-trouble}
+	\include{ch3-memory-access}
+	\include{ch4-rootkit-analysis}
+
+\begin{appendix}
+  \include{appendix-usage}
+\end{appendix}
+
+%%%%%%%%%%%%%%%%%%%%
+%\newpage
+%\bibliographystyle{natdin}
+%\bibliographystyle{natbib}%unsrtain,alpha
+%\bibliography{literature}
+\end{document}

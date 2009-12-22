@@ -1,0 +1,108 @@
+\section{Data acquirement process}
+Debug kernel images contain all information needed for memory inspection in a binary format. However, as implementing a parser to access the binary format debug symbols seemed unreasonable due to elf’s complexity and likelihood of being subject to change, the decision was made to not work on the raw data, but to parse \texttt{objdump}’s output of the debug symbols which has some advantages.
+
+\begin{description}
+	\item[Size reduction] A debug kernel image is usually around 50 to 100 mb in size, while the parsed and cleaned debug symbols are only around 15 mb.
+	\item[Redundancy reduction] The main reason for size reduction is, that most redundancies in the symbols have been removed. The kernel image tends to contain many duplicate symbol descriptions, which also tend to complicate other tasks and manipulations on the data base.
+	\item[Manipulability] Having a parsed object presentation of all kernel symbols allows us to manipulate objects, enrich them with functions (such as parent relationships) or introduce new more abstract types like Strings (for arrays of \texttt{chars}).
+\end{description}
+
+The following sections describe how the reduced, cleaned-up model of kernel objects end up as python objects.
+These store all relevant information from the debug symbols and are enriched with functions and attributes to facilitate access.
+The full documentation is available through pydoc.TThe next section gives some examples.
+
+\subsection{Parsing Data}
+\begin{lstlisting}[frame=single,caption=A typical objdump structure,label=lst:objdump]
+ <1><c6>: Abbrev Number: 4 (DW_TAG_base_type)
+    <c7>   DW_AT_byte_size   : 4
+    <c8>   DW_AT_encoding    : 5        (signed)
+    <c9>   DW_AT_name        : int
+ <1><122>: Abbrev Number: 11 (DW_TAG_typedef)
+    <123>   DW_AT_name        : (indirect string, offset: 0x82a): __kernel_pid_t
+    <127>   DW_AT_decl_file   : 4
+    <128>   DW_AT_decl_line   : 14
+    <129>   DW_AT_type        : <0xc6>
+\end{lstlisting}
+Every type has a location in the binary file.
+The output of \texttt{objdump} includes this location as the byte-offset for every piece of information displayed.
+The location is represented by the hexvalue enclosed in brackets (e.g.~\texttt{<c6>} for type \texttt{int} in line 1 of listing \ref{lst:objdump}).
+During the parsing process this location value is used as the type’s id.
+Other types may reference this type and will use the offset as well to reference it.
+In the example on line 9 the type \texttt{<122>} (definition begins on line 5) does this by declaring the type to be based on another type declared at offset \texttt{0xc6}.
+Here the relationship is established that the \texttt{typedef}-type named \texttt{\_\_kernel\_pid\_t} is actually a signed integer.
+From now on the type \texttt{int} will thus be \emph{base-type} of \texttt{\_\_kernel\_pid\_t}.
+
+Every type has a base-type unless the base-type is \texttt{void} or the type is a \texttt{struct} or \texttt{union}, because those are either not resolveable (void) or form a collection of other types (structs and unions).
+A type’s base-type as defined earlier does not necessarily have to be a \texttt{base\_type} as defined by objdump (such as \texttt{unsigned short integer}), but can be an arbitrary other type.
+For disambugiation purposes we’ll now call types that objdump refers to as \texttt{base\_type} \texttt{BasicType} as its instances reference true \emph{basic} types such as \texttt{unsigned long int} or \texttt{char}.
+Base-types in contrast can be of any type: 
+For example a \texttt{pointer\_type} might have a \texttt{structure\_type} as its base-type).
+
+Listing \ref{lst:types} shows a list of objdump primitive types that are parsed by the tool.
+Types denoted with a * are parsed, but currently ignored in tool-operation, because the focus has been on making data meaniningful.
+Parameters of functions or declarations of subprograms are not yet of any use to this objective.
+
+\begin{lstlisting}[frame=single,caption=Used types,label=lst:types]
+structure_type   subroutine_type    variable         formal_parameter*            
+union_type       enumeration_typ    const_type       subprogram* 
+member           enumerator         typedef          inlined_subroutine*
+array_type       pointer_type       base_type        lexical_block*         
+subrange_type                                           
+\end{lstlisting}
+
+Each type may have several unique properties (such as the byte-offset for members of structs). All types are modeled as classes and parse the relevant properties.
+Arrays form a special case as their size is not provided in the type itself. It is only implicitly known through a \texttt{subrange}-type referencing the corresponding array-type.
+These \texttt{subrange}-types hold a \texttt{upper\_bound} property, allowing to determine the array’s size.
+
+\subsection{Data Representation}
+To give an idea on how those types are used in the program, we’ll describe some of them exemplary:
+\paragraph{Const, Member, Variable} These are very simple, similar types, as they are basically just aliases.
+    A \texttt{const int} is just an \texttt{int} with the restriction of not being editable
+    which is not of importance to data representation and access. So it is going to be modelled as a
+    \texttt{Const} class which has its \texttt{base} attribute set to the \texttt{BasicType} instance for an
+    integer.
+    
+    Each type has a \texttt{value(location)} function to retrieve a representation of the memory at address \texttt{location}, assuming
+    that the memory stored there is in fact of that type.
+    The only task of the \texttt{Const.value(location)} function is therefore to call the base-type’s \texttt{value(location)} function,
+    which, for the \texttt{BasicType} instance of the example that represents an integer, would initiate a memory read to return the integer representation
+    of memory at the virtual address \texttt{location}.
+    
+    Member and Variable are just named references to other types. i.e.~a struct might have a member named
+    \texttt{number} having a \texttt{BasicType} named \texttt{int} set as its base-type.
+    Once again, the base-type does not necessarily have to be a \texttt{BasicType} instance, but can be any other type such as a \texttt{Pointer} or a \texttt{Struct}.
+
+\paragraph{Pointer} A pointer is still similar to the previously presented alias-types, except that pointers
+    have to modify the addresses while passing addresses to the base-type.
+    So the call to \texttt{Pointer.value(location)} will read the address from \texttt{location} and call the base-type’s
+    \texttt{value(location)} function, to evaluate the value.
+    While this is done, special care has to be taken for null-pointers which occur frequently.
+    
+    If for some reason, it is important to read the pointer’s value instead of the value of the element it is pointing to,
+    a high-level type-cast allows to access the pointer as being an object of an arbitrary other type.
+
+\paragraph{Struct} Structure types are more complicated, as they need to take care of managing their members.
+    \texttt{Struct}s (and \texttt{Array}s) provide a standard iterator function to loop through all members. When accessing a member,
+    the \texttt{Struct} takes care of modifying the access location according to the Member’s offset.
+    For convenience \texttt{Struct}s can also be used as a dictionary, as they override the \texttt{\_\_getitem\_\_} method 
+    and thus allow named access to members. The \texttt{value(location)} cannot return a simple value, but will return
+    a dictionary with all the member’s values included.
+
+\subsection{Clean-up process}
+Compared to their compressed storage in the debug image, the objects require much more space in memory, thus the parsing process will quickly require gigabytes of RAM for operation.
+This is also because of the many duplicates within the types, as the debug image tends to include multiple copies of most types.
+
+To reduce memory usage duplicate objects are eliminated a couple of times during the parsing process. However, there is no easy identification of a duplicate object except for its properties. Therefore a comparison function has been implemented for each type to decide whether types are equal. This test is based for example on name, size and comparison of their base-types or members. Unfortunately during parsing, not all references are already resolved, i.e.~a type may have a base-type that is not yet known to the application. Here the comparison is going to assume inequality.
+Additionally, the process may not clean up duplicate types completely, 
+since their \texttt{id}s might be referenced by other types which remain to be loaded.
+
+\bigskip
+Eventually, once parsing is complete, the full clean-up process is started and continues as follows:
+\begin{enumerate}
+	\item Sort all types, using their comparison function. All equal types will now be located next to each other.
+	\item Replace all equal types by the first representative. Create a list of replaced types and their representative.
+	\item Modify all references to types that were cleaned up in step 2 and replace them by a reference to its types’ representatives.
+\end{enumerate}
+
+As the process takes some time (15-30 minutes), after parsing and cleaning, the collected objects are dumped to a file using python’s \texttt{pickle} facility.
+This allows them to be almost instantly accessible afterwards.

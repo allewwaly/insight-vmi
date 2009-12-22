@@ -1,0 +1,15 @@
+\section{Overview}
+In a first step of meaningful virtual machine memory introspection, the exact semantics of all data in memory need to be known,
+which seems like an impossible task at the first glance, but fortunately access to memory semantics is essential for
+other tasks (mainly debugging) and thus a lot of required information can be obtained with ease.
+When compiling a binary, the compiler can be told to add debug information, describing data types and structures,
+which is fundamental for accessing memory in meaningful ways. Additionally, the debug information will note the addresses
+of global variables. These are going to be the entry points for memory inspection, as they allow us to recursively
+follow typed information such as structures and pointers through memory.
+Though there are still many obstacles to overcome, this approach is a giant first step in full memory inspection.
+
+In order to access not only flat kernel memory, but complete paged memory, paging is being implemented in a second stage of the project, before eventually measures to analyse changes between two memory dumps can be initiated.
+
+By using the outcome of this analysis we were able to inspect if the effects of installing rootkits into the kernel can be observed. Our conclusions can be found in chapter \ref{rootkit_analysis}.
+
+\newpage
