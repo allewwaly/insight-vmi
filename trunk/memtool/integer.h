@@ -15,7 +15,7 @@ public:
     /**
      * @return a string representation of this type
      */
-    virtual QString toString(size_t offset) const;
+//    virtual QString toString(size_t offset) const;
 
     /**
      * @return the native value of this type
