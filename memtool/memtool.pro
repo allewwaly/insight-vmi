@@ -1,5 +1,7 @@
-SOURCES += main.cpp \
+SOURCES += char.cpp \
+    main.cpp \
     basetype.cpp \
     integer.cpp
-HEADERS += basetype.h \
+HEADERS += char.h \
+    basetype.h \
     integer.h

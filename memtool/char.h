@@ -1,23 +1,32 @@
-#ifndef INTEGER_H
-#define INTEGER_H
+/*
+ * char.h
+ *
+ *  Created on: 29.03.2010
+ *      Author: chrschn
+ */
+
+#ifndef CHAR_H_
+#define CHAR_H_
 
 #include "basetype.h"
 
 template<class T>
-class GenericInteger : public BaseType
+class GenericChar: public BaseType
 {
 public:
     /**
       Constructor
       @see BaseType::BaseType()
      */
-    GenericInteger(const QString& name, const quint32 id, const quint32 size,
+    GenericChar(const QString& name, const quint32 id, const quint32 size,
             QIODevice *memory);
+
+//  virtual ~GenericChar();
 
     /**
       @return the native value of this type
      */
-    T toInt(size_t offset) const;
+    T toChar(size_t offset) const;
 
     /**
       @return a string representation of this type
@@ -28,17 +37,18 @@ public:
       @return the value of this type as a variant
      */
     virtual QVariant value(size_t offset) const;
+
 };
 
 //------------------------------------------------------------------------------
-class Integer : public GenericInteger<int>
+class Char: public GenericChar<char>
 {
 public:
     /**
       Constructor
       @see BaseType::BaseType()
      */
-    Integer(const quint32 id, const quint32 size, QIODevice *memory);
+	Char(const quint32 id, const quint32 size, QIODevice *memory);
 
     /**
       @return the actual type of that polimorphic instance
@@ -47,14 +57,14 @@ public:
 };
 
 //------------------------------------------------------------------------------
-class UnsignedInteger : public GenericInteger<unsigned int>
+class UnsignedChar: public GenericChar<unsigned char>
 {
 public:
     /**
       Constructor
       @see BaseType::BaseType()
      */
-    UnsignedInteger(const quint32 id, const quint32 size, QIODevice *memory);
+    UnsignedChar(const quint32 id, const quint32 size, QIODevice *memory);
 
     /**
       @return the actual type of that polimorphic instance
@@ -62,4 +72,4 @@ public:
     virtual RealType type() const;
 };
 
-#endif // INTEGER_H
+#endif /* CHAR_H_ */
