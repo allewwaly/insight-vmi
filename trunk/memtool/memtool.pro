@@ -1,7 +1,17 @@
-SOURCES += char.cpp \
+SOURCES += typefactory.cpp \
+    kernelsymbols.cpp \
+    instance.cpp \
+    structmember.cpp \
+    struct.cpp \
+    pointer.cpp \
+    numeric.cpp \
     main.cpp \
-    basetype.cpp \
-    integer.cpp
-HEADERS += char.h \
-    basetype.h \
-    integer.h
+    basetype.cpp
+HEADERS += typefactory.h \
+    kernelsymbols.h \
+    instance.h \
+    structmember.h \
+    struct.h \
+    pointer.h \
+    numeric.h \
+    basetype.h

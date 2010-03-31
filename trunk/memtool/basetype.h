@@ -53,17 +53,18 @@ public:
 };
 
 
-// template <typename T>
 class BaseType
 {
 public:
     enum RealType {
-        rtChar,
-        rtUChar,
-        rtInt,
-        rtUInt,
-        rtLong,
-        rtULong,
+        rtInt8,
+        rtUInt8,
+        rtInt16,
+        rtUInt16,
+        rtInt32,
+        rtUInt32,
+        rtInt64,
+        rtUInt64,
         rtFloat,
         rtDouble,
         rtPointer,
@@ -78,13 +79,12 @@ public:
       @param size size of this type in bytes
       @param memory pointer to the QFile or QBuffer to read the memory from
      */
-    BaseType(const QString& name, const quint32 id, const quint32 size,
-             QIODevice *memory);
+    BaseType(const QString& name, int id, quint32 size, QIODevice *memory = 0);
 
 //    /**
 //     * Destructor
 //     */
-//    ~BaseType();
+//    virtual ~BaseType();
 
     /**
       @return the actual type of that polimorphic instance
@@ -112,9 +112,139 @@ public:
     virtual QString toString(size_t offset) const = 0;
 
     /**
+     * Explicit representation of a value is the given type.
+     * @param offset the offset at which to read the value from memory
+     * @return the value at @a offset as the desired type
+     */
+    inline qint8 toInt8(size_t offset) const
+    {
+    	return value<qint8>(offset);
+    }
+
+    /**
+     * Explicit representation of a value is the given type.
+     * @param offset the offset at which to read the value from memory
+     * @return the value at @a offset as the desired type
+     */
+    inline quint8 toUInt8(size_t offset) const
+    {
+    	return value<quint8>(offset);
+    }
+
+    /**
+     * Explicit representation of a value is the given type.
+     * @param offset the offset at which to read the value from memory
+     * @return the value at @a offset as the desired type
+     */
+    inline qint16 toInt16(size_t offset) const
+    {
+    	return value<qint16>(offset);
+    }
+
+
+    /**
+     * Explicit representation of a value is the given type.
+     * @param offset the offset at which to read the value from memory
+     * @return the value at @a offset as the desired type
+     */
+    inline quint16 toUInt16(size_t offset) const
+    {
+    	return value<quint16>(offset);
+    }
+
+    /**
+     * Explicit representation of a value is the given type.
+     * @param offset the offset at which to read the value from memory
+     * @return the value at @a offset as the desired type
+     */
+    inline qint32 toInt32(size_t offset) const
+    {
+    	return value<qint32>(offset);
+    }
+
+    /**
+     * Explicit representation of a value is the given type.
+     * @param offset the offset at which to read the value from memory
+     * @return the value at @a offset as the desired type
+     */
+    inline quint32 toUInt32(size_t offset) const
+    {
+    	return value<quint32>(offset);
+    }
+
+    /**
+     * Explicit representation of a value is the given type.
+     * @param offset the offset at which to read the value from memory
+     * @return the value at @a offset as the desired type
+     */
+    inline qint64 toInt64(size_t offset) const
+    {
+    	return value<qint64>(offset);
+    }
+
+    /**
+     * Explicit representation of a value is the given type.
+     * @param offset the offset at which to read the value from memory
+     * @return the value at @a offset as the desired type
+     */
+    inline quint64 toUInt64(size_t offset) const
+    {
+    	return value<quint64>(offset);
+    }
+
+    /**
+     * Explicit representation of a value is the given type.
+     * @param offset the offset at which to read the value from memory
+     * @return the value at @a offset as the desired type
+     */
+    inline float toFloat(size_t offset) const
+    {
+    	return value<float>(offset);
+    }
+
+    /**
+     * Explicit representation of a value is the given type.
+     * @param offset the offset at which to read the value from memory
+     * @return the value at @a offset as the desired type
+     */
+    inline double toDouble(size_t offset) const
+    {
+    	return value<double>(offset);
+    }
+
+    /**
+     * Explicit representation of a value is the given type.
+     * @param offset the offset at which to read the value from memory
+     * @return the value at @a offset as the desired type
+     * @warning This function should only be called for a pointer type!
+     */
+    inline void* toPointer(size_t offset) const
+    {
+    	// We have to consider the size of the pointer
+    	if (_size == 4) {
+    		quint32 p = toUInt32(offset);
+    		return (void*)p;
+    	}
+    	else if (_size == 8) {
+    		quint64 p = toUInt64(offset);
+    		return (void*)p;
+    	}
+    	else {
+    		throw BaseTypeException(
+    				"Illegal conversion of a non-pointer type to a pointer",
+    				__FILE__,
+    				__LINE__);
+    	}
+    }
+
+    /**
       @return the value of this type as a variant
      */
-    virtual QVariant value(size_t offset) const = 0;
+	template<class T>
+    inline QVariant toVariant(size_t offset) const
+    {
+   	    return value<T>(offset);
+    }
 
     /**
       Generic value function that will return the data as any type
@@ -187,5 +317,6 @@ protected:
         }
     }
 };
+
 
 #endif // BASETYPE_H
