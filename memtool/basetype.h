@@ -5,20 +5,16 @@
 #include <QtGlobal>
 #include <QString>
 #include <QVariant>
-#include <exception>
+#include "genericexception.h"
 
 class QIODevice;
 
 /**
   Basic exception class for all type-related exceptions
  */
-class BaseTypeException : public std::exception
+class BaseTypeException: public GenericException
 {
 public:
-    QString message;   ///< error message
-    QString file;      ///< file name in which message was originally thrown
-    int line;          ///< line number at which message was originally thrown
-
     /**
       Constructor
       @param msg error message
@@ -27,7 +23,7 @@ public:
       @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
      */
     BaseTypeException(QString msg = QString(), const char* file = 0, int line = -1)
-        : message(msg), file(file), line(line)
+        : GenericException(msg, file, line)
     {
     }
 
@@ -57,19 +53,19 @@ class BaseType
 {
 public:
     enum RealType {
-        rtInt8,
-        rtUInt8,
-        rtInt16,
-        rtUInt16,
-        rtInt32,
-        rtUInt32,
-        rtInt64,
-        rtUInt64,
-        rtFloat,
-        rtDouble,
-        rtPointer,
-        rtStruct,
-        rtUnion
+        rtInt8    = (1 <<  0),
+        rtUInt8   = (1 <<  1),
+        rtInt16   = (1 <<  2),
+        rtUInt16  = (1 <<  3),
+        rtInt32   = (1 <<  4),
+        rtUInt32  = (1 <<  5),
+        rtInt64   = (1 <<  6),
+        rtUInt64  = (1 <<  7),
+        rtFloat   = (1 <<  8),
+        rtDouble  = (1 <<  9),
+        rtPointer = (1 << 10),
+        rtStruct  = (1 << 11),
+        rtUnion   = (1 << 12)
     };
 
     /**
@@ -105,6 +101,28 @@ public:
       @return the size of this type in bytes
      */
     uint size() const;
+
+    /**
+      @return the ID of the source file in which this type was declared
+     */
+    int srcFile() const;
+
+    /**
+      Sets the ID of the source file in which this type was declared
+      @param id new ID
+     */
+    void setSrcFile(int id);
+
+    /**
+      @return the line number at which this type was declared
+     */
+    int srcLine() const;
+
+    /**
+      Sets the line number at which this type was declared
+      @param line the new line number
+     */
+    void setSrcLine(int line);
 
     /**
       @return a string representation of this type
@@ -277,6 +295,8 @@ public:
     QIODevice* memory() const;
 
 protected:
+	int _srcFile;        ///< ID of the source file of the type's declaration
+	int _srcLine;        ///< line number within the source the type's declaration
     const QString _name;       ///< name of this type, e.g. "int"
     const quint32 _id;         ///< ID of this type, given by objdump
     const quint32 _size;       ///< size of this type in byte

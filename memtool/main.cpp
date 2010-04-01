@@ -1,12 +1,49 @@
 
 #include <iostream>
+#include <QCoreApplication>
+#include <QFile>
+
+#include "kernelsymbols.h"
+#include "genericexception.h"
+#include "debug.h"
+
+void usage()
+{
+	QString appName = QCoreApplication::applicationFilePath();
+	appName = appName.right(appName.length() - appName.lastIndexOf('/') - 1);
+
+	std::cout << "Usage: " << appName << " <objdump>" << std::endl;
+}
+
 
 int main(int argc, char* argv[])
 {
-    std::cout << "Hello, world! My arguments are:" << std::endl;
+	QCoreApplication app(argc, argv);
 
-    for (int i = 0; i < argc; i++)
-        std::cout << i << ": " << argv[i] << std::endl;
+	if (argc < 2) {
+		usage();
+		return 0;
+	}
+
+	QString fileName(argv[1]);
+	if (!QFile::exists(fileName)) {
+		std::cerr << "The file \"" << fileName << "\" does not exist." << std::endl;
+		return 1;
+	}
+
+	KernelSymbols sym;
+
+	try {
+		debugmsg("Reading symbols from file " << fileName);
+		sym.parseSymbols(fileName);
+	}
+	catch (GenericException e) {
+		std::cerr
+			<< "Caught exception at " << e.file << ":" << e.line << std::endl
+			<< "Message: " << e.message << std::endl;
+	}
+
+	std::cout << "Done, exiting." << std::endl;
 
     return 0;
 }

@@ -15,19 +15,19 @@
 #include <exception>
 
 class BaseType;
+class Structured;
+class ReferencingType;
 
 #include "numeric.h"
+#include "typeinfo.h"
+#include "genericexception.h"
 
 /**
   Basic exception class for all factory-related exceptions
  */
-class FactoryException : public std::exception
+class FactoryException : public GenericException
 {
 public:
-    QString message;   ///< error message
-    QString file;      ///< file name in which message was originally thrown
-    int line;          ///< line number at which message was originally thrown
-
     /**
       Constructor
       @param msg error message
@@ -36,7 +36,7 @@ public:
       @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
      */
     FactoryException(QString msg = QString(), const char* file = 0, int line = -1)
-        : message(msg), file(file), line(line)
+        : GenericException(msg, file, line)
     {
     }
 
@@ -45,6 +45,21 @@ public:
     }
 };
 
+/**
+ * Holds the infomation about a compile unit, i.e., a source file.
+ */
+class CompileUnit
+{
+public:
+	const int id;
+	const QString dir, file;
+
+	CompileUnit(int id, const QString& dir, const QString& file)
+		: id(id), dir(dir), file(file) {}
+};
+
+/// Hash table of all compile units
+typedef QHash<int, CompileUnit*> CompileUnitIntHash;
 
 /// List of all BaseType elements
 typedef QList<BaseType*> BaseTypeList;
@@ -61,6 +76,9 @@ typedef QMultiHash<QString, BaseType*> BaseTypeStringHash;
 /// Hash table to find all types by ID
 typedef QHash<int, BaseType*> BaseTypeIntHash;
 
+/// Hash table to find all referencing types by referring ID
+typedef QMultiHash<int, ReferencingType*> RefTypeMultiHash;
+
 /// This function is required to use BaseType as a key in a QHash
 inline uint qHash(const BaseTypeHashKey &key)
 {
@@ -73,19 +91,35 @@ inline uint qHash(const BaseTypeHashKey &key)
 class TypeFactory
 {
 public:
-	/// The data encoding of a type
-	enum Encoding { eUndef = 0, eSigned, eUnsigned, eFloat };
-
 	TypeFactory();
 
 	~TypeFactory();
+
+	void clear();
 
 	BaseType* findById(int id) const;
 
 	BaseType* findByName(const QString& name) const;
 
-	BaseType* create(const QString& name, size_t size, int id);
+	/**
+	 * Checks if the given combination of type information is a legal for a symbol
+	 * @return \c true if valid, \c false otherwise
+	 */
+	bool static isSymbolValid(const TypeInfo& info);
 
+	void addSymbol(const TypeInfo& info);
+
+	inline const BaseTypeList& types() const
+	{
+		return _types;
+	}
+
+	inline const CompileUnitIntHash& sources() const
+	{
+		return _sources;
+	}
+
+protected:
 	template<class T>
 	inline T* getInstance(const QString& name, int id, quint32 size,
 			QIODevice *memory = 0)
@@ -99,20 +133,18 @@ public:
 	}
 
 	BaseType* getNumericInstance(const QString& name, int id, quint32 size,
-			Encoding enc, QIODevice *memory = 0);
+			DataEncoding enc, QIODevice *memory = 0);
 
-	inline const BaseTypeList& types() const
-	{
-		return _types;
-	}
-
-protected:
 	void insert(BaseType* type);
+	void insert(CompileUnit* unit);
 
 private:
-	BaseTypeList _types;          ///< Holds all BaseType objects
-	BaseTypeStringHash _nameHash; ///< Holds all BaseType objects, indexed by name
-	BaseTypeIntHash _idHash;      ///< Holds all BaseType objects, indexed by ID
+	CompileUnitIntHash _sources;      ///< Holds all source files
+	BaseTypeList _types;              ///< Holds all BaseType objects
+	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
+	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
+	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
+	Structured* _lastStructure;
 };
 
 #endif /* TYPEFACTORY_H_ */
