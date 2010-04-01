@@ -83,10 +83,27 @@ typedef QHash<QString, HdrSymbolType> HdrSymMap;
 typedef QHash<QString, ParamSymbolType> ParamSymMap;
 typedef QHash<QString, DataEncoding> DataEncMap;
 
+typedef QHash<HdrSymbolType, QString> HdrSymRevMap;
 
 HdrSymMap getHdrSymMap();
 ParamSymMap getParamSymMap();
 DataEncMap getDataEncMap();
+
+/**
+ * Returns an inverted value of a QHash, i.e., a hash with key and value
+ * types swapped.
+ * @param hash the QHash to be inverted
+ * @return an inverted version of @a hash
+ */
+template<class T>
+QHash<typename T::mapped_type, typename T::key_type> invertHash(T hash)
+{
+    QHash<typename T::mapped_type, typename T::key_type> ret;
+    typename T::iterator it;
+    for (it = hash.begin(); it != hash.end(); ++it)
+        ret.insert(it.value(), it.key());
+    return ret;
+}
 
 
 static const quint32 relevantHdr =

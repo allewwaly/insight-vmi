@@ -4,6 +4,7 @@
 #include <QFile>
 
 #include "kernelsymbols.h"
+#include "shell.h"
 #include "genericexception.h"
 #include "debug.h"
 
@@ -31,19 +32,30 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	KernelSymbols sym;
+	int ret = 0;
 
 	try {
 		debugmsg("Reading symbols from file " << fileName);
+		KernelSymbols sym;
 		sym.parseSymbols(fileName);
+
+		std::cout
+            << "Read " << sym.factory().types().count() << " types from "
+            << sym.factory().sources().count() << " source files." << std::endl;
+
+		Shell shell(sym);
+		ret = shell.start();
 	}
 	catch (GenericException e) {
 		std::cerr
 			<< "Caught exception at " << e.file << ":" << e.line << std::endl
 			<< "Message: " << e.message << std::endl;
+	    return 1;
 	}
 
 	std::cout << "Done, exiting." << std::endl;
 
-    return 0;
+    return ret;
 }
+
+
