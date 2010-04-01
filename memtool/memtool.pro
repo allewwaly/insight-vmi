@@ -1,4 +1,5 @@
-SOURCES += referencingtype.cpp \
+SOURCES += shell.cpp \
+    referencingtype.cpp \
     genericexception.cpp \
     debug.cpp \
     structuredmember.cpp \
@@ -11,7 +12,8 @@ SOURCES += referencingtype.cpp \
     numeric.cpp \
     main.cpp \
     basetype.cpp
-HEADERS += referencingtype.h \
+HEADERS += shell.h \
+    referencingtype.h \
     genericexception.h \
     debug.h \
     structuredmember.h \
@@ -23,3 +25,4 @@ HEADERS += referencingtype.h \
     pointer.h \
     numeric.h \
     basetype.h
+CONFIG += console

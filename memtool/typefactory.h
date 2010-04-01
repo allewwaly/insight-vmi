@@ -51,11 +51,15 @@ public:
 class CompileUnit
 {
 public:
-	const int id;
-	const QString dir, file;
+	CompileUnit(int id, const QString& dir, const QString& file);
 
-	CompileUnit(int id, const QString& dir, const QString& file)
-		: id(id), dir(dir), file(file) {}
+	int id() const;
+	const QString& dir() const;
+    const QString& file() const;
+
+private:
+    const int _id;
+    const QString _dir, _file;
 };
 
 /// Hash table of all compile units

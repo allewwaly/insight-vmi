@@ -61,6 +61,8 @@ public:
 	void parseSymbols(QIODevice* from);
 	void parseSymbols(const QString& fileName);
 
+    const TypeFactory& factory() const;
+
 private:
 	TypeFactory _factory;
 };

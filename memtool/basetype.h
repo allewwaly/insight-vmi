@@ -339,4 +339,10 @@ protected:
 };
 
 
+typedef QHash<BaseType::RealType, QString> RealTypeRevMap;
+
+RealTypeRevMap getRealTypeRevMap();
+
+
+
 #endif // BASETYPE_H

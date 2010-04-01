@@ -225,3 +225,10 @@ void KernelSymbols::parseSymbols(const QString& fileName)
 	file.close();
 }
 
+
+const TypeFactory& KernelSymbols::factory() const
+{
+    return _factory;
+}
+
+

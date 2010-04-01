@@ -14,6 +14,29 @@
 
 #define factoryError(x) do { throw FactoryException((x), __FILE__, __LINE__); } while (0)
 
+CompileUnit::CompileUnit(int id, const QString& dir, const QString& file)
+    : _id(id), _dir(dir), _file(file)
+{
+}
+
+int CompileUnit::id() const
+{
+    return _id;
+}
+
+
+const QString& CompileUnit::dir() const
+{
+    return _dir;
+}
+
+
+const QString& CompileUnit::file() const
+{
+    return _file;
+}
+
+//------------------------------------------------------------------------------
 
 TypeFactory::TypeFactory()
 	: _lastStructure(0)
@@ -45,7 +68,7 @@ void TypeFactory::clear()
 	_typesById.clear();
 	_typesByName.clear();
 
-	// Throw an exception of the postponed list still contains items
+	// Throw an exception of the postponed cmdList still contains items
 	if (!_postponedTypes.isEmpty()) {
 		QString msg("The following types still have unresolved references:\n");
 //		QList<int> keys = _postponedTypes.keys();
@@ -177,7 +200,7 @@ void TypeFactory::insert(BaseType* type)
 //						.arg(type->id(), 0, 16));
 //			break;
 
-		// Delete this item from the list and proceed
+		// Delete this item from the cmdList and proceed
 		it = _postponedTypes.erase(it);
 	}
 }
@@ -185,7 +208,7 @@ void TypeFactory::insert(BaseType* type)
 
 void TypeFactory::insert(CompileUnit* unit)
 {
-	_sources.insert(unit->id, unit);
+	_sources.insert(unit->id(), unit);
 }
 
 
@@ -223,7 +246,7 @@ void TypeFactory::addSymbol(const TypeInfo& info)
 
 	switch(info.symType()) {
 	case hsCompileUnit: {
-		insert(new CompileUnit(info.id(), info.name(), info.srcDir()));
+		insert(new CompileUnit(info.id(), info.srcDir(), info.name()));
 		break;
 	}
 	case hsBaseType: {
