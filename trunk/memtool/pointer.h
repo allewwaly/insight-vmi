@@ -9,26 +9,23 @@
 #define POINTER_H_
 
 #include "basetype.h"
+#include "referencingtype.h"
 
-class Pointer: public BaseType
+class Pointer: public BaseType, public ReferencingType
 {
 public:
     Pointer(const QString & name, int id, quint32 size, QIODevice *memory = 0,
     		BaseType *type = 0);
 
-    /**
-     * @return the type this pointer points to
-     */
-    BaseType* refType() const;
+	/**
+	 @return the actual type of that polimorphic instance
+	 */
+	virtual RealType type() const;
 
-    /**
-     * Set the base type this pointer points to
-     * @param type new pointed type
-     */
-    void setRefType(BaseType* type);
-
-protected:
-	BaseType *_refType;
+	/**
+	 @return a string representation of this type
+	 */
+	virtual QString toString(size_t offset) const;
 };
 
 #endif /* POINTER_H_ */

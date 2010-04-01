@@ -5,33 +5,27 @@
  *      Author: chrschn
  */
 
-#ifndef STRUCTMEMBER_H_
-#define STRUCTMEMBER_H_
+#ifndef STRUCTUREDMEMBER_H_
+#define STRUCTUREDMEMBER_H_
 
 #include "basetype.h"
+#include "referencingtype.h"
 
-class StructMember
+class StructuredMember: public ReferencingType
 {
 public:
 	/**
 	 * Constructor for a member within a struct
 	 * @param innerName the member's name within the struct
 	 * @param innerOffset the member's offset within the struct;
-	 * @param type the data type of this member
+	 * @param refType the data type of this member
 	 */
-	StructMember(const QString& innerName, size_t innerOffset,
-			const BaseType* type);
-
-	/**
-	 * Copy constructor
-	 * @param from object to copy this instance from
-	 */
-//	StructMember(const StructMember& from);
+	StructuredMember(const QString& innerName, size_t innerOffset,
+			BaseType* refType);
 
 private:
 	QString _innerName;         ///< the member's name within the struct
 	size_t _innerOffset;        ///< the member's offset within the struct;
-	const BaseType* _type;		///< the type of this member
 };
 
-#endif /* STRUCTMEMBER_H_ */
+#endif /* STRUCTUREDMEMBER_H_ */

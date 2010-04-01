@@ -9,19 +9,15 @@
 #define KERNELSYMBOLS_H_
 
 #include "typefactory.h"
-#include <exception>
 #include <QHash>
+#include "genericexception.h"
 
 // Forward declaration
 class QIODevice;
 
-class ParserException: public std::exception
+class ParserException: public GenericException
 {
 public:
-    QString message;   ///< error message
-    QString file;      ///< file name in which message was originally thrown
-    int line;          ///< line number at which message was originally thrown
-
     /**
       Constructor
       @param msg error message
@@ -30,7 +26,7 @@ public:
       @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
      */
     ParserException(QString msg = QString(), const char* file = 0, int line = -1)
-        : message(msg), file(file), line(line)
+        : GenericException(msg, file, line)
     {
     }
 
@@ -49,9 +45,12 @@ private:
 		Parser(QIODevice* from, TypeFactory* factory);
 		void parse();
 
+		quint32 line() const;
+
 	private:
 		QIODevice* _from;
 		TypeFactory* _factory;
+		quint32 _line;
 	};
 
 public:
@@ -60,6 +59,7 @@ public:
 	~KernelSymbols();
 
 	void parseSymbols(QIODevice* from);
+	void parseSymbols(const QString& fileName);
 
 private:
 	TypeFactory _factory;

@@ -11,7 +11,7 @@
 
 Pointer::Pointer(const QString& name, const int id, const quint32 size,
         QIODevice *memory, BaseType *type)
-	: BaseType(name, id, size, memory), _refType(type)
+	: BaseType(name, id, size, memory), ReferencingType(type)
 {
 	// Make sure the host system can handle the pointer size of the guest
 	if (size > sizeof(void*)) {
@@ -20,18 +20,21 @@ Pointer::Pointer(const QString& name, const int id, const quint32 size,
 				__FILE__,
 				__LINE__);
 	}
-
-	assert(type != 0);
 }
 
 
-BaseType* Pointer::refType() const
+BaseType::RealType Pointer::type() const
 {
-	return _refType;
+	return rtPointer;
 }
 
 
-void Pointer::setRefType(BaseType* type)
+QString Pointer::toString(size_t offset) const
 {
-	_refType = type;
+	if (_size == 4) {
+		return "0x" + QString::number(value<quint32>(offset), 16);
+	}
+	else {
+		return "0x" + QString::number(value<quint64>(offset), 16);
+	}
 }
