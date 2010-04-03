@@ -1,4 +1,7 @@
-SOURCES += shell.cpp \
+SOURCES += array.cpp \
+    compileunit.cpp \
+    sourceref.cpp \
+    shell.cpp \
     referencingtype.cpp \
     genericexception.cpp \
     debug.cpp \
@@ -12,7 +15,10 @@ SOURCES += shell.cpp \
     numeric.cpp \
     main.cpp \
     basetype.cpp
-HEADERS += shell.h \
+HEADERS += array.h \
+    compileunit.h \
+    sourceref.h \
+    shell.h \
     referencingtype.h \
     genericexception.h \
     debug.h \

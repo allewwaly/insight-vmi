@@ -19,7 +19,8 @@ void TypeInfo::clear()
 	_enc = eUndef;
 	_name.clear();
 	_id = _refTypeId = -1;
-	_byteSize = _location = -1;
+	_byteSize = 0;
+	_location = _upperBound = -1;
 	_symType = hsUnknownSymbol;
 	_srcDir.clear();
 	_srcFileId = _srcLine = -1;
@@ -97,13 +98,13 @@ void TypeInfo::setRefTypeId(int refTypeID)
 }
 
 
-qint32 TypeInfo::byteSize() const
+quint32 TypeInfo::byteSize() const
 {
     return _byteSize;
 }
 
 
-void TypeInfo::setByteSize(qint32 byteSize)
+void TypeInfo::setByteSize(quint32 byteSize)
 {
     this->_byteSize = byteSize;
 }
@@ -156,6 +157,19 @@ void TypeInfo::setEnc(DataEncoding enc)
     this->_enc = enc;
 }
 
+
+qint32 TypeInfo::upperBound() const
+{
+	return _upperBound;
+}
+
+
+void TypeInfo::setUpperBound(qint32 bound)
+{
+	_upperBound = bound;
+}
+
+
 QString TypeInfo::dump() const
 {
 	static HdrSymMap hdrMap = getHdrSymMap();
@@ -174,11 +188,12 @@ QString TypeInfo::dump() const
 	if (_id >= 0) 		     ret += QString("  id:            0x%1\n").arg(_id, 0, 16);
 	if (_symType >= 0)       ret += QString("  symType:       %1 (%2)\n").arg(_symType).arg(symType);
 	if (!_name.isEmpty())    ret += QString("  name:          %1\n").arg(_name);
-	if (_byteSize >= 0)      ret += QString("  byteSize:      %1\n").arg(_byteSize);
+	if (_byteSize > 0)       ret += QString("  byteSize:      %1\n").arg(_byteSize);
 	if (_enc > 0)            ret += QString("  enc:           %1 (%2)\n").arg(_enc).arg(enc);
 	if (_location >= 0)      ret += QString("  location:      %1\n").arg(_location);
 	if (_dataMemberLoc >= 0) ret += QString("  dataMemberLoc: %1\n").arg(_dataMemberLoc);
 	if (_refTypeId >= 0)     ret += QString("  refType:       0x%1\n").arg(_refTypeId, 0, 16);
+	if (_upperBound >= 0)    ret += QString("  upperBound:    %1\n").arg(_upperBound);
 	if (!_srcDir.isEmpty())  ret += QString("  srcDir:        %1\n").arg(_srcDir);
 	if (_srcFileId >= 0)     ret += QString("  srcFile:       %1\n").arg(_srcFileId);
 	if (_srcLine >= 0)       ret += QString("  srcLine:       %1\n").arg(_srcLine);

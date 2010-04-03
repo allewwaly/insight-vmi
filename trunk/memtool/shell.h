@@ -43,6 +43,7 @@ private:
     QHash<QString, Command> _commands;
 
     int exec(QString command);
+    void hline(int width = 60);
     int cmdExit(QStringList args);
     int cmdHelp(QStringList args);
     int cmdList(QStringList args);

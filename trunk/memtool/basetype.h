@@ -6,6 +6,7 @@
 #include <QString>
 #include <QVariant>
 #include "genericexception.h"
+#include "sourceref.h"
 
 class QIODevice;
 
@@ -49,7 +50,7 @@ public:
 };
 
 
-class BaseType
+class BaseType: public SourceRef
 {
 public:
     enum RealType {
@@ -64,9 +65,14 @@ public:
         rtFloat   = (1 <<  8),
         rtDouble  = (1 <<  9),
         rtPointer = (1 << 10),
-        rtStruct  = (1 << 11),
-        rtUnion   = (1 << 12)
+        rtArray   = (1 << 11),
+        rtStruct  = (1 << 12),
+        rtUnion   = (1 << 13)
     };
+
+    typedef QHash<BaseType::RealType, QString> RealTypeRevMap;
+
+    static BaseType::RealTypeRevMap getRealTypeRevMap();
 
     /**
       Constructor
@@ -101,28 +107,6 @@ public:
       @return the size of this type in bytes
      */
     uint size() const;
-
-    /**
-      @return the ID of the source file in which this type was declared
-     */
-    int srcFile() const;
-
-    /**
-      Sets the ID of the source file in which this type was declared
-      @param id new ID
-     */
-    void setSrcFile(int id);
-
-    /**
-      @return the line number at which this type was declared
-     */
-    int srcLine() const;
-
-    /**
-      Sets the line number at which this type was declared
-      @param line the new line number
-     */
-    void setSrcLine(int line);
 
     /**
       @return a string representation of this type
@@ -295,8 +279,6 @@ public:
     QIODevice* memory() const;
 
 protected:
-	int _srcFile;        ///< ID of the source file of the type's declaration
-	int _srcLine;        ///< line number within the source the type's declaration
     const QString _name;       ///< name of this type, e.g. "int"
     const quint32 _id;         ///< ID of this type, given by objdump
     const quint32 _size;       ///< size of this type in byte
@@ -339,9 +321,6 @@ protected:
 };
 
 
-typedef QHash<BaseType::RealType, QString> RealTypeRevMap;
-
-RealTypeRevMap getRealTypeRevMap();
 
 
 

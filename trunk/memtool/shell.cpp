@@ -6,7 +6,9 @@
  */
 
 #include "shell.h"
+#include <string.h>
 #include <QtAlgorithms>
+#include "compileunit.h"
 
 Shell::Shell(const KernelSymbols& symbols)
     : _sym(symbols)
@@ -131,6 +133,20 @@ int getFieldWidth(quint32 maxVal, int base = 16)
     return w;
 }
 
+void Shell::hline(int width)
+{
+	const int bufLen = 256;
+	char buf[bufLen] = { 0 };
+	// Make sure we don't overrun the buffer
+	if (width + 2 > bufLen)
+		width = bufLen - 2;
+	// Construct and terminate the string
+	memset(buf, '-', width);
+	buf[width + 2] = 0;
+
+    _out << buf << endl;
+}
+
 
 int Shell::cmdList(QStringList args)
 {
@@ -146,49 +162,60 @@ int Shell::cmdList(QStringList args)
         // Find out required field width (keys needs to be sorted for that)
         int w = getFieldWidth(keys.last());
 
-        _out << qSetFieldWidth(w) << right << "ID" << "  "
+        _out << qSetFieldWidth(w) << right << "ID" << qSetFieldWidth(0) << "  "
              << qSetFieldWidth(0) << "File" << endl;
 
-        for (int i = 0; i < 60; i++)
-            _out << "-";
-        _out << endl;
+        hline();
 
         for (int i = 0; i < keys.size(); i++) {
             CompileUnit* unit = _sym.factory().sources().value(keys[i]);
-            QString file = QString("%1/%2").arg(unit->dir()).arg(unit->file());
-            _out << qSetFieldWidth(w) << right << hex << unit->id() << "  "
-                 << qSetFieldWidth(0) << file << endl;
+            _out << qSetFieldWidth(w) << right << hex << unit->id() << qSetFieldWidth(0) << "  "
+                 << qSetFieldWidth(0) << unit->file() << endl;
         }
 
-        for (int i = 0; i < 60; i++)
-            _out << "-";
-        _out << endl;
+        hline();
         _out << "Total source files: " << keys.size() << endl;
     }
     else if (s == "types") {
-        static RealTypeRevMap tRevMap = getRealTypeRevMap();
+        static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
         const BaseTypeList& types = _sym.factory().types();
+        CompileUnit* unit = 0;
         // Find out required field width (the types are sorted by ascending ID)
         int w = getFieldWidth(types.last()->id());
 
-        _out << qSetFieldWidth(w)  << right << "ID" << "  "
+        _out << qSetFieldWidth(w)  << right << "ID" << qSetFieldWidth(0) << "  "
              << qSetFieldWidth(10) << left << "Type"
-             << qSetFieldWidth(0)  << "Name" << endl;
+             << qSetFieldWidth(24) << "Name"
+             << qSetFieldWidth(5)  << right << "Size" << qSetFieldWidth(0) << "  "
+             << qSetFieldWidth(14) << left << "Source"
+             << qSetFieldWidth(0)  << endl;
 
-        for (int i = 0; i < 60; i++)
-            _out << "-";
-        _out << endl;
+        hline();
 
+		QString src;
         for (int i = 0; i < types.size(); i++) {
             BaseType* type = types[i];
-            _out << qSetFieldWidth(w)  << right << hex << type->id() << "  "
+            // Construct name and line of the source file
+            if (type->srcFile() >= 0) {
+            	if (!unit || unit->id() != type->srcFile())
+            		unit = _sym.factory().sources().value(type->srcFile());
+            	if (!unit)
+            		src = QString("(unknown id: %1)").arg(type->srcFile());
+            	else
+            		src = QString("%1").arg(unit->file());
+            }
+            else
+            	src = "--";
+
+            _out << qSetFieldWidth(w)  << right << hex << type->id() << qSetFieldWidth(0) << "  "
                  << qSetFieldWidth(10) << left << tRevMap[type->type()]
-                 << qSetFieldWidth(0)  << (type->name().isEmpty() ? "(none)" : type->name()) << endl;
+                 << qSetFieldWidth(24) << (type->name().isEmpty() ? "(none)" : type->name())
+                 << qSetFieldWidth(5) << right << type->size() << qSetFieldWidth(0) << "  "
+                 << qSetFieldWidth(14) << left << src
+                 << qSetFieldWidth(0) << endl;
         }
 
-        for (int i = 0; i < 60; i++)
-            _out << "-";
-        _out << endl;
+        hline();
         _out << "Total types: " << types.size() << endl;
     }
     else if (s == "variables") {

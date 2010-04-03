@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
 		sym.parseSymbols(fileName);
 
 		std::cout
-            << "Read " << sym.factory().types().count() << " types from "
+            << "Read " << sym.factory().types().count() << " types declared in "
             << sym.factory().sources().count() << " source files." << std::endl;
 
 		Shell shell(sym);

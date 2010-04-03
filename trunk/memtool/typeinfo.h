@@ -84,6 +84,7 @@ typedef QHash<QString, ParamSymbolType> ParamSymMap;
 typedef QHash<QString, DataEncoding> DataEncMap;
 
 typedef QHash<HdrSymbolType, QString> HdrSymRevMap;
+typedef QHash<ParamSymbolType, QString> ParamSymRevMap;
 
 HdrSymMap getHdrSymMap();
 ParamSymMap getParamSymMap();
@@ -113,14 +114,14 @@ static const quint32 relevantHdr =
 	hsConstType |
 	hsEnumerationType |
 	hsEnumerator |
-//		hsFormalParameter |
-//		hsInlinedSubroutine |
-//		hsLabel |
-//		hsLexicalBlock |
+//	hsFormalParameter |
+//	hsInlinedSubroutine |
+//	hsLabel |
+//	hsLexicalBlock |
 	hsMember |
 	hsPointerType |
 	hsStructureType |
-//		hsSubprogram |
+//	hsSubprogram |
 	hsSubrangeType |
 	hsSubroutineType |
 	hsTypedef |
@@ -130,37 +131,36 @@ static const quint32 relevantHdr =
 	hsVolatileType;
 
 static const quint32 relevantParam =
-//	  psAbstractOrigin |
-//	  psArtificial |
+//	psAbstractOrigin |
+//	psArtificial |
 	psBitOffset |
 	psBitSize |
 	psByteSize |
-//	  psCallFile |
-//	  psCallLine |
+//	psCallFile |
+//	psCallLine |
 	psCompDir |
 	psConstValue |
 	psDataMemberLocation |
 	psDeclaration |
-//	  psDeclFile |
-//	  psDeclLine |
+	psDeclFile |
+	psDeclLine |
 	psEncoding |
-//	  psEntryPc |
-//	  psExternal |
-//	  psFrameBase |
-//	  psHighPc |
-//	  psInline |
-//	  psLanguage |
+//	psEntryPc |
+//	psExternal |
+//	psFrameBase |
+//	psHighPc |
+//	psInline |
+//	psLanguage |
 	psLocation |
-//	  psLowPc |
+//	psLowPc |
 	psName |
-//	  psProducer |
-//	  psPrototyped |
-	psRanges |
-//	  psSibling |
+//	psProducer |
+//	psPrototyped |
+//	psRanges |
+//	psSibling |
 //	psStmtList |
-	psType //|
-//	  psUpperBound
-	;
+	psType |
+	psUpperBound;
 
 
 class TypeInfo
@@ -194,8 +194,8 @@ public:
     int refTypeId() const;
     void setRefTypeId(int refTypeID);
 
-    qint32 byteSize() const;
-    void setByteSize(qint32 byteSize);
+    quint32 byteSize() const;
+    void setByteSize(quint32 byteSize);
 
     qint32 location() const;
     void setLocation(qint32 location);
@@ -209,6 +209,9 @@ public:
     DataEncoding enc() const;
     void setEnc(DataEncoding enc);
 
+    qint32 upperBound() const;
+    void setUpperBound(qint32 bount);
+
     QString dump() const;
 
 private:
@@ -218,9 +221,10 @@ private:
 	int _srcLine;            ///< holds the line number within the source file
 	int _id;                 ///< holds the ID of this symbol
 	int _refTypeId;          ///< holds the ID of the referenced symbol
-	qint32 _byteSize;        ///< holds the size in byte of this symbol
+	quint32 _byteSize;       ///< holds the size in byte of this symbol
 	qint32 _location;        ///< holds the absolute offset offset of this symbol
 	qint32 _dataMemberLoc;   ///< holds the offset relative offset of this symbol
+	qint32 _upperBound;      ///< holds the upper bound for an integer type symbol
 	HdrSymbolType _symType;  ///< holds the type of this symbol
 	DataEncoding _enc;       ///< holds the data encoding of this symbol
 };
