@@ -58,6 +58,12 @@ struct nested_struct {
 };
 
 
+int int_array10[10];
+int int_array3[] = {1, 2, 3};
+char* string = "test";
+char char_array[] = "test";
+
+
 int main(int argc, char **argv) {
 
 	printf("HZ: %d\n", HZ);
