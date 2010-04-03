@@ -10,31 +10,12 @@
 #include "numeric.h"
 #include "structured.h"
 #include "pointer.h"
+#include "array.h"
+#include "compileunit.h"
 #include "debug.h"
 
 #define factoryError(x) do { throw FactoryException((x), __FILE__, __LINE__); } while (0)
 
-CompileUnit::CompileUnit(int id, const QString& dir, const QString& file)
-    : _id(id), _dir(dir), _file(file)
-{
-}
-
-int CompileUnit::id() const
-{
-    return _id;
-}
-
-
-const QString& CompileUnit::dir() const
-{
-    return _dir;
-}
-
-
-const QString& CompileUnit::file() const
-{
-    return _file;
-}
 
 //------------------------------------------------------------------------------
 
@@ -215,22 +196,24 @@ void TypeFactory::insert(CompileUnit* unit)
 bool TypeFactory::isSymbolValid(const TypeInfo& info)
 {
 	switch (info.symType()) {
+	case hsArrayType:
+		return info.id() != -1 && info.refTypeId() != -1 && info.upperBound() != -1;
 	case hsBaseType:
 		return info.id() != -1 && info.byteSize() != -1 && info.enc() != eUndef;
-	case hsStructureType:
-		return info.id() != -1 && info.byteSize() != -1; // name not required
-	case hsMember:
-		return info.id() != -1 && info.refTypeId() != -1 && info.dataMemberLoc() != -1 && !info.name().isEmpty();
-	case hsTypedef:
-		return info.id() != -1 && info.refTypeId() != -1 && !info.name().isEmpty();
-	case hsPointerType:
-		return info.id() != -1 && info.refTypeId() != -1 && info.byteSize() != -1;
-	case hsVariable:
-		return info.id() != -1 && info.refTypeId() != -1 && info.location() != -1 && !info.name().isEmpty();
-	case hsConstType:
-		return info.id() != -1 && info.refTypeId() != -1;
 	case hsCompileUnit:
 		return info.id() != -1 && !info.name().isEmpty() && !info.srcDir().isEmpty();
+	case hsConstType:
+		return info.id() != -1 && info.refTypeId() != -1;
+	case hsMember:
+		return info.id() != -1 && info.refTypeId() != -1 && info.dataMemberLoc() != -1 && !info.name().isEmpty();
+	case hsPointerType:
+		return info.id() != -1 && info.refTypeId() != -1 && info.byteSize() != -1;
+	case hsStructureType:
+		return info.id() != -1 && info.byteSize() != -1; // name not required
+	case hsTypedef:
+		return info.id() != -1 && info.refTypeId() != -1 && !info.name().isEmpty();
+	case hsVariable:
+		return info.id() != -1 && info.refTypeId() != -1 && info.location() != -1 && !info.name().isEmpty();
 	default:
 		return false;
 	}
@@ -242,20 +225,35 @@ void TypeFactory::addSymbol(const TypeInfo& info)
 	if (!isSymbolValid(info))
 		factoryError(QString("Type information for the following symbol is incomplete:\n%1").arg(info.dump()));
 
-	BaseType *b = 0, *ref = 0;
+	SourceRef *src = 0;
+	BaseType *ref = 0;
 
 	switch(info.symType()) {
+	case hsArrayType: {
+		Array* a = getInstance<Array>(info.name(), info.id(), info.byteSize());
+		src = (SourceRef*) a;
+		a->setLength(info.upperBound());
+		if (! (ref = findById(info.refTypeId())) ) {
+			// Add this type into the waiting queue
+			_postponedTypes.insert(info.refTypeId(), a);
+		}
+		else
+			a->setRefType(ref);
+		break;
+	}
 	case hsCompileUnit: {
-		insert(new CompileUnit(info.id(), info.srcDir(), info.name()));
+		CompileUnit* c = new CompileUnit(info.id(), info.srcDir(), info.name());
+		insert(c);
 		break;
 	}
 	case hsBaseType: {
-		b = getNumericInstance(info.name(), info.id(), info.byteSize(), info.enc());
+		BaseType* n = getNumericInstance(info.name(), info.id(), info.byteSize(), info.enc());
+		src = n;
 		break;
 	}
 	case hsPointerType: {
 		Pointer* p = getInstance<Pointer>(info.name(), info.id(), info.byteSize());
-		b = p;
+		src = (SourceRef*) p;
 		if (! (ref = findById(info.refTypeId())) ) {
 			// Add this type into the waiting queue
 			_postponedTypes.insert(info.refTypeId(), p);
@@ -267,8 +265,8 @@ void TypeFactory::addSymbol(const TypeInfo& info)
 	case hsStructureType: {
 		_lastStructure = 0;
 		Struct* s = getInstance<Struct>(info.name(), info.id(), info.byteSize());
+		src = s;
 		_lastStructure = s;
-		b = s;
 		break;
 	}
 	case hsMember: {
@@ -286,6 +284,7 @@ void TypeFactory::addSymbol(const TypeInfo& info)
 
 		// Create and add the member
 		StructuredMember* m = new StructuredMember(info.name(), info.location(), ref);
+		src = m;
 		_lastStructure->addMember(m);
 		if (!ref)
 			_postponedTypes.insert(info.refTypeId(), m);
@@ -296,9 +295,9 @@ void TypeFactory::addSymbol(const TypeInfo& info)
 	}
 
 	// Set generic type information
-	if (b) {
-		b->setSrcFile(info.srcFileId());
-		b->setSrcLine(info.srcLine());
+	if (src && info.srcFileId() >= 0) {
+		src->setSrcFile(info.srcFileId());
+		src->setSrcLine(info.srcLine());
 	}
 }
 

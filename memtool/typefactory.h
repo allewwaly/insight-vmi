@@ -17,10 +17,12 @@
 class BaseType;
 class Structured;
 class ReferencingType;
+class CompileUnit;
 
 #include "numeric.h"
 #include "typeinfo.h"
 #include "genericexception.h"
+
 
 /**
   Basic exception class for all factory-related exceptions
@@ -45,22 +47,6 @@ public:
     }
 };
 
-/**
- * Holds the infomation about a compile unit, i.e., a source file.
- */
-class CompileUnit
-{
-public:
-	CompileUnit(int id, const QString& dir, const QString& file);
-
-	int id() const;
-	const QString& dir() const;
-    const QString& file() const;
-
-private:
-    const int _id;
-    const QString _dir, _file;
-};
 
 /// Hash table of all compile units
 typedef QHash<int, CompileUnit*> CompileUnitIntHash;

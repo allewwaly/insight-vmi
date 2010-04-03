@@ -1,9 +1,9 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
-#ifndef DEBUG
+//#ifndef DEBUG
 #define DEBUG 1
-#endif
+//#endif
 
 #if (DEBUG == 1)
 

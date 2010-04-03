@@ -14,9 +14,9 @@ Pointer::Pointer(const QString& name, const int id, const quint32 size,
 	: BaseType(name, id, size, memory), ReferencingType(type)
 {
 	// Make sure the host system can handle the pointer size of the guest
-	if (size > sizeof(void*)) {
+	if (size > 0 && size > sizeof(void*)) {
 		throw BaseTypeException(
-				"The guest system has wider pointers than the host system.",
+				QString("The guest system has wider pointers (%1) than the host system (%2).").arg(size).arg(sizeof(void*)),
 				__FILE__,
 				__LINE__);
 	}

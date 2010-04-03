@@ -10,8 +10,9 @@
 
 #include "basetype.h"
 #include "referencingtype.h"
+#include "sourceref.h"
 
-class StructuredMember: public ReferencingType
+class StructuredMember: public ReferencingType, public SourceRef
 {
 public:
 	/**

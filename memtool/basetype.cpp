@@ -3,7 +3,7 @@
 #include <QIODevice>
 
 BaseType::BaseType(const QString& name, int id, quint32 size, QIODevice *memory)
-        : _srcFile(-1), _srcLine(-1), _name(name), _id(id), _size(size), _memory(memory)
+        : _name(name), _id(id), _size(size), _memory(memory)
 {
 }
 
@@ -29,30 +29,6 @@ uint BaseType::size() const
 }
 
 
-int BaseType::srcFile() const
-{
-	return _srcFile;
-}
-
-
-void BaseType::setSrcFile(int id)
-{
-	_srcFile = id;
-}
-
-
-int BaseType::srcLine() const
-{
-	return _srcLine;
-}
-
-
-void BaseType::setSrcLine(int line)
-{
-	_srcLine = line;
-}
-
-
 void BaseType::setMemory(QIODevice *memory)
 {
     _memory = memory;
@@ -65,7 +41,7 @@ QIODevice* BaseType::memory() const
 }
 
 
-RealTypeRevMap getRealTypeRevMap()
+BaseType::RealTypeRevMap BaseType::getRealTypeRevMap()
 {
     RealTypeRevMap ret;
     ret.insert(BaseType::rtInt8, "Int8");
@@ -79,6 +55,7 @@ RealTypeRevMap getRealTypeRevMap()
     ret.insert(BaseType::rtFloat, "Float");
     ret.insert(BaseType::rtDouble, "Double");
     ret.insert(BaseType::rtPointer, "Pointer");
+    ret.insert(BaseType::rtArray, "Array");
     ret.insert(BaseType::rtStruct, "Struct");
     ret.insert(BaseType::rtUnion, "Union");
     return ret;
