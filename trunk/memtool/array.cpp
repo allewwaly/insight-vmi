@@ -7,9 +7,9 @@
 
 #include "array.h"
 
-Array::Array(const QString& name, const int id, const quint32 size,
+Array::Array(int id, const QString& name, const quint32 size,
         QIODevice *memory, BaseType *type, qint32 length)
-	: Pointer(name, id, size, memory, type), _length(length)
+	: Pointer(id, name, size, memory, type), _length(length)
 {
 }
 

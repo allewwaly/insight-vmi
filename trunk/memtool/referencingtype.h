@@ -17,21 +17,21 @@ public:
 	 * Constructor
 	 * @param type
 	 */
-	ReferencingType(BaseType* type = 0);
+	ReferencingType(const BaseType* type = 0);
 
     /**
      * @return the type this pointer points to
      */
-    BaseType* refType() const;
+    const BaseType* refType() const;
 
     /**
      * Set the base type this pointer points to
      * @param type new pointed type
      */
-    void setRefType(BaseType* type);
+    void setRefType(const BaseType* type);
 
 protected:
-	BaseType *_refType;
+	const BaseType *_refType;
 };
 
 #endif /* REFERENCINGTYPE_H_ */

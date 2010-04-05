@@ -22,18 +22,18 @@ public:
 
 	/**
 	 Constructor
-	 @param name name of this type, e.g. "int"
 	 @param id ID of this type, as given by objdump output
+	 @param name name of this type, e.g. "int"
 	 @param size size of this type in bytes
 	 @param memory pointer to the QFile or QBuffer to read the memory from
 	 */
-	Numeric(const QString& name, int id, quint32 size, QIODevice *memory = 0)
-		: BaseType(name, id, size, memory), _type(realType)
+	Numeric(int id, const QString& name, quint32 size, QIODevice *memory = 0)
+		: BaseType(id, name, size, memory), _type(realType)
 	{
 	}
 
 	/**
-	 @return the actual type of that polimorphic instance
+	 @return the actual type of that polimorphic variable
 	 */
 	virtual RealType type() const
 	{

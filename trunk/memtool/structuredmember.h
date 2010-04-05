@@ -22,7 +22,7 @@ public:
 	 * @param refType the data type of this member
 	 */
 	StructuredMember(const QString& innerName, size_t innerOffset,
-			BaseType* refType);
+			const BaseType* refType = 0);
 
 private:
 	QString _innerName;         ///< the member's name within the struct

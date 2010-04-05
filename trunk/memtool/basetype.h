@@ -2,9 +2,8 @@
 #define BASETYPE_H
 
 #include <sys/types.h>
-#include <QtGlobal>
-#include <QString>
 #include <QVariant>
+#include "symbol.h"
 #include "genericexception.h"
 #include "sourceref.h"
 
@@ -50,7 +49,7 @@ public:
 };
 
 
-class BaseType: public SourceRef
+class BaseType: public Symbol, public SourceRef
 {
 public:
     enum RealType {
@@ -64,10 +63,12 @@ public:
         rtUInt64  = (1 <<  7),
         rtFloat   = (1 <<  8),
         rtDouble  = (1 <<  9),
-        rtPointer = (1 << 10),
-        rtArray   = (1 << 11),
-        rtStruct  = (1 << 12),
-        rtUnion   = (1 << 13)
+        rtConst   = (1 << 10),
+        rtPointer = (1 << 11),
+        rtArray   = (1 << 12),
+        rtEnum    = (1 << 13),
+        rtStruct  = (1 << 14),
+        rtUnion   = (1 << 15)
     };
 
     typedef QHash<BaseType::RealType, QString> RealTypeRevMap;
@@ -76,32 +77,17 @@ public:
 
     /**
       Constructor
-      @param name name of this type, e.g. "int"
       @param id ID of this type, as given by objdump output
+      @param name name of this type, e.g. "int"
       @param size size of this type in bytes
       @param memory pointer to the QFile or QBuffer to read the memory from
      */
-    BaseType(const QString& name, int id, quint32 size, QIODevice *memory = 0);
-
-//    /**
-//     * Destructor
-//     */
-//    virtual ~BaseType();
+    BaseType(int id, const QString& name, quint32 size, QIODevice *memory = 0);
 
     /**
-      @return the actual type of that polimorphic instance
+      @return the actual type of that polimorphic variable
      */
     virtual RealType type() const = 0;
-
-    /**
-      @return the name of that type, e.g. "int"
-     */
-    QString name() const;
-
-    /**
-      @return id ID of this type, as given by objdump output
-     */
-    int id() const;
 
     /**
       @return the size of this type in bytes
@@ -279,10 +265,8 @@ public:
     QIODevice* memory() const;
 
 protected:
-    const QString _name;       ///< name of this type, e.g. "int"
-    const quint32 _id;         ///< ID of this type, given by objdump
     const quint32 _size;       ///< size of this type in byte
-    BaseType* _parent;         ///< enclosing struct, if this is a struct member
+//    BaseType* _parent;         ///< enclosing struct, if this is a struct member
     QIODevice *_memory;        ///< the memory dump to read all values from
 
     /**

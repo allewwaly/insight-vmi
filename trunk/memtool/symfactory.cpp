@@ -1,17 +1,19 @@
 /*
- * typefactory.cpp
+ * symfactory.cpp
  *
  *  Created on: 30.03.2010
  *      Author: chrschn
  */
 
-#include "typefactory.h"
+#include "symfactory.h"
 #include "basetype.h"
 #include "numeric.h"
 #include "structured.h"
 #include "pointer.h"
 #include "array.h"
+#include "enum.h"
 #include "compileunit.h"
+#include "variable.h"
 #include "debug.h"
 
 #define factoryError(x) do { throw FactoryException((x), __FILE__, __LINE__); } while (0)
@@ -19,18 +21,18 @@
 
 //------------------------------------------------------------------------------
 
-TypeFactory::TypeFactory()
+SymFactory::SymFactory()
 	: _lastStructure(0)
 {
 }
 
 
-TypeFactory::~TypeFactory()
+SymFactory::~SymFactory()
 {
 	clear();
 }
 
-void TypeFactory::clear()
+void SymFactory::clear()
 {
 	// Delete all compile units
 	for (CompileUnitIntHash::iterator it = _sources.begin();
@@ -39,6 +41,11 @@ void TypeFactory::clear()
 		delete it.value();
 	}
 	_sources.clear();
+
+	for (VariableList::iterator it = _vars.begin(); it != _vars.end(); ++it) {
+		delete *it;
+	}
+	_vars.clear();
 
 	// Delete all types
 	for (BaseTypeList::iterator it = _types.begin(); it != _types.end(); ++it) {
@@ -73,32 +80,19 @@ void TypeFactory::clear()
 }
 
 
-BaseType* TypeFactory::findById(int id) const
+BaseType* SymFactory::findById(int id) const
 {
 	return _typesById.value(id);
 }
 
 
-BaseType* TypeFactory::findByName(const QString & name) const
+BaseType* SymFactory::findByName(const QString & name) const
 {
 	return _typesByName.value(name);
 }
 
 
-//template<class T>
-//T* TypeFactory::getInstance(const QString& name, int id, quint32 size,
-//		QIODevice *memory)
-//{
-//	BaseType* t = findById(id);
-//	if (!t) {
-//		t = new T(name, id, size, memory);
-//		insert(t);
-//	}
-//	return dynamic_cast<T*>(t);
-//}
-
-
-BaseType* TypeFactory::getNumericInstance(const QString& name, int id,
+BaseType* SymFactory::getNumericInstance(int id, const QString& name,
 		quint32 size, DataEncoding enc, QIODevice *memory)
 {
 	BaseType* t = 0;
@@ -107,16 +101,16 @@ BaseType* TypeFactory::getNumericInstance(const QString& name, int id,
 	case eSigned:
 		switch (size) {
 		case 1:
-			t = getInstance<Int8>(name, id, size, memory);
+			t = getTypeInstance<Int8>(id, name, size, memory);
 			break;
 		case 2:
-			t = getInstance<Int16>(name, id, size, memory);
+			t = getTypeInstance<Int16>(id, name, size, memory);
 			break;
 		case 4:
-			t = getInstance<Int32>(name, id, size, memory);
+			t = getTypeInstance<Int32>(id, name, size, memory);
 			break;
 		case 8:
-			t = getInstance<Int64>(name, id, size, memory);
+			t = getTypeInstance<Int64>(id, name, size, memory);
 			break;
 		}
 		break;
@@ -124,16 +118,16 @@ BaseType* TypeFactory::getNumericInstance(const QString& name, int id,
 	case eUnsigned:
 		switch (size) {
 		case 1:
-			t = getInstance<UInt8>(name, id, size, memory);
+			t = getTypeInstance<UInt8>(id, name, size, memory);
 			break;
 		case 2:
-			t = getInstance<UInt16>(name, id, size, memory);
+			t = getTypeInstance<UInt16>(id, name, size, memory);
 			break;
 		case 4:
-			t = getInstance<UInt32>(name, id, size, memory);
+			t = getTypeInstance<UInt32>(id, name, size, memory);
 			break;
 		case 8:
-			t = getInstance<UInt64>(name, id, size, memory);
+			t = getTypeInstance<UInt64>(id, name, size, memory);
 			break;
 		}
 		break;
@@ -141,10 +135,10 @@ BaseType* TypeFactory::getNumericInstance(const QString& name, int id,
 	case eFloat:
 		switch (size) {
 		case 4:
-			t = getInstance<Float>(name, id, size, memory);
+			t = getTypeInstance<Float>(id, name, size, memory);
 			break;
 		case 8:
-			t = getInstance<Double>(name, id, size, memory);
+			t = getTypeInstance<Double>(id, name, size, memory);
 			break;
 		}
 		break;
@@ -161,8 +155,18 @@ BaseType* TypeFactory::getNumericInstance(const QString& name, int id,
 }
 
 
-void TypeFactory::insert(BaseType* type)
+Variable* SymFactory::getVarInstance(int id, const QString& name,
+		const BaseType* type, size_t offset)
 {
+	Variable* var = new Variable(id, name, type, offset);
+	insert(var);
+	return var;
+}
+
+
+void SymFactory::insert(BaseType* type)
+{
+	assert(type != 0);
 	_types.append(type);
 	_typesById.insert(type->id(), type);
 	_typesByName.insert(type->name(), type);
@@ -187,111 +191,133 @@ void TypeFactory::insert(BaseType* type)
 }
 
 
-void TypeFactory::insert(CompileUnit* unit)
+void SymFactory::insert(CompileUnit* unit)
 {
+	assert(unit != 0);
 	_sources.insert(unit->id(), unit);
 }
 
 
-bool TypeFactory::isSymbolValid(const TypeInfo& info)
+void SymFactory::insert(Variable* var)
+{
+	assert(var != 0);
+	// Check if this variable already exists
+	if (_varsByName.contains(var->name())) {
+		factoryError(QString("A variable with name %1 has already been added.").arg(var->name()));
+	}
+	_vars.append(var);
+	_varsByName.insert(var->name(), var);
+}
+
+
+bool SymFactory::isSymbolValid(const TypeInfo& info)
 {
 	switch (info.symType()) {
 	case hsArrayType:
 		return info.id() != -1 && info.refTypeId() != -1 && info.upperBound() != -1;
 	case hsBaseType:
-		return info.id() != -1 && info.byteSize() != -1 && info.enc() != eUndef;
+		return info.id() != -1 && info.byteSize() > 0 && info.enc() != eUndef;
 	case hsCompileUnit:
 		return info.id() != -1 && !info.name().isEmpty() && !info.srcDir().isEmpty();
 	case hsConstType:
 		return info.id() != -1 && info.refTypeId() != -1;
+	case hsEnumerationType:
+		return info.id() != -1 && !info.enumValues().isEmpty();
 	case hsMember:
 		return info.id() != -1 && info.refTypeId() != -1 && info.dataMemberLoc() != -1 && !info.name().isEmpty();
 	case hsPointerType:
-		return info.id() != -1 && info.refTypeId() != -1 && info.byteSize() != -1;
+		return info.id() != -1 && info.refTypeId() != -1 && info.byteSize() > 0;
 	case hsStructureType:
-		return info.id() != -1 && info.byteSize() != -1; // name not required
+		return info.id() != -1 && info.byteSize() > 0; // name not required
 	case hsTypedef:
 		return info.id() != -1 && info.refTypeId() != -1 && !info.name().isEmpty();
 	case hsVariable:
-		return info.id() != -1 && info.refTypeId() != -1 && info.location() != -1 && !info.name().isEmpty();
+		return info.id() != -1 && info.refTypeId() != -1 && info.location() > 0 && !info.name().isEmpty();
 	default:
 		return false;
 	}
 }
 
 
-void TypeFactory::addSymbol(const TypeInfo& info)
+void SymFactory::addSymbol(const TypeInfo& info)
 {
 	if (!isSymbolValid(info))
 		factoryError(QString("Type information for the following symbol is incomplete:\n%1").arg(info.dump()));
 
-	SourceRef *src = 0;
-	BaseType *ref = 0;
+	SourceRef* src = 0;
+	BaseType* base = 0;
+	ReferencingType* ref = 0;
 
 	switch(info.symType()) {
 	case hsArrayType: {
-		Array* a = getInstance<Array>(info.name(), info.id(), info.byteSize());
-		src = (SourceRef*) a;
+		Array* a = getTypeInstance<Array>(info.id(), info.name(), info.byteSize());
+		src = a;
+		ref = a;
 		a->setLength(info.upperBound());
-		if (! (ref = findById(info.refTypeId())) ) {
-			// Add this type into the waiting queue
-			_postponedTypes.insert(info.refTypeId(), a);
-		}
-		else
-			a->setRefType(ref);
-		break;
-	}
-	case hsCompileUnit: {
-		CompileUnit* c = new CompileUnit(info.id(), info.srcDir(), info.name());
-		insert(c);
 		break;
 	}
 	case hsBaseType: {
-		BaseType* n = getNumericInstance(info.name(), info.id(), info.byteSize(), info.enc());
+		BaseType* n = getNumericInstance(info.id(), info.name(), info.byteSize(), info.enc());
 		src = n;
 		break;
 	}
-	case hsPointerType: {
-		Pointer* p = getInstance<Pointer>(info.name(), info.id(), info.byteSize());
-		src = (SourceRef*) p;
-		if (! (ref = findById(info.refTypeId())) ) {
-			// Add this type into the waiting queue
-			_postponedTypes.insert(info.refTypeId(), p);
-		}
+	case hsCompileUnit: {
+		CompileUnit* c = new CompileUnit(info.id(), info.name(), info.srcDir());
+		insert(c);
+		break;
+	}
+	case hsEnumerationType: {
+		Enum* e = getTypeInstance<Enum>(info.id(), info.name(), info.byteSize());
+		src = e;
+		e->setEnumValues(info.enumValues());
+		break;
+	}
+	case hsMember: {
+		// Create and add the member
+		StructuredMember* m = new StructuredMember(info.name(), info.location());
+		src = m;
+		ref = m;
+
+		if (!_lastStructure)
+			factoryError(QString("Parent structure/union 0x%1 not found for member %2").arg(info.refTypeId(), 0, 16).arg(info.name()));
 		else
-			p->setRefType(ref);
+			_lastStructure->addMember(m);
+		break;
+	}
+	case hsPointerType: {
+		Pointer* p = getTypeInstance<Pointer>(info.id(), info.name(), info.byteSize());
+		src = p;
+		ref = p;
 		break;
 	}
 	case hsStructureType: {
 		_lastStructure = 0;
-		Struct* s = getInstance<Struct>(info.name(), info.id(), info.byteSize());
+		Struct* s = getTypeInstance<Struct>(info.id(), info.name(), info.byteSize());
 		src = s;
 		_lastStructure = s;
 		break;
 	}
-	case hsMember: {
-		// If the last struct or union doesn't fit, try to find the real one
-//		if (!_lastStructure || _lastStructure->id() != info.refTypeId()) {
-//			_lastStructure = dynamic_cast<Structured*>(findById(info.refTypeId()));
-		if (!_lastStructure)
-			factoryError(QString("Referenced type 0x%1 not found for member %2").arg(info.refTypeId(), 0, 16).arg(info.name()));
-//			debugmsg("Had to look up the struct " << _lastStructure->name() << " for member " << info.name());
-//		}
-		// Find the referenced type
-		ref = findById(info.refTypeId());
-//			factoryError(QString("Did not find referenced type 0x%1, required by 0x%2").arg(info.refTypeId(), 0, 16).arg(info.id(), 0, 16));
-//			_postponedTypes.insert(info.refTypeId(), )
-
-		// Create and add the member
-		StructuredMember* m = new StructuredMember(info.name(), info.location(), ref);
-		src = m;
-		_lastStructure->addMember(m);
-		if (!ref)
-			_postponedTypes.insert(info.refTypeId(), m);
+	case hsVariable: {
+		Variable* i = getVarInstance(info.id(), info.name(), 0, info.location());
+		src = i;
+		ref = i;
 		break;
 	}
-	default:
+	default: {
+		HdrSymRevMap map = invertHash(getHdrSymMap());
+		factoryError(QString("We don't handle header type %1, but we should!").arg(map[info.symType()]));
 		break;
+	}
+	}
+
+	// Add the base-type that this type is referencing
+	if (ref) {
+		if (! (base = findById(info.refTypeId())) ) {
+			// Add this type into the waiting queue
+			_postponedTypes.insert(info.refTypeId(), ref);
+		}
+		else
+			ref->setRefType(base);
 	}
 
 	// Set generic type information

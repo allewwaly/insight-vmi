@@ -12,7 +12,7 @@
 #include <QRegExp>
 #include <QHash>
 #include "typeinfo.h"
-#include "typefactory.h"
+#include "symfactory.h"
 //#include "compileunit.h"
 #include "debug.h"
 
@@ -20,7 +20,7 @@
 
 
 
-KernelSymbols::Parser::Parser(QIODevice* from, TypeFactory* factory)
+KernelSymbols::Parser::Parser(QIODevice* from, SymFactory* factory)
 	: _from(from), _factory(factory), _line(0)
 {
 }
@@ -80,7 +80,8 @@ void KernelSymbols::Parser::parse()
 	QString val, line;
 	HdrSymbolType hdrSym = hsUnknownSymbol;
 	ParamSymbolType paramSym;
-	TypeInfo info;
+	TypeInfo info, subInfo;  // Holds the main type and sub-type information
+	TypeInfo* pInfo = &info; // Points to the type that is acutally parsed: info or subInfo
 	qint32 i;
 	int curSrcID = -1;
 
@@ -103,23 +104,47 @@ void KernelSymbols::Parser::parse()
 				parserError(QString("Unknown debug symbol type encountered: %1").arg(rxHdr.cap(2)));
 
 			// See if we have to finish the last symbol before we continue parsing
-			// The hsSubrangeType is just added to the  current info, so no new
-			// info is created
-			if (isRelevant && hdrSym != hsSubrangeType) {
-				_factory->addSymbol(info);
-				// Reset all data for a new symbol
-				info.clear();
+			if (isRelevant) {
+				// See if this is a sub-type of a multi-part type, if yes, merge
+				// its data with the "main" info
+				if (subInfo.symType()) {
+					switch (subInfo.symType()) {
+					case hsSubrangeType:
+						// We ignore subInfo.type() for now...
+						info.setUpperBound(subInfo.upperBound());
+						break;
+					case hsEnumerator:
+						info.addEnumValue(subInfo.name(), subInfo.constValue());
+						break;
+					default:
+						parserError(QString("Unhandled sub-type: %1").arg(subInfo.symType()));
+					}
+					subInfo.clear();
+				}
+				// If this is a symbol for a multi-part type, continue parsing
+				// and save data into subInfo
+				if (hdrSym & (hsSubrangeType|hsEnumerator)) {
+					pInfo = &subInfo;
+				}
+				// Otherwise finish the main-symbol and save parsed data into
+				// main symbol (again).
+				else {
+					_factory->addSymbol(info);
+					pInfo = &info;
+					// Reset all data for a new symbol
+					pInfo->clear();
+				}
 				isRelevant = false;
 			}
 
 			// Are we interested in this symbol?
-			if ( (isRelevant = (hdrSym & relevantHdr)) && hdrSym != hsSubrangeType ) {
-				info.setSymType(hdrSym);
+			if ( (isRelevant = (hdrSym & relevantHdr)) ) {
+				pInfo->setSymType(hdrSym);
 				parseInt16(i, rxHdr.cap(1), &ok);
-				info.setId(i);
-				// If this is a compile unit, save its ID
+				pInfo->setId(i);
+				// If this is a compile unit, save its ID locally
 				if (hdrSym == hsCompileUnit)
-					curSrcID = info.id();
+					curSrcID = pInfo->id();
 			}
 		}
 		// Next see if this matches a parameter
@@ -132,63 +157,64 @@ void KernelSymbols::Parser::parse()
 				switch (paramSym) {
 				case psByteSize: {
 					parseInt10(i, val, &ok);
-					info.setByteSize(i);
+					pInfo->setByteSize(i);
 					break;
 				}
 				case psCompDir: {
 					rxParamStr.exactMatch(val);
-					info.setSrcDir(rxParamStr.cap(1));
+					pInfo->setSrcDir(rxParamStr.cap(1));
+					break;
+				}
+				case psConstValue: {
+					parseInt10(i, val, &ok);
+					pInfo->setConstValue(i);
 					break;
 				}
 				case psDeclFile: {
 //					parseInt10(i, val, &ok);
-//					info.setSrcFileId(i);
+//					pInfo->setSrcFileId(i);
 					// Ignore real value, use curSrcID instead
-					info.setSrcFileId(curSrcID);
+					pInfo->setSrcFileId(curSrcID);
 					break;
 				}
 				case psDeclLine: {
 					parseInt10(i, val, &ok);
-					info.setSrcLine(i);
+					pInfo->setSrcLine(i);
 					break;
 				}
 				case psEncoding: {
 					rxEnc.exactMatch(val);
-					info.setEnc(encMap.value(rxEnc.cap(1)));
+					pInfo->setEnc(encMap.value(rxEnc.cap(1)));
 					break;
 				}
 				case psLocation: {
 					rxLocation.exactMatch(val);
 					// This one is hex-encoded
 					parseInt16(i, rxLocation.cap(1), &ok);
-					info.setLocation(i);
+					pInfo->setLocation(i);
 					break;
 				}
 				case psDataMemberLocation: {
 					rxLocation.exactMatch(val);
 					// This one is decimal encoded
 					parseInt10(i, rxLocation.cap(1), &ok);
-					info.setDataMemberLoc(i);
+					pInfo->setDataMemberLoc(i);
 					break;
 				}
 				case psName: {
 					rxParamStr.exactMatch(val);
-					info.setName(rxParamStr.cap(1));
+					pInfo->setName(rxParamStr.cap(1));
 					break;
 				}
 				case psType: {
-					// Ignore this parameter for hsSubrangeType, because this
-					// would overwrite the array's base type previously parsed
-					if (hdrSym != hsSubrangeType) {
-						rxId.exactMatch(val);
-						parseInt16(i, rxId.cap(1), &ok);
-						info.setRefTypeId(i);
-					}
+					rxId.exactMatch(val);
+					parseInt16(i, rxId.cap(1), &ok);
+					pInfo->setRefTypeId(i);
 					break;
 				}
 				case psUpperBound: {
 					parseInt10(i, val, &ok);
-					info.setUpperBound(i);
+					pInfo->setUpperBound(i);
 					break;
 				}
 				default: {
@@ -237,7 +263,7 @@ void KernelSymbols::parseSymbols(QIODevice* from)
 		parser.parse();
 	}
 	catch (...) {
-		debugerr("Exception caught at input line " << parser.line());
+		debugerr("Exception caught at input line " << parser.line() << " of the debug symbols");
 		throw;
 	}
 };
@@ -255,7 +281,7 @@ void KernelSymbols::parseSymbols(const QString& fileName)
 }
 
 
-const TypeFactory& KernelSymbols::factory() const
+const SymFactory& KernelSymbols::factory() const
 {
     return _factory;
 }

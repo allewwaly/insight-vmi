@@ -1,15 +1,15 @@
 /*
- * pointer.cpp
+ * consttype.cpp
  *
- *  Created on: 30.03.2010
+ *  Created on: 05.04.2010
  *      Author: chrschn
  */
 
-#include "pointer.h"
+#include "consttype.h"
 
 #include <assert.h>
 
-Pointer::Pointer(int id, const QString& name, const quint32 size,
+ConstType::ConstType(int id, const QString& name, const quint32 size,
         QIODevice *memory, const BaseType *type)
 	: BaseType(id, name, size, memory), ReferencingType(type)
 {
@@ -23,18 +23,14 @@ Pointer::Pointer(int id, const QString& name, const quint32 size,
 }
 
 
-BaseType::RealType Pointer::type() const
+BaseType::RealType ConstType::type() const
 {
-	return rtPointer;
+	return rtConst;
 }
 
 
-QString Pointer::toString(size_t offset) const
+QString ConstType::toString(size_t offset) const
 {
-	if (_size == 4) {
-		return "0x" + QString::number(value<quint32>(offset), 16);
-	}
-	else {
-		return "0x" + QString::number(value<quint64>(offset), 16);
-	}
+	assert(_refType != 0);
+	return _refType->toString(offset);
 }

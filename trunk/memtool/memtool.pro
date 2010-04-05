@@ -1,4 +1,6 @@
-SOURCES += array.cpp \
+SOURCES += consttype.cpp \
+    symbol.cpp \
+    array.cpp \
     compileunit.cpp \
     sourceref.cpp \
     shell.cpp \
@@ -8,14 +10,17 @@ SOURCES += array.cpp \
     structuredmember.cpp \
     structured.cpp \
     typeinfo.cpp \
-    typefactory.cpp \
+    symfactory.cpp \
     kernelsymbols.cpp \
-    instance.cpp \
+    variable.cpp \
     pointer.cpp \
     numeric.cpp \
     main.cpp \
-    basetype.cpp
-HEADERS += array.h \
+    basetype.cpp \
+    enum.cpp
+HEADERS += consttype.h \
+    symbol.h \
+    array.h \
     compileunit.h \
     sourceref.h \
     shell.h \
@@ -25,10 +30,11 @@ HEADERS += array.h \
     structuredmember.h \
     structured.h \
     typeinfo.h \
-    typefactory.h \
+    symfactory.h \
     kernelsymbols.h \
-    instance.h \
+    variable.h \
     pointer.h \
     numeric.h \
-    basetype.h
+    basetype.h \
+    enum.h
 CONFIG += console

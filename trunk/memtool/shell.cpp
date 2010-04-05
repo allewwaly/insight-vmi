@@ -170,7 +170,7 @@ int Shell::cmdList(QStringList args)
         for (int i = 0; i < keys.size(); i++) {
             CompileUnit* unit = _sym.factory().sources().value(keys[i]);
             _out << qSetFieldWidth(w) << right << hex << unit->id() << qSetFieldWidth(0) << "  "
-                 << qSetFieldWidth(0) << unit->file() << endl;
+                 << qSetFieldWidth(0) << unit->name() << endl;
         }
 
         hline();
@@ -202,7 +202,7 @@ int Shell::cmdList(QStringList args)
             	if (!unit)
             		src = QString("(unknown id: %1)").arg(type->srcFile());
             	else
-            		src = QString("%1").arg(unit->file());
+            		src = QString("%1").arg(unit->name());
             }
             else
             	src = "--";
