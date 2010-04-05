@@ -8,19 +8,19 @@
 #include "referencingtype.h"
 #include <assert.h>
 
-ReferencingType::ReferencingType(BaseType* type)
+ReferencingType::ReferencingType(const BaseType* type)
 	: _refType(type)
 {
 }
 
 
-BaseType* ReferencingType::refType() const
+const BaseType* ReferencingType::refType() const
 {
 	return _refType;
 }
 
 
-void ReferencingType::setRefType(BaseType* type)
+void ReferencingType::setRefType(const BaseType* type)
 {
 	assert(type != 0);
 	_refType = type;

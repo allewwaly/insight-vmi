@@ -8,7 +8,7 @@
 #ifndef KERNELSYMBOLS_H_
 #define KERNELSYMBOLS_H_
 
-#include "typefactory.h"
+#include "symfactory.h"
 #include <QHash>
 #include "genericexception.h"
 
@@ -42,14 +42,14 @@ private:
 	class Parser
 	{
 	public:
-		Parser(QIODevice* from, TypeFactory* factory);
+		Parser(QIODevice* from, SymFactory* factory);
 		void parse();
 
 		quint32 line() const;
 
 	private:
 		QIODevice* _from;
-		TypeFactory* _factory;
+		SymFactory* _factory;
 		quint32 _line;
 	};
 
@@ -61,10 +61,10 @@ public:
 	void parseSymbols(QIODevice* from);
 	void parseSymbols(const QString& fileName);
 
-    const TypeFactory& factory() const;
+    const SymFactory& factory() const;
 
 private:
-	TypeFactory _factory;
+	SymFactory _factory;
 };
 
 #endif /* KERNELSYMBOLS_H_ */

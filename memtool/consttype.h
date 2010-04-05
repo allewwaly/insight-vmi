@@ -1,20 +1,20 @@
 /*
- * pointer.h
+ * consttype.h
  *
- *  Created on: 30.03.2010
+ *  Created on: 05.04.2010
  *      Author: chrschn
  */
 
-#ifndef POINTER_H_
-#define POINTER_H_
+#ifndef CONSTTYPE_H_
+#define CONSTTYPE_H_
 
 #include "basetype.h"
 #include "referencingtype.h"
 
-class Pointer: public BaseType, public ReferencingType
+class ConstType: public BaseType, public ReferencingType
 {
 public:
-    Pointer(int id, const QString & name, quint32 size, QIODevice *memory = 0,
+	ConstType(int id, const QString & name, quint32 size = 0, QIODevice *memory = 0,
     		const BaseType *type = 0);
 
 	/**
@@ -28,4 +28,5 @@ public:
 	virtual QString toString(size_t offset) const;
 };
 
-#endif /* POINTER_H_ */
+
+#endif /* CONSTTYPE_H_ */

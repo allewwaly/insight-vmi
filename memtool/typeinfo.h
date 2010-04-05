@@ -10,6 +10,7 @@
 
 #include <QString>
 #include <QHash>
+#include <sys/types.h>
 
 enum HdrSymbolType {
 	hsUnknownSymbol         = 0,         // Start with 0 for any unknown symbol
@@ -166,6 +167,8 @@ static const quint32 relevantParam =
 class TypeInfo
 {
 public:
+	typedef QHash<qint32, QString> EnumHash;
+
 	/**
 	 * Constructor
 	 */
@@ -197,8 +200,8 @@ public:
     quint32 byteSize() const;
     void setByteSize(quint32 byteSize);
 
-    qint32 location() const;
-    void setLocation(qint32 location);
+    size_t location() const;
+    void setLocation(size_t location);
 
     qint32 dataMemberLoc() const;
     void setDataMemberLoc(qint32 location);
@@ -210,7 +213,13 @@ public:
     void setEnc(DataEncoding enc);
 
     qint32 upperBound() const;
-    void setUpperBound(qint32 bount);
+    void setUpperBound(qint32 bound);
+
+    qint32 constValue() const;
+    void setConstValue(qint32 value);
+
+    const EnumHash& enumValues() const;
+    void addEnumValue(const QString& name, qint32 value);
 
     QString dump() const;
 
@@ -222,9 +231,11 @@ private:
 	int _id;                 ///< holds the ID of this symbol
 	int _refTypeId;          ///< holds the ID of the referenced symbol
 	quint32 _byteSize;       ///< holds the size in byte of this symbol
-	qint32 _location;        ///< holds the absolute offset offset of this symbol
+	size_t _location;        ///< holds the absolute offset offset of this symbol
 	qint32 _dataMemberLoc;   ///< holds the offset relative offset of this symbol
 	qint32 _upperBound;      ///< holds the upper bound for an integer type symbol
+	qint32 _constValue;      ///< holds the value of an enumerator symbol
+	QHash<qint32, QString> _enumValues; ///< holds the enumeration values, if this symbol is an enumeration
 	HdrSymbolType _symType;  ///< holds the type of this symbol
 	DataEncoding _enc;       ///< holds the data encoding of this symbol
 };

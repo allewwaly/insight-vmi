@@ -10,7 +10,7 @@
 #include <assert.h>
 
 StructuredMember::StructuredMember(const QString& innerName, size_t innerOffset,
-		BaseType* refType)
+		const BaseType* refType)
 	: ReferencingType(refType), _innerName(innerName), _innerOffset(innerOffset)
 {
 }

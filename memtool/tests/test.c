@@ -63,6 +63,12 @@ int int_array3[] = {1, 2, 3};
 char* string = "test";
 char char_array[] = "test";
 
+enum SomeEnum {
+	seOne,
+	seTwo,
+	seThree
+} some_enum_inst;
+
 
 int main(int argc, char **argv) {
 

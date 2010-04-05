@@ -2,24 +2,9 @@
 
 #include <QIODevice>
 
-BaseType::BaseType(const QString& name, int id, quint32 size, QIODevice *memory)
-        : _name(name), _id(id), _size(size), _memory(memory)
+BaseType::BaseType(int id, const QString& name, quint32 size, QIODevice *memory)
+        : Symbol(id, name), _size(size), _memory(memory)
 {
-}
-
-
-//BaseType::~BaseType();
-
-
-QString BaseType::name() const
-{
-    return _name;
-}
-
-
-int BaseType::id() const
-{
-    return _id;
 }
 
 

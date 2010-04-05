@@ -20,10 +20,13 @@ void TypeInfo::clear()
 	_name.clear();
 	_id = _refTypeId = -1;
 	_byteSize = 0;
-	_location = _upperBound = -1;
+	_location = 0;
+	_upperBound = -1;
+	_constValue = -1;
 	_symType = hsUnknownSymbol;
 	_srcDir.clear();
 	_srcFileId = _srcLine = -1;
+	_enumValues.clear();
 }
 
 
@@ -110,13 +113,13 @@ void TypeInfo::setByteSize(quint32 byteSize)
 }
 
 
-qint32 TypeInfo::location() const
+size_t TypeInfo::location() const
 {
     return _location;
 }
 
 
-void TypeInfo::setLocation(qint32 location)
+void TypeInfo::setLocation(size_t location)
 {
     this->_location = location;
 }
@@ -169,6 +172,29 @@ void TypeInfo::setUpperBound(qint32 bound)
 	_upperBound = bound;
 }
 
+qint32 TypeInfo::constValue() const
+{
+	return _constValue;
+}
+
+
+void TypeInfo::setConstValue(qint32 value)
+{
+	_constValue = value;
+}
+
+
+const TypeInfo::EnumHash& TypeInfo::enumValues() const
+{
+	return _enumValues;
+}
+
+
+void TypeInfo::addEnumValue(const QString& name, qint32 value)
+{
+	_enumValues.insert(value, name);
+}
+
 
 QString TypeInfo::dump() const
 {
@@ -190,7 +216,7 @@ QString TypeInfo::dump() const
 	if (!_name.isEmpty())    ret += QString("  name:          %1\n").arg(_name);
 	if (_byteSize > 0)       ret += QString("  byteSize:      %1\n").arg(_byteSize);
 	if (_enc > 0)            ret += QString("  enc:           %1 (%2)\n").arg(_enc).arg(enc);
-	if (_location >= 0)      ret += QString("  location:      %1\n").arg(_location);
+	if (_location > 0)       ret += QString("  location:      %1\n").arg(_location);
 	if (_dataMemberLoc >= 0) ret += QString("  dataMemberLoc: %1\n").arg(_dataMemberLoc);
 	if (_refTypeId >= 0)     ret += QString("  refType:       0x%1\n").arg(_refTypeId, 0, 16);
 	if (_upperBound >= 0)    ret += QString("  upperBound:    %1\n").arg(_upperBound);

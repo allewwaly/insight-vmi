@@ -7,25 +7,13 @@
 
 #include "compileunit.h"
 
-CompileUnit::CompileUnit(int id, const QString& dir, const QString& file)
-    : _id(id), _dir(dir), _file(file)
+CompileUnit::CompileUnit(int id, const QString& name, const QString& dir)
+    : Symbol(id, name), _dir(dir)
 {
-}
-
-
-int CompileUnit::id() const
-{
-    return _id;
 }
 
 
 const QString& CompileUnit::dir() const
 {
     return _dir;
-}
-
-
-const QString& CompileUnit::file() const
-{
-    return _file;
 }
