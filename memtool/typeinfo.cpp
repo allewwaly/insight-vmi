@@ -20,6 +20,7 @@ void TypeInfo::clear()
 	_name.clear();
 	_id = _refTypeId = -1;
 	_byteSize = 0;
+	_bitSize = _bitOffset = -1;
 	_location = 0;
 	_upperBound = -1;
 	_constValue = -1;
@@ -110,6 +111,30 @@ quint32 TypeInfo::byteSize() const
 void TypeInfo::setByteSize(quint32 byteSize)
 {
     this->_byteSize = byteSize;
+}
+
+
+int TypeInfo::bitSize() const
+{
+    return _bitSize;
+}
+
+
+void TypeInfo::setBitSize(int bitSize)
+{
+    _bitSize = bitSize;
+}
+
+
+int TypeInfo::bitOffset() const
+{
+    return _bitOffset;
+}
+
+
+void TypeInfo::setBitOffset(int bitOffset)
+{
+    _bitOffset = bitOffset;
 }
 
 
@@ -215,6 +240,8 @@ QString TypeInfo::dump() const
 	if (_symType >= 0)       ret += QString("  symType:       %1 (%2)\n").arg(_symType).arg(symType);
 	if (!_name.isEmpty())    ret += QString("  name:          %1\n").arg(_name);
 	if (_byteSize > 0)       ret += QString("  byteSize:      %1\n").arg(_byteSize);
+    if (_bitSize >= 0)       ret += QString("  bitSize :      %1\n").arg(_bitSize);
+    if (_bitOffset >= 0)     ret += QString("  bitOffset :    %1\n").arg(_bitOffset);
 	if (_enc > 0)            ret += QString("  enc:           %1 (%2)\n").arg(_enc).arg(enc);
 	if (_location > 0)       ret += QString("  location:      %1\n").arg(_location);
 	if (_dataMemberLoc >= 0) ret += QString("  dataMemberLoc: %1\n").arg(_dataMemberLoc);
@@ -298,6 +325,7 @@ DataEncMap getDataEncMap()
 	DataEncMap ret;
 	ret.insert("float", eFloat);
 	ret.insert("signed", eSigned);
+	ret.insert("boolean", eBoolean);
 	ret.insert("unsigned", eUnsigned);
 	return ret;
 }

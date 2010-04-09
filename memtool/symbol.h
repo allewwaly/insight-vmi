@@ -8,7 +8,7 @@
 #ifndef SYMBOL_H_
 #define SYMBOL_H_
 
-#include <QString>
+#include "typeinfo.h"
 
 /**
  * This class represents a generic debugging symbol read from the objdump output.
@@ -18,11 +18,9 @@ class Symbol
 public:
 	/**
 	 * Constructor
-	 * @param id
-	 * @param name
-	 * @return
+     * @param info the type information to construct this type from
 	 */
-	Symbol(int id, const QString& name = QString());
+	Symbol(const TypeInfo& info);
 
 	/**
 	 * Destructor
@@ -32,13 +30,13 @@ public:
     /**
      * @return the name of that type, e.g. "int"
      */
-    const QString& name() const;
+    virtual QString name() const;
 
     /**
      * Set the name of this symbol
      * @param name new name
      */
-    void setName(const QString& name);
+    virtual void setName(const QString& name);
 
     /**
       @return id ID of this type, as given by objdump output

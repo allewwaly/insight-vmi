@@ -7,9 +7,8 @@
 
 #include "array.h"
 
-Array::Array(int id, const QString& name, const quint32 size,
-        QIODevice *memory, BaseType *type, qint32 length)
-	: Pointer(id, name, size, memory, type), _length(length)
+Array::Array(const TypeInfo& info)
+	: Pointer(info), _length(info.upperBound() < 0 ? -1 : info.upperBound() + 1)
 {
 }
 
@@ -17,6 +16,16 @@ Array::Array(int id, const QString& name, const quint32 size,
 BaseType::RealType Array::type() const
 {
 	return rtArray;
+}
+
+
+QString Array::name() const
+{
+    QString len = (_length >= 0) ? QString::number(_length) : QString();
+    if (_refType)
+        return QString("%1[%2]").arg(_refType->name()).arg(len);
+    else
+        return QString("[%1]").arg(len);
 }
 
 

@@ -7,8 +7,8 @@
 
 #include "symbol.h"
 
-Symbol::Symbol(int id, const QString& name)
-	: _id(id), _name(name)
+Symbol::Symbol(const TypeInfo& info)
+	: _id(info.id()), _name(info.name())
 {
 }
 
@@ -18,7 +18,7 @@ Symbol::~Symbol()
 }
 
 
-const QString& Symbol::name() const
+QString Symbol::name() const
 {
 	return _name;
 }

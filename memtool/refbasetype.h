@@ -1,28 +1,24 @@
 /*
- * pointer.h
+ * refbasetype.h
  *
- *  Created on: 30.03.2010
+ *  Created on: 05.04.2010
  *      Author: chrschn
  */
 
-#ifndef POINTER_H_
-#define POINTER_H_
+#ifndef REFBASETYPE_H_
+#define REFBASETYPE_H_
 
-#include "refbasetype.h"
+#include "basetype.h"
+#include "referencingtype.h"
 
-class Pointer: public RefBaseType
+class RefBaseType: public BaseType, public ReferencingType
 {
 public:
     /**
       Constructor
       @param info the type information to construct this type from
      */
-    Pointer(const TypeInfo& info);
-
-	/**
-	 @return the actual type of that polimorphic variable
-	 */
-	virtual RealType type() const;
+    RefBaseType(const TypeInfo& info);
 
     /**
      * @return the name of that type, e.g. "int"
@@ -30,9 +26,15 @@ public:
     virtual QString name() const;
 
     /**
+      @return the size of this type in bytes
+     */
+    virtual uint size() const;
+
+	/**
 	 @return a string representation of this type
 	 */
 	virtual QString toString(size_t offset) const;
 };
 
-#endif /* POINTER_H_ */
+
+#endif /* REFBASETYPE_H_ */

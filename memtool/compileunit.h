@@ -16,7 +16,11 @@
 class CompileUnit: public Symbol
 {
 public:
-	CompileUnit(int id, const QString& name, const QString& dir);
+    /**
+      Constructor
+      @param info the type information to construct this type from
+     */
+    CompileUnit(const TypeInfo& info);
 
 	const QString& dir() const;
 

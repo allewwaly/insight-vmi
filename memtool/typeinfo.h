@@ -76,7 +76,8 @@ enum DataEncoding {
 	eUndef     = 0,         // Start with 0 for any unknown symbol
 	eSigned    = (1 << 0),  // This represents first "real" symbol
 	eUnsigned  = (1 << 1),
-	eFloat     = (1 << 2)
+	eBoolean   = (1 << 2),
+	eFloat     = (1 << 3)
 };
 
 
@@ -142,7 +143,7 @@ static const quint32 relevantParam =
 	psCompDir |
 	psConstValue |
 	psDataMemberLocation |
-	psDeclaration |
+//	psDeclaration |
 	psDeclFile |
 	psDeclLine |
 	psEncoding |
@@ -200,6 +201,12 @@ public:
     quint32 byteSize() const;
     void setByteSize(quint32 byteSize);
 
+    int bitSize() const;
+    void setBitSize(int bitSize);
+
+    int bitOffset() const;
+    void setBitOffset(int bitOffset);
+
     size_t location() const;
     void setLocation(size_t location);
 
@@ -231,6 +238,8 @@ private:
 	int _id;                 ///< holds the ID of this symbol
 	int _refTypeId;          ///< holds the ID of the referenced symbol
 	quint32 _byteSize;       ///< holds the size in byte of this symbol
+	int _bitSize;            ///< holds the number of bits for a bit-split struct
+	int _bitOffset;          ///< holds the bit offset for a bit-split struct
 	size_t _location;        ///< holds the absolute offset offset of this symbol
 	qint32 _dataMemberLoc;   ///< holds the offset relative offset of this symbol
 	qint32 _upperBound;      ///< holds the upper bound for an integer type symbol

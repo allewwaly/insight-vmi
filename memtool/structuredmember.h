@@ -15,14 +15,11 @@
 class StructuredMember: public ReferencingType, public SourceRef
 {
 public:
-	/**
-	 * Constructor for a member within a struct
-	 * @param innerName the member's name within the struct
-	 * @param innerOffset the member's offset within the struct;
-	 * @param refType the data type of this member
-	 */
-	StructuredMember(const QString& innerName, size_t innerOffset,
-			const BaseType* refType = 0);
+    /**
+      Constructor
+      @param info the type information to construct this type from
+     */
+    StructuredMember(const TypeInfo& info);
 
 private:
 	QString _innerName;         ///< the member's name within the struct

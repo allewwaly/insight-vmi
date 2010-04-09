@@ -7,8 +7,8 @@
 
 #include "enum.h"
 
-Enum::Enum(int id, const QString& name, quint32 size, QIODevice *memory)
-	: BaseType(id, name, size, memory)
+Enum::Enum(const TypeInfo& info)
+	: BaseType(info), _enumValues(info.enumValues())
 {
 }
 

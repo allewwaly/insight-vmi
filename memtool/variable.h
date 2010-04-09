@@ -22,7 +22,11 @@ class BaseType;
 class Variable: public Symbol, public ReferencingType, public SourceRef
 {
 public:
-	Variable(int id, const QString& name, const BaseType* type, size_t offset);
+    /**
+      Constructor
+      @param info the type information to construct this type from
+     */
+    Variable(const TypeInfo& info);
 
 	template<class T>
 	QVariant toVariant() const;

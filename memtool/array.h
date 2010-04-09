@@ -13,13 +13,21 @@
 class Array: public Pointer
 {
 public:
-	Array(int id, const QString & name, quint32 size, QIODevice *memory = 0,
-    		BaseType *type = 0, qint32 length = -1);
+    /**
+      Constructor
+      @param info the type information to construct this type from
+     */
+    Array(const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable
 	 */
 	virtual RealType type() const;
+
+    /**
+     * @return the name of that type, e.g. "int"
+     */
+    virtual QString name() const;
 
 	/**
 	 @return a string representation of this type

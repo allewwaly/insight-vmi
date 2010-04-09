@@ -11,10 +11,9 @@
 #include <assert.h>
 
 
-Variable::Variable(int id, const QString& name, const BaseType* type, size_t offset)
-	: Symbol(id, name), ReferencingType(type), _offset(offset)
+Variable::Variable(const TypeInfo& info)
+	: Symbol(info), _offset(info.location())
 {
-//	assert(type != 0);
 }
 
 

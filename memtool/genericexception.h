@@ -8,7 +8,7 @@
 #ifndef GENERICEXCEPTION_H_
 #define GENERICEXCEPTION_H_
 
-#include <exception>
+//#include <exception>
 #include <QString>
 
 #define genericError(x) do { throw GenericException((x), __FILE__, __LINE__); } while (0)
@@ -16,7 +16,7 @@
 /**
   Basic exception class
  */
-class GenericException : public std::exception
+class GenericException //: public std::exception
 {
 public:
     QString message;   ///< error message

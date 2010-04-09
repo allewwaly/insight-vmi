@@ -7,8 +7,11 @@
 
 #include "shell.h"
 #include <string.h>
+#include <assert.h>
 #include <QtAlgorithms>
 #include "compileunit.h"
+#include "variable.h"
+#include "refbasetype.h"
 
 Shell::Shell(const KernelSymbols& symbols)
     : _sym(symbols)
@@ -133,6 +136,7 @@ int getFieldWidth(quint32 maxVal, int base = 16)
     return w;
 }
 
+
 void Shell::hline(int width)
 {
 	const int bufLen = 256;
@@ -151,78 +155,199 @@ void Shell::hline(int width)
 int Shell::cmdList(QStringList args)
 {
     // Show cmdHelp, of no argument is given
-    if (args.isEmpty())
-        return cmdHelp(QStringList("list"));
+    if (!args.isEmpty()) {
 
-    QString s = args[0].toLower();
+        QString s = args[0].toLower();
+        args.pop_front();
 
-    if (s == "sources") {
-        QList<int> keys = _sym.factory().sources().keys();
-        qSort(keys);
-        // Find out required field width (keys needs to be sorted for that)
-        int w = getFieldWidth(keys.last());
-
-        _out << qSetFieldWidth(w) << right << "ID" << qSetFieldWidth(0) << "  "
-             << qSetFieldWidth(0) << "File" << endl;
-
-        hline();
-
-        for (int i = 0; i < keys.size(); i++) {
-            CompileUnit* unit = _sym.factory().sources().value(keys[i]);
-            _out << qSetFieldWidth(w) << right << hex << unit->id() << qSetFieldWidth(0) << "  "
-                 << qSetFieldWidth(0) << unit->name() << endl;
+        if (QString("sources").startsWith(s)) {
+            return cmdListSources(args);
         }
-
-        hline();
-        _out << "Total source files: " << keys.size() << endl;
-    }
-    else if (s == "types") {
-        static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
-        const BaseTypeList& types = _sym.factory().types();
-        CompileUnit* unit = 0;
-        // Find out required field width (the types are sorted by ascending ID)
-        int w = getFieldWidth(types.last()->id());
-
-        _out << qSetFieldWidth(w)  << right << "ID" << qSetFieldWidth(0) << "  "
-             << qSetFieldWidth(10) << left << "Type"
-             << qSetFieldWidth(24) << "Name"
-             << qSetFieldWidth(5)  << right << "Size" << qSetFieldWidth(0) << "  "
-             << qSetFieldWidth(14) << left << "Source"
-             << qSetFieldWidth(0)  << endl;
-
-        hline();
-
-		QString src;
-        for (int i = 0; i < types.size(); i++) {
-            BaseType* type = types[i];
-            // Construct name and line of the source file
-            if (type->srcFile() >= 0) {
-            	if (!unit || unit->id() != type->srcFile())
-            		unit = _sym.factory().sources().value(type->srcFile());
-            	if (!unit)
-            		src = QString("(unknown id: %1)").arg(type->srcFile());
-            	else
-            		src = QString("%1").arg(unit->name());
-            }
-            else
-            	src = "--";
-
-            _out << qSetFieldWidth(w)  << right << hex << type->id() << qSetFieldWidth(0) << "  "
-                 << qSetFieldWidth(10) << left << tRevMap[type->type()]
-                 << qSetFieldWidth(24) << (type->name().isEmpty() ? "(none)" : type->name())
-                 << qSetFieldWidth(5) << right << type->size() << qSetFieldWidth(0) << "  "
-                 << qSetFieldWidth(14) << left << src
-                 << qSetFieldWidth(0) << endl;
+        else if (QString("types").startsWith(s)) {
+            return cmdListTypes(args);
         }
+        else if (QString("variables").startsWith(s)) {
+            return cmdListVars(args);
+        }
+    }
 
-        hline();
-        _out << "Total types: " << types.size() << endl;
+    return cmdHelp(QStringList("list"));
+}
+
+
+int Shell::cmdListSources(QStringList /*args*/)
+{
+    QList<int> keys = _sym.factory().sources().keys();
+    qSort(keys);
+
+    if (keys.isEmpty()) {
+        _out << "There were no source references.";
+        return 0;
     }
-    else if (s == "variables") {
-        _out << "Not implemented in " << __FILE__ << ":" << __LINE__ << endl;
+
+    // Find out required field width (keys needs to be sorted for that)
+    int w = getFieldWidth(keys.last());
+
+    _out << qSetFieldWidth(w) << right << "ID" << qSetFieldWidth(0) << "  "
+         << qSetFieldWidth(0) << "File" << endl;
+
+    hline();
+
+    for (int i = 0; i < keys.size(); i++) {
+        CompileUnit* unit = _sym.factory().sources().value(keys[i]);
+        _out << qSetFieldWidth(w) << right << hex << unit->id() << qSetFieldWidth(0) << "  "
+             << qSetFieldWidth(0) << unit->name() << endl;
     }
+
+    hline();
+    _out << "Total source files: " << keys.size() << endl;
 
     return 0;
 }
 
 
+int Shell::cmdListTypes(QStringList /*args*/)
+{
+    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
+    const BaseTypeList& types = _sym.factory().types();
+    CompileUnit* unit = 0;
+
+    if (types.isEmpty()) {
+        _out << "There were no type references.";
+        return 0;
+    }
+
+    // Find out required field width (the types are sorted by ascending ID)
+    int w = getFieldWidth(types.last()->id());
+
+    _out << qSetFieldWidth(w)  << right << "ID" << qSetFieldWidth(0) << "  "
+         << qSetFieldWidth(10) << left << "Type"
+         << qSetFieldWidth(24) << "Name"
+         << qSetFieldWidth(5)  << right << "Size" << qSetFieldWidth(0) << "  "
+         << qSetFieldWidth(14) << left << "Source"
+         << qSetFieldWidth(0)  << endl;
+
+    hline();
+
+    QString src;
+    for (int i = 0; i < types.size(); i++) {
+        BaseType* type = types[i];
+        // Construct name and line of the source file
+        if (type->srcFile() >= 0) {
+            if (!unit || unit->id() != type->srcFile())
+                unit = _sym.factory().sources().value(type->srcFile());
+            if (!unit)
+                src = QString("(unknown id: %1)").arg(type->srcFile());
+            else
+                src = QString("%1").arg(unit->name());
+        }
+        else
+            src = "--";
+
+        _out << qSetFieldWidth(w)  << right << hex << type->id() << qSetFieldWidth(0) << "  "
+             << qSetFieldWidth(10) << left << tRevMap[type->type()]
+             << qSetFieldWidth(24) << (type->name().isEmpty() ? "(none)" : type->name())
+             << qSetFieldWidth(5) << right << type->size() << qSetFieldWidth(0) << "  "
+             << qSetFieldWidth(14) << left << src
+             << qSetFieldWidth(0) << endl;
+    }
+
+    hline();
+    _out << "Total types: " << types.size() << endl;
+
+    return 0;
+}
+
+
+int Shell::cmdListVars(QStringList /*args*/)
+{
+    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
+    const VariableList& vars = _sym.factory().vars();
+    CompileUnit* unit = 0;
+
+    if (vars.isEmpty()) {
+        _out << "There were no variable references.";
+        return 0;
+    }
+
+    // Find out required field width (the types are sorted by ascending ID)
+    const int w_id = getFieldWidth(vars.last()->id());
+    const int w_datatype = 8;
+    const int w_typename = 24;
+    const int w_name = 24;
+    const int w_size = 5;
+    const int w_src = 12;
+    const int w_colsep = 2;
+    const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + 5*w_colsep;
+
+    _out
+        << qSetFieldWidth(w_id)  << right << "ID"
+        << qSetFieldWidth(w_colsep) << " "
+        << qSetFieldWidth(w_datatype) << left << "Base"
+        << qSetFieldWidth(w_colsep) << " "
+        << qSetFieldWidth(w_typename) << left << "Type name"
+        << qSetFieldWidth(w_colsep) << " "
+        << qSetFieldWidth(w_name) << "Name"
+        << qSetFieldWidth(w_colsep) << " "
+        << qSetFieldWidth(w_size)  << right << "Size"
+        << qSetFieldWidth(w_colsep) << " "
+        << qSetFieldWidth(w_src) << left << "Source"
+        << qSetFieldWidth(0) << endl;
+
+    hline(w_total);
+
+    for (int i = 0; i < vars.size(); i++) {
+        Variable* var = vars[i];
+        // Construct name and line of the source file
+        QString s_src;
+        if (var->srcFile() >= 0) {
+            if (!unit || unit->id() != var->srcFile())
+                unit = _sym.factory().sources().value(var->srcFile());
+            if (!unit)
+                s_src = QString("(unknown id: %1)").arg(var->srcFile());
+            else
+                s_src = QString("%1").arg(unit->name());
+        }
+        else
+            s_src = "--";
+        // Shorten, if neccessary
+        if (s_src.length() > w_src)
+            s_src = "..." + s_src.right(w_src - 3);
+
+        assert(var->refType() != 0);
+
+        // Find out the basic data type of this variable
+        const BaseType* base = var->refType();
+        while ( dynamic_cast<const RefBaseType*>(base) )
+            base = dynamic_cast<const RefBaseType*>(base)->refType();
+        QString s_datatype = tRevMap[base->type()];
+
+        // Shorten the type name, if required
+        QString s_typename = var->refType()->name().isEmpty() ? "(anonymous type)" : var->refType()->name();
+        if (s_typename.length() > w_typename)
+            s_typename = s_typename.left(w_typename - 3) + "...";
+
+        QString s_name = var->name().isEmpty() ? "(none)" : var->name();
+        if (s_name.length() > w_name)
+            s_name = s_name.left(w_name - 3) + "...";
+
+        _out
+            << qSetFieldWidth(w_id)  << right << hex << var->id()
+            << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(w_datatype) << left << s_datatype
+            << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(w_typename) << left << s_typename
+            << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(w_name) << s_name
+            << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(w_size)  << right << right << var->refType()->size()
+            << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(w_src) << left << s_src
+            << qSetFieldWidth(0) << endl;
+    }
+
+    hline(w_total);
+    _out << "Total variables: " << vars.size() << endl;
+
+    return 0;
+}

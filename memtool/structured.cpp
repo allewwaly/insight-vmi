@@ -7,8 +7,8 @@
 
 #include "structured.h"
 
-Structured::Structured(int id, const QString& name, quint32 size, QIODevice *memory)
-	: BaseType(id, name, size, memory)
+Structured::Structured(const TypeInfo& info)
+	: BaseType(info)
 {
 }
 
@@ -27,8 +27,8 @@ void Structured::addMember(StructuredMember* member)
 }
 
 //------------------------------------------------------------------------------
-Struct::Struct(int id, const QString& name, quint32 size, QIODevice *memory)
-	: Structured(id, name, size, memory)
+Struct::Struct(const TypeInfo& info)
+	: Structured(info)
 {
 }
 
@@ -46,8 +46,8 @@ QString Struct::toString(size_t offset) const
 }
 
 //------------------------------------------------------------------------------
-Union::Union(int id, const QString& name, quint32 size, QIODevice *memory)
-	: Structured(id, name, size, memory)
+Union::Union(const TypeInfo& info)
+	: Structured(info)
 {
 }
 

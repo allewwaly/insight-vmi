@@ -6,8 +6,9 @@
 #include "symbol.h"
 #include "genericexception.h"
 #include "sourceref.h"
+#include "typeinfo.h"
 
-class QIODevice;
+//class QIODevice;
 
 /**
   Basic exception class for all type-related exceptions
@@ -53,22 +54,29 @@ class BaseType: public Symbol, public SourceRef
 {
 public:
     enum RealType {
-        rtInt8    = (1 <<  0),
-        rtUInt8   = (1 <<  1),
-        rtInt16   = (1 <<  2),
-        rtUInt16  = (1 <<  3),
-        rtInt32   = (1 <<  4),
-        rtUInt32  = (1 <<  5),
-        rtInt64   = (1 <<  6),
-        rtUInt64  = (1 <<  7),
-        rtFloat   = (1 <<  8),
-        rtDouble  = (1 <<  9),
-        rtConst   = (1 << 10),
-        rtPointer = (1 << 11),
-        rtArray   = (1 << 12),
-        rtEnum    = (1 << 13),
-        rtStruct  = (1 << 14),
-        rtUnion   = (1 << 15)
+        rtInt8        = (1 <<  0),
+        rtUInt8       = (1 <<  1),
+        rtBool8       = (1 <<  2),
+        rtInt16       = (1 <<  3),
+        rtUInt16      = (1 <<  4),
+        rtBool16      = (1 <<  5),
+        rtInt32       = (1 <<  6),
+        rtUInt32      = (1 <<  7),
+        rtBool32      = (1 <<  8),
+        rtInt64       = (1 <<  9),
+        rtUInt64      = (1 << 10),
+        rtBool64      = (1 << 11),
+        rtFloat       = (1 << 12),
+        rtDouble      = (1 << 13),
+        rtPointer     = (1 << 14),
+        rtArray       = (1 << 15),
+        rtEnum        = (1 << 16),
+        rtStruct      = (1 << 17),
+        rtUnion       = (1 << 18),
+        rtConst       = (1 << 19),
+        rtTypedef     = (1 << 20),
+        rtFuncPointer = (1 << 21)
+        // Don't forget to add new types to getRealTypeRevMap()
     };
 
     typedef QHash<BaseType::RealType, QString> RealTypeRevMap;
@@ -77,12 +85,9 @@ public:
 
     /**
       Constructor
-      @param id ID of this type, as given by objdump output
-      @param name name of this type, e.g. "int"
-      @param size size of this type in bytes
-      @param memory pointer to the QFile or QBuffer to read the memory from
+      @param info the type information to construct this type from
      */
-    BaseType(int id, const QString& name, quint32 size, QIODevice *memory = 0);
+    BaseType(const TypeInfo& info);
 
     /**
       @return the actual type of that polimorphic variable
@@ -92,7 +97,7 @@ public:
     /**
       @return the size of this type in bytes
      */
-    uint size() const;
+    virtual quint32 size() const;
 
     /**
       @return a string representation of this type
@@ -248,26 +253,26 @@ public:
         return buf;
     }
 
-    /**
-      Sets the memory image which will be used to parse the data from, e.g.
-      by a call to value().
-      @note The QIODevice must already be opened, no attempt is made to open
-      the device by this class.
-      @param memory pointer to the QFile or QBuffer to read the memory from
-     */
-    void setMemory(QIODevice *memory);
-
-    /**
-      Access to the globally set memory image which all descendents of
-      BaseType will use to read their data from.
-      @return the memory pointer to read the data from
-     */
-    QIODevice* memory() const;
+//    /**
+//      Sets the memory image which will be used to parse the data from, e.g.
+//      by a call to value().
+//      @note The QIODevice must already be opened, no attempt is made to open
+//      the device by this class.
+//      @param memory pointer to the QFile or QBuffer to read the memory from
+//     */
+//    void setMemory(QIODevice *memory);
+//
+//    /**
+//      Access to the globally set memory image which all descendents of
+//      BaseType will use to read their data from.
+//      @return the memory pointer to read the data from
+//     */
+//    QIODevice* memory() const;
 
 protected:
     const quint32 _size;       ///< size of this type in byte
 //    BaseType* _parent;         ///< enclosing struct, if this is a struct member
-    QIODevice *_memory;        ///< the memory dump to read all values from
+//    QIODevice *_memory;        ///< the memory dump to read all values from
 
     /**
       Moves the file position of _memory to the given offset. Throws a
@@ -276,12 +281,14 @@ protected:
      */
     inline void seek(size_t offset) const
     {
-        if (!_memory->seek(offset)) {
-            throw MemAccessException(
-                    QString("Cannot seek to position %1").arg(offset),
-                    __FILE__,
-                    __LINE__);
-        }
+        Q_UNUSED(offset);
+        // TODO
+//        if (!_memory->seek(offset)) {
+//            throw MemAccessException(
+//                    QString("Cannot seek to position %1").arg(offset),
+//                    __FILE__,
+//                    __LINE__);
+//        }
     }
 
     /**
@@ -292,15 +299,18 @@ protected:
      */
     inline void read(char* data, qint64 maxSize) const
     {
-        quint32 ret = _memory->read(data, maxSize);
-
-        // Make sure we read the right amount of bytes
-        if (ret != maxSize) {
-            throw MemAccessException(
-                    QString("Error reading from device, only received %1 from %2 bytes").arg(ret).arg(maxSize),
-                    __FILE__,
-                    __LINE__);
-        }
+        Q_UNUSED(data);
+        Q_UNUSED(maxSize);
+        // TODO
+//        quint32 ret = _memory->read(data, maxSize);
+//
+//        // Make sure we read the right amount of bytes
+//        if (ret != maxSize) {
+//            throw MemAccessException(
+//                    QString("Error reading from device, only received %1 from %2 bytes").arg(ret).arg(maxSize),
+//                    __FILE__,
+//                    __LINE__);
+//        }
     }
 };
 

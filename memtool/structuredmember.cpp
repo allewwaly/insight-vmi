@@ -9,9 +9,8 @@
 #include "basetype.h"
 #include <assert.h>
 
-StructuredMember::StructuredMember(const QString& innerName, size_t innerOffset,
-		const BaseType* refType)
-	: ReferencingType(refType), _innerName(innerName), _innerOffset(innerOffset)
+StructuredMember::StructuredMember(const TypeInfo& info)
+	: _innerName(info.name()), _innerOffset(info.location())
 {
 }
 
