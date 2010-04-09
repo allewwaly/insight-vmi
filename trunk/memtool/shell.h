@@ -47,6 +47,9 @@ private:
     int cmdExit(QStringList args);
     int cmdHelp(QStringList args);
     int cmdList(QStringList args);
+    int cmdListSources(QStringList args);
+    int cmdListTypes(QStringList args);
+    int cmdListVars(QStringList args);
 };
 
 #endif /* SHELL_H_ */

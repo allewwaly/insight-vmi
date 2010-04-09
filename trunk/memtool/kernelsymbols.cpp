@@ -155,6 +155,16 @@ void KernelSymbols::Parser::parse()
 			if (paramSym & relevantParam) {
 				val = rxParam.cap(2);
 				switch (paramSym) {
+                case psBitOffset: {
+                    parseInt10(i, val, &ok);
+                    pInfo->setBitOffset(i);
+                    break;
+                }
+                case psBitSize: {
+                    parseInt10(i, val, &ok);
+                    pInfo->setBitSize(i);
+                    break;
+                }
 				case psByteSize: {
 					parseInt10(i, val, &ok);
 					pInfo->setByteSize(i);
@@ -227,8 +237,8 @@ void KernelSymbols::Parser::parse()
 		}
 
 		// Show some progress information
-		if (_line % 100 == 0)
-			std::cout << "\rParsing line " << _line;
+//		if (_line % 100 == 0)
+//			std::cout << "\rParsing line " << _line;
 	}
 
 	// Finish the last symbol, if required
@@ -262,8 +272,11 @@ void KernelSymbols::parseSymbols(QIODevice* from)
 	try {
 		parser.parse();
 	}
-	catch (...) {
-		debugerr("Exception caught at input line " << parser.line() << " of the debug symbols");
+    catch (GenericException e) {
+        debugerr("Exception caught at input line " << parser.line() << " of the debug symbols");
+        std::cerr
+            << "Caught exception at " << e.file << ":" << e.line << std::endl
+            << "Message: " << e.message << std::endl;
 		throw;
 	}
 };

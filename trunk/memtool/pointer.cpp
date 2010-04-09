@@ -9,14 +9,13 @@
 
 #include <assert.h>
 
-Pointer::Pointer(int id, const QString& name, const quint32 size,
-        QIODevice *memory, const BaseType *type)
-	: BaseType(id, name, size, memory), ReferencingType(type)
+Pointer::Pointer(const TypeInfo& info)
+	: RefBaseType(info)
 {
 	// Make sure the host system can handle the pointer size of the guest
-	if (size > 0 && size > sizeof(void*)) {
+	if (_size > 0 && _size > sizeof(void*)) {
 		throw BaseTypeException(
-				QString("The guest system has wider pointers (%1) than the host system (%2).").arg(size).arg(sizeof(void*)),
+				QString("The guest system has wider pointers (%1) than the host system (%2).").arg(_size).arg(sizeof(void*)),
 				__FILE__,
 				__LINE__);
 	}
@@ -26,6 +25,15 @@ Pointer::Pointer(int id, const QString& name, const quint32 size,
 BaseType::RealType Pointer::type() const
 {
 	return rtPointer;
+}
+
+
+QString Pointer::name() const
+{
+    if (_refType)
+        return _refType->name() + " *";
+    else
+        return "void *";
 }
 
 

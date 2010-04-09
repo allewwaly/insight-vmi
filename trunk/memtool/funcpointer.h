@@ -1,23 +1,23 @@
 /*
- * pointer.h
+ * array.h
  *
- *  Created on: 30.03.2010
+ *  Created on: 03.04.2010
  *      Author: chrschn
  */
 
-#ifndef POINTER_H_
-#define POINTER_H_
+#ifndef FUNCPOINTER_H_
+#define FUNCPOINTER_H_
 
-#include "refbasetype.h"
+#include "pointer.h"
 
-class Pointer: public RefBaseType
+class FuncPointer: public Pointer
 {
 public:
     /**
       Constructor
       @param info the type information to construct this type from
      */
-    Pointer(const TypeInfo& info);
+    FuncPointer(const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable
@@ -29,10 +29,11 @@ public:
      */
     virtual QString name() const;
 
-    /**
+	/**
 	 @return a string representation of this type
 	 */
 	virtual QString toString(size_t offset) const;
 };
 
-#endif /* POINTER_H_ */
+
+#endif /* FUNCPOINTER_H_ */

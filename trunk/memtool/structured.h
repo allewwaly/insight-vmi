@@ -19,8 +19,15 @@ typedef QList<StructuredMember*> MemberList;
 class Structured: public BaseType
 {
 public:
-	Structured(int id, const QString& name, quint32 size, QIODevice *memory = 0);
+    /**
+      Constructor
+      @param info the type information to construct this type from
+     */
+    Structured(const TypeInfo& info);
 
+    /**
+     * Destructor
+     */
 	virtual ~Structured();
 
 	inline const MemberList& members()
@@ -38,7 +45,11 @@ protected:
 class Struct: public Structured
 {
 public:
-	Struct(int id, const QString& name, quint32 size, QIODevice *memory = 0);
+    /**
+      Constructor
+      @param info the type information to construct this type from
+     */
+    Struct(const TypeInfo& info);
 
 	virtual RealType type() const;
 
@@ -49,7 +60,11 @@ public:
 class Union: public Structured
 {
 public:
-	Union(int id, const QString& name, quint32 size, QIODevice *memory = 0);
+    /**
+      Constructor
+      @param info the type information to construct this type from
+     */
+    Union(const TypeInfo& info);
 
 	virtual RealType type() const;
 

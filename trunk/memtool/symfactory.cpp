@@ -12,6 +12,9 @@
 #include "pointer.h"
 #include "array.h"
 #include "enum.h"
+#include "consttype.h"
+#include "typedef.h"
+#include "funcpointer.h"
 #include "compileunit.h"
 #include "variable.h"
 #include "debug.h"
@@ -92,53 +95,70 @@ BaseType* SymFactory::findByName(const QString & name) const
 }
 
 
-BaseType* SymFactory::getNumericInstance(int id, const QString& name,
-		quint32 size, DataEncoding enc, QIODevice *memory)
+BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 {
 	BaseType* t = 0;
 
-	switch (enc) {
+	switch (info.enc()) {
 	case eSigned:
-		switch (size) {
+		switch (info.byteSize()) {
 		case 1:
-			t = getTypeInstance<Int8>(id, name, size, memory);
+			t = getTypeInstance<Int8>(info);
 			break;
 		case 2:
-			t = getTypeInstance<Int16>(id, name, size, memory);
+			t = getTypeInstance<Int16>(info);
 			break;
 		case 4:
-			t = getTypeInstance<Int32>(id, name, size, memory);
+			t = getTypeInstance<Int32>(info);
 			break;
 		case 8:
-			t = getTypeInstance<Int64>(id, name, size, memory);
+			t = getTypeInstance<Int64>(info);
 			break;
 		}
 		break;
 
-	case eUnsigned:
-		switch (size) {
-		case 1:
-			t = getTypeInstance<UInt8>(id, name, size, memory);
-			break;
-		case 2:
-			t = getTypeInstance<UInt16>(id, name, size, memory);
-			break;
-		case 4:
-			t = getTypeInstance<UInt32>(id, name, size, memory);
-			break;
-		case 8:
-			t = getTypeInstance<UInt64>(id, name, size, memory);
-			break;
-		}
-		break;
+    case eUnsigned:
+        switch (info.byteSize()) {
+        case 1:
+            t = getTypeInstance<UInt8>(info);
+            break;
+        case 2:
+            t = getTypeInstance<UInt16>(info);
+            break;
+        case 4:
+            t = getTypeInstance<UInt32>(info);
+            break;
+        case 8:
+            t = getTypeInstance<UInt64>(info);
+            break;
+        }
+        break;
+
+    case eBoolean:
+        switch (info.byteSize()) {
+        case 1:
+            t = getTypeInstance<Bool8>(info);
+            break;
+        case 2:
+            t = getTypeInstance<Bool16>(info);
+            break;
+        case 4:
+            t = getTypeInstance<Bool32>(info);
+            break;
+        case 8:
+            t = getTypeInstance<Bool64>(info);
+            break;
+        }
+        break;
+
 
 	case eFloat:
-		switch (size) {
+		switch (info.byteSize()) {
 		case 4:
-			t = getTypeInstance<Float>(id, name, size, memory);
+			t = getTypeInstance<Float>(info);
 			break;
 		case 8:
-			t = getTypeInstance<Double>(id, name, size, memory);
+			t = getTypeInstance<Double>(info);
 			break;
 		}
 		break;
@@ -149,16 +169,15 @@ BaseType* SymFactory::getNumericInstance(int id, const QString& name,
 	}
 
 	if (!t)
-		factoryError(QString("Illegal combination of encoding (%1) and size (%2)").arg(enc).arg(size));
+		factoryError(QString("Illegal combination of encoding (%1) and info.size() (%2)").arg(info.enc()).arg(info.byteSize()));
 
 	return t;
 }
 
 
-Variable* SymFactory::getVarInstance(int id, const QString& name,
-		const BaseType* type, size_t offset)
+Variable* SymFactory::getVarInstance(const TypeInfo& info)
 {
-	Variable* var = new Variable(id, name, type, offset);
+	Variable* var = new Variable(info);
 	insert(var);
 	return var;
 }
@@ -214,21 +233,24 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 {
 	switch (info.symType()) {
 	case hsArrayType:
-		return info.id() != -1 && info.refTypeId() != -1 && info.upperBound() != -1;
+		return info.id() != -1 && info.refTypeId() != -1 /*&& info.upperBound() != -1*/;
 	case hsBaseType:
 		return info.id() != -1 && info.byteSize() > 0 && info.enc() != eUndef;
 	case hsCompileUnit:
 		return info.id() != -1 && !info.name().isEmpty() && !info.srcDir().isEmpty();
 	case hsConstType:
-		return info.id() != -1 && info.refTypeId() != -1;
+		return info.id() != -1 /*&& info.refTypeId() != -1*/;
 	case hsEnumerationType:
 		return info.id() != -1 && !info.enumValues().isEmpty();
+	case hsSubroutineType:
+        return info.id() != -1;
 	case hsMember:
-		return info.id() != -1 && info.refTypeId() != -1 && info.dataMemberLoc() != -1 && !info.name().isEmpty();
+		return info.id() != -1 && info.refTypeId() != -1 && info.dataMemberLoc() != -1;
 	case hsPointerType:
-		return info.id() != -1 && info.refTypeId() != -1 && info.byteSize() > 0;
+		return info.id() != -1 && info.byteSize() > 0;
+	case hsUnionType:
 	case hsStructureType:
-		return info.id() != -1 && info.byteSize() > 0; // name not required
+		return info.id() != -1 /*&& info.byteSize() > 0*/; // name not required
 	case hsTypedef:
 		return info.id() != -1 && info.refTypeId() != -1 && !info.name().isEmpty();
 	case hsVariable:
@@ -250,31 +272,35 @@ void SymFactory::addSymbol(const TypeInfo& info)
 
 	switch(info.symType()) {
 	case hsArrayType: {
-		Array* a = getTypeInstance<Array>(info.id(), info.name(), info.byteSize());
+		Array* a = getTypeInstance<Array>(info);
 		src = a;
 		ref = a;
-		a->setLength(info.upperBound());
 		break;
 	}
 	case hsBaseType: {
-		BaseType* n = getNumericInstance(info.id(), info.name(), info.byteSize(), info.enc());
+		BaseType* n = getNumericInstance(info);
 		src = n;
 		break;
 	}
 	case hsCompileUnit: {
-		CompileUnit* c = new CompileUnit(info.id(), info.name(), info.srcDir());
+		CompileUnit* c = new CompileUnit(info);
 		insert(c);
 		break;
 	}
+	case hsConstType: {
+	    ConstType* c = getTypeInstance<ConstType>(info);
+	    src = c;
+	    ref = c;
+	    break;
+	}
 	case hsEnumerationType: {
-		Enum* e = getTypeInstance<Enum>(info.id(), info.name(), info.byteSize());
+		Enum* e = getTypeInstance<Enum>(info);
 		src = e;
-		e->setEnumValues(info.enumValues());
 		break;
 	}
 	case hsMember: {
 		// Create and add the member
-		StructuredMember* m = new StructuredMember(info.name(), info.location());
+		StructuredMember* m = new StructuredMember(info);
 		src = m;
 		ref = m;
 
@@ -285,20 +311,39 @@ void SymFactory::addSymbol(const TypeInfo& info)
 		break;
 	}
 	case hsPointerType: {
-		Pointer* p = getTypeInstance<Pointer>(info.id(), info.name(), info.byteSize());
+		Pointer* p = getTypeInstance<Pointer>(info);
 		src = p;
 		ref = p;
 		break;
 	}
+	case hsSubroutineType: {
+	    FuncPointer* p = getTypeInstance<FuncPointer>(info);
+        src = p;
+        ref = p;
+	    break;
+	}
 	case hsStructureType: {
 		_lastStructure = 0;
-		Struct* s = getTypeInstance<Struct>(info.id(), info.name(), info.byteSize());
+		Struct* s = getTypeInstance<Struct>(info);
 		src = s;
 		_lastStructure = s;
 		break;
 	}
+	case hsTypedef: {
+        Typedef* t = getTypeInstance<Typedef>(info);
+        src = t;
+        ref = t;
+        break;
+	}
+    case hsUnionType: {
+        _lastStructure = 0;
+        Union* u = getTypeInstance<Union>(info);
+        src = u;
+        _lastStructure = u;
+        break;
+    }
 	case hsVariable: {
-		Variable* i = getVarInstance(info.id(), info.name(), 0, info.location());
+		Variable* i = getVarInstance(info);
 		src = i;
 		ref = i;
 		break;

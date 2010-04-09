@@ -7,8 +7,8 @@
 
 #include "compileunit.h"
 
-CompileUnit::CompileUnit(int id, const QString& name, const QString& dir)
-    : Symbol(id, name), _dir(dir)
+CompileUnit::CompileUnit(const TypeInfo& info)
+    : Symbol(info), _dir(info.srcDir())
 {
 }
 

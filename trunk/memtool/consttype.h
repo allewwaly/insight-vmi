@@ -8,24 +8,31 @@
 #ifndef CONSTTYPE_H_
 #define CONSTTYPE_H_
 
-#include "basetype.h"
-#include "referencingtype.h"
+#include "refbasetype.h"
 
-class ConstType: public BaseType, public ReferencingType
+class ConstType: public RefBaseType
 {
 public:
-	ConstType(int id, const QString & name, quint32 size = 0, QIODevice *memory = 0,
-    		const BaseType *type = 0);
+    /**
+      Constructor
+      @param info the type information to construct this type from
+     */
+    ConstType(const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable
 	 */
 	virtual RealType type() const;
 
-	/**
-	 @return a string representation of this type
-	 */
-	virtual QString toString(size_t offset) const;
+    /**
+     * @return the name of that type, e.g. "int"
+     */
+    virtual QString name() const;
+
+//	/**
+//	 @return a string representation of this type
+//	 */
+//	virtual QString toString(size_t offset) const;
 };
 
 

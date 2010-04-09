@@ -1,4 +1,7 @@
-SOURCES += consttype.cpp \
+SOURCES += funcpointer.cpp \
+    refbasetype.cpp \
+    typedef.cpp \
+    consttype.cpp \
     symbol.cpp \
     array.cpp \
     compileunit.cpp \
@@ -18,7 +21,10 @@ SOURCES += consttype.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += consttype.h \
+HEADERS += funcpointer.h \
+    refbasetype.h \
+    typedef.h \
+    consttype.h \
     symbol.h \
     array.h \
     compileunit.h \

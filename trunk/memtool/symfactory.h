@@ -123,22 +123,19 @@ public:
 
 protected:
 	template<class T>
-	inline T* getTypeInstance(int id, const QString& name, quint32 size,
-			QIODevice *memory = 0)
+	inline T* getTypeInstance(const TypeInfo& info)
 	{
-		BaseType* t = findById(id);
+		BaseType* t = findById(info.id());
 		if (!t) {
-			t = new T(id, name, size, memory);
+			t = new T(info);
 			insert(t);
 		}
 		return dynamic_cast<T*>(t);
 	}
 
-	Variable* getVarInstance(int id, const QString& name, const BaseType* type,
-			size_t offset);
+	Variable* getVarInstance(const TypeInfo& info);
 
-	BaseType* getNumericInstance(int id, const QString& name, quint32 size,
-			DataEncoding enc, QIODevice *memory = 0);
+	BaseType* getNumericInstance(const TypeInfo& info);
 
 	void insert(BaseType* type);
 	void insert(CompileUnit* unit);

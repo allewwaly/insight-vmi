@@ -19,14 +19,11 @@ class Enum: public BaseType
 public:
 	typedef QHash<qint32, QString> EnumHash;
 
-	/**
-	 Constructor
-	 @param id ID of this type, as given by objdump output
-	 @param name name of this type, e.g. "int"
-	 @param size size of this type in bytes
-	 @param memory pointer to the QFile or QBuffer to read the memory from
-	 */
-	Enum(int id, const QString& name, quint32 size, QIODevice *memory = 0);
+    /**
+      Constructor
+      @param info the type information to construct this type from
+     */
+    Enum(const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable
