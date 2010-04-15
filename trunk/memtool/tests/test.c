@@ -9,6 +9,14 @@
 #include <asm/param.h>                  /* for HZ */
 //#include <linux/jiffies.h>
 
+int someFunc(int param1, char* param2)
+{
+    int i;
+    for (i = 0; i < 10; i++)
+        printf("%d: %d\n", i, param1);
+    return 0;
+}
+
 // Basic types
 char some_char;
 unsigned char some_uchar;
