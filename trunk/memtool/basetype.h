@@ -74,8 +74,9 @@ public:
         rtStruct      = (1 << 17),
         rtUnion       = (1 << 18),
         rtConst       = (1 << 19),
-        rtTypedef     = (1 << 20),
-        rtFuncPointer = (1 << 21)
+        rtVolatile    = (1 << 20),
+        rtTypedef     = (1 << 21),
+        rtFuncPointer = (1 << 22)
         // Don't forget to add new types to getRealTypeRevMap()
     };
 

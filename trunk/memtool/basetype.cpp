@@ -50,6 +50,7 @@ BaseType::RealTypeRevMap BaseType::getRealTypeRevMap()
     ret.insert(BaseType::rtUnion, "Union");
     ret.insert(BaseType::rtTypedef, "Typedef");
     ret.insert(BaseType::rtConst, "Const");
+    ret.insert(BaseType::rtVolatile, "Volatile");
     ret.insert(BaseType::rtFuncPointer, "FuncPointer");
     return ret;
 }
