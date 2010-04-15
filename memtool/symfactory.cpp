@@ -13,6 +13,7 @@
 #include "array.h"
 #include "enum.h"
 #include "consttype.h"
+#include "volatiletype.h"
 #include "typedef.h"
 #include "funcpointer.h"
 #include "compileunit.h"
@@ -255,6 +256,8 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 		return info.id() != -1 && info.refTypeId() != -1 && !info.name().isEmpty();
 	case hsVariable:
 		return info.id() != -1 && info.refTypeId() != -1 && info.location() > 0 && !info.name().isEmpty();
+	case hsVolatileType:
+        return info.id() != -1 && info.refTypeId() != -1;
 	default:
 		return false;
 	}
@@ -347,6 +350,12 @@ void SymFactory::addSymbol(const TypeInfo& info)
 		src = i;
 		ref = i;
 		break;
+	}
+	case hsVolatileType: {
+	    VolatileType* v = getTypeInstance<VolatileType>(info);
+        src = v;
+        ref = v;
+        break;
 	}
 	default: {
 		HdrSymRevMap map = invertHash(getHdrSymMap());

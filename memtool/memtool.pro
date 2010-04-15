@@ -1,4 +1,5 @@
-SOURCES += funcpointer.cpp \
+SOURCES += volatiletype.cpp \
+    funcpointer.cpp \
     refbasetype.cpp \
     typedef.cpp \
     consttype.cpp \
@@ -21,7 +22,8 @@ SOURCES += funcpointer.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += funcpointer.h \
+HEADERS += volatiletype.h \
+    funcpointer.h \
     refbasetype.h \
     typedef.h \
     consttype.h \

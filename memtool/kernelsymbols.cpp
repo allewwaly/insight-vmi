@@ -274,9 +274,9 @@ void KernelSymbols::parseSymbols(QIODevice* from)
 	}
     catch (GenericException e) {
         debugerr("Exception caught at input line " << parser.line() << " of the debug symbols");
-        std::cerr
-            << "Caught exception at " << e.file << ":" << e.line << std::endl
-            << "Message: " << e.message << std::endl;
+//        std::cerr
+//            << "Caught exception at " << e.file << ":" << e.line << std::endl
+//            << "Message: " << e.message << std::endl;
 		throw;
 	}
 };

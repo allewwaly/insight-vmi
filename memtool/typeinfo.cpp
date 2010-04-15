@@ -22,6 +22,7 @@ void TypeInfo::clear()
 	_byteSize = 0;
 	_bitSize = _bitOffset = -1;
 	_location = 0;
+	_dataMemberLoc = -1;
 	_upperBound = -1;
 	_constValue = -1;
 	_symType = hsUnknownSymbol;
