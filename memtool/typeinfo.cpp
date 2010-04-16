@@ -198,13 +198,13 @@ void TypeInfo::setUpperBound(qint32 bound)
 	_upperBound = bound;
 }
 
-qint32 TypeInfo::constValue() const
+qint64 TypeInfo::constValue() const
 {
 	return _constValue;
 }
 
 
-void TypeInfo::setConstValue(qint32 value)
+void TypeInfo::setConstValue(qint64 value)
 {
 	_constValue = value;
 }

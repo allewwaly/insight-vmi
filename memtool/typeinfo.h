@@ -128,7 +128,7 @@ static const quint32 relevantHdr =
 	hsSubroutineType |
 	hsTypedef |
 	hsUnionType |
-	hsUnspecifiedParameters |
+//	hsUnspecifiedParameters |
 	hsVariable |
 	hsVolatileType;
 
@@ -222,8 +222,8 @@ public:
     qint32 upperBound() const;
     void setUpperBound(qint32 bound);
 
-    qint32 constValue() const;
-    void setConstValue(qint32 value);
+    qint64 constValue() const;
+    void setConstValue(qint64 value);
 
     const EnumHash& enumValues() const;
     void addEnumValue(const QString& name, qint32 value);
@@ -243,7 +243,7 @@ private:
 	size_t _location;        ///< holds the absolute offset offset of this symbol
 	qint32 _dataMemberLoc;   ///< holds the offset relative offset of this symbol
 	qint32 _upperBound;      ///< holds the upper bound for an integer type symbol
-	qint32 _constValue;      ///< holds the value of an enumerator symbol
+	qint64 _constValue;      ///< holds the value of an enumerator symbol
 	QHash<qint32, QString> _enumValues; ///< holds the enumeration values, if this symbol is an enumeration
 	HdrSymbolType _symType;  ///< holds the type of this symbol
 	DataEncoding _enc;       ///< holds the data encoding of this symbol
