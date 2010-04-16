@@ -222,9 +222,6 @@ void SymFactory::insert(Variable* var)
 {
 	assert(var != 0);
 	// Check if this variable already exists
-	if (_varsByName.contains(var->name())) {
-		factoryError(QString("A variable with name %1 has already been added.").arg(var->name()));
-	}
 	_vars.append(var);
 	_varsByName.insert(var->name(), var);
 }
@@ -246,7 +243,7 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 	case hsSubroutineType:
         return info.id() != -1;
 	case hsMember:
-		return info.id() != -1 && info.refTypeId() != -1 && info.dataMemberLoc() != -1;
+		return info.id() != -1 && info.refTypeId() != -1 /*&& info.dataMemberLoc() != -1*/; // location not required
 	case hsPointerType:
 		return info.id() != -1 && info.byteSize() > 0;
 	case hsUnionType:
@@ -255,7 +252,7 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 	case hsTypedef:
 		return info.id() != -1 && info.refTypeId() != -1 && !info.name().isEmpty();
 	case hsVariable:
-		return info.id() != -1 && info.refTypeId() != -1 && info.location() > 0 && !info.name().isEmpty();
+		return info.id() != -1 /*&& info.refTypeId() != -1*/ && info.location() > 0 /*&& !info.name().isEmpty()*/;
 	case hsVolatileType:
         return info.id() != -1 && info.refTypeId() != -1;
 	default:

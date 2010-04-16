@@ -9,6 +9,7 @@
 #define KERNELSYMBOLS_H_
 
 #include "symfactory.h"
+#include "typeinfo.h"
 #include <QHash>
 #include "genericexception.h"
 
@@ -45,12 +46,22 @@ private:
 		Parser(QIODevice* from, SymFactory* factory);
 		void parse();
 
-		quint32 line() const;
+		quint64 line() const;
 
 	private:
-		QIODevice* _from;
+	    void mergeSubInfo();
+        void addSymbolFromMainInfo();
+        void finishLastSymbol();
+        void parseParam(const ParamSymbolType param, QString value);
+	    QIODevice* _from;
 		SymFactory* _factory;
-		quint32 _line;
+		quint64 _line;
+	    qint64 _bytesRead;
+	    TypeInfo _info, _subInfo;  // Holds the main type and sub-type information
+	    TypeInfo* _pInfo; // Points to the type that is acutally parsed: info or subInfo
+	    HdrSymbolType _hdrSym;
+	    bool _isRelevant;
+	    int _curSrcID;
 	};
 
 public:
