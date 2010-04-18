@@ -10,7 +10,12 @@
 #include <assert.h>
 
 StructuredMember::StructuredMember(const TypeInfo& info)
-	: _innerName(info.name()), _innerOffset(info.location())
+	: Symbol(info), _offset(info.location())
 {
 }
 
+
+size_t StructuredMember::offset() const
+{
+	return _offset;
+}
