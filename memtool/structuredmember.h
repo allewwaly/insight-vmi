@@ -11,8 +11,9 @@
 #include "basetype.h"
 #include "referencingtype.h"
 #include "sourceref.h"
+#include "symbol.h"
 
-class StructuredMember: public ReferencingType, public SourceRef
+class StructuredMember: public Symbol, public ReferencingType, public SourceRef
 {
 public:
     /**
@@ -21,9 +22,10 @@ public:
      */
     StructuredMember(const TypeInfo& info);
 
+    size_t offset() const;
+
 private:
-	QString _innerName;         ///< the member's name within the struct
-	size_t _innerOffset;        ///< the member's offset within the struct;
+	size_t _offset;        ///< the member's offset within the struct;
 };
 
 #endif /* STRUCTUREDMEMBER_H_ */

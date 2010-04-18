@@ -38,6 +38,54 @@ SymFactory::~SymFactory()
 
 void SymFactory::clear()
 {
+	// Throw an exception of the postponed cmdList still contains items
+	if (!_postponedTypes.isEmpty()) {
+		QString msg("The following types still have unresolved references:\n");
+		QList<int> keys = _postponedTypes.keys();
+		for (int i = 0; i < keys.size(); i++) {
+			int key = keys[i];
+			msg += QString("  missing ref=0x%1\n").arg(key, 0, 16);
+			QList<ReferencingType*> values = _postponedTypes.values(key);
+			bool displayed;
+			for (int j = 0; j < values.size(); j++) {
+				displayed = false;
+				// Find the types
+				for (int k = 0; k < _types.size(); k++) {
+					if ((void*)_types[k] == (void*)values[j]) {
+						RefBaseType* b = dynamic_cast<RefBaseType*>(_types[k]);
+						if (b) {
+							msg += QString("    id=0x%1, name=%2\n").arg(b->id(), 0, 16).arg(b->name());
+							displayed = true;
+						}
+						break;
+					}
+				}
+				for (int k = 0; !displayed && k < _vars.size(); k++) {
+					if ((void*)_vars[k] == (void*)values[j]) {
+						Variable* v = dynamic_cast<Variable*>(_types[k]);
+						if (v) {
+							msg += QString("    id=0x%1, name=%2\n").arg(v->id(), 0, 16).arg(v->name());
+							displayed = true;
+						}
+						break;
+					}
+				}
+//				RefBaseType* b = dynamic_cast<RefBaseType*>(values[j]);
+//				StructuredMember* s = dynamic_cast<StructuredMember*>(values[j]);
+//				if (b)
+//					msg += QString("    id=0x%1, name=%2\n").arg(b->id(), 0, 16).arg(b->name());
+//				else if (s)
+//					msg += QString("    id=0x%1, name=%2\n").arg(f->id(), 0, 16).arg(f->name());
+//				else
+//					msg += QString("    (member type)\n");
+				if (!displayed)
+					msg += QString("    addr=0x%1\n").arg((quint64)values[j], 0, 16);
+			}
+		}
+		factoryError(msg);
+
+	}
+
 	// Delete all compile units
 	for (CompileUnitIntHash::iterator it = _sources.begin();
 		it != _sources.end(); ++it)
@@ -59,27 +107,6 @@ void SymFactory::clear()
 	_types.clear();
 	_typesById.clear();
 	_typesByName.clear();
-
-	// Throw an exception of the postponed cmdList still contains items
-	if (!_postponedTypes.isEmpty()) {
-		QString msg("The following types still have unresolved references:\n");
-//		QList<int> keys = _postponedTypes.keys();
-//		for (int i = 0; i < keys.size(); i++) {
-//			int key = keys[i];
-//			msg += QString("  missing ref=0x%1").arg(i, 0, 16);
-//			QList<ReferencingType*> values = _postponedTypes.values(key);
-//			for (int j = 0; j < values.size(); j++) {
-//				BaseType* b = dynamic_cast<BaseType*>(values[j]);
-//				if (b)
-//					msg += QString("    id=0x%1, name=%2\n").arg(b->id(), 0, 16).arg(b->name());
-//				else
-//					msg += QString("    (member type)\n");
-//			}
-//		}
-		factoryError(msg);
-
-	}
-
 	_postponedTypes.clear();
 }
 

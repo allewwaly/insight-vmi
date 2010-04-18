@@ -320,7 +320,7 @@ int Shell::cmdListVars(QStringList /*args*/)
         const BaseType* base = var->refType();
         while ( dynamic_cast<const RefBaseType*>(base) )
             base = dynamic_cast<const RefBaseType*>(base)->refType();
-        QString s_datatype = tRevMap[base->type()];
+        QString s_datatype = base ? tRevMap[base->type()] : "(undef)";
 
         // Shorten the type name, if required
         QString s_typename = var->refType()->name().isEmpty() ? "(anonymous type)" : var->refType()->name();
