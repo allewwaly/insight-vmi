@@ -14,13 +14,13 @@ RefBaseType::RefBaseType(const TypeInfo& info)
 }
 
 
-QString RefBaseType::name() const
-{
-    if (_refType)
-        return "const " + _refType->name();
-    else
-        return "const";
-}
+//QString RefBaseType::name() const
+//{
+//    if (_refType)
+//        return "const " + _refType->name();
+//    else
+//        return "const";
+//}
 
 
 uint RefBaseType::size() const
