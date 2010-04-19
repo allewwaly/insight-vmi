@@ -297,7 +297,7 @@ void KernelSymbols::Parser::parse()
 			continue;
 
 		// First see if a new header starts
-		if (rxHdr.exactMatch(buf)) {
+		if (rxHdr.exactMatch(line)) {
 
 			// If the symbol does not exist in the hash, it will return 0, which
 			// corresponds to hsUnknownSymbol.
@@ -322,7 +322,7 @@ void KernelSymbols::Parser::parse()
 			}
 		}
 		// Next see if this matches a parameter
-		else if (_isRelevant && rxParam.exactMatch(buf)) {
+		else if (_isRelevant && rxParam.exactMatch(line)) {
 			paramSym = paramMap.value(rxParam.cap(1));
 
 			// Are we interested in this parameter?
