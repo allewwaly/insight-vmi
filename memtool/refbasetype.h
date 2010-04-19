@@ -23,7 +23,7 @@ public:
     /**
      * @return the name of that type, e.g. "int"
      */
-    virtual QString name() const;
+//    virtual QString name() const;
 
     /**
       @return the size of this type in bytes
