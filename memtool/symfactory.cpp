@@ -218,22 +218,26 @@ void SymFactory::insert(BaseType* type)
 	_typesById.insert(type->id(), type);
 	_typesByName.insert(type->name(), type);
 
+	// TODO that' wrong!!!
 	// See if we have types with missing references waiting
-	RefTypeMultiHash::iterator it = _postponedTypes.find(type->id());
-
-	while (it != _postponedTypes.end()) {
-		ReferencingType* t = it.value();
-		// Add the missing reference according to type
-		t->setRefType(type);
-//		default:
-//			factoryError(
-//					QString("Don't know how to add a reference to type %1 (0x%2)")
-//						.arg(type->name())
-//						.arg(type->id(), 0, 16));
-//			break;
-
-		// Delete this item from the cmdList and proceed
-		it = _postponedTypes.erase(it);
+	if (_postponedTypes.contains(type->id())) {
+        QList<ReferencingType*> list = _postponedTypes.values(type->id());
+//        RefTypeMultiHash::iterator it = _postponedTypes.find(type->id());
+//
+//        while (it != _postponedTypes.end()) {
+//            ReferencingType* t = it.value();
+//            // Add the missing reference according to type
+//            t->setRefType(type);
+//    //		default:
+//    //			factoryError(
+//    //					QString("Don't know how to add a reference to type %1 (0x%2)")
+//    //						.arg(type->name())
+//    //						.arg(type->id(), 0, 16));
+//    //			break;
+//
+//            // Delete this item from the cmdList and proceed
+//            it = _postponedTypes.erase(it);
+//        }
 	}
 }
 
