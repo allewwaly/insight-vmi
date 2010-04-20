@@ -222,6 +222,31 @@ void SymFactory::insert(BaseType* type)
 	// See if we have types with missing references waiting
 	if (_postponedTypes.contains(type->id())) {
         QList<ReferencingType*> list = _postponedTypes.values(type->id());
+
+        QList<ReferencingType*>::iterator it = list.begin();
+
+        while (it != list.end())
+        {
+        	ReferencingType* t = *it;
+
+        	// Add the missing reference according to type
+        	t->setRefType(type);
+        	    //		default:
+        	    //			factoryError(
+        	    //					QString("Don't know how to add a reference to type %1 (0x%2)")
+        	    //						.arg(type->name())
+        	    //						.arg(type->id(), 0, 16));
+        	    //			break;
+
+        	// Delete this item from the cmdList and proceed
+        	debugmsg("Setting reftype to " << type->name() << " " << type->id() << " " << type->srcLine());
+        	it++;
+        	//it = _postponedTypes.erase(it);
+        }
+
+        // Delete the entry from the hash
+        _postponedTypes.remove(type->id());
+
 //        RefTypeMultiHash::iterator it = _postponedTypes.find(type->id());
 //
 //        while (it != _postponedTypes.end()) {
@@ -350,7 +375,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	case hsSubroutineType: {
 	    FuncPointer* p = getTypeInstance<FuncPointer>(info);
         src = p;
-        ref = p;
+        // ref = p;
 	    break;
 	}
 	case hsStructureType: {

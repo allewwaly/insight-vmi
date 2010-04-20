@@ -8,9 +8,9 @@
 #ifndef FUNCPOINTER_H_
 #define FUNCPOINTER_H_
 
-#include "pointer.h"
+#include "basetype.h"
 
-class FuncPointer: public Pointer
+class FuncPointer: public BaseType
 {
 public:
     /**
