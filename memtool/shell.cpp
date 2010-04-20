@@ -261,7 +261,7 @@ int Shell::cmdListTypes(QStringList /*args*/)
     }
 
     hline(w_total);
-    _out << "Total types: " << types.size() << endl;
+    _out << "Total types: " << dec << types.size() << endl;
 
     return 0;
 }
@@ -324,6 +324,7 @@ int Shell::cmdListVars(QStringList /*args*/)
         if (s_src.length() > w_src)
             s_src = "..." + s_src.right(w_src - 3);
 
+        // _out << "id " << var->id() << " name " << var->name();
         assert(var->refType() != 0);
 
         // Find out the basic data type of this variable
@@ -358,7 +359,7 @@ int Shell::cmdListVars(QStringList /*args*/)
     }
 
     hline(w_total);
-    _out << "Total variables: " << vars.size() << endl;
+    _out << "Total variables: " << dec << vars.size() << endl;
 
     return 0;
 }

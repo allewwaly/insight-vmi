@@ -28,6 +28,7 @@ QString FuncPointer::name() const
 
 QString FuncPointer::toString(size_t offset) const
 {
+	// TODO: Implement
 	// return Pointer::toString(offset);
-
+    return "";
 }

@@ -218,7 +218,6 @@ void SymFactory::insert(BaseType* type)
 	_typesById.insert(type->id(), type);
 	_typesByName.insert(type->name(), type);
 
-	// TODO that' wrong!!!
 	// See if we have types with missing references waiting
 	if (_postponedTypes.contains(type->id())) {
         QList<ReferencingType*> list = _postponedTypes.values(type->id());
@@ -275,7 +274,10 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 	case hsConstType:
 		return info.id() != -1 /*&& info.refTypeId() != -1*/;
 	case hsEnumerationType:
-		return info.id() != -1 && !info.enumValues().isEmpty();
+		// TODO: Check if this is correct
+		// It seems like it is possible to have an enum without any enumvalues.
+		// return info.id() != -1 && !info.enumValues().isEmpty();
+		return info.id() != -1;
 	case hsSubroutineType:
         return info.id() != -1;
 	case hsMember:
