@@ -198,13 +198,14 @@ void TypeInfo::setUpperBound(qint32 bound)
 	_upperBound = bound;
 }
 
-qint64 TypeInfo::constValue() const
+// TODO: Currently QVariant is returned
+QVariant TypeInfo::constValue() const
 {
 	return _constValue;
 }
 
 
-void TypeInfo::setConstValue(qint64 value)
+void TypeInfo::setConstValue(QVariant value)
 {
 	_constValue = value;
 }

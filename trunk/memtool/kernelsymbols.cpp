@@ -120,7 +120,7 @@ void KernelSymbols::Parser::finishLastSymbol()
             _info.setUpperBound(_subInfo.upperBound());
             break;
         case hsEnumerator:
-            _info.addEnumValue(_subInfo.name(), _subInfo.constValue());
+            _info.addEnumValue(_subInfo.name(), _subInfo.constValue().toInt());
             break;
         default:
             parserError(QString("Unhandled sub-type: %1").arg(_subInfo.symType()));
@@ -156,7 +156,7 @@ void KernelSymbols::Parser::parseParam(const ParamSymbolType param, QString valu
     bool ok;
     qint32 i;
     quint64 ul;
-    qint64 l;
+    // qint64 l;
 
     QRegExp rxParamStr(str::paramStrRegex);
     QRegExp rxEnc(str::encRegex);
@@ -177,8 +177,20 @@ void KernelSymbols::Parser::parseParam(const ParamSymbolType param, QString valu
         break;
     }
     case psByteSize: {
-        parseInt(i, value, &ok);
-        _pInfo->setByteSize(i);
+    	// TODO: Find a better solution
+    	// The byte size can have the value 0xffffffff.
+    	// How do we handle this?
+    	if (value != "0xffffffff")
+    	{
+    	    parseInt(i, value, &ok);
+    	    _pInfo->setByteSize(i);
+    	}
+    	else
+    	{
+    		_pInfo->setByteSize(-1);
+    	}
+
+
         break;
     }
     case psCompDir: {
@@ -188,11 +200,12 @@ void KernelSymbols::Parser::parseParam(const ParamSymbolType param, QString valu
         break;
     }
     case psConstValue: {
-        if (value.startsWith("-"))
-            parseLongLong(l, value, &ok);
-        else
-            parseULongLong(l, value, &ok);
-        _pInfo->setConstValue(l);
+//        if (value.startsWith("-"))
+//            parseLongLong(l, value, &ok);
+//        else
+//            parseULongLong(l, value, &ok);
+
+        _pInfo->setConstValue(value);
         break;
     }
     case psDeclFile: {
@@ -282,6 +295,7 @@ void KernelSymbols::Parser::parse()
 	ParamSymbolType paramSym;
 	qint32 i;
 	bool ok;
+	qint64 size = _from->size();
 	_curSrcID = -1;
 	_isRelevant = false;
 	_pInfo = &_info;
@@ -334,7 +348,7 @@ void KernelSymbols::Parser::parse()
 		if (_line % 10000 == 0) {
 			std::cout << "\rParsing line " << _line;
 			if (!_from->isSequential())
-			    std::cout << " (" << (int) (_bytesRead / (float) _from->size() * 100) << "%)";
+			    std::cout << " (" << (int) ((_bytesRead / (float) size) * 100) << "%)";
 			std::cout << std::flush;
 		}
 	}
@@ -378,7 +392,7 @@ void KernelSymbols::parseSymbols(QIODevice* from)
 		int m = duration / (60*1000);
 		QString time = QString("%1 sec").arg(s);
 		if (m > 0)
-		    time = QString("%1 min ") + time;
+		    time = QString("%1 min ").arg(m) + time;
 
 //		debugmsg("Parsing of " << parser.line() << " lines finish in "
 //		        << time << " (" << (parser.line() / duration) << " lines per second).");
