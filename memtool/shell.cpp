@@ -218,16 +218,23 @@ int Shell::cmdListTypes(QStringList /*args*/)
     }
 
     // Find out required field width (the types are sorted by ascending ID)
-    int w = getFieldWidth(types.last()->id());
+    const int w_id = getFieldWidth(types.last()->id());
+    const int w_type = 12;
+    const int w_name = 24;
+    const int w_size = 5;
+    const int w_src = 14;
+    const int w_line = 10;
+    const int w_total = w_id + w_type + w_name + w_size + w_src + w_line;
 
-    _out << qSetFieldWidth(w)  << right << "ID" << qSetFieldWidth(0) << "  "
-         << qSetFieldWidth(10) << left << "Type"
-         << qSetFieldWidth(24) << "Name"
-         << qSetFieldWidth(5)  << right << "Size" << qSetFieldWidth(0) << "  "
-         << qSetFieldWidth(14) << left << "Source"
+    _out << qSetFieldWidth(w_id)  << right << "ID" << qSetFieldWidth(0) << "  "
+         << qSetFieldWidth(w_type) << left << "Type"
+         << qSetFieldWidth(w_name) << "Name"
+         << qSetFieldWidth(w_size)  << right << "Size" << qSetFieldWidth(0) << "  "
+         << qSetFieldWidth(w_src) << left << "Source"
+         << qSetFieldWidth(w_line) << left << "Line"
          << qSetFieldWidth(0)  << endl;
 
-    hline();
+    hline(w_total);
 
     QString src;
     for (int i = 0; i < types.size(); i++) {
@@ -244,15 +251,16 @@ int Shell::cmdListTypes(QStringList /*args*/)
         else
             src = "--";
 
-        _out << qSetFieldWidth(w)  << right << hex << type->id() << qSetFieldWidth(0) << "  "
-             << qSetFieldWidth(10) << left << tRevMap[type->type()]
-             << qSetFieldWidth(24) << (type->name().isEmpty() ? "(none)" : type->name())
-             << qSetFieldWidth(5) << right << type->size() << qSetFieldWidth(0) << "  "
-             << qSetFieldWidth(14) << left << src
+        _out << qSetFieldWidth(w_id)  << right << hex << type->id() << qSetFieldWidth(0) << "  "
+             << qSetFieldWidth(w_type) << left << tRevMap[type->type()]
+             << qSetFieldWidth(w_name) << (type->name().isEmpty() ? "(none)" : type->name())
+             << qSetFieldWidth(w_size) << right << type->size() << qSetFieldWidth(0) << "  "
+             << qSetFieldWidth(w_src) << left << src
+             << qSetFieldWidth(w_line) << left << dec << type->srcLine()
              << qSetFieldWidth(0) << endl;
     }
 
-    hline();
+    hline(w_total);
     _out << "Total types: " << types.size() << endl;
 
     return 0;
@@ -272,13 +280,14 @@ int Shell::cmdListVars(QStringList /*args*/)
 
     // Find out required field width (the types are sorted by ascending ID)
     const int w_id = getFieldWidth(vars.last()->id());
-    const int w_datatype = 8;
+    const int w_datatype = 12;
     const int w_typename = 24;
     const int w_name = 24;
     const int w_size = 5;
     const int w_src = 12;
+    const int w_line = 10;
     const int w_colsep = 2;
-    const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + 5*w_colsep;
+    const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + w_line + 5*w_colsep;
 
     _out
         << qSetFieldWidth(w_id)  << right << "ID"
@@ -292,6 +301,7 @@ int Shell::cmdListVars(QStringList /*args*/)
         << qSetFieldWidth(w_size)  << right << "Size"
         << qSetFieldWidth(w_colsep) << " "
         << qSetFieldWidth(w_src) << left << "Source"
+        << qSetFieldWidth(w_line) << left << "Line"
         << qSetFieldWidth(0) << endl;
 
     hline(w_total);
@@ -343,6 +353,7 @@ int Shell::cmdListVars(QStringList /*args*/)
             << qSetFieldWidth(w_size)  << right << right << var->refType()->size()
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(w_src) << left << s_src
+            << qSetFieldWidth(w_line) << left << dec << var->srcLine()
             << qSetFieldWidth(0) << endl;
     }
 
