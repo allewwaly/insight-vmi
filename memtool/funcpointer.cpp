@@ -8,7 +8,7 @@
 #include "funcpointer.h"
 
 FuncPointer::FuncPointer(const TypeInfo& info)
-	: Pointer(info)
+	: BaseType(info)
 {
 }
 
@@ -21,11 +21,13 @@ BaseType::RealType FuncPointer::type() const
 
 QString FuncPointer::name() const
 {
-    return QString("%1 (*%2)()").arg(_refType ? _refType->name() : "void").arg(_name);
+    // return QString("%1 (*%2)()").arg(_refType ? _refType->name() : "void").arg(_name);
+	return QString("%1 (*%2)()").arg("void").arg(_name);
 }
 
 
 QString FuncPointer::toString(size_t offset) const
 {
-	return Pointer::toString(offset);
+	// return Pointer::toString(offset);
+
 }
