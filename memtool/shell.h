@@ -50,6 +50,7 @@ private:
     int cmdListSources(QStringList args);
     int cmdListTypes(QStringList args);
     int cmdListVars(QStringList args);
+    int cmdInfo(QStringList args);
 };
 
 #endif /* SHELL_H_ */
