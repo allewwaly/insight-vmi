@@ -49,6 +49,13 @@ Shell::Shell(const KernelSymbols& symbols)
                 "  info <symbol_id>   Get info by id\n"
                 "  info <symbol_name> Get info by name"));
 
+    _commands.insert("show",
+            Command(
+                &Shell::cmdShow,
+                "Shows variable given by name",
+                "This command shows the variable given by name.\n"
+                "  show <variable_name>    Show variable by name"));
+
 }
 
 
@@ -403,10 +410,10 @@ int Shell::cmdInfo(QStringList args)
 		if (ok)
 		{
 
-			if((result = _sym.factory().findById(iv))) {
+			if((result = _sym.factory().findBaseTypeById(iv))) {
 			}
 			else if(! (vresult = _sym.factory().findVarById(iv))) {
-				_out << "Error: Unknown id (" << v << ")\n";
+				_out << "Error: Unknown id (" << v << ")" << endl;
 				ok = false;
 			}
 		}
@@ -489,8 +496,31 @@ int Shell::cmdInfo(QStringList args)
 					<< qSetFieldWidth(0) << endl;
 
 			}
+
 		}
 	}
 
 	return 0;
+}
+
+int Shell::cmdShow(QStringList args)
+{
+    Variable * variable;
+		
+		// Show cmdHelp, of no argument is given
+    if (!args.isEmpty()) {
+
+        QString s = args[0].toLower();
+        args.pop_front();
+
+			 	if((variable = _sym.factory().findVarByName(s)) != NULL){
+					_out << variable->toString() << endl;
+				}else{
+					_out << "Error: Unknown variable \"" << s << "\"" << endl;
+				}
+			return 0;
+				
+    }
+
+    return cmdHelp(QStringList("show"));
 }
