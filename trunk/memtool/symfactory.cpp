@@ -116,12 +116,22 @@ BaseType* SymFactory::findById(int id) const
 	return _typesById.value(id);
 }
 
+Variable* SymFactory::findVarById(int id) const
+{
+	return _varsById.value(id);
+}
+
 
 BaseType* SymFactory::findByName(const QString & name) const
 {
 	return _typesByName.value(name);
 }
 
+
+Variable* SymFactory::findVarByName(const QString & name) const
+{
+	return _varsByName.value(name);
+}
 
 BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 {
@@ -258,6 +268,7 @@ void SymFactory::insert(Variable* var)
 	assert(var != 0);
 	// Check if this variable already exists
 	_vars.append(var);
+	_varsById.insert(var->id(), var);
 	_varsByName.insert(var->name(), var);
 }
 

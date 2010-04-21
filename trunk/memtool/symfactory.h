@@ -67,11 +67,14 @@ typedef QPair<QString, quint32> BaseTypeHashKey;
 /// Hash table for BaseType pointers
 typedef QMultiHash<QString, BaseType*> BaseTypeStringHash;
 
-/// Hash table for BaseType pointers
+/// Hash table for Variable pointers
 typedef QMultiHash<QString, Variable*> VariableStringHash;
 
 /// Hash table to find all types by ID
 typedef QHash<int, BaseType*> BaseTypeIntHash;
+
+/// Hash table to find all variables by ID
+typedef QHash<int, Variable*> VariableIntHash;
 
 /// Hash table to find all referencing types by referring ID
 typedef QMultiHash<int, ReferencingType*> RefTypeMultiHash;
@@ -96,7 +99,11 @@ public:
 
 	BaseType* findById(int id) const;
 
+	Variable* findVarById(int id) const;
+
 	BaseType* findByName(const QString& name) const;
+
+	Variable* findVarByName(const QString& name) const;
 
 	/**
 	 * Checks if the given combination of type information is a legal for a symbol
@@ -145,6 +152,7 @@ private:
 	CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
 	VariableStringHash _varsByName;   ///< Holds all Variable objects, indexed by name
+	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
 	BaseTypeList _types;              ///< Holds all BaseType objects
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
