@@ -111,7 +111,7 @@ void SymFactory::clear()
 }
 
 
-BaseType* SymFactory::findById(int id) const
+BaseType* SymFactory::findBaseTypeById(int id) const
 {
 	return _typesById.value(id);
 }
@@ -121,12 +121,10 @@ Variable* SymFactory::findVarById(int id) const
 	return _varsById.value(id);
 }
 
-
-BaseType* SymFactory::findByName(const QString & name) const
+BaseType* SymFactory::findBaseTypeByName(const QString & name) const
 {
 	return _typesByName.value(name);
 }
-
 
 Variable* SymFactory::findVarByName(const QString & name) const
 {
@@ -412,7 +410,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
 
 	// Add the base-type that this type is referencing
 	if (ref) {
-		if (! (base = findById(info.refTypeId())) ) {
+		if (! (base = findBaseTypeById(info.refTypeId())) ) {
 			// Add this type into the waiting queue
 			_postponedTypes.insert(info.refTypeId(), ref);
 		}

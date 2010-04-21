@@ -97,11 +97,11 @@ public:
 
 	void clear();
 
-	BaseType* findById(int id) const;
+	BaseType* findBaseTypeById(int id) const;
 
 	Variable* findVarById(int id) const;
 
-	BaseType* findByName(const QString& name) const;
+	BaseType* findBaseTypeByName(const QString& name) const;
 
 	Variable* findVarByName(const QString& name) const;
 
@@ -132,7 +132,7 @@ protected:
 	template<class T>
 	inline T* getTypeInstance(const TypeInfo& info)
 	{
-		BaseType* t = findById(info.id());
+		BaseType* t = findBaseTypeById(info.id());
 		if (!t) {
 			t = new T(info);
 			insert(t);
