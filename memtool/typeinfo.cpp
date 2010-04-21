@@ -24,6 +24,7 @@ void TypeInfo::clear()
 	_location = 0;
 	_dataMemberLoc = -1;
 	_upperBound = -1;
+	_sibling = -1;
 	_constValue = -1;
 	_symType = hsUnknownSymbol;
 	_srcDir.clear();
@@ -198,6 +199,16 @@ void TypeInfo::setUpperBound(qint32 bound)
 	_upperBound = bound;
 }
 
+qint32 TypeInfo::sibling() const
+{
+	return _sibling;
+}
+
+void TypeInfo::setSibling(qint32 sibling)
+{
+	_sibling = sibling;
+}
+
 // TODO: Currently QVariant is returned
 QVariant TypeInfo::constValue() const
 {
@@ -252,6 +263,7 @@ QString TypeInfo::dump() const
 	if (!_srcDir.isEmpty())  ret += QString("  srcDir:        %1\n").arg(_srcDir);
 	if (_srcFileId >= 0)     ret += QString("  srcFile:       %1\n").arg(_srcFileId);
 	if (_srcLine >= 0)       ret += QString("  srcLine:       %1\n").arg(_srcLine);
+	if (_sibling >= 0)       ret += QString("  sibling:       %1\n").arg(_sibling);
 	return ret;
 }
 

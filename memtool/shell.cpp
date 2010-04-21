@@ -324,7 +324,6 @@ int Shell::cmdListVars(QStringList /*args*/)
         if (s_src.length() > w_src)
             s_src = "..." + s_src.right(w_src - 3);
 
-        // _out << "id " << var->id() << " name " << var->name();
         assert(var->refType() != 0);
 
         // Find out the basic data type of this variable

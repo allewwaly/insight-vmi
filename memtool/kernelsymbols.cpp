@@ -272,6 +272,14 @@ void KernelSymbols::Parser::parseParam(const ParamSymbolType param, QString valu
         _pInfo->setUpperBound(i);
         break;
     }
+    case psSibling: {
+    	// Sibiling is currently only parsed to skip the symbols that belong to a function
+    	if (!rxId.exactMatch(value))
+			parserError(QString("Regex \"%1\" did not match the following string: %1").arg(rxId.pattern()).arg(value));
+		parseInt16(i, rxId.cap(1), &ok);
+		_pInfo->setSibling(i);
+		break;
+    }
     default: {
         ParamSymRevMap map = invertHash(getParamSymMap());
         parserError(QString("We don't handle parameter type %1, but we should!").arg(map[param]));
@@ -296,6 +304,8 @@ void KernelSymbols::Parser::parse()
 	qint32 i;
 	bool ok;
 	qint64 size = _from->size();
+	bool skip = false;
+	qint32 skipUntil = -1;
 	_curSrcID = -1;
 	_isRelevant = false;
 	_pInfo = &_info;
@@ -319,6 +329,27 @@ void KernelSymbols::Parser::parse()
 			if (_hdrSym == hsUnknownSymbol)
 				parserError(QString("Unknown debug symbol type encountered: %1").arg(rxHdr.cap(2)));
 
+			// If skip is set, we are going to skip all symbols until we reach skipUntil
+			if (skip) {
+				// Set skip value
+			    skipUntil = _pInfo->sibling();
+
+			    // Clear the skip symbol & set variables accordingly
+			    _pInfo->clear();
+			    skip = false;
+			    _isRelevant = false;
+			}
+
+			// skip all symbols till the id saved in skipUntil is reached
+			parseInt16(i, rxHdr.cap(1), &ok);
+			if (skipUntil != -1 && skipUntil != i) {
+				continue;
+			}
+			else {
+				// We reached the mark, reset values
+				skipUntil = -1;
+			}
+
 			// See if we have to finish the last symbol before we continue parsing
 			if (_isRelevant) {
 			    finishLastSymbol();
@@ -333,6 +364,14 @@ void KernelSymbols::Parser::parse()
 				// If this is a compile unit, save its ID locally
 				if (_hdrSym == hsCompileUnit)
 					_curSrcID = _pInfo->id();
+			}
+			else {
+				// If this is a function we skip all symbols that belong to it.
+				if (_hdrSym & hsSubprogram) {
+					// Parse the parameters
+					_isRelevant = true;
+					skip = true;
+				}
 			}
 		}
 		// Next see if this matches a parameter
