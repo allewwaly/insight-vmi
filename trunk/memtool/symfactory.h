@@ -113,6 +113,11 @@ public:
 
 	void addSymbol(const TypeInfo& info);
 
+	/**
+	 * Convert the type t (e.g. 4 for rtBool8) to a natural number n (2 in this example) (n = ld(t))
+	 */
+	int typeToInt(int type);
+
 	inline const BaseTypeList& types() const
 	{
 		return _types;
@@ -135,7 +140,7 @@ protected:
 		BaseType* t = findBaseTypeById(info.id());
 		if (!t) {
 			t = new T(info);
-			insert(t);
+			// insert(t);
 		}
 		return dynamic_cast<T*>(t);
 	}
@@ -145,6 +150,11 @@ protected:
 	BaseType* getNumericInstance(const TypeInfo& info);
 
 	void insert(BaseType* type);
+	/**
+	 * Updates the different sortings that exist for the types (e.g. typesById).
+	 * During this progress postponed types will be updated as well.
+	 */
+	void updateSortings(BaseType* entry, BaseType* target);
 	void insert(CompileUnit* unit);
 	void insert(Variable* var);
 
@@ -158,6 +168,8 @@ private:
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
 	Structured* _lastStructure;
+
+	BaseType* _numerics[14];          ///< Contains the types of numerics that have already been created
 };
 
 #endif /* TYPEFACTORY_H_ */

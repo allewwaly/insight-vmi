@@ -28,6 +28,8 @@
 SymFactory::SymFactory()
 	: _lastStructure(0)
 {
+	// Initialize numerics array
+	_numerics = {0};
 }
 
 
@@ -140,7 +142,6 @@ BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 		switch (info.byteSize()) {
 		case 1:
 			t = getTypeInstance<Int8>(info);
-			break;
 		case 2:
 			t = getTypeInstance<Int16>(info);
 			break;
@@ -222,33 +223,41 @@ Variable* SymFactory::getVarInstance(const TypeInfo& info)
 void SymFactory::insert(BaseType* type)
 {
 	assert(type != 0);
+
 	_types.append(type);
-	_typesById.insert(type->id(), type);
-	_typesByName.insert(type->name(), type);
+	updateSortings(type, type);
+
+}
+
+void SymFactory::updateSortings(BaseType* entry, BaseType* target)
+{
+	_typesById.insert(entry->id(), target);
+	_typesByName.insert(entry->name(), target);
+
 
 	// See if we have types with missing references waiting
-	if (_postponedTypes.contains(type->id())) {
-        QList<ReferencingType*> list = _postponedTypes.values(type->id());
+	if (_postponedTypes.contains(entry->id())) {
+		QList<ReferencingType*> list = _postponedTypes.values(entry->id());
 
-        QList<ReferencingType*>::iterator it = list.begin();
+		QList<ReferencingType*>::iterator it = list.begin();
 
-        while (it != list.end())
-        {
-        	ReferencingType* t = *it;
+		while (it != list.end())
+		{
+			ReferencingType* t = *it;
 
-        	// Add the missing reference according to type
-        	t->setRefType(type);
-        	    //		default:
-        	    //			factoryError(
-        	    //					QString("Don't know how to add a reference to type %1 (0x%2)")
-        	    //						.arg(type->name())
-        	    //						.arg(type->id(), 0, 16));
-        	    //			break;
-        	it++;
-        }
+			// Add the missing reference according to type
+			t->setRefType(target);
+				//		default:
+				//			factoryError(
+				//					QString("Don't know how to add a reference to type %1 (0x%2)")
+				//						.arg(type->name())
+				//						.arg(type->id(), 0, 16));
+				//			break;
+			it++;
+		}
 
-        // Delete the entry from the hash
-        _postponedTypes.remove(type->id());
+		// Delete the entry from the hash
+		_postponedTypes.remove(entry->id());
 
 	}
 }
@@ -320,12 +329,26 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	switch(info.symType()) {
 	case hsArrayType: {
 		Array* a = getTypeInstance<Array>(info);
+		insert(a);
 		src = a;
 		ref = a;
 		break;
 	}
 	case hsBaseType: {
 		BaseType* n = getNumericInstance(info);
+
+		// Did we already create this type?
+		if (!_numerics[typeToInt(n->type())]) {
+			// No - create it
+			insert(n);
+			_numerics[typeToInt(n->type())] = n;
+		}
+		else {
+			// Yes - Just update
+			updateSortings(n, _numerics[typeToInt(n->type())]);
+		}
+
+
 		src = n;
 		break;
 	}
@@ -336,12 +359,14 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	}
 	case hsConstType: {
 	    ConstType* c = getTypeInstance<ConstType>(info);
+	    insert(c);
 	    src = c;
 	    ref = c;
 	    break;
 	}
 	case hsEnumerationType: {
 		Enum* e = getTypeInstance<Enum>(info);
+		insert(e);
 		src = e;
 		break;
 	}
@@ -359,12 +384,14 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	}
 	case hsPointerType: {
 		Pointer* p = getTypeInstance<Pointer>(info);
+		insert(p);
 		src = p;
 		ref = p;
 		break;
 	}
 	case hsSubroutineType: {
 	    FuncPointer* p = getTypeInstance<FuncPointer>(info);
+	    insert(p);
         src = p;
         // ref = p;
 	    break;
@@ -372,12 +399,14 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	case hsStructureType: {
 		_lastStructure = 0;
 		Struct* s = getTypeInstance<Struct>(info);
+		insert(s);
 		src = s;
 		_lastStructure = s;
 		break;
 	}
 	case hsTypedef: {
         Typedef* t = getTypeInstance<Typedef>(info);
+        insert(t);
         src = t;
         ref = t;
         break;
@@ -385,6 +414,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
     case hsUnionType: {
         _lastStructure = 0;
         Union* u = getTypeInstance<Union>(info);
+        insert(u);
         src = u;
         _lastStructure = u;
         break;
@@ -397,6 +427,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	}
 	case hsVolatileType: {
 	    VolatileType* v = getTypeInstance<VolatileType>(info);
+	    insert(v);
         src = v;
         ref = v;
         break;
@@ -423,6 +454,18 @@ void SymFactory::addSymbol(const TypeInfo& info)
 		src->setSrcFile(info.srcFileId());
 		src->setSrcLine(info.srcLine());
 	}
+}
+
+int SymFactory::typeToInt(int type)
+{
+	int result = 0;
+
+	while(type != 1) {
+		type = type >> 1;
+		result++;
+	}
+
+	return result;
 }
 
 

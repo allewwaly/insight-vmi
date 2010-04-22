@@ -9,6 +9,7 @@
 #define NUMERICTYPE_H_
 
 #include "basetype.h"
+#include "debug.h"
 
 /**
  * Generic template class for all numeric types
@@ -28,6 +29,7 @@ public:
 		: BaseType(info), _type(realType), _bitSize(info.bitSize()), _bitOffset(info.bitOffset())
 	{
 	}
+
 
 	/**
 	 @return the actual type of that polimorphic variable
@@ -64,6 +66,17 @@ public:
 	void setBitOffset(int offset)
 	{
 	    _bitOffset = offset;
+	}
+
+	bool operator==(const Numeric& other) const
+	{
+		// Two types are equal if they have the same type and the same size.
+		debugmsg(this->type() << "\n");
+		debugmsg(other.type() << "\n");
+		if (this->type() == other.type() && this->size() == other._size)
+			return true;
+		else
+			return false;
 	}
 
 protected:
@@ -109,11 +122,21 @@ typedef Numeric<quint64, BaseType::rtUInt64> UInt64;
 /// Represents a boolean 64-bit integer
 typedef Numeric<quint64, BaseType::rtBool64> Bool64;
 
-/// Represents a signle precision float (32 bit)
+/// Represents a single precision float (32 bit)
 typedef Numeric<float, BaseType::rtFloat> Float;
 
 /// Represents a double precision float (64 bit)
 typedef Numeric<double, BaseType::rtDouble> Double;
+
+// TODO: Move this function to the right place and implement the hash value for each type.
+///**
+// * Return a hash value for this object.
+// */
+//uint qHash(const BaseType* key) const
+//{
+//	debugmsg("Hashing...\n");
+//	return key->type();
+//}
 
 
 

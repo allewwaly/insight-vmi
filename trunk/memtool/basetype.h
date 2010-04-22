@@ -254,6 +254,8 @@ public:
         return buf;
     }
 
+    bool operator==(const BaseType& other) const;
+
 //    /**
 //      Sets the memory image which will be used to parse the data from, e.g.
 //      by a call to value().
