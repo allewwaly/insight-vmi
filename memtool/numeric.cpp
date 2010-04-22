@@ -7,6 +7,7 @@
 
 #include "numeric.h"
 
+
 //template<class T, BaseType::RealType type>
 //Numeric<T, type>::Numeric(const QString & name, int id, quint32 size,
 //		QIODevice *memory)
