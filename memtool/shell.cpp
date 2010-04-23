@@ -384,128 +384,121 @@ int Shell::cmdInfo(QStringList args)
 {
 	static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
 
-	QString v = "";
 	qint32 iv;
 	bool ok = true;
 	BaseType* result = 0;
 	Variable* vresult = 0;
 
-	if(!args.isEmpty())
-	{
-		// Build argument that could consist of more than one part
-		while(args.length() > 0)
+	// Show cmdHelp, of no argument is given
+	if (!args.isEmpty()) {
+
+		QString s = args[0].toLower();
+		args.pop_front();
+
+		iv = s.toInt(&ok, 16);
+		
+		if(ok) //The argument had been an id
 		{
-			v.append(args[0]);
-
-			if (args.length() > 1)
-				v.append(" ");
-
-			args.pop_front();
-
+			if(!((result = _sym.factory().findBaseTypeById(iv)) ||
+			    (vresult = _sym.factory().findVarById(iv))))
+		 	{
+				_out << "Error: Unknown symbol id (" << s << ")" << endl;
+				return 0;  //But no result with this id was found
+			}
+		}else //The argument must be a name
+		{
+			if(!((result = _sym.factory().findBaseTypeByName(s)) ||
+			    (vresult = _sym.factory().findVarByName(s))))
+		 	{
+				_out << "Error: Unknown symbol name (" << s << ")" << endl;
+				return 0;  //But no result with this id was found
+			}
 		}
 
-		iv = v.toInt(&ok, 16);
-
-		// Get value by ID
-		if (ok)
+		if(result)  //The type is a BaseType
 		{
+			const int w_id = 4;
+			const int w_type = 12;
+			const int w_name = 24;
+			const int w_size = 5;
+			const int w_src = 14;
+			const int w_line = 10;
+			const int w_total = w_id + w_type + w_name + w_size + w_src + w_line;
 
-			if((result = _sym.factory().findBaseTypeById(iv))) {
-			}
-			else if(! (vresult = _sym.factory().findVarById(iv))) {
-				_out << "Error: Unknown id (" << v << ")" << endl;
-				ok = false;
-			}
+			_out << qSetFieldWidth(w_id)  << right << "ID" << qSetFieldWidth(0) << "  "
+				<< qSetFieldWidth(w_type) << left << "Type"
+				<< qSetFieldWidth(w_name) << "Name"
+				<< qSetFieldWidth(w_size)  << right << "Size" << qSetFieldWidth(0) << "  "
+				<< qSetFieldWidth(w_src) << left << "Source"
+				<< qSetFieldWidth(w_line) << left << "Line"
+				<< qSetFieldWidth(0)  << endl;
+
+			hline(w_total);
+
+			_out << qSetFieldWidth(w_id)  << right << hex << result->id() << qSetFieldWidth(0) << "  "
+				<< qSetFieldWidth(w_type) << left << tRevMap[result->type()]
+				<< qSetFieldWidth(w_name) << (result->name().isEmpty() ? "(none)" : result->name())
+				<< qSetFieldWidth(w_size) << right << result->size() << qSetFieldWidth(0) << "  "
+				<< qSetFieldWidth(w_src) << left << (result->srcFile() < 0 ? "--" : \
+						(_sym.factory().sources().value(result->srcFile()))->name())
+				<< qSetFieldWidth(w_line) << left << dec << result->srcLine()
+				<< qSetFieldWidth(0) << endl;
 		}
+		else if(vresult)  //The type is a Variable
+		{
+			const int w_id = 4;
+			const int w_datatype = 12;
+			const int w_typename = 24;
+			const int w_name = 24;
+			const int w_size = 5;
+			const int w_src = 12;
+			const int w_line = 10;
+			const int w_colsep = 2;
+			const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + w_line + 5*w_colsep;
 
-		// Print data if symbol was found
-		if(ok) {
+			_out
+				<< qSetFieldWidth(w_id)  << right << "ID"
+				<< qSetFieldWidth(w_colsep) << " "
+				<< qSetFieldWidth(w_datatype) << left << "Base"
+				<< qSetFieldWidth(w_colsep) << " "
+				<< qSetFieldWidth(w_typename) << left << "Type name"
+				<< qSetFieldWidth(w_colsep) << " "
+				<< qSetFieldWidth(w_name) << "Name"
+				<< qSetFieldWidth(w_colsep) << " "
+				<< qSetFieldWidth(w_size)  << right << "Size"
+				<< qSetFieldWidth(w_colsep) << " "
+				<< qSetFieldWidth(w_src) << left << "Source"
+				<< qSetFieldWidth(w_line) << left << "Line"
+				<< qSetFieldWidth(0) << endl;
 
-			if(result)
-			{
-				const int w_id = 4;
-				const int w_type = 12;
-				const int w_name = 24;
-				const int w_size = 5;
-				const int w_src = 14;
-				const int w_line = 10;
-				const int w_total = w_id + w_type + w_name + w_size + w_src + w_line;
+			hline(w_total);
 
-				_out << qSetFieldWidth(w_id)  << right << "ID" << qSetFieldWidth(0) << "  "
-					 << qSetFieldWidth(w_type) << left << "Type"
-					 << qSetFieldWidth(w_name) << "Name"
-					 << qSetFieldWidth(w_size)  << right << "Size" << qSetFieldWidth(0) << "  "
-					 << qSetFieldWidth(w_src) << left << "Source"
-					 << qSetFieldWidth(w_line) << left << "Line"
-					 << qSetFieldWidth(0)  << endl;
+			_out
+				<< qSetFieldWidth(w_id)  << right << hex << vresult->id()
+				<< qSetFieldWidth(w_colsep) << " "
+				<< qSetFieldWidth(w_datatype) << left << tRevMap[vresult->refType()->type()]
+				<< qSetFieldWidth(w_colsep) << " "
+				<< qSetFieldWidth(w_typename) << left << vresult->refType()->name()
+				<< qSetFieldWidth(w_colsep) << " "
+				<< qSetFieldWidth(w_name) << vresult->name()
+				<< qSetFieldWidth(w_colsep) << " "
+				<< qSetFieldWidth(w_size)  << right << right << vresult->refType()->size()
+				<< qSetFieldWidth(w_colsep) << " "
+				<< qSetFieldWidth(w_src) << left << (vresult->srcFile() < 0 ? "--" : \
+						(_sym.factory().sources().value(vresult->srcFile()))->name())
+				<< qSetFieldWidth(w_line) << left << dec << vresult->srcLine()
+				<< qSetFieldWidth(0) << endl;
 
-				hline(w_total);
-
-				_out << qSetFieldWidth(w_id)  << right << hex << result->id() << qSetFieldWidth(0) << "  "
-					 << qSetFieldWidth(w_type) << left << tRevMap[result->type()]
-					 << qSetFieldWidth(w_name) << (result->name().isEmpty() ? "(none)" : result->name())
-					 << qSetFieldWidth(w_size) << right << result->size() << qSetFieldWidth(0) << "  "
-					 << qSetFieldWidth(w_src) << left << (result->srcFile() < 0 ? "--" : \
-														 (_sym.factory().sources().value(result->srcFile()))->name())
-					 << qSetFieldWidth(w_line) << left << dec << result->srcLine()
-					 << qSetFieldWidth(0) << endl;
-			}
-			else if(vresult)
-			{
-				const int w_id = 4;
-				const int w_datatype = 12;
-				const int w_typename = 24;
-				const int w_name = 24;
-			    const int w_size = 5;
-				const int w_src = 12;
-				const int w_line = 10;
-				const int w_colsep = 2;
-				const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + w_line + 5*w_colsep;
-
-				_out
-					<< qSetFieldWidth(w_id)  << right << "ID"
-					<< qSetFieldWidth(w_colsep) << " "
-					<< qSetFieldWidth(w_datatype) << left << "Base"
-					<< qSetFieldWidth(w_colsep) << " "
-					<< qSetFieldWidth(w_typename) << left << "Type name"
-					<< qSetFieldWidth(w_colsep) << " "
-					<< qSetFieldWidth(w_name) << "Name"
-					<< qSetFieldWidth(w_colsep) << " "
-					<< qSetFieldWidth(w_size)  << right << "Size"
-					<< qSetFieldWidth(w_colsep) << " "
-					<< qSetFieldWidth(w_src) << left << "Source"
-					<< qSetFieldWidth(w_line) << left << "Line"
-					<< qSetFieldWidth(0) << endl;
-
-				hline(w_total);
-
-				_out
-					<< qSetFieldWidth(w_id)  << right << hex << vresult->id()
-					<< qSetFieldWidth(w_colsep) << " "
-					<< qSetFieldWidth(w_datatype) << left << tRevMap[vresult->refType()->type()]
-					<< qSetFieldWidth(w_colsep) << " "
-					<< qSetFieldWidth(w_typename) << left << vresult->refType()->name()
-					<< qSetFieldWidth(w_colsep) << " "
-					<< qSetFieldWidth(w_name) << vresult->name()
-					<< qSetFieldWidth(w_colsep) << " "
-					<< qSetFieldWidth(w_size)  << right << right << vresult->refType()->size()
-					<< qSetFieldWidth(w_colsep) << " "
-					<< qSetFieldWidth(w_src) << left << (vresult->srcFile() < 0 ? "--" : \
-							                             (_sym.factory().sources().value(vresult->srcFile()))->name())
-					<< qSetFieldWidth(w_line) << left << dec << vresult->srcLine()
-					<< qSetFieldWidth(0) << endl;
-
-			}
-
+		}else{
+			return cmdHelp(QStringList("info"));
 		}
 	}
-
 	return 0;
 }
 
 int Shell::cmdShow(QStringList args)
 {
-    Variable * variable;
+    Variable * variable = 0;
 		
 		// Show cmdHelp, of no argument is given
     if (!args.isEmpty()) {
@@ -513,7 +506,7 @@ int Shell::cmdShow(QStringList args)
         QString s = args[0].toLower();
         args.pop_front();
 
-			 	if((variable = _sym.factory().findVarByName(s)) != NULL){
+			 	if((variable = _sym.factory().findVarByName(s))){
 					_out << variable->toString() << endl;
 				}else{
 					_out << "Error: Unknown variable \"" << s << "\"" << endl;
