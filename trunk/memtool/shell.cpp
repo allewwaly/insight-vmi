@@ -405,14 +405,19 @@ int Shell::cmdInfo(QStringList args)
 				_out << "Error: Unknown symbol id (" << s << ")" << endl;
 				return 0;  //But no result with this id was found
 			}
-		}else //The argument must be a name
+		}
+	 	//The argument must be a name
+		while(!args.isEmpty()){ //Concatinate full name
+			s.append(" ");
+			s.append(args[0].toLower());
+			args.pop_front();
+		}
+		
+		if(!((result = _sym.factory().findBaseTypeByName(s)) ||
+					(vresult = _sym.factory().findVarByName(s))))
 		{
-			if(!((result = _sym.factory().findBaseTypeByName(s)) ||
-			    (vresult = _sym.factory().findVarByName(s))))
-		 	{
-				_out << "Error: Unknown symbol name (" << s << ")" << endl;
-				return 0;  //But no result with this id was found
-			}
+			_out << "Error: Unknown symbol name (" << s << ")" << endl;
+			return 0;  //But no result with this id was found
 		}
 
 		if(result)  //The type is a BaseType
