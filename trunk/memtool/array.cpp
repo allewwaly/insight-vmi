@@ -36,6 +36,12 @@ QString Array::toString(size_t offset) const
 }
 
 
+qint32 Array::length() const
+{
+    return _length;
+}
+
+
 void Array::setLength(qint32 len)
 {
 	_length = len;
