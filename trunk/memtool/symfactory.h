@@ -79,11 +79,11 @@ typedef QHash<int, Variable*> VariableIntHash;
 /// Hash table to find all referencing types by referring ID
 typedef QMultiHash<int, ReferencingType*> RefTypeMultiHash;
 
-// /// This function is required to use BaseType as a key in a QHash
-// inline uint qHash(const BaseTypeHashKey &key)
-// {
-//     return qHash(key.first) ^ key.second;
-// }
+/// Has table to find equivalent types based on a per-type hash function
+typedef QMultiHash<const BaseType*, BaseType*> BaseTypeMultiHash;
+
+/// This function is required to use pointer to BaseType as a key in a QHash
+uint qHash(const BaseType* key);
 
 /**
  * Creates and holds all defined types
@@ -112,11 +112,6 @@ public:
 	bool static isSymbolValid(const TypeInfo& info);
 
 	void addSymbol(const TypeInfo& info);
-
-	/**
-	 * Convert the type t (e.g. 4 for rtBool8) to a natural number n (2 in this example) (n = ld(t))
-	 */
-	int typeToInt(int type);
 
 	inline const BaseTypeList& types() const
 	{
@@ -149,12 +144,21 @@ protected:
 
 	BaseType* getNumericInstance(const TypeInfo& info);
 
-	void insert(BaseType* type);
 	/**
-	 * Updates the different sortings that exist for the types (e.g. typesById).
-	 * During this progress postponed types will be updated as well.
+	 * Checks if \a type has the same ID as the one given in \a info
+	 * @param info the type information to compare the ID with
+	 * @param type the base type to compare the ID with
+	 * @return \c true if the IDs are different, \c false if the IDs are the same
 	 */
-	void updateSortings(BaseType* entry, BaseType* target);
+	bool isNewType(const TypeInfo& info, BaseType* type) const;
+
+    /**
+     * Updates the different sortings that exist for the types (e.g. typesById).
+     * During this progress postponed types will be updated as well.
+     */
+    void updateTypeRelations(const TypeInfo& info, BaseType* target);
+
+	void insert(const TypeInfo& info, BaseType* type);
 	void insert(CompileUnit* unit);
 	void insert(Variable* var);
 
@@ -169,7 +173,7 @@ private:
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
 	Structured* _lastStructure;
 
-	BaseType* _numerics[14];          ///< Contains the types of numerics that have already been created
+	BaseType* _numerics[16];          ///< Contains the types of numerics that have already been created
 };
 
 #endif /* TYPEFACTORY_H_ */
