@@ -30,7 +30,7 @@ public:
      */
 	virtual ~Structured();
 
-	inline const MemberList& members()
+	inline const MemberList& members() const
 	{
 		return _members;
 	}
