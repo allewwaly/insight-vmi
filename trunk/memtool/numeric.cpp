@@ -7,23 +7,37 @@
 
 #include "numeric.h"
 
+NumericBaseType::NumericBaseType(const TypeInfo& info)
+    : BaseType(info), _bitSize(info.bitSize()), _bitOffset(info.bitOffset())
+{
+}
 
-//template<class T, BaseType::RealType type>
-//Numeric<T, type>::Numeric(const QString & name, int id, quint32 size,
-//		QIODevice *memory)
-//	: BaseType(name, id, size, memory), _type(type)
-//{
-//}
-//
-//template<class T, BaseType::RealType type>
-//BaseType::RealType Numeric<T, type>::type() const
-//{
-//	return _type;
-//}
-//
-//template<class T, BaseType::RealType type>
-//QString Numeric<T, type>::toString(size_t offset) const
-//{
-//	return QString::number(value<T>(offset));
-//}
 
+uint NumericBaseType::hash() const
+{
+    return BaseType::hash() ^ _bitSize ^ rotl32(_bitOffset, 16);
+}
+
+
+int NumericBaseType::bitSize() const
+{
+    return _bitSize;
+}
+
+
+void NumericBaseType::setBitSize(int size)
+{
+    _bitSize = size;
+}
+
+
+int NumericBaseType::bitOffset() const
+{
+    return _bitOffset;
+}
+
+
+void NumericBaseType::setBitOffset(int offset)
+{
+    _bitOffset = offset;
+}

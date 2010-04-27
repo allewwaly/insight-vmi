@@ -25,76 +25,18 @@
 
 
 //------------------------------------------------------------------------------
-// Hash the various descendents of BaseType by their discreminating properties
-// (except ID)
-// TODO: Should we also use the srcLine() property here?
+/**
+ * Hash the various descendents of BaseType by their discreminating properties
+ * (except ID): type(), size(), name(), or their srcLine() and members(),
+ * depending on their type
+ * @param key the BaseType object to hash
+ * @return
+ */
 uint qHash(const BaseType* key)
 {
-    switch (key->type()) {
-    // An array is uniquely defined by its value type and its length.
-    case BaseType::rtArray: {
-        const Array* t = dynamic_cast<const Array*>(key);
-        return key->type() ^ t->length() ^ (t->refType() ? qHash(t->refType()) : 0);
-    }
-    // For numeric types, the type already covers the individual combinations of
-    // byte size and encoding, so just return this.
-    case BaseType::rtInt8:
-    case BaseType::rtUInt8:
-    case BaseType::rtBool8:
-    case BaseType::rtInt16:
-    case BaseType::rtUInt16:
-    case BaseType::rtBool16:
-    case BaseType::rtInt32:
-    case BaseType::rtUInt32:
-    case BaseType::rtBool32:
-    case BaseType::rtInt64:
-    case BaseType::rtUInt64:
-    case BaseType::rtBool64:
-    case BaseType::rtFloat:
-    case BaseType::rtDouble: {
-        return key->type();
-    }
-    // Referencing types are uniquely defined by their concrete type() and the
-    // hash of the type they refer to.
-    case BaseType::rtConst:
-    case BaseType::rtPointer:
-    case BaseType::rtTypedef:
-    case BaseType::rtVolatile: {
-        const RefBaseType* t = dynamic_cast<const RefBaseType*>(key);
-        return key->type() ^ (t->refType() ? qHash(t->refType()) : 0);
-    }
-    // An enum is uniquely defined by its members
-    case BaseType::rtEnum: {
-        const Enum* t = dynamic_cast<const Enum*>(key);
-        uint ret = t->type() ^ t->enumValues().size();
-        // Extend the hash to all enumeration values
-        Enum::EnumHash::const_iterator it = t->enumValues().constBegin();
-        while (it != t->enumValues().constEnd()) {
-            ret ^= it.key() ^ qHash(it.value());
-            ++it;
-        }
-    }
-    // Structured types uniquely defined by their size and their members
-    case BaseType::rtStruct:
-    case BaseType::rtUnion: {
-        const Structured* t = dynamic_cast<const Structured*>(key);
-        uint ret = t->type() ^ t->members().size();
-        // Extend the hash recursively to all members
-        for (int i = 0; i < t->members().size(); i++) {
-            const StructuredMember* member = t->members().at(i);
-            ret ^=  qHash(member->name());
-            if (member->refType())
-                ret ^= qHash(member->refType());
-        }
-        return ret;
-    }
-    case BaseType::rtFuncPointer:
-        // TODO: implement me
-    default: {
-        BaseType::RealTypeRevMap map = BaseType::getRealTypeRevMap();
-        factoryError(QString("%1 not implemented for type %2").arg(__PRETTY_FUNCTION__).arg(map[key->type()]));
-    }
-    }
+    assert(key != 0);
+
+    return key->hash();
 }
 
 //------------------------------------------------------------------------------
@@ -111,6 +53,7 @@ SymFactory::~SymFactory()
 {
 	clear();
 }
+
 
 void SymFactory::clear()
 {
@@ -159,7 +102,6 @@ void SymFactory::clear()
 			}
 		}
 		factoryError(msg);
-
 	}
 
 	// Delete all compile units
@@ -170,6 +112,7 @@ void SymFactory::clear()
 	}
 	_sources.clear();
 
+	// Delete all variables
 	for (VariableList::iterator it = _vars.begin(); it != _vars.end(); ++it) {
 		delete *it;
 	}
@@ -179,11 +122,13 @@ void SymFactory::clear()
 	for (BaseTypeList::iterator it = _types.begin(); it != _types.end(); ++it) {
 		delete *it;
 	}
-
 	_types.clear();
+
+	// Clear all further hashes and lists
 	_typesById.clear();
 	_typesByName.clear();
 	_postponedTypes.clear();
+	memset(_numerics, 0, sizeof(_numerics));
 }
 
 

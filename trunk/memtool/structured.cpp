@@ -21,6 +21,24 @@ Structured::~Structured()
 }
 
 
+uint Structured::hash() const
+{
+    uint ret = BaseType::hash();
+    ret ^= rotl32(_members.size(), 16) ^ _srcLine;
+    // To place the member hashes at different bit positions
+    uint rot = 0;
+    // Extend the hash recursively to all members
+    for (int i = 0; i < _members.size(); i++) {
+        const StructuredMember* member = _members[i];
+        ret ^=  qHash(member->name());
+        if (member->refType())
+            ret ^= rotl32(qHash(member->refType()), rot);
+        rot = (rot + 4) % 32;
+    }
+    return ret;
+}
+
+
 void Structured::addMember(StructuredMember* member)
 {
 	_members.append(member);

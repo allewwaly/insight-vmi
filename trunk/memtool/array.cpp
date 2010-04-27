@@ -19,6 +19,15 @@ BaseType::RealType Array::type() const
 }
 
 
+uint Array::hash() const
+{
+    uint ret = Pointer::hash();
+    if (_length > 0)
+        ret ^= rotl32(_length, 8);
+    return ret;
+}
+
+
 QString Array::name() const
 {
     QString len = (_length >= 0) ? QString::number(_length) : QString();

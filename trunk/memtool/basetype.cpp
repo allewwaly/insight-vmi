@@ -8,6 +8,18 @@ BaseType::BaseType(const TypeInfo& info)
 }
 
 
+uint BaseType::hash() const
+{
+    // Create a hash value based on name, size and type
+    uint ret = type();
+    if (!_name.isEmpty())
+        ret ^= qHash(_name);
+    if (_size > 0)
+        ret ^= qHash(_size);
+    return ret;
+}
+
+
 quint32 BaseType::size() const
 {
     return _size;
@@ -53,5 +65,15 @@ BaseType::RealTypeRevMap BaseType::getRealTypeRevMap()
     ret.insert(BaseType::rtVolatile, "Volatile");
     ret.insert(BaseType::rtFuncPointer, "FuncPointer");
     return ret;
+}
+
+
+bool BaseType::operator==(const BaseType& other) const
+{
+    return
+        type() == other.type() &&
+        size() == other.size() &&
+        srcLine() == other.srcLine() &&
+        name() == other.name();
 }
 

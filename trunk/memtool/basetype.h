@@ -96,6 +96,12 @@ public:
     virtual RealType type() const = 0;
 
     /**
+     * Create a hash of that type based on type(), size() and name().
+     * @return a hash value of this type
+     */
+    virtual uint hash() const;
+
+    /**
       @return the size of this type in bytes
      */
     virtual quint32 size() const;
@@ -254,6 +260,17 @@ public:
         return buf;
     }
 
+    /**
+     * This operator considers two types to be equal if their following data
+     * is equal:
+     * @li type()
+     * @li size()
+     * @li name()
+     * @li srcLine()
+     *
+     * @param other BaseType to compare to
+     * @return \c true if the BaseTypes are equal, \c false otherwise
+     */
     bool operator==(const BaseType& other) const;
 
 //    /**
@@ -318,7 +335,17 @@ protected:
 };
 
 
-
-
+/**
+ * Cyclic rotate a 32 bit integer bitwise to the left
+ * @param i value to rotate bitwise
+ * @param rot_amount the number of bits to rotate
+ * @return the value of \a i cyclicly rotated y \a rot_amount bits
+ */
+inline uint rotl32(uint i, uint rot_amount)
+{
+    rot_amount %= 32;
+    uint mask = (1 << rot_amount) - 1;
+    return (i << rot_amount) | ((i >> (32 - rot_amount)) & mask);
+}
 
 #endif // BASETYPE_H

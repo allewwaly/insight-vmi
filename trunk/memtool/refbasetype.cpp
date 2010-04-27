@@ -14,6 +14,15 @@ RefBaseType::RefBaseType(const TypeInfo& info)
 }
 
 
+uint RefBaseType::hash() const
+{
+    uint ret = BaseType::hash();
+    if (_refType)
+        ret ^= _refType->hash();
+    return ret;
+}
+
+
 //QString RefBaseType::name() const
 //{
 //    if (_refType)
