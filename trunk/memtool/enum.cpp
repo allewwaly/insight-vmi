@@ -19,9 +19,9 @@ BaseType::RealType Enum::type() const
 }
 
 
-uint Enum::hash() const
+uint Enum::hash(VisitedSet* visited) const
 {
-    uint ret = BaseType::hash();
+    uint ret = BaseType::hash(visited);
     ret ^= rotl32(_enumValues.size(), 16) ^ (_srcLine);
     // To place the enum values at different bit positions
     uint rot = 0;

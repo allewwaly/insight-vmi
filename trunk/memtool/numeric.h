@@ -26,9 +26,10 @@ public:
     /**
      * Create a hash of that type based on BaseType::hash(), bitSize() and
      * bitOffset().
+     * @param visited set of IDs of all already visited types which could cause recursion
      * @return a hash value of this type
      */
-    virtual uint hash() const;
+    virtual uint hash(VisitedSet* visited) const;
 
     int bitSize() const;
     void setBitSize(int size);

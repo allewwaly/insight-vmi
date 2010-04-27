@@ -33,9 +33,10 @@ public:
     /**
      * Create a hash of that type based on BaseType::hash(), srcLine() and the
      * enumeration values.
+     * @param visited set of IDs of all already visited types which could cause recursion
      * @return a hash value of this type
      */
-    virtual uint hash() const;
+    virtual uint hash(VisitedSet* visited) const;
 
     /**
 	 @return a string representation of this type

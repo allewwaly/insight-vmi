@@ -19,9 +19,9 @@ BaseType::RealType Array::type() const
 }
 
 
-uint Array::hash() const
+uint Array::hash(VisitedSet* visited) const
 {
-    uint ret = Pointer::hash();
+    uint ret = Pointer::hash(visited);
     if (_length > 0)
         ret ^= rotl32(_length, 8);
     return ret;

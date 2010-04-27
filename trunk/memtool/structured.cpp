@@ -21,9 +21,12 @@ Structured::~Structured()
 }
 
 
-uint Structured::hash() const
+uint Structured::hash(VisitedSet* visited) const
 {
-    uint ret = BaseType::hash();
+    if (visited->contains(_id)) return 0;
+    visited->insert(_id);
+
+    uint ret = BaseType::hash(visited);
     ret ^= rotl32(_members.size(), 16) ^ _srcLine;
     // To place the member hashes at different bit positions
     uint rot = 0;
@@ -32,7 +35,7 @@ uint Structured::hash() const
         const StructuredMember* member = _members[i];
         ret ^=  qHash(member->name());
         if (member->refType())
-            ret ^= rotl32(qHash(member->refType()), rot);
+            ret ^= rotl32(member->refType()->hash(visited), rot);
         rot = (rot + 4) % 32;
     }
     return ret;
