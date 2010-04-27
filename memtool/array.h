@@ -25,6 +25,12 @@ public:
 	virtual RealType type() const;
 
     /**
+     * Create a hash of that type based on Pointer::hash() and length()
+     * @return a hash value of this type
+     */
+    virtual uint hash() const;
+
+    /**
      * @return the name of that type, e.g. "int"
      */
     virtual QString name() const;

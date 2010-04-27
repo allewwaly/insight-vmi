@@ -20,10 +20,11 @@ public:
      */
     RefBaseType(const TypeInfo& info);
 
-    /**
-     * @return the name of that type, e.g. "int"
+     /**
+     * Create a hash of that type based on BaseType::hash() and refType()
+     * @return a hash value of this type
      */
-//    virtual QString name() const;
+    virtual uint hash() const;
 
     /**
       @return the size of this type in bytes

@@ -30,7 +30,15 @@ public:
      */
 	virtual ~Structured();
 
-	inline const MemberList& members() const
+    /**
+     * Create a hash of that type based on BaseType::hash(), srcLine() and the
+     * name and hash() of all members.
+     * @return a hash value of this type
+     */
+    virtual uint hash() const;
+
+
+    inline const MemberList& members() const
 	{
 		return _members;
 	}

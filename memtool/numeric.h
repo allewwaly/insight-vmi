@@ -12,10 +12,41 @@
 #include "debug.h"
 
 /**
+ * Generic non-template class for all numeric types
+ */
+class NumericBaseType: public BaseType
+{
+public:
+    /**
+      Constructor
+      @param info the type information to construct this type from
+     */
+    NumericBaseType(const TypeInfo& info);
+
+    /**
+     * Create a hash of that type based on BaseType::hash(), bitSize() and
+     * bitOffset().
+     * @return a hash value of this type
+     */
+    virtual uint hash() const;
+
+    int bitSize() const;
+    void setBitSize(int size);
+
+    int bitOffset() const;
+    void setBitOffset(int offset);
+
+protected:
+    int _bitSize;
+    int _bitOffset;
+};
+
+
+/**
  * Generic template class for all numeric types
  */
 template<class T, const BaseType::RealType realType>
-class Numeric: public BaseType
+class Numeric: public NumericBaseType
 {
 public:
 	/// The type that this class wraps
@@ -26,10 +57,9 @@ public:
       @param info the type information to construct this type from
      */
 	Numeric(const TypeInfo& info)
-		: BaseType(info), _type(realType), _bitSize(info.bitSize()), _bitOffset(info.bitOffset())
+		: NumericBaseType(info), _type(realType)
 	{
 	}
-
 
 	/**
 	 @return the actual type of that polimorphic variable
@@ -48,26 +78,6 @@ public:
 		return QString::number(value<T>(offset));
 	}
 
-	int bitSize() const
-	{
-	    return _bitSize;
-	}
-
-	void setBitSize(int size)
-	{
-	    _bitSize = size;
-	}
-
-	int bitOffset() const
-	{
-	    return _bitOffset;
-	}
-
-	void setBitOffset(int offset)
-	{
-	    _bitOffset = offset;
-	}
-
 	bool operator==(const Numeric& other) const
 	{
 		// Two types are equal if they have the same type and the same size.
@@ -81,8 +91,6 @@ public:
 
 protected:
 	RealType _type;
-	int _bitSize;
-	int _bitOffset;
 };
 
 
@@ -127,17 +135,6 @@ typedef Numeric<float, BaseType::rtFloat> Float;
 
 /// Represents a double precision float (64 bit)
 typedef Numeric<double, BaseType::rtDouble> Double;
-
-// TODO: Move this function to the right place and implement the hash value for each type.
-///**
-// * Return a hash value for this object.
-// */
-//uint qHash(const BaseType* key) const
-//{
-//	debugmsg("Hashing...\n");
-//	return key->type();
-//}
-
 
 
 #endif /* NUMERICTYPE_H_ */

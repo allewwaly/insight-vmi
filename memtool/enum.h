@@ -30,7 +30,14 @@ public:
 	 */
 	virtual RealType type() const;
 
-	/**
+    /**
+     * Create a hash of that type based on BaseType::hash(), srcLine() and the
+     * enumeration values.
+     * @return a hash value of this type
+     */
+    virtual uint hash() const;
+
+    /**
 	 @return a string representation of this type
 	 */
 	virtual QString toString(size_t offset) const;
