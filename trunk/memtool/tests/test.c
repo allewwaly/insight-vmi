@@ -22,6 +22,13 @@ int someFunc(int param1, char* param2)
     return 0;
 }
 
+struct Node;
+
+struct Node {
+    int i;
+    struct Node *prev, *next;
+};
+
 // Basic types
 char some_char;
 unsigned char some_uchar;
