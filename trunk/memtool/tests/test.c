@@ -29,6 +29,8 @@ struct Node {
     struct Node *prev, *next;
 };
 
+struct Node* list_head = 0;
+
 // Basic types
 char some_char;
 unsigned char some_uchar;
