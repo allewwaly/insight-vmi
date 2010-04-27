@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <QVariant>
+#include <QSet>
 #include "symbol.h"
 #include "genericexception.h"
 #include "sourceref.h"
@@ -49,6 +50,7 @@ public:
     }
 };
 
+typedef QSet<int> VisitedSet;
 
 class BaseType: public Symbol, public SourceRef
 {
@@ -97,9 +99,10 @@ public:
 
     /**
      * Create a hash of that type based on type(), size() and name().
+     * @param visited set of IDs of all already visited types which could cause recursion
      * @return a hash value of this type
      */
-    virtual uint hash() const;
+    virtual uint hash(VisitedSet* visited) const;
 
     /**
       @return the size of this type in bytes

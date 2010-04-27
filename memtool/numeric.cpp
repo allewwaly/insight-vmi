@@ -13,9 +13,9 @@ NumericBaseType::NumericBaseType(const TypeInfo& info)
 }
 
 
-uint NumericBaseType::hash() const
+uint NumericBaseType::hash(VisitedSet* visited) const
 {
-    return BaseType::hash() ^ _bitSize ^ rotl32(_bitOffset, 16);
+    return BaseType::hash(visited) ^ _bitSize ^ rotl32(_bitOffset, 16);
 }
 
 

@@ -8,7 +8,7 @@ BaseType::BaseType(const TypeInfo& info)
 }
 
 
-uint BaseType::hash() const
+uint BaseType::hash(VisitedSet* /* visited */) const
 {
     // Create a hash value based on name, size and type
     uint ret = type();

@@ -14,11 +14,11 @@ RefBaseType::RefBaseType(const TypeInfo& info)
 }
 
 
-uint RefBaseType::hash() const
+uint RefBaseType::hash(VisitedSet* visited) const
 {
-    uint ret = BaseType::hash();
+    uint ret = BaseType::hash(visited);
     if (_refType)
-        ret ^= _refType->hash();
+        ret ^= _refType->hash(visited);
     return ret;
 }
 
