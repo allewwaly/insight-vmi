@@ -25,24 +25,24 @@
 
 
 //------------------------------------------------------------------------------
-/**
- * Hash the various descendents of BaseType by their discreminating properties
- * (except ID): type(), size(), name(), or their srcLine() and members(),
- * depending on their type
- * @param key the BaseType object to hash
- * @return
- */
-uint qHash(const BaseType* key)
-{
-    assert(key != 0);
-
-    return key->hash();
-}
+///**
+// * Hash the various descendents of BaseType by their discreminating properties
+// * (except ID): type(), size(), name(), or their srcLine() and members(),
+// * depending on their type
+// * @param key the BaseType object to hash
+// * @return
+// */
+//uint qHash(const BaseType* key)
+//{
+//    assert(key != 0);
+//
+//    return key->hash();
+//}
 
 //------------------------------------------------------------------------------
 
 SymFactory::SymFactory()
-	: _lastStructure(0)
+	: _lastStructure(0), _typeFoundById(0), _typeFoundByHash(0)
 {
 	// Initialize numerics array
     memset(_numerics, 0, sizeof(_numerics));
@@ -127,8 +127,13 @@ void SymFactory::clear()
 	// Clear all further hashes and lists
 	_typesById.clear();
 	_typesByName.clear();
+	_typesByHash.clear();
 	_postponedTypes.clear();
 	memset(_numerics, 0, sizeof(_numerics));
+
+	// Reset other vars
+	_typeFoundById = 0;
+	_typeFoundByHash = 0;
 }
 
 
@@ -137,20 +142,24 @@ BaseType* SymFactory::findBaseTypeById(int id) const
 	return _typesById.value(id);
 }
 
+
 Variable* SymFactory::findVarById(int id) const
 {
 	return _varsById.value(id);
 }
+
 
 BaseType* SymFactory::findBaseTypeByName(const QString & name) const
 {
 	return _typesByName.value(name);
 }
 
+
 Variable* SymFactory::findVarByName(const QString & name) const
 {
 	return _varsByName.value(name);
 }
+
 
 BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 {

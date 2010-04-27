@@ -73,6 +73,9 @@ typedef QMultiHash<QString, Variable*> VariableStringHash;
 /// Hash table to find all types by ID
 typedef QHash<int, BaseType*> BaseTypeIntHash;
 
+/// Hash table to find all types by their hash
+typedef QMultiHash<uint, BaseType*> BaseTypeUIntHash;
+
 /// Hash table to find all variables by ID
 typedef QHash<int, Variable*> VariableIntHash;
 
@@ -82,8 +85,8 @@ typedef QMultiHash<int, ReferencingType*> RefTypeMultiHash;
 /// Has table to find equivalent types based on a per-type hash function
 typedef QMultiHash<const BaseType*, BaseType*> BaseTypeMultiHash;
 
-/// This function is required to use pointer to BaseType as a key in a QHash
-uint qHash(const BaseType* key);
+// /// This function is required to use pointer to BaseType as a key in a QHash
+// uint qHash(const BaseType* key);
 
 /**
  * Creates and holds all defined types
@@ -132,10 +135,43 @@ protected:
 	template<class T>
 	inline T* getTypeInstance(const TypeInfo& info)
 	{
+	    // First, try to find the type based on its ID
 		BaseType* t = findBaseTypeById(info.id());
 		if (!t) {
 			t = new T(info);
+			// Try to find the type based on its hash
+			VisitedSet visited;
+			uint hash = t->hash(&visited);
+            bool foundByHash = false;
+
+			if (_typesByHash.contains(hash)) {
+			    BaseTypeList list = _typesByHash.values(hash);
+                // Go through the list and make sure we found the correct type
+			    for (int i = 0; i < list.size(); i++) {
+			        if (*list[i] == *t) {
+			            // We found it, so delete the previously created object
+			            // and return the found one
+			            delete t;
+			            t = list[i];
+                        foundByHash = true;
+			            _typeFoundByHash++;
+			        }
+			    }
+			}
+            // Either the hash did not contain this type, or it was just a
+			// collision, so add it to the type-by-hash table.
+            if (!foundByHash)
+                _typesByHash.insert(hash, t);
+
+            // Only add to the list if this is a new type
+            if (isNewType(info, t))
+                _types.append(t);
+
+
 			// insert(t);
+		}
+		else {
+		    _typeFoundById++;
 		}
 		return dynamic_cast<T*>(t);
 	}
@@ -170,8 +206,12 @@ private:
 	BaseTypeList _types;              ///< Holds all BaseType objects
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
+	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
 	Structured* _lastStructure;
+
+	uint _typeFoundById;
+	uint _typeFoundByHash;
 
 	BaseType* _numerics[16];          ///< Contains the types of numerics that have already been created
 };
