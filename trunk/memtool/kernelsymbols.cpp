@@ -14,7 +14,7 @@
 #include <QTime>
 #include "typeinfo.h"
 #include "symfactory.h"
-//#include "compileunit.h"
+#include "structuredmember.h"
 #include "debug.h"
 
 #define parserError(x) do { throw ParserException((x), __FILE__, __LINE__); } while (0)
@@ -122,15 +122,17 @@ void KernelSymbols::Parser::finishLastSymbol()
         case hsEnumerator:
             _info.addEnumValue(_subInfo.name(), _subInfo.constValue().toInt());
             break;
+        case hsMember:
+            _info.members().append(new StructuredMember(_subInfo));
+            break;
         default:
             parserError(QString("Unhandled sub-type: %1").arg(_subInfo.symType()));
         }
-        _subInfo.clear();
     }
 
     // If this is a symbol for a multi-part type, continue parsing
     // and save data into subInfo
-    if (_hdrSym & (hsSubrangeType|hsEnumerator)) {
+    if (_hdrSym & (hsSubrangeType|hsEnumerator|hsMember)) {
         _pInfo = &_subInfo;
     }
     // Otherwise finish the main-symbol and save parsed data into
@@ -145,9 +147,9 @@ void KernelSymbols::Parser::finishLastSymbol()
            )
             _factory->addSymbol(_info);
         _pInfo = &_info;
-        // Reset all data for a new symbol
-        _pInfo->clear();
     }
+    // Reset all data for a new symbol
+    _pInfo->clear();
 }
 
 
@@ -200,11 +202,6 @@ void KernelSymbols::Parser::parseParam(const ParamSymbolType param, QString valu
         break;
     }
     case psConstValue: {
-//        if (value.startsWith("-"))
-//            parseLongLong(l, value, &ok);
-//        else
-//            parseULongLong(l, value, &ok);
-
         _pInfo->setConstValue(value);
         break;
     }
