@@ -8,16 +8,24 @@
 #ifndef REFERENCINGTYPE_H_
 #define REFERENCINGTYPE_H_
 
+#include "typeinfo.h"
+
 class BaseType;
 
 class ReferencingType
 {
 public:
-	/**
-	 * Constructor
-	 * @param type
-	 */
-	ReferencingType(const BaseType* type = 0);
+    /**
+     * Constructor
+     * @param type the type this object is referencing
+     */
+    ReferencingType(const BaseType* type = 0);
+
+    /**
+      Constructor
+      @param info the type information to construct this type from
+     */
+    ReferencingType(const TypeInfo& info);
 
     /**
      * @return the type this pointer points to
@@ -30,8 +38,20 @@ public:
      */
     void setRefType(const BaseType* type);
 
+    /**
+     * @return ID of the type this object is referencing
+     */
+    int refTypeId() const;
+
+    /**
+     * Sets the new ID of the type this object is referencing
+     * @param id new ID
+     */
+    void setRefTypeId(int id);
+
 protected:
-	const BaseType *_refType;
+	const BaseType *_refType;  ///< holds the type this object is referencing
+    int _refTypeId;            ///< holds ID of the type this object is referencing
 };
 
 #endif /* REFERENCINGTYPE_H_ */
