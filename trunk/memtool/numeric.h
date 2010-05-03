@@ -79,16 +79,16 @@ public:
 		return QString::number(value<T>(offset));
 	}
 
-	bool operator==(const Numeric& other) const
-	{
-		// Two types are equal if they have the same type and the same size.
-		debugmsg(this->type() << "\n");
-		debugmsg(other.type() << "\n");
-		if (this->type() == other.type() && this->size() == other._size)
-			return true;
-		else
-			return false;
-	}
+//	bool operator==(const Numeric& other) const
+//	{
+//		// Two types are equal if they have the same type and the same size.
+//		debugmsg(this->type() << "\n");
+//		debugmsg(other.type() << "\n");
+//		if (this->type() == other.type() && this->size() == other._size)
+//			return true;
+//		else
+//			return false;
+//	}
 
 protected:
 	RealType _type;
