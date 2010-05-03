@@ -6,7 +6,8 @@
  */
 
 #include "typeinfo.h"
-
+#include "structuredmember.h"
+#include <QtAlgorithms>
 
 TypeInfo::TypeInfo()
 {
@@ -30,6 +31,7 @@ void TypeInfo::clear()
 	_srcDir.clear();
 	_srcFileId = _srcLine = -1;
 	_enumValues.clear();
+	_members.clear();
 }
 
 
@@ -234,6 +236,18 @@ void TypeInfo::addEnumValue(const QString& name, qint32 value)
 }
 
 
+MemberList& TypeInfo::members()
+{
+    return _members;
+}
+
+
+const MemberList& TypeInfo::members() const
+{
+    return _members;
+}
+
+
 QString TypeInfo::dump() const
 {
 	static HdrSymMap hdrMap = getHdrSymMap();
@@ -249,21 +263,42 @@ QString TypeInfo::dump() const
 			enc = it.key();
 
 	QString ret;
-	if (_id >= 0) 		     ret += QString("  id:            0x%1\n").arg(_id, 0, 16);
-	if (_symType >= 0)       ret += QString("  symType:       %1 (%2)\n").arg(_symType).arg(symType);
-	if (!_name.isEmpty())    ret += QString("  name:          %1\n").arg(_name);
-	if (_byteSize > 0)       ret += QString("  byteSize:      %1\n").arg(_byteSize);
-    if (_bitSize >= 0)       ret += QString("  bitSize :      %1\n").arg(_bitSize);
-    if (_bitOffset >= 0)     ret += QString("  bitOffset :    %1\n").arg(_bitOffset);
-	if (_enc > 0)            ret += QString("  enc:           %1 (%2)\n").arg(_enc).arg(enc);
-	if (_location > 0)       ret += QString("  location:      %1\n").arg(_location);
-	if (_dataMemberLoc >= 0) ret += QString("  dataMemberLoc: %1\n").arg(_dataMemberLoc);
-	if (_refTypeId >= 0)     ret += QString("  refType:       0x%1\n").arg(_refTypeId, 0, 16);
-	if (_upperBound >= 0)    ret += QString("  upperBound:    %1\n").arg(_upperBound);
-	if (!_srcDir.isEmpty())  ret += QString("  srcDir:        %1\n").arg(_srcDir);
-	if (_srcFileId >= 0)     ret += QString("  srcFile:       %1\n").arg(_srcFileId);
-	if (_srcLine >= 0)       ret += QString("  srcLine:       %1\n").arg(_srcLine);
-	if (_sibling >= 0)       ret += QString("  sibling:       %1\n").arg(_sibling);
+	if (_id >= 0) 		        ret += QString("  id:            0x%1\n").arg(_id, 0, 16);
+	if (_symType >= 0)          ret += QString("  symType:       %1 (%2)\n").arg(_symType).arg(symType);
+	if (!_name.isEmpty())       ret += QString("  name:          %1\n").arg(_name);
+	if (_byteSize > 0)          ret += QString("  byteSize:      %1\n").arg(_byteSize);
+    if (_bitSize >= 0)          ret += QString("  bitSize :      %1\n").arg(_bitSize);
+    if (_bitOffset >= 0)        ret += QString("  bitOffset :    %1\n").arg(_bitOffset);
+	if (_enc > 0)               ret += QString("  enc:           %1 (%2)\n").arg(_enc).arg(enc);
+	if (_location > 0)          ret += QString("  location:      %1\n").arg(_location);
+	if (_dataMemberLoc >= 0)    ret += QString("  dataMemberLoc: %1\n").arg(_dataMemberLoc);
+	if (_refTypeId >= 0)        ret += QString("  refType:       0x%1\n").arg(_refTypeId, 0, 16);
+	if (_upperBound >= 0)       ret += QString("  upperBound:    %1\n").arg(_upperBound);
+	if (!_srcDir.isEmpty()   )  ret += QString("  srcDir:        %1\n").arg(_srcDir);
+	if (_srcFileId >= 0)        ret += QString("  srcFile:       %1\n").arg(_srcFileId);
+	if (_srcLine >= 0)          ret += QString("  srcLine:       %1\n").arg(_srcLine);
+	if (_sibling >= 0)          ret += QString("  sibling:       %1\n").arg(_sibling);
+	if (!_enumValues.isEmpty()) {
+	  ret +=                           QString("  enumValues:    ");
+	  QList<qint32> keys = _enumValues.keys();
+	  qSort(keys);
+	  for (int i = 0; i < keys.size(); i++) {
+        ret += _enumValues[keys[i]];
+        if (i + 1 < keys.size())
+            ret += ", ";
+	  }
+	  ret += "\n";
+	}
+    if (!_members.isEmpty()) {
+      ret +=                           QString("  members:       ");
+      for (int i = 0; i < _members.size(); i++) {
+        ret += _members[i]->name();
+        if (i + 1 < _members.size())
+            ret += ", ";
+      }
+      ret += "\n";
+    }
+
 	return ret;
 }
 

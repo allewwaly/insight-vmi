@@ -8,7 +8,7 @@
 #include "structured.h"
 
 Structured::Structured(const TypeInfo& info)
-	: BaseType(info)
+	: BaseType(info), _members(info.members())
 {
 }
 
@@ -33,9 +33,13 @@ uint Structured::hash(VisitedSet* visited) const
     // Extend the hash recursively to all members
     for (int i = 0; i < _members.size(); i++) {
         const StructuredMember* member = _members[i];
-        ret ^=  qHash(member->name());
-        if (member->refType())
-            ret ^= rotl32(member->refType()->hash(visited), rot);
+        ret ^= rotl32(member->offset(), rot) ^ qHash(member->name());
+        // Recursive hashing should not be necessary, because it is highly
+        // unlikely that the struct name, source line, size and all member names
+        // and offsets are equal AND that the members still have different
+        // types.
+//        if (member->refType())
+//            ret ^= rotl32(member->refType()->hash(visited), rot);
         rot = (rot + 4) % 32;
     }
     return ret;
