@@ -30,7 +30,7 @@ Shell::Shell(const KernelSymbols& symbols)
                 "Displays some help for a command",
                 "Without any arguments, this command displays a list of all "
                 "commands. For more detailed information about a command, try "
-                "\"help <command>\" for any command."));
+                "\"help <command>\"."));
 
     _commands.insert("list",
             Command(
@@ -229,7 +229,7 @@ int Shell::cmdListTypes(QStringList /*args*/)
     CompileUnit* unit = 0;
 
     if (types.isEmpty()) {
-        _out << "There were no type references.";
+        _out << "There are no type references.";
         return 0;
     }
 
@@ -396,7 +396,7 @@ int Shell::cmdInfo(QStringList args)
 		args.pop_front();
 
 		iv = s.toInt(&ok, 16);
-		
+
 		if(ok) //The argument had been an id
 		{
 			if(!((result = _sym.factory().findBaseTypeById(iv)) ||
@@ -412,7 +412,7 @@ int Shell::cmdInfo(QStringList args)
 			s.append(args[0].toLower());
 			args.pop_front();
 		}
-		
+
 		if(!((result = _sym.factory().findBaseTypeByName(s)) ||
 					(vresult = _sym.factory().findVarByName(s))))
 		{
@@ -504,7 +504,7 @@ int Shell::cmdInfo(QStringList args)
 int Shell::cmdShow(QStringList args)
 {
     Variable * variable = 0;
-		
+
 		// Show cmdHelp, of no argument is given
     if (!args.isEmpty()) {
 
@@ -517,7 +517,7 @@ int Shell::cmdShow(QStringList args)
 					_out << "Error: Unknown variable \"" << s << "\"" << endl;
 				}
 			return 0;
-				
+
     }
 
     return cmdHelp(QStringList("show"));
