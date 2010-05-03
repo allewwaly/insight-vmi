@@ -394,6 +394,8 @@ void KernelSymbols::Parser::parse()
 	    finishLastSymbol();
 
 	std::cout << "\rParsing all " << _line << " lines finished." << std::endl;
+
+    _factory->parsingFinished();
 }
 
 

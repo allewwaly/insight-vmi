@@ -37,9 +37,11 @@ Shell::Shell(const KernelSymbols& symbols)
                 &Shell::cmdList,
                 "Lists various types of read symbols",
                 "This command lists various types of read symbols.\n"
-                "  list sources      List the source files\n"
-                "  list types        List the types\n"
-                "  list variables    List the variables"));
+                "  list sources          List the source files\n"
+                "  list types            List the types\n"
+                "  list types-by-id      List the types-by-ID hash\n"
+                "  list types-by-name    List the types-by-name hash\n"
+                "  list variables        List the variables"));
 
     _commands.insert("info",
             Command(
@@ -179,8 +181,14 @@ int Shell::cmdList(QStringList args)
         if (QString("sources").startsWith(s)) {
             return cmdListSources(args);
         }
-        else if (QString("types").startsWith(s)) {
+        else if (s.length() <= 5 && QString("types").startsWith(s)) {
             return cmdListTypes(args);
+        }
+        else if (s.length() > 9 && QString("types-by-id").startsWith(s)) {
+            return cmdListTypesById(args);
+        }
+        else if (s.length() > 9 && QString("types-by-name").startsWith(s)) {
+            return cmdListTypesByName(args);
         }
         else if (QString("variables").startsWith(s)) {
             return cmdListVars(args);
@@ -238,21 +246,24 @@ int Shell::cmdListTypes(QStringList /*args*/)
     const int w_type = 12;
     const int w_name = 24;
     const int w_size = 5;
-    const int w_src = 14;
-    const int w_line = 10;
-    const int w_total = w_id + w_type + w_name + w_size + w_src + w_line;
+    const int w_src = 15;
+    const int w_line = 5;
+    const int w_colsep = 2;
+    const int w_total = w_id + w_type + w_name + w_size + w_src + w_line + 2*w_colsep;
 
-    _out << qSetFieldWidth(w_id)  << right << "ID" << qSetFieldWidth(0) << "  "
+    _out << qSetFieldWidth(w_id)  << right << "ID"
+         << qSetFieldWidth(w_colsep) << " "
          << qSetFieldWidth(w_type) << left << "Type"
          << qSetFieldWidth(w_name) << "Name"
-         << qSetFieldWidth(w_size)  << right << "Size" << qSetFieldWidth(0) << "  "
+         << qSetFieldWidth(w_size)  << right << "Size"
+         << qSetFieldWidth(w_colsep) << " "
          << qSetFieldWidth(w_src) << left << "Source"
-         << qSetFieldWidth(w_line) << left << "Line"
+         << qSetFieldWidth(w_line) << right << "Line"
          << qSetFieldWidth(0)  << endl;
 
     hline(w_total);
 
-    QString src;
+    QString src, srcLine;
     for (int i = 0; i < types.size(); i++) {
         BaseType* type = types[i];
         // Construct name and line of the source file
@@ -267,17 +278,127 @@ int Shell::cmdListTypes(QStringList /*args*/)
         else
             src = "--";
 
-        _out << qSetFieldWidth(w_id)  << right << hex << type->id() << qSetFieldWidth(0) << "  "
+        if (type->srcLine() > 0)
+            srcLine = QString::number(type->srcLine());
+        else
+            srcLine = "--";
+
+        _out << qSetFieldWidth(w_id)  << right << hex << type->id()
+             << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << tRevMap[type->type()]
              << qSetFieldWidth(w_name) << (type->name().isEmpty() ? "(none)" : type->name())
-             << qSetFieldWidth(w_size) << right << type->size() << qSetFieldWidth(0) << "  "
+             << qSetFieldWidth(w_size) << right << type->size()
+             << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_src) << left << src
-             << qSetFieldWidth(w_line) << left << dec << type->srcLine()
+             << qSetFieldWidth(w_line) << right << srcLine
              << qSetFieldWidth(0) << endl;
     }
 
     hline(w_total);
     _out << "Total types: " << dec << types.size() << endl;
+
+    return 0;
+}
+
+
+int Shell::cmdListTypesById(QStringList /*args*/)
+{
+    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
+    QList<int> ids = _sym.factory()._typesById.keys();
+
+    if (ids.isEmpty()) {
+        _out << "There are no types by ID.";
+        return 0;
+    }
+
+    qSort(ids);
+
+    // Find out required field width (the types are sorted by ascending ID)
+    const int w_id = getFieldWidth(ids.last());
+    const int w_realId = getFieldWidth(ids.last()) <= 6 ? 6 : getFieldWidth(ids.last());
+    const int w_type = 12;
+    const int w_name = 24;
+    const int w_size = 5;
+    const int w_colsep = 2;
+    const int w_total = w_id + w_realId + w_type + w_name + w_size + 3*w_colsep;
+
+    _out << qSetFieldWidth(w_id)  << right << "ID"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_realId) << "RealID"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_type) << left << "Type"
+         << qSetFieldWidth(w_name) << "Name"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_size)  << right << "Size"
+         << qSetFieldWidth(0)  << endl;
+
+    hline(w_total);
+
+    for (int i = 0; i < ids.size(); i++) {
+        BaseType* type = _sym.factory()._typesById.value(ids[i]);
+        // Construct name and line of the source file
+        _out << qSetFieldWidth(w_id)  << right << hex << ids[i]
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_realId) << type->id()
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_type) << left << tRevMap[type->type()]
+             << qSetFieldWidth(w_name) << (type->name().isEmpty() ? "(none)" : type->name())
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_size) << right << type->size() << qSetFieldWidth(0)
+             << qSetFieldWidth(0) << endl;
+    }
+
+    hline(w_total);
+    _out << "Total types by ID: " << dec << _sym.factory()._typesById.size() << endl;
+
+    return 0;
+}
+
+
+int Shell::cmdListTypesByName(QStringList /*args*/)
+{
+    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
+    QList<QString> names = _sym.factory()._typesByName.keys();
+
+    if (names.isEmpty()) {
+        _out << "There are no types by ID.";
+        return 0;
+    }
+
+    qSort(names);
+
+    // Find out required field width (the types are sorted by ascending ID)
+    const int w_id = getFieldWidth(_sym.factory().types().last()->id());
+    const int w_type = 12;
+    const int w_name = 24;
+    const int w_size = 5;
+    const int w_colsep = 2;
+    const int w_total = w_id + w_type + w_name + w_size + 2*w_colsep;
+
+    _out << qSetFieldWidth(w_id)  << right << "ID" << qSetFieldWidth(0)
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_type) << left << "Type"
+         << qSetFieldWidth(w_name) << "Name"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_size)  << right << "Size" << qSetFieldWidth(0)
+         << qSetFieldWidth(0)  << endl;
+
+    hline(w_total);
+
+    for (int i = 0; i < names.size(); i++) {
+        BaseType* type = _sym.factory()._typesByName.value(names[i]);
+        // Construct name and line of the source file
+        _out << qSetFieldWidth(w_id)  << right << hex << type->id()
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_type) << left << tRevMap[type->type()]
+             << qSetFieldWidth(w_name) << names[i]
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_size) << right << type->size()
+             << qSetFieldWidth(0) << endl;
+    }
+
+    hline(w_total);
+    _out << "Total types by name: " << dec << _sym.factory()._typesByName.size() << endl;
 
     return 0;
 }
@@ -300,8 +421,8 @@ int Shell::cmdListVars(QStringList /*args*/)
     const int w_typename = 24;
     const int w_name = 24;
     const int w_size = 5;
-    const int w_src = 12;
-    const int w_line = 10;
+    const int w_src = 15;
+    const int w_line = 5;
     const int w_colsep = 2;
     const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + w_line + 5*w_colsep;
 
