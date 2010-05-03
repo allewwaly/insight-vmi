@@ -3,7 +3,7 @@
 #include <QIODevice>
 
 BaseType::BaseType(const TypeInfo& info)
-        : Symbol(info), _size(info.byteSize())
+        : Symbol(info), SourceRef(info), _size(info.byteSize())
 {
 }
 

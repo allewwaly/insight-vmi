@@ -7,8 +7,8 @@
 
 #include "sourceref.h"
 
-SourceRef::SourceRef(int srcFile, int srcLine)
-	: _srcFile(srcFile), _srcLine(srcLine)
+SourceRef::SourceRef(const TypeInfo& info)
+	: _srcFile(info.srcFileId()), _srcLine(info.srcLine())
 {
 }
 
