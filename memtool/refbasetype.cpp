@@ -9,7 +9,7 @@
 #include <assert.h>
 
 RefBaseType::RefBaseType(const TypeInfo& info)
-	: BaseType(info)
+	: BaseType(info), ReferencingType(info)
 {
 }
 

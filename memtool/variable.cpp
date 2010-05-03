@@ -12,7 +12,7 @@
 
 
 Variable::Variable(const TypeInfo& info)
-	: Symbol(info), _offset(info.location())
+	: Symbol(info), ReferencingType(info), SourceRef(info), _offset(info.location())
 {
 }
 

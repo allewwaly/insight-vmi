@@ -8,6 +8,8 @@
 #ifndef SOURCEREF_H_
 #define SOURCEREF_H_
 
+#include "typeinfo.h"
+
 class SourceRef
 {
 public:
@@ -17,7 +19,7 @@ public:
 	 * @param srcLine
 	 * @return
 	 */
-	SourceRef(int srcFile = -1, int srcLine = -1);
+	SourceRef(const TypeInfo& info);
 
     /**
       @return the ID of the source file in which this type was declared
