@@ -23,6 +23,7 @@ class Variable;
 #include "numeric.h"
 #include "typeinfo.h"
 #include "genericexception.h"
+#include "structured.h"
 
 
 /**
@@ -139,6 +140,18 @@ protected:
 		BaseType* t = findBaseTypeById(info.id());
 		if (!t) {
 			t = new T(info);
+            // If this is a structured type, then try to resolve the referenced
+			// types of all members.
+			if (info.symType() & (hsStructureType | hsUnionType)) {
+			    Structured* s = dynamic_cast<Structured*>(t);
+                assert(s != 0);
+
+                // Find referenced type for all members
+                for (int i = 0; i < s->members().size(); i++) {
+                    resolveReference(s->members().at(i));
+			    }
+			}
+
 			// Try to find the type based on its hash
 			VisitedSet visited;
 			uint hash = t->hash(&visited);
@@ -164,11 +177,10 @@ protected:
                 _typesByHash.insert(hash, t);
 
             // Only add to the list if this is a new type
-            if (isNewType(info, t))
-                _types.append(t);
+//            if (isNewType(info, t))
+//                _types.append(t);
 
-
-			// insert(t);
+			 insert(info, t);
 		}
 		else {
 		    _typeFoundById++;
@@ -199,7 +211,17 @@ protected:
 	void insert(Variable* var);
 
 private:
-	CompileUnitIntHash _sources;      ///< Holds all source files
+    /**
+     * Tries to resolve the type reference of a ReferencingType object \a ref.
+     * If the reference cannot be resolved, \a ref is added to the
+     * _postponedTypes hash for later resolution.
+     * @param ref the referencing type to be resolved
+     * @return \c true if the type could be resolved, \c false if it was added
+     * to the _postponedTypes hash.
+     */
+    bool resolveReference(ReferencingType* ref);
+
+    CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
 	VariableStringHash _varsByName;   ///< Holds all Variable objects, indexed by name
 	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
@@ -208,12 +230,11 @@ private:
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
-	Structured* _lastStructure;
 
 	uint _typeFoundById;
 	uint _typeFoundByHash;
 
-	BaseType* _numerics[16];          ///< Contains the types of numerics that have already been created
+//	BaseType* _numerics[16];          ///< Contains the types of numerics that have already been created
 };
 
 #endif /* TYPEFACTORY_H_ */

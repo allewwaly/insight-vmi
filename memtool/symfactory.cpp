@@ -42,10 +42,10 @@
 //------------------------------------------------------------------------------
 
 SymFactory::SymFactory()
-	: _lastStructure(0), _typeFoundById(0), _typeFoundByHash(0)
+	: _typeFoundById(0), _typeFoundByHash(0)
 {
 	// Initialize numerics array
-    memset(_numerics, 0, sizeof(_numerics));
+//    memset(_numerics, 0, sizeof(_numerics));
 }
 
 
@@ -129,7 +129,7 @@ void SymFactory::clear()
 	_typesByName.clear();
 	_typesByHash.clear();
 	_postponedTypes.clear();
-	memset(_numerics, 0, sizeof(_numerics));
+//	memset(_numerics, 0, sizeof(_numerics));
 
 	// Reset other vars
 	_typeFoundById = 0;
@@ -165,27 +165,29 @@ BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 {
 	BaseType* t = 0;
 
-	// Construct index into instance array from byte size and encoding
-    int index = 0;
-
-	switch (info.enc()) {
-	case eSigned:   index |= 0; break;
-    case eUnsigned: index |= 1; break;
-    case eBoolean:  index |= 2; break;
-    case eFloat:    index |= 3; break;
-    default: factoryError(QString("Illegal encoding for numeric type: %1").arg(info.enc())); break;
-	}
-	switch (info.byteSize()) {
-    case 1: index |= (0 << 2); break;
-    case 2: index |= (1 << 2); break;
-    case 4: index |= (2 << 2); break;
-    case 8: index |= (3 << 2); break;
-    default: factoryError(QString("Illegal size for numeric type: %2").arg(info.byteSize()));
-	}
-
-	// If an instance for that type already exists, return it
-	if (_numerics[index])
-	    return _numerics[index];
+//	// Construct index into instance array from byte size and encoding
+//    int index = 0;
+//
+//	switch (info.enc()) {
+//	case eSigned:   index |= 0; break;
+//    case eUnsigned: index |= 1; break;
+//    case eBoolean:  index |= 2; break;
+//    case eFloat:    index |= 3; break;
+//    default: factoryError(QString("Illegal encoding for numeric type: %1").arg(info.enc())); break;
+//	}
+//	switch (info.byteSize()) {
+//    case 1: index |= (0 << 2); break;
+//    case 2: index |= (1 << 2); break;
+//    case 4: index |= (2 << 2); break;
+//    case 8: index |= (3 << 2); break;
+//    default: factoryError(QString("Illegal size for numeric type: %2").arg(info.byteSize()));
+//	}
+//
+//	// If an instance for that type already exists, return it
+//	if (_numerics[index]) {
+//	    insert(info, _numerics[index]);
+//	    return _numerics[index];
+//	}
 
 	// Otherwise create a new instance
 	switch (info.enc()) {
@@ -260,9 +262,10 @@ BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 	if (!t)
 		factoryError(QString("Illegal combination of encoding (%1) and info.size() (%2)").arg(info.enc()).arg(info.byteSize()));
 
-	// Save the instance for future reference
-	_numerics[index] = t;
+//	// Save the instance for future reference
+//	_numerics[index] = t;
 
+	// insert() is implicitly called by getTypeInstance() above
 	return t;
 }
 
@@ -298,12 +301,12 @@ bool SymFactory::isNewType(const TypeInfo& info, BaseType* type) const
 
 void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 {
+    // Insert new ID/type relation into lookup tables
 	_typesById.insert(info.id(), target);
 	if (!info.name().isEmpty())
 	    _typesByName.insert(info.name(), target);
 
-
-	// See if we have types with missing references waiting
+	// See if we have types with missing references to the given type
 	if (_postponedTypes.contains(info.id())) {
 		QList<ReferencingType*> list = _postponedTypes.values(info.id());
 
@@ -316,18 +319,11 @@ void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 
 			// Add the missing reference according to type
 			t->setRefType(target);
-				//		default:
-				//			factoryError(
-				//					QString("Don't know how to add a reference to type %1 (0x%2)")
-				//						.arg(type->name())
-				//						.arg(type->id(), 0, 16));
-				//			break;
 			++it;
 		}
 
 		// Delete the entry from the hash
 		_postponedTypes.remove(info.id());
-
 	}
 }
 
@@ -391,26 +387,15 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	if (!isSymbolValid(info))
 		factoryError(QString("Type information for the following symbol is incomplete:\n%1").arg(info.dump()));
 
-	SourceRef* src = 0;
-	BaseType* base = 0;
 	ReferencingType* ref = 0;
 
 	switch(info.symType()) {
 	case hsArrayType: {
-		Array* a = getTypeInstance<Array>(info);
-		insert(info, a);
-		if (isNewType(info, a)) {
-		    src = a;
-		    ref = a;
-		}
+		ref = getTypeInstance<Array>(info);
 		break;
 	}
 	case hsBaseType: {
-		BaseType* n = getNumericInstance(info);
-		insert(info, n);
-		// Only set the source references for a new type
-		if (isNewType(info, n))
-		    src = n;
+		getNumericInstance(info);
 		break;
 	}
 	case hsCompileUnit: {
@@ -419,88 +404,39 @@ void SymFactory::addSymbol(const TypeInfo& info)
 		break;
 	}
 	case hsConstType: {
-	    ConstType* c = getTypeInstance<ConstType>(info);
-	    insert(info, c);
-        if (isNewType(info, c)) {
-            src = c;
-            ref = c;
-        }
+	    ref = getTypeInstance<ConstType>(info);
 	    break;
 	}
 	case hsEnumerationType: {
-		Enum* e = getTypeInstance<Enum>(info);
-		insert(info, e);
-        if (isNewType(info, e))
-            src = e;
-		break;
-	}
-	case hsMember: {
-		// Create and add the member
-		StructuredMember* m = new StructuredMember(info);
-		src = m;
-		ref = m;
-
-		if (!_lastStructure)
-			factoryError(QString("Parent structure/union 0x%1 not found for member %2").arg(info.refTypeId(), 0, 16).arg(info.name()));
-		else
-			_lastStructure->addMember(m);
+		getTypeInstance<Enum>(info);
 		break;
 	}
 	case hsPointerType: {
-		Pointer* p = getTypeInstance<Pointer>(info);
-		insert(info, p);
-        if (isNewType(info, p)) {
-            src = p;
-            ref = p;
-        }
+		ref = getTypeInstance<Pointer>(info);
 		break;
 	}
 	case hsSubroutineType: {
-	    FuncPointer* p = getTypeInstance<FuncPointer>(info);
-	    insert(info, p);
-        if (isNewType(info, p))
-            src = p;
-        // ref = p;
+	    getTypeInstance<FuncPointer>(info);
 	    break;
 	}
-	case hsStructureType: {
-		_lastStructure = 0;
-		Struct* s = getTypeInstance<Struct>(info);
-		insert(info, s);
-        if (isNewType(info, s))
-            src = s;
-		_lastStructure = s;
-		break;
-	}
 	case hsTypedef: {
-        Typedef* t = getTypeInstance<Typedef>(info);
-        insert(info, t);
-        src = t;
-        ref = t;
+        ref = getTypeInstance<Typedef>(info);
         break;
 	}
+    case hsStructureType:
     case hsUnionType: {
-        _lastStructure = 0;
-        Union* u = getTypeInstance<Union>(info);
-        insert(info, u);
-        if (isNewType(info, u))
-            src = u;
-        _lastStructure = u;
+        if (info.symType() == hsStructureType)
+            getTypeInstance<Struct>(info);
+        else
+            getTypeInstance<Union>(info);
         break;
     }
 	case hsVariable: {
-		Variable* i = getVarInstance(info);
-		src = i;
-		ref = i;
+		ref = getVarInstance(info);
 		break;
 	}
 	case hsVolatileType: {
-	    VolatileType* v = getTypeInstance<VolatileType>(info);
-	    insert(info, v);
-        if (isNewType(info, v)) {
-            src = v;
-            ref = v;
-        }
+	    ref = getTypeInstance<VolatileType>(info);
         break;
 	}
 	default: {
@@ -511,20 +447,28 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	}
 
 	// Add the base-type that this type is referencing
-	if (ref) {
-		if (! (base = findBaseTypeById(info.refTypeId())) ) {
-			// Add this type into the waiting queue
-			_postponedTypes.insert(info.refTypeId(), ref);
-		}
-		else
-			ref->setRefType(base);
-	}
+	if (ref)
+	    resolveReference(ref);
+}
 
-	// Set generic type information
-	if (src && info.srcFileId() >= 0) {
-		src->setSrcFile(info.srcFileId());
-		src->setSrcLine(info.srcLine());
-	}
+
+bool SymFactory::resolveReference(ReferencingType* ref)
+{
+    assert(ref != 0);
+
+    if (ref->refType())
+        return true;
+
+    BaseType* base = 0;
+    if (! (base = findBaseTypeById(ref->refTypeId())) ) {
+        // Add this type into the waiting queue
+        _postponedTypes.insert(ref->refTypeId(), ref);
+        return false;
+    }
+    else {
+        ref->setRefType(base);
+        return true;
+    }
 }
 
 
