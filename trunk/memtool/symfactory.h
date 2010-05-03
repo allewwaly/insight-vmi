@@ -94,6 +94,7 @@ typedef QMultiHash<const BaseType*, BaseType*> BaseTypeMultiHash;
  */
 class SymFactory
 {
+    friend class Shell;
 public:
 	SymFactory();
 
@@ -132,6 +133,8 @@ public:
 		return _vars;
 	}
 
+	void parsingFinished();
+
 protected:
 	template<class T>
 	inline T* getTypeInstance(const TypeInfo& info)
@@ -161,7 +164,7 @@ protected:
 			    BaseTypeList list = _typesByHash.values(hash);
                 // Go through the list and make sure we found the correct type
 			    for (int i = 0; i < list.size(); i++) {
-			        if (*list[i] == *t) {
+			        if (*list.at(i) == *t) {
 			            // We found it, so delete the previously created object
 			            // and return the found one
 			            delete t;
@@ -176,11 +179,8 @@ protected:
             if (!foundByHash)
                 _typesByHash.insert(hash, t);
 
-            // Only add to the list if this is a new type
-//            if (isNewType(info, t))
-//                _types.append(t);
 
-			 insert(info, t);
+			insert(info, t);
 		}
 		else {
 		    _typeFoundById++;
@@ -233,8 +233,6 @@ private:
 
 	uint _typeFoundById;
 	uint _typeFoundByHash;
-
-//	BaseType* _numerics[16];          ///< Contains the types of numerics that have already been created
 };
 
 #endif /* TYPEFACTORY_H_ */

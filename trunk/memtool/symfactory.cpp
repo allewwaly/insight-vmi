@@ -44,8 +44,6 @@
 SymFactory::SymFactory()
 	: _typeFoundById(0), _typeFoundByHash(0)
 {
-	// Initialize numerics array
-//    memset(_numerics, 0, sizeof(_numerics));
 }
 
 
@@ -129,7 +127,6 @@ void SymFactory::clear()
 	_typesByName.clear();
 	_typesByHash.clear();
 	_postponedTypes.clear();
-//	memset(_numerics, 0, sizeof(_numerics));
 
 	// Reset other vars
 	_typeFoundById = 0;
@@ -164,30 +161,6 @@ Variable* SymFactory::findVarByName(const QString & name) const
 BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 {
 	BaseType* t = 0;
-
-//	// Construct index into instance array from byte size and encoding
-//    int index = 0;
-//
-//	switch (info.enc()) {
-//	case eSigned:   index |= 0; break;
-//    case eUnsigned: index |= 1; break;
-//    case eBoolean:  index |= 2; break;
-//    case eFloat:    index |= 3; break;
-//    default: factoryError(QString("Illegal encoding for numeric type: %1").arg(info.enc())); break;
-//	}
-//	switch (info.byteSize()) {
-//    case 1: index |= (0 << 2); break;
-//    case 2: index |= (1 << 2); break;
-//    case 4: index |= (2 << 2); break;
-//    case 8: index |= (3 << 2); break;
-//    default: factoryError(QString("Illegal size for numeric type: %2").arg(info.byteSize()));
-//	}
-//
-//	// If an instance for that type already exists, return it
-//	if (_numerics[index]) {
-//	    insert(info, _numerics[index]);
-//	    return _numerics[index];
-//	}
 
 	// Otherwise create a new instance
 	switch (info.enc()) {
@@ -262,9 +235,6 @@ BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 	if (!t)
 		factoryError(QString("Illegal combination of encoding (%1) and info.size() (%2)").arg(info.enc()).arg(info.byteSize()));
 
-//	// Save the instance for future reference
-//	_numerics[index] = t;
-
 	// insert() is implicitly called by getTypeInstance() above
 	return t;
 }
@@ -295,7 +265,7 @@ void SymFactory::insert(const TypeInfo& info, BaseType* type)
 bool SymFactory::isNewType(const TypeInfo& info, BaseType* type) const
 {
     assert(type != 0);
-    return info.id() != type->id();
+    return info.id() == type->id();
 }
 
 
@@ -472,4 +442,15 @@ bool SymFactory::resolveReference(ReferencingType* ref)
 }
 
 
+void SymFactory::parsingFinished()
+{
+    std::cout << "Statistics:" << std::endl;
+
+    std::cout << "  | No. of types:         " << _types.size() << std::endl;
+    std::cout << "  | No. of types by name: " << _typesByName.size() << std::endl;
+    std::cout << "  | No. of types by ID:   " << _typesById.size() << std::endl;
+    std::cout << "  | No. of types by hash: " << _typesByHash.size() << std::endl;
+    std::cout << "  | Types found by ID:    " << _typeFoundById << std::endl;
+    std::cout << "  | Types found by hash:  " << _typeFoundByHash << std::endl;
+}
 
