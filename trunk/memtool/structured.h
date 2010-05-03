@@ -13,9 +13,6 @@
 
 #include <QList>
 
-typedef QList<StructuredMember*> MemberList;
-
-
 class Structured: public BaseType
 {
 public:

@@ -13,6 +13,7 @@
 #include <QVariant>
 #include <sys/types.h>
 
+/// These enum values represent all possible debugging symbol
 enum HdrSymbolType {
 	hsUnknownSymbol         = 0,         // Start with 0 for any unknown symbol
 	hsArrayType             = (1 <<  0), // This represents first "real" symbol
@@ -38,6 +39,7 @@ enum HdrSymbolType {
 	hsVolatileType          = (1 << 20)
 };
 
+/// These enum values represent all possible parameters for a debugging symbol.
 enum ParamSymbolType {
 	psUnknownSymbol      = 0,         // Start with 0 for any unknown symbol
 	psAbstractOrigin     = (1 <<  0), // This represents first "real" symbol
@@ -165,7 +167,16 @@ static const quint32 relevantParam =
 	psType |
 	psUpperBound;
 
+// forward declaration
+class StructuredMember;
 
+/// A list of StructuredMember objects
+typedef QList<StructuredMember*> MemberList;
+
+/**
+ * Holds all information about a parsed debugging symbol. Its main purpose is
+ * to transfer the symbol information from the parser to the SymFactory class.
+ */
 class TypeInfo
 {
 public:
@@ -232,6 +243,9 @@ public:
     const EnumHash& enumValues() const;
     void addEnumValue(const QString& name, qint32 value);
 
+    MemberList& members();
+    const MemberList& members() const;
+
     QString dump() const;
 
 private:
@@ -252,6 +266,7 @@ private:
 	QHash<qint32, QString> _enumValues; ///< holds the enumeration values, if this symbol is an enumeration
 	HdrSymbolType _symType;  ///< holds the type of this symbol
 	DataEncoding _enc;       ///< holds the data encoding of this symbol
+	MemberList _members;     ///< holds all members of a union or struct
 };
 
 
