@@ -28,6 +28,11 @@ public:
     ReferencingType(const TypeInfo& info);
 
     /**
+     * Destructor, just required to make this type polymorphical
+     */
+    virtual ~ReferencingType();
+
+    /**
      * @return the type this pointer points to
      */
     const BaseType* refType() const;

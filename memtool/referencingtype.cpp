@@ -21,6 +21,11 @@ ReferencingType::ReferencingType(const TypeInfo& info)
 }
 
 
+ReferencingType::~ReferencingType()
+{
+}
+
+
 const BaseType* ReferencingType::refType() const
 {
 	return _refType;
