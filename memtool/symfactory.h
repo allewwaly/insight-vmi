@@ -143,17 +143,6 @@ protected:
 		BaseType* t = findBaseTypeById(info.id());
 		if (!t) {
 			t = new T(info);
-            // If this is a structured type, then try to resolve the referenced
-			// types of all members.
-			if (info.symType() & (hsStructureType | hsUnionType)) {
-			    Structured* s = dynamic_cast<Structured*>(t);
-                assert(s != 0);
-
-                // Find referenced type for all members
-                for (int i = 0; i < s->members().size(); i++) {
-                    resolveReference(s->members().at(i));
-			    }
-			}
 
 			// Try to find the type based on its hash
 			VisitedSet visited;
@@ -162,22 +151,37 @@ protected:
 
 			if (_typesByHash.contains(hash)) {
 			    BaseTypeList list = _typesByHash.values(hash);
+
                 // Go through the list and make sure we found the correct type
-			    for (int i = 0; i < list.size(); i++) {
-			        if (*list.at(i) == *t) {
-			            // We found it, so delete the previously created object
-			            // and return the found one
-			            delete t;
-			            t = list[i];
+                for (int i = 0; i < list.size(); i++) {
+                    if (*list[i] == *t ) {
+                        // We found it, so delete the previously created object
+                        // and return the found one
+                        delete t;
+                        t = list[i];
                         foundByHash = true;
-			            _typeFoundByHash++;
+                        _typeFoundByHash++;
+                        break;
 			        }
 			    }
 			}
             // Either the hash did not contain this type, or it was just a
 			// collision, so add it to the type-by-hash table.
-            if (!foundByHash)
+            if (!foundByHash) {
+                // If this is a structured type, then try to resolve the referenced
+                // types of all members.
+                if (info.symType() & (hsStructureType | hsUnionType)) {
+                    Structured* s = dynamic_cast<Structured*>(t);
+                    assert(s != 0);
+
+                    // Find referenced type for all members
+                    for (int i = 0; i < s->members().size(); i++) {
+                        resolveReference(s->members().at(i));
+                    }
+                }
+
                 _typesByHash.insert(hash, t);
+            }
 
 
 			insert(info, t);
