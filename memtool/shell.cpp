@@ -57,7 +57,6 @@ Shell::Shell(const KernelSymbols& symbols)
                 "Shows variable given by name",
                 "This command shows the variable given by name.\n"
                 "  show <variable_name>    Show variable by name"));
-
 }
 
 
@@ -286,7 +285,7 @@ int Shell::cmdListTypes(QStringList /*args*/)
         _out << qSetFieldWidth(w_id)  << right << hex << type->id()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << tRevMap[type->type()]
-             << qSetFieldWidth(w_name) << (type->name().isEmpty() ? "(none)" : type->name())
+             << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
              << qSetFieldWidth(w_size) << right << type->size()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_src) << left << src
@@ -342,7 +341,7 @@ int Shell::cmdListTypesById(QStringList /*args*/)
              << qSetFieldWidth(w_realId) << type->id()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << tRevMap[type->type()]
-             << qSetFieldWidth(w_name) << (type->name().isEmpty() ? "(none)" : type->name())
+             << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_size) << right << type->size() << qSetFieldWidth(0)
              << qSetFieldWidth(0) << endl;
@@ -424,7 +423,7 @@ int Shell::cmdListVars(QStringList /*args*/)
     const int w_src = 15;
     const int w_line = 5;
     const int w_colsep = 2;
-    const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + w_line + 5*w_colsep;
+    const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + w_line + 6*w_colsep;
 
     _out
         << qSetFieldWidth(w_id)  << right << "ID"
@@ -438,7 +437,8 @@ int Shell::cmdListVars(QStringList /*args*/)
         << qSetFieldWidth(w_size)  << right << "Size"
         << qSetFieldWidth(w_colsep) << " "
         << qSetFieldWidth(w_src) << left << "Source"
-        << qSetFieldWidth(w_line) << left << "Line"
+        << qSetFieldWidth(w_colsep) << " "
+        << qSetFieldWidth(w_line) << right << "Line"
         << qSetFieldWidth(0) << endl;
 
     hline(w_total);
@@ -490,7 +490,8 @@ int Shell::cmdListVars(QStringList /*args*/)
             << qSetFieldWidth(w_size)  << right << right << var->refType()->size()
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(w_src) << left << s_src
-            << qSetFieldWidth(w_line) << left << dec << var->srcLine()
+            << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(w_line) << right << dec << var->srcLine()
             << qSetFieldWidth(0) << endl;
     }
 
