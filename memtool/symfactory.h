@@ -165,7 +165,7 @@ protected:
 			        }
 			    }
 			}
-            // Either the hash did not contain this type, or it was just a
+            // Either the hash did not contain this type or it was just a
 			// collision, so add it to the type-by-hash table.
             if (!foundByHash) {
                 // If this is a structured type, then try to resolve the referenced
@@ -176,13 +176,15 @@ protected:
 
                     // Find referenced type for all members
                     for (int i = 0; i < s->members().size(); i++) {
+                        // This function adds all member to _postponedTypes whose
+                        // references could not be resolved.
                         resolveReference(s->members().at(i));
                     }
                 }
-
+                // We don't need to re-calc the hash here because even for
+                // structs or unions it does not depend on the member's hash.
                 _typesByHash.insert(hash, t);
             }
-
 
 			insert(info, t);
 		}
@@ -224,6 +226,18 @@ private:
      * to the _postponedTypes hash.
      */
     bool resolveReference(ReferencingType* ref);
+
+    /**
+     * Removes a value in a QMultiHash at given at index \a old_key, if present,
+     * and adds or re-adds it at index \a new_key.
+     * @param old_key the old index at which \a value can be found
+     * @param new_key the new index at which \a value should be inserted
+     * @param value the value to be relocated
+     * @param hash the QMultiHash to perform this operation on
+     */
+    template<class T_key, class T_val>
+    void relocateHashEntry(const T_key& old_key, const T_key& new_key,
+            T_val* value, QMultiHash<T_key, T_val*>* hash);
 
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects

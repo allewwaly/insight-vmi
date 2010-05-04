@@ -7,6 +7,7 @@
 
 #include "symfactory.h"
 #include "basetype.h"
+#include "refbasetype.h"
 #include "numeric.h"
 #include "structured.h"
 #include "pointer.h"
@@ -71,7 +72,7 @@ void SymFactory::clear()
 					if ((void*)_types[k] == (void*)values[j]) {
 						RefBaseType* b = dynamic_cast<RefBaseType*>(_types[k]);
 						if (b) {
-							msg += QString("    id=0x%1, name=%2\n").arg(b->id(), 0, 16).arg(b->name());
+							msg += QString("    id=0x%1, name=%2\n").arg(b->id(), 0, 16).arg(b->prettyName());
 							displayed = true;
 						}
 						break;
@@ -269,26 +270,71 @@ bool SymFactory::isNewType(const TypeInfo& info, BaseType* type) const
 }
 
 
+template<class T_key, class T_val>
+void SymFactory::relocateHashEntry(const T_key& old_key, const T_key& new_key,
+        T_val* value, QMultiHash<T_key, T_val*>* hash)
+{
+    bool removed = false;
+
+    // Remove type at old hash-index
+    QList<T_val*> list = hash->values(old_key);
+    for (int i = 0; i < list.size(); i++) {
+        if (value->id() == list[i]->id()) {
+            hash->remove(old_key, list[i]);
+            removed = true;
+            break;
+        }
+    }
+
+    if (!removed)
+        debugerr("Did not find value at index \"" << old_key << "\"");
+
+    // Re-add it at new hash-index
+    hash->insert(new_key, value);
+}
+
+
 void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 {
     // Insert new ID/type relation into lookup tables
 	_typesById.insert(info.id(), target);
-	if (!info.name().isEmpty())
+
+    // Only add this type into the name relation table if it is new
+	if (isNewType(info, target) && !info.name().isEmpty())
 	    _typesByName.insert(info.name(), target);
 
 	// See if we have types with missing references to the given type
 	if (_postponedTypes.contains(info.id())) {
 		QList<ReferencingType*> list = _postponedTypes.values(info.id());
-
 		QList<ReferencingType*>::iterator it = list.begin();
+
+		VisitedSet visited;
 
 		while (it != list.end())
 		{
 			ReferencingType* t = *it;
-			/// TODO: re-insert this type into the hash of similar types
+            RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
+            uint hash = 0, old_hash = 0;
+
+			// Is this a Variable or a RefBaseType?
+			if (rbt) {
+			    // Get previous hash and name of type
+			    visited.clear();
+			    old_hash = rbt->hash(&visited);
+			}
 
 			// Add the missing reference according to type
 			t->setRefType(target);
+
+			// Remove type at its old indices, re-add it at its new indices
+            if (rbt) {
+                // Calculate new hash of type
+                visited.clear();
+                hash = rbt->hash(&visited);
+                // Did the name change?
+                if (hash != old_hash)
+                    relocateHashEntry(old_hash, hash, dynamic_cast<BaseType*>(rbt), &_typesByHash);
+            }
 			++it;
 		}
 
@@ -416,7 +462,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	}
 	}
 
-	// Add the base-type that this type is referencing
+	// Resolve references to another type, if necessary
 	if (ref)
 	    resolveReference(ref);
 }
@@ -441,16 +487,32 @@ bool SymFactory::resolveReference(ReferencingType* ref)
     }
 }
 
+template<class T>
+int hashCount(const T& hash)
+{
+    typename T::const_iterator it;
+    int ret = 0;
+
+    for (it = hash.constBegin(); it != hash.constEnd(); ++it)
+        ret += hash.count(it.key());
+
+    return ret;
+}
+
 
 void SymFactory::parsingFinished()
 {
     std::cout << "Statistics:" << std::endl;
 
-    std::cout << "  | No. of types:         " << _types.size() << std::endl;
-    std::cout << "  | No. of types by name: " << _typesByName.size() << std::endl;
-    std::cout << "  | No. of types by ID:   " << _typesById.size() << std::endl;
-    std::cout << "  | No. of types by hash: " << _typesByHash.size() << std::endl;
-    std::cout << "  | Types found by ID:    " << _typeFoundById << std::endl;
-    std::cout << "  | Types found by hash:  " << _typeFoundByHash << std::endl;
+    std::cout << "  | No. of types:             " << std::setw(10) << std::right << _types.size() << std::endl;
+    std::cout << "  | No. of types by name:     " << std::setw(10) << std::right << hashCount(_typesByName) << std::endl;
+    std::cout << "  | No. of types by ID:       " << std::setw(10) << std::right << _typesById.size() << std::endl;
+    std::cout << "  | No. of types by hash:     " << std::setw(10) << std::right << hashCount(_typesByHash) << std::endl;
+    std::cout << "  | Types found by ID:        " << std::setw(10) << std::right << _typeFoundById << std::endl;
+    std::cout << "  | Types found by hash:      " << std::setw(10) << std::right << _typeFoundByHash << std::endl;
+    std::cout << "  | No. of variables:         " << std::setw(10) << std::right << _vars.size() << std::endl;
+    std::cout << "  | No. of variables by ID:   " << std::setw(10) << std::right << _varsById.size() << std::endl;
+    std::cout << "  | No. of variables by name: " << std::setw(10) << std::right << hashCount(_varsByName) << std::endl;
+    std::cout << "  `-------------------------------------------" << std::endl;
 }
 
