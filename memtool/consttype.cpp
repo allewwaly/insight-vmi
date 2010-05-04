@@ -21,10 +21,10 @@ BaseType::RealType ConstType::type() const
 }
 
 
-QString ConstType::name() const
+QString ConstType::prettyName() const
 {
     if (_refType)
-        return "const " + _refType->name();
+        return "const " + _refType->prettyName();
     else
         return "const";
 }

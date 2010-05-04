@@ -28,10 +28,10 @@ BaseType::RealType Pointer::type() const
 }
 
 
-QString Pointer::name() const
+QString Pointer::prettyName() const
 {
     if (_refType)
-        return _refType->name() + " *";
+        return _refType->prettyName() + " *";
     else
         return "void *";
 }

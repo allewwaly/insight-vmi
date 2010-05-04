@@ -30,13 +30,20 @@ public:
     /**
      * @return the name of that type, e.g. "int"
      */
-    virtual QString name() const;
+    QString name() const;
 
     /**
      * Set the name of this symbol
      * @param name new name
      */
-    virtual void setName(const QString& name);
+    void setName(const QString& name);
+
+    /**
+     * This gives a pretty name of that type which may involve referencing
+     * types.
+     * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
+     */
+    virtual QString prettyName() const;
 
     /**
       @return id ID of this type, as given by objdump output

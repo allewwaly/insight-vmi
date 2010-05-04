@@ -25,9 +25,11 @@ public:
 	virtual RealType type() const;
 
     /**
-     * @return the name of that type, e.g. "int"
+     * This gives a pretty name of that type which may involve referencing
+     * types.
+     * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
      */
-    virtual QString name() const;
+    virtual QString prettyName() const;
 
     /**
 	 @return a string representation of this type
