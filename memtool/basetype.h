@@ -257,7 +257,7 @@ public:
     {
         // We put the implementation in the header to allow the compiler to
         // inline the code
-        T buf;
+        T buf = T();
         seek(offset);
         read((char*)&buf, sizeof(T));
         return buf;
