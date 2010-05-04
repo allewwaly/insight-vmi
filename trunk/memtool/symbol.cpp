@@ -30,6 +30,12 @@ void Symbol::setName(const QString& name)
 }
 
 
+QString Symbol::prettyName() const
+{
+    return _name;
+}
+
+
 int Symbol::id() const
 {
 	return _id;

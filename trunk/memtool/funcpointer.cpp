@@ -19,7 +19,7 @@ BaseType::RealType FuncPointer::type() const
 }
 
 
-QString FuncPointer::name() const
+QString FuncPointer::prettyName() const
 {
     // return QString("%1 (*%2)()").arg(_refType ? _refType->name() : "void").arg(_name);
 	return QString("%1 (*%2)()").arg("void").arg(_name);

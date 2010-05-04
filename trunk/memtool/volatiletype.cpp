@@ -21,10 +21,10 @@ BaseType::RealType VolatileType::type() const
 }
 
 
-QString VolatileType::name() const
+QString VolatileType::prettyName() const
 {
     if (_refType)
-        return "volatile " + _refType->name();
+        return "volatile " + _refType->prettyName();
     else
         return "volatile";
 }

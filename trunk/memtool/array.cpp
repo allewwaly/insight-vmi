@@ -28,11 +28,11 @@ uint Array::hash(VisitedSet* visited) const
 }
 
 
-QString Array::name() const
+QString Array::prettyName() const
 {
     QString len = (_length >= 0) ? QString::number(_length) : QString();
     if (_refType)
-        return QString("%1[%2]").arg(_refType->name()).arg(len);
+        return QString("%1[%2]").arg(_refType->prettyName()).arg(len);
     else
         return QString("[%1]").arg(len);
 }
