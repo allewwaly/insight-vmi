@@ -614,7 +614,7 @@ int Shell::cmdShowVariable(const Variable* v)
 	_out << "  Name:           " << v->name() << endl;
 	_out << "  Location:       " << "0x" << hex << v->offset() << dec << endl;
 	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {
-		_out << "Source file:    " << _sym.factory().sources().value(v->srcFile())->name()
+		_out << "  Source file:    " << _sym.factory().sources().value(v->srcFile())->name()
 			<< ":" << v->srcLine() << endl;
 	}
 
