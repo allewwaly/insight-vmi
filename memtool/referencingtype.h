@@ -16,12 +16,6 @@ class ReferencingType
 {
 public:
     /**
-     * Constructor
-     * @param type the type this object is referencing
-     */
-    ReferencingType(const BaseType* type = 0);
-
-    /**
       Constructor
       @param info the type information to construct this type from
      */

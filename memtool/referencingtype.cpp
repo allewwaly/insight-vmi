@@ -9,12 +9,6 @@
 #include "basetype.h"
 #include <assert.h>
 
-ReferencingType::ReferencingType(const BaseType* type)
-    : _refType(type), _refTypeId(type ? type->id() : -1)
-{
-}
-
-
 ReferencingType::ReferencingType(const TypeInfo& info)
     : _refType(0), _refTypeId(info.refTypeId())
 {
