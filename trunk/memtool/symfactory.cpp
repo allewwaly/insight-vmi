@@ -43,7 +43,7 @@
 //------------------------------------------------------------------------------
 
 SymFactory::SymFactory()
-	: _typeFoundById(0), _typeFoundByHash(0)
+	: _typeFoundByHash(0)
 {
 }
 
@@ -56,53 +56,6 @@ SymFactory::~SymFactory()
 
 void SymFactory::clear()
 {
-	// Throw an exception of the postponed cmdList still contains items
-	if (!_postponedTypes.isEmpty()) {
-		QString msg("The following types still have unresolved references:\n");
-		QList<int> keys = _postponedTypes.keys();
-		for (int i = 0; i < keys.size(); i++) {
-			int key = keys[i];
-			msg += QString("  missing ref=0x%1\n").arg(key, 0, 16);
-			QList<ReferencingType*> values = _postponedTypes.values(key);
-			bool displayed;
-			for (int j = 0; j < values.size(); j++) {
-				displayed = false;
-				// Find the types
-				for (int k = 0; k < _types.size(); k++) {
-					if ((void*)_types[k] == (void*)values[j]) {
-						RefBaseType* b = dynamic_cast<RefBaseType*>(_types[k]);
-						if (b) {
-							msg += QString("    id=0x%1, name=%2\n").arg(b->id(), 0, 16).arg(b->prettyName());
-							displayed = true;
-						}
-						break;
-					}
-				}
-				for (int k = 0; !displayed && k < _vars.size(); k++) {
-					if ((void*)_vars[k] == (void*)values[j]) {
-						Variable* v = dynamic_cast<Variable*>(_types[k]);
-						if (v) {
-							msg += QString("    id=0x%1, name=%2\n").arg(v->id(), 0, 16).arg(v->name());
-							displayed = true;
-						}
-						break;
-					}
-				}
-//				RefBaseType* b = dynamic_cast<RefBaseType*>(values[j]);
-//				StructuredMember* s = dynamic_cast<StructuredMember*>(values[j]);
-//				if (b)
-//					msg += QString("    id=0x%1, name=%2\n").arg(b->id(), 0, 16).arg(b->name());
-//				else if (s)
-//					msg += QString("    id=0x%1, name=%2\n").arg(f->id(), 0, 16).arg(f->name());
-//				else
-//					msg += QString("    (member type)\n");
-				if (!displayed)
-					msg += QString("    addr=0x%1\n").arg((quint64)values[j], 0, 16);
-			}
-		}
-		factoryError(msg);
-	}
-
 	// Delete all compile units
 	for (CompileUnitIntHash::iterator it = _sources.begin();
 		it != _sources.end(); ++it)
@@ -130,7 +83,6 @@ void SymFactory::clear()
 	_postponedTypes.clear();
 
 	// Reset other vars
-	_typeFoundById = 0;
 	_typeFoundByHash = 0;
 }
 
@@ -280,14 +232,18 @@ void SymFactory::relocateHashEntry(const T_key& old_key, const T_key& new_key,
     QList<T_val*> list = hash->values(old_key);
     for (int i = 0; i < list.size(); i++) {
         if (value->id() == list[i]->id()) {
-            hash->remove(old_key, list[i]);
+        	// Remove either the complete list or the single entry
+        	if (list.size() == 1)
+        		hash->remove(old_key);
+        	else
+        		hash->remove(old_key, list[i]);
             removed = true;
             break;
         }
     }
 
     if (!removed)
-        debugerr("Did not find value at index \"" << old_key << "\"");
+        debugerr("Did not find entry in hash table at index \"" << old_key << "\"");
 
     // Re-add it at new hash-index
     hash->insert(new_key, value);
@@ -297,6 +253,7 @@ void SymFactory::relocateHashEntry(const T_key& old_key, const T_key& new_key,
 void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 {
     // Insert new ID/type relation into lookup tables
+	assert(_typesById.contains(info.id()) == false);
 	_typesById.insert(info.id(), target);
 
     // Only add this type into the name relation table if it is new
@@ -326,12 +283,12 @@ void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 			// Add the missing reference according to type
 			t->setRefType(target);
 
-			// Remove type at its old indices, re-add it at its new indices
+			// Remove type at its old index, re-add it at its new index
             if (rbt) {
                 // Calculate new hash of type
                 visited.clear();
                 hash = rbt->hash(&visited);
-                // Did the name change?
+                // Did the hash change?
                 if (hash != old_hash)
                     relocateHashEntry(old_hash, hash, dynamic_cast<BaseType*>(rbt), &_typesByHash);
             }
@@ -431,6 +388,10 @@ void SymFactory::addSymbol(const TypeInfo& info)
 		ref = getTypeInstance<Pointer>(info);
 		break;
 	}
+    case hsStructureType: {
+        getTypeInstance<Struct>(info);
+        break;
+    }
 	case hsSubroutineType: {
 	    getTypeInstance<FuncPointer>(info);
 	    break;
@@ -439,12 +400,8 @@ void SymFactory::addSymbol(const TypeInfo& info)
         ref = getTypeInstance<Typedef>(info);
         break;
 	}
-    case hsStructureType:
     case hsUnionType: {
-        if (info.symType() == hsStructureType)
-            getTypeInstance<Struct>(info);
-        else
-            getTypeInstance<Union>(info);
+        getTypeInstance<Union>(info);
         break;
     }
 	case hsVariable: {
@@ -463,8 +420,13 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	}
 
 	// Resolve references to another type, if necessary
-	if (ref)
-	    resolveReference(ref);
+	if (ref) {
+		RefBaseType* rbt = dynamic_cast<RefBaseType*>(ref);
+		// Only resolve the reference if this is a variable (rbt == 0) or if
+		// its a new RefBaseType.
+		if (!rbt || isNewType(info, rbt))
+			resolveReference(ref);
+	}
 }
 
 
@@ -472,8 +434,12 @@ bool SymFactory::resolveReference(ReferencingType* ref)
 {
     assert(ref != 0);
 
+    // Don't resolve already resolved types
     if (ref->refType())
         return true;
+    // Don't try to resolve types without valid ID
+    else if (ref->refTypeId() <= 0)
+    	return false;
 
     BaseType* base = 0;
     if (! (base = findBaseTypeById(ref->refTypeId())) ) {
@@ -487,32 +453,38 @@ bool SymFactory::resolveReference(ReferencingType* ref)
     }
 }
 
-template<class T>
-int hashCount(const T& hash)
-{
-    typename T::const_iterator it;
-    int ret = 0;
-
-    for (it = hash.constBegin(); it != hash.constEnd(); ++it)
-        ret += hash.count(it.key());
-
-    return ret;
-}
-
 
 void SymFactory::parsingFinished()
 {
     std::cout << "Statistics:" << std::endl;
 
     std::cout << "  | No. of types:             " << std::setw(10) << std::right << _types.size() << std::endl;
-    std::cout << "  | No. of types by name:     " << std::setw(10) << std::right << hashCount(_typesByName) << std::endl;
+    std::cout << "  | No. of types by name:     " << std::setw(10) << std::right << _typesByName.size() << std::endl;
     std::cout << "  | No. of types by ID:       " << std::setw(10) << std::right << _typesById.size() << std::endl;
-    std::cout << "  | No. of types by hash:     " << std::setw(10) << std::right << hashCount(_typesByHash) << std::endl;
-    std::cout << "  | Types found by ID:        " << std::setw(10) << std::right << _typeFoundById << std::endl;
-    std::cout << "  | Types found by hash:      " << std::setw(10) << std::right << _typeFoundByHash << std::endl;
+    std::cout << "  | No. of types by hash:     " << std::setw(10) << std::right << _typesByHash.size() << std::endl;
+//    std::cout << "  | Types found by hash:      " << std::setw(10) << std::right << _typeFoundByHash << std::endl;
+//    std::cout << "  | Postponed types:          " << std::setw(10) << std::right << _postponedTypes.size() << std::endl;
     std::cout << "  | No. of variables:         " << std::setw(10) << std::right << _vars.size() << std::endl;
     std::cout << "  | No. of variables by ID:   " << std::setw(10) << std::right << _varsById.size() << std::endl;
-    std::cout << "  | No. of variables by name: " << std::setw(10) << std::right << hashCount(_varsByName) << std::endl;
+    std::cout << "  | No. of variables by name: " << std::setw(10) << std::right << _varsByName.size() << std::endl;
+
+	if (!_postponedTypes.isEmpty()) {
+		std::cout << "  | The following types still have unresolved references:" << std::endl;
+		QList<int> keys = _postponedTypes.uniqueKeys();
+		qSort(keys);
+		for (int i = 0; i < keys.size(); i++) {
+			int key = keys[i];
+			std::cout << QString("  |   missing id: 0x%1, %2 element(s)\n").arg(key, 0, 16).arg(_postponedTypes.count(key));
+		}
+	}
+
     std::cout << "  `-------------------------------------------" << std::endl;
+
+    // Some sanity checks on the numbers
+    assert(_typesById.size() >= _types.size());
+    assert(_typesById.size() >= _typesByName.size());
+    assert(_typesById.size() >= _typesByHash.size());
+    assert(_typesByHash.size() == _types.size());
+    assert(_types.size() + _typeFoundByHash == _typesById.size());
 }
 
