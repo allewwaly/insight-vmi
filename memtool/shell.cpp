@@ -9,6 +9,7 @@
 #include <string.h>
 #include <assert.h>
 #include <QtAlgorithms>
+#include <QProcess>
 #include "compileunit.h"
 #include "variable.h"
 #include "refbasetype.h"
@@ -43,20 +44,22 @@ Shell::Shell(const KernelSymbols& symbols)
                 "  list types-by-name    List the types-by-name hash\n"
                 "  list variables        List the variables"));
 
-    _commands.insert("info",
-            Command(
-                &Shell::cmdInfo,
-                "List information about a symbol",
-                "This command gives information about a specific symbol.\n"
-                "  info <symbol_id>   Get info by id\n"
-                "  info <symbol_name> Get info by name"));
+//    _commands.insert("info",
+//            Command(
+//                &Shell::cmdInfo,
+//                "List information about a symbol",
+//                "This command gives information about a specific symbol.\n"
+//                "  info <symbol_id>   Get info by id\n"
+//                "  info <symbol_name> Get info by name"));
 
     _commands.insert("show",
             Command(
                 &Shell::cmdShow,
-                "Shows variable given by name",
-                "This command shows the variable given by name.\n"
-                "  show <variable_name>    Show variable by name"));
+                "Shows information about a symbol given by name or ID",
+                "This command shows information about the variable or type "
+                "given by a name or ID.\n"
+                "  show <name>       Show type or variable by name\n"
+                "  show <ID>         Show type or variable by ID\n"));
 }
 
 
@@ -90,7 +93,23 @@ int Shell::start()
 
 int Shell::exec(QString command)
 {
-    QStringList words = command.split(QRegExp("\\s+"), QString::SkipEmptyParts);
+	QStringList pipeCmds = command.split(QRegExp("\\s*\\|\\s*"), QString::KeepEmptyParts);
+/*
+	// Create piped process
+	QProcess * proc = 0;
+	if (pipeCmds.size() == 2) {
+		QStringList pipeCmd = pipeCmds.last().split(QRegExp("\\s+"), QString::SkipEmptyParts);
+
+		proc = new QProcess();
+
+		proc->start()
+	}
+	else if (pipeCmds.size() > 2) {
+		debugerr("Currently only one piped process is supported!");
+		return 0;
+	}
+*/
+    QStringList words = pipeCmds.first().split(QRegExp("\\s+"), QString::SkipEmptyParts);
     if (words.isEmpty())
         return 0;
 
@@ -501,146 +520,115 @@ int Shell::cmdListVars(QStringList /*args*/)
     return 0;
 }
 
-//TODO: Clean up
-int Shell::cmdInfo(QStringList args)
-{
-	static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
-
-	qint32 iv;
-	bool ok = true;
-	BaseType* result = 0;
-	Variable* vresult = 0;
-
-	// Show cmdHelp, of no argument is given
-	if (!args.isEmpty()) {
-
-		QString s = args[0].toLower();
-		args.pop_front();
-
-		iv = s.toInt(&ok, 16);
-
-		if(ok) //The argument had been an id
-		{
-			if(!((result = _sym.factory().findBaseTypeById(iv)) ||
-			    (vresult = _sym.factory().findVarById(iv))))
-		 	{
-				_out << "Error: Unknown symbol id (" << s << ")" << endl;
-				return 0;  //But no result with this id was found
-			}
-		}
-	 	//The argument must be a name
-		while(!args.isEmpty()){ //Concatinate full name
-			s.append(" ");
-			s.append(args[0].toLower());
-			args.pop_front();
-		}
-
-		if(!((result = _sym.factory().findBaseTypeByName(s)) ||
-					(vresult = _sym.factory().findVarByName(s))))
-		{
-			_out << "Error: Unknown symbol name (" << s << ")" << endl;
-			return 0;  //But no result with this id was found
-		}
-
-		if(result)  //The type is a BaseType
-		{
-			const int w_id = 4;
-			const int w_type = 12;
-			const int w_name = 24;
-			const int w_size = 5;
-			const int w_src = 14;
-			const int w_line = 10;
-			const int w_total = w_id + w_type + w_name + w_size + w_src + w_line;
-
-			_out << qSetFieldWidth(w_id)  << right << "ID" << qSetFieldWidth(0) << "  "
-				<< qSetFieldWidth(w_type) << left << "Type"
-				<< qSetFieldWidth(w_name) << "Name"
-				<< qSetFieldWidth(w_size)  << right << "Size" << qSetFieldWidth(0) << "  "
-				<< qSetFieldWidth(w_src) << left << "Source"
-				<< qSetFieldWidth(w_line) << left << "Line"
-				<< qSetFieldWidth(0)  << endl;
-
-			hline(w_total);
-
-			_out << qSetFieldWidth(w_id)  << right << hex << result->id() << qSetFieldWidth(0) << "  "
-				<< qSetFieldWidth(w_type) << left << tRevMap[result->type()]
-				<< qSetFieldWidth(w_name) << (result->name().isEmpty() ? "(none)" : result->name())
-				<< qSetFieldWidth(w_size) << right << result->size() << qSetFieldWidth(0) << "  "
-				<< qSetFieldWidth(w_src) << left << (result->srcFile() < 0 ? "--" : \
-						(_sym.factory().sources().value(result->srcFile()))->name())
-				<< qSetFieldWidth(w_line) << left << dec << result->srcLine()
-				<< qSetFieldWidth(0) << endl;
-		}
-		else if(vresult)  //The type is a Variable
-		{
-			const int w_id = 4;
-			const int w_datatype = 12;
-			const int w_typename = 24;
-			const int w_name = 24;
-			const int w_size = 5;
-			const int w_src = 12;
-			const int w_line = 10;
-			const int w_colsep = 2;
-			const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + w_line + 5*w_colsep;
-
-			_out
-				<< qSetFieldWidth(w_id)  << right << "ID"
-				<< qSetFieldWidth(w_colsep) << " "
-				<< qSetFieldWidth(w_datatype) << left << "Base"
-				<< qSetFieldWidth(w_colsep) << " "
-				<< qSetFieldWidth(w_typename) << left << "Type name"
-				<< qSetFieldWidth(w_colsep) << " "
-				<< qSetFieldWidth(w_name) << "Name"
-				<< qSetFieldWidth(w_colsep) << " "
-				<< qSetFieldWidth(w_size)  << right << "Size"
-				<< qSetFieldWidth(w_colsep) << " "
-				<< qSetFieldWidth(w_src) << left << "Source"
-				<< qSetFieldWidth(w_line) << left << "Line"
-				<< qSetFieldWidth(0) << endl;
-
-			hline(w_total);
-
-			_out
-				<< qSetFieldWidth(w_id)  << right << hex << vresult->id()
-				<< qSetFieldWidth(w_colsep) << " "
-				<< qSetFieldWidth(w_datatype) << left << tRevMap[vresult->refType()->type()]
-				<< qSetFieldWidth(w_colsep) << " "
-				<< qSetFieldWidth(w_typename) << left << vresult->refType()->name()
-				<< qSetFieldWidth(w_colsep) << " "
-				<< qSetFieldWidth(w_name) << vresult->name()
-				<< qSetFieldWidth(w_colsep) << " "
-				<< qSetFieldWidth(w_size)  << right << right << vresult->refType()->size()
-				<< qSetFieldWidth(w_colsep) << " "
-				<< qSetFieldWidth(w_src) << left << (vresult->srcFile() < 0 ? "--" : \
-						(_sym.factory().sources().value(vresult->srcFile()))->name())
-				<< qSetFieldWidth(w_line) << left << dec << vresult->srcLine()
-				<< qSetFieldWidth(0) << endl;
-
-		}else{
-			return cmdHelp(QStringList("info"));
-		}
-	}
-	return 0;
-}
 
 int Shell::cmdShow(QStringList args)
 {
-    Variable * variable = 0;
+    // Show cmdHelp, of no argument is given
+    if (args.isEmpty())
+    	return cmdHelp(QStringList("show"));
 
-		// Show cmdHelp, of no argument is given
-    if (!args.isEmpty()) {
+    QString s = args.front();
 
-        QString s = args[0].toLower();
-        args.pop_front();
+    // Try to parse an ID
+    if (s.startsWith("0x"))
+    	s = s.right(s.size() - 2);
+    bool ok = false;
+    int id = s.toInt(&ok, 16);
 
-			 	if((variable = _sym.factory().findVarByName(s))){
-					_out << variable->toString() << endl;
-				}else{
-					_out << "Error: Unknown variable \"" << s << "\"" << endl;
-				}
-			return 0;
+    BaseType* bt = 0;
+    Variable * var = 0;
 
+    // Did we parse an ID?
+    if (ok) {
+    	// Try to find this ID in types and variables
+    	if ( (bt = _sym.factory().findBaseTypeById(id)) ) {
+    		_out << "Found type with ID 0x" << hex << id << dec << ":" << endl;
+    		return cmdShowBaseType(bt);
+    	}
+    	else if ( (var = _sym.factory().findVarById(id)) ) {
+    		_out << "Found variable with ID 0x" << hex << id << ":" << endl;
+    		return cmdShowVariable(var);
+    	}
     }
 
-    return cmdHelp(QStringList("show"));
+    // Reset s
+    s = args.front();
+
+    // If we did not find a type by that ID, try the names
+    if (!var && !bt) {
+    	// Try to find this ID in types and variables
+    	if ( (bt = _sym.factory().findBaseTypeByName(s)) ) {
+    		_out << "Found type with name " << s << ":" << endl;
+    		return cmdShowBaseType(bt);
+    	}
+    	else if ( (var = _sym.factory().findVarByName(s)) ) {
+    		_out << "Found variable with name " << s << ":" << endl;
+    		return cmdShowVariable(var);
+		}
+    }
+
+    // If we came here, we were not successful
+	_out << "No type or variable by name or ID \"" << s << "\" found." << endl;
+
+	return 0;
 }
+
+
+int Shell::cmdShowBaseType(const BaseType* t)
+{
+	static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
+
+	_out << "  ID:             " << "0x" << hex << t->id() << dec << endl;
+	_out << "  Name:           " << (t->prettyName().isEmpty() ? QString("(unnamed)") : t->prettyName()) << endl;
+	_out << "  Type:           " << tRevMap[t->type()] << endl;
+	_out << "  Size:           " << t->size() << endl;
+	if (t->srcFile() > 0 && _sym.factory().sources().contains(t->srcFile())) {
+		_out << "  Source file:    " << _sym.factory().sources().value(t->srcFile())->name()
+			<< ":" << t->srcLine() << endl;
+	}
+
+	const Structured* s = dynamic_cast<const Structured*>(t);
+	if (s) {
+		_out << "  Members:        " << s->members().size() << endl;
+
+		for (int i = 0; i < s->members().size(); i++) {
+			StructuredMember* m = s->members().at(i);
+			_out << "    " << qSetFieldWidth(20) << left << (m->name() + ": ")
+					<< qSetFieldWidth(0)
+					<< (m->refType() ? m->refType()->prettyName() : QString("(unresolved"))
+					<< ", offset " << m->offset() << endl;
+		}
+	}
+
+	return 0;
+}
+
+
+int Shell::cmdShowVariable(const Variable* v)
+{
+	assert(v != 0);
+
+	static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
+
+	_out << "  ID:             " << "0x" << hex << v->id() << dec << endl;
+	_out << "  Name:           " << v->name() << endl;
+	_out << "  Location:       " << "0x" << hex << v->offset() << dec << endl;
+	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {
+		_out << "Source file:    " << _sym.factory().sources().value(v->srcFile())->name()
+			<< ":" << v->srcLine() << endl;
+	}
+
+	if (v->refType()) {
+		_out << "Corresponding type information:" << endl;
+		cmdShowBaseType(v->refType());
+	}
+	else {
+		_out << "  Type:           " << QString("(unresolved)") << endl;
+	}
+
+
+	return 0;
+}
+
+
+
