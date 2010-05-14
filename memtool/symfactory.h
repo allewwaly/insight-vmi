@@ -139,59 +139,55 @@ protected:
 	template<class T>
 	inline T* getTypeInstance(const TypeInfo& info)
 	{
-	    // First, try to find the type based on its ID
-		BaseType* t = findBaseTypeById(info.id());
-		if (!t) {
-			t = new T(info);
+	    // Create a new type from the info
+		T* t = new T(info);
 
-			// Try to find the type based on its hash
-			VisitedSet visited;
-			uint hash = t->hash(&visited);
-            bool foundByHash = false;
+		// Try to find the type based on its hash
+		VisitedSet visited;
+		uint hash = t->hash(&visited);
+		bool foundByHash = false;
 
-			if (_typesByHash.contains(hash)) {
-			    BaseTypeList list = _typesByHash.values(hash);
+		if (_typesByHash.contains(hash)) {
+			BaseTypeList list = _typesByHash.values(hash);
 
-                // Go through the list and make sure we found the correct type
-                for (int i = 0; i < list.size(); i++) {
-                    if (*list[i] == *t ) {
-                        // We found it, so delete the previously created object
-                        // and return the found one
-                        delete t;
-                        t = list[i];
-                        foundByHash = true;
-                        _typeFoundByHash++;
-                        break;
-			        }
-			    }
+			// Go through the list and make sure we found the correct type
+			for (int i = 0; i < list.size(); i++) {
+				if (*list[i] == *t ) {
+					// We found it, so delete the previously created object
+					// and return the found one
+					delete t;
+					t = dynamic_cast<T*>(list[i]);
+					foundByHash = true;
+					_typeFoundByHash++;
+					break;
+				}
 			}
-            // Either the hash did not contain this type or it was just a
-			// collision, so add it to the type-by-hash table.
-            if (!foundByHash) {
-                // If this is a structured type, then try to resolve the referenced
-                // types of all members.
-                if (info.symType() & (hsStructureType | hsUnionType)) {
-                    Structured* s = dynamic_cast<Structured*>(t);
-                    assert(s != 0);
-
-                    // Find referenced type for all members
-                    for (int i = 0; i < s->members().size(); i++) {
-                        // This function adds all member to _postponedTypes whose
-                        // references could not be resolved.
-                        resolveReference(s->members().at(i));
-                    }
-                }
-                // We don't need to re-calc the hash here because even for
-                // structs or unions it does not depend on the member's hash.
-                _typesByHash.insert(hash, t);
-            }
-
-			insert(info, t);
 		}
-		else {
-		    _typeFoundById++;
+		// Either the hash did not contain this type or it was just a
+		// collision, so add it to the type-by-hash table.
+		if (!foundByHash) {
+			// If this is a structured type, then try to resolve the referenced
+			// types of all members.
+			if (info.symType() & (hsStructureType | hsUnionType)) {
+				Structured* s = dynamic_cast<Structured*>(t);
+				assert(s != 0);
+
+				// Find referenced type for all members
+				for (int i = 0; i < s->members().size(); i++) {
+					// This function adds all member to _postponedTypes whose
+					// references could not be resolved.
+					resolveReference(s->members().at(i));
+				}
+			}
+			// We don't need to re-calc the hash here because even for
+			// structs or unions it does not depend on the member's hash,
+			// so it has not changed.
+			_typesByHash.insert(hash, t);
 		}
-		return dynamic_cast<T*>(t);
+
+		insert(info, t);
+
+		return t;
 	}
 
 	Variable* getVarInstance(const TypeInfo& info);
@@ -249,8 +245,7 @@ private:
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
 
-	uint _typeFoundById;
-	uint _typeFoundByHash;
+	int _typeFoundByHash;
 };
 
 #endif /* TYPEFACTORY_H_ */
