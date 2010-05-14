@@ -52,8 +52,9 @@ private:
     int cmdListVars(QStringList args);
     int cmdListTypesById(QStringList args);
     int cmdListTypesByName(QStringList args);
-    int cmdInfo(QStringList args);
     int cmdShow(QStringList args);
+    int cmdShowBaseType(const BaseType* t);
+    int cmdShowVariable(const Variable* v);
 };
 
 #endif /* SHELL_H_ */
