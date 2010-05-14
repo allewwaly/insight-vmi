@@ -272,7 +272,7 @@ QString TypeInfo::dump() const
 	if (_enc > 0)               ret += QString("  enc:           %1 (%2)\n").arg(_enc).arg(enc);
 	if (_location > 0)          ret += QString("  location:      %1\n").arg(_location);
 	if (_dataMemberLoc >= 0)    ret += QString("  dataMemberLoc: %1\n").arg(_dataMemberLoc);
-	if (_refTypeId >= 0)        ret += QString("  refType:       0x%1\n").arg(_refTypeId, 0, 16);
+	if (_refTypeId >= 0)        ret += QString("  refTypeId:     0x%1\n").arg(_refTypeId, 0, 16);
 	if (_upperBound >= 0)       ret += QString("  upperBound:    %1\n").arg(_upperBound);
 	if (!_srcDir.isEmpty()   )  ret += QString("  srcDir:        %1\n").arg(_srcDir);
 	if (_srcFileId >= 0)        ret += QString("  srcFile:       %1\n").arg(_srcFileId);
