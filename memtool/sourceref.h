@@ -9,6 +9,7 @@
 #define SOURCEREF_H_
 
 #include "typeinfo.h"
+#include <QDataStream>
 
 class SourceRef
 {
@@ -42,6 +43,20 @@ public:
       @param line the new line number
      */
     void setSrcLine(int line);
+
+    /**
+     * Reads a serialized version of this object from \a in.
+     * \sa writeTo()
+     * @param in the data stream to read the data from, must be ready to read
+     */
+    virtual void readFrom(QDataStream& in);
+
+    /**
+     * Writes a serialized version of this object to \a out
+     * \sa readFrom()
+     * @param out the data stream to write the data to, must be ready to write
+     */
+    virtual void writeTo(QDataStream& out) const;
 
 protected:
 	int _srcFile;        ///< ID of the source file of the type's declaration

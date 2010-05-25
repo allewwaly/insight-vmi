@@ -9,6 +9,7 @@
 #define SYMBOL_H_
 
 #include "typeinfo.h"
+#include <QDataStream>
 
 /**
  * This class represents a generic debugging symbol read from the objdump output.
@@ -50,8 +51,22 @@ public:
      */
     int id() const;
 
+    /**
+     * Reads a serialized version of this object from \a in.
+     * \sa writeTo()
+     * @param in the data stream to read the data from, must be ready to read
+     */
+    virtual void readFrom(QDataStream& in);
+
+    /**
+     * Writes a serialized version of this object to \a out
+     * \sa readFrom()
+     * @param out the data stream to write the data to, must be ready to write
+     */
+    virtual void writeTo(QDataStream& out) const;
+
 protected:
-    const int _id;         ///< ID of this type, given by objdump
+    int _id;         ///< ID of this type, given by objdump
     QString _name;       ///< name of this type, e.g. "int"
 };
 

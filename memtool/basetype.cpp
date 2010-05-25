@@ -77,3 +77,37 @@ bool BaseType::operator==(const BaseType& other) const
         name() == other.name();
 }
 
+
+void BaseType::readFrom(QDataStream& in)
+{
+    // Read inherited values
+    Symbol::readFrom(in);
+    SourceRef::readFrom(in);
+    in >> _size;
+}
+
+
+void BaseType::writeTo(QDataStream& out) const
+{
+    // Write inherited values
+    Symbol::writeTo(out);
+    SourceRef::writeTo(out);
+    out << _size;
+}
+
+
+
+QDataStream& operator>>(QDataStream& in, BaseType& type)
+{
+    type.readFrom(in);
+    return in;
+}
+
+
+QDataStream& operator<<(QDataStream& out, const BaseType& type)
+{
+    type.writeTo(out);
+    return out;
+}
+
+

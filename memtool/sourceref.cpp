@@ -41,3 +41,13 @@ void SourceRef::setSrcLine(int line)
 }
 
 
+void SourceRef::readFrom(QDataStream& in)
+{
+    in >> _srcFile >> _srcLine;
+}
+
+
+void SourceRef::writeTo(QDataStream& out) const
+{
+    out << _srcFile << _srcLine;
+}

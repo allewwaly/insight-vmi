@@ -12,6 +12,7 @@
 #include <QRegExp>
 #include <QHash>
 #include <QTime>
+#include "qtiocompressor.h"
 #include "typeinfo.h"
 #include "symfactory.h"
 #include "structuredmember.h"
@@ -94,6 +95,13 @@ namespace str {
 };
 
 
+namespace kSym {
+    static const char fileMagic[4] = { 'K', 'S', 'Y', 'M' };
+    static const qint16 fileVersion = 1;
+    static const qint16 flagCompressed = 1;
+};
+
+
 KernelSymbols::Parser::Parser(QIODevice* from, SymFactory* factory)
 	: _from(from),
 	  _factory(factory),
@@ -102,6 +110,7 @@ KernelSymbols::Parser::Parser(QIODevice* from, SymFactory* factory)
 	  _pInfo(0)
 {
 }
+
 
 quint64 KernelSymbols::Parser::line() const
 {
@@ -285,6 +294,7 @@ void KernelSymbols::Parser::parseParam(const ParamSymbolType param, QString valu
     }
 }
 
+
 void KernelSymbols::Parser::parse()
 {
 	const int bufSize = 4096;
@@ -399,6 +409,62 @@ void KernelSymbols::Parser::parse()
 }
 
 
+KernelSymbols::Writer::Writer(QIODevice* to, SymFactory* factory)
+    : _to(to),
+      _factory(factory),
+      _bytesRead(0)
+{
+}
+
+
+void KernelSymbols::Writer::write()
+{
+    // Enable compression by default
+    qint16 flags = kSym::flagCompressed;
+    // Write the file magic, version number, and flags
+    _to->write(kSym::fileMagic, sizeof(kSym::fileMagic));
+    _to->write((char*)&kSym::fileVersion, sizeof(kSym::fileVersion));
+    _to->write((char*)&flags, sizeof(flags));
+
+    QIODevice* to = _to;
+    QtIOCompressor* zip = 0;
+
+    // Is data compression requested?
+    if (flags & kSym::flagCompressed) {
+        zip = new QtIOCompressor(_to);
+        zip->setStreamFormat(QtIOCompressor::ZlibFormat);
+        to = zip;
+    }
+
+    QDataStream out(to);
+
+    // Write all information from SymFactory
+    try {
+        for (int i = 0; i < _factory->types().size(); i++) {
+            BaseType* t = _factory->types().at(i);
+            out << *t;
+        }
+        // TODO continue
+    }
+    catch (...) {
+        // Exceptional clean-up
+        if (zip) {
+            zip->close();
+            delete zip;
+            zip = 0;
+        }
+        throw; // Re-throw exception
+    }
+
+    // Regular clean-up
+    if (zip) {
+        zip->close();
+        delete zip;
+        zip = 0;
+    }
+}
+
+
 //------------------------------------------------------------------------------
 KernelSymbols::KernelSymbols()
 {
@@ -459,6 +525,48 @@ void KernelSymbols::parseSymbols(const QString& fileName)
 	parseSymbols(&file);
 
 	file.close();
+}
+
+
+void KernelSymbols::loadSymbols(QIODevice* from)
+{
+    QtIOCompressor zip(from);
+    zip.setStreamFormat(QtIOCompressor::ZlibFormat);
+
+    zip.close();
+}
+
+
+void KernelSymbols::loadSymbols(const QString& fileName)
+{
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly))
+        parserError(QString("Error opening file %1 for reading").arg(fileName));
+
+    loadSymbols(&file);
+
+    file.close();
+}
+
+
+void KernelSymbols::saveSymbols(QIODevice* to)
+{
+    QtIOCompressor zip(to);
+    zip.setStreamFormat(QtIOCompressor::ZlibFormat);
+
+    zip.close();
+}
+
+
+void KernelSymbols::saveSymbols(const QString& fileName)
+{
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly|QIODevice::Truncate))
+        parserError(QString("Error opening file %1 for reading").arg(fileName));
+
+    saveSymbols(&file);
+
+    file.close();
 }
 
 

@@ -16,6 +16,10 @@
 // Forward declaration
 class QIODevice;
 
+/**
+ * Exception class for parser-related errors
+ * \sa KernelSymbols::Parser
+ */
 class ParserException: public GenericException
 {
 public:
@@ -36,6 +40,31 @@ public:
     }
 };
 
+/**
+ * Exception class for reader/writer-related errors
+ * \sa KernelSymbols::Reader
+ * \sa KernelSymbols::Writer
+ */
+class ReaderWriterException: public GenericException
+{
+public:
+    /**
+      Constructor
+      @param msg error message
+      @param file file name in which message was originally thrown
+      @param line line number at which message was originally thrown
+      @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
+     */
+    ReaderWriterException(QString msg = QString(), const char* file = 0, int line = -1)
+        : GenericException(msg, file, line)
+    {
+    }
+
+    virtual ~ReaderWriterException() throw()
+    {
+    }
+};
+
 
 class KernelSymbols
 {
@@ -45,12 +74,14 @@ private:
 	public:
 		Parser(QIODevice* from, SymFactory* factory);
 		void parse();
+		void load();
+		void save();
 
 		quint64 line() const;
 
 	private:
-	    void mergeSubInfo();
-        void addSymbolFromMainInfo();
+//	    void mergeSubInfo();
+//      void addSymbolFromMainInfo();
         void finishLastSymbol();
         void parseParam(const ParamSymbolType param, QString value);
 	    QIODevice* _from;
@@ -64,6 +95,30 @@ private:
 	    int _curSrcID;
 	};
 
+/*    class Reader
+    {
+    public:
+        Reader(QIODevice* to, SymFactory* factory);
+        void read();
+
+    private:
+        QIODevice* _to;
+        SymFactory* _factory;
+        qint64 _bytesRead;
+    };*/
+
+    class Writer
+    {
+    public:
+        Writer(QIODevice* to, SymFactory* factory);
+        void write();
+
+    private:
+        QIODevice* _to;
+        SymFactory* _factory;
+        qint64 _bytesRead;
+    };
+
 public:
 	KernelSymbols();
 
@@ -71,6 +126,12 @@ public:
 
 	void parseSymbols(QIODevice* from);
 	void parseSymbols(const QString& fileName);
+
+    void loadSymbols(QIODevice* from);
+    void loadSymbols(const QString& fileName);
+
+    void saveSymbols(QIODevice* to);
+    void saveSymbols(const QString& fileName);
 
     const SymFactory& factory() const;
 

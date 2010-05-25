@@ -110,6 +110,20 @@ public:
     virtual quint32 size() const;
 
     /**
+     * Reads a serialized version of this type from \a in.
+     * \sa writeTo()
+     * @param in the data stream to read the data from, must be ready to read
+     */
+    virtual void readFrom(QDataStream& in);
+
+    /**
+     * Writes a serialized version of this type to \a out
+     * \sa readFrom()
+     * @param out the data stream to write the data to, must be ready to write
+     */
+    virtual void writeTo(QDataStream& out) const;
+
+    /**
       @return a string representation of this type
      */
     virtual QString toString(size_t offset) const = 0;
@@ -293,7 +307,7 @@ public:
 //    QIODevice* memory() const;
 
 protected:
-    const quint32 _size;       ///< size of this type in byte
+    quint32 _size;       ///< size of this type in byte
 //    BaseType* _parent;         ///< enclosing struct, if this is a struct member
 //    QIODevice *_memory;        ///< the memory dump to read all values from
 
@@ -350,5 +364,24 @@ inline uint rotl32(uint i, uint rot_amount)
     uint mask = (1 << rot_amount) - 1;
     return (i << rot_amount) | ((i >> (32 - rot_amount)) & mask);
 }
+
+
+/**
+ * Operator for native usage of the BaseType class for streams
+ * @param in data stream to read from
+ * @param type object to store the serialized data to
+ * @return the data strem \a in
+ */
+QDataStream& operator>>(QDataStream& in, BaseType& type);
+
+
+/**
+ * Operator for native usage of the BaseType class for streams
+ * @param out data stream to write the serialized data to
+ * @param type object to serialize
+ * @return the data strem \a out
+ */
+QDataStream& operator<<(QDataStream& out, const BaseType& type);
+
 
 #endif // BASETYPE_H

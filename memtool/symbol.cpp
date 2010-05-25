@@ -40,3 +40,15 @@ int Symbol::id() const
 {
 	return _id;
 }
+
+
+void Symbol::readFrom(QDataStream& in)
+{
+    in >> _id >> _name;
+}
+
+
+void Symbol::writeTo(QDataStream& out) const
+{
+    out << _id << _name;
+}
