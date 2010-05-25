@@ -1,4 +1,5 @@
-SOURCES += volatiletype.cpp \
+SOURCES += qtiocompressor.cpp \
+    volatiletype.cpp \
     funcpointer.cpp \
     refbasetype.cpp \
     typedef.cpp \
@@ -22,7 +23,8 @@ SOURCES += volatiletype.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += volatiletype.h \
+HEADERS += qtiocompressor.h \
+    volatiletype.h \
     funcpointer.h \
     refbasetype.h \
     typedef.h \
