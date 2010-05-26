@@ -19,6 +19,11 @@ class Enum: public BaseType
 public:
 	typedef QHash<qint32, QString> EnumHash;
 
+	/**
+	 * Constructor
+	 */
+	Enum();
+
     /**
       Constructor
       @param info the type information to construct this type from
@@ -53,6 +58,20 @@ public:
 	 * @param values new enumerators
 	 */
 	void setEnumValues(const EnumHash& values);
+
+    /**
+     * Reads a serialized version of this object from \a in.
+     * \sa writeTo()
+     * @param in the data stream to read the data from, must be ready to read
+     */
+    virtual void readFrom(QDataStream& in);
+
+    /**
+     * Writes a serialized version of this object to \a out
+     * \sa readFrom()
+     * @param out the data stream to write the data to, must be ready to write
+     */
+    virtual void writeTo(QDataStream& out) const;
 
 protected:
 	EnumHash _enumValues;

@@ -7,7 +7,10 @@
 
 #include "pointer.h"
 
-#include <assert.h>
+Pointer::Pointer()
+{
+}
+
 
 Pointer::Pointer(const TypeInfo& info)
 	: RefBaseType(info)

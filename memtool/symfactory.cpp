@@ -430,6 +430,28 @@ void SymFactory::addSymbol(const TypeInfo& info)
 }
 
 
+void SymFactory::addSymbol(CompileUnit* unit)
+{
+    // Just insert the unit
+    insert(unit);
+}
+
+
+void SymFactory::addSymbol(Variable* var)
+{
+    insert(var);
+    resolveReference(var);
+}
+
+
+void SymFactory::addSymbol(BaseType* type)
+{
+    // TODO
+//    insert(type);
+//    resolveReference(type);
+}
+
+
 bool SymFactory::resolveReference(ReferencingType* ref)
 {
     assert(ref != 0);

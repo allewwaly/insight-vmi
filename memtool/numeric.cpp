@@ -7,6 +7,12 @@
 
 #include "numeric.h"
 
+NumericBaseType::NumericBaseType()
+    : _bitSize(-1), _bitOffset(-1)
+{
+}
+
+
 NumericBaseType::NumericBaseType(const TypeInfo& info)
     : BaseType(info), _bitSize(info.bitSize()), _bitOffset(info.bitOffset())
 {
@@ -40,4 +46,18 @@ int NumericBaseType::bitOffset() const
 void NumericBaseType::setBitOffset(int offset)
 {
     _bitOffset = offset;
+}
+
+
+void NumericBaseType::readFrom(QDataStream& in)
+{
+    BaseType::readFrom(in);
+    in >> _bitSize >> _bitOffset;
+}
+
+
+void NumericBaseType::writeTo(QDataStream& out) const
+{
+    BaseType::writeTo(out);
+    out << _bitSize << _bitOffset;
 }

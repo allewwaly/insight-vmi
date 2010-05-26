@@ -7,6 +7,11 @@
 
 #include "funcpointer.h"
 
+FuncPointer::FuncPointer()
+{
+}
+
+
 FuncPointer::FuncPointer(const TypeInfo& info)
 	: BaseType(info)
 {

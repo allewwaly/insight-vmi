@@ -7,6 +7,12 @@
 
 #include "symbol.h"
 
+Symbol::Symbol()
+    : _id(-1)
+{
+}
+
+
 Symbol::Symbol(const TypeInfo& info)
 	: _id(info.id()), _name(info.name())
 {
