@@ -18,6 +18,11 @@ class NumericBaseType: public BaseType
 {
 public:
     /**
+     * Constructor
+     */
+    NumericBaseType();
+
+    /**
       Constructor
       @param info the type information to construct this type from
      */
@@ -36,6 +41,20 @@ public:
 
     int bitOffset() const;
     void setBitOffset(int offset);
+
+    /**
+     * Reads a serialized version of this object from \a in.
+     * \sa writeTo()
+     * @param in the data stream to read the data from, must be ready to read
+     */
+    virtual void readFrom(QDataStream& in);
+
+    /**
+     * Writes a serialized version of this object to \a out
+     * \sa readFrom()
+     * @param out the data stream to write the data to, must be ready to write
+     */
+    virtual void writeTo(QDataStream& out) const;
 
 protected:
     int _bitSize;

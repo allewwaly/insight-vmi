@@ -2,6 +2,12 @@
 
 #include <QIODevice>
 
+BaseType::BaseType()
+        : _size(0)
+{
+}
+
+
 BaseType::BaseType(const TypeInfo& info)
         : Symbol(info), SourceRef(info), _size(info.byteSize())
 {
@@ -94,7 +100,6 @@ void BaseType::writeTo(QDataStream& out) const
     SourceRef::writeTo(out);
     out << _size;
 }
-
 
 
 QDataStream& operator>>(QDataStream& in, BaseType& type)

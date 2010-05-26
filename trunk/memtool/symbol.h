@@ -17,6 +17,11 @@
 class Symbol
 {
 public:
+    /**
+     * Constructor
+     */
+    Symbol();
+
 	/**
 	 * Constructor
      * @param info the type information to construct this type from

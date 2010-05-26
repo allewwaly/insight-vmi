@@ -7,7 +7,10 @@
 
 #include "consttype.h"
 
-#include <assert.h>
+ConstType::ConstType()
+{
+}
+
 
 ConstType::ConstType(const TypeInfo& info)
 	: RefBaseType(info)

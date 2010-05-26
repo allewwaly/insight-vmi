@@ -16,9 +16,13 @@
 #include "typeinfo.h"
 #include "symfactory.h"
 #include "structuredmember.h"
+#include "compileunit.h"
+#include "variable.h"
 #include "debug.h"
 
 #define parserError(x) do { throw ParserException((x), __FILE__, __LINE__); } while (0)
+
+#define readerWriterError(x) do { throw ReaderWriterException((x), __FILE__, __LINE__); } while (0)
 
 #define parseInt(i, s, pb) \
     do { \
@@ -96,11 +100,13 @@ namespace str {
 
 
 namespace kSym {
-    static const char fileMagic[4] = { 'K', 'S', 'Y', 'M' };
+    static const qint32 fileMagic = 0x4B53594D; // "KSYM"
     static const qint16 fileVersion = 1;
     static const qint16 flagCompressed = 1;
 };
 
+
+//------------------------------------------------------------------------------
 
 KernelSymbols::Parser::Parser(QIODevice* from, SymFactory* factory)
 	: _from(from),
@@ -409,10 +415,10 @@ void KernelSymbols::Parser::parse()
 }
 
 
+//------------------------------------------------------------------------------
+
 KernelSymbols::Writer::Writer(QIODevice* to, SymFactory* factory)
-    : _to(to),
-      _factory(factory),
-      _bytesRead(0)
+    : _to(to), _factory(factory)
 {
 }
 
@@ -421,30 +427,63 @@ void KernelSymbols::Writer::write()
 {
     // Enable compression by default
     qint16 flags = kSym::flagCompressed;
-    // Write the file magic, version number, and flags
-    _to->write(kSym::fileMagic, sizeof(kSym::fileMagic));
-    _to->write((char*)&kSym::fileVersion, sizeof(kSym::fileVersion));
-    _to->write((char*)&flags, sizeof(flags));
 
-    QIODevice* to = _to;
+    // First, write the header information to the uncompressed device
+    QDataStream out(_to);
+
+    // Write the file header in the following format:
+    // 1. (qint32) magic number
+    // 2. (qint16) file version number
+    // 3. (qint16) flags, i.e., compression enabled, etc.
+    // 4. (qint32) Qt's serialization format version (see QDataStream::Version)
+
+    out << kSym::fileMagic << kSym::fileVersion << flags << (qint32) out.version();
+
+    // Now switch to the compression device, if necessary
     QtIOCompressor* zip = 0;
 
-    // Is data compression requested?
     if (flags & kSym::flagCompressed) {
         zip = new QtIOCompressor(_to);
         zip->setStreamFormat(QtIOCompressor::ZlibFormat);
-        to = zip;
+        out.setDevice(zip);
     }
 
-    QDataStream out(to);
-
-    // Write all information from SymFactory
+    // Write all information from SymFactory in the following format:
+    // 1.a  (qint32) number of compile units
+    // 1.b  (CompileUnit) data of 1st compile unit
+    // 1.c  (CompileUnit) data of 2nd compile unit
+    // 1.d  ...
+    // 2.a  (qint32) number of types
+    // 2.b  (qint32) type (BaseType::RealType casted to qint32)
+    // 2.c  (subclass of BaseType) data of type
+    // 2.d  (qint32) type (BaseType::RealType casted to qint32)
+    // 2.e  (subclass of BaseType) data of type
+    // 2.f  ...
+    // 3.a  (qint32) number of variables
+    // 3.b  (Variable) data of variable
+    // 3.c  (Variable) data of variable
+    // 3.d  ...
     try {
+        // Write list of compile units
+        out << (qint32) _factory->sources().size();
+        CompileUnitIntHash::const_iterator it = _factory->sources().constBegin();
+        while (it != _factory->sources().constEnd()) {
+            const CompileUnit* c = it.value();
+            out << *c;
+            ++it;
+        }
+        // Write list of types
+        out << (qint32) _factory->types().size();
         for (int i = 0; i < _factory->types().size(); i++) {
             BaseType* t = _factory->types().at(i);
+            out << (qint32) t->type();
             out << *t;
         }
-        // TODO continue
+        // Write list of variables
+        out << (qint32) _factory->vars().size();
+        for (int i = 0; i < _factory->vars().size(); i++) {
+            out << *_factory->vars().at(i);
+        }
     }
     catch (...) {
         // Exceptional clean-up
@@ -464,6 +503,115 @@ void KernelSymbols::Writer::write()
     }
 }
 
+
+//------------------------------------------------------------------------------
+
+KernelSymbols::Reader::Reader(QIODevice* from, SymFactory* factory)
+    : _from(from), _factory(factory)
+{
+}
+
+
+void KernelSymbols::Reader::read()
+{
+    // Enable compression by default
+    qint16 flags, version;
+    qint32 magic, qt_stream_version;
+
+    QDataStream in(_from);
+
+    // Read the header information;
+    // 1. (qint32) magic number
+    // 2. (qint16) file version number
+    // 3. (qint16) flags, i.e., compression enabled, etc.
+    // 4. (qint32) Qt's serialization format version (see QDataStream::Version)
+    in >> magic >> version >> flags >> qt_stream_version;
+
+    // Compare magic number and versions
+    if (magic != kSym::fileMagic)
+        readerWriterError(QString("The given file magic number 0x%1 is invalid.")
+                                  .arg(magic, 16));
+    if (version != kSym::fileVersion)
+        readerWriterError(QString("Don't know how to read symbol file verison "
+                                  "%1 (our version is %2).")
+                                  .arg(version)
+                                  .arg(kSym::fileVersion));
+    if (qt_stream_version > in.version()) {
+        std::cerr << "WARNING: This file was created with a newer version of "
+            << "the Qt libraries, your system is running version " << qVersion()
+            << ". We will continue, but the result is undefined!" << std::endl;
+    }
+    // Try to apply the version in any case
+    in.setVersion(qt_stream_version);
+
+    // Now switch to the compression device, if necessary
+    QtIOCompressor* zip = 0;
+
+    if (flags & kSym::flagCompressed) {
+        zip = new QtIOCompressor(_from);
+        zip->setStreamFormat(QtIOCompressor::ZlibFormat);
+        in.setDevice(zip);
+    }
+
+    // Read in all information in the following format:
+    // 1.a  (qint32) number of compile units
+    // 1.b  (CompileUnit) data of 1st compile unit
+    // 1.c  (CompileUnit) data of 2nd compile unit
+    // 1.d  ...
+    // 2.a  (qint32) number of types
+    // 2.b  (qint32) type (BaseType::RealType casted to qint32)
+    // 2.c  (subclass of BaseType) data of type
+    // 2.d  (qint32) type (BaseType::RealType casted to qint32)
+    // 2.e  (subclass of BaseType) data of type
+    // 2.f  ...
+    // 3.a  (qint32) number of variables
+    // 3.b  (Variable) data of variable
+    // 3.c  (Variable) data of variable
+    // 3.d  ...
+    try {
+        qint32 size;
+
+        // Read list of compile units
+        in >> size;
+        for (qint32 i = 0; i < size; i++) {
+            CompileUnit* c = new CompileUnit();
+            if (!c)
+                genericError("Out of memory.");
+            in >> *c;
+            _factory->addSymbol(c);
+        }
+
+        // TODO
+/*        // Read list of types
+        in << (qint32) _factory->types().size();
+        for (int i = 0; i < _factory->types().size(); i++) {
+            BaseType* t = _factory->types().at(i);
+            in << (qint32) t->type();
+            in << *t;
+        }
+        // Read list of variables
+        in << (qint32) _factory->vars().size();
+        for (int i = 0; i < _factory->vars().size(); i++) {
+            in << *_factory->vars().at(i);
+        }*/
+    }
+    catch (...) {
+        // Exceptional clean-up
+        if (zip) {
+            zip->close();
+            delete zip;
+            zip = 0;
+        }
+        throw; // Re-throw exception
+    }
+
+    // Regular clean-up
+    if (zip) {
+        zip->close();
+        delete zip;
+        zip = 0;
+    }
+}
 
 //------------------------------------------------------------------------------
 KernelSymbols::KernelSymbols()
@@ -498,8 +646,6 @@ void KernelSymbols::parseSymbols(QIODevice* from)
 		if (m > 0)
 		    time = QString("%1 min ").arg(m) + time;
 
-//		debugmsg("Parsing of " << parser.line() << " lines finish in "
-//		        << time << " (" << (parser.line() / duration) << " lines per second).");
         std::cout << "Parsing of " << parser.line() << " lines finish in "
                 << time;
         if (duration > 0)
@@ -530,10 +676,6 @@ void KernelSymbols::parseSymbols(const QString& fileName)
 
 void KernelSymbols::loadSymbols(QIODevice* from)
 {
-    QtIOCompressor zip(from);
-    zip.setStreamFormat(QtIOCompressor::ZlibFormat);
-
-    zip.close();
 }
 
 
@@ -541,7 +683,7 @@ void KernelSymbols::loadSymbols(const QString& fileName)
 {
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly))
-        parserError(QString("Error opening file %1 for reading").arg(fileName));
+        readerWriterError(QString("Error opening file %1 for reading").arg(fileName));
 
     loadSymbols(&file);
 
@@ -551,10 +693,38 @@ void KernelSymbols::loadSymbols(const QString& fileName)
 
 void KernelSymbols::saveSymbols(QIODevice* to)
 {
-    QtIOCompressor zip(to);
-    zip.setStreamFormat(QtIOCompressor::ZlibFormat);
+    if (!to)
+        readerWriterError("Received a null device to read the data from");
 
-    zip.close();
+    Writer writer(to, &_factory);
+    try {
+        QTime timer;
+        timer.start();
+
+        writer.write();
+
+        // Print out some timing statistics
+        int duration = timer.elapsed();
+        int s = (duration / 1000) % 60;
+        int m = duration / (60*1000);
+        QString time = QString("%1 sec").arg(s);
+        if (m > 0)
+            time = QString("%1 min ").arg(m) + time;
+
+        std::cout << "Writing ";
+        if (to->pos() > 0)
+            std::cout << "of " << to->pos() << " bytes ";
+        std::cout << "finished in " << time;
+        if (to->pos() > 0)
+            std::cout << " (" << (int)((to->pos() / (float)duration * 1000)) << " byte/s)";
+        std::cout << "." << std::endl;
+    }
+    catch (GenericException e) {
+        std::cerr
+            << "Caught exception at " << e.file << ":" << e.line << std::endl
+            << "Message: " << e.message << std::endl;
+        throw;
+    }
 }
 
 

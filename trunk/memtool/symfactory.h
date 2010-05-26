@@ -118,6 +118,12 @@ public:
 
 	void addSymbol(const TypeInfo& info);
 
+    void addSymbol(CompileUnit* unit);
+
+    void addSymbol(Variable* var);
+
+    void addSymbol(BaseType* type);
+
 	inline const BaseTypeList& types() const
 	{
 		return _types;
@@ -141,6 +147,9 @@ protected:
 	{
 	    // Create a new type from the info
 		T* t = new T(info);
+
+		if (!t)
+		    genericError("Out of memory.");
 
 		// Try to find the type based on its hash
 		VisitedSet visited;

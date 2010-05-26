@@ -14,6 +14,11 @@ class Pointer: public RefBaseType
 {
 public:
     /**
+     * Constructor
+     */
+    Pointer();
+
+    /**
       Constructor
       @param info the type information to construct this type from
      */

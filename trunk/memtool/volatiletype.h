@@ -14,6 +14,11 @@ class VolatileType: public RefBaseType
 {
 public:
     /**
+     * Constructor
+     */
+    VolatileType();
+
+    /**
       Volatileructor
       @param info the type information to volatileruct this type from
      */

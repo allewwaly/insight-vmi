@@ -95,17 +95,16 @@ private:
 	    int _curSrcID;
 	};
 
-/*    class Reader
+    class Reader
     {
     public:
-        Reader(QIODevice* to, SymFactory* factory);
+        Reader(QIODevice* from, SymFactory* factory);
         void read();
 
     private:
-        QIODevice* _to;
+        QIODevice* _from;
         SymFactory* _factory;
-        qint64 _bytesRead;
-    };*/
+    };
 
     class Writer
     {
@@ -116,7 +115,6 @@ private:
     private:
         QIODevice* _to;
         SymFactory* _factory;
-        qint64 _bytesRead;
     };
 
 public:

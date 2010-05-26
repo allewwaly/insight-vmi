@@ -14,6 +14,11 @@ class Typedef: public RefBaseType
 {
 public:
     /**
+     * Constructor
+     */
+    Typedef();
+
+    /**
       Constructor
       @param info the type information to construct this type from
      */

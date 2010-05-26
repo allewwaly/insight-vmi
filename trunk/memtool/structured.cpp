@@ -7,6 +7,12 @@
 
 #include "structured.h"
 
+
+Structured::Structured()
+{
+}
+
+
 Structured::Structured(const TypeInfo& info)
 	: BaseType(info), _members(info.members())
 {
@@ -54,7 +60,41 @@ void Structured::addMember(StructuredMember* member)
 	_members.append(member);
 }
 
+
+void Structured::readFrom(QDataStream& in)
+{
+    BaseType::readFrom(in);
+
+    qint32 size;
+    in >> size;
+
+    for (qint32 i = 0; i < size; i++) {
+        StructuredMember* member = new StructuredMember();
+        if (!member)
+            genericError("Out of memory.");
+        in >> *member;
+        addMember(member);
+    }
+}
+
+
+void Structured::writeTo(QDataStream& out) const
+{
+    BaseType::writeTo(out);
+
+    out << (qint32) _members.size();
+    for (qint32 i = 0; i < _members.size(); i++) {
+        out << *_members[i];
+    }
+}
+
+
 //------------------------------------------------------------------------------
+Struct::Struct()
+{
+}
+
+
 Struct::Struct(const TypeInfo& info)
 	: Structured(info)
 {
@@ -74,8 +114,13 @@ QString Struct::toString(size_t offset) const
 }
 
 //------------------------------------------------------------------------------
+Union::Union()
+{
+}
+
+
 Union::Union(const TypeInfo& info)
-	: Structured(info)
+    : Structured(info)
 {
 }
 

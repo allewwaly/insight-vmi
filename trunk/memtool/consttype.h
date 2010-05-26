@@ -14,6 +14,11 @@ class ConstType: public RefBaseType
 {
 public:
     /**
+     * Constructor
+     */
+    ConstType();
+
+    /**
       Constructor
       @param info the type information to construct this type from
      */

@@ -14,6 +14,11 @@ class FuncPointer: public BaseType
 {
 public:
     /**
+     * Constructor
+     */
+    FuncPointer();
+
+    /**
       Constructor
       @param info the type information to construct this type from
      */

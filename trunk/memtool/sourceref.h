@@ -14,11 +14,14 @@
 class SourceRef
 {
 public:
+    /**
+     * Constructor
+     */
+    SourceRef();
+
 	/**
 	 * Constructor
-	 * @param srcFile
-	 * @param srcLine
-	 * @return
+     * @param info the type information to construct this type from
 	 */
 	SourceRef(const TypeInfo& info);
 

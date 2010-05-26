@@ -87,6 +87,11 @@ public:
     static BaseType::RealTypeRevMap getRealTypeRevMap();
 
     /**
+     * Constructor
+     */
+    BaseType();
+
+    /**
       Constructor
       @param info the type information to construct this type from
      */
@@ -370,7 +375,7 @@ inline uint rotl32(uint i, uint rot_amount)
  * Operator for native usage of the BaseType class for streams
  * @param in data stream to read from
  * @param type object to store the serialized data to
- * @return the data strem \a in
+ * @return the data stream \a in
  */
 QDataStream& operator>>(QDataStream& in, BaseType& type);
 
@@ -379,7 +384,7 @@ QDataStream& operator>>(QDataStream& in, BaseType& type);
  * Operator for native usage of the BaseType class for streams
  * @param out data stream to write the serialized data to
  * @param type object to serialize
- * @return the data strem \a out
+ * @return the data stream \a out
  */
 QDataStream& operator<<(QDataStream& out, const BaseType& type);
 

@@ -7,14 +7,16 @@
 
 #include "sourceref.h"
 
+SourceRef::SourceRef()
+    : _srcFile(-1), _srcLine(-1)
+{
+}
+
+
 SourceRef::SourceRef(const TypeInfo& info)
 	: _srcFile(info.srcFileId()), _srcLine(info.srcLine())
 {
 }
-
-//SourceRef::~SourceRef()
-//{
-//}
 
 
 int SourceRef::srcFile() const

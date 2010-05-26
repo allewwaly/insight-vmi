@@ -7,8 +7,14 @@
 
 #include "array.h"
 
+Array::Array()
+    : _length(-1)
+{
+}
+
+
 Array::Array(const TypeInfo& info)
-	: Pointer(info), _length(info.upperBound() < 0 ? -1 : info.upperBound() + 1)
+    : Pointer(info), _length(info.upperBound() < 0 ? -1 : info.upperBound() + 1)
 {
 }
 
@@ -54,4 +60,18 @@ qint32 Array::length() const
 void Array::setLength(qint32 len)
 {
 	_length = len;
+}
+
+
+void Array::readFrom(QDataStream& in)
+{
+    Pointer::readFrom(in);
+    in >> _length;
+}
+
+
+void Array::writeTo(QDataStream& out) const
+{
+    Pointer::writeTo(out);
+    out << _length;
 }

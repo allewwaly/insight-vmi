@@ -8,8 +8,13 @@
 #include "refbasetype.h"
 #include <assert.h>
 
+RefBaseType::RefBaseType()
+{
+}
+
+
 RefBaseType::RefBaseType(const TypeInfo& info)
-	: BaseType(info), ReferencingType(info)
+    : BaseType(info), ReferencingType(info)
 {
 }
 
@@ -21,15 +26,6 @@ uint RefBaseType::hash(VisitedSet* visited) const
         ret ^= _refType->hash(visited);
     return ret;
 }
-
-
-//QString RefBaseType::name() const
-//{
-//    if (_refType)
-//        return "const " + _refType->name();
-//    else
-//        return "const";
-//}
 
 
 uint RefBaseType::size() const
@@ -45,4 +41,18 @@ QString RefBaseType::toString(size_t offset) const
 {
 	assert(_refType != 0);
 	return _refType->toString(offset);
+}
+
+
+void RefBaseType::readFrom(QDataStream& in)
+{
+    BaseType::readFrom(in);
+    ReferencingType::readFrom(in);
+}
+
+
+void RefBaseType::writeTo(QDataStream& out) const
+{
+    BaseType::writeTo(out);
+    ReferencingType::writeTo(out);
 }

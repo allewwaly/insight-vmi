@@ -7,7 +7,10 @@
 
 #include "typedef.h"
 
-#include <assert.h>
+Typedef::Typedef()
+{
+}
+
 
 Typedef::Typedef(const TypeInfo& info)
 	: RefBaseType(info)

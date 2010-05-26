@@ -9,6 +9,10 @@
 
 #include <assert.h>
 
+VolatileType::VolatileType()
+{
+}
+
 VolatileType::VolatileType(const TypeInfo& info)
 	: RefBaseType(info)
 {

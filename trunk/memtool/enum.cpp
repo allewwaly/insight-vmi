@@ -7,6 +7,11 @@
 
 #include "enum.h"
 
+Enum::Enum()
+{
+}
+
+
 Enum::Enum(const TypeInfo& info)
 	: BaseType(info), _enumValues(info.enumValues())
 {
@@ -55,4 +60,33 @@ const Enum::EnumHash& Enum::enumValues() const
 void Enum::setEnumValues(const EnumHash& values)
 {
 	_enumValues = values;
+}
+
+
+void Enum::readFrom(QDataStream& in)
+{
+    BaseType::readFrom(in);
+
+    _enumValues.clear();
+    qint32 size;
+    EnumHash::key_type key;
+    EnumHash::mapped_type value;
+
+    in >> size;
+    for (int i = 0; i < size; i++) {
+        in >> key >> value;
+        _enumValues.insert(key, value);
+    }
+}
+
+
+void Enum::writeTo(QDataStream& out) const
+{
+    BaseType::writeTo(out);
+    out << (qint32) _enumValues.size();
+    for (EnumHash::const_iterator it = _enumValues.constBegin();
+        it != _enumValues.constEnd(); ++it)
+    {
+        out << it.key() << it.value();
+    }
 }

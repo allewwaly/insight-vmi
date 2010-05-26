@@ -9,6 +9,12 @@
 #include "basetype.h"
 #include <assert.h>
 
+ReferencingType::ReferencingType()
+    : _refType(0), _refTypeId(-1)
+{
+}
+
+
 ReferencingType::ReferencingType(const TypeInfo& info)
     : _refType(0), _refTypeId(info.refTypeId())
 {
@@ -43,4 +49,17 @@ int ReferencingType::refTypeId() const
 void ReferencingType::setRefTypeId(int id)
 {
     _refTypeId = id;
+}
+
+
+void ReferencingType::readFrom(QDataStream& in)
+{
+    _refType = 0;
+    in >> _refTypeId;
+}
+
+
+void ReferencingType::writeTo(QDataStream& out) const
+{
+    out << _refTypeId;
 }
