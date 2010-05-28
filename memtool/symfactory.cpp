@@ -111,6 +111,115 @@ Variable* SymFactory::findVarByName(const QString & name) const
 }
 
 
+BaseType* SymFactory::createEmptyType(BaseType::RealType type)
+{
+    BaseType* t = 0;
+
+    switch (type) {
+    case BaseType::rtInt8:
+        t = new Int8();
+        break;
+
+    case BaseType::rtUInt8:
+        t = new UInt8();
+        break;
+
+    case BaseType::rtBool8:
+        t = new Bool8();
+        break;
+
+    case BaseType::rtInt16:
+        t = new Int16();
+        break;
+
+    case BaseType::rtUInt16:
+        t = new UInt16();
+        break;
+
+    case BaseType::rtBool16:
+        t = new Bool16();
+        break;
+
+    case BaseType::rtInt32:
+        t = new Int32();
+        break;
+
+    case BaseType::rtUInt32:
+        t = new UInt32();
+        break;
+
+    case BaseType::rtBool32:
+        t = new Bool32();
+        break;
+
+    case BaseType::rtInt64:
+        t = new Int64();
+        break;
+
+    case BaseType::rtUInt64:
+        t = new UInt64();
+        break;
+
+    case BaseType::rtBool64:
+        t = new Bool64();
+        break;
+
+    case BaseType::rtFloat:
+        t = new Float();
+        break;
+
+    case BaseType::rtDouble:
+        t = new Double();
+        break;
+
+    case BaseType::rtPointer:
+        t = new Pointer();
+        break;
+
+    case BaseType::rtArray:
+        t = new Array();
+        break;
+
+    case BaseType::rtEnum:
+        t = new Enum();
+        break;
+
+    case BaseType::rtStruct:
+        t = new Struct();
+        break;
+
+    case BaseType::rtUnion:
+        t = new Union();
+        break;
+
+    case BaseType::rtConst:
+        t = new ConstType();
+        break;
+
+    case BaseType::rtVolatile:
+        t = new VolatileType();
+        break;
+
+    case BaseType::rtTypedef:
+        t = new Typedef();
+        break;
+
+    case BaseType::rtFuncPointer:
+        t = new FuncPointer();
+        break;
+
+    default:
+        factoryError(QString("We don't handle symbol type %1, but we should!").arg(type));
+        break;
+    }
+
+    if (!t)
+        genericError("Out of memory");
+
+    return t;
+}
+
+
 BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 {
 	BaseType* t = 0;
@@ -214,11 +323,29 @@ void SymFactory::insert(const TypeInfo& info, BaseType* type)
 }
 
 
+void SymFactory::insert(BaseType* type)
+{
+    assert(type != 0);
+
+    // Add to the list of types
+    _types.append(type);
+
+    // Insert into the various hashes and check for missing references
+    updateTypeRelations(type->id(), type->name(), type);
+}
+
+
 // This function was only introduced to have a more descriptive comparison
 bool SymFactory::isNewType(const TypeInfo& info, BaseType* type) const
 {
+    return isNewType(info.id(), type);
+}
+
+// This function was only introduced to have a more descriptive comparison
+bool SymFactory::isNewType(const int new_id, BaseType* type) const
+{
     assert(type != 0);
-    return info.id() == type->id();
+    return new_id == type->id();
 }
 
 
@@ -252,17 +379,23 @@ void SymFactory::relocateHashEntry(const T_key& old_key, const T_key& new_key,
 
 void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 {
+    updateTypeRelations(info.id(), info.name(), target);
+}
+
+
+void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, BaseType* target)
+{
     // Insert new ID/type relation into lookup tables
-	assert(_typesById.contains(info.id()) == false);
-	_typesById.insert(info.id(), target);
+	assert(_typesById.contains(new_id) == false);
+	_typesById.insert(new_id, target);
 
     // Only add this type into the name relation table if it is new
-	if (isNewType(info, target) && !info.name().isEmpty())
-	    _typesByName.insert(info.name(), target);
+	if (isNewType(new_id, target) && !new_name.isEmpty())
+	    _typesByName.insert(new_name, target);
 
 	// See if we have types with missing references to the given type
-	if (_postponedTypes.contains(info.id())) {
-		QList<ReferencingType*> list = _postponedTypes.values(info.id());
+	if (_postponedTypes.contains(new_id)) {
+		QList<ReferencingType*> list = _postponedTypes.values(new_id);
 		QList<ReferencingType*>::iterator it = list.begin();
 
 		VisitedSet visited;
@@ -283,6 +416,7 @@ void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 			// Add the missing reference according to type
 			t->setRefType(target);
 
+            // For a RefBaseType only, not for a Variable:
 			// Remove type at its old index, re-add it at its new index
             if (rbt) {
                 // Calculate new hash of type
@@ -296,7 +430,7 @@ void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 		}
 
 		// Delete the entry from the hash
-		_postponedTypes.remove(info.id());
+		_postponedTypes.remove(new_id);
 	}
 }
 
@@ -439,6 +573,7 @@ void SymFactory::addSymbol(CompileUnit* unit)
 
 void SymFactory::addSymbol(Variable* var)
 {
+    // Insert and find referenced type
     insert(var);
     resolveReference(var);
 }
@@ -446,9 +581,16 @@ void SymFactory::addSymbol(Variable* var)
 
 void SymFactory::addSymbol(BaseType* type)
 {
-    // TODO
-//    insert(type);
-//    resolveReference(type);
+    // Insert into list
+    insert(type);
+
+    // Resolve references for referencing types or structures
+    RefBaseType* rbt = dynamic_cast<RefBaseType*>(type);
+    Structured* s = dynamic_cast<Structured*>(type);
+    if (rbt)
+        resolveReference(rbt);
+    else if (s)
+        resolveReferences(s);
 }
 
 
@@ -476,7 +618,23 @@ bool SymFactory::resolveReference(ReferencingType* ref)
 }
 
 
-void SymFactory::parsingFinished()
+bool SymFactory::resolveReferences(Structured* s)
+{
+    assert(s != 0);
+    bool ret = true;
+
+    // Find referenced type for all members
+    for (int i = 0; i < s->members().size(); i++) {
+        // This function adds all member to _postponedTypes whose
+        // references could not be resolved.
+        ret = ret && resolveReference(s->members().at(i));
+    }
+
+    return ret;
+}
+
+
+void SymFactory::symbolsFinished()
 {
     std::cout << "Statistics:" << std::endl;
 

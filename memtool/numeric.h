@@ -73,6 +73,14 @@ public:
 	typedef T Type;
 
     /**
+     * Constructor
+     */
+    Numeric()
+        : _type(realType)
+    {
+    }
+
+    /**
       Constructor
       @param info the type information to construct this type from
      */
@@ -110,7 +118,7 @@ public:
 //	}
 
 protected:
-	RealType _type;
+	const RealType _type;
 };
 
 

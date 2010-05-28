@@ -30,18 +30,19 @@ class Shell
     };
 
 public:
-    Shell(const KernelSymbols& symbols);
+    Shell(KernelSymbols& symbols);
     ~Shell();
 
     int start();
 
 private:
-    const KernelSymbols& _sym;
+    KernelSymbols& _sym;
     QFile _stdin;
     QFile _stdout;
     QTextStream _out;
     QHash<QString, Command> _commands;
 
+    QString readLine();
     int exec(QString command);
     void hline(int width = 60);
     int cmdExit(QStringList args);
@@ -55,6 +56,7 @@ private:
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t);
     int cmdShowVariable(const Variable* v);
+    int cmdSymbols(QStringList args);
 };
 
 #endif /* SHELL_H_ */
