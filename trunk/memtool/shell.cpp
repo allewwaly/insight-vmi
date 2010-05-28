@@ -15,7 +15,7 @@
 #include "refbasetype.h"
 #include "kernelsymbols.h"
 
-Shell::Shell(const KernelSymbols& symbols)
+Shell::Shell(KernelSymbols& symbols)
     : _sym(symbols)
 {
     // Register all commands
@@ -60,11 +60,30 @@ Shell::Shell(const KernelSymbols& symbols)
                 "given by a name or ID.\n"
                 "  show <name>       Show type or variable by name\n"
                 "  show <ID>         Show type or variable by ID\n"));
+
+    _commands.insert("symbols",
+            Command(
+                &Shell::cmdSymbols,
+                "Allows to load, store or parse the kernel symbols",
+                "This command allows to load, store or parse the kernel"
+                "debugging symbols that are to be used.\n"
+                "  symbols parse <file>    Parse the symbols from an objdump output\n"
+                "  symbols store <file>    Saves the parsed symbols to a file\n"
+                "  symbols save <file>     Alias for \"store\"\n"
+                "  symbols load <file>     Loads previously stored symbols for usage\n"));
 }
 
 
 Shell::~Shell()
 {
+}
+
+
+QString Shell::readLine()
+{
+    QByteArray buf;
+    buf = _stdin.readLine();
+    return QString::fromLocal8Bit(buf.constData(), buf.size()).trimmed();
 }
 
 
@@ -76,15 +95,20 @@ int Shell::start()
 
     int ret = 0;
     QString line, cmd;
-    QByteArray buf;
-    QStringList words;
 
     while (ret == 0 && !_stdin.atEnd()) {
         _out << ">>> " << flush;
 
-        buf = _stdin.readLine();
-        line = QString::fromLocal8Bit(buf.constData(), buf.size()).trimmed();
-        ret = exec(line);
+        line = readLine();
+
+        try {
+            ret = exec(line);
+        }
+        catch (GenericException e) {
+                std::cerr
+                    << "Caught exception at " << e.file << ":" << e.line << std::endl
+                    << "Message: " << e.message << std::endl;
+        }
     }
 
     return ret;
@@ -122,7 +146,24 @@ int Shell::exec(QString command)
         ret = (this->*c)(words);
     }
     else {
-        _out << "Command not recognized: " << cmd << endl;
+        // Try to match the start of a command
+        QList<QString> cmds = _commands.keys();
+        int match, match_count = 0;
+        for (int i = 0; i < cmds.size(); i++) {
+            if (cmds[i].startsWith(cmd)) {
+                match_count++;
+                match = i;
+            }
+        }
+
+        if (match_count == 1) {
+            ShellCallback c =_commands[cmds[match]].callback;
+            ret = (this->*c)(words);
+        }
+        else if (match_count > 1)
+            _out << "Command prefix \"" << cmd << "\" is ambiguous." << endl;
+        else
+            _out << "Command not recognized: " << cmd << endl;
     }
 
     return ret;
@@ -223,7 +264,7 @@ int Shell::cmdListSources(QStringList /*args*/)
     qSort(keys);
 
     if (keys.isEmpty()) {
-        _out << "There were no source references.";
+        _out << "There were no source references.\n";
         return 0;
     }
 
@@ -255,7 +296,7 @@ int Shell::cmdListTypes(QStringList /*args*/)
     CompileUnit* unit = 0;
 
     if (types.isEmpty()) {
-        _out << "There are no type references.";
+        _out << "There are no type references.\n";
         return 0;
     }
 
@@ -325,7 +366,7 @@ int Shell::cmdListTypesById(QStringList /*args*/)
     QList<int> ids = _sym.factory()._typesById.keys();
 
     if (ids.isEmpty()) {
-        _out << "There are no types by ID.";
+        _out << "There are no type references.\n";
         return 0;
     }
 
@@ -379,7 +420,7 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
     QList<QString> names = _sym.factory()._typesByName.keys();
 
     if (names.isEmpty()) {
-        _out << "There are no types by ID.";
+        _out << "There are no type references.\n";
         return 0;
     }
 
@@ -429,7 +470,7 @@ int Shell::cmdListVars(QStringList /*args*/)
     CompileUnit* unit = 0;
 
     if (vars.isEmpty()) {
-        _out << "There were no variable references.";
+        _out << "There were no variable references.\n";
         return 0;
     }
 
@@ -631,4 +672,45 @@ int Shell::cmdShowVariable(const Variable* v)
 }
 
 
+int Shell::cmdSymbols(QStringList args)
+{
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() != 2)
+        return cmdHelp(QStringList("symbols"));
 
+    QString action = args[0].toLower(), fileName = args[1];
+
+    // Check file for existence
+    QFile file(fileName);
+    if (action == "parse" || action == "load") {
+        if (!file.exists()) {
+            _out << "File not found: " << fileName << "\n";
+            return 0;
+        }
+    }
+    else if (action == "store" || action == "save") {
+        if (file.exists()) {
+            QString reply;
+            do {
+                _out << "Ok to overwrite existing file? [Y/n] " << flush;
+                reply = readLine().toLower();
+                if (reply.isEmpty())
+                    reply = "y";
+                else if (reply == "n")
+                    return 0;
+            } while (reply != "y");
+        }
+    }
+
+    // Perform the action
+    if (action == "parse")
+        _sym.parseSymbols(fileName);
+    else if (action == "store" || action == "save")
+        _sym.saveSymbols(fileName);
+    else if (action == "load")
+        _sym.loadSymbols(fileName);
+    else
+        return cmdHelp(QStringList("symbols"));
+
+    return 0;
+}

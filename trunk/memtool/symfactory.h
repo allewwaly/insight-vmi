@@ -25,6 +25,8 @@ class Variable;
 #include "genericexception.h"
 #include "structured.h"
 
+// forward declaration
+class KernelSymbolReader;
 
 /**
   Basic exception class for all factory-related exceptions
@@ -95,6 +97,8 @@ typedef QMultiHash<const BaseType*, BaseType*> BaseTypeMultiHash;
 class SymFactory
 {
     friend class Shell;
+    friend class KernelSymbolReader;
+
 public:
 	SymFactory();
 
@@ -109,6 +113,15 @@ public:
 	BaseType* findBaseTypeByName(const QString& name) const;
 
 	Variable* findVarByName(const QString& name) const;
+
+	/**
+	 * Creates a new BaseType object of the given type \a type. This object is
+	 * in no way stored or added to any tables. The caller is responsible for
+	 * cleaning it up.
+	 * @param type the type of BaseType to create
+	 * @return pointer to the new BaseType object of type \a type
+	 */
+	static BaseType* createEmptyType(BaseType::RealType type);
 
 	/**
 	 * Checks if the given combination of type information is a legal for a symbol
@@ -129,6 +142,16 @@ public:
 		return _types;
 	}
 
+    inline const BaseTypeIntHash& typesById() const
+    {
+        return _typesById;
+    }
+
+    inline const BaseTypeStringHash& typesByName() const
+    {
+        return _typesByName;
+    }
+
 	inline const CompileUnitIntHash& sources() const
 	{
 		return _sources;
@@ -139,7 +162,7 @@ public:
 		return _vars;
 	}
 
-	void parsingFinished();
+	void symbolsFinished();
 
 protected:
 	template<class T>
@@ -180,13 +203,7 @@ protected:
 			if (info.symType() & (hsStructureType | hsUnionType)) {
 				Structured* s = dynamic_cast<Structured*>(t);
 				assert(s != 0);
-
-				// Find referenced type for all members
-				for (int i = 0; i < s->members().size(); i++) {
-					// This function adds all member to _postponedTypes whose
-					// references could not be resolved.
-					resolveReference(s->members().at(i));
-				}
+				resolveReferences(s);
 			}
 			// We don't need to re-calc the hash here because even for
 			// structs or unions it does not depend on the member's hash,
@@ -203,21 +220,45 @@ protected:
 
 	BaseType* getNumericInstance(const TypeInfo& info);
 
-	/**
-	 * Checks if \a type has the same ID as the one given in \a info
-	 * @param info the type information to compare the ID with
-	 * @param type the base type to compare the ID with
-	 * @return \c true if the IDs are different, \c false if the IDs are the same
-	 */
-	bool isNewType(const TypeInfo& info, BaseType* type) const;
+    /**
+     * This is an overloaded convenience function.
+     * Checks if \a type has the same ID as the one given in \a info
+     * @param info the type information to compare the ID with
+     * @param type the base type to compare the ID with
+     * @return \c true if the IDs are different, \c false if the IDs are the same
+     */
+    bool isNewType(const TypeInfo& info, BaseType* type) const;
 
     /**
-     * Updates the different sortings that exist for the types (e.g. typesById).
+     * Checks if \a type has the same ID as the one given in \a new_id
+     * @param new_id the ID to compare the type's ID with
+     * @param type the base type to compare the ID with
+     * @return \c true if the IDs are different, \c false if the IDs are the same
+     */
+    bool isNewType(const int new_id, BaseType* type) const;
+
+    /**
+     * This is an overloaded convenience function.
+     * Updates the different relations that exist for the types (e.g. typesById).
      * During this progress postponed types will be updated as well.
+     * @param info the type information for the current type
+     * @param target the BaseType that either was just created from \a info, or
+     * the equivalent type found by the type hash.
      */
     void updateTypeRelations(const TypeInfo& info, BaseType* target);
 
+    /**
+     * Updates the different relations that exist for the types (e.g. typesById).
+     * During this progress postponed types will be updated as well.
+     * @param new_id the ID of the type to update the relations for
+     * @param new_name the name of the type to update the relations for
+     * @param target the BaseType that either was just created from some type
+     * information, or the equivalent type found by the type hash.
+     */
+    void updateTypeRelations(const int new_id, const QString& new_name, BaseType* target);
+
 	void insert(const TypeInfo& info, BaseType* type);
+    void insert(BaseType* type);
 	void insert(CompileUnit* unit);
 	void insert(Variable* var);
 
@@ -231,6 +272,17 @@ private:
      * to the _postponedTypes hash.
      */
     bool resolveReference(ReferencingType* ref);
+
+    /**
+     * Tries to resolve the type references of all members of the Structured
+     * object \a s.
+     * If the reference of a member cannot be resolved, it is added to the
+     * _postponedTypes hash for later resolution.
+     * @param s the struct/union which members should be resolved
+     * @return \c true if all members could be resolved, \c false if it at least
+     * one was added to the _postponedTypes hash.
+     */
+    bool resolveReferences(Structured* s);
 
     /**
      * Removes a value in a QMultiHash at given at index \a old_key, if present,

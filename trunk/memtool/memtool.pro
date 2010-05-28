@@ -1,4 +1,7 @@
-SOURCES += qtiocompressor.cpp \
+SOURCES += kernelsymbolparser.cpp \
+    kernelsymbolwriter.cpp \
+    kernelsymbolreader.cpp \
+    qtiocompressor.cpp \
     volatiletype.cpp \
     funcpointer.cpp \
     refbasetype.cpp \
@@ -23,7 +26,13 @@ SOURCES += qtiocompressor.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += qtiocompressor.h \
+HEADERS += parserexception.h \
+    readerwriterexception.h \
+    kernelsymbolconsts.h \
+    kernelsymbolparser.h \
+    kernelsymbolwriter.h \
+    kernelsymbolreader.h \
+    qtiocompressor.h \
     volatiletype.h \
     funcpointer.h \
     refbasetype.h \
