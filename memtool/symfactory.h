@@ -100,6 +100,11 @@ class SymFactory
     friend class KernelSymbolReader;
 
 public:
+    enum RestoreType {
+        rtParsing,
+        rtLoading
+    };
+
 	SymFactory();
 
 	~SymFactory();
@@ -162,7 +167,7 @@ public:
 		return _vars;
 	}
 
-	void symbolsFinished();
+	void symbolsFinished(RestoreType rt);
 
 protected:
 	template<class T>
