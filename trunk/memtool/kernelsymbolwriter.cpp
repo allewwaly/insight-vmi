@@ -11,10 +11,10 @@
 #include <QSet>
 #include "kernelsymbolconsts.h"
 #include "symfactory.h"
-#include "qtiocompressor.h"
 #include "basetype.h"
 #include "compileunit.h"
 #include "variable.h"
+#include "debug.h"
 
 
 KernelSymbolWriter::KernelSymbolWriter(QIODevice* to, SymFactory* factory)
@@ -25,9 +25,8 @@ KernelSymbolWriter::KernelSymbolWriter(QIODevice* to, SymFactory* factory)
 
 void KernelSymbolWriter::write()
 {
-    // Enable compression by default
-    qint16 flags = kSym::flagCompressed;
-    flags = 0;
+    // Disable compression by default
+    qint16 flags = 0; // kSym::flagCompressed;
 
     // First, write the header information to the uncompressed device
     QDataStream out(_to);
@@ -35,19 +34,10 @@ void KernelSymbolWriter::write()
     // Write the file header in the following format:
     // 1. (qint32) magic number
     // 2. (qint16) file version number
-    // 3. (qint16) flags, i.e., compression enabled, etc.
+    // 3. (qint16) flags (currently unused)
     // 4. (qint32) Qt's serialization format version (see QDataStream::Version)
 
     out << kSym::fileMagic << kSym::fileVersion << flags << (qint32) out.version();
-
-    // Now switch to the compression device, if necessary
-    QtIOCompressor* zip = 0;
-
-    if (flags & kSym::flagCompressed) {
-        zip = new QtIOCompressor(_to);
-        zip->setStreamFormat(QtIOCompressor::ZlibFormat);
-        out.setDevice(zip);
-    }
 
     // Write all information from SymFactory in the following format:
     // 1.a  (qint32) number of compile units
@@ -96,8 +86,9 @@ void KernelSymbolWriter::write()
         out << _factory->typesById().size() - _factory->types().size();
         BaseTypeIntHash::const_iterator bt_id_it = _factory->typesById().constBegin();
         while (bt_id_it != _factory->typesById().constEnd()) {
-            if (!written_types.contains(bt_id_it.key()))
+            if (!written_types.contains(bt_id_it.key())) {
                 out << (qint32) bt_id_it.key() << (qint32) bt_id_it.value()->id();
+            }
             ++bt_id_it;
         }
 
@@ -108,20 +99,8 @@ void KernelSymbolWriter::write()
         }
     }
     catch (...) {
-        // Exceptional clean-up
-        if (zip) {
-            zip->close();
-            delete zip;
-            zip = 0;
-        }
+        // Nothing to do right now
         throw; // Re-throw exception
-    }
-
-    // Regular clean-up
-    if (zip) {
-        zip->close();
-        delete zip;
-        zip = 0;
     }
 }
 

@@ -1,7 +1,6 @@
 SOURCES += kernelsymbolparser.cpp \
     kernelsymbolwriter.cpp \
     kernelsymbolreader.cpp \
-    qtiocompressor.cpp \
     volatiletype.cpp \
     funcpointer.cpp \
     refbasetype.cpp \
@@ -32,7 +31,6 @@ HEADERS += parserexception.h \
     kernelsymbolparser.h \
     kernelsymbolwriter.h \
     kernelsymbolreader.h \
-    qtiocompressor.h \
     volatiletype.h \
     funcpointer.h \
     refbasetype.h \

@@ -11,11 +11,11 @@
 #include <QSet>
 #include "kernelsymbolconsts.h"
 #include "symfactory.h"
-#include "qtiocompressor.h"
 #include "basetype.h"
 #include "compileunit.h"
 #include "variable.h"
 #include "readerwriterexception.h"
+#include "debug.h"
 
 //------------------------------------------------------------------------------
 
@@ -36,7 +36,7 @@ void KernelSymbolReader::read()
     // Read the header information;
     // 1. (qint32) magic number
     // 2. (qint16) file version number
-    // 3. (qint16) flags, i.e., compression enabled, etc.
+    // 3. (qint16) flags (currently unused)
     // 4. (qint32) Qt's serialization format version (see QDataStream::Version)
     in >> magic >> version >> flags >> qt_stream_version;
 
@@ -56,15 +56,6 @@ void KernelSymbolReader::read()
     }
     // Try to apply the version in any case
     in.setVersion(qt_stream_version);
-
-    // Now switch to the compression device, if necessary
-    QtIOCompressor* zip = 0;
-
-    if (flags & kSym::flagCompressed) {
-        zip = new QtIOCompressor(_from);
-        zip->setStreamFormat(QtIOCompressor::ZlibFormat);
-        in.setDevice(zip);
-    }
 
     // Read in all information in the following format:
     // 1.a  (qint32) number of compile units
@@ -113,9 +104,9 @@ void KernelSymbolReader::read()
 
         // Read list of additional type-id-relations
         in >> size;
+
         QString s; // empty string
         for (int i = 0; i < size; i++) {
-            in >> type;
             in >> source >> target;
             BaseType* t = _factory->findBaseTypeById(target);
             _factory->updateTypeRelations(source, s, t);
@@ -132,19 +123,7 @@ void KernelSymbolReader::read()
         }
     }
     catch (...) {
-        // Exceptional clean-up
-        if (zip) {
-            zip->close();
-            delete zip;
-            zip = 0;
-        }
+        // Nothing to do right now
         throw; // Re-throw exception
-    }
-
-    // Regular clean-up
-    if (zip) {
-        zip->close();
-        delete zip;
-        zip = 0;
     }
 }

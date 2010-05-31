@@ -370,7 +370,7 @@ void SymFactory::relocateHashEntry(const T_key& old_key, const T_key& new_key,
     }
 
     if (!removed)
-        debugerr("Did not find entry in hash table at index \"" << old_key << "\"");
+        debugerr("Did not find entry in hash table at index 0x" << std::hex << old_key << std::dec << "");
 
     // Re-add it at new hash-index
     hash->insert(new_key, value);
@@ -591,6 +591,9 @@ void SymFactory::addSymbol(BaseType* type)
         resolveReference(rbt);
     else if (s)
         resolveReferences(s);
+
+    VisitedSet visited;
+    _typesByHash.insert(type->hash(&visited), type);
 }
 
 
@@ -634,7 +637,7 @@ bool SymFactory::resolveReferences(Structured* s)
 }
 
 
-void SymFactory::symbolsFinished()
+void SymFactory::symbolsFinished(RestoreType rt)
 {
     std::cout << "Statistics:" << std::endl;
 
@@ -665,6 +668,7 @@ void SymFactory::symbolsFinished()
     assert(_typesById.size() >= _typesByName.size());
     assert(_typesById.size() >= _typesByHash.size());
     assert(_typesByHash.size() == _types.size());
+    if (rt == rtParsing)
     assert(_types.size() + _typeFoundByHash == _typesById.size());
 }
 

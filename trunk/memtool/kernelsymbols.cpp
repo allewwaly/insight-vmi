@@ -49,7 +49,7 @@ void KernelSymbols::parseSymbols(QIODevice* from)
 	    timer.start();
 
 		parser.parse();
-	    _factory.symbolsFinished();
+	    _factory.symbolsFinished(SymFactory::rtParsing);
 
 		// Print out some timing statistics
 		int duration = timer.elapsed();
@@ -100,7 +100,7 @@ void KernelSymbols::loadSymbols(QIODevice* from)
         timer.start();
 
         reader.read();
-        _factory.symbolsFinished();
+        _factory.symbolsFinished(SymFactory::rtLoading);
 
         // Print out some timing statistics
         int duration = timer.elapsed();
@@ -114,7 +114,7 @@ void KernelSymbols::loadSymbols(QIODevice* from)
         if (from->pos() > 0)
             std::cout << "of " << from->pos() << " bytes ";
         std::cout << "finished in " << time;
-        if (from->pos() > 0)
+        if (from->pos() > 0 && duration > 0)
             std::cout << " (" << (int)((from->pos() / (float)duration * 1000)) << " byte/s)";
         std::cout << "." << std::endl;
     }
@@ -163,7 +163,7 @@ void KernelSymbols::saveSymbols(QIODevice* to)
         if (to->pos() > 0)
             std::cout << "of " << to->pos() << " bytes ";
         std::cout << "finished in " << time;
-        if (to->pos() > 0)
+        if (to->pos() > 0 && duration > 0)
             std::cout << " (" << (int)((to->pos() / (float)duration * 1000)) << " byte/s)";
         std::cout << "." << std::endl;
     }
