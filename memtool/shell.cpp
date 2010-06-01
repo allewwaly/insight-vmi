@@ -10,10 +10,16 @@
 #include <assert.h>
 #include <QtAlgorithms>
 #include <QProcess>
+#include <QCoreApplication>
 #include "compileunit.h"
 #include "variable.h"
 #include "refbasetype.h"
 #include "kernelsymbols.h"
+#include "programoptions.h"
+
+
+Shell* shell = 0;
+
 
 Shell::Shell(KernelSymbols& symbols)
     : _sym(symbols)
@@ -71,11 +77,30 @@ Shell::Shell(KernelSymbols& symbols)
                 "  symbols store <file>    Saves the parsed symbols to a file\n"
                 "  symbols save <file>     Alias for \"store\"\n"
                 "  symbols load <file>     Loads previously stored symbols for usage\n"));
+
+    // Open the console devices
+    _stdin.open(stdin, QIODevice::ReadOnly);
+    _stdout.open(stdout, QIODevice::WriteOnly);
+    _stderr.open(stderr, QIODevice::WriteOnly);
+    _out.setDevice(&_stdout);
+    _err.setDevice(&_stderr);
 }
 
 
 Shell::~Shell()
 {
+}
+
+
+QTextStream& Shell::out()
+{
+    return _out;
+}
+
+
+QTextStream& Shell::err()
+{
+    return _err;
 }
 
 
@@ -87,35 +112,33 @@ QString Shell::readLine()
 }
 
 
-int Shell::start()
+void Shell::run()
 {
-    _stdin.open(stdin, QIODevice::ReadOnly);
-    _stdout.open(stdout, QIODevice::WriteOnly);
-    _out.setDevice(&_stdout);
-
     int ret = 0;
     QString line, cmd;
 
+    // Enter command line loop
     while (ret == 0 && !_stdin.atEnd()) {
         _out << ">>> " << flush;
 
         line = readLine();
 
         try {
-            ret = exec(line);
+            ret = eval(line);
         }
         catch (GenericException e) {
-                std::cerr
-                    << "Caught exception at " << e.file << ":" << e.line << std::endl
-                    << "Message: " << e.message << std::endl;
+                _err
+                    << "Caught exception at " << e.file << ":" << e.line << endl
+                    << "Message: " << e.message << endl;
         }
     }
 
-    return ret;
+    _out << "Done, exiting." << endl;
+    QCoreApplication::exit(ret);
 }
 
 
-int Shell::exec(QString command)
+int Shell::eval(QString command)
 {
 	QStringList pipeCmds = command.split(QRegExp("\\s*\\|\\s*"), QString::KeepEmptyParts);
 /*
@@ -126,7 +149,7 @@ int Shell::exec(QString command)
 
 		proc = new QProcess();
 
-		proc->start()
+		proc->run()
 	}
 	else if (pipeCmds.size() > 2) {
 		debugerr("Currently only one piped process is supported!");
@@ -146,7 +169,7 @@ int Shell::exec(QString command)
         ret = (this->*c)(words);
     }
     else {
-        // Try to match the start of a command
+        // Try to match the run of a command
         QList<QString> cmds = _commands.keys();
         int match, match_count = 0;
         for (int i = 0; i < cmds.size(); i++) {

@@ -1,5 +1,4 @@
 
-#include <iostream>
 #include <QCoreApplication>
 #include <QFile>
 
@@ -7,54 +6,58 @@
 #include "kernelsymbols.h"
 #include "shell.h"
 #include "genericexception.h"
-
-//void usage()
-//{
-//	QString appName = QCoreApplication::applicationFilePath();
-//	appName = appName.right(appName.length() - appName.lastIndexOf('/') - 1);
-//
-//	std::cout << "Usage: " << appName << " <objdump>" << std::endl;
-//}
+#include "programoptions.h"
 
 
+/**
+ * Entry point function that sets up the environment, parses the command line
+ * options, performs the requested actions and/or spawns an interactive shell.
+ */
 int main(int argc, char* argv[])
 {
 	QCoreApplication app(argc, argv);
 
-	QString fileName;
-
-	if (argc > 1)
-		fileName = argv[1];
+	// Parse the command line options
+	QStringList args = app.arguments();
+    args.pop_front();
+    if (!programOptions.parseCmdOptions(args))
+        return 1;
 
 	int ret = 0;
 
 	try {
-		KernelSymbols sym;
+	    KernelSymbols sym;
+	    shell = new Shell(sym);
 
-		if (!fileName.isEmpty()) {
-	        if (!QFile::exists(fileName)) {
-	            std::cerr << "The file \"" << fileName << "\" does not exist." << std::endl;
-	            return 1;
-	        }
-		    debugmsg("Reading symbols from file " << fileName);
-		    sym.parseSymbols(fileName);
+	    // Perform any initial action that might be given
+	    switch (programOptions.action()) {
+	    case acNone:
+	        break;
+	    case acParseSymbols:
+	        sym.parseSymbols(programOptions.inFileName());
+	        break;
+	    case acLoadSymbols:
+	        sym.loadSymbols(programOptions.inFileName());
+	        break;
+	    case acUsage:
+	        ProgramOptions::cmdOptionsUsage();
+	        break;
+	    }
 
-	        std::cout
-	            << "Read " << sym.factory().types().count() << " types declared in "
-	            << sym.factory().sources().count() << " source files." << std::endl;
-		}
+        // Start the interactive shell
+		shell->start();
 
-		Shell shell(sym);
-		ret = shell.start();
+		ret = app.exec();
 	}
 	catch (GenericException e) {
-		std::cerr
-			<< "Caught exception at " << e.file << ":" << e.line << std::endl
-			<< "Message: " << e.message << std::endl;
+	    shell->err()
+			<< "Caught exception at " << e.file << ":" << e.line << endl
+			<< "Message: " << e.message << endl;
 	    return 1;
 	}
 
-	std::cout << "Done, exiting." << std::endl;
+	if (shell)
+	    delete shell;
 
     return ret;
 }

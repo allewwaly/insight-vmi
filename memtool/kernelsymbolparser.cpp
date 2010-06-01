@@ -8,7 +8,9 @@
 #include "kernelsymbolparser.h"
 #include "symfactory.h"
 #include "parserexception.h"
+#include "shell.h"
 #include <QRegExp>
+#include <QTime>
 
 
 #define parseInt(i, s, pb) \
@@ -296,7 +298,6 @@ void KernelSymbolParser::parse()
     ParamSymbolType paramSym;
     qint32 i;
     bool ok;
-    qint64 size = _from->size();
     bool skip = false;
     qint32 skipUntil = -1;
     _curSrcID = -1;
@@ -304,91 +305,111 @@ void KernelSymbolParser::parse()
     _pInfo = &_info;
     _hdrSym = hsUnknownSymbol;
 
-    while (!_from->atEnd()) {
-        int len = _from->readLine(buf, bufSize);
-        _line++;
-        _bytesRead += len;
-        // Skip all lines without interesting information
-        line = QString(buf).trimmed();
-        if (len < 30 || line.isEmpty() || line[0] != '<')
-            continue;
+    operationStarted();
 
-        // First see if a new header starts
-        if (rxHdr.exactMatch(line)) {
-
-            // If the symbol does not exist in the hash, it will return 0, which
-            // corresponds to hsUnknownSymbol.
-            _hdrSym = hdrMap.value(rxHdr.cap(2));
-            if (_hdrSym == hsUnknownSymbol)
-                parserError(QString("Unknown debug symbol type encountered: %1").arg(rxHdr.cap(2)));
-
-            // If skip is set, we are going to skip all symbols until we reach skipUntil
-            if (skip) {
-                // Set skip value
-                skipUntil = _pInfo->sibling();
-
-                // Clear the skip symbol & set variables accordingly
-                _pInfo->clear();
-                skip = false;
-                _isRelevant = false;
-            }
-
-            // skip all symbols till the id saved in skipUntil is reached
-            parseInt16(i, rxHdr.cap(1), &ok);
-            if (skipUntil != -1 && skipUntil != i) {
+    try {
+        while (!_from->atEnd()) {
+            int len = _from->readLine(buf, bufSize);
+            _line++;
+            _bytesRead += len;
+            // Skip all lines without interesting information
+            line = QString(buf).trimmed();
+            if (len < 30 || line.isEmpty() || line[0] != '<')
                 continue;
-            }
-            else {
-                // We reached the mark, reset values
-                skipUntil = -1;
-            }
 
-            // See if we have to finish the last symbol before we continue parsing
-            if (_isRelevant) {
-                finishLastSymbol();
-                _isRelevant = false;
-            }
+            // First see if a new header starts
+            if (rxHdr.exactMatch(line)) {
 
-            // Are we interested in this symbol?
-            if ( (_isRelevant = (_hdrSym & relevantHdr)) ) {
-                _pInfo->setSymType(_hdrSym);
+                // If the symbol does not exist in the hash, it will return 0, which
+                // corresponds to hsUnknownSymbol.
+                _hdrSym = hdrMap.value(rxHdr.cap(2));
+                if (_hdrSym == hsUnknownSymbol)
+                    parserError(QString("Unknown debug symbol type encountered: %1").arg(rxHdr.cap(2)));
+
+                // If skip is set, we are going to skip all symbols until we reach skipUntil
+                if (skip) {
+                    // Set skip value
+                    skipUntil = _pInfo->sibling();
+
+                    // Clear the skip symbol & set variables accordingly
+                    _pInfo->clear();
+                    skip = false;
+                    _isRelevant = false;
+                }
+
+                // skip all symbols till the id saved in skipUntil is reached
                 parseInt16(i, rxHdr.cap(1), &ok);
-                _pInfo->setId(i);
-                // If this is a compile unit, save its ID locally
-                if (_hdrSym == hsCompileUnit)
-                    _curSrcID = _pInfo->id();
-            }
-            else {
-                // If this is a function we skip all symbols that belong to it.
-                if (_hdrSym & hsSubprogram) {
-                    // Parse the parameters
-                    _isRelevant = true;
-                    skip = true;
+                if (skipUntil != -1 && skipUntil != i) {
+                    continue;
+                }
+                else {
+                    // We reached the mark, reset values
+                    skipUntil = -1;
+                }
+
+                // See if we have to finish the last symbol before we continue parsing
+                if (_isRelevant) {
+                    finishLastSymbol();
+                    _isRelevant = false;
+                }
+
+                // Are we interested in this symbol?
+                if ( (_isRelevant = (_hdrSym & relevantHdr)) ) {
+                    _pInfo->setSymType(_hdrSym);
+                    parseInt16(i, rxHdr.cap(1), &ok);
+                    _pInfo->setId(i);
+                    // If this is a compile unit, save its ID locally
+                    if (_hdrSym == hsCompileUnit)
+                        _curSrcID = _pInfo->id();
+                }
+                else {
+                    // If this is a function we skip all symbols that belong to it.
+                    if (_hdrSym & hsSubprogram) {
+                        // Parse the parameters
+                        _isRelevant = true;
+                        skip = true;
+                    }
                 }
             }
-        }
-        // Next see if this matches a parameter
-        else if (_isRelevant && rxParam.exactMatch(line)) {
-            paramSym = paramMap.value(rxParam.cap(1));
+            // Next see if this matches a parameter
+            else if (_isRelevant && rxParam.exactMatch(line)) {
+                paramSym = paramMap.value(rxParam.cap(1));
 
-            // Are we interested in this parameter?
-            if (paramSym & relevantParam)
-                parseParam(paramSym, rxParam.cap(2));
+                // Are we interested in this parameter?
+                if (paramSym & relevantParam)
+                    parseParam(paramSym, rxParam.cap(2));
+            }
+            checkOperationProgress();
         }
-
-        // Show some progress information
-        if (_line % 10000 == 0) {
-            std::cout << "\rParsing line " << _line;
-            if (!_from->isSequential())
-                std::cout << " (" << (int) ((_bytesRead / (float) size) * 100) << "%)";
-            std::cout << std::flush;
-        }
+    }
+    catch (...) {
+        // Exceptional cleanup
+        operationStopped();
+        shell->out() << endl;
+        throw; // Re-throw exception
     }
 
     // Finish the last symbol, if required
     if (_isRelevant)
         finishLastSymbol();
 
-    std::cout << "\rParsing all " << _line << " lines finished." << std::endl;
+    operationStopped();
+
+    shell->out()
+        << "\rParsing " << _line << " lines ("
+        << _bytesRead << " bytes) finished." << endl;
 }
 
+
+// Show some progress information
+void KernelSymbolParser::operationProgress()
+{
+    shell->out() << "\rParsing line " << _line;
+
+    qint64 size = _from->size();
+    if (!_from->isSequential() && size > 0)
+        shell->out()
+            << " (" << (int) ((_bytesRead / (float) size) * 100) << "%)";
+
+    shell->out() << ", " << elapsedTime() << " elapsed" << flush;
+}

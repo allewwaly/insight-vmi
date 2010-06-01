@@ -8,16 +8,24 @@
 #ifndef KERNELSYMBOLREADER_H_
 #define KERNELSYMBOLREADER_H_
 
+#include "longoperation.h"
+
 // forward declarations
 class QIODevice;
 class SymFactory;
 
 
-class KernelSymbolReader
+class KernelSymbolReader: public LongOperation
 {
 public:
     KernelSymbolReader(QIODevice* from, SymFactory* factory);
     void read();
+
+protected:
+    /**
+     * Displays progress information
+     */
+    virtual void operationProgress();
 
 private:
     QIODevice* _from;

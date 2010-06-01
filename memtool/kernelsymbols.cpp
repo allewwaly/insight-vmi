@@ -12,7 +12,6 @@
 #include <QRegExp>
 #include <QHash>
 #include <QTime>
-#include "qtiocompressor.h"
 #include "typeinfo.h"
 #include "symfactory.h"
 #include "structuredmember.h"
@@ -22,6 +21,7 @@
 #include "kernelsymbolreader.h"
 #include "kernelsymbolwriter.h"
 #include "parserexception.h"
+#include "shell.h"
 #include "debug.h"
 
 
@@ -59,17 +59,16 @@ void KernelSymbols::parseSymbols(QIODevice* from)
 		if (m > 0)
 		    time = QString("%1 min ").arg(m) + time;
 
-        std::cout << "Parsing of " << parser.line() << " lines finish in "
-                << time;
+		shell->out() << "Parsing finish in " << time;
         if (duration > 0)
-            std::cout << " (" << (int)((parser.line() / (float)duration * 1000)) << " lines per second)";
-        std::cout << "." << std::endl;
+            shell->out() << " (" << (int)((parser.line() / (float)duration * 1000)) << " lines per second)";
+        shell->out() << "." << endl;
 	}
     catch (GenericException e) {
         debugerr("Exception caught at input line " << parser.line() << " of the debug symbols");
-        std::cerr
-            << "Caught exception at " << e.file << ":" << e.line << std::endl
-            << "Message: " << e.message << std::endl;
+        shell->err()
+            << "Caught exception at " << e.file << ":" << e.line << endl
+            << "Message: " << e.message << endl;
 		throw;
 	}
 };
@@ -110,18 +109,18 @@ void KernelSymbols::loadSymbols(QIODevice* from)
         if (m > 0)
             time = QString("%1 min ").arg(m) + time;
 
-        std::cout << "Reading ";
+        shell->out() << "Reading ";
         if (from->pos() > 0)
-            std::cout << "of " << from->pos() << " bytes ";
-        std::cout << "finished in " << time;
+            shell->out() << "of " << from->pos() << " bytes ";
+        shell->out() << "finished in " << time;
         if (from->pos() > 0 && duration > 0)
-            std::cout << " (" << (int)((from->pos() / (float)duration * 1000)) << " byte/s)";
-        std::cout << "." << std::endl;
+            shell->out() << " (" << (int)((from->pos() / (float)duration * 1000)) << " byte/s)";
+        shell->out() << "." << endl;
     }
     catch (GenericException e) {
-        std::cerr
-            << "Caught exception at " << e.file << ":" << e.line << std::endl
-            << "Message: " << e.message << std::endl;
+        shell->err()
+            << "Caught exception at " << e.file << ":" << e.line << endl
+            << "Message: " << e.message << endl;
         throw;
     }
 }
@@ -159,18 +158,18 @@ void KernelSymbols::saveSymbols(QIODevice* to)
         if (m > 0)
             time = QString("%1 min ").arg(m) + time;
 
-        std::cout << "Writing ";
+        shell->out() << "Writing ";
         if (to->pos() > 0)
-            std::cout << "of " << to->pos() << " bytes ";
-        std::cout << "finished in " << time;
+            shell->out() << "of " << to->pos() << " bytes ";
+        shell->out() << "finished in " << time;
         if (to->pos() > 0 && duration > 0)
-            std::cout << " (" << (int)((to->pos() / (float)duration * 1000)) << " byte/s)";
-        std::cout << "." << std::endl;
+            shell->out() << " (" << (int)((to->pos() / (float)duration * 1000)) << " byte/s)";
+        shell->out() << "." << endl;
     }
     catch (GenericException e) {
-        std::cerr
-            << "Caught exception at " << e.file << ":" << e.line << std::endl
-            << "Message: " << e.message << std::endl;
+        shell->err()
+            << "Caught exception at " << e.file << ":" << e.line << endl
+            << "Message: " << e.message << endl;
         throw;
     }
 }

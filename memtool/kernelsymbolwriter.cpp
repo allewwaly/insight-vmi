@@ -14,6 +14,7 @@
 #include "basetype.h"
 #include "compileunit.h"
 #include "variable.h"
+#include "shell.h"
 #include "debug.h"
 
 
@@ -25,6 +26,8 @@ KernelSymbolWriter::KernelSymbolWriter(QIODevice* to, SymFactory* factory)
 
 void KernelSymbolWriter::write()
 {
+    operationStarted();
+
     // Disable compression by default
     qint16 flags = 0; // kSym::flagCompressed;
 
@@ -70,6 +73,7 @@ void KernelSymbolWriter::write()
             const CompileUnit* c = cu_it.value();
             out << *c;
             ++cu_it;
+            checkOperationProgress();
         }
 
         // Write list of types
@@ -80,6 +84,7 @@ void KernelSymbolWriter::write()
             out << *t;
             // Remember which types we have written out
             written_types.insert(t->id());
+            checkOperationProgress();
         }
 
         // Write list of missing types by ID
@@ -90,18 +95,40 @@ void KernelSymbolWriter::write()
                 out << (qint32) bt_id_it.key() << (qint32) bt_id_it.value()->id();
             }
             ++bt_id_it;
+            checkOperationProgress();
         }
 
         // Write list of variables
         out << (qint32) _factory->vars().size();
         for (int i = 0; i < _factory->vars().size(); i++) {
             out << *_factory->vars().at(i);
+            checkOperationProgress();
         }
     }
     catch (...) {
-        // Nothing to do right now
+        // Exceptional cleanup
+        operationStopped();
+        shell->out() << endl;
         throw; // Re-throw exception
     }
+
+    operationStopped();
+    shell->out() << "\rWriting symbols finished";
+    if (!_to->isSequential())
+        shell->out() << " ("
+        << _to->pos() << " bytes written)";
+    shell->out() << "." << endl;
 }
 
 
+// Show some progress information
+void KernelSymbolWriter::operationProgress()
+{
+    shell->out() << "\rWriting symbols";
+
+    qint64 pos = _to->pos();
+    if (!_to->isSequential() && pos > 0)
+        shell->out()
+            << " (" << pos << " bytes)";
+    shell->out() << ", " << elapsedTime() << " elapsed" << flush;
+}

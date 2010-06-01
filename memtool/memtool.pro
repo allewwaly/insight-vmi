@@ -1,4 +1,6 @@
-SOURCES += kernelsymbolparser.cpp \
+SOURCES += programoptions.cpp \
+    longoperation.cpp \
+    kernelsymbolparser.cpp \
     kernelsymbolwriter.cpp \
     kernelsymbolreader.cpp \
     volatiletype.cpp \
@@ -25,7 +27,9 @@ SOURCES += kernelsymbolparser.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += parserexception.h \
+HEADERS += programoptions.h \
+    longoperation.h \
+    parserexception.h \
     readerwriterexception.h \
     kernelsymbolconsts.h \
     kernelsymbolparser.h \
