@@ -15,6 +15,7 @@
 #include "compileunit.h"
 #include "variable.h"
 #include "readerwriterexception.h"
+#include "shell.h"
 #include "debug.h"
 
 //------------------------------------------------------------------------------
@@ -27,7 +28,8 @@ KernelSymbolReader::KernelSymbolReader(QIODevice* from, SymFactory* factory)
 
 void KernelSymbolReader::read()
 {
-    // Enable compression by default
+    operationStarted();
+
     qint16 flags, version;
     qint32 magic, qt_stream_version;
 
@@ -89,6 +91,7 @@ void KernelSymbolReader::read()
                 genericError("Out of memory.");
             in >> *c;
             _factory->addSymbol(c);
+            checkOperationProgress();
         }
 
         // Read list of types
@@ -100,6 +103,7 @@ void KernelSymbolReader::read()
                 genericError("Out of memory.");
             in >> *t;
             _factory->addSymbol(t);
+            checkOperationProgress();
         }
 
         // Read list of additional type-id-relations
@@ -110,6 +114,7 @@ void KernelSymbolReader::read()
             in >> source >> target;
             BaseType* t = _factory->findBaseTypeById(target);
             _factory->updateTypeRelations(source, s, t);
+            checkOperationProgress();
         }
 
         // Read list of variables
@@ -120,10 +125,34 @@ void KernelSymbolReader::read()
                 genericError("Out of memory.");
             in >> *v;
             _factory->addSymbol(v);
+            checkOperationProgress();
         }
     }
     catch (...) {
-        // Nothing to do right now
+        // Exceptional cleanup
+        operationStopped();
+        shell->out() << endl;
         throw; // Re-throw exception
     }
+
+    // Regular cleanup
+    operationStopped();
+    shell->out() << "\rReading symbols finished";
+    if (!_from->isSequential())
+        shell->out() << " ("
+        << _from->pos() << " bytes read)";
+    shell->out() << "." << endl;
+}
+
+
+// Show some progress information
+void KernelSymbolReader::operationProgress()
+{
+    shell->out() << "\rReading symbols";
+
+    qint64 size = _from->size();
+    qint64 pos = _from->pos();
+    if (!_from->isSequential() && size > 0)
+        shell->out() << " (" << (int) ((pos / (float) size) * 100) << "%)";
+    shell->out() << ", " << elapsedTime() << " elapsed" << flush;
 }

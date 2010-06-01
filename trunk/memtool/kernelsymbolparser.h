@@ -9,12 +9,13 @@
 #define KERNELSYMBOLPARSER_H_
 
 #include "typeinfo.h"
+#include "longoperation.h"
 
 // forward declarations
 class QIODevice;
 class SymFactory;
 
-class KernelSymbolParser
+class KernelSymbolParser: public LongOperation
 {
 public:
     KernelSymbolParser(QIODevice* from, SymFactory* factory);
@@ -23,6 +24,12 @@ public:
     void save();
 
     quint64 line() const;
+
+protected:
+    /**
+     * Displays progress information
+     */
+    virtual void operationProgress();
 
 private:
     void finishLastSymbol();

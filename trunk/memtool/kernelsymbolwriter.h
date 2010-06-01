@@ -8,15 +8,23 @@
 #ifndef KERNELSYMBOLWRITER_H_
 #define KERNELSYMBOLWRITER_H_
 
+#include "longoperation.h"
+
 // forward declarations
 class QIODevice;
 class SymFactory;
 
-class KernelSymbolWriter
+class KernelSymbolWriter: public LongOperation
 {
 public:
     KernelSymbolWriter(QIODevice* to, SymFactory* factory);
     void write();
+
+protected:
+    /**
+     * Displays progress information
+     */
+    virtual void operationProgress();
 
 private:
     QIODevice* _to;
