@@ -1,6 +1,5 @@
 
 #include <QCoreApplication>
-#include <QFile>
 
 #include "debug.h"
 #include "kernelsymbols.h"
