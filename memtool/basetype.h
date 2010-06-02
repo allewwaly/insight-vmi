@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <QVariant>
 #include <QSet>
+#include <QIODevice>
 #include "symbol.h"
 #include "genericexception.h"
 #include "sourceref.h"
@@ -92,13 +93,13 @@ public:
     BaseType();
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param info the type information to construct this type from
      */
     BaseType(const TypeInfo& info);
 
     /**
-      @return the actual type of that polimorphic variable
+     * @return the actual type of that polimorphic variable
      */
     virtual RealType type() const = 0;
 
@@ -110,7 +111,7 @@ public:
     virtual uint hash(VisitedSet* visited) const;
 
     /**
-      @return the size of this type in bytes
+     * @return the size of this type in bytes
      */
     virtual quint32 size() const;
 
@@ -129,126 +130,139 @@ public:
     virtual void writeTo(QDataStream& out) const;
 
     /**
-      @return a string representation of this type
+     * @param mem the memory device to read the data from
+     * @param offset the offset at which to read the value from memory
+     * @return a string representation of this type
      */
-    virtual QString toString(size_t offset) const = 0;
+    virtual QString toString(QIODevice* mem, size_t offset) const = 0;
 
     /**
      * Explicit representation of a value is the given type.
+     * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
      */
-    inline qint8 toInt8(size_t offset) const
+    inline qint8 toInt8(QIODevice* mem, size_t offset) const
     {
-    	return value<qint8>(offset);
+    	return value<qint8>(mem, offset);
     }
 
     /**
      * Explicit representation of a value is the given type.
+     * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
      */
-    inline quint8 toUInt8(size_t offset) const
+    inline quint8 toUInt8(QIODevice* mem, size_t offset) const
     {
-    	return value<quint8>(offset);
+    	return value<quint8>(mem, offset);
     }
 
     /**
      * Explicit representation of a value is the given type.
+     * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
      */
-    inline qint16 toInt16(size_t offset) const
+    inline qint16 toInt16(QIODevice* mem, size_t offset) const
     {
-    	return value<qint16>(offset);
+    	return value<qint16>(mem, offset);
     }
 
 
     /**
      * Explicit representation of a value is the given type.
+     * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
      */
-    inline quint16 toUInt16(size_t offset) const
+    inline quint16 toUInt16(QIODevice* mem, size_t offset) const
     {
-    	return value<quint16>(offset);
+    	return value<quint16>(mem, offset);
     }
 
     /**
      * Explicit representation of a value is the given type.
+     * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
      */
-    inline qint32 toInt32(size_t offset) const
+    inline qint32 toInt32(QIODevice* mem, size_t offset) const
     {
-    	return value<qint32>(offset);
+    	return value<qint32>(mem, offset);
     }
 
     /**
      * Explicit representation of a value is the given type.
+     * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
      */
-    inline quint32 toUInt32(size_t offset) const
+    inline quint32 toUInt32(QIODevice* mem, size_t offset) const
     {
-    	return value<quint32>(offset);
+    	return value<quint32>(mem, offset);
     }
 
     /**
      * Explicit representation of a value is the given type.
+     * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
      */
-    inline qint64 toInt64(size_t offset) const
+    inline qint64 toInt64(QIODevice* mem, size_t offset) const
     {
-    	return value<qint64>(offset);
+    	return value<qint64>(mem, offset);
     }
 
     /**
      * Explicit representation of a value is the given type.
+     * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
      */
-    inline quint64 toUInt64(size_t offset) const
+    inline quint64 toUInt64(QIODevice* mem, size_t offset) const
     {
-    	return value<quint64>(offset);
+    	return value<quint64>(mem, offset);
     }
 
     /**
      * Explicit representation of a value is the given type.
+     * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
      */
-    inline float toFloat(size_t offset) const
+    inline float toFloat(QIODevice* mem, size_t offset) const
     {
-    	return value<float>(offset);
+    	return value<float>(mem, offset);
     }
 
     /**
      * Explicit representation of a value is the given type.
+     * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
      */
-    inline double toDouble(size_t offset) const
+    inline double toDouble(QIODevice* mem, size_t offset) const
     {
-    	return value<double>(offset);
+    	return value<double>(mem, offset);
     }
 
     /**
      * Explicit representation of a value is the given type.
+     * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
      * @warning This function should only be called for a pointer type!
      */
-    inline void* toPointer(size_t offset) const
+    inline void* toPointer(QIODevice* mem, size_t offset) const
     {
     	// We have to consider the size of the pointer
     	if (_size == 4) {
-    		quint32 p = toUInt32(offset);
+    		quint32 p = toUInt32(mem, offset);
     		return (void*)p;
     	}
     	else if (_size == 8) {
-    		quint64 p = toUInt64(offset);
+    		quint64 p = toUInt64(mem, offset);
     		return (void*)p;
     	}
     	else {
@@ -260,25 +274,29 @@ public:
     }
 
     /**
-      @return the value of this type as a variant
+     * @param mem the memory device to read the data from
+     * @param offset the offset at which to read the value from memory
+     * @return the value of this type as a variant
      */
 	template<class T>
-    inline QVariant toVariant(size_t offset) const
+    inline QVariant toVariant(QIODevice* mem, size_t offset) const
     {
-   	    return value<T>(offset);
+   	    return value<T>(mem, offset);
     }
 
     /**
-      Generic value function that will return the data as any type
+     * Generic value function that will return the data as any type
+     * @param mem the memory device to read the data from
+     * @param offset the offset at which to read the value from memory
      */
     template <class T>
-    inline T value(size_t offset) const
+    inline T value(QIODevice* mem, size_t offset) const
     {
         // We put the implementation in the header to allow the compiler to
         // inline the code
-        T buf = T();
-        seek(offset);
-        read((char*)&buf, sizeof(T));
+        T buf; // = T();
+        seek(mem, offset);
+        read(mem, (char*)&buf, sizeof(T));
         return buf;
     }
 
@@ -295,64 +313,48 @@ public:
      */
     bool operator==(const BaseType& other) const;
 
-//    /**
-//      Sets the memory image which will be used to parse the data from, e.g.
-//      by a call to value().
-//      @note The QIODevice must already be opened, no attempt is made to open
-//      the device by this class.
-//      @param memory pointer to the QFile or QBuffer to read the memory from
-//     */
-//    void setMemory(QIODevice *memory);
-//
-//    /**
-//      Access to the globally set memory image which all descendents of
-//      BaseType will use to read their data from.
-//      @return the memory pointer to read the data from
-//     */
-//    QIODevice* memory() const;
-
 protected:
     quint32 _size;       ///< size of this type in byte
 //    BaseType* _parent;         ///< enclosing struct, if this is a struct member
-//    QIODevice *_memory;        ///< the memory dump to read all values from
 
     /**
-      Moves the file position of _memory to the given offset. Throws a
-      MemReadException, if seeking fails.
-      @param offset the new file position
+     * Moves the file position of _memory to the given offset. Throws a
+     * MemReadException if seeking fails.
+     * @param mem the memory device to seek
+     * @param offset the new file position
      */
-    inline void seek(size_t offset) const
+    inline void seek(QIODevice* mem, size_t offset) const
     {
         Q_UNUSED(offset);
         // TODO
-//        if (!_memory->seek(offset)) {
-//            throw MemAccessException(
-//                    QString("Cannot seek to position %1").arg(offset),
-//                    __FILE__,
-//                    __LINE__);
-//        }
+        if (!mem->seek(offset)) {
+            throw MemAccessException(
+                    QString("Could not seek memory position 0x%1").arg(offset, 0, 16),
+                    __FILE__,
+                    __LINE__);
+        }
     }
 
     /**
-      Performs a read operation on _memory at the current file position. Throws
-      a MemReadException, if reading fails.
-      @param data the buffer to store the read values to
-      @param maxSize the number of bytes to read
+     * Performs a read operation on _memory at the current file position. Throws
+     * a MemReadException if reading fails.
+     * @param mem the memory device to read the data from
+     * @param data the buffer to store the read values to
+     * @param maxSize the number of bytes to read
      */
-    inline void read(char* data, qint64 maxSize) const
+    inline void read(QIODevice* mem, char* data, qint64 maxSize) const
     {
-        Q_UNUSED(data);
-        Q_UNUSED(maxSize);
-        // TODO
-//        quint32 ret = _memory->read(data, maxSize);
-//
-//        // Make sure we read the right amount of bytes
-//        if (ret != maxSize) {
-//            throw MemAccessException(
-//                    QString("Error reading from device, only received %1 from %2 bytes").arg(ret).arg(maxSize),
-//                    __FILE__,
-//                    __LINE__);
-//        }
+
+
+        // Make sure we read the right amount of bytes
+        if (mem->read(data, maxSize) != maxSize) {
+            throw MemAccessException(
+                    QString("Could not read %1 byte(s) from memory position 0x%2")
+                        .arg(maxSize)
+                        .arg(mem->pos(), 0, 16),
+                    __FILE__,
+                    __LINE__);
+        }
     }
 };
 
