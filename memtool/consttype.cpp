@@ -33,7 +33,7 @@ QString ConstType::prettyName() const
 }
 
 
-//QString ConstType::toString(size_t offset) const
+//QString ConstType::toString(QIODevice* mem, size_t offset) const
 //{
 //	assert(_refType != 0);
 //	return _refType->toString(offset);

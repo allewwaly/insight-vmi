@@ -26,21 +26,6 @@
 
 
 //------------------------------------------------------------------------------
-///**
-// * Hash the various descendents of BaseType by their discreminating properties
-// * (except ID): type(), size(), name(), or their srcLine() and members(),
-// * depending on their type
-// * @param key the BaseType object to hash
-// * @return
-// */
-//uint qHash(const BaseType* key)
-//{
-//    assert(key != 0);
-//
-//    return key->hash();
-//}
-
-//------------------------------------------------------------------------------
 
 SymFactory::SymFactory()
 	: _typeFoundByHash(0)

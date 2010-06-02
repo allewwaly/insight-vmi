@@ -13,8 +13,9 @@
 #include "symbol.h"
 #include "referencingtype.h"
 #include "sourceref.h"
+#include "basetype.h"
+#include "debug.h"
 
-class BaseType;
 
 /**
  * This class represents a variable variable of a certain type.
@@ -33,10 +34,38 @@ public:
      */
     Variable(const TypeInfo& info);
 
-	template<class T>
-	QVariant toVariant() const;
+    /**
+     * Generic value function that will return the data as any type
+     * @param mem the memory device to read the data from
+     */
+    template<class T>
+    inline T value(QIODevice* mem) const
+    {
+        // We put the implementation in the header to allow the compiler to
+        // inline the code
+        assert(_refType != 0);
+        return _refType->value<T>(mem, _offset);
+    }
 
-	QString toString() const;
+    /**
+     * @param mem the memory device to read the data from
+     * @param offset the offset at which to read the value from memory
+     * @return the value of this type as a variant
+     */
+    template<class T>
+    inline QVariant toVariant(QIODevice* mem) const
+    {
+        // We put the implementation in the header to allow the compiler to
+        // inline the code
+        assert(_refType != 0);
+        return _refType->value<T>(mem, _offset);
+    }
+
+    /**
+     * @param mem the memory device to read the data from
+     * @return a string representation of this variable
+     */
+    inline QString toString(QIODevice* mem) const;
 
 	size_t offset() const;
 	void setOffset(size_t offset);

@@ -41,9 +41,9 @@ uint Enum::hash(VisitedSet* visited) const
 }
 
 
-QString Enum::toString(size_t offset) const
+QString Enum::toString(QIODevice* mem, size_t offset) const
 {
-	qint32 key = value<qint32>(offset);
+	qint32 key = value<qint32>(mem, offset);
 	if (_enumValues.contains(key))
 		return QString("%1 (%2)").arg(_enumValues.value(key)).arg(key);
 	else

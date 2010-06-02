@@ -12,21 +12,90 @@
 #include "debug.h"
 
 /**
- * Generic non-template class for all numeric types
+ * Generic template class for all numeric types
  */
+template<class T, const BaseType::RealType realType>
 class NumericBaseType: public BaseType
+{
+public:
+    /// The type that this class wraps
+    typedef T numeric_type;
+
+    /**
+     * Constructor
+     */
+    NumericBaseType()
+        : _type(realType)
+    {
+    }
+
+    /**
+     * Constructor
+     * @param info the type information to construct this type from
+     */
+    NumericBaseType(const TypeInfo& info)
+        : BaseType(info), _type(realType)
+    {
+    }
+
+    /**
+     * @return the actual type of that polimorphic variable
+     */
+    virtual RealType type() const
+    {
+        return _type;
+    }
+
+protected:
+    const RealType _type;
+};
+
+
+/**
+ * Generic template class for all integer types
+ */
+template<class T, const BaseType::RealType realType>
+class IntegerBaseType: public NumericBaseType<T, realType>
 {
 public:
     /**
      * Constructor
      */
-    NumericBaseType();
+    IntegerBaseType()
+        : _bitSize(-1), _bitOffset(-1)
+    {
+    }
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param info the type information to construct this type from
      */
-    NumericBaseType(const TypeInfo& info);
+    IntegerBaseType(const TypeInfo& info)
+        : NumericBaseType<T, realType>(info),
+          _bitSize(info.bitSize()),
+          _bitOffset(info.bitOffset())
+    {
+    }
+
+    /**
+     * @param mem the memory device to read the data from
+     * @param offset the offset at which to read the value from memory
+     * @return a string representation of this type
+     */
+    virtual QString toString(QIODevice* mem, size_t offset) const
+    {
+        T n = BaseType::value<T>(mem, offset);
+        // Take bit size and bit offset into account
+        if (_bitSize > 0 && _bitOffset >= 0) {
+            // Construct the bit mask
+            T mask = 0;
+            for (int i = 0; i < _bitSize; i++)
+                mask = (mask << 1) | 1;
+            // Extract the bits
+            n = (n >> _bitOffset) & mask;
+        }
+        return QString::number(n);
+    }
 
     /**
      * Create a hash of that type based on BaseType::hash(), bitSize() and
@@ -34,27 +103,66 @@ public:
      * @param visited set of IDs of all already visited types which could cause recursion
      * @return a hash value of this type
      */
-    virtual uint hash(VisitedSet* visited) const;
+    virtual uint hash(VisitedSet* visited) const
+    {
+        return BaseType::hash(visited) ^ _bitSize ^ rotl32(_bitOffset, 16);
+    }
 
-    int bitSize() const;
-    void setBitSize(int size);
+    /**
+     * @return the bit size of this bit-split integer declaration
+     */
+    int bitSize() const
+    {
+        return _bitSize;
+    }
 
-    int bitOffset() const;
-    void setBitOffset(int offset);
+    /**
+     * Sets the bit size of this bit-split integer declaration
+     * @param size new bit size of bit-split integer declaration
+     */
+    void setBitSize(int size)
+    {
+        _bitSize = size;
+    }
+
+    /**
+     * @return the bit offset of this bit-split integer declaration
+     */
+    int bitOffset() const
+    {
+        return _bitOffset;
+    }
+
+    /**
+     * Sets the bit offset of this bit-split integer declaration
+     * @param offset new bit offset of bit-split integer declaration
+     */
+    void setBitOffset(int offset)
+    {
+        _bitOffset = offset;
+    }
 
     /**
      * Reads a serialized version of this object from \a in.
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in);
+    virtual void readFrom(QDataStream& in)
+    {
+        BaseType::readFrom(in);
+        in >> _bitSize >> _bitOffset;
+    }
 
     /**
      * Writes a serialized version of this object to \a out
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const;
+    virtual void writeTo(QDataStream& out) const
+    {
+        BaseType::writeTo(out);
+        out << _bitSize << _bitOffset;
+    }
 
 protected:
     int _bitSize;
@@ -63,106 +171,83 @@ protected:
 
 
 /**
- * Generic template class for all numeric types
+ * Generic template class for all floating-point types
  */
 template<class T, const BaseType::RealType realType>
-class Numeric: public NumericBaseType
+class FloatingBaseType: public NumericBaseType<T, realType>
 {
 public:
-	/// The type that this class wraps
-	typedef T Type;
-
     /**
      * Constructor
      */
-    Numeric()
-        : _type(realType)
+    FloatingBaseType()
+    {
+    }
+
+
+    /**
+     * Constructor
+     * @param info the type information to construct this type from
+     */
+    FloatingBaseType(const TypeInfo& info)
+        : NumericBaseType<T, realType>(info)
     {
     }
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * @param mem the memory device to read the data from
+     * @param offset the offset at which to read the value from memory
+     * @return a string representation of this type
      */
-	Numeric(const TypeInfo& info)
-		: NumericBaseType(info), _type(realType)
-	{
-	}
-
-	/**
-	 @return the actual type of that polimorphic variable
-	 */
-	virtual RealType type() const
-	{
-		return _type;
-	}
-
-	/**
-	 @return a string representation of this type
-	 */
-	virtual QString toString(size_t offset) const
-	{
-	    // TODO: Take bit size and bit offset into account
-		return QString::number(value<T>(offset));
-	}
-
-//	bool operator==(const Numeric& other) const
-//	{
-//		// Two types are equal if they have the same type and the same size.
-//		debugmsg(this->type() << "\n");
-//		debugmsg(other.type() << "\n");
-//		if (this->type() == other.type() && this->size() == other._size)
-//			return true;
-//		else
-//			return false;
-//	}
-
-protected:
-	const RealType _type;
+    virtual QString toString(QIODevice* mem, size_t offset) const
+    {
+        return QString::number(BaseType::value<T>(mem, offset));
+    }
 };
 
 
+
 /// Represents a signed 8-bit integer
-typedef Numeric<qint8, BaseType::rtInt8> Int8;
+typedef IntegerBaseType<qint8, BaseType::rtInt8> Int8;
 
 /// Represents an unsigned 8-bit integer
-typedef Numeric<quint8, BaseType::rtUInt8> UInt8;
+typedef IntegerBaseType<quint8, BaseType::rtUInt8> UInt8;
 
 /// Represents a boolean 8-bit integer
-typedef Numeric<quint8, BaseType::rtBool8> Bool8;
+typedef IntegerBaseType<quint8, BaseType::rtBool8> Bool8;
 
 /// Represents a signed 16-bit integer
-typedef Numeric<qint16, BaseType::rtInt16> Int16;
+typedef IntegerBaseType<qint16, BaseType::rtInt16> Int16;
 
 /// Represents an unsigned 16-bit integer
-typedef Numeric<quint16, BaseType::rtUInt16> UInt16;
+typedef IntegerBaseType<quint16, BaseType::rtUInt16> UInt16;
 
 /// Represents a boolean 16-bit integer
-typedef Numeric<quint16, BaseType::rtBool16> Bool16;
+typedef IntegerBaseType<quint16, BaseType::rtBool16> Bool16;
 
 /// Represents a signed 32-bit integer
-typedef Numeric<qint32, BaseType::rtInt32> Int32;
+typedef IntegerBaseType<qint32, BaseType::rtInt32> Int32;
 
 /// Represents an unsigned 32-bit integer
-typedef Numeric<quint32, BaseType::rtUInt32> UInt32;
+typedef IntegerBaseType<quint32, BaseType::rtUInt32> UInt32;
 
 /// Represents an unsigned 32-bit integer
-typedef Numeric<quint32, BaseType::rtBool32> Bool32;
+typedef IntegerBaseType<quint32, BaseType::rtBool32> Bool32;
 
 /// Represents a signed 64-bit integer
-typedef Numeric<qint64, BaseType::rtInt64> Int64;
+typedef IntegerBaseType<qint64, BaseType::rtInt64> Int64;
 
 /// Represents an unsigned 64-bit integer
-typedef Numeric<quint64, BaseType::rtUInt64> UInt64;
+typedef IntegerBaseType<quint64, BaseType::rtUInt64> UInt64;
 
 /// Represents a boolean 64-bit integer
-typedef Numeric<quint64, BaseType::rtBool64> Bool64;
+typedef IntegerBaseType<quint64, BaseType::rtBool64> Bool64;
 
 /// Represents a single precision float (32 bit)
-typedef Numeric<float, BaseType::rtFloat> Float;
+typedef FloatingBaseType<float, BaseType::rtFloat> Float;
 
 /// Represents a double precision float (64 bit)
-typedef Numeric<double, BaseType::rtDouble> Double;
+typedef FloatingBaseType<double, BaseType::rtDouble> Double;
 
 
 #endif /* NUMERICTYPE_H_ */

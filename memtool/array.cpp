@@ -6,6 +6,7 @@
  */
 
 #include "array.h"
+#include "debug.h"
 
 Array::Array()
     : _length(-1)
@@ -44,10 +45,36 @@ QString Array::prettyName() const
 }
 
 
-QString Array::toString(size_t offset) const
+QString Array::toString(QIODevice* mem, size_t offset) const
 {
-	// TODO: output the whole array, if possible
-	return Pointer::toString(offset);
+    assert(_refType != 0);
+
+	// Is this possibly a string?
+    if (_refType->type() == rtInt8) {
+        // Setup a buffer, at most 1024 bytes long
+        const int bufSize = _length > 0 ? _length+1 : 1024;
+        char* buf = new char[bufSize];
+        memset(buf, 0, bufSize);
+        // Read the data such that the result is always null-terminated
+        seek(mem, offset);
+        read(mem, buf, bufSize-1);
+        return QString(buf);
+    }
+    else {
+        if (_length >= 0) {
+            // Output all array members
+            QString s = "(";
+            for (int i = 0; i < _length; i++) {
+                s += _refType->toString(mem, offset + i * _refType->size());
+                if (i+1 < _length)
+                    s += ", ";
+            }
+            s += ")";
+            return s;
+        }
+        else
+            return "(...)";
+    }
 }
 
 
