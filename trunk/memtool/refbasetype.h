@@ -20,8 +20,8 @@ public:
     RefBaseType();
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param info the type information to construct this type from
      */
     RefBaseType(const TypeInfo& info);
 
@@ -33,14 +33,16 @@ public:
     virtual uint hash(VisitedSet* visited) const;
 
     /**
-      @return the size of this type in bytes
+     * @return the size of this type in bytes
      */
     virtual uint size() const;
 
-	/**
-	 @return a string representation of this type
-	 */
-	virtual QString toString(size_t offset) const;
+    /**
+     * @param mem the memory device to read the data from
+     * @param offset the offset at which to read the value from memory
+     * @return a string representation of this type
+     */
+    virtual QString toString(QIODevice* mem, size_t offset) const;
 
     /**
      * Reads a serialized version of this object from \a in.

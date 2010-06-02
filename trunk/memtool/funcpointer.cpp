@@ -31,9 +31,12 @@ QString FuncPointer::prettyName() const
 }
 
 
-QString FuncPointer::toString(size_t offset) const
+QString FuncPointer::toString(QIODevice* mem, size_t offset) const
 {
-	// TODO: Implement
-	// return Pointer::toString(offset);
-    return "";
+    if (_size == 4) {
+        return "0x" + QString::number(value<quint32>(mem, offset), 8, 16);
+    }
+    else {
+        return "0x" + QString::number(value<quint64>(mem, offset), 16, 16);
+    }
 }

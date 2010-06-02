@@ -44,9 +44,11 @@ public:
     virtual uint hash(VisitedSet* visited) const;
 
     /**
-	 @return a string representation of this type
-	 */
-	virtual QString toString(size_t offset) const;
+     * @param mem the memory device to read the data from
+     * @param offset the offset at which to read the value from memory
+     * @return a string representation of this type
+     */
+    virtual QString toString(QIODevice* mem, size_t offset) const;
 
 	/**
 	 * @return the names and values of the defined enumerators

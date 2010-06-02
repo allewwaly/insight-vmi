@@ -43,10 +43,12 @@ public:
      */
     virtual QString prettyName() const;
 
-	/**
-	 @return a string representation of this type
-	 */
-	virtual QString toString(size_t offset) const;
+    /**
+     * @param mem the memory device to read the data from
+     * @param offset the offset at which to read the value from memory
+     * @return a string representation of this type
+     */
+    virtual QString toString(QIODevice* mem, size_t offset) const;
 
 	/**
 	 * @return the length if this array if it was defined, -1 otherwise

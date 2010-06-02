@@ -6,7 +6,7 @@
  */
 
 #include "refbasetype.h"
-#include <assert.h>
+#include "debug.h"
 
 RefBaseType::RefBaseType()
 {
@@ -37,10 +37,10 @@ uint RefBaseType::size() const
 }
 
 
-QString RefBaseType::toString(size_t offset) const
+QString RefBaseType::toString(QIODevice* mem, size_t offset) const
 {
 	assert(_refType != 0);
-	return _refType->toString(offset);
+	return _refType->toString(mem, offset);
 }
 
 

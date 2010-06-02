@@ -22,21 +22,6 @@ Variable::Variable(const TypeInfo& info)
 }
 
 
-template<class T>
-QVariant Variable::toVariant() const
-{
-	assert(_refType != 0);
-	return _refType->toVariant<T>(_offset);
-}
-
-
-QString Variable::toString() const
-{
-	assert(_refType != 0);
-	return _refType->toString(_offset);
-}
-
-
 size_t Variable::offset() const
 {
 	return _offset;

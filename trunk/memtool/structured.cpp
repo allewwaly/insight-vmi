@@ -107,9 +107,8 @@ BaseType::RealType Struct::type() const
 }
 
 
-QString Struct::toString(size_t offset) const
+QString Struct::toString(QIODevice* mem, size_t offset) const
 {
-	Q_UNUSED(offset);
 	return QString("NOT IMPLEMENTED in %1:%2").arg(__FILE__).arg(__LINE__);
 }
 
@@ -131,9 +130,8 @@ BaseType::RealType Union::type() const
 }
 
 
-QString Union::toString(size_t offset) const
+QString Union::toString(QIODevice* mem, size_t offset) const
 {
-	Q_UNUSED(offset);
 	return QString("NOT IMPLEMENTED in %1:%2").arg(__FILE__).arg(__LINE__);
 }
 

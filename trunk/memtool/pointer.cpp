@@ -40,12 +40,12 @@ QString Pointer::prettyName() const
 }
 
 
-QString Pointer::toString(size_t offset) const
+QString Pointer::toString(QIODevice* mem, size_t offset) const
 {
 	if (_size == 4) {
-		return "0x" + QString::number(value<quint32>(offset), 16);
+		return "0x" + QString::number(value<quint32>(mem, offset), 8, 16);
 	}
 	else {
-		return "0x" + QString::number(value<quint64>(offset), 16);
+		return "0x" + QString::number(value<quint64>(mem, offset), 16, 16);
 	}
 }
