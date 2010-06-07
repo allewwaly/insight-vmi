@@ -14,10 +14,23 @@
 class QIODevice;
 class SymFactory;
 
+/**
+ * This class writes kernel symbols in a self-defined, compact format to a file
+ * or any other QIODevice.
+ */
 class KernelSymbolWriter: public LongOperation
 {
 public:
+    /**
+     * Constructor
+     * @param from destination to write the debugging symbols to
+     * @param factory the SymFactory whose symbols shall be written
+     */
     KernelSymbolWriter(QIODevice* to, SymFactory* factory);
+
+    /**
+     * Starts the writing process.
+     */
     void write();
 
 protected:

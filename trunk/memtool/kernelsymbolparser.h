@@ -15,14 +15,29 @@
 class QIODevice;
 class SymFactory;
 
+/**
+ * This class parses the kernel debugging symbols from the output of the
+ * \c objdump tool.
+ */
 class KernelSymbolParser: public LongOperation
 {
 public:
+    /**
+     * Constructor
+     * @param from source to read the debugging symbols from
+     * @param factory the SymFactory to use for symbol creation
+     */
     KernelSymbolParser(QIODevice* from, SymFactory* factory);
-    void parse();
-    void load();
-    void save();
 
+    /**
+     * Starts the parsing process
+     * @exception ParserException unrecoverable parsing error
+     */
+    void parse();
+
+    /**
+     * @return the last processed line number of the debugging symbols
+     */
     quint64 line() const;
 
 protected:
