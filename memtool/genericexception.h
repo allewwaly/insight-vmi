@@ -32,6 +32,9 @@ public:
      */
     GenericException(QString msg = QString(), const char* file = 0, int line = -1);
 
+    /**
+     * Destructor
+     */
     virtual ~GenericException() throw();
 };
 
