@@ -61,6 +61,42 @@ void Structured::addMember(StructuredMember* member)
 }
 
 
+bool Structured::memberExists(const QString& memberName) const
+{
+    for (MemberList::const_iterator it = _members.constBegin();
+        it != _members.constEnd(); ++it)
+    {
+        if ((*it)->name() == memberName)
+            return true;
+    }
+    return false;
+}
+
+
+StructuredMember* Structured::findMember(const QString& memberName)
+{
+    for (MemberList::const_iterator it = _members.constBegin();
+        it != _members.constEnd(); ++it)
+    {
+        if ((*it)->name() == memberName)
+            return *it;
+    }
+    return 0;
+}
+
+
+const StructuredMember* Structured::findMember(const QString& memberName) const
+{
+    for (MemberList::const_iterator it = _members.constBegin();
+        it != _members.constEnd(); ++it)
+    {
+        if ((*it)->name() == memberName)
+            return *it;
+    }
+    return 0;
+}
+
+
 void Structured::readFrom(QDataStream& in)
 {
     BaseType::readFrom(in);
@@ -107,6 +143,12 @@ BaseType::RealType Struct::type() const
 }
 
 
+QString Struct::prettyName() const
+{
+    return _name.isEmpty() ? QString("struct") : QString("struct %1").arg(_name);
+}
+
+
 QString Struct::toString(QIODevice* mem, size_t offset) const
 {
 	return QString("NOT IMPLEMENTED in %1:%2").arg(__FILE__).arg(__LINE__);
@@ -127,6 +169,12 @@ Union::Union(const TypeInfo& info)
 BaseType::RealType Union::type() const
 {
 	return rtUnion;
+}
+
+
+QString Union::prettyName() const
+{
+    return _name.isEmpty() ? QString("union") : QString("union %1").arg(_name);
 }
 
 

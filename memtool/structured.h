@@ -59,6 +59,27 @@ public:
      */
 	void addMember(StructuredMember* member);
 
+	/**
+	 * Finds out if a member with name \a memberName exists.
+	 * @param memberName name of the member
+	 * @return \c true if that member exists, \a false otherwise
+	 */
+	bool memberExists(const QString& memberName) const;
+
+	/**
+	 * Searches for a member with the name \a memberName
+	 * @param memberName name of the member to search
+	 * @return the member, if it exists, \c 0 otherwise
+	 */
+	StructuredMember* findMember(const QString& memberName);
+
+    /**
+     * Searches for a member with the name \a memberName (const version)
+     * @param memberName name of the member to search
+     * @return the member, if it exists, \c 0 otherwise
+     */
+    const StructuredMember* findMember(const QString& memberName) const;
+
     /**
      * Reads a serialized version of this object from \a in.
      * \sa writeTo()
@@ -95,7 +116,16 @@ public:
      */
     Struct(const TypeInfo& info);
 
+    /**
+     * @return the real type, i. e., \c rtStruct
+     */
 	virtual RealType type() const;
+
+    /**
+     * This gives a pretty name of this struct.
+     * @return the pretty name of that type, e.g. "struct foo"
+     */
+    virtual QString prettyName() const;
 
     /**
      * @param mem the memory device to read the data from
@@ -123,7 +153,16 @@ public:
      */
     Union(const TypeInfo& info);
 
+    /**
+     * @return the real type, i. e., \c rtUnion
+     */
 	virtual RealType type() const;
+
+    /**
+     * This gives a pretty name of this union.
+     * @return the pretty name of that type, e.g. "union foo"
+     */
+    virtual QString prettyName() const;
 
     /**
      * @param mem the memory device to read the data from
