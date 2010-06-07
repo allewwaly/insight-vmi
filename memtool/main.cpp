@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
 	        break;
 	    case acUsage:
 	        ProgramOptions::cmdOptionsUsage();
-	        break;
+	        return 0;
 	    }
 
         // Start the interactive shell
