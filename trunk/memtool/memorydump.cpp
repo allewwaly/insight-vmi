@@ -1,0 +1,105 @@
+/*
+ * memorydump.cpp
+ *
+ *  Created on: 07.06.2010
+ *      Author: chrschn
+ */
+
+#include "memorydump.h"
+
+#include <QFile>
+#include <QStringList>
+#include "symfactory.h"
+#include "variable.h"
+#include "structured.h"
+
+
+#define queryError(x) do { throw QueryException((x), __FILE__, __LINE__); } while (0)
+
+
+MemoryDump::MemoryDump(QIODevice* mem, SymFactory* factory)
+    : _file(0), _memory(mem), _factory(factory)
+{
+}
+
+
+MemoryDump::MemoryDump(const QString& fileName, SymFactory* factory)
+    : _file(new QFile(fileName)), _memory((QIODevice*)_file), _factory(factory)
+{
+    // Check existence
+    if (!_file->exists())
+        throw FileNotFoundException(
+                QString("File not found: \"%1\"").arg(fileName),
+                __FILE__,
+                __LINE__);
+    // Open the file for reading
+    if (!_file->open(QIODevice::ReadOnly))
+        throw IOException(
+                QString("Error opening file \"%1\" for reading").arg(fileName),
+                __FILE__,
+                __LINE__);
+}
+
+
+MemoryDump::~MemoryDump()
+{
+    // Delete the file object if we created one
+    if (_file)
+        delete _file;
+}
+
+
+QString MemoryDump::query(const QString& queryString) const
+{
+    QStringList components = queryString.split('.', QString::SkipEmptyParts);
+    QString ret;
+
+    if (components.isEmpty()) {
+        // Generate a list of all global variables
+        for (int i = 0; i < _factory->vars().size(); i++) {
+            if (i > 0)
+                ret += "\n";
+            Variable* var = _factory->vars().at(i);
+            ret += var->prettyName();
+        }
+    }
+    else {
+        // The first component must be a variable
+        QString first = components.last();
+        components.pop_front();
+        Variable* v = _factory->findVarByName(first);
+        if (!v)
+            queryError(QString("Variable does not exist: %1").arg(first));
+        if (!v->refType())
+            queryError(QString("The type of variable \"%1\" is unresolved").arg(first));
+
+        if (!components.isEmpty()) {
+            // We need to keep track of the offset
+            size_t offset = v->offset();
+            // The first component must be a struct or union
+            const Structured* s = dynamic_cast<const Structured*>(v->refType());
+            if (!s)
+                queryError(QString("Variable \"%1\" is not a struct or union").arg(first));
+
+            // Resolve nested structs or unions
+            const StructuredMember* m = 0;
+            while (!components.isEmpty()) {
+                QString comp = components.front();
+                components.pop_front();
+
+                if ( !(m = s->findMember(comp)) )
+                    queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(s->name()).arg(comp));
+                else if (!m->refType())
+                    queryError(QString("The type of member \"%1\" is unresolved").arg(comp));
+                else {
+                    offset += m->offset();
+                    if ( !(s = dynamic_cast<const Structured*>(m->refType())) )
+                        queryError(QString("Member \"%1\" is not a struct or union").arg(comp));
+                }
+            }
+
+            ret = m->refType()->toString(_memory, offset);
+        }
+    }
+    return ret;
+}
