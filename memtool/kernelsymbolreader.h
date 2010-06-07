@@ -14,11 +14,25 @@
 class QIODevice;
 class SymFactory;
 
-
+/**
+ * This class reads kernel symbols in a self-defined, compact format to a file
+ * or any other QIODevice.
+ */
 class KernelSymbolReader: public LongOperation
 {
 public:
+    /**
+     * Constructor
+     * @param from source to read the previsouly saved debugging symbols from
+     * @param factory the SymFactory to use for symbol creation
+     */
     KernelSymbolReader(QIODevice* from, SymFactory* factory);
+
+    /**
+     * Starts the reading process
+     * @exception ReaderWriterException error in data format
+     * @exception GenericException out of memory
+     */
     void read();
 
 protected:
