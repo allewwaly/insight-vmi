@@ -1,4 +1,5 @@
-SOURCES += programoptions.cpp \
+SOURCES += memorydump.cpp \
+    programoptions.cpp \
     longoperation.cpp \
     kernelsymbolparser.cpp \
     kernelsymbolwriter.cpp \
@@ -27,7 +28,10 @@ SOURCES += programoptions.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += programoptions.h \
+HEADERS += ioexception.h \
+    filenotfoundexception.h \
+    memorydump.h \
+    programoptions.h \
     longoperation.h \
     parserexception.h \
     readerwriterexception.h \
