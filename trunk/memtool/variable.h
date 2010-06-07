@@ -62,10 +62,16 @@ public:
     }
 
     /**
+     * This gives a pretty name of that variable in a C-style definition.
+     * @return the pretty name of that type
+     */
+    virtual QString prettyName() const;
+
+    /**
      * @param mem the memory device to read the data from
      * @return a string representation of this variable
      */
-    inline QString toString(QIODevice* mem) const;
+    QString toString(QIODevice* mem) const;
 
 	size_t offset() const;
 	void setOffset(size_t offset);
