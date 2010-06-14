@@ -45,7 +45,7 @@ void KernelSymbolReader::read()
     // Compare magic number and versions
     if (magic != kSym::fileMagic)
         readerWriterError(QString("The given file magic number 0x%1 is invalid.")
-                                  .arg(magic, 16));
+                                  .arg(magic, 0, 16));
     if (version != kSym::fileVersion)
         readerWriterError(QString("Don't know how to read symbol file verison "
                                   "%1 (our version is %2).")
