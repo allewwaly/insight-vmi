@@ -13,7 +13,12 @@
 #include <QStringList>
 #include <QTextStream>
 #include <QThread>
+#include <QVarLengthArray>
 #include "kernelsymbols.h"
+
+// Forward declaration
+class MemoryDump;
+
 
 /**
  * This class represents the interactive shell, which is the primary interface
@@ -92,6 +97,7 @@ private:
     QTextStream _out;
     QTextStream _err;
     QHash<QString, Command> _commands;
+    QVarLengthArray<MemoryDump*, 16> _memDumps;
 
     QString readLine();
     int eval(QString command);
@@ -104,6 +110,11 @@ private:
     int cmdListVars(QStringList args);
     int cmdListTypesById(QStringList args);
     int cmdListTypesByName(QStringList args);
+    int cmdMemory(QStringList args);
+    int cmdMemoryLoad(QStringList args);
+    int cmdMemoryUnload(QStringList args);
+    int cmdMemoryList(QStringList args);
+    int cmdMemoryQuery(QStringList args);
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t);
     int cmdShowVariable(const Variable* v);
