@@ -22,7 +22,8 @@ enum Action {
 /// The expected next token when parsing the command line arguments
 enum NextToken {
     ntOption,
-    ntInFileName
+    ntInFileName,
+    ntMemFileName
 };
 
 /// Represents one command line option
@@ -77,6 +78,17 @@ public:
     void setInFileName(QString inFileName);
 
     /**
+     * @return the list of memory dump files
+     */
+    QStringList memFileNames() const;
+
+    /**
+     * Sets the memory dump files
+     * @param memFiles the new memory dump files
+     */
+    void setMemFileNames(const QStringList& memFiles);
+
+    /**
      * @return the initial action to perform
      */
     Action action() const;
@@ -95,6 +107,7 @@ public:
 
 private:
     QString _inFileName;
+    QStringList _memFileNames;
     Action _action;
     int _activeOptions;
 };
