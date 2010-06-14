@@ -51,6 +51,15 @@ QString Variable::prettyName() const
 }
 
 
+QString Variable::toString(QIODevice* mem) const
+{
+    if (_refType)
+        return _refType->toString(mem, _offset);
+    else
+        return QString();
+}
+
+
 void Variable::readFrom(QDataStream& in)
 {
     Symbol::readFrom(in);
