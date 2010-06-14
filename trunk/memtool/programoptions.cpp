@@ -13,7 +13,7 @@
 
 ProgramOptions programOptions;
 
-const int OPTION_COUNT = 3;
+const int OPTION_COUNT = 4;
 
 const struct Option options[OPTION_COUNT] = {
         {
@@ -31,6 +31,14 @@ const struct Option options[OPTION_COUNT] = {
                 acLoadSymbols,
                 ntInFileName,
                 acParseSymbols // conflicting actions
+        },
+        {
+                "-m",
+                "--memory",
+                "Load a memory dump",
+                acNone,
+                ntMemFileName,
+                0 // conflicting actions
         },
         {
                 "-h",
@@ -139,6 +147,17 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
             }
             nextToken = ntOption;
             break;
+
+        case ntMemFileName:
+            if (!QFile::exists(arg)) {
+                std::cerr
+                    << "The file \"" << arg.toStdString()
+                    << "\" does not exist." << std::endl;
+                return false;
+            }
+            _memFileNames.append(arg);
+            nextToken = ntOption;
+            break;
         }
     }
 
@@ -155,6 +174,18 @@ QString ProgramOptions::inFileName() const
 void ProgramOptions::setInFileName(QString inFileName)
 {
     this->_inFileName = inFileName;
+}
+
+
+QStringList ProgramOptions::memFileNames() const
+{
+    return _memFileNames;
+}
+
+
+void ProgramOptions::setMemFileNames(const QStringList& memFiles)
+{
+    this->_memFileNames = memFiles;
 }
 
 
