@@ -16,6 +16,7 @@
 #include "refbasetype.h"
 #include "kernelsymbols.h"
 #include "programoptions.h"
+#include "memorydump.h"
 
 
 Shell* shell = 0;
@@ -50,13 +51,17 @@ Shell::Shell(KernelSymbols& symbols)
                 "  list types-by-name    List the types-by-name hash\n"
                 "  list variables        List the variables"));
 
-//    _commands.insert("info",
-//            Command(
-//                &Shell::cmdInfo,
-//                "List information about a symbol",
-//                "This command gives information about a specific symbol.\n"
-//                "  info <symbol_id>   Get info by id\n"
-//                "  info <symbol_name> Get info by name"));
+    _commands.insert("memory",
+            Command(
+                &Shell::cmdMemory,
+                "Load or unload a memory dump",
+                "This command loads or unloads memory dumps from files. They "
+                "are used in conjunction with \"query\" to interpret them with "
+                "the debugging symbols loaded with the \"symbols\" command.\n"
+                "  memory load   <file_name>   Load a memory dump\n"
+                "  memory unload <file_name>   Unload a memory dump by file name\n"
+                "  memory unload <file_index>  Unload a memory dump by its index\n"
+                "  memory list                 Show the loaded memory dumps"));
 
     _commands.insert("show",
             Command(
@@ -71,7 +76,7 @@ Shell::Shell(KernelSymbols& symbols)
             Command(
                 &Shell::cmdSymbols,
                 "Allows to load, store or parse the kernel symbols",
-                "This command allows to load, store or parse the kernel"
+                "This command allows to load, store or parse the kernel "
                 "debugging symbols that are to be used.\n"
                 "  symbols parse <file>    Parse the symbols from an objdump output\n"
                 "  symbols store <file>    Saves the parsed symbols to a file\n"
@@ -116,6 +121,11 @@ void Shell::run()
 {
     int ret = 0;
     QString line, cmd;
+
+    // Handle the command line params
+    for (int i = 0; i < programOptions.memFileNames().size(); ++i) {
+        cmdMemoryLoad(QStringList(programOptions.memFileNames().at(i)));
+    }
 
     // Enter command line loop
     while (ret == 0 && !_stdin.atEnd()) {
@@ -585,6 +595,163 @@ int Shell::cmdListVars(QStringList /*args*/)
 }
 
 
+int Shell::cmdMemory(QStringList args)
+{
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() < 1)
+        return cmdHelp(QStringList("memory"));
+
+    QString action = args[0].toLower();
+    args.pop_front();
+
+    // Perform the action
+    if (QString("load").startsWith(action) && (action.size() >= 2)) {
+        return cmdMemoryLoad(args);
+    }
+    else if (QString("unload").startsWith(action) && (action.size() >= 1)) {
+        return cmdMemoryUnload(args);
+    }
+    else if (QString("list").startsWith(action) && (action.size() >= 2)) {
+        return cmdMemoryList(args);
+    }
+    else if (QString("query").startsWith(action) && (action.size() >= 1)) {
+        return cmdMemoryQuery(args);
+    }
+    else
+        return cmdHelp(QStringList("memory"));
+
+    return 0;
+}
+
+
+int Shell::cmdMemoryLoad(QStringList args)
+{
+    // Check argument size
+    if (args.size() != 1) {
+        _err << "No file name given." << endl;
+        return 0;
+    }
+    QString fileName = args[0];
+
+    // Check file for existence
+    QFile file(fileName);
+    if (!file.exists()) {
+        _err << "File not found: " << fileName << endl;
+        return 0;
+    }
+
+    // Find an unused index and check if the file is already loaded
+    int index = -1;
+    for (int i = 0; i < _memDumps.size(); ++i) {
+        if (!_memDumps[i] && index < 0)
+            index = i;
+        if (_memDumps[i] && _memDumps[i]->fileName() == fileName) {
+            _out << "File already loaded as [" << i + 1 << "] " << fileName << endl;
+            return 0;
+        }
+    }
+    // Enlarge array, if necessary
+    if (index < 0) {
+        index = _memDumps.size();
+        _memDumps.resize(_memDumps.size() + 1);
+    }
+    // Load memory dump
+    _memDumps[index] =  new MemoryDump(fileName, &_sym.factory());
+    _out << "Loaded [" << index + 1 << "] " << fileName << endl;
+
+    return 0;
+}
+
+
+int Shell::cmdMemoryUnload(QStringList args)
+{
+    // Check argument size
+    if (args.size() != 1) {
+        _err << "No file name or index given." << endl;
+        return 0;
+    }
+
+    QString fileName = args[0];
+
+    // Did the user specify a file index?
+    bool ok = false;
+    int index = fileName.toInt(&ok) - 1;
+
+    if (ok) {
+        // Check the bounds
+        if (index < 0 || index >= _memDumps.size() || !_memDumps[index])
+            _err << "Memory dump index " << index + 1 << " does not exist." << endl;
+        else
+            fileName = _memDumps[index]->fileName();
+    }
+    // Not numeric, must have been a file name
+    else {
+        index = -1;
+        for (int i = 0; i < _memDumps.size(); ++i) {
+            if (_memDumps[i] && _memDumps[i]->fileName() == fileName)
+                index = i;
+        }
+        if (index < 0)
+            _err << "No memory dump with file name \"" << fileName << "\" loaded." << endl;
+    }
+
+    // Finally, delete the memory dump
+    if (index >= 0) {
+        delete _memDumps[index];
+        _memDumps[index] = 0;
+        _out << "Unloaded [" << index + 1 << "] " << fileName << endl;
+    }
+
+    return 0;
+}
+
+
+int Shell::cmdMemoryList(QStringList /*args*/)
+{
+    QString out;
+    for (int i = 0; i < _memDumps.size(); ++i) {
+        if (_memDumps[i])
+            out += QString("  [%1] %2\n").arg(i + 1).arg(_memDumps[i]->fileName());
+    }
+
+    if (out.isEmpty())
+        _out << "No memory dumps loaded." << endl;
+    else
+        _out << "Loaded memory dumps:" << endl << out;
+    return 0;
+}
+
+
+int Shell::cmdMemoryQuery(QStringList args)
+{
+    // See if we got an index to a specific memory dump
+    bool ok = false;
+    int index = (args.size() > 0) ? (args[0].toInt(&ok) - 1) : -1;
+    if (ok) {
+        args.pop_front();
+        // Check the bounds
+        if (index < 0 || index >= _memDumps.size() || !_memDumps[index]) {
+            _err << "Memory dump index " << index + 1 << " does not exist." << endl;
+            return 0;
+        }
+    }
+    // Otherwise use the first valid index
+    else {
+        for (int i = 0; i < _memDumps.size() && index < 0; ++i)
+            if (_memDumps[i])
+                index = i;
+    }
+    // No memory dumps loaded at all?
+    if (index < 0)
+        _err << "No memory dumps loaded." << endl;
+    // Perform the query
+    else
+        _out << _memDumps[index]->query(args.join(" ")) << endl;
+
+    return 0;
+}
+
+
 int Shell::cmdShow(QStringList args)
 {
     // Show cmdHelp, of no argument is given
@@ -705,13 +872,13 @@ int Shell::cmdSymbols(QStringList args)
 
     // Check file for existence
     QFile file(fileName);
-    if (action == "parse" || action == "load") {
+    if (QString("parse").startsWith(action) || QString("load").startsWith(action)) {
         if (!file.exists()) {
-            _out << "File not found: " << fileName << "\n";
+            _err << "File not found: " << fileName << "\n";
             return 0;
         }
     }
-    else if (action == "store" || action == "save") {
+    else if (QString("store").startsWith(action) || QString("save").startsWith(action)) {
         if (file.exists()) {
             QString reply;
             do {
@@ -726,11 +893,11 @@ int Shell::cmdSymbols(QStringList args)
     }
 
     // Perform the action
-    if (action == "parse")
+    if (QString("parse").startsWith(action))
         _sym.parseSymbols(fileName);
-    else if (action == "store" || action == "save")
+    else if (QString("store").startsWith(action) || QString("save").startsWith(action))
         _sym.saveSymbols(fileName);
-    else if (action == "load")
+    else if (QString("load").startsWith(action))
         _sym.loadSymbols(fileName);
     else
         return cmdHelp(QStringList("symbols"));
