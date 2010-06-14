@@ -73,7 +73,15 @@ public:
      */
     QString toString(QIODevice* mem) const;
 
+    /**
+     * @return the offset of this variable in memory
+     */
 	size_t offset() const;
+
+	/**
+	 * Sets the offset of this variable in memory
+	 * @param offset new offset
+	 */
 	void setOffset(size_t offset);
 
 	/**
