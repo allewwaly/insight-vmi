@@ -23,9 +23,10 @@ MemoryDump::MemoryDump(QIODevice* mem, SymFactory* factory)
 }
 
 
-MemoryDump::MemoryDump(const QString& fileName, SymFactory* factory)
+MemoryDump::MemoryDump(const QString& fileName, const SymFactory* factory)
     : _file(new QFile(fileName)), _memory((QIODevice*)_file), _factory(factory)
 {
+    _fileName = fileName;
     // Check existence
     if (!_file->exists())
         throw FileNotFoundException(
@@ -46,6 +47,12 @@ MemoryDump::~MemoryDump()
     // Delete the file object if we created one
     if (_file)
         delete _file;
+}
+
+
+const QString& MemoryDump::fileName() const
+{
+    return _fileName;
 }
 
 
@@ -99,6 +106,9 @@ QString MemoryDump::query(const QString& queryString) const
             }
 
             ret = m->refType()->toString(_memory, offset);
+        }
+        else {
+            ret = v->toString(_memory);
         }
     }
     return ret;
