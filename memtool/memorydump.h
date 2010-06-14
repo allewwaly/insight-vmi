@@ -62,19 +62,25 @@ public:
      * @exception FileNotFoundException the file given by \a fileName could not be found
      * @exception IOException error opening the file given by \a fileName
      */
-    MemoryDump(const QString& fileName, SymFactory* factory);
+    MemoryDump(const QString& fileName, const SymFactory* factory);
 
     /**
      * Destructor
      */
     ~MemoryDump();
 
+    /**
+     * @return the name of the loaded file, if applicaple
+     */
+    const QString& fileName() const;
+
     QString query(const QString& queryString) const;
 
 private:
     QFile* _file;
+    QString _fileName;
     QIODevice* _memory;
-    SymFactory* _factory;
+    const SymFactory* _factory;
 };
 
 #endif /* MEMORYDUMP_H_ */
