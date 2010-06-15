@@ -7,7 +7,7 @@
 
 #include "structuredmember.h"
 #include "basetype.h"
-#include <assert.h>
+#include "debug.h"
 
 StructuredMember::StructuredMember()
     : _offset(0)
@@ -24,6 +24,13 @@ StructuredMember::StructuredMember(const TypeInfo& info)
 size_t StructuredMember::offset() const
 {
 	return _offset;
+}
+
+
+QString StructuredMember::prettyName() const
+{
+    assert(_refType != 0);
+    return QString("%1 %2").arg(_refType->prettyName(), _name);
 }
 
 
