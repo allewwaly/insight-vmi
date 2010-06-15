@@ -325,8 +325,6 @@ protected:
      */
     inline void seek(QIODevice* mem, size_t offset) const
     {
-        Q_UNUSED(offset);
-        // TODO
         if (!mem->seek(offset)) {
             throw MemAccessException(
                     QString("Could not seek memory position 0x%1").arg(offset, 0, 16),
@@ -344,8 +342,6 @@ protected:
      */
     inline void read(QIODevice* mem, char* data, qint64 maxSize) const
     {
-
-
         // Make sure we read the right amount of bytes
         if (mem->read(data, maxSize) != maxSize) {
             throw MemAccessException(
