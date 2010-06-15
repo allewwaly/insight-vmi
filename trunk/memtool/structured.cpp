@@ -6,6 +6,7 @@
  */
 
 #include "structured.h"
+#include "debug.h"
 
 
 Structured::Structured()
@@ -125,6 +126,34 @@ void Structured::writeTo(QDataStream& out) const
 }
 
 
+QString Structured::toString(QIODevice* mem, size_t offset) const
+{
+    QString s;
+    // Output all members
+    for (int i = 0; i < _members.size(); ++i) {
+        StructuredMember* m = _members[i];
+        assert(m->refType() != 0);
+
+        // Start new line
+        if (!s.isEmpty())
+            s += "\n";
+
+        // Output all types except structured types
+        if (m->refType()->type() & (rtStruct | rtUnion) )
+            s += QString("0x%1 %2 = ...")
+                    .arg(m->offset(), 4, 16, QChar('0'))
+                    .arg(m->prettyName(), 30);
+        else
+            s += QString("0x%1 %2 = %3")
+                    .arg(m->offset(), 4, 16, QChar('0'))
+                    .arg(m->prettyName(), 30)
+                    .arg(m->refType()->toString(mem, offset + m->offset()));
+    }
+
+    return s;
+}
+
+
 //------------------------------------------------------------------------------
 Struct::Struct()
 {
@@ -149,10 +178,10 @@ QString Struct::prettyName() const
 }
 
 
-QString Struct::toString(QIODevice* mem, size_t offset) const
-{
-	return QString("NOT IMPLEMENTED in %1:%2").arg(__FILE__).arg(__LINE__);
-}
+//QString Struct::toString(QIODevice* mem, size_t offset) const
+//{
+//	return QString("NOT IMPLEMENTED in %1:%2").arg(__FILE__).arg(__LINE__);
+//}
 
 //------------------------------------------------------------------------------
 Union::Union()
@@ -178,10 +207,10 @@ QString Union::prettyName() const
 }
 
 
-QString Union::toString(QIODevice* mem, size_t offset) const
-{
-	return QString("NOT IMPLEMENTED in %1:%2").arg(__FILE__).arg(__LINE__);
-}
+//QString Union::toString(QIODevice* mem, size_t offset) const
+//{
+//	return QString("NOT IMPLEMENTED in %1:%2").arg(__FILE__).arg(__LINE__);
+//}
 
 
 
