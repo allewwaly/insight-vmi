@@ -33,6 +33,13 @@ public:
     size_t offset() const;
 
     /**
+     * This gives a pretty name of that type which may involve referencing
+     * types.
+     * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
+     */
+    virtual QString prettyName() const;
+
+    /**
      * Reads a serialized version of this object from \a in.
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
