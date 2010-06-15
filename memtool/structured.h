@@ -94,6 +94,13 @@ public:
      */
     virtual void writeTo(QDataStream& out) const;
 
+    /**
+     * @param mem the memory device to read the data from
+     * @param offset the offset at which to read the value from memory
+     * @return a string representation of this type
+     */
+    virtual QString toString(QIODevice* mem, size_t offset) const;
+
 protected:
 	MemberList _members;
 };
@@ -127,12 +134,12 @@ public:
      */
     virtual QString prettyName() const;
 
-    /**
-     * @param mem the memory device to read the data from
-     * @param offset the offset at which to read the value from memory
-     * @return a string representation of this type
-     */
-    virtual QString toString(QIODevice* mem, size_t offset) const;
+//    /**
+//     * @param mem the memory device to read the data from
+//     * @param offset the offset at which to read the value from memory
+//     * @return a string representation of this type
+//     */
+//    virtual QString toString(QIODevice* mem, size_t offset) const;
 };
 
 
@@ -164,12 +171,12 @@ public:
      */
     virtual QString prettyName() const;
 
-    /**
-     * @param mem the memory device to read the data from
-     * @param offset the offset at which to read the value from memory
-     * @return a string representation of this type
-     */
-    virtual QString toString(QIODevice* mem, size_t offset) const;
+//    /**
+//     * @param mem the memory device to read the data from
+//     * @param offset the offset at which to read the value from memory
+//     * @return a string representation of this type
+//     */
+//    virtual QString toString(QIODevice* mem, size_t offset) const;
 };
 
 #endif /* STRUCTURED_H_ */
