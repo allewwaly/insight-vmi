@@ -1,4 +1,5 @@
-SOURCES += memorydump.cpp \
+SOURCES += virtualmemory.cpp \
+    memorydump.cpp \
     programoptions.cpp \
     longoperation.cpp \
     kernelsymbolparser.cpp \
@@ -28,7 +29,8 @@ SOURCES += memorydump.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += ioexception.h \
+HEADERS += virtualmemory.h \
+    ioexception.h \
     filenotfoundexception.h \
     memorydump.h \
     programoptions.h \
