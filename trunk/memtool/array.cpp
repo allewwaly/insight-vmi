@@ -58,7 +58,14 @@ QString Array::toString(QIODevice* mem, size_t offset) const
         // Read the data such that the result is always null-terminated
         seek(mem, offset);
         read(mem, buf, bufSize-1);
-        return QString(buf);
+        // Limit to ASCII characters
+        for (int i = 0; i < bufSize-1; i++) {
+            if (buf[i] == 0)
+                break;
+            else if ( (buf[i] & 0x80) || !(buf[i] & 0x60) ) // buf[i] >= 128 || buf[i] < 32
+                buf[i] = '.';
+        }
+        return QString("\"%1\"").arg(buf);
     }
     else {
         if (_length >= 0) {
