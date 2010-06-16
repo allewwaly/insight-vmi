@@ -18,6 +18,7 @@
 
 // Forward declaration
 class MemoryDump;
+class QProcess;
 
 
 /**
@@ -27,6 +28,8 @@ class MemoryDump;
  */
 class Shell: public QThread
 {
+    Q_OBJECT
+
     /**
      * Generic call-back function for shell commands
      * @param args additional arguments passed to the command
@@ -89,6 +92,10 @@ protected:
      */
     virtual void run();
 
+private slots:
+    void pipeEndReadyReadStdOut();
+    void pipeEndReadyReadStdErr();
+
 private:
     KernelSymbols& _sym;
     QFile _stdin;
@@ -98,7 +105,9 @@ private:
     QTextStream _err;
     QHash<QString, Command> _commands;
     QVarLengthArray<MemoryDump*, 16> _memDumps;
+    QList<QProcess*> _pipedProcs;
 
+    void cleanupPipedProcs();
     QString readLine();
     int eval(QString command);
     void hline(int width = 60);
