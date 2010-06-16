@@ -117,6 +117,51 @@ QString Shell::readLine()
 }
 
 
+void Shell::pipeEndReadyReadStdOut()
+{
+    if (_pipedProcs.isEmpty())
+        return;
+    // Only the last process writes to stdout
+    _stdout.write(_pipedProcs.last()->readAllStandardOutput());
+    _stdout.flush();
+}
+
+
+void Shell::pipeEndReadyReadStdErr()
+{
+    // We don't know which process cased the signal, so just read all
+    for (int i = 0; i < _pipedProcs.size(); ++i) {
+        if (_pipedProcs[i])
+            _stderr.write(_pipedProcs[i]->readAllStandardError());
+    }
+    _stderr.flush();
+}
+
+
+void Shell::cleanupPipedProcs()
+{
+    if (_pipedProcs.isEmpty())
+        return;
+
+    // Reset the output to stdout
+    _out.setDevice(&_stdout);
+    // Close write channel and wait for process to terminate from first to last
+    for (int i = 0; i < _pipedProcs.size(); ++i) {
+        if (!_pipedProcs[i])
+            continue;
+        _pipedProcs[i]->closeWriteChannel();
+        _pipedProcs[i]->waitForBytesWritten(-1);
+        _pipedProcs[i]->waitForFinished(-1);
+        QCoreApplication::processEvents();
+        // Reset pipe and delete process
+        _pipedProcs[i]->deleteLater();
+        _pipedProcs[i] = 0;
+    }
+
+    _pipedProcs.clear();
+}
+
+
 void Shell::run()
 {
     int ret = 0;
@@ -150,54 +195,86 @@ void Shell::run()
 
 int Shell::eval(QString command)
 {
-	QStringList pipeCmds = command.split(QRegExp("\\s*\\|\\s*"), QString::KeepEmptyParts);
-/*
-	// Create piped process
-	QProcess * proc = 0;
-	if (pipeCmds.size() == 2) {
-		QStringList pipeCmd = pipeCmds.last().split(QRegExp("\\s+"), QString::SkipEmptyParts);
-
-		proc = new QProcess();
-
-		proc->run()
-	}
-	else if (pipeCmds.size() > 2) {
-		debugerr("Currently only one piped process is supported!");
-		return 0;
-	}
-*/
-    QStringList words = pipeCmds.first().split(QRegExp("\\s+"), QString::SkipEmptyParts);
-    if (words.isEmpty())
-        return 0;
-
     int ret = 0;
-    QString cmd = words[0].toLower();
-    words.pop_front();
+	QStringList pipeCmds = command.split(QRegExp("\\s*\\|\\s*"), QString::KeepEmptyParts);
+	assert(_pipedProcs.isEmpty() == true);
 
-    if (_commands.contains(cmd)) {
-        ShellCallback c =_commands[cmd].callback;
-        ret = (this->*c)(words);
-    }
-    else {
-        // Try to match the run of a command
-        QList<QString> cmds = _commands.keys();
-        int match, match_count = 0;
-        for (int i = 0; i < cmds.size(); i++) {
-            if (cmds[i].startsWith(cmd)) {
-                match_count++;
-                match = i;
+	// Setup piped processes
+	if (pipeCmds.size() > 1) {
+        // First, create piped processes in reverse order, i.e., right to left
+        for (int i = 1; i < pipeCmds.size(); ++i) {
+            QProcess* proc = new QProcess();
+            // Connect with previously created process
+            if (!_pipedProcs.isEmpty())
+                proc->setStandardOutputProcess(_pipedProcs.first());
+            // Add to the list and connect signal
+            _pipedProcs.push_front(proc);
+            connect(proc, SIGNAL(readyReadStandardError()), SLOT(pipeEndReadyReadStdErr()));
+        }
+        // Next, connect the stdout to the pipe
+        _out.setDevice(_pipedProcs.first());
+        connect(_pipedProcs.last(),
+                SIGNAL(readyReadStandardOutput()),
+                SLOT(pipeEndReadyReadStdOut()));
+        // Finally, start the piped processes in regular order, i.e., left to right
+        for (int i = 0; i < _pipedProcs.size(); ++i) {
+            QStringList args = pipeCmds[i+1].split(QRegExp("\\s+"), QString::SkipEmptyParts);
+            // Prepare program name and arguments
+            QString prog = args.first();
+            args.pop_front();
+
+            // Start and wait for process
+            _pipedProcs[i]->start(prog, args);
+            _pipedProcs[i]->waitForStarted(-1);
+            if (_pipedProcs[i]->state() != QProcess::Running) {
+                _err << "Error executing " << pipeCmds[i+1] << endl;
+                cleanupPipedProcs();
+                return 0;
             }
         }
+	}
 
-        if (match_count == 1) {
-            ShellCallback c =_commands[cmds[match]].callback;
+    QStringList words = pipeCmds.first().split(QRegExp("\\s+"), QString::SkipEmptyParts);
+    if (!words.isEmpty()) {
+
+        QString cmd = words[0].toLower();
+        words.pop_front();
+
+        if (_commands.contains(cmd)) {
+            ShellCallback c =_commands[cmd].callback;
             ret = (this->*c)(words);
         }
-        else if (match_count > 1)
-            _out << "Command prefix \"" << cmd << "\" is ambiguous." << endl;
-        else
-            _out << "Command not recognized: " << cmd << endl;
+        else {
+            // Try to match the run of a command
+            QList<QString> cmds = _commands.keys();
+            int match, match_count = 0;
+            for (int i = 0; i < cmds.size(); i++) {
+                if (cmds[i].startsWith(cmd)) {
+                    match_count++;
+                    match = i;
+                }
+            }
+
+            if (match_count == 1) {
+                ShellCallback c =_commands[cmds[match]].callback;
+                try {
+                    ret = (this->*c)(words);
+                }
+                catch (...) {
+                    // Exceptional cleanup
+                    cleanupPipedProcs();
+                    throw;
+                }
+            }
+            else if (match_count > 1)
+                _out << "Command prefix \"" << cmd << "\" is ambiguous." << endl;
+            else
+                _out << "Command not recognized: " << cmd << endl;
+        }
     }
+
+    // Regular cleanup
+    cleanupPipedProcs();
 
     return ret;
 }
@@ -655,8 +732,21 @@ int Shell::cmdMemoryLoad(QStringList args)
         index = _memDumps.size();
         _memDumps.resize(_memDumps.size() + 1);
     }
+    // TODO parse these values form System.map
+    MemSpecs specs;
+    specs.initLevel4Pgt      = 0xffffffff80201000UL;
+    specs.modulesVaddr       = 0xffffffff88000000UL;
+    specs.modulesEnd         = 0xfffffffffff00000UL;
+    specs.pageOffset         = 0xffff880000000000UL;
+    specs.sizeofUnsignedLong = sizeof(unsigned long);
+    specs.startKernelMap     = 0xffffffff80000000UL;
+    specs.vmallocStart       = 0xffffc20000000000UL;
+    specs.vmallocEnd         = 0xffffe1ffffffffffUL;
+    specs.vmemmapVaddr       = 0xffffe20000000000UL;
+    specs.vmemmapEnd         = 0xffffe2ffffffffffUL;
+
     // Load memory dump
-    _memDumps[index] =  new MemoryDump(fileName, &_sym.factory());
+    _memDumps[index] =  new MemoryDump(specs, fileName, &_sym.factory());
     _out << "Loaded [" << index + 1 << "] " << fileName << endl;
 
     return 0;
