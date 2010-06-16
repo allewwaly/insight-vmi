@@ -83,7 +83,6 @@ private:
     MemSpecs _specs;
     QFile* _file;
     QString _fileName;
-//    QIODevice* _memDev;
     VirtualMemory* _vmem;
     const SymFactory* _factory;
 };
