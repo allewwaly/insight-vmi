@@ -42,10 +42,13 @@ public:
 
 /**
  * This struct holds the memory specifications, i.e., the fixed memory offsets
- * and locations
+ * and locations as well as the CPU architecture.
  */
 struct MemSpecs
 {
+    /// Architecture variants: i386 or x86_64
+    enum Architecture { i386, x86_64 };
+
     /// Constructor
     MemSpecs() :
         pageOffset(0),
@@ -57,7 +60,8 @@ struct MemSpecs
         modulesEnd(0),
         startKernelMap(0),
         initLevel4Pgt(0),
-        sizeofUnsignedLong(sizeof(unsigned long))
+        sizeofUnsignedLong(sizeof(unsigned long)),
+        arch(x86_64)
     {}
 
     quint64 pageOffset;
@@ -70,6 +74,7 @@ struct MemSpecs
     quint64 startKernelMap;
     quint64 initLevel4Pgt;
     int sizeofUnsignedLong;
+    Architecture arch;
 };
 
 

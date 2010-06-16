@@ -48,7 +48,7 @@
 
 
 VirtualMemory::VirtualMemory(MemSpecs specs, QIODevice* physMem)
-    : _physMem(physMem), _specs(specs), _tlb(1000), _pos(0)
+    : _tlb(1000), _physMem(physMem), _specs(specs), _pos(0)
 {
     // TODO Auto-generated constructor stub
 
@@ -71,8 +71,8 @@ bool VirtualMemory::open(OpenMode mode)
     // Make sure no write attempt is made
     if (mode & (WriteOnly|Append|Truncate))
         return false;
-    // Call inherited function
-    return QIODevice::open(mode);
+    // Call inherited function and open physical memory file
+    return _physMem && QIODevice::open(mode) && (_physMem->isOpen() || _physMem->open(ReadOnly));
 }
 
 
@@ -92,23 +92,31 @@ bool VirtualMemory::reset()
 
 bool VirtualMemory::seek(qint64 pos)
 {
+    if ( ((quint64) pos) > ((quint64) size()) )
+        return false;
+
     _pos = (quint64) pos;
 
     // If the address translation works, we consider the seek to succeed.
-    try {
+//    try {
         int pageSize;
         virtualToPhysical((quint64) pos, &pageSize);
         return true;
-    }
-    catch (VirtualMemoryException) {
-        return false;
-    }
+//    }
+//    catch (VirtualMemoryException) {
+//        return false;
+//    }
 }
 
 
 qint64 VirtualMemory::size() const
 {
-    return 0xFFFFFFFFFFFFFFFFUL;
+    switch (_specs.arch) {
+    case MemSpecs::i386:   return 0xFFFFFFFFUL;
+    case MemSpecs::x86_64: return 0xFFFFFFFFFFFFFFFFUL;
+    }
+    // Fallback
+    return 0;
 }
 
 
@@ -116,12 +124,48 @@ qint64 VirtualMemory::readData (char* data, qint64 maxSize)
 {
     assert(_physMem != 0);
     assert(_physMem->isReadable());
-    // TODO stub
+
+    int pageSize;
+    qint64 totalRead = 0, ret = 0;
+
+    while (maxSize > 0) {
+        // Obtain physical address and page size
+        quint64 physAddr = virtualToPhysical(_pos, &pageSize);
+        // Set file position to physical address
+        if (!_physMem->seek(physAddr))
+            virtualMemoryError(QString("Cannot seek to address 0x%1 "
+                    "(translated from virtual address 0x%2")
+                    .arg(physAddr, 8, 16)
+                    .arg(_pos, 16, 16));
+        // A page size of -1 means the address belongs to linear space
+        if (pageSize < 0) {
+            ret = _physMem->read(data, maxSize);
+        }
+        else {
+            // Only read to the end of the page
+            qint64 pageOffset = _pos & (pageSize - 1UL);
+            qint64 remPageSize = pageSize - pageOffset;
+            ret = _physMem->read(data, maxSize > remPageSize ? remPageSize : maxSize);
+        }
+        // Advance positions
+        if (ret > 0) {
+            _pos += (quint64)ret;
+            totalRead += ret;
+            data += ret;
+            maxSize -= ret;
+        }
+        else
+            break;
+    }
+    // If we did not read anything and the last return value is -1, then return
+    // -1, otherwise return the number of bytes read
+    return (totalRead == 0 && ret < 0) ? ret : totalRead;
 }
 
 
 qint64 VirtualMemory::writeData (const char* data, qint64 maxSize)
 {
+    // We don't support writing
     Q_UNUSED(data);
     Q_UNUSED(maxSize);
     return -1;
@@ -282,8 +326,12 @@ quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
 
 quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
 {
+    // TODO honor _sprecs.arch flag and use different address translations
+    if (_specs.arch != MemSpecs::x86_64)
+        virtualMemoryError("Architecture not implemented");
+
     quint64 physaddr = 0;
-    // if we can do the job with a simple linear translation subtract the
+    // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
     if(!((vaddr >= _specs.vmallocStart && vaddr <= _specs.vmallocEnd) ||
          (vaddr >= _specs.vmemmapVaddr && vaddr <= _specs.vmemmapEnd) ||
@@ -298,7 +346,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
         *pageSize = -1;
     }
     else {
-        // otherwise use the address_lookup function
+        // Otherwise use the address_lookup function
         physaddr = pageLookup(vaddr, pageSize);
     }
 
