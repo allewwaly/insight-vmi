@@ -17,14 +17,21 @@
 #define queryError(x) do { throw QueryException((x), __FILE__, __LINE__); } while (0)
 
 
-MemoryDump::MemoryDump(QIODevice* mem, SymFactory* factory)
-    : _file(0), _memory(mem), _factory(factory)
+MemoryDump::MemoryDump(const MemSpecs& specs, QIODevice* mem, SymFactory* factory)
+    : _specs(specs),
+      _file(0),
+      _vmem(new VirtualMemory(_specs, mem)),
+      _factory(factory)
 {
 }
 
 
-MemoryDump::MemoryDump(const QString& fileName, const SymFactory* factory)
-    : _file(new QFile(fileName)), _memory((QIODevice*)_file), _factory(factory)
+MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
+        const SymFactory* factory)
+    : _specs(specs),
+      _file(new QFile(fileName)),
+      _vmem(new VirtualMemory(_specs, _file)),
+      _factory(factory)
 {
     _fileName = fileName;
     // Check existence
@@ -44,6 +51,8 @@ MemoryDump::MemoryDump(const QString& fileName, const SymFactory* factory)
 
 MemoryDump::~MemoryDump()
 {
+    if (_vmem)
+        delete _vmem;
     // Delete the file object if we created one
     if (_file)
         delete _file;
@@ -105,10 +114,10 @@ QString MemoryDump::query(const QString& queryString) const
                 }
             }
 
-            ret = m->refType()->toString(_memory, offset);
+            ret = m->refType()->toString(_vmem, offset);
         }
         else {
-            ret = v->toString(_memory);
+            ret = v->toString(_vmem);
         }
     }
     return ret;

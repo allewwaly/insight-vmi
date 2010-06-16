@@ -9,6 +9,7 @@
 #define MEMORYDUMP_H_
 
 #include "filenotfoundexception.h"
+#include "virtualmemory.h"
 
 // forward declarations
 class QFile;
@@ -48,21 +49,23 @@ class MemoryDump
 public:
     /**
      * Constructor
+     * @param specs the memory and architecture specifications
      * @param mem the memory image to operate on
      * @param factory the debugging symbols to use for memory interpretation
      */
-    MemoryDump(QIODevice* mem, SymFactory* factory);
+    MemoryDump(const MemSpecs& specs, QIODevice* mem, SymFactory* factory);
 
     /**
      * This convenience constructor will create a QIODevice for the given file
      * name and operate on that.
+     * @param specs the memory and architecture specifications
      * @param fileName the name of a memory dump file to operate on
      * @param factory the debugging symbols to use for memory interpretation
      *
      * @exception FileNotFoundException the file given by \a fileName could not be found
      * @exception IOException error opening the file given by \a fileName
      */
-    MemoryDump(const QString& fileName, const SymFactory* factory);
+    MemoryDump(const MemSpecs& specs, const QString& fileName, const SymFactory* factory);
 
     /**
      * Destructor
@@ -77,9 +80,11 @@ public:
     QString query(const QString& queryString) const;
 
 private:
+    MemSpecs _specs;
     QFile* _file;
     QString _fileName;
-    QIODevice* _memory;
+//    QIODevice* _memDev;
+    VirtualMemory* _vmem;
     const SymFactory* _factory;
 };
 
