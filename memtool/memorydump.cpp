@@ -88,44 +88,64 @@ QString MemoryDump::query(const QString& queryString) const
     }
     else {
         // The first component must be a variable
-        QString first = components.last();
+        QString first = components.first();
         components.pop_front();
         Variable* v = _factory->findVarByName(first);
+        const ReferencingType* refType = dynamic_cast<const ReferencingType*>(v);
+
         if (!v)
             queryError(QString("Variable does not exist: %1").arg(first));
         if (!v->refType())
             queryError(QString("The type of variable \"%1\" is unresolved").arg(first));
 
+        // We need to keep track of the offset
+        size_t offset = v->offset();
+
         if (!components.isEmpty()) {
-            // We need to keep track of the offset
-            size_t offset = v->offset();
             // The first component must be a struct or union
-            const Structured* s = dynamic_cast<const Structured*>(v->refType());
+            const Structured* s = dynamic_cast<const Structured*>(v->refTypeDeep());
             if (!s)
                 queryError(QString("Variable \"%1\" is not a struct or union").arg(first));
 
+            QString processedQuery = first;
+
             // Resolve nested structs or unions
             const StructuredMember* m = 0;
+            const BaseType* b = 0;
             while (!components.isEmpty()) {
                 QString comp = components.front();
                 components.pop_front();
 
                 if ( !(m = s->findMember(comp)) )
-                    queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(s->name()).arg(comp));
-                else if (!m->refType())
-                    queryError(QString("The type of member \"%1\" is unresolved").arg(comp));
+                    queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(processedQuery).arg(comp));
+
+                processedQuery += "." + comp;
+
+                if (! (b = m->refTypeDeep()) )
+                    queryError(QString("The type of member \"%1\" is unresolved").arg(processedQuery));
+                else if ( !components.isEmpty() && !(s = dynamic_cast<const Structured*>(b)) )
+                    queryError(QString("Member \"%1\" is not a struct or union").arg(processedQuery));
                 else {
+                    // Update the offset
                     offset += m->offset();
-                    if ( !(s = dynamic_cast<const Structured*>(m->refType())) )
-                        queryError(QString("Member \"%1\" is not a struct or union").arg(comp));
                 }
             }
 
+            refType = dynamic_cast<const ReferencingType*>(m);
             ret = m->refType()->toString(_vmem, offset);
         }
         else {
-            ret = v->toString(_vmem);
+            ret += v->toString(_vmem);
         }
+
+        QString s = QString("%1: ").arg(queryString);
+        if (refType->refType())
+            s += QString("%1 (ID 0x%2)").arg(refType->refType()->prettyName()).arg(refType->refTypeId(), 0, 16);
+        else
+            s += QString("(unresolved type 0x%1)").arg(refType->refTypeId(), 0, 16);
+        s += QString(" @ 0x%1\n").arg(offset, _specs.sizeofUnsignedLong, 16);
+
+        ret = s + ret;
     }
     return ret;
 }
