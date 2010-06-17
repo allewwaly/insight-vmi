@@ -48,7 +48,7 @@
 
 
 VirtualMemory::VirtualMemory(MemSpecs specs, QIODevice* physMem)
-    : _tlb(1000), _physMem(physMem), _specs(specs), _pos(0)
+    : _tlb(1000), _physMem(physMem), _specs(specs), _pos(-1)
 {
     // TODO Auto-generated constructor stub
 
@@ -71,6 +71,7 @@ bool VirtualMemory::open(OpenMode mode)
     // Make sure no write attempt is made
     if (mode & (WriteOnly|Append|Truncate))
         return false;
+    _pos = 0;
     // Call inherited function and open physical memory file
     return _physMem && QIODevice::open(mode) && (_physMem->isOpen() || _physMem->open(ReadOnly));
 }
@@ -84,7 +85,7 @@ qint64 VirtualMemory::pos() const
 
 bool VirtualMemory::reset()
 {
-    _pos = 0;
+    _pos = isOpen() ? 0 : -1;
     // Call inherited function
     return QIODevice::reset();
 }
@@ -92,7 +93,7 @@ bool VirtualMemory::reset()
 
 bool VirtualMemory::seek(qint64 pos)
 {
-    if ( ((quint64) pos) > ((quint64) size()) )
+    if ( ((quint64) pos) > ((quint64) size()) || !isOpen() )
         return false;
 
     _pos = (quint64) pos;
@@ -101,6 +102,7 @@ bool VirtualMemory::seek(qint64 pos)
 //    try {
         int pageSize;
         virtualToPhysical((quint64) pos, &pageSize);
+//        QIODevice::seek(pos);
         return true;
 //    }
 //    catch (VirtualMemoryException) {
