@@ -1,4 +1,5 @@
 #include "basetype.h"
+#include "refbasetype.h"
 
 #include <QIODevice>
 
@@ -11,6 +12,18 @@ BaseType::BaseType()
 BaseType::BaseType(const TypeInfo& info)
         : Symbol(info), SourceRef(info), _size(info.byteSize())
 {
+}
+
+
+BaseType::RealType BaseType::dereferencedType() const
+{
+    const BaseType* prev = this;
+    const RefBaseType* curr = dynamic_cast<const RefBaseType*>(prev);
+    while (curr && curr->refType()) {
+        prev = curr->refType();
+        curr = dynamic_cast<const RefBaseType*>(prev);
+    }
+    return prev->type();
 }
 
 
