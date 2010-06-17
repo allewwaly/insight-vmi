@@ -99,9 +99,17 @@ public:
     BaseType(const TypeInfo& info);
 
     /**
-     * @return the actual type of that polimorphic variable
+     * @return the actual type of that polymorphic variable
      */
     virtual RealType type() const = 0;
+
+    /**
+     * If this is a referencing type, all types are successively dereferenced
+     * until the final non-referencing type is revealed
+     * @return non-referencing type if this is a referencing type, type()
+     * otherwise
+     */
+    RealType dereferencedType() const;
 
     /**
      * Create a hash of that type based on type(), size() and name().
