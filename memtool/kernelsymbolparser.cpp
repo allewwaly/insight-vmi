@@ -231,7 +231,7 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
             else if (param == psDataMemberLocation && rxLocation.cap(1) == str::locOffset) {
                 // This one is decimal encoded
                 parseInt(i, rxLocation.cap(2), &ok);
-                _pInfo->setDataMemberLoc(i);
+                _pInfo->setDataMemberLocation(i);
             }
             else
                 parserError(QString("Strange location: %1").arg(value));
