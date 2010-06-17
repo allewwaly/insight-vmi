@@ -23,6 +23,7 @@ MemoryDump::MemoryDump(const MemSpecs& specs, QIODevice* mem, SymFactory* factor
       _vmem(new VirtualMemory(_specs, mem)),
       _factory(factory)
 {
+    init();
 }
 
 
@@ -40,12 +41,7 @@ MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
                 QString("File not found: \"%1\"").arg(fileName),
                 __FILE__,
                 __LINE__);
-    // Open the file for reading
-    if (!_file->open(QIODevice::ReadOnly))
-        throw IOException(
-                QString("Error opening file \"%1\" for reading").arg(fileName),
-                __FILE__,
-                __LINE__);
+    init();
 }
 
 
@@ -56,6 +52,17 @@ MemoryDump::~MemoryDump()
     // Delete the file object if we created one
     if (_file)
         delete _file;
+}
+
+
+void MemoryDump::init()
+{
+    // Open virtual memory for reading
+    if (!_vmem->open(QIODevice::ReadOnly))
+        throw IOException(
+                QString("Error opening virtual memory (filename=\"%1\")").arg(_fileName),
+                __FILE__,
+                __LINE__);
 }
 
 

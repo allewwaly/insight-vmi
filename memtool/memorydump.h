@@ -80,6 +80,8 @@ public:
     QString query(const QString& queryString) const;
 
 private:
+    void init();
+
     MemSpecs _specs;
     QFile* _file;
     QString _fileName;
