@@ -16,7 +16,7 @@ StructuredMember::StructuredMember()
 
 
 StructuredMember::StructuredMember(const TypeInfo& info)
-	: Symbol(info), ReferencingType(info), SourceRef(info), _offset(info.location())
+	: Symbol(info), ReferencingType(info), SourceRef(info), _offset(info.dataMemberLocation())
 {
 }
 
@@ -30,7 +30,10 @@ size_t StructuredMember::offset() const
 QString StructuredMember::prettyName() const
 {
     assert(_refType != 0);
-    return QString("%1 %2").arg(_refType->prettyName(), _name);
+    if (_refType)
+        return QString("%1 %2").arg(_refType->prettyName(), _name);
+    else
+        return QString("(unresolved type 0x%1) %2").arg(_refTypeId, 0, 16).arg(_name);
 }
 
 
