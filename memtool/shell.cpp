@@ -903,7 +903,16 @@ int Shell::cmdShowBaseType(const BaseType* t)
 	_out << "  Name:           " << (t->prettyName().isEmpty() ? QString("(unnamed)") : t->prettyName()) << endl;
 	_out << "  Type:           " << tRevMap[t->type()] << endl;
 	_out << "  Size:           " << t->size() << endl;
-	if (t->srcFile() > 0 && _sym.factory().sources().contains(t->srcFile())) {
+
+    const RefBaseType* r = dynamic_cast<const RefBaseType*>(t);
+    if (r) {
+        _out << "  Ref. type ID:   " << "0x" << hex << r->refTypeId() << dec << endl;
+        _out << "  Ref. type:      "
+            <<  (r->refType() ? r->refType()->prettyName() : QString("(unresolved)"))
+            << endl;
+    }
+
+	if (t->srcFile() >= 0 && _sym.factory().sources().contains(t->srcFile())) {
 		_out << "  Source file:    " << _sym.factory().sources().value(t->srcFile())->name()
 			<< ":" << t->srcLine() << endl;
 	}
@@ -914,10 +923,15 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
 		for (int i = 0; i < s->members().size(); i++) {
 			StructuredMember* m = s->members().at(i);
-			_out << "    " << qSetFieldWidth(20) << left << (m->name() + ": ")
+			_out << "    "
+                    << QString("0x%1").arg(m->offset(), 4, 16, QChar('0'))
+                    << "  "
+                    << qSetFieldWidth(20) << left << (m->name() + ": ")
 					<< qSetFieldWidth(0)
-					<< (m->refType() ? m->refType()->prettyName() : QString("(unresolved"))
-					<< ", offset " << m->offset() << endl;
+					<< (m->refType() ?
+					        m->refType()->prettyName() :
+					        QString("(unresolved type, 0x%1)").arg(m->refTypeId(), 0, 16))
+					<< endl;
 		}
 	}
 
