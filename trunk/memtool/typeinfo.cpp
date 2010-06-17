@@ -154,13 +154,13 @@ void TypeInfo::setLocation(size_t location)
 }
 
 
-qint32 TypeInfo::dataMemberLoc() const
+qint32 TypeInfo::dataMemberLocation() const
 {
     return _dataMemberLoc;
 }
 
 
-void TypeInfo::setDataMemberLoc(qint32 location)
+void TypeInfo::setDataMemberLocation(qint32 location)
 {
     this->_dataMemberLoc = location;
 }

@@ -456,7 +456,7 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 	case hsSubroutineType:
         return info.id() != -1;
 	case hsMember:
-		return info.id() != -1 && info.refTypeId() != -1 /*&& info.dataMemberLoc() != -1*/; // location not required
+		return info.id() != -1 && info.refTypeId() != -1 /*&& info.dataMemberLocation() != -1*/; // location not required
 	case hsPointerType:
 		return info.id() != -1 && info.byteSize() > 0;
 	case hsUnionType:
@@ -615,7 +615,8 @@ bool SymFactory::resolveReferences(Structured* s)
     for (int i = 0; i < s->members().size(); i++) {
         // This function adds all member to _postponedTypes whose
         // references could not be resolved.
-        ret = ret && resolveReference(s->members().at(i));
+        if (!resolveReference(s->members().at(i)))
+            ret = false;
     }
 
     return ret;
