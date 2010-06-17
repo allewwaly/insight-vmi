@@ -125,6 +125,8 @@ void KernelSymbolParser::finishLastSymbol()
         default:
             parserError(QString("Unhandled sub-type: %1").arg(_subInfo.symType()));
         }
+        // Reset all data for a new sub-symbol
+        _subInfo.clear();
     }
 
     // If this is a symbol for a multi-part type, continue parsing
@@ -143,10 +145,11 @@ void KernelSymbolParser::finishLastSymbol()
                 !(_info.symType() == hsVolatileType && _info.refTypeId() < 0)
            )
             _factory->addSymbol(_info);
+        // Reset all data for a new symbol
+        _info.clear();
+
         _pInfo = &_info;
     }
-    // Reset all data for a new symbol
-    _pInfo->clear();
 }
 
 
