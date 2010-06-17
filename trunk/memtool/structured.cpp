@@ -128,6 +128,8 @@ void Structured::writeTo(QDataStream& out) const
 
 QString Structured::toString(QIODevice* mem, size_t offset) const
 {
+//    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
+
     QString s;
     // Output all members
     for (int i = 0; i < _members.size(); ++i) {
@@ -140,20 +142,25 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
 
         if (m->refType()) {
             // Output all types except structured types
-            if (m->refType()->type() & (rtStruct | rtUnion) )
+            if ( //(m->refType()->type() & (rtStruct | rtUnion)) ||
+                 ( //(m->refType()->type() & rtTypedef) &&
+                   (m->refType()->dereferencedType() & (rtStruct | rtUnion)) ) )
+            {
                 s += QString("0x%1 %2 = ...")
                         .arg(m->offset(), 4, 16, QChar('0'))
-                        .arg(m->prettyName(), 30);
-            else
+                        .arg(m->prettyName(), 40);
+            }
+            else {
                 s += QString("0x%1 %2 = %3")
                         .arg(m->offset(), 4, 16, QChar('0'))
-                        .arg(m->prettyName(), 30)
+                        .arg(m->prettyName(), 40)
                         .arg(m->refType()->toString(mem, offset + m->offset()));
+            }
         }
         else {
             s += QString("0x%1 %2 = (unresolved type 0x%3)")
                     .arg(m->offset(), 4, 16, QChar('0'))
-                    .arg(m->prettyName(), 30)
+                    .arg(m->prettyName(), 40)
                     .arg(m->refTypeId(), 0, 16);
         }
     }
