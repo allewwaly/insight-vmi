@@ -222,8 +222,8 @@ public:
     size_t location() const;
     void setLocation(size_t location);
 
-    qint32 dataMemberLoc() const;
-    void setDataMemberLoc(qint32 location);
+    qint32 dataMemberLocation() const;
+    void setDataMemberLocation(qint32 location);
 
     HdrSymbolType symType() const;
     void setSymType(HdrSymbolType symType);
