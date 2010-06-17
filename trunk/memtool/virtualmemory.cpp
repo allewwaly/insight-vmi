@@ -73,7 +73,7 @@ bool VirtualMemory::open(OpenMode mode)
         return false;
     _pos = 0;
     // Call inherited function and open physical memory file
-    return _physMem && QIODevice::open(mode) && (_physMem->isOpen() || _physMem->open(ReadOnly));
+    return _physMem && QIODevice::open(mode|Unbuffered) && (_physMem->isOpen() || _physMem->open(ReadOnly));
 }
 
 
