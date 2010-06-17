@@ -32,9 +32,17 @@ public:
     virtual ~ReferencingType();
 
     /**
-     * @return the type this pointer points to
+     * Getter for the directly referenced type
+     * @return the type this referencing type directly points to
      */
     const BaseType* refType() const;
+
+    /**
+     * Follows all referencing types' references until a non-referencing
+     * type was found.
+     * @return the type this and all chained referencing types point to
+     */
+    const BaseType* refTypeDeep() const;
 
     /**
      * Set the base type this pointer points to

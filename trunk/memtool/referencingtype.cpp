@@ -7,6 +7,7 @@
 
 #include "referencingtype.h"
 #include "basetype.h"
+#include "refbasetype.h"
 #include <assert.h>
 
 ReferencingType::ReferencingType()
@@ -29,6 +30,18 @@ ReferencingType::~ReferencingType()
 const BaseType* ReferencingType::refType() const
 {
 	return _refType;
+}
+
+
+const BaseType* ReferencingType::refTypeDeep() const
+{
+    const ReferencingType* prev = this;
+    const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(_refType);
+    while (rbt) {
+        prev = rbt;
+        rbt = dynamic_cast<const RefBaseType*>(rbt->refType());
+    }
+    return prev->refType();
 }
 
 
