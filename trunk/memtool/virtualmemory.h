@@ -11,6 +11,7 @@
 #include <QIODevice>
 #include <QCache>
 #include "genericexception.h"
+#include "memspecs.h"
 
 #define virtualMemoryError(x) do { throw VirtualMemoryException((x), __FILE__, __LINE__); } while (0)
 
@@ -37,44 +38,6 @@ public:
     virtual ~VirtualMemoryException() throw()
     {
     }
-};
-
-
-/**
- * This struct holds the memory specifications, i.e., the fixed memory offsets
- * and locations as well as the CPU architecture.
- */
-struct MemSpecs
-{
-    /// Architecture variants: i386 or x86_64
-    enum Architecture { i386, x86_64 };
-
-    /// Constructor
-    MemSpecs() :
-        pageOffset(0),
-        vmallocStart(0),
-        vmallocEnd(0),
-        vmemmapVaddr(0),
-        vmemmapEnd(0),
-        modulesVaddr(0),
-        modulesEnd(0),
-        startKernelMap(0),
-        initLevel4Pgt(0),
-        sizeofUnsignedLong(sizeof(unsigned long)),
-        arch(x86_64)
-    {}
-
-    quint64 pageOffset;
-    quint64 vmallocStart;
-    quint64 vmallocEnd;
-    quint64 vmemmapVaddr;
-    quint64 vmemmapEnd;
-    quint64 modulesVaddr;
-    quint64 modulesEnd;
-    quint64 startKernelMap;
-    quint64 initLevel4Pgt;
-    int sizeofUnsignedLong;
-    Architecture arch;
 };
 
 
