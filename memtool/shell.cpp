@@ -732,14 +732,24 @@ int Shell::cmdMemoryLoad(QStringList args)
         index = _memDumps.size();
         _memDumps.resize(_memDumps.size() + 1);
     }
-    // TODO parse these values form System.map
+    // TODO parse these values from System.map
+    //    START_KERNEL_map = 0xffffffff80000000
+    //    VMALLOC_START    = 0xffffc20000000000
+    //    VMALLOC_END      = 0xffffe1ffffffffff
+    //    PAGE_OFFSET      = 0xffff810000000000
+    //    MODULES_VADDR    = 0xffffffffa0000000
+    //    MODULES_END      = 0xfffffffffff00000
+    //    VMEMMAP_START    = 0xffffe20000000000
+    //    VMEMMAP_END      = 0xffffe2ffffffffff
+    //    SIZEOF_UNSIGNED_LONG = 8
+
     MemSpecs specs;
-    specs.initLevel4Pgt      = 0xffffffff80201000UL;
-    specs.modulesVaddr       = 0xffffffff88000000UL;
+    specs.initLevel4Pgt      = 0xffffffff80201000UL;  // init_level4_pgt in System.map
+    specs.modulesVaddr       = 0xffffffffa0000000UL;
     specs.modulesEnd         = 0xfffffffffff00000UL;
-    specs.pageOffset         = 0xffff880000000000UL;
+    specs.pageOffset         = 0xffff810000000000UL;  // __PAGE_OFFSET in include/asm-x86/page_64.h:29
     specs.sizeofUnsignedLong = sizeof(unsigned long);
-    specs.startKernelMap     = 0xffffffff80000000UL;
+    specs.startKernelMap     = 0xffffffff80000000UL;  // __START_KERNEL_map in include/asm-x86/page_64.h:44
     specs.vmallocStart       = 0xffffc20000000000UL;
     specs.vmallocEnd         = 0xffffe1ffffffffffUL;
     specs.vmemmapVaddr       = 0xffffe20000000000UL;
