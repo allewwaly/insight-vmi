@@ -1,4 +1,5 @@
-SOURCES += virtualmemory.cpp \
+SOURCES += memspecparser.cpp \
+    virtualmemory.cpp \
     memorydump.cpp \
     programoptions.cpp \
     longoperation.cpp \
@@ -29,7 +30,9 @@ SOURCES += virtualmemory.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += virtualmemory.h \
+HEADERS += memspecs.h \
+    memspecparser.h \
+    virtualmemory.h \
     ioexception.h \
     filenotfoundexception.h \
     memorydump.h \
