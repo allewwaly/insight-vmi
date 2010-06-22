@@ -54,10 +54,10 @@ public:
      */
     MemSpecParser(const QString& kernelSrcDir, const QString& systemMapFile);
 
-//    /**
-//     * Destructor
-//     */
-//    virtual ~MemSpecParser();
+    /**
+     * Destructor
+     */
+    virtual ~MemSpecParser();
 
     /**
      * Parses the memory specifications from the previously given kernel source
@@ -67,13 +67,71 @@ public:
      */
     MemSpecs parse();
 
+    /**
+     * Returns the temporary build directory after it has been successfully
+     * created by a call to parse(). Before that, an empty string is
+     * returned.
+     * @return the temporary build directory
+     */
+    QString buildDir() const;
+
+    /**
+     * Per default, the build directory is automatically removed when the
+     * object is deleted.
+     * @return \c true if the build directory is automatically removed if this
+     * object is deleted, \c false otherwise
+     */
+    bool autoRemoveBuildDir() const;
+
+    /**
+     * Controls if the build directory is automatically removed when the object
+     * is deleted.
+     * @param autoRemove set to \c true to have the build directory removed,
+     * \c false otherwise.
+     */
+    void setAutoRemoveBuildDir(bool autoRemove);
+
+    /**
+     * @return the output to standard error of the last failed process
+     */
+    const QByteArray& errorOutput() const;
+
 private:
+    /**
+     * Creates a temporary build directory and sets up all necessary files.
+     * \sa buildDir()
+     */
     void setupBuildDir();
+
+    /**
+     * Builds the helper program in the directory \a buildDir.
+     */
     void buildHelperProg();
+
+    /**
+     * Runs the helper program and parses the output.
+     * @param specs the MemSpec struct to store the parsed result
+     */
     void parseHelperProg(MemSpecs* specs);
 
+    /**
+     * Parses the \c System.map file and stores the relevant data to \a specs.
+     * @param specs the MemSpec struct to store the parsed result
+     */
+    void parseSystemMap(MemSpecs* specs);
+
+    /**
+     * Removes a directory and all contained files recursively.
+     * @param dir the directory to remove
+     * @return \c true in case of success, \c false otherwise
+     */
+    bool rmdirRek(const QString& dir) const;
+
+    bool _autoRemoveBuildDir;
     QString _kernelSrcDir;
     QString _systemMapFile;
+    QString _buildDir;
+    QByteArray _errorOutput;
 };
 
 #endif /* MEMSPECPARSER_H_ */
