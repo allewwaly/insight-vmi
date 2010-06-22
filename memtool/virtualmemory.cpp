@@ -336,7 +336,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
     if(!((vaddr >= _specs.vmallocStart && vaddr <= _specs.vmallocEnd) ||
-         (vaddr >= _specs.vmemmapVaddr && vaddr <= _specs.vmemmapEnd) ||
+         (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd)))
     {
         if (vaddr >= _specs.startKernelMap) {
