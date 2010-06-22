@@ -15,11 +15,12 @@
 #include "compileunit.h"
 #include "variable.h"
 #include "shell.h"
+#include "memspecs.h"
 #include "debug.h"
 
 
-KernelSymbolWriter::KernelSymbolWriter(QIODevice* to, SymFactory* factory)
-    : _to(to), _factory(factory)
+KernelSymbolWriter::KernelSymbolWriter(QIODevice* to, SymFactory* factory, MemSpecs* specs)
+    : _to(to), _factory(factory), _specs(specs)
 {
 }
 
@@ -43,28 +44,33 @@ void KernelSymbolWriter::write()
     out << kSym::fileMagic << kSym::fileVersion << flags << (qint32) out.version();
 
     // Write all information from SymFactory in the following format:
-    // 1.a  (qint32) number of compile units
-    // 1.b  (CompileUnit) data of 1st compile unit
-    // 1.c  (CompileUnit) data of 2nd compile unit
-    // 1.d  ...
-    // 2.a  (qint32) number of types
-    // 2.b  (qint32) type (BaseType::RealType casted to qint32)
-    // 2.c  (subclass of BaseType) data of type
-    // 2.d  (qint32) type (BaseType::RealType casted to qint32)
-    // 2.e  (subclass of BaseType) data of type
-    // 2.f  ...
-    // 3.a  (qint32) number of id-mappings for types
-    // 3.b  (qint32) 1st source id
-    // 3.c  (qint32) 1st target id
-    // 3.d  (qint32) 2nd source id
-    // 3.e  (qint32) 2nd target id
+    // 1.   (MemSpecs) data of _specs
+    // 2.a  (qint32) number of compile units
+    // 2.b  (CompileUnit) data of 1st compile unit
+    // 2.c  (CompileUnit) data of 2nd compile unit
+    // 2.d  ...
+    // 3.a  (qint32) number of types
+    // 3.b  (qint32) type (BaseType::RealType casted to qint32)
+    // 3.c  (subclass of BaseType) data of type
+    // 3.d  (qint32) type (BaseType::RealType casted to qint32)
+    // 3.e  (subclass of BaseType) data of type
     // 3.f  ...
-    // 4.a  (qint32) number of variables
-    // 4.b  (Variable) data of variable
-    // 4.c  (Variable) data of variable
-    // 4.d  ...
+    // 4.a  (qint32) number of id-mappings for types
+    // 4.b  (qint32) 1st source id
+    // 4.c  (qint32) 1st target id
+    // 4.d  (qint32) 2nd source id
+    // 4.e  (qint32) 2nd target id
+    // 4.f  ...
+    // 5.a  (qint32) number of variables
+    // 5.b  (Variable) data of variable
+    // 5.c  (Variable) data of variable
+    // 5.d  ...
+
     try {
         QSet<qint32> written_types;
+
+        // Write the memory specifications
+        out << *_specs;
 
         // Write list of compile units
         out << (qint32) _factory->sources().size();

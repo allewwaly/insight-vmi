@@ -21,6 +21,7 @@
 #include "kernelsymbolreader.h"
 #include "kernelsymbolwriter.h"
 #include "parserexception.h"
+#include "memspecparser.h"
 #include "shell.h"
 #include "debug.h"
 
@@ -36,51 +37,100 @@ KernelSymbols::~KernelSymbols()
 }
 
 
-void KernelSymbols::parseSymbols(QIODevice* from)
+void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
+        const QString systemMap)
 {
 	if (!from)
 		parserError("Received a null device to read the data from");
 
 	_factory.clear();
 
-	KernelSymbolParser parser(from, &_factory);
-	try {
-	    QTime timer;
-	    timer.start();
+    QTime timer;
+    timer.start();
 
-		parser.parse();
+    MemSpecParser specParser(kernelSrc, systemMap);
+
+	try {
+        shell->out()
+            << "Parsing memory specifications..." << flush;
+
+	    // Parse the memory specifications
+	    _memSpecs = specParser.parse();
+
+        // Print out some timing statistics
+        int duration = timer.elapsed();
+        int s = (duration / 1000) % 60;
+        int m = duration / (60*1000);
+        QString time = QString("%1 sec").arg(s);
+        if (m > 0)
+            time = QString("%1 min ").arg(m) + time;
+
+	    shell->out()
+            << "\rSuccessfully parsed the memory specifications in " << time << endl;
+	}
+    catch (GenericException e) {
+        shell->err()
+            << endl
+            << "Caught exception at " << e.file << ":" << e.line << endl
+            << "Message: " << e.message << endl;
+
+        // Was the error caused during the memspec build process?
+        if (!specParser.errorOutput().isEmpty()) {
+            // Output the error messages
+            shell->err() << endl << specParser.errorOutput() << endl;
+
+            // Ask the user if he wants to keep the build directory
+            QString reply;
+            do {
+                shell->out() << "Keep build directory \"" << specParser.buildDir() << "\"? [Y/n] " << flush;
+                reply = shell->readLine().toLower();
+                if (reply.isEmpty())
+                    reply = "y";
+            } while (reply != "y" && reply != "n");
+            specParser.setAutoRemoveBuildDir(reply == "n");
+        }
+        throw;
+    }
+
+    KernelSymbolParser symParser(from, &_factory);
+
+    try {
+	    // Parse the debugging symbols
+		symParser.parse();
 	    _factory.symbolsFinished(SymFactory::rtParsing);
 
-		// Print out some timing statistics
-		int duration = timer.elapsed();
-		int s = (duration / 1000) % 60;
-		int m = duration / (60*1000);
-		QString time = QString("%1 sec").arg(s);
-		if (m > 0)
-		    time = QString("%1 min ").arg(m) + time;
+        // Print out some timing statistics
+        int duration = timer.elapsed();
+        int s = (duration / 1000) % 60;
+        int m = duration / (60*1000);
+        QString time = QString("%1 sec").arg(s);
+        if (m > 0)
+            time = QString("%1 min ").arg(m) + time;
 
 		shell->out() << "Parsing finish in " << time;
         if (duration > 0)
-            shell->out() << " (" << (int)((parser.line() / (float)duration * 1000)) << " lines per second)";
+            shell->out() << " (" << (int)((symParser.line() / (float)duration * 1000)) << " lines per second)";
         shell->out() << "." << endl;
 	}
     catch (GenericException e) {
-        debugerr("Exception caught at input line " << parser.line() << " of the debug symbols");
         shell->err()
-            << "Caught exception at " << e.file << ":" << e.line << endl
+            << endl
+            << "Caught exception at " << e.file << ":" << e.line
+            << " at input line " << symParser.line() << " of the debug symbols" << endl
             << "Message: " << e.message << endl;
 		throw;
 	}
-};
+}
 
 
-void KernelSymbols::parseSymbols(const QString& fileName)
+void KernelSymbols::parseSymbols(const QString& objdump,
+        const QString& kernelSrc, const QString systemMap)
 {
-	QFile file(fileName);
+	QFile file(objdump);
 	if (!file.open(QIODevice::ReadOnly))
-	    genericError(QString("Error opening file %1 for reading").arg(fileName));
+	    genericError(QString("Error opening file %1 for reading").arg(objdump));
 
-	parseSymbols(&file);
+	parseSymbols(&file, kernelSrc, systemMap);
 
 	file.close();
 }
@@ -93,7 +143,7 @@ void KernelSymbols::loadSymbols(QIODevice* from)
 
     _factory.clear();
 
-    KernelSymbolReader reader(from, &_factory);
+    KernelSymbolReader reader(from, &_factory, &_memSpecs);
     try {
         QTime timer;
         timer.start();
@@ -143,7 +193,7 @@ void KernelSymbols::saveSymbols(QIODevice* to)
     if (!to)
         genericError("Received a null device to read the data from");
 
-    KernelSymbolWriter writer(to, &_factory);
+    KernelSymbolWriter writer(to, &_factory, &_memSpecs);
     try {
         QTime timer;
         timer.start();
@@ -193,3 +243,7 @@ const SymFactory& KernelSymbols::factory() const
 }
 
 
+const MemSpecs&  KernelSymbols::memSpecs() const
+{
+    return _memSpecs;
+}

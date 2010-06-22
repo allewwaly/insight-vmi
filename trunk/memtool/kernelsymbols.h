@@ -11,6 +11,7 @@
 #include "symfactory.h"
 #include "typeinfo.h"
 #include "genericexception.h"
+#include "memspecs.h"
 
 // Forward declaration
 class QIODevice;
@@ -35,14 +36,22 @@ public:
 	/**
 	 * Parses the kernel debugging symbols from the given device.
 	 * @param from device to parse the symbols from
+     * @param kernelSrc path to kernel source or header tree
+     * @param systemMap path and file name to \c System.map file
 	 */
-	void parseSymbols(QIODevice* from);
+	void parseSymbols(QIODevice* from, const QString& kernelSrc,
+	        const QString systemMap);
 
 	/**
-	 * Parses the kernel debugging symbols from the file given by \a fileName.
-	 * @param fileName the name of the file to parse the symbols from
+	 * Parses the kernel debugging symbols from the file given by \a objdump
+	 * and the memory specifications from \a kernelSrc and \a systemMap and
+     * stores the result in _factory and _memSpecs.
+	 * @param objdump the name of the objdump file to parse the symbols from
+     * @param kernelSrc path to kernel source or header tree
+     * @param systemMap path and file name to \c System.map file
 	 */
-	void parseSymbols(const QString& fileName);
+	void parseSymbols(const QString& objdump, const QString& kernelSrc,
+	        const QString systemMap);
 
 	/**
 	 * Loads the kernel debugging symbols from the given device.
@@ -73,8 +82,14 @@ public:
      */
     const SymFactory& factory() const;
 
+    /**
+     * @return the memory specifications of the kernel symbols
+     */
+    const MemSpecs& memSpecs() const;
+
 private:
 	SymFactory _factory;
+	MemSpecs _memSpecs;
 };
 
 #endif /* KERNELSYMBOLS_H_ */
