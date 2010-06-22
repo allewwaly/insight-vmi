@@ -78,10 +78,12 @@ Shell::Shell(KernelSymbols& symbols)
                 "Allows to load, store or parse the kernel symbols",
                 "This command allows to load, store or parse the kernel "
                 "debugging symbols that are to be used.\n"
-                "  symbols parse <file>    Parse the symbols from an objdump output\n"
-                "  symbols store <file>    Saves the parsed symbols to a file\n"
-                "  symbols save <file>     Alias for \"store\"\n"
-                "  symbols load <file>     Loads previously stored symbols for usage\n"));
+                "  symbols parse <objdump> <System.map> <kernel_tree>\n"
+                "                                 Parse the symbols from an objdump output, a\n"
+                "                                 System.map file and a kernel source tree\n"
+                "  symbols store <ksym_file>      Saves the parsed symbols to a file\n"
+                "  symbols save <ksym_file>       Alias for \"store\"\n"
+                "  symbols load <ksym_file>       Loads previously stored symbols for usage\n"));
 
     // Open the console devices
     _stdin.open(stdin, QIODevice::ReadOnly);
@@ -732,31 +734,9 @@ int Shell::cmdMemoryLoad(QStringList args)
         index = _memDumps.size();
         _memDumps.resize(_memDumps.size() + 1);
     }
-    // TODO parse these values from System.map
-    //    START_KERNEL_map = 0xffffffff80000000
-    //    VMALLOC_START    = 0xffffc20000000000
-    //    VMALLOC_END      = 0xffffe1ffffffffff
-    //    PAGE_OFFSET      = 0xffff810000000000
-    //    MODULES_VADDR    = 0xffffffffa0000000
-    //    MODULES_END      = 0xfffffffffff00000
-    //    VMEMMAP_START    = 0xffffe20000000000
-    //    VMEMMAP_END      = 0xffffe2ffffffffff
-    //    SIZEOF_UNSIGNED_LONG = 8
-
-    MemSpecs specs;
-    specs.initLevel4Pgt      = 0xffffffff80201000UL;  // init_level4_pgt in System.map
-    specs.modulesVaddr       = 0xffffffffa0000000UL;
-    specs.modulesEnd         = 0xfffffffffff00000UL;
-    specs.pageOffset         = 0xffff810000000000UL;  // __PAGE_OFFSET in include/asm-x86/page_64.h:29
-    specs.sizeofUnsignedLong = sizeof(unsigned long);
-    specs.startKernelMap     = 0xffffffff80000000UL;  // __START_KERNEL_map in include/asm-x86/page_64.h:44
-    specs.vmallocStart       = 0xffffc20000000000UL;
-    specs.vmallocEnd         = 0xffffe1ffffffffffUL;
-    specs.vmemmapVaddr       = 0xffffe20000000000UL;
-    specs.vmemmapEnd         = 0xffffe2ffffffffffUL;
 
     // Load memory dump
-    _memDumps[index] =  new MemoryDump(specs, fileName, &_sym.factory());
+    _memDumps[index] =  new MemoryDump(_sym.memSpecs(), fileName, &_sym.factory());
     _out << "Loaded [" << index + 1 << "] " << fileName << endl;
 
     return 0;
@@ -979,42 +959,97 @@ int Shell::cmdShowVariable(const Variable* v)
 int Shell::cmdSymbols(QStringList args)
 {
     // Show cmdHelp, of an invalid number of arguments is given
-    if (args.size() != 2)
+    if (args.size() < 2)
         return cmdHelp(QStringList("symbols"));
 
-    QString action = args[0].toLower(), fileName = args[1];
-
-    // Check file for existence
-    QFile file(fileName);
-    if (QString("parse").startsWith(action) || QString("load").startsWith(action)) {
-        if (!file.exists()) {
-            _err << "File not found: " << fileName << "\n";
-            return 0;
-        }
-    }
-    else if (QString("store").startsWith(action) || QString("save").startsWith(action)) {
-        if (file.exists()) {
-            QString reply;
-            do {
-                _out << "Ok to overwrite existing file? [Y/n] " << flush;
-                reply = readLine().toLower();
-                if (reply.isEmpty())
-                    reply = "y";
-                else if (reply == "n")
-                    return 0;
-            } while (reply != "y");
-        }
-    }
+    QString action = args[0].toLower();
+    args.pop_front();
 
     // Perform the action
     if (QString("parse").startsWith(action))
-        _sym.parseSymbols(fileName);
+        cmdSymbolsParse(args);
     else if (QString("store").startsWith(action) || QString("save").startsWith(action))
-        _sym.saveSymbols(fileName);
+        cmdSymbolsStore(args);
     else if (QString("load").startsWith(action))
-        _sym.loadSymbols(fileName);
+        cmdSymbolsLoad(args);
     else
         return cmdHelp(QStringList("symbols"));
 
     return 0;
 }
+
+int Shell::cmdSymbolsParse(QStringList args)
+{
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() != 3)
+        return cmdHelp(QStringList("symbols"));
+
+    QString objdump = args[0], sysmap = args[1], kernelSrc = args[2];
+
+    // Check files for existence
+    if (!QFile::exists(objdump)) {
+        _err << "File not found: " << objdump << endl;
+        return 0;
+    }
+    if (!QFile::exists(sysmap)) {
+        _err << "File not found: " << sysmap << endl;
+        return 0;
+    }
+    if (!QFile::exists(kernelSrc)) {
+        _err << "Directory not found: " << kernelSrc << endl;
+        return 0;
+    }
+
+    _sym.parseSymbols(objdump, kernelSrc, sysmap);
+
+    return 0;
+}
+
+
+int Shell::cmdSymbolsLoad(QStringList args)
+{
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() != 1)
+        return cmdHelp(QStringList("symbols"));
+
+    QString fileName = args[0];
+
+    // Check file for existence
+    // Check files for existence
+    if (!QFile::exists(fileName)) {
+        _err << "File not found: " << fileName << endl;
+        return 0;
+    }
+
+    _sym.loadSymbols(fileName);
+
+    return 0;
+}
+
+
+int Shell::cmdSymbolsStore(QStringList args)
+{
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() != 1)
+        return cmdHelp(QStringList("symbols"));
+
+    QString fileName = args[0];
+
+    // Check file for existence
+    if (QFile::exists(fileName)) {
+        QString reply;
+        do {
+            _out << "Ok to overwrite existing file? [Y/n] " << flush;
+            reply = readLine().toLower();
+            if (reply.isEmpty())
+                reply = "y";
+            else if (reply == "n")
+                return 0;
+        } while (reply != "y");
+    }
+
+    _sym.saveSymbols(fileName);
+
+    return 0;
+}
+

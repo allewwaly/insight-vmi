@@ -85,6 +85,12 @@ public:
      */
     QTextStream& err();
 
+    /**
+     * Reads a line of text from stdin and returns the reply.
+     * @return line of text from stdin
+     */
+    QString readLine();
+
 protected:
     /**
      * Starts the interactive shell and does not return until the user invokes
@@ -108,7 +114,6 @@ private:
     QList<QProcess*> _pipedProcs;
 
     void cleanupPipedProcs();
-    QString readLine();
     int eval(QString command);
     void hline(int width = 60);
     int cmdExit(QStringList args);
@@ -128,6 +133,9 @@ private:
     int cmdShowBaseType(const BaseType* t);
     int cmdShowVariable(const Variable* v);
     int cmdSymbols(QStringList args);
+    int cmdSymbolsParse(QStringList args);
+    int cmdSymbolsLoad(QStringList args);
+    int cmdSymbolsStore(QStringList args);
 };
 
 /// Globally accessible shell object

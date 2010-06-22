@@ -13,6 +13,7 @@
 // forward declarations
 class QIODevice;
 class SymFactory;
+struct MemSpecs;
 
 /**
  * This class writes kernel symbols in a self-defined, compact format to a file
@@ -25,8 +26,9 @@ public:
      * Constructor
      * @param from destination to write the debugging symbols to
      * @param factory the SymFactory whose symbols shall be written
+     * @param specs the MemSpecs whose data shall be written
      */
-    KernelSymbolWriter(QIODevice* to, SymFactory* factory);
+    KernelSymbolWriter(QIODevice* to, SymFactory* factory, MemSpecs* specs);
 
     /**
      * Starts the writing process.
@@ -42,6 +44,7 @@ protected:
 private:
     QIODevice* _to;
     SymFactory* _factory;
+    MemSpecs* _specs;
 };
 
 #endif /* KERNELSYMBOLWRITER_H_ */
