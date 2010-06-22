@@ -1,4 +1,5 @@
-SOURCES += memspecparser.cpp \
+SOURCES += memspecs.cpp \
+    memspecparser.cpp \
     virtualmemory.cpp \
     memorydump.cpp \
     programoptions.cpp \
