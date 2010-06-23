@@ -31,7 +31,7 @@ Structured::~Structured()
 uint Structured::hash(VisitedSet* visited) const
 {
 	// TODO: This tracking of visited IDs for avoiding endless loops might not
-	// be necessary anymore, since we don't recursive through the members
+	// be necessary anymore, since we don't recurse through the members
 	// anymore for building the hash.
     if (visited->contains(_id)) return 0;
     visited->insert(_id);
