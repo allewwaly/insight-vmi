@@ -3,6 +3,36 @@
 
 #include <QIODevice>
 
+// These types need further resolution
+const qint32 ReferencingTypes =
+    BaseType::rtPointer     |
+    BaseType::rtArray       |
+    BaseType::rtStruct      |
+    BaseType::rtUnion       |
+    BaseType::rtConst       |
+    BaseType::rtVolatile    |
+    BaseType::rtTypedef;
+
+// These types cannot be resolved anymore
+const qint32 ElementaryTypes =
+    BaseType::rtInt8        |
+    BaseType::rtUInt8       |
+    BaseType::rtBool8       |
+    BaseType::rtInt16       |
+    BaseType::rtUInt16      |
+    BaseType::rtBool16      |
+    BaseType::rtInt32       |
+    BaseType::rtUInt32      |
+    BaseType::rtBool32      |
+    BaseType::rtInt64       |
+    BaseType::rtUInt64      |
+    BaseType::rtBool64      |
+    BaseType::rtFloat       |
+    BaseType::rtDouble      |
+    BaseType::rtEnum        |
+    BaseType::rtFuncPointer;
+
+
 BaseType::BaseType()
         : _size(0)
 {

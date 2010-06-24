@@ -10,7 +10,12 @@
 #include "sourceref.h"
 #include "typeinfo.h"
 
-//class QIODevice;
+/// Bitmask with all BaseType::RealType's that need further resolution
+extern const qint32 ReferencingTypes;
+
+/// Bitmask with all BaseType::RealType's that cannot be further resolved
+extern const qint32 ElementaryTypes;
+
 
 /**
   Basic exception class for all type-related exceptions
@@ -52,6 +57,7 @@ public:
 };
 
 typedef QSet<int> VisitedSet;
+
 
 class BaseType: public Symbol, public SourceRef
 {
