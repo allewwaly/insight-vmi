@@ -279,6 +279,18 @@ private:
     bool resolveReference(ReferencingType* ref);
 
     /**
+     * Tries to resolve the type reference of a StructuredMember object
+     * \a member. I
+     * If the reference cannot be resolved, \a ref is added to the
+     * _postponedTypes hash for later resolution.
+     * @param member the structured member to be resolved
+     * @param parent the structured type this member belongs to
+     * @return \c true if the type could be resolved, \c false if it was added
+     * to the _postponedTypes hash.
+     */
+    bool resolveReference(StructuredMember* member, Structured* parent);
+
+    /**
      * Tries to resolve the type references of all members of the Structured
      * object \a s.
      * If the reference of a member cannot be resolved, it is added to the
