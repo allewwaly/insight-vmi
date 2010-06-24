@@ -12,6 +12,8 @@
 #include "symfactory.h"
 #include "variable.h"
 #include "structured.h"
+#include "refbasetype.h"
+#include "pointer.h"
 
 
 #define queryError(x) do { throw QueryException((x), __FILE__, __LINE__); } while (0)
@@ -87,62 +89,78 @@ QString MemoryDump::query(const QString& queryString) const
         }
     }
     else {
-        // The first component must be a variable
-        QString first = components.first();
+        QStringList processed(components.first());
         components.pop_front();
-        Variable* v = _factory->findVarByName(first);
-        const ReferencingType* refType = dynamic_cast<const ReferencingType*>(v);
+
+        // The very first component must be a variable
+        Variable* v = _factory->findVarByName(processed.first());
 
         if (!v)
-            queryError(QString("Variable does not exist: %1").arg(first));
-        if (!v->refType())
-            queryError(QString("The type of variable \"%1\" is unresolved").arg(first));
+            queryError(QString("Variable does not exist: %1").arg(processed.first()));
 
         // We need to keep track of the offset
         size_t offset = v->offset();
+        // The "cursor" for resolving the type
+        const BaseType* b = v->refType();
+        // Keep track of ID of the last referenced type for error messages
+        int refTypeId = v->refTypeId();
 
-        if (!components.isEmpty()) {
-            // The first component must be a struct or union
-            const Structured* s = dynamic_cast<const Structured*>(v->refTypeDeep());
-            if (!s)
-                queryError(QString("Variable \"%1\" is not a struct or union").arg(first));
+        while ( b && (b->type() & ReferencingTypes) ) {
+            const RefBaseType* rbt = 0;
+            const Structured* s = 0;
 
-            QString processedQuery = first;
+            // Is this a referencing type?
+            if ( (rbt = dynamic_cast<const RefBaseType*>(b)) ) {
+                // Resolve pointer references
+                if (b->type() & (BaseType::rtArray|BaseType::rtPointer)) {
+                    const Pointer* p = dynamic_cast<const Pointer*>(rbt);
+                    offset = ((size_t) p->toPointer(_vmem, offset)) + p->macroExtraOffset();
+                }
+                b = rbt->refType();
+                refTypeId = rbt->refTypeId();
+            }
+            // Do we have queried components left?
+            else if ( !components.isEmpty() ) {
+                // Is this a struct or union?
+                if ( (s = dynamic_cast<const Structured*>(b)) ) {
+                    // Resolve member
+                    QString comp = components.front();
+                    components.pop_front();
 
-            // Resolve nested structs or unions
-            const StructuredMember* m = 0;
-            const BaseType* b = 0;
-            while (!components.isEmpty()) {
-                QString comp = components.front();
-                components.pop_front();
+                    const StructuredMember* m = s->findMember(comp);
+                    if (!m)
+                        queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(processed.join(".")).arg(comp));
 
-                if ( !(m = s->findMember(comp)) )
-                    queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(processedQuery).arg(comp));
-
-                processedQuery += "." + comp;
-
-                if (! (b = m->refTypeDeep()) )
-                    queryError(QString("The type of member \"%1\" is unresolved").arg(processedQuery));
-                else if ( !components.isEmpty() && !(s = dynamic_cast<const Structured*>(b)) )
-                    queryError(QString("Member \"%1\" is not a struct or union").arg(processedQuery));
-                else {
+                    processed.append(comp);
+                    b = m->refType();
+                    refTypeId = m->refTypeId();
                     // Update the offset
                     offset += m->offset();
                 }
+                // If there is nothing more to resolve, we're stuck
+                else {
+                    queryError(QString("Member \"%1\" is not a struct or union").arg(processed.join(".")));
+                }
+            }
+            // No components left and nothing more to resolve: we're done.
+            else {
+                break;
             }
 
-            refType = dynamic_cast<const ReferencingType*>(m);
-            ret = m->refType()->toString(_vmem, offset);
-        }
-        else {
-            ret += v->toString(_vmem);
+            // Make sure b still holds a valid reference
+            if (!b)
+                queryError(QString("The type 0x%2 of member \"%1\" is unresolved")
+                                .arg(processed.join("."))
+                                .arg(refTypeId, 0, 16));
         }
 
         QString s = QString("%1: ").arg(queryString);
-        if (refType->refType())
-            s += QString("%1 (ID 0x%2)").arg(refType->refType()->prettyName()).arg(refType->refTypeId(), 0, 16);
+        if (b) {
+            s += QString("%1 (ID 0x%2)").arg(b->prettyName()).arg(b->id(), 0, 16);
+            ret = b->toString(_vmem, offset);
+        }
         else
-            s += QString("(unresolved type 0x%1)").arg(refType->refTypeId(), 0, 16);
+            s += QString("(unresolved type 0x%1)").arg(refTypeId, 0, 16);
         s += QString(" @ 0x%1\n").arg(offset, _specs.sizeofUnsignedLong, 16);
 
         ret = s + ret;
