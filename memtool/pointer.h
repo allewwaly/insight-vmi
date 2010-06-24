@@ -42,6 +42,26 @@ public:
      * @return a string representation of this type
      */
     virtual QString toString(QIODevice* mem, size_t offset) const;
+
+    /**
+     * This returns the additional offset to consider when de-referencing this
+     * pointer.
+     * \sa setMacroOffset()
+     * @return additional offset
+     */
+    size_t macroExtraOffset() const;
+
+    /**
+     * This sets the additional offset to consider when de-referencing this
+     * pointer. It is required, for example, to cope with C macro tricks that
+     * the kernel uses for its linked lists (\c struct \c list_head) and hash
+     * tables.
+     * @param offset the additional offset
+     */
+    void setMacroExtraOffset(size_t offset);
+
+protected:
+    size_t _macroExtraOffset;  ///< Additional offset to consider when de-referencing this pointer
 };
 
 #endif /* POINTER_H_ */

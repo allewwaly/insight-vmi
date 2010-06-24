@@ -47,6 +47,7 @@ QString Array::prettyName() const
 
 QString Array::toString(QIODevice* mem, size_t offset) const
 {
+    // TODO fixme
     assert(_refType != 0);
 
 	// Is this possibly a string?
