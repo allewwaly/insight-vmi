@@ -606,6 +606,34 @@ bool SymFactory::resolveReference(ReferencingType* ref)
 }
 
 
+bool SymFactory::resolveReference(StructuredMember* member, Structured* parent)
+{
+    // TODO: filter out "list_head" structs and replace them by special pointers
+    return resolveReference(member);
+/*
+     assert(member != 0);
+
+    // Don't resolve already resolved types
+    if (member->refType())
+        return true;
+    // Don't try to resolve types without valid ID
+    else if (member->refTypeId() <= 0)
+        return false;
+
+    BaseType* base = 0;
+    if (! (base = findBaseTypeById(member->refTypeId())) ) {
+        // Add this type into the waiting queue
+        _postponedTypes.insert(member->refTypeId(), member);
+        return false;
+    }
+    else {
+        ref->setRefType(base);
+        return true;
+    }
+*/
+}
+
+
 bool SymFactory::resolveReferences(Structured* s)
 {
     assert(s != 0);
@@ -615,7 +643,7 @@ bool SymFactory::resolveReferences(Structured* s)
     for (int i = 0; i < s->members().size(); i++) {
         // This function adds all member to _postponedTypes whose
         // references could not be resolved.
-        if (!resolveReference(s->members().at(i)))
+        if (!resolveReference(s->members().at(i), s))
             ret = false;
     }
 
