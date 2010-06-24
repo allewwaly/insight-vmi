@@ -13,34 +13,6 @@
 #include "genericexception.h"
 #include "memspecs.h"
 
-#define virtualMemoryError(x) do { throw VirtualMemoryException((x), __FILE__, __LINE__); } while (0)
-
-/**
- * Exception class for virtual memory related errors
- * \sa KernelSymbols::Reader
- * \sa KernelSymbols::Writer
- */
-class VirtualMemoryException: public GenericException
-{
-public:
-    /**
-      Constructor
-      @param msg error message
-      @param file file name in which message was originally thrown
-      @param line line number at which message was originally thrown
-      @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
-     */
-    VirtualMemoryException(QString msg = QString(), const char* file = 0, int line = -1)
-        : GenericException(msg, file, line)
-    {
-    }
-
-    virtual ~VirtualMemoryException() throw()
-    {
-    }
-};
-
-
 /**
  * This class provides read access to a virtual address space and performs
  * the virtual to physical address translation.

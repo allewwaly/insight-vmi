@@ -6,6 +6,7 @@
  */
 
 #include "virtualmemory.h"
+#include "virtualmemoryexception.h"
 #include "debug.h"
 
 // Offsets of the components of a virtual address in x86_64

@@ -31,7 +31,8 @@ SOURCES += memspecs.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += memspecs.h \
+HEADERS += virtualmemoryexception.h \
+    memspecs.h \
     memspecparser.h \
     virtualmemory.h \
     ioexception.h \
