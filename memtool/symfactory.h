@@ -24,6 +24,8 @@ class Variable;
 #include "typeinfo.h"
 #include "genericexception.h"
 #include "structured.h"
+#include "memspecs.h"
+#include "pointer.h"
 
 // forward declaration
 class KernelSymbolReader;
@@ -105,7 +107,7 @@ public:
         rtLoading
     };
 
-	SymFactory();
+	SymFactory(const MemSpecs& memSpecs);
 
 	~SymFactory();
 
@@ -179,6 +181,15 @@ protected:
 		if (!t)
 		    genericError("Out of memory.");
 
+        // If this is an array or pointer, make sure their size is set
+        // correctly
+        if (info.symType() & (hsArrayType | hsPointerType)) {
+            Pointer* p = dynamic_cast<Pointer*>(t);
+            assert(p != 0);
+            if (p->size() == 0)
+                p->setSize(_memSpecs.sizeofUnsignedLong);
+        }
+
 		// Try to find the type based on its hash
 		VisitedSet visited;
 		uint hash = t->hash(&visited);
@@ -205,7 +216,7 @@ protected:
 		if (!foundByHash) {
 			// If this is a structured type, then try to resolve the referenced
 			// types of all members.
-			if (info.symType() & (hsStructureType | hsUnionType)) {
+            if (info.symType() & (hsStructureType | hsUnionType)) {
 				Structured* s = dynamic_cast<Structured*>(t);
 				assert(s != 0);
 				resolveReferences(s);
@@ -241,6 +252,14 @@ protected:
      * @return \c true if the IDs are different, \c false if the IDs are the same
      */
     bool isNewType(const int new_id, BaseType* type) const;
+
+    /**
+     * Checks if \a type represents the special type \c struct \c list_head.
+     * @param type the type to check
+     * @return \c true if \a type is \c struct \c list_head, or \c false
+     * otherwise
+     */
+    bool isStructListHead(const BaseType* type) const;
 
     /**
      * This is an overloaded convenience function.
@@ -322,6 +341,7 @@ private:
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
+	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
 
 	int _typeFoundByHash;
 };

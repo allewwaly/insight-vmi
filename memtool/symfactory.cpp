@@ -27,8 +27,8 @@
 
 //------------------------------------------------------------------------------
 
-SymFactory::SymFactory()
-	: _typeFoundByHash(0)
+SymFactory::SymFactory(const MemSpecs& memSpecs)
+	: _memSpecs(memSpecs), _typeFoundByHash(0)
 {
 }
 
@@ -333,6 +333,28 @@ bool SymFactory::isNewType(const int new_id, BaseType* type) const
     return new_id == type->id();
 }
 
+bool SymFactory::isStructListHead(const BaseType* type) const
+{
+    const Struct* s = dynamic_cast<const Struct*>(type);
+
+    if (!s)
+        return false;
+
+    // Check name and member size
+    if (s->name() != "list_head" || s->members().size() != 2)
+        return false;
+
+    // Check the members
+    const StructuredMember* next = s->members().at(0);
+    const StructuredMember* prev = s->members().at(1);
+    return next->name() == "next" &&
+           next->refType() &&
+           next->refType()->type() == BaseType::rtPointer &&
+           prev->name() == "prev" &&
+           prev->refType() &&
+           prev->refType()->type() == BaseType::rtPointer;
+}
+
 
 template<class T_key, class T_val>
 void SymFactory::relocateHashEntry(const T_key& old_key, const T_key& new_key,
@@ -608,11 +630,13 @@ bool SymFactory::resolveReference(ReferencingType* ref)
 
 bool SymFactory::resolveReference(StructuredMember* member, Structured* parent)
 {
+    assert(member != 0);
+    assert(parent != 0);
+
     // TODO: filter out "list_head" structs and replace them by special pointers
     return resolveReference(member);
-/*
-     assert(member != 0);
 
+/*
     // Don't resolve already resolved types
     if (member->refType())
         return true;

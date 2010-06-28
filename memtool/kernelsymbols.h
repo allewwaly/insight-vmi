@@ -88,8 +88,8 @@ public:
     const MemSpecs& memSpecs() const;
 
 private:
-	SymFactory _factory;
 	MemSpecs _memSpecs;
+    SymFactory _factory;
 };
 
 #endif /* KERNELSYMBOLS_H_ */
