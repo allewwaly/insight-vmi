@@ -130,6 +130,12 @@ public:
     virtual quint32 size() const;
 
     /**
+     * Sets the size of this type.
+     * @param size the new size in bytes
+     */
+    virtual void setSize(quint32 size);
+
+    /**
      * Reads a serialized version of this type from \a in.
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
@@ -356,10 +362,12 @@ protected:
      */
     inline void read(QIODevice* mem, char* data, qint64 maxSize) const
     {
+        qint64 ret;
         // Make sure we read the right amount of bytes
-        if (mem->read(data, maxSize) != maxSize) {
+        if ( (ret = mem->read(data, maxSize)) != maxSize) {
             throw MemAccessException(
-                    QString("Could not read %1 byte(s) from memory position 0x%2")
+                    QString("Could only read %1 of %2 byte(s) from memory position 0x%3")
+                        .arg(ret)
                         .arg(maxSize)
                         .arg(mem->pos(), 0, 16),
                     __FILE__,
