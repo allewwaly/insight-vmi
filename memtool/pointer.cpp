@@ -45,9 +45,7 @@ QString Pointer::prettyName() const
 
 QString Pointer::toString(QIODevice* mem, size_t offset) const
 {
-    quint64 p = (_size == 4) ?
-                value<quint32>(mem, offset) :
-                value<quint64>(mem, offset);
+    quint64 p = (quint64) toPointer(mem, offset);
 
     if (!p)
         return "NULL";
@@ -79,7 +77,7 @@ QString Pointer::toString(QIODevice* mem, size_t offset) const
         }
     }
 
-    QString ret = QString("0x%1").arg((quint32)p, (_size << 1), 16);
+    QString ret = QString("0x%1").arg((quint32)p, (_size << 1), 16, QChar('0'));
     if (!errMsg.isEmpty())
         ret += QString(" (%1)").arg(errMsg);
 
