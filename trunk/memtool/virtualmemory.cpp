@@ -138,8 +138,8 @@ qint64 VirtualMemory::readData (char* data, qint64 maxSize)
         if (!_physMem->seek(physAddr))
             virtualMemoryError(QString("Cannot seek to address 0x%1 "
                     "(translated from virtual address 0x%2")
-                    .arg(physAddr, 8, 16)
-                    .arg(_pos, 16, 16));
+                    .arg(physAddr, 8, 16, QChar('0'))
+                    .arg(_pos, _specs.sizeofUnsignedLong, 16, QChar('0')));
         // A page size of -1 means the address belongs to linear space
         if (pageSize < 0) {
             ret = _physMem->read(data, maxSize);
@@ -195,7 +195,7 @@ quint64 VirtualMemory::extractULongFromPhysMem(quint64 physaddr)
     quint32 ret32 = 0;
 
     if (!_physMem->seek(physaddr))
-        virtualMemoryError(QString("Cannot seek to physical address 0x%1").arg(physaddr, 8, 16));
+        virtualMemoryError(QString("Cannot seek to physical address 0x%1").arg(physaddr, 8, 16, QChar('0')));
 
     switch (_specs.sizeofUnsignedLong) {
 
@@ -210,7 +210,7 @@ quint64 VirtualMemory::extractULongFromPhysMem(quint64 physaddr)
         break;
 
     default:
-        virtualMemoryError(QString("Illegal size for unsinged long: %1").arg(_specs.sizeofUnsignedLong));
+        virtualMemoryError(QString("Illegal size for unsigned long: %1").arg(_specs.sizeofUnsignedLong));
     }
 
     // We don't come here if the operation succeeded
@@ -266,7 +266,7 @@ quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
     if (!(pml4 & _PAGE_PRESENT)) {
         virtualMemoryError(
                 QString("Error reading from virtual address 0x%1: page not present in mpl4")
-                    .arg(vaddr, 8, 16));
+                    .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
     }
 
     pgd_paddr = (pml4) & PHYSICAL_PAGE_MASK;
@@ -278,7 +278,7 @@ quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
     if (!(pgd & _PAGE_PRESENT)) {
         virtualMemoryError(
                 QString("Error reading from virtual address 0x%1: page not present in pgd")
-                    .arg(vaddr, 8, 16));
+                    .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
     }
 
     pmd_paddr = pgd & PHYSICAL_PAGE_MASK;
@@ -290,7 +290,7 @@ quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
     if (!(pmd & _PAGE_PRESENT)) {
         virtualMemoryError(
                 QString("Error reading from virtual address 0x%1: page not present in pmd")
-                    .arg(vaddr, 8, 16));
+                    .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
     }
 
     quint64 physaddr = 0;
@@ -310,7 +310,7 @@ quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
         if (!(pte & (_PAGE_PRESENT))) {
             virtualMemoryError(
                     QString("Error reading from virtual address 0x%1: page not present in pte")
-                        .arg(vaddr, 8, 16));
+                        .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
         }
 
         *pageSize = KPAGE_SIZE;
@@ -343,8 +343,24 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
         if (vaddr >= _specs.startKernelMap) {
             physaddr = ((vaddr) - _specs.startKernelMap);
         }
-        else {
+        else if (vaddr >= _specs.pageOffset) {
             physaddr = ((vaddr) - _specs.pageOffset);
+        }
+        else {
+            // Is the address in canonical form?
+            if (_specs.arch == MemSpecs::x86_64) {
+                quint64 high_bits = 0xFFFF800000000000UL & vaddr;
+                if (high_bits != 0 && high_bits != 0xFFFF800000000000UL)
+                    virtualMemoryError(
+                                    QString("Virtual address 0x%1 is not in canonical form")
+                                        .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
+            }
+
+            virtualMemoryError(
+                            QString("Error reading from virtual address 0x%1: "
+                                    "address below linear offsets, seems to be "
+                                    "user-land memory")
+                                .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
         }
         *pageSize = -1;
     }
