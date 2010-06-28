@@ -14,6 +14,7 @@
 #include "compileunit.h"
 #include "variable.h"
 #include "refbasetype.h"
+#include "enum.h"
 #include "kernelsymbols.h"
 #include "programoptions.h"
 #include "memorydump.h"
@@ -925,6 +926,21 @@ int Shell::cmdShowBaseType(const BaseType* t)
 		}
 	}
 
+	const Enum* e = dynamic_cast<const Enum*>(t);
+	if (e) {
+        _out << "  Enumerators:    " << e->enumValues().size() << endl;
+
+        QList<Enum::EnumHash::key_type> keys = e->enumValues().keys();
+        qSort(keys);
+
+        for (int i = 0; i < keys.size(); i++) {
+            _out << "    "
+                    << qSetFieldWidth(30) << left << e->enumValues().value(keys[i])
+                    << qSetFieldWidth(0) << " = " << keys[i]
+                    << endl;
+        }
+	}
+
 	return 0;
 }
 
@@ -977,6 +993,7 @@ int Shell::cmdSymbols(QStringList args)
 
     return 0;
 }
+
 
 int Shell::cmdSymbolsParse(QStringList args)
 {
