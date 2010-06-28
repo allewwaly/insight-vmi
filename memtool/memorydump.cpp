@@ -113,6 +113,15 @@ QString MemoryDump::query(const QString& queryString) const
             if ( (rbt = dynamic_cast<const RefBaseType*>(b)) ) {
                 // Resolve pointer references
                 if (b->type() & (BaseType::rtArray|BaseType::rtPointer)) {
+                    // If this is a a type "char*", treat it as a string
+                    if (components.isEmpty() &&
+                        rbt->refType() &&
+                        rbt->refType()->type() == BaseType::rtInt8)
+                    {
+                        // Stop here, the b->toString() later on will print b as string
+                        break;
+                    }
+                    // Otherwise resolve pointer reference
                     const Pointer* p = dynamic_cast<const Pointer*>(rbt);
                     offset = ((size_t) p->toPointer(_vmem, offset)) + p->macroExtraOffset();
                 }
