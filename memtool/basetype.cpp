@@ -75,16 +75,10 @@ quint32 BaseType::size() const
 }
 
 
-//void BaseType::setMemory(QIODevice *memory)
-//{
-//    _memory = memory;
-//}
-//
-//
-//QIODevice* BaseType::memory() const
-//{
-//    return _memory;
-//}
+void BaseType::setSize(quint32 size)
+{
+    _size = size;
+}
 
 
 BaseType::RealTypeRevMap BaseType::getRealTypeRevMap()
