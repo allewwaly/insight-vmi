@@ -73,11 +73,17 @@ QString Pointer::toString(QIODevice* mem, size_t offset) const
             return QString("\"%1\"").arg(buf);
         }
         catch (VirtualMemoryException e) {
-            errMsg = "illegal address";
+            errMsg = "illegal address: " + e.message;
+        }
+        catch (MemAccessException e) {
+            errMsg = "illegal address: " + e.message;
         }
     }
 
-    QString ret = QString("0x%1").arg((quint32)p, (_size << 1), 16, QChar('0'));
+    QString ret = (_size == 4) ?
+            QString("0x%1").arg((quint32)p, (_size << 1), 16, QChar('0')) :
+            QString("0x%1").arg(p, (_size << 1), 16, QChar('0'));
+
     if (!errMsg.isEmpty())
         ret += QString(" (%1)").arg(errMsg);
 
