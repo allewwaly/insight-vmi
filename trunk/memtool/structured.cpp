@@ -17,6 +17,8 @@ Structured::Structured()
 Structured::Structured(const TypeInfo& info)
 	: BaseType(info), _members(info.members())
 {
+    for (int i = 0; i < _members.size(); i++)
+        _members[i]->_belongsTo = this;
 }
 
 
@@ -58,6 +60,7 @@ uint Structured::hash(VisitedSet* visited) const
 
 void Structured::addMember(StructuredMember* member)
 {
+    member->_belongsTo = this;
 	_members.append(member);
 }
 

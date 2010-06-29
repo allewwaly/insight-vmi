@@ -10,13 +10,14 @@
 #include "debug.h"
 
 StructuredMember::StructuredMember()
-    : _offset(0)
+    : _offset(0), _belongsTo(0)
 {
 }
 
 
 StructuredMember::StructuredMember(const TypeInfo& info)
-	: Symbol(info), ReferencingType(info), SourceRef(info), _offset(info.dataMemberLocation())
+	: Symbol(info), ReferencingType(info), SourceRef(info),
+	  _offset(info.dataMemberLocation()), _belongsTo(0)
 {
 }
 
@@ -24,6 +25,18 @@ StructuredMember::StructuredMember(const TypeInfo& info)
 size_t StructuredMember::offset() const
 {
 	return _offset;
+}
+
+
+void StructuredMember::setOffset(size_t offset)
+{
+    _offset = offset;
+}
+
+
+Structured* StructuredMember::belongsTo() const
+{
+    return _belongsTo;
 }
 
 

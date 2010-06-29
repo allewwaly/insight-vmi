@@ -13,8 +13,13 @@
 #include "sourceref.h"
 #include "symbol.h"
 
+class Structured;
+
+
 class StructuredMember: public Symbol, public ReferencingType, public SourceRef
 {
+    friend class Structured;
+
 public:
     /**
      * Constructor
@@ -31,6 +36,12 @@ public:
      * @return the offset of this member within a struct or union
      */
     size_t offset() const;
+
+    /**
+     * Sets a new value for the offset.
+     * @param offset the new offset
+     */
+    void setOffset(size_t offset);
 
     /**
      * This gives a pretty name of that type which may involve referencing
@@ -53,8 +64,14 @@ public:
      */
     virtual void writeTo(QDataStream& out) const;
 
+    /**
+     * @return the Struct or Union this member belongs to
+     */
+    Structured* belongsTo() const;
+
 private:
-	size_t _offset;        ///< the member's offset within the struct;
+	size_t _offset;          ///< the member's offset within the struct;
+	Structured* _belongsTo;  ///< Struct or Union this member belongs to
 };
 
 
