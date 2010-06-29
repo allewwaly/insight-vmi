@@ -12,6 +12,14 @@
 #include <QDataStream>
 
 /**
+ * Special IDs for special symbol types
+ */
+enum SpecialIds {
+    siListHead = 0x7FFFFFFF      ///< kernel linked list (struct list_head)
+};
+
+
+/**
  * This class represents a generic debugging symbol read from the objdump output.
  */
 class Symbol
@@ -52,9 +60,15 @@ public:
     virtual QString prettyName() const;
 
     /**
-      @return id ID of this type, as given by objdump output
+     * @return id ID of this type, as given by objdump output
      */
     int id() const;
+
+    /**
+     * Sets the ID of this type
+     * @param id new ID
+     */
+    void setId(int id);
 
     /**
      * Reads a serialized version of this object from \a in.
