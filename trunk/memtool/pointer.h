@@ -61,6 +61,8 @@ public:
     void setMacroExtraOffset(size_t offset);
 
 protected:
+    // Doesn't need to be saved in writeTo() because it's only set when creating
+    // special struct types.
     size_t _macroExtraOffset;  ///< Additional offset to consider when de-referencing this pointer
 };
 
