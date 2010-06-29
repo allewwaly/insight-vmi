@@ -84,13 +84,26 @@ void KernelSymbolWriter::write()
 
         // Write list of types
         out << (qint32) _factory->types().size();
-        for (int i = 0; i < _factory->types().size(); i++) {
-            BaseType* t = _factory->types().at(i);
-            out << (qint32) t->type();
-            out << *t;
-            // Remember which types we have written out
-            written_types.insert(t->id());
-            checkOperationProgress();
+
+        // Make three rounds: first write elementary types, then the
+        // simple referencing types, finally the structs and unions
+        for (int round = 0; round < 3; ++round) {
+            int mask = ElementaryTypes;
+            switch (round) {
+            case 1: mask = ReferencingTypes & ~(BaseType::rtStruct|BaseType::rtUnion); break;
+            case 2: mask = (BaseType::rtStruct|BaseType::rtUnion); break;
+            }
+
+            for (int i = 0; i < _factory->types().size(); i++) {
+                BaseType* t = _factory->types().at(i);
+                if (t->type() & mask) {
+                    out << (qint32) t->type();
+                    out << *t;
+                    // Remember which types we have written out
+                    written_types.insert(t->id());
+                }
+                checkOperationProgress();
+            }
         }
 
         // Write list of missing types by ID
