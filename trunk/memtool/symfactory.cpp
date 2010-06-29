@@ -19,6 +19,7 @@
 #include "funcpointer.h"
 #include "compileunit.h"
 #include "variable.h"
+#include "shell.h"
 #include "debug.h"
 #include <string.h>
 
@@ -28,7 +29,7 @@
 //------------------------------------------------------------------------------
 
 SymFactory::SymFactory(const MemSpecs& memSpecs)
-	: _memSpecs(memSpecs), _typeFoundByHash(0)
+	: _memSpecs(memSpecs), _typeFoundByHash(0), _structListHeadCount(0)
 {
 }
 
@@ -67,8 +68,17 @@ void SymFactory::clear()
 	_typesByHash.clear();
 	_postponedTypes.clear();
 
+    // Delete all helper types
+    for (BaseTypeList::iterator it = _helperTypes.begin();
+            it != _helperTypes.end(); ++it)
+    {
+        delete *it;
+    }
+    _helperTypes.clear();
+
 	// Reset other vars
 	_typeFoundByHash = 0;
+	_structListHeadCount = 0;
 }
 
 
@@ -347,12 +357,14 @@ bool SymFactory::isStructListHead(const BaseType* type) const
     // Check the members
     const StructuredMember* next = s->members().at(0);
     const StructuredMember* prev = s->members().at(1);
-    return next->name() == "next" &&
-           next->refType() &&
-           next->refType()->type() == BaseType::rtPointer &&
-           prev->name() == "prev" &&
-           prev->refType() &&
-           prev->refType()->type() == BaseType::rtPointer;
+    return s->id() == siListHead ||
+           (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
+            next->name() == "next" &&
+            (!next->refType() ||
+             next->refType()->type() == BaseType::rtPointer) &&
+            prev->name() == "prev" &&
+            (!prev->refType() ||
+             prev->refType()->type() == BaseType::rtPointer));
 }
 
 
@@ -410,28 +422,37 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
 		while (it != list.end())
 		{
 			ReferencingType* t = *it;
-            RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
-            uint hash = 0, old_hash = 0;
+            StructuredMember* m = dynamic_cast<StructuredMember*>(t);
 
-			// Is this a Variable or a RefBaseType?
-			if (rbt) {
-			    // Get previous hash and name of type
-			    visited.clear();
-			    old_hash = rbt->hash(&visited);
-			}
+            // If this is a StructuredMember, use the special resolveReference()
+            // function to handle "struct list_head" and the like.
+            if (m) {
+                assert(resolveReference(m) == true);
+            }
+            else {
+                RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
+                uint hash = 0, old_hash = 0;
 
-			// Add the missing reference according to type
-			t->setRefType(target);
+                // If this a RefBaseType, we need to save the old hash
+                if (rbt) {
+                    // Get previous hash and name of type
+                    visited.clear();
+                    old_hash = rbt->hash(&visited);
+                }
 
-            // For a RefBaseType only, not for a Variable:
-			// Remove type at its old index, re-add it at its new index
-            if (rbt) {
-                // Calculate new hash of type
-                visited.clear();
-                hash = rbt->hash(&visited);
-                // Did the hash change?
-                if (hash != old_hash)
-                    relocateHashEntry(old_hash, hash, dynamic_cast<BaseType*>(rbt), &_typesByHash);
+                // Add the missing reference according to type
+                t->setRefType(target);
+
+                // For a RefBaseType only, not for a Variable/StructuredMember:
+                // Remove type at its old index, re-add it at its new index
+                if (rbt) {
+                    // Calculate new hash of type
+                    visited.clear();
+                    hash = rbt->hash(&visited);
+                    // Did the hash change?
+                    if (hash != old_hash)
+                        relocateHashEntry(old_hash, hash, (BaseType*)rbt, &_typesByHash);
+                }
             }
 			++it;
 		}
@@ -628,15 +649,58 @@ bool SymFactory::resolveReference(ReferencingType* ref)
 }
 
 
-bool SymFactory::resolveReference(StructuredMember* member, Structured* parent)
+Struct* SymFactory::makeStructListHead(StructuredMember* member)
 {
     assert(member != 0);
-    assert(parent != 0);
 
-    // TODO: filter out "list_head" structs and replace them by special pointers
-    return resolveReference(member);
+    // Create a new struct a special ID. This way, the type will be recognized
+    // as "struct list_head" when the symbols are stored and loaded again.
+    Struct* ret = new Struct();
+    Structured* parent = member->belongsTo();
 
-/*
+    ret->setName("list_head");
+    ret->setId(siListHead);
+    ret->setSize(2 * _memSpecs.sizeofUnsignedLong);
+
+    // Create "next" pointer
+    Pointer* pnext = new Pointer();
+    pnext->setId(0);
+    pnext->setRefTypeId(parent->id());
+    pnext->setRefType(parent);
+    pnext->setSize(_memSpecs.sizeofUnsignedLong);
+    // To dereference this pointer, the member's offset has to be subtracted
+    pnext->setMacroExtraOffset(- member->offset());
+
+    StructuredMember* next = new StructuredMember();
+    next->setId(0);
+    next->setName("next");
+    next->setOffset(0);
+    next->setRefTypeId(pnext->id());
+    next->setRefType(pnext);
+    ret->addMember(next);
+
+    //Create "prev" pointer
+    Pointer* pprev = new Pointer(*pnext);
+    StructuredMember* prev = new StructuredMember();
+    prev->setId(0);
+    prev->setName("prev");
+    prev->setOffset(_memSpecs.sizeofUnsignedLong);
+    prev->setRefTypeId(pprev->id());
+    prev->setRefType(pprev);
+    ret->addMember(prev);
+
+    _helperTypes.append(pnext);
+    _helperTypes.append(pprev);
+    _helperTypes.append(ret);
+
+    return ret;
+}
+
+
+bool SymFactory::resolveReference(StructuredMember* member)
+{
+    assert(member != 0);
+
     // Don't resolve already resolved types
     if (member->refType())
         return true;
@@ -644,17 +708,18 @@ bool SymFactory::resolveReference(StructuredMember* member, Structured* parent)
     else if (member->refTypeId() <= 0)
         return false;
 
-    BaseType* base = 0;
-    if (! (base = findBaseTypeById(member->refTypeId())) ) {
-        // Add this type into the waiting queue
-        _postponedTypes.insert(member->refTypeId(), member);
-        return false;
-    }
-    else {
-        ref->setRefType(base);
+    BaseType* base = findBaseTypeById(member->refTypeId());
+
+    if (member->refTypeId() == siListHead || isStructListHead(base)) {
+        Struct* list_head = makeStructListHead(member);
+        member->setRefType(list_head);
+        member->setRefTypeId(list_head->id());
+        _structListHeadCount++;
         return true;
     }
-*/
+    else
+        // Fall back to the generic resolver
+        return resolveReference((ReferencingType*)member);
 }
 
 
@@ -667,7 +732,7 @@ bool SymFactory::resolveReferences(Structured* s)
     for (int i = 0; i < s->members().size(); i++) {
         // This function adds all member to _postponedTypes whose
         // references could not be resolved.
-        if (!resolveReference(s->members().at(i), s))
+        if (!resolveReference(s->members().at(i)))
             ret = false;
     }
 
@@ -677,29 +742,34 @@ bool SymFactory::resolveReferences(Structured* s)
 
 void SymFactory::symbolsFinished(RestoreType rt)
 {
-    std::cout << "Statistics:" << std::endl;
+    shell->out() << "Statistics:" << endl;
 
-    std::cout << "  | No. of types:             " << std::setw(10) << std::right << _types.size() << std::endl;
-    std::cout << "  | No. of types by name:     " << std::setw(10) << std::right << _typesByName.size() << std::endl;
-    std::cout << "  | No. of types by ID:       " << std::setw(10) << std::right << _typesById.size() << std::endl;
-    std::cout << "  | No. of types by hash:     " << std::setw(10) << std::right << _typesByHash.size() << std::endl;
-//    std::cout << "  | Types found by hash:      " << std::setw(10) << std::right << _typeFoundByHash << std::endl;
-//    std::cout << "  | Postponed types:          " << std::setw(10) << std::right << _postponedTypes.size() << std::endl;
-    std::cout << "  | No. of variables:         " << std::setw(10) << std::right << _vars.size() << std::endl;
-    std::cout << "  | No. of variables by ID:   " << std::setw(10) << std::right << _varsById.size() << std::endl;
-    std::cout << "  | No. of variables by name: " << std::setw(10) << std::right << _varsByName.size() << std::endl;
+    shell->out() << qSetFieldWidth(10) << right;
+
+    shell->out() << "  | No. of types:             " << _types.size() << endl;
+    shell->out() << "  | No. of types by name:     " << _typesByName.size() << endl;
+    shell->out() << "  | No. of types by ID:       " << _typesById.size() << endl;
+    shell->out() << "  | No. of types by hash:     " << _typesByHash.size() << endl;
+//    shell->out() << "  | Types found by hash:      " << _typeFoundByHash << endl;
+    shell->out() << "  | No of \"struct list_head\": " << _structListHeadCount << endl;
+//    shell->out() << "  | Postponed types:          " << << _postponedTypes.size() << endl;
+    shell->out() << "  | No. of variables:         " << _vars.size() << endl;
+    shell->out() << "  | No. of variables by ID:   " << _varsById.size() << endl;
+    shell->out() << "  | No. of variables by name: " << _varsByName.size() << endl;
+
+    shell->out() << qSetFieldWidth(0) << left;
 
 	if (!_postponedTypes.isEmpty()) {
-		std::cout << "  | The following types still have unresolved references:" << std::endl;
+		shell->out() << "  | The following types still have unresolved references:" << endl;
 		QList<int> keys = _postponedTypes.uniqueKeys();
 		qSort(keys);
 		for (int i = 0; i < keys.size(); i++) {
 			int key = keys[i];
-			std::cout << QString("  |   missing id: 0x%1, %2 element(s)\n").arg(key, 0, 16).arg(_postponedTypes.count(key));
+			shell->out() << QString("  |   missing id: 0x%1, %2 element(s)\n").arg(key, 0, 16).arg(_postponedTypes.count(key));
 		}
 	}
 
-    std::cout << "  `-------------------------------------------" << std::endl;
+    shell->out() << "  `-------------------------------------------" << endl;
 
     // Some sanity checks on the numbers
     assert(_typesById.size() >= _types.size());
@@ -707,6 +777,6 @@ void SymFactory::symbolsFinished(RestoreType rt)
     assert(_typesById.size() >= _typesByHash.size());
     assert(_typesByHash.size() == _types.size());
     if (rt == rtParsing)
-    assert(_types.size() + _typeFoundByHash == _typesById.size());
+        assert(_types.size() + _typeFoundByHash == _typesById.size());
 }
 
