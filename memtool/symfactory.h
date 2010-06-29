@@ -287,7 +287,19 @@ protected:
 	void insert(Variable* var);
 
 private:
-    /**
+	/**
+	 * Generates a working "struct list_head" from a given, generic one.
+	 *
+	 * It creates a new Struct object from \a member->refType() with exactly
+	 * two members: two Pointer objects "next" and "prev" which point to the
+	 * type of \a parent. In addition, the Pointer::macroExtraOffset() is
+	 * set accordingly.	 *
+	 * @param member the StructuredMember to create a "struct list_head" from
+	 * @return
+	 */
+	Struct* makeStructListHead(StructuredMember* member);
+
+	/**
      * Tries to resolve the type reference of a ReferencingType object \a ref.
      * If the reference cannot be resolved, \a ref is added to the
      * _postponedTypes hash for later resolution.
@@ -300,14 +312,13 @@ private:
     /**
      * Tries to resolve the type reference of a StructuredMember object
      * \a member. I
-     * If the reference cannot be resolved, \a ref is added to the
+     * If the reference cannot be resolved, \a member is added to the
      * _postponedTypes hash for later resolution.
      * @param member the structured member to be resolved
-     * @param parent the structured type this member belongs to
      * @return \c true if the type could be resolved, \c false if it was added
      * to the _postponedTypes hash.
      */
-    bool resolveReference(StructuredMember* member, Structured* parent);
+    bool resolveReference(StructuredMember* member);
 
     /**
      * Tries to resolve the type references of all members of the Structured
@@ -336,14 +347,16 @@ private:
 	VariableList _vars;               ///< Holds all Variable objects
 	VariableStringHash _varsByName;   ///< Holds all Variable objects, indexed by name
 	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
-	BaseTypeList _types;              ///< Holds all BaseType objects
+	BaseTypeList _types;              ///< Holds all BaseType objects which were parsed or read from symbol files
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
+    BaseTypeList _helperTypes;        ///< Holds all extra types which were created for internal purposes
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
 	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
 
 	int _typeFoundByHash;
+	int _structListHeadCount;
 };
 
 #endif /* TYPEFACTORY_H_ */
