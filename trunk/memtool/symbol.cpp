@@ -48,6 +48,12 @@ int Symbol::id() const
 }
 
 
+void Symbol::setId(int id)
+{
+    _id = id;
+}
+
+
 void Symbol::readFrom(QDataStream& in)
 {
     in >> _id >> _name;
