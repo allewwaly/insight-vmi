@@ -61,6 +61,17 @@ public:
     void setMacroExtraOffset(size_t offset);
 
 protected:
+    /**
+     * Reads a zero-terminated string of max. length \a len from \a mem at
+     * address \a offset.
+     * @param mem the memory device to read from
+     * @param offset the address to read from
+     * @param len the max. length of the string (if not zero-terminated)
+     * @param errMsg any error messages are returned here
+     * @return the read string
+     */
+    QString readString(QIODevice* mem, size_t offset, const int len, QString* errMsg) const;
+
     // Doesn't need to be saved in writeTo() because it's only set when creating
     // special struct types.
     size_t _macroExtraOffset;  ///< Additional offset to consider when de-referencing this pointer

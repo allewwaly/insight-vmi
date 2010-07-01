@@ -6,6 +6,7 @@
  */
 
 #include "array.h"
+#include "virtualmemoryexception.h"
 #include "debug.h"
 
 Array::Array()
@@ -47,12 +48,16 @@ QString Array::prettyName() const
 
 QString Array::toString(QIODevice* mem, size_t offset) const
 {
-    // TODO fixme
     assert(_refType != 0);
+
+    QString errMsg;
 
 	// Is this possibly a string?
     if (_refType && _refType->type() == rtInt8) {
-        return Pointer::toString(mem, offset);
+        QString s = readString(mem, offset, _length > 0 ? _length : 256, &errMsg);
+
+        if (errMsg.isEmpty())
+            return QString("\"%1\"").arg(s);
     }
     else {
         if (_length >= 0) {
@@ -69,6 +74,8 @@ QString Array::toString(QIODevice* mem, size_t offset) const
         else
             return "(...)";
     }
+
+    return errMsg;
 }
 
 

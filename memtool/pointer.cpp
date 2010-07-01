@@ -8,6 +8,7 @@
 #include "pointer.h"
 #include <string.h>
 #include "virtualmemoryexception.h"
+#include "debug.h"
 
 Pointer::Pointer()
     : _macroExtraOffset(0)
@@ -45,6 +46,8 @@ QString Pointer::prettyName() const
 
 QString Pointer::toString(QIODevice* mem, size_t offset) const
 {
+    assert(_refType != 0);
+
     quint64 p = (quint64) toPointer(mem, offset);
 
     if (!p)
@@ -54,30 +57,9 @@ QString Pointer::toString(QIODevice* mem, size_t offset) const
 
     // Is this possibly a string?
     if (_refType && _refType->type() == rtInt8) {
-        // Setup a buffer, at most 1024 bytes long
-        const int bufSize = 1024;
-        char buf[bufSize];
-        memset(buf, 0, bufSize);
-        // We expect exceptions here
-        try {
-            // Read the data such that the result is always null-terminated
-            seek(mem, p);
-            read(mem, buf, bufSize-1);
-            // Limit to ASCII characters
-            for (int i = 0; i < bufSize-1; i++) {
-                if (buf[i] == 0)
-                    break;
-                else if ( (buf[i] & 0x80) || !(buf[i] & 0x60) ) // buf[i] >= 128 || buf[i] < 32
-                    buf[i] = '.';
-            }
-            return QString("\"%1\"").arg(buf);
-        }
-        catch (VirtualMemoryException e) {
-            errMsg = "illegal address: " + e.message;
-        }
-        catch (MemAccessException e) {
-            errMsg = "illegal address: " + e.message;
-        }
+        QString s = readString(mem, p, 255, &errMsg);
+        if (errMsg.isEmpty())
+            return QString("\"%1\"").arg(s);
     }
 
     QString ret = (_size == 4) ?
@@ -88,6 +70,36 @@ QString Pointer::toString(QIODevice* mem, size_t offset) const
         ret += QString(" (%1)").arg(errMsg);
 
     return ret;
+}
+
+
+QString Pointer::readString(QIODevice* mem, size_t offset, const int len, QString* errMsg) const
+{
+    // Setup a buffer, at most 1024 bytes long
+    char buf[len + 1];
+    memset(buf, 0, len + 1);
+    // We expect exceptions here
+    try {
+        // Read the data such that the result is always null-terminated
+        seek(mem, offset);
+        read(mem, buf, len);
+        // Limit to ASCII characters
+        for (int i = 0; i < len; i++) {
+            if (buf[i] == 0)
+                break;
+            else if ( (buf[i] & 0x80) || !(buf[i] & 0x60) ) // buf[i] >= 128 || buf[i] < 32
+                buf[i] = '.';
+        }
+        return QString(buf);
+    }
+    catch (VirtualMemoryException e) {
+        *errMsg = e.message;
+    }
+    catch (MemAccessException e) {
+        *errMsg = e.message;
+    }
+
+    return QString();
 }
 
 
