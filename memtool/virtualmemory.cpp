@@ -51,13 +51,11 @@
 VirtualMemory::VirtualMemory(MemSpecs specs, QIODevice* physMem)
     : _tlb(1000), _physMem(physMem), _specs(specs), _pos(-1)
 {
-    // TODO Auto-generated constructor stub
-
 }
+
 
 VirtualMemory::~VirtualMemory()
 {
-    // TODO Auto-generated destructor stub
 }
 
 
@@ -363,7 +361,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
                             QString("Error reading from virtual address 0x%1: "
                                     "address below linear offsets, seems to be "
                                     "user-land memory")
-                                .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
+                                .arg(vaddr, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
         }
         *pageSize = -1;
     }
