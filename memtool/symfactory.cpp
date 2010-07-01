@@ -662,6 +662,16 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     ret->setId(siListHead);
     ret->setSize(2 * _memSpecs.sizeofUnsignedLong);
 
+    // Which macro offset should be used? In the kernel, the "childen" list_head
+    // in the struct "task_struct" actually points to the next "sibling", not
+    // to the next "children". So we catch special cases like this here.
+    size_t extraOffset = -member->offset();
+    if (member->name() == "children") {
+        StructuredMember *sibling = parent->findMember("sibling");
+        if (sibling)
+            extraOffset = -sibling->offset();
+    }
+
     // Create "next" pointer
     Pointer* pnext = new Pointer();
     pnext->setId(0);
@@ -669,7 +679,7 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     pnext->setRefType(parent);
     pnext->setSize(_memSpecs.sizeofUnsignedLong);
     // To dereference this pointer, the member's offset has to be subtracted
-    pnext->setMacroExtraOffset(- member->offset());
+    pnext->setMacroExtraOffset(extraOffset);
 
     StructuredMember* next = new StructuredMember();
     next->setId(0);
