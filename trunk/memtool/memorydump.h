@@ -79,6 +79,8 @@ public:
 
     QString query(const QString& queryString) const;
 
+    QString dump(const QString& type, quint64 address) const;
+
 private:
     void init();
 

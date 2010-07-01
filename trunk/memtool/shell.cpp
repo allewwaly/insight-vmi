@@ -62,7 +62,10 @@ Shell::Shell(KernelSymbols& symbols)
                 "  memory load   <file_name>   Load a memory dump\n"
                 "  memory unload <file_name>   Unload a memory dump by file name\n"
                 "  memory unload <file_index>  Unload a memory dump by its index\n"
-                "  memory list                 Show the loaded memory dumps"));
+                "  memory list                 Show the loaded memory dumps\n"
+                "  memory query [index] <expr> Show the loaded memory dumps\n"
+                "  memory dump [index] <type> @ <address\n"
+                "                              Show the loaded memory dumps"));
 
     _commands.insert("show",
             Command(
@@ -697,6 +700,9 @@ int Shell::cmdMemory(QStringList args)
     else if (QString("query").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryQuery(args);
     }
+    else if (QString("dump").startsWith(action) && (action.size() >= 1)) {
+        return cmdMemoryDump(args);
+    }
     else
         return cmdHelp(QStringList("memory"));
 
@@ -828,6 +834,45 @@ int Shell::cmdMemoryQuery(QStringList args)
     // Perform the query
     else
         _out << _memDumps[index]->query(args.join(" ")) << endl;
+
+    return 0;
+}
+
+
+int Shell::cmdMemoryDump(QStringList args)
+{
+    // See if we got an index to a specific memory dump
+    bool ok = false;
+    int index = (args.size() > 0) ? (args[0].toInt(&ok) - 1) : -1;
+    if (ok) {
+        args.pop_front();
+        // Check the bounds
+        if (index < 0 || index >= _memDumps.size() || !_memDumps[index]) {
+            _err << "Memory dump index " << index + 1 << " does not exist." << endl;
+            return 0;
+        }
+    }
+    // Otherwise use the first valid index
+    else {
+        for (int i = 0; i < _memDumps.size() && index < 0; ++i)
+            if (_memDumps[i])
+                index = i;
+    }
+    // No memory dumps loaded at all?
+    if (index < 0)
+        _err << "No memory dumps loaded." << endl;
+    // Perform the dump
+    else {
+        QRegExp re("^\\s*([^@\\s]+)\\s*@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
+
+        if (!re.exactMatch(args.join(" "))) {
+            _err << "Usage: memory dump [index] <char|int|long> @ <address>" << endl;
+            return 0;
+        }
+
+        quint64 addr = re.cap(2).toULong(&ok, 16);
+        _out << _memDumps[index]->dump(re.cap(1), addr) << endl;
+    }
 
     return 0;
 }

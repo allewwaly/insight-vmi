@@ -129,6 +129,7 @@ private:
     int cmdMemoryUnload(QStringList args);
     int cmdMemoryList(QStringList args);
     int cmdMemoryQuery(QStringList args);
+    int cmdMemoryDump(QStringList args);
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t);
     int cmdShowVariable(const Variable* v);
