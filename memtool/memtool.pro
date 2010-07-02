@@ -1,4 +1,5 @@
-SOURCES += memspecs.cpp \
+SOURCES += instance.cpp \
+    memspecs.cpp \
     memspecparser.cpp \
     virtualmemory.cpp \
     memorydump.cpp \
@@ -31,7 +32,8 @@ SOURCES += memspecs.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += virtualmemoryexception.h \
+HEADERS += instance.h \
+    virtualmemoryexception.h \
     memspecs.h \
     memspecparser.h \
     virtualmemory.h \

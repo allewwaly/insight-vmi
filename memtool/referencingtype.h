@@ -9,6 +9,7 @@
 #define REFERENCINGTYPE_H_
 
 #include "typeinfo.h"
+#include "instance.h"
 
 class BaseType;
 
@@ -76,6 +77,16 @@ public:
     virtual void writeTo(QDataStream& out) const;
 
 protected:
+    /**
+     * Creates an Instance object of the \e referenced type.
+     * @param address the address of the instance within \a vmem
+     * @param vmem the virtual memory object to read data from
+     * @param name the name of this instance
+     * @return an Instace object for this member
+     */
+    InstancePointer createRefInstance(size_t address, VirtualMemory* vmem,
+    		const QString& namePrefix = QString()) const;
+
 	const BaseType *_refType;  ///< holds the type this object is referencing
     int _refTypeId;            ///< holds ID of the type this object is referencing
 };

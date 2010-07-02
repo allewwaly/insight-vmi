@@ -5,8 +5,8 @@
  *      Author: chrschn
  */
 
-#ifndef INSTANCE_H_
-#define INSTANCE_H_
+#ifndef VARIABLE_H_
+#define VARIABLE_H_
 
 #include <sys/types.h>
 #include <QVariant>
@@ -14,6 +14,7 @@
 #include "referencingtype.h"
 #include "sourceref.h"
 #include "basetype.h"
+#include "instance.h"
 #include "debug.h"
 
 
@@ -84,6 +85,13 @@ public:
 	 */
 	void setOffset(size_t offset);
 
+    /**
+     * Creates an Instance object from this variable.
+     * @param vmem the virtual memory object to read data from
+     * @return an Instace object for this member
+     */
+    InstancePointer toInstance(VirtualMemory* vmem) const;
+
 	/**
 	 * Reads a serialized version of this object from \a in.
 	 * \sa writeTo()
@@ -120,4 +128,4 @@ QDataStream& operator>>(QDataStream& in, Variable& var);
 */
 QDataStream& operator<<(QDataStream& out, const Variable& var);
 
-#endif /* INSTANCE_H_ */
+#endif /* VARIABLE_H_ */

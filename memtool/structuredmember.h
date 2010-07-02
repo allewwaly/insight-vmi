@@ -12,8 +12,10 @@
 #include "referencingtype.h"
 #include "sourceref.h"
 #include "symbol.h"
+#include "instance.h"
 
 class Structured;
+class VirtualMemory;
 
 
 class StructuredMember: public Symbol, public ReferencingType, public SourceRef
@@ -68,6 +70,16 @@ public:
      * @return the Struct or Union this member belongs to
      */
     Structured* belongsTo() const;
+
+    /**
+     * Creates an Instance object from this struct member.
+     * @param structAddress the virtual memory address of the containing (parent) struct
+     * @param vmem the virtual memory object to read data from
+     * @param namePrefix the name of all members which lead to this member
+     * @return an Instace object for this member
+     */
+    InstancePointer toInstance(size_t structAddress, VirtualMemory* vmem,
+    		const QString& namePrefix = QString()) const;
 
 private:
 	size_t _offset;          ///< the member's offset within the struct;

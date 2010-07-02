@@ -6,7 +6,9 @@
  */
 
 #include "structuredmember.h"
-#include "basetype.h"
+#include "refbasetype.h"
+#include "virtualmemory.h"
+#include "pointer.h"
 #include "debug.h"
 
 StructuredMember::StructuredMember()
@@ -50,6 +52,18 @@ QString StructuredMember::prettyName() const
 }
 
 
+InstancePointer StructuredMember::toInstance(size_t structAddress,
+		VirtualMemory* vmem, const QString& namePrefix) const
+{
+    QString name = namePrefix;
+    if (!name.isEmpty() && !name.endsWith(QChar('.')))
+    	name.append(".");
+    name.append(_name);
+
+	return createRefInstance(structAddress + _offset, vmem, name);
+}
+
+
 void StructuredMember::readFrom(QDataStream& in)
 {
     Symbol::readFrom(in);
@@ -82,3 +96,4 @@ QDataStream& operator<<(QDataStream& out, const StructuredMember& member)
     member.writeTo(out);
     return out;
 }
+
