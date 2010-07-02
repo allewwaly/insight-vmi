@@ -60,8 +60,10 @@ uint Structured::hash(VisitedSet* visited) const
 
 void Structured::addMember(StructuredMember* member)
 {
+	assert(member != 0);
     member->_belongsTo = this;
 	_members.append(member);
+	_memberNames.append(member->name());
 }
 
 
