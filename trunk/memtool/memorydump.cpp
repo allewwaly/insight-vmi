@@ -98,82 +98,40 @@ QString MemoryDump::query(const QString& queryString) const
         if (!v)
             queryError(QString("Variable does not exist: %1").arg(processed.first()));
 
-        // We need to keep track of the offset
-        size_t offset = v->offset();
-        // The "cursor" for resolving the type
-        const BaseType* b = v->refType();
-        // Keep track of ID of the last referenced type for error messages
-        int refTypeId = v->refTypeId();
+        InstancePointer instance = v->toInstance(_vmem);
+        while (!instance.isNull() && !components.isEmpty()) {
+            // Resolve member
+            QString comp = components.front();
+            components.pop_front();
+            if (! instance->type()->type() & (BaseType::rtStruct|BaseType::rtUnion))
+            	queryError(QString("Member \"%1\" is not a struct or union").arg(processed.join(".")));
 
-        while ( b && (b->type() & ReferencingTypes) ) {
-            const RefBaseType* rbt = 0;
-            const Structured* s = 0;
-
-            // Is this a referencing type?
-            if ( (rbt = dynamic_cast<const RefBaseType*>(b)) ) {
-                // Resolve pointer references
-                if (b->type() & (BaseType::rtArray|BaseType::rtPointer)) {
-                    // If this is a a type "char*", treat it as a string
-                    if (components.isEmpty() &&
-                        rbt->refType() &&
-                        rbt->refType()->type() == BaseType::rtInt8)
-                    {
-                        // Stop here, the b->toString() later on will print b as string
-                        break;
-                    }
-                    // Otherwise resolve pointer reference
-                    const Pointer* p = dynamic_cast<const Pointer*>(rbt);
-                    offset = ((size_t) p->toPointer(_vmem, offset)) + p->macroExtraOffset();
-                }
-                b = rbt->refType();
-                refTypeId = rbt->refTypeId();
-            }
-            // Do we have queried components left?
-            else if ( !components.isEmpty() ) {
-                // Is this a struct or union?
-                if ( (s = dynamic_cast<const Structured*>(b)) ) {
-                    // Resolve member
-                    QString comp = components.front();
-                    components.pop_front();
-
-                    const StructuredMember* m = s->findMember(comp);
-                    if (!m)
-                        queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(processed.join(".")).arg(comp));
-
-                    processed.append(comp);
-                    b = m->refType();
-                    refTypeId = m->refTypeId();
-                    // Update the offset
-                    offset += m->offset();
-                }
-                // If there is nothing more to resolve, we're stuck
-                else {
-                    queryError(QString("Member \"%1\" is not a struct or union").arg(processed.join(".")));
-                }
-            }
-            // No components left and nothing more to resolve: we're done.
-            else {
-                break;
+            InstancePointer tmp = instance->findMember(comp);
+            if (tmp.isNull()) {
+            	if (!instance->memberExists(comp))
+            		queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(processed.join(".")).arg(comp));
+            	else
+            		queryError(QString("The type 0x%2 of member \"%1\" is unresolved")
+            		                                .arg(processed.join("."))
+            		                                .arg(instance->typeIdOfMember(comp), 0, 16));
             }
 
-            // Make sure b still holds a valid reference
-            if (!b)
-                queryError(QString("The type 0x%2 of member \"%1\" is unresolved")
-                                .arg(processed.join("."))
-                                .arg(refTypeId, 0, 16));
+            instance = tmp;
+            processed.append(comp);
         }
 
         QString s = QString("%1: ").arg(queryString);
-        if (b) {
-            s += QString("%1 (ID 0x%2)").arg(b->prettyName()).arg(b->id(), 0, 16);
-            ret = b->toString(_vmem, offset);
+        if (!instance.isNull()) {
+            s += QString("%1 (ID 0x%2)").arg(instance->typeName()).arg(instance->type()->id(), 0, 16);
+            ret = instance->toString();
         }
         else
-            s += QString("(unresolved type 0x%1)").arg(refTypeId, 0, 16);
-        s += QString(" @ 0x%1\n").arg(offset, _specs.sizeofUnsignedLong, 16);
+            s += "(unresolved type)";
+        s += QString(" @ 0x%1\n").arg(v->offset(), _specs.sizeofUnsignedLong << 1, 16);
 
         ret = s + ret;
     }
+
     return ret;
 }
 

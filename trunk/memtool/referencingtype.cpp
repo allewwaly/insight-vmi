@@ -8,6 +8,8 @@
 #include "referencingtype.h"
 #include "basetype.h"
 #include "refbasetype.h"
+#include "pointer.h"
+#include "virtualmemory.h"
 #include <assert.h>
 
 ReferencingType::ReferencingType()
@@ -76,3 +78,36 @@ void ReferencingType::writeTo(QDataStream& out) const
 {
     out << _refTypeId;
 }
+
+InstancePointer ReferencingType::createRefInstance(size_t address,
+		VirtualMemory* vmem, const QString& name) const
+{
+	if (!_refType)
+		return InstancePointer();
+
+    // We need to keep track of the address
+    size_t addr = address;
+    // The "cursor" for resolving the type
+    const BaseType* b = _refType;
+    const RefBaseType* rbt = 0;
+
+    while ( (rbt = dynamic_cast<const RefBaseType*>(b)) ) {
+		// Resolve pointer references
+		if (rbt->type() & (BaseType::rtArray|BaseType::rtPointer)) {
+			// If this is a a type "char*", treat it as a string
+			if (rbt->refType() && rbt->refType()->type() == BaseType::rtInt8)
+			{
+				// Stop here, so that toString() later on will print this as string
+				break;
+			}
+			// Otherwise resolve pointer reference, if this is a pointer
+			const Pointer* p = dynamic_cast<const Pointer*>(rbt);
+			if (p)
+				addr = ((size_t) p->toPointer(vmem, addr)) + p->macroExtraOffset();
+		}
+		b = rbt->refType();
+    }
+
+	return InstancePointer(new Instance(addr, b, name, vmem));
+}
+
