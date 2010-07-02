@@ -12,6 +12,7 @@
 #include "structuredmember.h"
 
 #include <QList>
+#include <QStringList>
 
 /**
  * Base class for a struct or union type
@@ -50,6 +51,14 @@ public:
 	{
 		return _members;
 	}
+
+    /**
+     * @return the names of all members of this struct or union
+     */
+    inline const QStringList& memberNames() const
+    {
+    	return _memberNames;
+    }
 
     /**
      * Adds a member to this struct or union. This transfers the ownership of
@@ -103,6 +112,7 @@ public:
 
 protected:
 	MemberList _members;
+	QStringList _memberNames;
 };
 
 
