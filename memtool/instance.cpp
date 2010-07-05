@@ -10,10 +10,8 @@
 #include "refbasetype.h"
 #include "pointer.h"
 #include "virtualmemory.h"
-
-Q_DECLARE_METATYPE(InstancePointer);
-Q_DECLARE_METATYPE(InstancePointerVector);
-
+#include "debug.h"
+#include <QScriptEngine>
 
 const QStringList Instance::_emtpyStringList;
 
@@ -50,6 +48,7 @@ QString Instance::name() const
 
 const QStringList& Instance::memberNames() const
 {
+    debugenter();
 	const Structured* s = dynamic_cast<const Structured*>(_type);
 	return s ? s->memberNames() : Instance::_emtpyStringList;
 }
@@ -119,5 +118,47 @@ int Instance::typeIdOfMember(const QString& name) const
 QString Instance::toString() const
 {
 	return _type ? _type->toString(_vmem, _address) : QString();
+}
+
+
+QScriptValue Instance::toScriptValue(InstancePointer inst, QScriptContext* /*ctx*/, QScriptEngine* eng)
+{
+    QScriptValue ret = eng->newVariant(qVariantFromValue(inst));
+
+    QScriptValue func = eng->newFunction(script_memberNames, 0);
+    ret.setProperty("memberNames", func);
+    func = eng->newFunction(script_members, ret, 0);
+    ret.setProperty("members", func);
+
+    return ret;
+}
+
+
+QScriptValue Instance::script_memberNames(QScriptContext* ctx, QScriptEngine* eng)
+{
+    InstancePointer instance = qscriptvalue_cast<InstancePointer>(ctx->thisObject());
+    if (!instance)
+        return ctx->throwError(QScriptContext::TypeError, "this object is not an Instance");
+    QStringList list = instance->memberNames();
+    QScriptValue arr = eng->newArray(list.size());
+    for (int i = 0; i < list.size(); ++i)
+        arr.setProperty(i, list[i],
+                QScriptValue::ReadOnly|QScriptValue::Undeletable);
+    return arr;
+}
+
+
+QScriptValue Instance::script_members(QScriptContext* ctx, QScriptEngine* eng)
+{
+    InstancePointer instance = qscriptvalue_cast<InstancePointer>(ctx->thisObject());
+    if (!instance)
+        return ctx->throwError(QScriptContext::TypeError, "this object is not an Instance");
+    InstancePointerVector members = instance->members();
+    QScriptValue arr = eng->newArray(members.size());
+    for (int i = 0; i < members.size(); ++i) {
+        QScriptValue val = eng->newVariant(qVariantFromValue(members[i]));
+        arr.setProperty(i, val, QScriptValue::ReadOnly|QScriptValue::Undeletable);
+    }
+    return arr;
 }
 

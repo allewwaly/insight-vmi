@@ -14,16 +14,23 @@
 #include <QSharedPointer>
 #include <QMetaType>
 #include <QVector>
+#include <QScriptValue>
 
 class BaseType;
 class VirtualMemory;
 class Instance;
+class QScriptEngine;
+class QScriptContext;
 
 /// A reference counting pointer for Instance objects
 typedef QSharedPointer<Instance> InstancePointer;
 
+Q_DECLARE_METATYPE(InstancePointer);
+
 /// A list of Instance objects
 typedef QVector<InstancePointer> InstancePointerVector;
+
+Q_DECLARE_METATYPE(InstancePointerVector);
 
 /**
  * This class wraps a variable instance in a memory dump.
@@ -133,6 +140,13 @@ public slots:
 	 * @return a string representation of this instance
 	 */
 	QString toString() const;
+
+	static QScriptValue toScriptValue(InstancePointer inst, QScriptContext* ctx,
+	        QScriptEngine* eng);
+
+protected:
+	static QScriptValue script_memberNames(QScriptContext* ctx, QScriptEngine* eng);
+    static QScriptValue script_members(QScriptContext* ctx, QScriptEngine* eng);
 
 private:
 	static const QStringList _emtpyStringList;

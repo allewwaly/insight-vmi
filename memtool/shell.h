@@ -14,11 +14,14 @@
 #include <QTextStream>
 #include <QThread>
 #include <QVarLengthArray>
+#include <QScriptValue>
 #include "kernelsymbols.h"
 
 // Forward declaration
 class MemoryDump;
 class QProcess;
+class QScriptContext;
+class QScriptEngine;
 
 
 /**
@@ -103,6 +106,8 @@ private slots:
     void pipeEndReadyReadStdErr();
 
 private:
+    typedef QVarLengthArray<MemoryDump*, 16> MemDumpArray;
+
     KernelSymbols& _sym;
     QFile _stdin;
     QFile _stdout;
@@ -110,12 +115,15 @@ private:
     QTextStream _out;
     QTextStream _err;
     QHash<QString, Command> _commands;
-    QVarLengthArray<MemoryDump*, 16> _memDumps;
+    static MemDumpArray _memDumps;
     QList<QProcess*> _pipedProcs;
 
     void cleanupPipedProcs();
     int eval(QString command);
     void hline(int width = 60);
+    static QScriptValue scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng);
+    static QScriptValue scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng);
+    //---------------------------------
     int cmdExit(QStringList args);
     int cmdHelp(QStringList args);
     int cmdList(QStringList args);
@@ -130,6 +138,7 @@ private:
     int cmdMemoryList(QStringList args);
     int cmdMemoryQuery(QStringList args);
     int cmdMemoryDump(QStringList args);
+    int cmdScript(QStringList args);
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t);
     int cmdShowVariable(const Variable* v);

@@ -74,12 +74,54 @@ const QString& MemoryDump::fileName() const
 }
 
 
-QString MemoryDump::query(const QString& queryString) const
+InstancePointer MemoryDump::queryInstance(const QString& queryString) const
 {
     QStringList components = queryString.split('.', QString::SkipEmptyParts);
     QString ret;
 
-    if (components.isEmpty()) {
+    if (components.isEmpty())
+        queryError("Empty query string given");
+
+    QStringList processed(components.first());
+    components.pop_front();
+
+    // The very first component must be a variable
+    Variable* v = _factory->findVarByName(processed.first());
+
+    if (!v)
+        queryError(QString("Variable does not exist: %1").arg(processed.first()));
+
+    InstancePointer instance = v->toInstance(_vmem);
+    while (!instance.isNull() && !components.isEmpty()) {
+        // Resolve member
+        QString comp = components.front();
+        components.pop_front();
+        if (! instance->type()->type() & (BaseType::rtStruct|BaseType::rtUnion))
+            queryError(QString("Member \"%1\" is not a struct or union").arg(processed.join(".")));
+
+        InstancePointer tmp = instance->findMember(comp);
+        if (tmp.isNull()) {
+            if (!instance->memberExists(comp))
+                queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(processed.join(".")).arg(comp));
+            else
+                queryError(QString("The type 0x%2 of member \"%1\" is unresolved")
+                                                .arg(processed.join("."))
+                                                .arg(instance->typeIdOfMember(comp), 0, 16));
+        }
+
+        instance = tmp;
+        processed.append(comp);
+    }
+
+    return instance;
+}
+
+
+QString MemoryDump::query(const QString& queryString) const
+{
+    QString ret;
+
+    if (queryString.isEmpty()) {
         // Generate a list of all global variables
         for (int i = 0; i < _factory->vars().size(); i++) {
             if (i > 0)
@@ -89,36 +131,7 @@ QString MemoryDump::query(const QString& queryString) const
         }
     }
     else {
-        QStringList processed(components.first());
-        components.pop_front();
-
-        // The very first component must be a variable
-        Variable* v = _factory->findVarByName(processed.first());
-
-        if (!v)
-            queryError(QString("Variable does not exist: %1").arg(processed.first()));
-
-        InstancePointer instance = v->toInstance(_vmem);
-        while (!instance.isNull() && !components.isEmpty()) {
-            // Resolve member
-            QString comp = components.front();
-            components.pop_front();
-            if (! instance->type()->type() & (BaseType::rtStruct|BaseType::rtUnion))
-            	queryError(QString("Member \"%1\" is not a struct or union").arg(processed.join(".")));
-
-            InstancePointer tmp = instance->findMember(comp);
-            if (tmp.isNull()) {
-            	if (!instance->memberExists(comp))
-            		queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(processed.join(".")).arg(comp));
-            	else
-            		queryError(QString("The type 0x%2 of member \"%1\" is unresolved")
-            		                                .arg(processed.join("."))
-            		                                .arg(instance->typeIdOfMember(comp), 0, 16));
-            }
-
-            instance = tmp;
-            processed.append(comp);
-        }
+        InstancePointer instance = queryInstance(queryString);
 
         QString s = QString("%1: ").arg(queryString);
         if (!instance.isNull()) {
@@ -127,7 +140,8 @@ QString MemoryDump::query(const QString& queryString) const
         }
         else
             s += "(unresolved type)";
-        s += QString(" @ 0x%1\n").arg(v->offset(), _specs.sizeofUnsignedLong << 1, 16);
+        // TODO get offset from somewhere else
+//        s += QString(" @ 0x%1\n").arg(v->offset(), _specs.sizeofUnsignedLong << 1, 16);
 
         ret = s + ret;
     }
@@ -166,5 +180,3 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 
     return QString();
 }
-
-
