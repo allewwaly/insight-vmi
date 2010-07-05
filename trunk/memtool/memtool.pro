@@ -72,3 +72,4 @@ HEADERS += instance.h \
     basetype.h \
     enum.h
 CONFIG += console
+QT += script

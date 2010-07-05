@@ -11,6 +11,7 @@
 #include <QtAlgorithms>
 #include <QProcess>
 #include <QCoreApplication>
+#include <QScriptEngine>
 #include "compileunit.h"
 #include "variable.h"
 #include "refbasetype.h"
@@ -21,6 +22,8 @@
 
 
 Shell* shell = 0;
+
+Shell::MemDumpArray Shell::_memDumps;
 
 
 Shell::Shell(KernelSymbols& symbols)
@@ -67,6 +70,14 @@ Shell::Shell(KernelSymbols& symbols)
                 "  memory dump [index] <type> @ <address\n"
                 "                              Show the loaded memory dumps"));
 
+    _commands.insert("script",
+            Command(
+                &Shell::cmdScript,
+                "Executes a QtScript script file",
+                "This command executes a given QtScript script file in the current "
+                "shell's context. All output is printed to the screen.\n"
+                "  script <file_name>     Interprets the script in <file_name>"));
+
     _commands.insert("show",
             Command(
                 &Shell::cmdShow,
@@ -74,7 +85,7 @@ Shell::Shell(KernelSymbols& symbols)
                 "This command shows information about the variable or type "
                 "given by a name or ID.\n"
                 "  show <name>       Show type or variable by name\n"
-                "  show <ID>         Show type or variable by ID\n"));
+                "  show <ID>         Show type or variable by ID"));
 
     _commands.insert("symbols",
             Command(
@@ -87,7 +98,7 @@ Shell::Shell(KernelSymbols& symbols)
                 "                                 System.map file and a kernel source tree\n"
                 "  symbols store <ksym_file>      Saves the parsed symbols to a file\n"
                 "  symbols save <ksym_file>       Alias for \"store\"\n"
-                "  symbols load <ksym_file>       Loads previously stored symbols for usage\n"));
+                "  symbols load <ksym_file>       Loads previously stored symbols for usage"));
 
     // Open the console devices
     _stdin.open(stdin, QIODevice::ReadOnly);
@@ -875,6 +886,95 @@ int Shell::cmdMemoryDump(QStringList args)
     }
 
     return 0;
+}
+
+
+int Shell::cmdScript(QStringList args)
+{
+    if (args.size() != 1)
+        return cmdHelp(QStringList("script"));
+
+    QString fileName = args[0];
+
+    QFile file(fileName);
+    if (!file.exists()) {
+        _err << "File not found: " << fileName << endl;
+        return 0;
+    }
+
+    // Try to read in the whole file
+    if (!file.open(QIODevice::ReadOnly)) {
+        _err << "Cannot open file \"" << fileName << "\" for reading." << endl;
+        return 0;
+    }
+    QTextStream stream(&file);
+    QString scriptCode(stream.readAll());
+    file.close();
+
+    // Prepare the script engine
+    QScriptEngine engine;
+    QScriptValue memDumpFunc = engine.newFunction(scriptListMemDumps);
+    engine.globalObject().setProperty("getMemDumps", memDumpFunc);
+
+    QScriptValue getInstanceFunc = engine.newFunction(scriptGetInstance, 2);
+    engine.globalObject().setProperty("getInstance", getInstanceFunc);
+
+    // Execute the script
+    QScriptValue ret = engine.evaluate(scriptCode, fileName);
+
+    if (!ret.isUndefined())
+        _out << ret.toString() << endl;
+
+    return 0;
+}
+
+
+QScriptValue Shell::scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng)
+{
+    if (ctx->argumentCount() > 0)
+        ctx->throwError("Expected one or two arguments");
+    // Create a new script array with all members of _memDumps
+    QScriptValue arr = eng->newArray(_memDumps.size());
+    for (int i = 0; i < _memDumps.size(); ++i) {
+        if (_memDumps[i])
+            arr.setProperty(i, _memDumps[i]->fileName());
+    }
+
+    return arr;
+}
+
+
+QScriptValue Shell::scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng)
+{
+    if (ctx->argumentCount() < 1 || ctx->argumentCount() > 2)
+        ctx->throwError("Expected one or two arguments");
+
+    // First argument must be a query string
+    if (!ctx->argument(0).isString())
+        ctx->throwError("First argument must be a string");
+    QString query = ctx->argument(0).toString();
+
+    // Default memDump index is the first one
+    int index = 0;
+    while (index < _memDumps.size() && !_memDumps[index])
+        index++;
+    if (index > _memDumps.size())
+        ctx->throwError("No memory dumps loaded");
+
+    // Second argument is optional and defines the memDump index
+    if (ctx->argumentCount() == 2) {
+        index = ctx->argument(1).isNumber() ? ctx->argument(1).toInt32() : -1;
+        if (index < 0 || index >= _memDumps.size() || !_memDumps[index])
+            ctx->throwError("Invalid memory dump index");
+    }
+
+    // Get the instance
+    InstancePointer instance = _memDumps[index]->queryInstance(query);
+
+    if (instance.isNull())
+        return QScriptValue();
+    else
+        return Instance::toScriptValue(instance, ctx, eng);
 }
 
 

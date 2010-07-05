@@ -10,6 +10,7 @@
 
 #include "filenotfoundexception.h"
 #include "virtualmemory.h"
+#include "instance.h"
 
 // forward declarations
 class QFile;
@@ -78,6 +79,8 @@ public:
     const QString& fileName() const;
 
     QString query(const QString& queryString) const;
+
+    InstancePointer queryInstance(const QString& queryString) const;
 
     QString dump(const QString& type, quint64 address) const;
 
