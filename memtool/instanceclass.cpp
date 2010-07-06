@@ -69,8 +69,8 @@ InstanceClass::~InstanceClass()
 }
 
 
-QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue &object,
-        const QScriptString &name, QueryFlags flags, uint *id)
+QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue& object,
+        const QScriptString& name, QueryFlags flags, uint* id)
 {
     Instance *inst = qscriptvalue_cast<Instance*>(object.data());
     if (!inst)
@@ -89,14 +89,14 @@ QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue &object
 }
 
 
-QScriptValue InstanceClass::property(const QScriptValue &object,
+QScriptValue InstanceClass::property(const QScriptValue& object,
 		const QScriptString& /*name*/, uint id)
 {
     Instance *inst = qscriptvalue_cast<Instance*>(object.data());
     if (!inst)
         return QScriptValue();
     // We should never be called without a valid id
-    assert(id < (uint)inst->memberNames().size());
+    assert(id < (uint)inst->memberCount());
 
     Instance member = inst->member(id);
     assert(!member.isNull());
@@ -192,6 +192,7 @@ QScriptValue InstanceClass::instToScriptValue(QScriptEngine* eng, const Instance
     return cls->newInstance(inst);
 }
 
+
 void InstanceClass::instFromScriptValue(const QScriptValue& obj, Instance& inst)
 {
     inst = qvariant_cast<Instance>(obj.data().toVariant());
@@ -202,18 +203,24 @@ QScriptValue InstanceClass::membersToScriptValue(QScriptEngine* eng, const Insta
 {
 	QScriptValue ret = eng->newArray(list.size());
 	for (int i = 0; i < list.size(); ++i)
-		ret.setProperty(i, eng->newVariant(qVariantFromValue(list[i])));
+		ret.setProperty(i, instToScriptValue(eng, list[i]));
     return ret;
 }
 
 
-void InstanceClass::membersFromScriptValue(const QScriptValue& obj, InstanceList& inst)
+void InstanceClass::membersFromScriptValue(const QScriptValue& obj, InstanceList& list)
 {
+	list.clear();
+    if (!obj.isArray())
+    	return;
+
     int i = 0;
     QScriptValue val = obj.property(i);
     while (val.isValid()) {
-    	inst.append(val.toVariant().value<Instance>());
-    	val = obj.property(i++);
+    	Instance inst;
+    	instFromScriptValue(val, inst);
+    	list.append(inst);
+    	val = obj.property(++i);
     }
 }
 
@@ -277,7 +284,7 @@ void InstanceClassPropertyIterator::toBack()
 QScriptString InstanceClassPropertyIterator::name() const
 {
     Instance *inst = qscriptvalue_cast<Instance*>(object().data());
-    return object().engine()->toStringHandle(inst->name());
+    return object().engine()->toStringHandle(inst->member(m_last).name());
 }
 
 
