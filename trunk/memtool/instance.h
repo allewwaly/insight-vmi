@@ -11,45 +11,24 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
-#include <QSharedPointer>
-#include <QMetaType>
-#include <QVector>
-#include <QScriptValue>
 
 class BaseType;
 class VirtualMemory;
 class Instance;
-class QScriptEngine;
-class QScriptContext;
-
-/// A reference counting pointer for Instance objects
-typedef QSharedPointer<Instance> InstancePointer;
-
-Q_DECLARE_METATYPE(InstancePointer);
 
 /// A list of Instance objects
-typedef QVector<InstancePointer> InstancePointerVector;
-
-Q_DECLARE_METATYPE(InstancePointerVector);
+typedef QList<Instance> InstanceList;
 
 /**
  * This class wraps a variable instance in a memory dump.
  */
-class Instance: public QObject
+class Instance
 {
-	Q_OBJECT
-	Q_PROPERTY(quint64 address READ address)
-	Q_PROPERTY(QString name READ name)
-	Q_PROPERTY(QStringList memberNames READ memberNames)
-	Q_PROPERTY(QString typeName READ typeName)
-	Q_PROPERTY(quint32 size READ size)
-
 public:
 	/**
 	 * Constructor
-	 * @param parent the parent QObject
 	 */
-	Instance(QObject* parent = 0);
+	Instance();
 
 	/**
 	 * Constructor
@@ -86,9 +65,9 @@ public:
 	const QStringList& memberNames() const;
 
 	/**
-	 * @return a vector of instances of all members
+	 * @return a list of instances of all members
 	 */
-	InstancePointerVector members() const;
+	InstanceList members() const;
 
 	/**
 	 * Gives access to the concrete BaseType of this instance.
@@ -108,7 +87,33 @@ public:
 	 */
 	quint32 size() const;
 
-public slots:
+	/**
+	 * @return \c true if this object is null, \c false otherwise
+	 */
+	bool isNull() const;
+
+	/**
+	 * @return the number of members, if this is a struct, \c 0 otherwise
+	 */
+	int memberCount() const;
+
+	/**
+	 * Access function to the members of this instance, if it is a struct. If
+	 * this instance is no struct/union or if the index is out of bounds, a
+	 * null Instance is returned.
+	 *
+	 * This function is much more efficient than getting the whole list of
+	 * members with the members() function and than accessing an individual
+	 * member.
+	 *
+	 * \note Make sure to check Instance::isNull() on the returned object to
+	 * see if it is valid or not.
+	 *
+	 * @param index index into the member list
+	 * @return
+	 */
+	Instance member(int index) const;
+
 	/**
 	 * Checks if a member with the given name \a name exists in this instance.
 	 * @param name the name of the member to find
@@ -117,17 +122,26 @@ public slots:
 	bool memberExists(const QString& name) const;
 
 	/**
-	 * Retrieves members (i.e., struct components) of this Instance, if they
-	 * exist. You can check their existence with memberExists() or by iterating
-	 * over the names returned by members().
+	 * Retrieves a member (i.e., struct components) of this Instance, if it
+	 * exists. You can check their existence with memberExists() or by iterating
+	 * over the names returned by memberNames().
 	 *
-	 * \note The returned pointer is wrapped in a QSharedPointer object for
-	 * reference counting and automatic deletion of the created objects.
+	 * \note Make sure to check Instance::isNull() on the returned object to
+	 * see if it is valid or not.
 	 *
 	 * @param name the name of the member to find
-	 * @return a new Instance object if the member was found, \c null otherwise
+	 * @return a new Instance object if the member was found, or an empty
+	 * object otherwise
 	 */
-	InstancePointer findMember(const QString& name) const;
+	Instance findMember(const QString& name) const;
+
+	/**
+	 * Retrieves the index of the member with name \a name. This index can be
+	 * used as array index to both members() and memberNames().
+	 * @param name the name of the member to find
+	 * @return the index of that member, if found, or \c -1 otherwise.
+	 */
+	int indexOfMember(const QString& name) const;
 
 	/**
 	 * Retrieves the type ID of the member \a name.
@@ -141,12 +155,12 @@ public slots:
 	 */
 	QString toString() const;
 
-	static QScriptValue toScriptValue(InstancePointer inst, QScriptContext* ctx,
-	        QScriptEngine* eng);
-
-protected:
-	static QScriptValue script_memberNames(QScriptContext* ctx, QScriptEngine* eng);
-    static QScriptValue script_members(QScriptContext* ctx, QScriptEngine* eng);
+//	static QScriptValue instToScriptValue(const Instance& inst, QScriptContext* ctx,
+//	        QScriptEngine* eng);
+//
+//protected:
+//	static QScriptValue script_memberNames(QScriptContext* ctx, QScriptEngine* eng);
+//    static QScriptValue script_members(QScriptContext* ctx, QScriptEngine* eng);
 
 private:
 	static const QStringList _emtpyStringList;
@@ -155,6 +169,7 @@ private:
 	const BaseType* _type;
 	QString _name;
     VirtualMemory* _vmem;
+    bool _isNull;
 };
 
 #endif /* INSTANCE_H_ */

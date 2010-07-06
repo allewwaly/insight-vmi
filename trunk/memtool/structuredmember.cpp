@@ -52,7 +52,7 @@ QString StructuredMember::prettyName() const
 }
 
 
-InstancePointer StructuredMember::toInstance(size_t structAddress,
+Instance StructuredMember::toInstance(size_t structAddress,
 		VirtualMemory* vmem, const QString& namePrefix) const
 {
     QString name = namePrefix;

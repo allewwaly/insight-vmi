@@ -6,10 +6,19 @@
  */
 
 #include "instanceclass.h"
+#include <QScriptEngine>
+#include <QScriptClassPropertyIterator>
+#include "instanceprototype.h"
+#include "debug.h"
 
+Q_DECLARE_METATYPE(Instance)
 Q_DECLARE_METATYPE(Instance*)
 Q_DECLARE_METATYPE(InstanceClass*)
+Q_DECLARE_METATYPE(InstanceList);
 
+/**
+ * This is an iterator for the properties of InstanceClass object.
+ */
 class InstanceClassPropertyIterator : public QScriptClassPropertyIterator
 {
 public:
@@ -36,23 +45,22 @@ private:
 
 //------------------------------------------------------------------------------
 
-InstanceClass::InstanceClass(QScriptEngine *engine)
-    : QObject(engine), QScriptClass(engine)
+InstanceClass::InstanceClass(QScriptEngine *eng)
+    : QObject(eng), QScriptClass(eng)
 {
-    qScriptRegisterMetaType<Instance>(engine, toScriptValue, fromScriptValue);
+    qScriptRegisterMetaType<Instance>(eng, instToScriptValue, instFromScriptValue);
+    qScriptRegisterMetaType<InstanceList>(eng, membersToScriptValue, membersFromScriptValue);
 
-//    length = engine->toStringHandle(QLatin1String("length"));
-
-    proto = engine->newQObject(new InstancePrototype(this),
+    proto = eng->newQObject(new InstancePrototype(this),
                                QScriptEngine::QtOwnership,
                                QScriptEngine::SkipMethodsInEnumeration
                                | QScriptEngine::ExcludeSuperClassMethods
                                | QScriptEngine::ExcludeSuperClassProperties);
-    QScriptValue global = engine->globalObject();
+    QScriptValue global = eng->globalObject();
     proto.setPrototype(global.property("Object").property("prototype"));
 
-    ctor = engine->newFunction(construct, proto);
-    ctor.setData(qScriptValueFromValue(engine, this));
+    ctor = eng->newFunction(construct, proto);
+    ctor.setData(qScriptValueFromValue(eng, this));
 }
 
 
@@ -68,159 +76,168 @@ QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue &object
     if (!inst)
         return 0;
 
-//    if (name == length) {
-//        return flags;
-//    }
-//    else {
-        bool isArrayIndex;
-        qint32 pos = name.toArrayIndex(&isArrayIndex);
-        if (!isArrayIndex)
-            return 0;
-        *id = pos;
-        if ((flags & HandlesReadAccess) && (pos >= inst->size()))
-            flags &= ~HandlesReadAccess;
+    // If we have a member with that index, we handle it as a property
+    int index = inst->indexOfMember(name.toString());
+    if (index >= 0) {
+    	*id = (uint) index;
         return flags;
-//    }
+    }
+    else
+    	*id = (uint) -1;
+    // Return zero to indicate we don't handle this property ourself
+    return 0;
 }
 
 
 QScriptValue InstanceClass::property(const QScriptValue &object,
-                                      const QScriptString &name, uint id)
+		const QScriptString& /*name*/, uint id)
 {
-//    Q_PROPERTY(quint64 address READ address)
-//    Q_PROPERTY(QString name READ name)
-//    Q_PROPERTY(QStringList memberNames READ memberNames)
-//    Q_PROPERTY(QString typeName READ typeName)
-//    Q_PROPERTY(quint32 size READ size)
-
     Instance *inst = qscriptvalue_cast<Instance*>(object.data());
     if (!inst)
         return QScriptValue();
-    if (name == length) {
-        return inst->length();
-    } else {
-        qint32 pos = id;
-        if ((pos < 0) || (pos >= inst->size()))
-            return QScriptValue();
-        return uint(inst->at(pos)) & 255;
-    }
-    return QScriptValue();
-}
-//! [4]
+    // We should never be called without a valid id
+    assert(id < (uint)inst->memberNames().size());
 
-//! [5]
-void InstanceClass::setProperty(QScriptValue &object,
-                                 const QScriptString &name,
-                                 uint id, const QScriptValue &value)
-{
-    Instance *ba = qscriptvalue_cast<Instance*>(object.data());
-    if (!ba)
-        return;
-    if (name == length) {
-        ba->resize(value.toInt32());
-    } else {
-        qint32 pos = id;
-        if (pos < 0)
-            return;
-        if (ba->size() <= pos)
-            ba->resize(pos + 1);
-        (*ba)[pos] = char(value.toInt32());
-    }
-}
-//! [5]
+    Instance member = inst->member(id);
+    assert(!member.isNull());
 
-//! [6]
+    return newInstance(member);
+}
+
+
+//void InstanceClass::setProperty(QScriptValue &object,
+//                                 const QScriptString &name,
+//                                 uint id, const QScriptValue &value)
+//{
+//}
+
+
 QScriptValue::PropertyFlags InstanceClass::propertyFlags(
-    const QScriptValue &/*object*/, const QScriptString &name, uint /*id*/)
+		const QScriptValue& /*object*/, const QScriptString& /*name*/, uint /*id*/)
 {
-    if (name == length) {
-        return QScriptValue::Undeletable
-            | QScriptValue::SkipInEnumeration;
-    }
-    return QScriptValue::Undeletable;
+	return QScriptValue::Undeletable | QScriptValue::ReadOnly;
 }
-//! [6]
 
-//! [7]
+
 QScriptClassPropertyIterator *InstanceClass::newIterator(const QScriptValue &object)
 {
     return new InstanceClassPropertyIterator(object);
 }
-//! [7]
+
 
 QString InstanceClass::name() const
 {
     return QLatin1String("Instance");
 }
 
+
 QScriptValue InstanceClass::prototype() const
 {
     return proto;
 }
+
 
 QScriptValue InstanceClass::constructor()
 {
     return ctor;
 }
 
-QScriptValue InstanceClass::newInstance(int size)
+
+//QScriptValue InstanceClass::newInstance(const QString& queryString)
+//{
+//    return newInstance(Instance());
+//}
+
+QScriptValue InstanceClass::toScriptValue(const Instance& inst,
+		QScriptContext* /*ctx*/, QScriptEngine* eng)
 {
-    return newInstance(Instance(size, /*ch=*/0));
+	InstanceClass* cls = new InstanceClass(eng);
+    return cls->newInstance(inst);
 }
 
-//! [1]
-QScriptValue InstanceClass::newInstance(const Instance &ba)
+
+QScriptValue InstanceClass::newInstance(const Instance& inst)
 {
-    QScriptValue data = engine()->newVariant(qVariantFromValue(ba));
+    QScriptValue data = engine()->newVariant(qVariantFromValue(inst));
     return engine()->newObject(this, data);
 }
-//! [1]
 
-//! [2]
-QScriptValue InstanceClass::construct(QScriptContext *ctx, QScriptEngine *)
+
+QScriptValue InstanceClass::construct(QScriptContext* ctx, QScriptEngine* eng)
 {
+	// Try to obtain the "this" object (set in the constructor)
     InstanceClass *cls = qscriptvalue_cast<InstanceClass*>(ctx->callee().data());
     if (!cls)
         return QScriptValue();
+    // Provide a copy-constructor, if argument was given
     QScriptValue arg = ctx->argument(0);
     if (arg.instanceOf(ctx->callee()))
         return cls->newInstance(qscriptvalue_cast<Instance>(arg));
-    int size = arg.toInt32();
-    return cls->newInstance(size);
+    // Otherwise execute the "getInstance" function as constructor
+    // First, get the "getInstance" function object
+    QScriptValue getInstance = eng->globalObject().property("getInstance");
+    if (!getInstance.isFunction())
+    	return QScriptValue();
+    // Second, call the function
+    return getInstance.call(eng->globalObject(), ctx->argumentsObject());
 }
-//! [2]
 
-QScriptValue InstanceClass::toScriptValue(QScriptEngine *eng, const Instance &ba)
+
+QScriptValue InstanceClass::instToScriptValue(QScriptEngine* eng, const Instance& inst)
 {
     QScriptValue ctor = eng->globalObject().property("Instance");
     InstanceClass *cls = qscriptvalue_cast<InstanceClass*>(ctor.data());
     if (!cls)
-        return eng->newVariant(qVariantFromValue(ba));
-    return cls->newInstance(ba);
+        return eng->newVariant(qVariantFromValue(inst));
+    return cls->newInstance(inst);
 }
 
-void InstanceClass::fromScriptValue(const QScriptValue &obj, Instance &ba)
+void InstanceClass::instFromScriptValue(const QScriptValue& obj, Instance& inst)
 {
-    ba = qvariant_cast<Instance>(obj.data().toVariant());
+    inst = qvariant_cast<Instance>(obj.data().toVariant());
 }
 
 
-InstanceClassPropertyIterator::InstanceClassPropertyIterator(const QScriptValue &object)
+QScriptValue InstanceClass::membersToScriptValue(QScriptEngine* eng, const InstanceList& list)
+{
+	QScriptValue ret = eng->newArray(list.size());
+	for (int i = 0; i < list.size(); ++i)
+		ret.setProperty(i, eng->newVariant(qVariantFromValue(list[i])));
+    return ret;
+}
+
+
+void InstanceClass::membersFromScriptValue(const QScriptValue& obj, InstanceList& inst)
+{
+    int i = 0;
+    QScriptValue val = obj.property(i);
+    while (val.isValid()) {
+    	inst.append(val.toVariant().value<Instance>());
+    	val = obj.property(i++);
+    }
+}
+
+
+//------------------------------------------------------------------------------
+
+InstanceClassPropertyIterator::InstanceClassPropertyIterator(const QScriptValue& object)
     : QScriptClassPropertyIterator(object)
 {
     toFront();
 }
 
+
 InstanceClassPropertyIterator::~InstanceClassPropertyIterator()
 {
 }
 
-//! [8]
+
 bool InstanceClassPropertyIterator::hasNext() const
 {
-    Instance *ba = qscriptvalue_cast<Instance*>(object().data());
-    return m_index < ba->size();
+    Instance *inst = qscriptvalue_cast<Instance*>(object().data());
+    return m_index < inst->memberCount();
 }
+
 
 void InstanceClassPropertyIterator::next()
 {
@@ -228,10 +245,12 @@ void InstanceClassPropertyIterator::next()
     ++m_index;
 }
 
+
 bool InstanceClassPropertyIterator::hasPrevious() const
 {
     return (m_index > 0);
 }
+
 
 void InstanceClassPropertyIterator::previous()
 {
@@ -239,23 +258,28 @@ void InstanceClassPropertyIterator::previous()
     m_last = m_index;
 }
 
+
 void InstanceClassPropertyIterator::toFront()
 {
     m_index = 0;
     m_last = -1;
 }
 
+
 void InstanceClassPropertyIterator::toBack()
 {
-    Instance *ba = qscriptvalue_cast<Instance*>(object().data());
-    m_index = ba->size();
+    Instance *inst = qscriptvalue_cast<Instance*>(object().data());
+    m_index = inst->memberCount();
     m_last = -1;
 }
 
+
 QScriptString InstanceClassPropertyIterator::name() const
 {
-    return object().engine()->toStringHandle(QString::number(m_last));
+    Instance *inst = qscriptvalue_cast<Instance*>(object().data());
+    return object().engine()->toStringHandle(inst->name());
 }
+
 
 uint InstanceClassPropertyIterator::id() const
 {

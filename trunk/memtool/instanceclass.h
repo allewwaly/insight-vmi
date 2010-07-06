@@ -12,46 +12,55 @@
 #include <QScriptString>
 #include "instance.h"
 
+// Forward declarations
+class QScriptContext;
+class QScriptEngine;
+
 /**
  * This class wraps an Instance object for a QtScript environment.
  */
 class InstanceClass : public QObject, public QScriptClass
 {
 public:
-    InstanceClass(QScriptEngine *engine);
+    InstanceClass(QScriptEngine *eng);
     ~InstanceClass();
 
     QScriptValue constructor();
 
-    QScriptValue newInstance(int size = 0);
-    QScriptValue newInstance(const Instance &ba);
+//    QScriptValue newInstance(const QString& queryString);
+    QScriptValue newInstance(const Instance& inst);
 
-    QueryFlags queryProperty(const QScriptValue &object,
-                             const QScriptString &name,
+    QueryFlags queryProperty(const QScriptValue& object,
+                             const QScriptString& name,
                              QueryFlags flags, uint *id);
 
-    QScriptValue property(const QScriptValue &object,
-                          const QScriptString &name, uint id);
+    QScriptValue property(const QScriptValue& object,
+                          const QScriptString& name, uint id);
 
-    void setProperty(QScriptValue &object, const QScriptString &name,
-                     uint id, const QScriptValue &value);
+//    void setProperty(QScriptValue &object, const QScriptString &name,
+//                     uint id, const QScriptValue &value);
 
     QScriptValue::PropertyFlags propertyFlags(
-        const QScriptValue &object, const QScriptString &name, uint id);
+        const QScriptValue& object, const QScriptString& name, uint id);
 
-    QScriptClassPropertyIterator *newIterator(const QScriptValue &object);
+    QScriptClassPropertyIterator *newIterator(const QScriptValue& object);
 
     QString name() const;
 
     QScriptValue prototype() const;
 
+    static QScriptValue toScriptValue(const Instance& inst, QScriptContext* ctx,
+    		QScriptEngine* eng);
+
 private:
-    static QScriptValue construct(QScriptContext *ctx, QScriptEngine *eng);
+    static QScriptValue construct(QScriptContext* ctx, QScriptEngine* eng);
 
-    static QScriptValue toScriptValue(QScriptEngine *eng, const Instance &ba);
-    static void fromScriptValue(const QScriptValue &obj, Instance &ba);
+    static QScriptValue instToScriptValue(QScriptEngine* eng, const Instance& inst);
+    static void instFromScriptValue(const QScriptValue& obj, Instance& inst);
 
-//    QScriptString length;
+    static QScriptValue membersToScriptValue(QScriptEngine* eng, const InstanceList& inst);
+    static void membersFromScriptValue(const QScriptValue& obj, InstanceList& inst);
+
     QScriptValue proto;
     QScriptValue ctor;
 };

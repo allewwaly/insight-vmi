@@ -32,10 +32,10 @@ int main(int argc, char* argv[])
 	    switch (programOptions.action()) {
 	    case acNone:
 	        break;
-	    // TODO fix me
-//	    case acParseSymbols:
+	    case acParseSymbols:
+		    // TODO fix me
 //	        sym.parseSymbols(programOptions.inFileName());
-//	        break;
+	        break;
 	    case acLoadSymbols:
 	        sym.loadSymbols(programOptions.inFileName());
 	        break;

@@ -74,7 +74,7 @@ const QString& MemoryDump::fileName() const
 }
 
 
-InstancePointer MemoryDump::queryInstance(const QString& queryString) const
+Instance MemoryDump::queryInstance(const QString& queryString) const
 {
     QStringList components = queryString.split('.', QString::SkipEmptyParts);
     QString ret;
@@ -91,22 +91,22 @@ InstancePointer MemoryDump::queryInstance(const QString& queryString) const
     if (!v)
         queryError(QString("Variable does not exist: %1").arg(processed.first()));
 
-    InstancePointer instance = v->toInstance(_vmem);
+    Instance instance = v->toInstance(_vmem);
     while (!instance.isNull() && !components.isEmpty()) {
         // Resolve member
         QString comp = components.front();
         components.pop_front();
-        if (! instance->type()->type() & (BaseType::rtStruct|BaseType::rtUnion))
+        if (! instance.type()->type() & (BaseType::rtStruct|BaseType::rtUnion))
             queryError(QString("Member \"%1\" is not a struct or union").arg(processed.join(".")));
 
-        InstancePointer tmp = instance->findMember(comp);
+        Instance tmp = instance.findMember(comp);
         if (tmp.isNull()) {
-            if (!instance->memberExists(comp))
+            if (!instance.memberExists(comp))
                 queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(processed.join(".")).arg(comp));
             else
                 queryError(QString("The type 0x%2 of member \"%1\" is unresolved")
                                                 .arg(processed.join("."))
-                                                .arg(instance->typeIdOfMember(comp), 0, 16));
+                                                .arg(instance.typeIdOfMember(comp), 0, 16));
         }
 
         instance = tmp;
@@ -131,12 +131,12 @@ QString MemoryDump::query(const QString& queryString) const
         }
     }
     else {
-        InstancePointer instance = queryInstance(queryString);
+        Instance instance = queryInstance(queryString);
 
         QString s = QString("%1: ").arg(queryString);
         if (!instance.isNull()) {
-            s += QString("%1 (ID 0x%2)").arg(instance->typeName()).arg(instance->type()->id(), 0, 16);
-            ret = instance->toString();
+            s += QString("%1 (ID 0x%2)").arg(instance.typeName()).arg(instance.type()->id(), 0, 16);
+            ret = instance.toString();
         }
         else
             s += "(unresolved type)";

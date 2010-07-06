@@ -19,6 +19,7 @@
 #include "kernelsymbols.h"
 #include "programoptions.h"
 #include "memorydump.h"
+#include "instanceclass.h"
 
 
 Shell* shell = 0;
@@ -919,6 +920,9 @@ int Shell::cmdScript(QStringList args)
     QScriptValue getInstanceFunc = engine.newFunction(scriptGetInstance, 2);
     engine.globalObject().setProperty("getInstance", getInstanceFunc);
 
+    InstanceClass* instClass = new InstanceClass(&engine);
+    engine.globalObject().setProperty("Instance", instClass->constructor());
+
     // Execute the script
     QScriptValue ret = engine.evaluate(scriptCode, fileName);
 
@@ -969,12 +973,12 @@ QScriptValue Shell::scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng)
     }
 
     // Get the instance
-    InstancePointer instance = _memDumps[index]->queryInstance(query);
+    Instance instance = _memDumps[index]->queryInstance(query);
 
     if (instance.isNull())
         return QScriptValue();
     else
-        return Instance::toScriptValue(instance, ctx, eng);
+        return InstanceClass::toScriptValue(instance, ctx, eng);
 }
 
 

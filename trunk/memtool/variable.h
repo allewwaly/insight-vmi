@@ -90,7 +90,7 @@ public:
      * @param vmem the virtual memory object to read data from
      * @return an Instace object for this member
      */
-    InstancePointer toInstance(VirtualMemory* vmem) const;
+    Instance toInstance(VirtualMemory* vmem) const;
 
 	/**
 	 * Reads a serialized version of this object from \a in.

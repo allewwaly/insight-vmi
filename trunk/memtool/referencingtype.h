@@ -84,7 +84,7 @@ protected:
      * @param name the name of this instance
      * @return an Instace object for this member
      */
-    InstancePointer createRefInstance(size_t address, VirtualMemory* vmem,
+    Instance createRefInstance(size_t address, VirtualMemory* vmem,
     		const QString& namePrefix = QString()) const;
 
 	const BaseType *_refType;  ///< holds the type this object is referencing
