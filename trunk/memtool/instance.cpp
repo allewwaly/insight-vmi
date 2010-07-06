@@ -25,8 +25,9 @@ Instance::Instance()
 
 
 Instance::Instance(size_t address, const BaseType* type, const QString& name,
-		VirtualMemory* vmem)
-	: _address(address),  _type(type), _name(name), _vmem(vmem), _isNull(true)
+		const QString& parentName, VirtualMemory* vmem)
+	: _address(address),  _type(type), _name(name), _parentName(parentName),
+	  _vmem(vmem), _isNull(true)
 {
 	_isNull = !type || !vmem;
 }
@@ -46,6 +47,21 @@ quint64 Instance::address() const
 QString Instance::name() const
 {
 	return _name;
+}
+
+
+QString Instance::parentName() const
+{
+	return _parentName;
+}
+
+
+QString Instance::fullName() const
+{
+	if (_parentName.isEmpty())
+		return _name;
+	else
+		return QString("%1.%2").arg(_parentName).arg(_name);
 }
 
 
@@ -71,8 +87,9 @@ InstanceList Instance::members() const
 
 	const MemberList& list = s->members();
 	InstanceList ret;
+	QString fullName = this->fullName();
 	for (int i = 0; i < list.count(); ++i)
-		ret.append(list[i]->toInstance(_address, _vmem, _name));
+		ret.append(list[i]->toInstance(_address, _vmem, fullName));
 	return ret;
 }
 
@@ -105,7 +122,7 @@ Instance Instance::member(int index) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_type);
 	if (s && index >= 0 && index < s->members().size())
-		return s->members().at(index)->toInstance(_address, _vmem, _name);
+		return s->members().at(index)->toInstance(_address, _vmem, fullName());
 	return Instance();
 }
 
@@ -124,7 +141,7 @@ Instance Instance::findMember(const QString& name) const
 	if ( !s || !(m = s->findMember(name)) )
 		return Instance();
 
-	return m->toInstance(_address, _vmem, _name);
+	return m->toInstance(_address, _vmem, fullName());
 }
 
 
@@ -151,15 +168,3 @@ QString Instance::toString() const
 	return _type ? _type->toString(_vmem, _address) : QString();
 }
 
-
-//QScriptValue Instance::instToScriptValue(const Instance& inst, QScriptContext* /*ctx*/, QScriptEngine* eng)
-//{
-//    QScriptValue ret = eng->newVariant(qVariantFromValue(inst));
-//
-//    QScriptValue func = eng->newFunction(script_memberNames, 0);
-//    ret.setProperty("memberNames", func);
-//    func = eng->newFunction(script_members, ret, 0);
-//    ret.setProperty("members", func);
-//
-//    return ret;
-//}

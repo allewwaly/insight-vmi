@@ -32,8 +32,11 @@ public:
     virtual ~InstancePrototype();
 
 public slots:
+	bool isNull() const;
     quint64 address() const;
     QString name() const;
+    QString parentName() const;
+    QString fullName() const;
     const QList<QString>& memberNames() const;
     InstanceList members() const;
     const BaseType* type() const;

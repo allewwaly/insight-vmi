@@ -75,11 +75,11 @@ public:
      * Creates an Instance object from this struct member.
      * @param structAddress the virtual memory address of the containing (parent) struct
      * @param vmem the virtual memory object to read data from
-     * @param namePrefix the name of all members which lead to this member
+     * @param parent the name of all members which lead to this member
      * @return an Instace object for this member
      */
     Instance toInstance(size_t structAddress, VirtualMemory* vmem,
-    		const QString& namePrefix = QString()) const;
+    		const QString& parent) const;
 
 private:
 	size_t _offset;          ///< the member's offset within the struct;
