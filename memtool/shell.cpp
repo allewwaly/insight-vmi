@@ -926,7 +926,19 @@ int Shell::cmdScript(QStringList args)
     // Execute the script
     QScriptValue ret = engine.evaluate(scriptCode, fileName);
 
-    if (!ret.isUndefined())
+    if (ret.isError()) {
+        if (engine.hasUncaughtException()) {
+        	_err << "Exception occured on " << fileName << ":"
+        			<< engine.uncaughtExceptionLineNumber() << ": " << endl
+        			<< engine.uncaughtException().toString() << endl;
+        	QStringList bt = engine.uncaughtExceptionBacktrace();
+        	for (int i = 0; i < bt.size(); ++i)
+        		_err << "    " << bt[i] << endl;
+        }
+        else
+        	_err << ret.toString() << endl;
+    }
+    else if (!ret.isUndefined())
         _out << ret.toString() << endl;
 
     return 0;
