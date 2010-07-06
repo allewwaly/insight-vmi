@@ -1,4 +1,6 @@
 SOURCES += instance.cpp \
+    instanceprototype.cpp \
+    instanceclass.cpp \
     memspecs.cpp \
     memspecparser.cpp \
     virtualmemory.cpp \
@@ -33,6 +35,8 @@ SOURCES += instance.cpp \
     basetype.cpp \
     enum.cpp
 HEADERS += instance.h \
+    instanceprototype.h \
+    instanceclass.h \
     virtualmemoryexception.h \
     memspecs.h \
     memspecparser.h \

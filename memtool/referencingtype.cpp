@@ -79,11 +79,11 @@ void ReferencingType::writeTo(QDataStream& out) const
     out << _refTypeId;
 }
 
-InstancePointer ReferencingType::createRefInstance(size_t address,
+Instance ReferencingType::createRefInstance(size_t address,
 		VirtualMemory* vmem, const QString& name) const
 {
 	if (!_refType)
-		return InstancePointer();
+		return Instance();
 
     // We need to keep track of the address
     size_t addr = address;
@@ -108,6 +108,6 @@ InstancePointer ReferencingType::createRefInstance(size_t address,
 		b = rbt->refType();
     }
 
-	return InstancePointer(new Instance(addr, b, name, vmem));
+	return Instance(addr, b, name, vmem);
 }
 

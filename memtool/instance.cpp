@@ -13,19 +13,22 @@
 #include "debug.h"
 #include <QScriptEngine>
 
+Q_DECLARE_METATYPE(Instance)
+
 const QStringList Instance::_emtpyStringList;
 
 
-Instance::Instance(QObject* parent)
-	: QObject(parent), _address(0),  _type(0), _vmem(0)
+Instance::Instance()
+	: _address(0),  _type(0), _vmem(0), _isNull(true)
 {
 }
 
 
 Instance::Instance(size_t address, const BaseType* type, const QString& name,
 		VirtualMemory* vmem)
-	: _address(address),  _type(type), _name(name), _vmem(vmem)
+	: _address(address),  _type(type), _name(name), _vmem(vmem), _isNull(true)
 {
+	_isNull = !type || !vmem;
 }
 
 
@@ -46,24 +49,30 @@ QString Instance::name() const
 }
 
 
+int Instance::memberCount() const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_type);
+	return s ? s->members().size() : 0;
+}
+
+
 const QStringList& Instance::memberNames() const
 {
-    debugenter();
 	const Structured* s = dynamic_cast<const Structured*>(_type);
 	return s ? s->memberNames() : Instance::_emtpyStringList;
 }
 
 
-InstancePointerVector Instance::members() const
+InstanceList Instance::members() const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_type);
 	if (!s)
-		return InstancePointerVector(0);
+		return InstanceList();
 
 	const MemberList& list = s->members();
-	InstancePointerVector ret(list.count());
+	InstanceList ret;
 	for (int i = 0; i < list.count(); ++i)
-		ret[i] = list[i]->toInstance(_address, _vmem, _name);
+		ret.append(list[i]->toInstance(_address, _vmem, _name));
 	return ret;
 }
 
@@ -86,6 +95,21 @@ quint32 Instance::size() const
 }
 
 
+bool Instance::isNull() const
+{
+	return _isNull;
+}
+
+
+Instance Instance::member(int index) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_type);
+	if (s && index >= 0 && index < s->members().size())
+		return s->members().at(index)->toInstance(_address, _vmem, _name);
+	return Instance();
+}
+
+
 bool Instance::memberExists(const QString& name) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_type);
@@ -93,14 +117,21 @@ bool Instance::memberExists(const QString& name) const
 }
 
 
-InstancePointer Instance::findMember(const QString& name) const
+Instance Instance::findMember(const QString& name) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_type);
 	const StructuredMember* m = 0;
 	if ( !s || !(m = s->findMember(name)) )
-		return InstancePointer();
+		return Instance();
 
 	return m->toInstance(_address, _vmem, _name);
+}
+
+
+int Instance::indexOfMember(const QString& name) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_type);
+	return s ? s->memberNames().indexOf(name) : -1;
 }
 
 
@@ -121,44 +152,14 @@ QString Instance::toString() const
 }
 
 
-QScriptValue Instance::toScriptValue(InstancePointer inst, QScriptContext* /*ctx*/, QScriptEngine* eng)
-{
-    QScriptValue ret = eng->newVariant(qVariantFromValue(inst));
-
-    QScriptValue func = eng->newFunction(script_memberNames, 0);
-    ret.setProperty("memberNames", func);
-    func = eng->newFunction(script_members, ret, 0);
-    ret.setProperty("members", func);
-
-    return ret;
-}
-
-
-QScriptValue Instance::script_memberNames(QScriptContext* ctx, QScriptEngine* eng)
-{
-    InstancePointer instance = qscriptvalue_cast<InstancePointer>(ctx->thisObject());
-    if (!instance)
-        return ctx->throwError(QScriptContext::TypeError, "this object is not an Instance");
-    QStringList list = instance->memberNames();
-    QScriptValue arr = eng->newArray(list.size());
-    for (int i = 0; i < list.size(); ++i)
-        arr.setProperty(i, list[i],
-                QScriptValue::ReadOnly|QScriptValue::Undeletable);
-    return arr;
-}
-
-
-QScriptValue Instance::script_members(QScriptContext* ctx, QScriptEngine* eng)
-{
-    InstancePointer instance = qscriptvalue_cast<InstancePointer>(ctx->thisObject());
-    if (!instance)
-        return ctx->throwError(QScriptContext::TypeError, "this object is not an Instance");
-    InstancePointerVector members = instance->members();
-    QScriptValue arr = eng->newArray(members.size());
-    for (int i = 0; i < members.size(); ++i) {
-        QScriptValue val = eng->newVariant(qVariantFromValue(members[i]));
-        arr.setProperty(i, val, QScriptValue::ReadOnly|QScriptValue::Undeletable);
-    }
-    return arr;
-}
-
+//QScriptValue Instance::instToScriptValue(const Instance& inst, QScriptContext* /*ctx*/, QScriptEngine* eng)
+//{
+//    QScriptValue ret = eng->newVariant(qVariantFromValue(inst));
+//
+//    QScriptValue func = eng->newFunction(script_memberNames, 0);
+//    ret.setProperty("memberNames", func);
+//    func = eng->newFunction(script_members, ret, 0);
+//    ret.setProperty("members", func);
+//
+//    return ret;
+//}

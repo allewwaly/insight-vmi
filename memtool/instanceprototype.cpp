@@ -6,12 +6,14 @@
  */
 
 #include "instanceprototype.h"
+#include <QScriptEngine>
+
+Q_DECLARE_METATYPE(Instance*)
+
 
 InstancePrototype::InstancePrototype(QObject *parent)
     : QObject(parent)
 {
-    // TODO Auto-generated constructor stub
-
 }
 
 
@@ -32,13 +34,13 @@ QString InstancePrototype::name() const
 }
 
 
-const QStringList& InstancePrototype::memberNames() const
+const QList<QString>& InstancePrototype::memberNames() const
 {
-    return thisInstance()->memberNames();
+    return *dynamic_cast<const QList<QString>*>(&thisInstance()->memberNames());
 }
 
 
-InstancePointerVector InstancePrototype::members() const
+InstanceList InstancePrototype::members() const
 {
     return thisInstance()->members();
 }

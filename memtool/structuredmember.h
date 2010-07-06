@@ -78,7 +78,7 @@ public:
      * @param namePrefix the name of all members which lead to this member
      * @return an Instace object for this member
      */
-    InstancePointer toInstance(size_t structAddress, VirtualMemory* vmem,
+    Instance toInstance(size_t structAddress, VirtualMemory* vmem,
     		const QString& namePrefix = QString()) const;
 
 private:

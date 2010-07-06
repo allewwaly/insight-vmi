@@ -80,7 +80,7 @@ public:
 
     QString query(const QString& queryString) const;
 
-    InstancePointer queryInstance(const QString& queryString) const;
+    Instance queryInstance(const QString& queryString) const;
 
     QString dump(const QString& type, quint64 address) const;
 
