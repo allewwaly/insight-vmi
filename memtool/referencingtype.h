@@ -82,10 +82,11 @@ protected:
      * @param address the address of the instance within \a vmem
      * @param vmem the virtual memory object to read data from
      * @param name the name of this instance
+     * @param parent the name of the parent
      * @return an Instace object for this member
      */
     Instance createRefInstance(size_t address, VirtualMemory* vmem,
-    		const QString& namePrefix = QString()) const;
+    		const QString& name, const QString& parent = QString()) const;
 
 	const BaseType *_refType;  ///< holds the type this object is referencing
     int _refTypeId;            ///< holds ID of the type this object is referencing

@@ -80,7 +80,7 @@ void ReferencingType::writeTo(QDataStream& out) const
 }
 
 Instance ReferencingType::createRefInstance(size_t address,
-		VirtualMemory* vmem, const QString& name) const
+		VirtualMemory* vmem, const QString& name, const QString& parent) const
 {
 	if (!_refType)
 		return Instance();
@@ -108,6 +108,6 @@ Instance ReferencingType::createRefInstance(size_t address,
 		b = rbt->refType();
     }
 
-	return Instance(addr, b, name, vmem);
+	return Instance(addr, b, name, parent, vmem);
 }
 

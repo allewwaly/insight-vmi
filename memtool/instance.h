@@ -34,11 +34,12 @@ public:
 	 * Constructor
 	 * @param address the address of that instance
 	 * @param type the underlying BaseType of this instance
-	 * @param name the full name of this instance
+	 * @param name the name of this instance
+	 * @param parentName the full name of the parent
 	 * @param vmem the virtual memory device to read data from
 	 */
 	Instance(size_t address, const BaseType* type, const QString& name,
-			VirtualMemory* vmem);
+			const QString& parentName, VirtualMemory* vmem);
 
 	/**
 	 * Destructor
@@ -51,12 +52,26 @@ public:
 	quint64 address() const;
 
 	/**
-	 * Use this function to retrieve the full name of this instance as it was
-	 * found following the names and members of structs in dotted notation,
-	 * i.e., \c init_task.children.next.pid.
-	 * @return the full name of this instance
+	 * This gives you the (short) name of this Instance, i. e., its name its
+	 * parent's struct, e. g. \c next.
+	 * @return the name of this instance
 	 */
 	QString name() const;
+
+	/**
+	 * This function returns the full name of the parent's struct, as it was
+	 * found, e. g. \c init_task.children
+	 * @return the full name of the parent's struct
+	 */
+	QString parentName() const;
+
+	/**
+	 * Use this function to retrieve the full name of this instance as it was
+	 * found following the names and members of structs in dotted notation,
+	 * i.e., \c init_task.children.next.
+	 * @return the full name of this instance
+	 */
+	QString fullName() const;
 
 	/**
 	 * Gives access to the names of all members if this instance.
@@ -155,19 +170,13 @@ public:
 	 */
 	QString toString() const;
 
-//	static QScriptValue instToScriptValue(const Instance& inst, QScriptContext* ctx,
-//	        QScriptEngine* eng);
-//
-//protected:
-//	static QScriptValue script_memberNames(QScriptContext* ctx, QScriptEngine* eng);
-//    static QScriptValue script_members(QScriptContext* ctx, QScriptEngine* eng);
-
 private:
 	static const QStringList _emtpyStringList;
 
 	size_t _address;
 	const BaseType* _type;
 	QString _name;
+	QString _parentName;
     VirtualMemory* _vmem;
     bool _isNull;
 };

@@ -53,14 +53,9 @@ QString StructuredMember::prettyName() const
 
 
 Instance StructuredMember::toInstance(size_t structAddress,
-		VirtualMemory* vmem, const QString& namePrefix) const
+		VirtualMemory* vmem, const QString& parent) const
 {
-    QString name = namePrefix;
-    if (!name.isEmpty() && !name.endsWith(QChar('.')))
-    	name.append(".");
-    name.append(_name);
-
-	return createRefInstance(structAddress + _offset, vmem, name);
+	return createRefInstance(structAddress + _offset, vmem, _name, parent);
 }
 
 
