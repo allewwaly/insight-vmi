@@ -136,6 +136,19 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
 //    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
 
     QString s;
+    int offset_len = 1, name_len = 1, type_len = 1;
+    quint32 i = _size;
+
+    while ( (i >>= 4) )
+        offset_len++;
+
+    for (int i = 0; i < _members.size(); ++i) {
+        if (name_len < _members[i]->name().length())
+            name_len = _members[i]->name().length();
+        if (_members[i]->refType() && type_len < _members[i]->refType()->prettyName().length())
+            type_len = _members[i]->refType()->prettyName().length();
+    }
+
     // Output all members
     for (int i = 0; i < _members.size(); ++i) {
         StructuredMember* m = _members[i];
@@ -145,27 +158,31 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
         if (!s.isEmpty())
             s += "\n";
 
+
         if (m->refType()) {
             // Output all types except structured types
             if ( //(m->refType()->type() & (rtStruct | rtUnion)) ||
                  ( //(m->refType()->type() & rtTypedef) &&
                    (m->refType()->dereferencedType() & (rtStruct | rtUnion)) ) )
             {
-                s += QString("0x%1 %2 = ...")
-                        .arg(m->offset(), 4, 16, QChar('0'))
-                        .arg(m->prettyName(), 40);
+                s += QString("0x%1 %2 : %3 = ...")
+                        .arg(m->offset(), offset_len, 16, QChar('0'))
+                        .arg(m->name(), -name_len)
+                        .arg(m->refType()->prettyName(), -type_len);
             }
             else {
-                s += QString("0x%1 %2 = %3")
-                        .arg(m->offset(), 4, 16, QChar('0'))
-                        .arg(m->prettyName(), 40)
+                s += QString("0x%1 %2 : %3 = %4")
+                        .arg(m->offset(), offset_len, 16, QChar('0'))
+                        .arg(m->name(), -name_len)
+                        .arg(m->refType()->prettyName(), -type_len)
                         .arg(m->refType()->toString(mem, offset + m->offset()));
             }
         }
         else {
-            s += QString("0x%1 %2 = (unresolved type 0x%3)")
-                    .arg(m->offset(), 4, 16, QChar('0'))
-                    .arg(m->prettyName(), 40)
+            s += QString("0x%1 %2 : %3 = (unresolved type 0x%3)")
+                    .arg(m->offset(), offset_len, 16, QChar('0'))
+                    .arg(m->name(), -name_len)
+                    .arg(m->refType()->prettyName(), -type_len)
                     .arg(m->refTypeId(), 0, 16);
         }
     }

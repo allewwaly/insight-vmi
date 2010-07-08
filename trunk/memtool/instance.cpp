@@ -29,7 +29,7 @@ Instance::Instance(size_t address, const BaseType* type, const QString& name,
 	: _address(address),  _type(type), _name(name), _parentName(parentName),
 	  _vmem(vmem), _isNull(true)
 {
-	_isNull = !type || !vmem;
+	_isNull = !_address || !_type || !_vmem;
 }
 
 
