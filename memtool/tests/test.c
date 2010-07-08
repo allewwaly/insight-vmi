@@ -42,6 +42,7 @@ float some_float;
 double some_double;
 const int some_const_int = 5;
 int *some_pint;
+void* void_pointer = 0;
 
 typedef int int_typedef;
 int_typedef some_int_typedef_inst;
