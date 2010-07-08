@@ -135,13 +135,12 @@ QString MemoryDump::query(const QString& queryString) const
 
         QString s = QString("%1: ").arg(queryString);
         if (!instance.isNull()) {
-            s += QString("%1 (ID 0x%2)\n").arg(instance.typeName()).arg(instance.type()->id(), 0, 16);
+            s += QString("%1 (ID 0x%2)").arg(instance.typeName()).arg(instance.type()->id(), 0, 16);
             ret = instance.toString();
         }
         else
-            s += "(unresolved type)\n";
-        // TODO get offset from somewhere else
-//        s += QString(" @ 0x%1\n").arg(v->offset(), _specs.sizeofUnsignedLong << 1, 16);
+            s += "(unresolved type)";
+        s += QString(" @ 0x%1\n").arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16);
 
         ret = s + ret;
     }

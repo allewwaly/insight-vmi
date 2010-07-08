@@ -32,23 +32,22 @@ var pid_size = 8;
 var gid_size = 8;
 var cmd_size = 18;
 
-var hdr = 
-	lalign("USER", uid_size) + 
-	ralign("PID", pid_size) + 
-	ralign("GID", gid_size) +
-	"  " + 
-	lalign("COMMAND", cmd_size);
-
-print(hdr);
-
-var it = getInstance("init_task.children.next");
-
-
 function printSiblings(p)
 {
-	if (p.isNull())
+//	if (!(p instanceof Instance)) {
+//		print("This is not an Instance object!, p = " + p);
+//		return;
+//	}
+	print("+++ Entering printSiblings()");
+	
+	if (p.isNull()) {
+		print("+++ Returning from printSiblings()");
 		return;
+	}
+	
 	var it = p;
+//	print("p.parent.address() = 0x" + p.parent.address().toString(16));
+	
 	do {
 		var line = 
 			lalign(it.uid.toString(), uid_size) + 
@@ -59,13 +58,31 @@ function printSiblings(p)
 			"  @ 0x" + it.address().toString(16);
 
 		print(line);
+		
+		printSiblings(it.children.next);
+		
 		it = it.sibling.next;
-	} while (p.pid.toString() != it.pid.toString());
+//		print ("it.address() = 0x" + it.address().toString(16) + ", ");
+	} while (it.address() != p.parent.address() && it.address() != p.address());
 
-	printSiblings(p.children.next);
+
+	print("+++ Leaving printSiblings()");
 }
 
-printSiblings(it);
+var hdr = 
+	lalign("USER", uid_size) + 
+	ralign("PID", pid_size) + 
+	ralign("GID", gid_size) +
+	"  " + 
+	lalign("COMMAND", cmd_size);
+
+print(hdr);
+
+var it = new Instance("init_task");
+
+//if (!(it instanceof Instance))
+//	print("Not an Instance object: " + it);
+printSiblings(it.children.next, it);
 
 //dumpThis(it.pid);
 

@@ -190,12 +190,19 @@ protected:
                 p->setSize(_memSpecs.sizeofUnsignedLong);
         }
 
-		// Try to find the type based on its hash
+        RefBaseType* rbt = 0;
+        // Try to resolve the reference for the hash
+        if ( (rbt = dynamic_cast<RefBaseType*>(t)) ) {
+            rbt->setRefType(findBaseTypeById(rbt->refTypeId()));
+        }
+
+		// Try to find the type based on its hash, but only if we don't have
+        // any unresolved types
 		VisitedSet visited;
 		uint hash = t->hash(&visited);
 		bool foundByHash = false;
 
-		if (_typesByHash.contains(hash)) {
+		if ((!rbt || rbt->refType()) && _typesByHash.contains(hash)) {
 			BaseTypeList list = _typesByHash.values(hash);
 
 			// Go through the list and make sure we found the correct type
@@ -221,7 +228,7 @@ protected:
 				assert(s != 0);
 				resolveReferences(s);
 			}
-			// We don't need to re-calc the hash here because even for
+			// We don't need to re-calc the hash here because for
 			// structs or unions it does not depend on the member's hash,
 			// so it has not changed.
 			_typesByHash.insert(hash, t);

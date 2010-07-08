@@ -148,6 +148,7 @@ QScriptValue InstanceClass::constructor()
 //    return newInstance(Instance());
 //}
 
+
 QScriptValue InstanceClass::toScriptValue(const Instance& inst,
 		QScriptContext* /*ctx*/, QScriptEngine* eng)
 {
@@ -171,8 +172,10 @@ QScriptValue InstanceClass::construct(QScriptContext* ctx, QScriptEngine* eng)
         return QScriptValue();
     // Provide a copy-constructor, if argument was given
     QScriptValue arg = ctx->argument(0);
-    if (arg.instanceOf(ctx->callee()))
+    if (arg.instanceOf(ctx->callee())) {
+        debugmsg("Called copy-constructor");
         return cls->newInstance(qscriptvalue_cast<Instance>(arg));
+    }
     // Otherwise execute the "getInstance" function as constructor
     // First, get the "getInstance" function object
     QScriptValue getInstance = eng->globalObject().property("getInstance");

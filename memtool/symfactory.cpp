@@ -407,6 +407,8 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
     // Insert new ID/type relation into lookup tables
 	assert(_typesById.contains(new_id) == false);
 	_typesById.insert(new_id, target);
+	if (new_id == 0x1fff)
+	    debugmsg("Found it.");
 
     // Only add this type into the name relation table if it is new
 	if (isNewType(new_id, target) && !new_name.isEmpty())
