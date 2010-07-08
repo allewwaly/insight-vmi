@@ -46,8 +46,6 @@ QString Pointer::prettyName() const
 
 QString Pointer::toString(QIODevice* mem, size_t offset) const
 {
-    assert(_refType != 0);
-
     quint64 p = (quint64) toPointer(mem, offset);
 
     if (!p)
