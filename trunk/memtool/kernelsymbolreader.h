@@ -44,9 +44,21 @@ protected:
     virtual void operationProgress();
 
 private:
+    /// Encodes the reading phases of the reading process
+    enum Phases {
+        phCompileUnits,
+        phElementaryTypes,
+        phReferencingTypes,
+        phStructuredTypes,
+        phTypeRelations,
+        phVariables,
+        phFinished
+    };
+
     QIODevice* _from;
     SymFactory* _factory;
     MemSpecs* _specs;
+    Phases _phase;
 };
 
 #endif /* KERNELSYMBOLREADER_H_ */

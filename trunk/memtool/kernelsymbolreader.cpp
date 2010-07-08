@@ -22,7 +22,7 @@
 //------------------------------------------------------------------------------
 
 KernelSymbolReader::KernelSymbolReader(QIODevice* from, SymFactory* factory, MemSpecs* specs)
-    : _from(from), _factory(factory), _specs(specs)
+    : _from(from), _factory(factory), _specs(specs), _phase(phFinished)
 {
 }
 
@@ -89,6 +89,7 @@ void KernelSymbolReader::read()
         in >> *_specs;
 
         // Read list of compile units
+        _phase = phCompileUnits;
         in >> size;
         for (qint32 i = 0; i < size; i++) {
             CompileUnit* c = new CompileUnit();
@@ -100,6 +101,7 @@ void KernelSymbolReader::read()
         }
 
         // Read list of types
+        _phase = phElementaryTypes;
         in >> size;
         for (int i = 0; i < size; i++) {
             in >> type;
@@ -108,10 +110,22 @@ void KernelSymbolReader::read()
                 genericError("Out of memory.");
             in >> *t;
             _factory->addSymbol(t);
+
+            if (t->type() & (ReferencingTypes & ~(BaseType::rtStruct|BaseType::rtUnion)))
+                _phase = phReferencingTypes;
+            else if (t->type() & (BaseType::rtStruct|BaseType::rtUnion)) {
+                if (_phase == phReferencingTypes)
+                    debugmsg("\n" << _factory->postponedTypesStats());
+                _phase = phStructuredTypes;
+            }
+
             checkOperationProgress();
         }
 
+        debugmsg("\n" << _factory->postponedTypesStats());
+
         // Read list of additional type-id-relations
+        _phase = phTypeRelations;
         in >> size;
 
         QString s; // empty string
@@ -122,7 +136,10 @@ void KernelSymbolReader::read()
             checkOperationProgress();
         }
 
+        debugmsg("\n" << _factory->postponedTypesStats());
+
         // Read list of variables
+        _phase = phVariables;
         in >> size;
         for (qint32 i = 0; i < size; i++) {
             Variable* v = new Variable();
@@ -140,6 +157,8 @@ void KernelSymbolReader::read()
         throw; // Re-throw exception
     }
 
+    _phase = phFinished;
+
     // Regular cleanup
     operationStopped();
     shell->out() << "\rReading symbols finished";
@@ -153,7 +172,18 @@ void KernelSymbolReader::read()
 // Show some progress information
 void KernelSymbolReader::operationProgress()
 {
-    shell->out() << "\rReading symbols";
+    QString what;
+
+    switch(_phase) {
+    case phCompileUnits:     what = "compile units"; break;
+    case phElementaryTypes:  what = "elementary types"; break;
+    case phReferencingTypes: what = "referencing types"; break;
+    case phStructuredTypes:  what = "structured types"; break;
+    case phTypeRelations:    what = "type aliases"; break;
+    default:                 what = "variables"; break;
+    }
+
+    shell->out() << "\rReading " << what;
 
     qint64 size = _from->size();
     qint64 pos = _from->pos();
