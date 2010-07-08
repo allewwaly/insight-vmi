@@ -402,13 +402,46 @@ void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 }
 
 
+QString SymFactory::postponedTypesStats() const
+{
+    if (_postponedTypes.isEmpty())
+        return "The postponedTypes hash is emtpy.";
+
+    QString ret;
+    QList<RefTypeMultiHash::key_type> keys = _postponedTypes.uniqueKeys();
+
+    QMap<int, int> typeCount;
+
+    ret = QString("The postponedTypes hash contains %1 elements waiting for "
+            "%2 types.\n")
+            .arg(_postponedTypes.size())
+            .arg(keys.size());
+
+    for (int i = 0; i < keys.size(); ++i) {
+        int cnt = _postponedTypes.count(keys[i]);
+        if (typeCount.size() < 10)
+            typeCount.insert(cnt, keys[i]);
+        else {
+            QMap<int, int>::iterator it = --typeCount.end();
+            if (it.key() < cnt) {
+                typeCount.erase(it);
+                typeCount.insert(cnt, keys[i]);
+            }
+        }
+    }
+
+    for (QMap<int, int>::iterator it = typeCount.begin(); it != typeCount.end(); ++it)
+        ret += QString("%1 types waiting for id 0x%2\n").arg(it.key(), 10).arg(it.value(), 0, 16);
+
+    return ret;
+}
+
+
 void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, BaseType* target)
 {
     // Insert new ID/type relation into lookup tables
 	assert(_typesById.contains(new_id) == false);
 	_typesById.insert(new_id, target);
-	if (new_id == 0x1fff)
-	    debugmsg("Found it.");
 
     // Only add this type into the name relation table if it is new
 	if (isNewType(new_id, target) && !new_name.isEmpty())

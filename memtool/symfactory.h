@@ -171,6 +171,8 @@ public:
 
 	void symbolsFinished(RestoreType rt);
 
+	QString postponedTypesStats() const;
+
 protected:
 	template<class T>
 	inline T* getTypeInstance(const TypeInfo& info)
