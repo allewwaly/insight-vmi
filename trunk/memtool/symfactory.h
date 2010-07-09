@@ -172,6 +172,7 @@ public:
 	void symbolsFinished(RestoreType rt);
 
 	QString postponedTypesStats() const;
+	QString typesByHashStats() const;
 
 protected:
 	template<class T>
@@ -200,8 +201,7 @@ protected:
 
 		// Try to find the type based on its hash, but only if we don't have
         // any unresolved types
-		VisitedSet visited;
-		uint hash = t->hash(&visited);
+		uint hash = t->hash();
 		bool foundByHash = false;
 
 		if ((!rbt || rbt->refType()) && _typesByHash.contains(hash)) {

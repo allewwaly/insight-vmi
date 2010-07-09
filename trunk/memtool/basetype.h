@@ -56,8 +56,6 @@ public:
     }
 };
 
-typedef QSet<int> VisitedSet;
-
 
 class BaseType: public Symbol, public SourceRef
 {
@@ -119,10 +117,9 @@ public:
 
     /**
      * Create a hash of that type based on type(), size() and name().
-     * @param visited set of IDs of all already visited types which could cause recursion
      * @return a hash value of this type
      */
-    virtual uint hash(VisitedSet* visited) const;
+    virtual uint hash() const;
 
     /**
      * @return the size of this type in bytes
@@ -334,7 +331,9 @@ public:
     bool operator==(const BaseType& other) const;
 
 protected:
-    quint32 _size;       ///< size of this type in byte
+    quint32 _size;             ///< size of this type in byte
+    mutable uint _hash;        ///< cashes the hash of this type
+    bool _typeReadFromStream;  ///< hint whether type was initialized by readFrom() function
 //    BaseType* _parent;         ///< enclosing struct, if this is a struct member
 
     /**

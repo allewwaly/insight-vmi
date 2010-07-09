@@ -100,12 +100,13 @@ public:
     /**
      * Create a hash of that type based on BaseType::hash(), bitSize() and
      * bitOffset().
-     * @param visited set of IDs of all already visited types which could cause recursion
      * @return a hash value of this type
      */
-    virtual uint hash(VisitedSet* visited) const
+    virtual uint hash() const
     {
-        return BaseType::hash(visited) ^ _bitSize ^ rotl32(_bitOffset, 16);
+        if (!BaseType::_typeReadFromStream)
+            BaseType::_hash = NumericBaseType<T, realType>::hash() ^ _bitSize ^ rotl32(_bitOffset, 16);
+        return BaseType::_hash;
     }
 
     /**

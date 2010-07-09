@@ -10,7 +10,7 @@
 
 namespace kSym {
     static const qint32 fileMagic = 0x4B53594D; // "KSYM"
-    static const qint16 fileVersion = 2;
+    static const qint16 fileVersion = 3;
 //    static const qint16 flagCompressed = 1;
 };
 

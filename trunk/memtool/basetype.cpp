@@ -1,5 +1,6 @@
 #include "basetype.h"
 #include "refbasetype.h"
+#include "debug.h"
 
 #include <QIODevice>
 
@@ -34,13 +35,14 @@ const qint32 ElementaryTypes =
 
 
 BaseType::BaseType()
-        : _size(0)
+        : _size(0), _hash(0), _typeReadFromStream(false)
 {
 }
 
 
 BaseType::BaseType(const TypeInfo& info)
-        : Symbol(info), SourceRef(info), _size(info.byteSize())
+        : Symbol(info), SourceRef(info), _size(info.byteSize()), _hash(0),
+          _typeReadFromStream(false)
 {
 }
 
@@ -57,15 +59,19 @@ BaseType::RealType BaseType::dereferencedType() const
 }
 
 
-uint BaseType::hash(VisitedSet* /* visited */) const
+uint BaseType::hash() const
 {
-    // Create a hash value based on name, size and type
-    uint ret = type();
-    if (!_name.isEmpty())
-        ret ^= qHash(_name);
-    if (_size > 0)
-        ret ^= qHash(_size);
-    return ret;
+    if (!_typeReadFromStream) {
+        // Create a hash value based on name, size and type. Always do this,
+        // don't cache the hash, because it might change for chained referencing
+        // types unnoticed
+            _hash = type();
+        if (!_name.isEmpty())
+            _hash ^= qHash(_name);
+        if (_size > 0)
+            _hash ^= qHash(_size);
+    }
+    return _hash;
 }
 
 
@@ -126,7 +132,8 @@ void BaseType::readFrom(QDataStream& in)
     // Read inherited values
     Symbol::readFrom(in);
     SourceRef::readFrom(in);
-    in >> _size;
+    in >> _size >> _hash;
+    _typeReadFromStream = true;
 }
 
 
@@ -135,7 +142,7 @@ void BaseType::writeTo(QDataStream& out) const
     // Write inherited values
     Symbol::writeTo(out);
     SourceRef::writeTo(out);
-    out << _size;
+    out << _size << hash();
 }
 
 

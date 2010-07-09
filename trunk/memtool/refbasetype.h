@@ -27,10 +27,9 @@ public:
 
      /**
      * Create a hash of that type based on BaseType::hash() and refType()
-     * @param visited set of IDs of all already visited types which could cause recursion
      * @return a hash value of this type
      */
-    virtual uint hash(VisitedSet* visited) const;
+    virtual uint hash() const;
 
     /**
      * @return the size of this type in bytes

@@ -19,12 +19,14 @@ RefBaseType::RefBaseType(const TypeInfo& info)
 }
 
 
-uint RefBaseType::hash(VisitedSet* visited) const
+uint RefBaseType::hash() const
 {
-    uint ret = BaseType::hash(visited);
-    if (_refType)
-        ret ^= _refType->hash(visited);
-    return ret;
+    if (!_typeReadFromStream) {
+        _hash = BaseType::hash();
+        if (_refType)
+            _hash ^= _refType->hash();
+    }
+    return _hash;
 }
 
 
