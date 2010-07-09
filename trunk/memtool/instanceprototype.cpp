@@ -58,30 +58,25 @@ QString InstancePrototype::fullName() const
 }
 
 
-const QList<QString>& InstancePrototype::memberNames() const
+QStringList InstancePrototype::memberNames() const
 {
-	debugenter();
-	Instance* inst;
-	const QList<QString>* list = dynamic_cast<const QList<QString>* >(
-			(inst = thisInstance()) ? &thisInstance()->memberNames() : 0);
-	assert(list != 0);
-    return list ? *list : *(new QList<QString>());
+    Instance* inst;
+    return (inst = thisInstance()) ? inst->memberNames() : QStringList();
 }
 
 
 InstanceList InstancePrototype::members() const
 {
-	debugenter();
 	Instance* inst;
     return (inst = thisInstance()) ? inst->members() : InstanceList();
 }
 
 
-const BaseType* InstancePrototype::type() const
-{
-	Instance* inst;
-    return (inst = thisInstance()) ? inst->type() : 0;
-}
+//const BaseType* InstancePrototype::type() const
+//{
+//	Instance* inst;
+//    return (inst = thisInstance()) ? inst->type() : 0;
+//}
 
 
 QString InstancePrototype::typeName() const

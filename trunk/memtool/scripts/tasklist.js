@@ -8,11 +8,6 @@ function dumpInstance(inst)
 	print("-------------------------------------------------------");
 }
 
-function dumpThis()
-{
-	print("this = " + this["name"]);
-}
-
 function lalign(s, len)
 {
 	while (len > 0 && s.length < len)
@@ -38,10 +33,10 @@ function printSiblings(p)
 //		print("This is not an Instance object!, p = " + p);
 //		return;
 //	}
-	print("+++ Entering printSiblings()");
+//	print("+++ Entering printSiblings()");
 	
 	if (p.isNull()) {
-		print("+++ Returning from printSiblings()");
+//		print("+++ Returning from printSiblings()");
 		return;
 	}
 	
@@ -66,7 +61,7 @@ function printSiblings(p)
 	} while (it.address() != p.parent.address() && it.address() != p.address());
 
 
-	print("+++ Leaving printSiblings()");
+//	print("+++ Leaving printSiblings()");
 }
 
 var hdr = 

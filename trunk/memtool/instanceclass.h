@@ -10,6 +10,7 @@
 
 #include <QScriptClass>
 #include <QScriptString>
+#include <QStringList>
 #include "instance.h"
 
 // Forward declarations
@@ -27,7 +28,6 @@ public:
 
     QScriptValue constructor();
 
-//    QScriptValue newInstance(const QString& queryString);
     QScriptValue newInstance(const Instance& inst);
 
     QueryFlags queryProperty(const QScriptValue& object,
@@ -52,6 +52,9 @@ public:
     static QScriptValue toScriptValue(const Instance& inst, QScriptContext* ctx,
     		QScriptEngine* eng);
 
+//    QVariant extension(Extension extension, const QVariant& argument = QVariant());
+//    bool supportsExtension(Extension extension) const;
+
 private:
     static QScriptValue construct(QScriptContext* ctx, QScriptEngine* eng);
 
@@ -61,8 +64,11 @@ private:
     static QScriptValue membersToScriptValue(QScriptEngine* eng, const InstanceList& inst);
     static void membersFromScriptValue(const QScriptValue& obj, InstanceList& inst);
 
-    QScriptValue proto;
-    QScriptValue ctor;
+    static QScriptValue stringListToScriptValue(QScriptEngine* eng, const QStringList& list);
+    static void stringListFromScriptValue(const QScriptValue& obj, QStringList& list);
+
+    QScriptValue _proto;
+    QScriptValue _ctor;
 };
 
 #endif /* INSTANCECLASS_H_ */
