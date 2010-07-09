@@ -402,41 +402,6 @@ void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 }
 
 
-QString SymFactory::postponedTypesStats() const
-{
-    if (_postponedTypes.isEmpty())
-        return "The postponedTypes hash is emtpy.";
-
-    QString ret;
-    QList<RefTypeMultiHash::key_type> keys = _postponedTypes.uniqueKeys();
-
-    QMap<int, int> typeCount;
-
-    ret = QString("The postponedTypes hash contains %1 elements waiting for "
-            "%2 types.\n")
-            .arg(_postponedTypes.size())
-            .arg(keys.size());
-
-    for (int i = 0; i < keys.size(); ++i) {
-        int cnt = _postponedTypes.count(keys[i]);
-        if (typeCount.size() < 10)
-            typeCount.insert(cnt, keys[i]);
-        else {
-            QMap<int, int>::iterator it = --typeCount.end();
-            if (it.key() < cnt) {
-                typeCount.erase(it);
-                typeCount.insert(cnt, keys[i]);
-            }
-        }
-    }
-
-    for (QMap<int, int>::iterator it = typeCount.begin(); it != typeCount.end(); ++it)
-        ret += QString("%1 types waiting for id 0x%2\n").arg(it.key(), 10).arg(it.value(), 0, 16);
-
-    return ret;
-}
-
-
 void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, BaseType* target)
 {
     // Insert new ID/type relation into lookup tables
@@ -451,8 +416,6 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
 	if (_postponedTypes.contains(new_id)) {
 		QList<ReferencingType*> list = _postponedTypes.values(new_id);
 		QList<ReferencingType*>::iterator it = list.begin();
-
-		VisitedSet visited;
 
 		while (it != list.end())
 		{
@@ -471,8 +434,7 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
                 // If this a RefBaseType, we need to save the old hash
                 if (rbt) {
                     // Get previous hash and name of type
-                    visited.clear();
-                    old_hash = rbt->hash(&visited);
+                    old_hash = rbt->hash();
                 }
 
                 // Add the missing reference according to type
@@ -482,8 +444,7 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
                 // Remove type at its old index, re-add it at its new index
                 if (rbt) {
                     // Calculate new hash of type
-                    visited.clear();
-                    hash = rbt->hash(&visited);
+                    hash = rbt->hash();
                     // Did the hash change?
                     if (hash != old_hash)
                         relocateHashEntry(old_hash, hash, (BaseType*)rbt, &_typesByHash);
@@ -655,8 +616,7 @@ void SymFactory::addSymbol(BaseType* type)
     else if (s)
         resolveReferences(s);
 
-    VisitedSet visited;
-    _typesByHash.insert(type->hash(&visited), type);
+    _typesByHash.insert(type->hash(), type);
 }
 
 
@@ -805,16 +765,24 @@ void SymFactory::symbolsFinished(RestoreType rt)
     shell->out() << qSetFieldWidth(0) << left;
 
 	if (!_postponedTypes.isEmpty()) {
-		shell->out() << "  | The following types still have unresolved references:" << endl;
+//		shell->out() << "  | The following types still have unresolved references:" << endl;
 		QList<int> keys = _postponedTypes.uniqueKeys();
-		qSort(keys);
-		for (int i = 0; i < keys.size(); i++) {
-			int key = keys[i];
-			shell->out() << QString("  |   missing id: 0x%1, %2 element(s)\n").arg(key, 0, 16).arg(_postponedTypes.count(key));
-		}
+//		qSort(keys);
+//		for (int i = 0; i < keys.size(); i++) {
+//			int key = keys[i];
+//			shell->out() << QString("  |   missing id: 0x%1, %2 element(s)\n").arg(key, 0, 16).arg(_postponedTypes.count(key));
+//		}
+	    shell->out() << "  | There are " << _postponedTypes.size()
+	            << " referencing types still waiting for " << keys.size()
+	            << " missing types." << endl;
 	}
 
     shell->out() << "  `-------------------------------------------" << endl;
+//    shell->out() << typesByHashStats();
+//    shell->out() << "-------------------------------------------" << endl;
+//    shell->out() << postponedTypesStats();
+//    shell->out() << "-------------------------------------------" << endl;
+
 
     // Some sanity checks on the numbers
     assert(_typesById.size() >= _types.size());
@@ -825,3 +793,94 @@ void SymFactory::symbolsFinished(RestoreType rt)
         assert(_types.size() + _typeFoundByHash == _typesById.size());
 }
 
+
+QString SymFactory::postponedTypesStats() const
+{
+    if (_postponedTypes.isEmpty())
+        return "The postponedTypes hash is emtpy.";
+
+    QString ret;
+    QList<RefTypeMultiHash::key_type> keys = _postponedTypes.uniqueKeys();
+
+    QMap<int, int> typeCount;
+
+    ret = QString("The postponedTypes hash contains %1 elements waiting for "
+            "%2 types.\n")
+            .arg(_postponedTypes.size())
+            .arg(keys.size());
+
+    for (int i = 0; i < keys.size(); ++i) {
+        int cnt = _postponedTypes.count(keys[i]);
+//        if (typeCount.size() < 10)
+            typeCount.insert(cnt, keys[i]);
+//        else {
+//            QMap<int, int>::iterator it = --typeCount.end();
+//            if (it.key() < cnt) {
+//                typeCount.erase(it);
+//                typeCount.insert(cnt, keys[i]);
+//            }
+//        }
+    }
+
+    QMap<int, int>::const_iterator it = --typeCount.constEnd();
+    for (int i = 0; i < 10; ++i) {
+        ret += QString("%1 types waiting for id 0x%2\n")
+                .arg(it.key(), 10)
+                .arg(it.value(), 0, 16);
+
+        if (it == typeCount.constBegin())
+            break;
+        else
+            --it;
+    }
+
+    return ret;
+}
+
+
+QString SymFactory::typesByHashStats() const
+{
+    if (_typesByHash.isEmpty())
+        return "The typesByHash hash is emtpy.";
+
+    typedef BaseTypeUIntHash HashType;
+    typedef QMap<int, HashType::key_type> MapType;
+
+    QString ret;
+    QList<HashType::key_type> keys = _typesByHash.uniqueKeys();
+
+    MapType typeCount;
+
+    ret = QString("The typesByHash hash contains %1 keys and "
+            "%2 values.\n")
+            .arg(keys.size())
+            .arg(_typesByHash.size());
+
+    for (int i = 0; i < keys.size(); ++i) {
+        int cnt = _typesByHash.count(keys[i]);
+//        if (typeCount.size() < 10)
+            typeCount.insert(cnt, keys[i]);
+//        else {
+//            MapType::iterator it = --typeCount.end();
+//            if (it.key() < cnt) {
+//                typeCount.erase(it);
+//                typeCount.insert(cnt, keys[i]);
+//            }
+//        }
+    }
+
+    MapType::const_iterator it = --typeCount.constEnd();
+    for (int i = 0; i < 10; ++i) {
+        ret += QString("%1 entries for key 0x%2 (type id 0x%3)\n")
+            .arg(it.key(), 10)
+            .arg(it.value(), sizeof(HashType::key_type) << 1, 16, QChar('0'))
+            .arg(_typesByHash.value(it.value())->id(), 0, 16);
+
+        if (it == typeCount.constBegin())
+            break;
+        else
+            --it;
+    }
+
+    return ret;
+}

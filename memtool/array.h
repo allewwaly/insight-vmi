@@ -31,10 +31,9 @@ public:
 
     /**
      * Create a hash of that type based on Pointer::hash() and length()
-     * @param visited set of IDs of all already visited types which could cause recursion
      * @return a hash value of this type
      */
-    virtual uint hash(VisitedSet* visited) const;
+    virtual uint hash() const;
 
     /**
      * This gives a pretty name of that type which may involve referencing

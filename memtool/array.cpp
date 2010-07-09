@@ -27,12 +27,14 @@ BaseType::RealType Array::type() const
 }
 
 
-uint Array::hash(VisitedSet* visited) const
+uint Array::hash() const
 {
-    uint ret = Pointer::hash(visited);
-    if (_length > 0)
-        ret ^= rotl32(_length, 8);
-    return ret;
+    if (!_typeReadFromStream) {
+        _hash = Pointer::hash();
+        if (_length > 0)
+            _hash ^= rotl32(_length, 8);
+    }
+    return _hash;
 }
 
 

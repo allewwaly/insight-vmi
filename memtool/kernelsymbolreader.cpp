@@ -114,15 +114,15 @@ void KernelSymbolReader::read()
             if (t->type() & (ReferencingTypes & ~(BaseType::rtStruct|BaseType::rtUnion)))
                 _phase = phReferencingTypes;
             else if (t->type() & (BaseType::rtStruct|BaseType::rtUnion)) {
-                if (_phase == phReferencingTypes)
-                    debugmsg("\n" << _factory->postponedTypesStats());
+//                if (_phase == phReferencingTypes)
+//                    debugmsg("\n" << _factory->postponedTypesStats());
                 _phase = phStructuredTypes;
             }
 
             checkOperationProgress();
         }
 
-        debugmsg("\n" << _factory->postponedTypesStats());
+//        debugmsg("\n" << _factory->postponedTypesStats());
 
         // Read list of additional type-id-relations
         _phase = phTypeRelations;
@@ -136,7 +136,7 @@ void KernelSymbolReader::read()
             checkOperationProgress();
         }
 
-        debugmsg("\n" << _factory->postponedTypesStats());
+//        debugmsg("\n" << _factory->postponedTypesStats());
 
         // Read list of variables
         _phase = phVariables;

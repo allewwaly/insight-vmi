@@ -6,6 +6,7 @@
  */
 
 #include "enum.h"
+#include "debug.h"
 
 Enum::Enum()
 {
@@ -24,20 +25,22 @@ BaseType::RealType Enum::type() const
 }
 
 
-uint Enum::hash(VisitedSet* visited) const
+uint Enum::hash() const
 {
-    uint ret = BaseType::hash(visited);
-    ret ^= rotl32(_enumValues.size(), 16) ^ (_srcLine);
-    // To place the enum values at different bit positions
-    uint rot = 0;
-    // Extend the hash to all enumeration values
-    EnumHash::const_iterator it = _enumValues.constBegin();
-    while (it != _enumValues.constEnd()) {
-        ret ^= rotl32(it.key(), rot) ^ qHash(it.value());
-        rot = (rot + 4) % 32;
-        ++it;
+    if (!_typeReadFromStream) {
+        _hash = BaseType::hash();
+        _hash ^= rotl32(_enumValues.size(), 16) ^ (_srcLine);
+        // To place the enum values at different bit positions
+        uint rot = 0;
+        // Extend the hash to all enumeration values
+        EnumHash::const_iterator it = _enumValues.constBegin();
+        while (it != _enumValues.constEnd()) {
+            _hash ^= rotl32(it.key(), rot) ^ qHash(it.value());
+            rot = (rot + 4) % 32;
+            ++it;
+        }
     }
-    return ret;
+    return _hash;
 }
 
 
@@ -68,12 +71,12 @@ void Enum::readFrom(QDataStream& in)
     BaseType::readFrom(in);
 
     _enumValues.clear();
-    qint32 size;
+    qint32 enumCnt;
     EnumHash::key_type key;
     EnumHash::mapped_type value;
 
-    in >> size;
-    for (int i = 0; i < size; i++) {
+    in >> enumCnt;
+    for (int i = 0; i < enumCnt; i++) {
         in >> key >> value;
         _enumValues.insert(key, value);
     }
