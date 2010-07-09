@@ -37,9 +37,9 @@ public slots:
     QString name() const;
     QString parentName() const;
     QString fullName() const;
-    const QList<QString>& memberNames() const;
+    QStringList memberNames() const;
     InstanceList members() const;
-    const BaseType* type() const;
+//    const BaseType* type() const;
     QString typeName() const;
     quint32 size() const;
     bool memberExists(const QString& name) const;

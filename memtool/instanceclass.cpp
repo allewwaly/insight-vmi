@@ -14,7 +14,7 @@
 Q_DECLARE_METATYPE(Instance)
 Q_DECLARE_METATYPE(Instance*)
 Q_DECLARE_METATYPE(InstanceClass*)
-Q_DECLARE_METATYPE(InstanceList);
+Q_DECLARE_METATYPE(InstanceList)
 
 /**
  * This is an iterator for the properties of InstanceClass object.
@@ -50,17 +50,18 @@ InstanceClass::InstanceClass(QScriptEngine *eng)
 {
     qScriptRegisterMetaType<Instance>(eng, instToScriptValue, instFromScriptValue);
     qScriptRegisterMetaType<InstanceList>(eng, membersToScriptValue, membersFromScriptValue);
+    qScriptRegisterMetaType<QStringList>(eng, stringListToScriptValue, stringListFromScriptValue);
 
-    proto = eng->newQObject(new InstancePrototype(this),
+    _proto = eng->newQObject(new InstancePrototype(this),
                                QScriptEngine::QtOwnership,
                                QScriptEngine::SkipMethodsInEnumeration
                                | QScriptEngine::ExcludeSuperClassMethods
                                | QScriptEngine::ExcludeSuperClassProperties);
     QScriptValue global = eng->globalObject();
-    proto.setPrototype(global.property("Object").property("prototype"));
+    _proto.setPrototype(global.property("Object").property("prototype"));
 
-    ctor = eng->newFunction(construct, proto);
-    ctor.setData(qScriptValueFromValue(eng, this));
+    _ctor = eng->newFunction(construct, _proto);
+    _ctor.setData(qScriptValueFromValue(eng, this));
 }
 
 
@@ -133,20 +134,14 @@ QString InstanceClass::name() const
 
 QScriptValue InstanceClass::prototype() const
 {
-    return proto;
+    return _proto;
 }
 
 
 QScriptValue InstanceClass::constructor()
 {
-    return ctor;
+    return _ctor;
 }
-
-
-//QScriptValue InstanceClass::newInstance(const QString& queryString)
-//{
-//    return newInstance(Instance());
-//}
 
 
 QScriptValue InstanceClass::toScriptValue(const Instance& inst,
@@ -160,7 +155,9 @@ QScriptValue InstanceClass::toScriptValue(const Instance& inst,
 QScriptValue InstanceClass::newInstance(const Instance& inst)
 {
     QScriptValue data = engine()->newVariant(qVariantFromValue(inst));
-    return engine()->newObject(this, data);
+    QScriptValue ret = engine()->newObject(this, data);
+    ret.setPrototype(_proto);
+    return ret;
 }
 
 
@@ -204,29 +201,78 @@ void InstanceClass::instFromScriptValue(const QScriptValue& obj, Instance& inst)
 
 QScriptValue InstanceClass::membersToScriptValue(QScriptEngine* eng, const InstanceList& list)
 {
-	QScriptValue ret = eng->newArray(list.size());
-	for (int i = 0; i < list.size(); ++i)
-		ret.setProperty(i, instToScriptValue(eng, list[i]));
+    QScriptValue ret = eng->newArray(list.size());
+    for (int i = 0; i < list.size(); ++i)
+        ret.setProperty(i, instToScriptValue(eng, list[i]));
     return ret;
 }
 
 
 void InstanceClass::membersFromScriptValue(const QScriptValue& obj, InstanceList& list)
 {
-	list.clear();
+    list.clear();
     if (!obj.isArray())
-    	return;
+        return;
 
-    int i = 0;
-    QScriptValue val = obj.property(i);
-    while (val.isValid()) {
-    	Instance inst;
-    	instFromScriptValue(val, inst);
-    	list.append(inst);
-    	val = obj.property(++i);
+    QScriptValue lenVal = obj.property("length");
+    int len = lenVal.isNumber() ? lenVal.toNumber() : 0;
+
+    for (int i = 0; i < len; ++i) {
+        Instance inst;
+        instFromScriptValue(obj.property(i), inst);
+        list.append(inst);
     }
 }
 
+
+QScriptValue InstanceClass::stringListToScriptValue(QScriptEngine* eng, const QStringList& list)
+{
+    QScriptValue ret = eng->newArray(list.size());
+    for (int i = 0; i < list.size(); ++i)
+        ret.setProperty(i, list[i]);
+    return ret;
+}
+
+
+void InstanceClass::stringListFromScriptValue(const QScriptValue& obj, QStringList& list)
+{
+    list.clear();
+    if (!obj.isArray())
+        return;
+
+    QScriptValue lenVal = obj.property("length");
+    int len = lenVal.isNumber() ? lenVal.toNumber() : 0;
+
+    for (int i = 0; i < len; ++i) {
+        list.append(obj.property(i).toString());
+    }
+}
+
+
+//QVariant InstanceClass::extension(Extension extension, const QVariant& argument)
+//{
+//    if (extension != HasInstance)
+//        return QVariant();
+//
+//    QScriptValueList args = argument.value<QScriptValueList>();
+//    if (args.size() != 2)
+//        return false;
+//
+//    Instance inst;
+//    instFromScriptValue(args[0], inst);
+//    if (inst.isNull())
+//        return QScriptClass::extension(extension, argument);
+//
+//    debugmsg(args[1].toString());
+//
+//    return QVariant();
+//}
+//
+//
+//bool InstanceClass::supportsExtension(Extension extension) const
+//{
+//    return extension == HasInstance;
+//}
 
 //------------------------------------------------------------------------------
 
