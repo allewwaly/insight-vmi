@@ -54,13 +54,22 @@ protected:
 
 private:
     /**
-     * Looks up a virtual address in the page table and returns the physical
-     * address.
+     * Looks up a virtual address in the x86_64 page table and returns the
+     * physical address.
      * @param vaddr virtual address
      * @param pageSize here the size of the belonging page is returned
      * @return physical address
      */
-    quint64 pageLookup(quint64 vaddr, int* pageSize);
+    quint64 pageLookup64(quint64 vaddr, int* pageSize);
+
+    /**
+     * Looks up a virtual address in the i386 page table and returns the
+     * physical address.
+     * @param vaddr virtual address
+     * @param pageSize here the size of the belonging page is returned
+     * @return physical address
+     */
+    quint64 pageLookup32(quint64 vaddr, int* pageSize);
 
     /**
      * Translates a virtual kernel address to a physical address, either by

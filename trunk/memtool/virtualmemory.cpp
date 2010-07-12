@@ -9,43 +9,57 @@
 #include "virtualmemoryexception.h"
 #include "debug.h"
 
-// Offsets of the components of a virtual address in x86_64
-#define PML4_SHIFT      39
-#define PTRS_PER_PML4   512
-#define PGDIR_SHIFT     30
-#define PTRS_PER_PGD    512
-#define PMD_SHIFT       21
-#define PTRS_PER_PMD    512
-#define PTRS_PER_PTE    512
+// Offsets of the components of a virtual address in i386
+#define PGDIR_SHIFT_X86       22
+#define PTRS_PER_PGD_X86    1024
+#define PTRS_PER_PTE_X86    1024
 
-// Extract offsets from virtual addresses
-#define pml4_index(address) (((address) >> PML4_SHIFT) & (PTRS_PER_PML4-1))
-#define pgd_index(address)  (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
-#define pmd_index(address)  (((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
-#define pte_index(address)  (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+// Offsets of the components of a virtual address in x86_64
+#define PML4_SHIFT_X86_64      39
+#define PTRS_PER_PML4_X86_64   512
+#define PGDIR_SHIFT_X86_64     30
+#define PTRS_PER_PGD_X86_64    512
+#define PMD_SHIFT_X86_64       21
+#define PTRS_PER_PMD_X86_64    512
+#define PTRS_PER_PTE_X86_64    512
 
 // Kernel constants for memory and page sizes.
 // I think it's reasonable to hard-code them for now.
 #define MEGABYTES(x)  ((x) * (1048576))
-#define __PHYSICAL_MASK_SHIFT  40
-#define __PHYSICAL_MASK        ((1UL << __PHYSICAL_MASK_SHIFT) - 1)
-#define __VIRTUAL_MASK_SHIFT   48
-#define __VIRTUAL_MASK         ((1UL << __VIRTUAL_MASK_SHIFT) - 1)
+#define __PHYSICAL_MASK_SHIFT_X86     32
+#define __PHYSICAL_MASK_SHIFT_X86_64  40
+#define __PHYSICAL_MASK_X86           ((1UL << __PHYSICAL_MASK_SHIFT_X86) - 1)
+#define __PHYSICAL_MASK_X86_64        ((1UL << __PHYSICAL_MASK_SHIFT_X86_64) - 1)
+//#define __VIRTUAL_MASK_SHIFT_X86    32
+//#define __VIRTUAL_MASK_SHIFT_X86_64   48
+//#define __VIRTUAL_MASK_X86_64         ((1UL << __VIRTUAL_MASK_SHIFT_X86_64) - 1)
 #define PAGE_SHIFT             12
 #define KPAGE_SIZE              (1UL << PAGE_SHIFT)
-#define PHYSICAL_PAGE_MASK    (~(KPAGE_SIZE-1) & (__PHYSICAL_MASK << PAGE_SHIFT))
+#define PHYSICAL_PAGE_MASK_X86       (~(KPAGE_SIZE-1) & (__PHYSICAL_MASK_X86 << PAGE_SHIFT))
+#define PHYSICAL_PAGE_MASK_X86_64    (~(KPAGE_SIZE-1) & (__PHYSICAL_MASK_X86_64 << PAGE_SHIFT))
 
 #define KERNEL_PAGE_OFFSET_FOR_MASK (KPAGE_SIZE - 1)
 #define PAGEMASK    ~((unsigned long long)KERNEL_PAGE_OFFSET_FOR_MASK)
 
-#define PAGEBASE(X)           (((unsigned long)(X)) & (unsigned long)PAGEMASK)
+//#define PAGEBASE(X)           (((unsigned long)(X)) & (unsigned long)PAGEMASK)
 #define _2MB_PAGE_MASK       (~((MEGABYTES(2))-1))
+#define _4MB_PAGE_MASK       (~((MEGABYTES(4))-1))
 
 #define PAGEOFFSET(X)   ((X) & KERNEL_PAGE_OFFSET_FOR_MASK)
 
 // flags
 #define _PAGE_PRESENT   0x001
 #define _PAGE_PSE       0x080   /* 2MB page */
+
+// Extract offsets from virtual addresses in x86_64
+#define pgd_index_x86(address)  (((address) >> PGDIR_SHIFT_X86) & (PTRS_PER_PGD_X86 - 1))
+#define pte_index_x86(address)  (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE_X86 - 1))
+
+// Extract offsets from virtual addresses in x86_64
+#define pml4_index_x86_64(address) (((address) >> PML4_SHIFT_X86_64) & (PTRS_PER_PML4_X86_64 - 1))
+#define pgd_index_x86_64(address)  (((address) >> PGDIR_SHIFT_X86_64) & (PTRS_PER_PGD_X86_64 - 1))
+#define pmd_index_x86_64(address)  (((address) >> PMD_SHIFT_X86_64) & (PTRS_PER_PMD_X86_64 - 1))
+#define pte_index_x86_64(address)  (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE_X86_64 - 1))
 
 
 VirtualMemory::VirtualMemory(MemSpecs specs, QIODevice* physMem)
@@ -226,7 +240,92 @@ quint64 VirtualMemory::extractULongFromPhysMem(quint64 physaddr)
 }
 
 
-quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
+quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize)
+{
+    // Check the TLB first. For the key, the small page size (4k) is always
+    // assumed.
+    TLBEntry* tlbEntry;
+    if ( (tlbEntry =_tlb[vaddr & PAGEMASK]) ) {
+        // Return page size and address
+        *pageSize = tlbEntry->size;
+        quint64 mask = tlbEntry->size - 1UL;
+        return tlbEntry->addr | (vaddr & mask);
+    }
+
+//    quint64 pml4;
+//    quint64 pgd_paddr;
+    quint64 pgd;
+//    quint64 pmd_paddr;
+//    quint64 pmd;
+    quint64 pte_paddr;
+    quint64 pte;
+
+    if (_specs.initLevel4Pgt == 0) {
+        virtualMemoryError("_specs.initLevel4Pgt not set\n");
+    }
+
+    // First translate the virtual address of the base page directory to a
+    // physical address
+    quint64 swapper_pg_dir = 0;
+    if (_specs.swapperPgDir >= _specs.startKernelMap) {
+        swapper_pg_dir = ((_specs.swapperPgDir)
+                - (quint64) _specs.startKernelMap);
+    }
+    else if (_specs.swapperPgDir >= _specs.pageOffset) {
+        swapper_pg_dir = ((_specs.swapperPgDir) - _specs.pageOffset);
+    }
+    else {
+        swapper_pg_dir = _specs.swapperPgDir;
+    }
+    swapper_pg_dir = (swapper_pg_dir) & PHYSICAL_PAGE_MASK_X86;
+
+    // Lookup address for the pgd page directory. The size of one page table
+    // entry is sizeof(unsigned long)
+    pgd = extractULongFromPhysMem(swapper_pg_dir
+            + PAGEOFFSET(_specs.sizeofUnsignedLong * pgd_index_x86(vaddr)));
+
+    if (!(pgd & _PAGE_PRESENT)) {
+        virtualMemoryError(
+                QString("Error reading from virtual address 0x%1: page not present in pgd")
+                    .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
+    }
+
+    pte_paddr = pgd & PHYSICAL_PAGE_MASK_X86;
+
+    // Lookup the final page table entry
+    pte = extractULongFromPhysMem(pte_paddr
+            + PAGEOFFSET(_specs.sizeofUnsignedLong * pmd_index_x86_64(vaddr)));
+
+    if (!(pte & _PAGE_PRESENT)) {
+        virtualMemoryError(
+                QString("Error reading from virtual address 0x%1: page not present in pte")
+                    .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
+    }
+
+    quint64 physaddr = 0;
+
+    // Is this a 4kB or 4MB page?
+    if (pgd & _PAGE_PSE) {
+        // 4MB Page
+        *pageSize = MEGABYTES(4);
+        physaddr = (pgd & PHYSICAL_PAGE_MASK_X86) + (vaddr & ~_4MB_PAGE_MASK);
+    }
+    else {
+        *pageSize = KPAGE_SIZE;
+        physaddr = (pte & PHYSICAL_PAGE_MASK_X86)
+                + (((quint64) (vaddr)) & KERNEL_PAGE_OFFSET_FOR_MASK);
+    }
+
+    // Create TLB entry. Always use small page size (4k) as key into cache.
+    _tlb.insert(
+            vaddr & PAGEMASK,
+            new TLBEntry(vaddr & ~((*pageSize) - 1), *pageSize));
+
+    return physaddr;
+}
+
+
+quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize)
 {
     // Check the TLB first. For the key, the small page size (4k) is always
     // assumed.
@@ -257,18 +356,18 @@ quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
         init_level4_pgt_tr = ((_specs.initLevel4Pgt)
                 - (quint64) _specs.startKernelMap);
     }
-    else if (vaddr >= _specs.pageOffset) {
+    else if (_specs.initLevel4Pgt >= _specs.pageOffset) {
         init_level4_pgt_tr = ((_specs.initLevel4Pgt) - _specs.pageOffset);
     }
     else {
         init_level4_pgt_tr = _specs.initLevel4Pgt;
     }
-    init_level4_pgt_tr = (init_level4_pgt_tr) & PHYSICAL_PAGE_MASK;
+    init_level4_pgt_tr = (init_level4_pgt_tr) & PHYSICAL_PAGE_MASK_X86_64;
 
     // Lookup address for the pgd page directory. The size of one page table
     // entry is sizeof(unsigned long)
     pml4 = extractULongFromPhysMem(init_level4_pgt_tr
-                    + PAGEOFFSET(_specs.sizeofUnsignedLong * pml4_index(vaddr)));
+                    + PAGEOFFSET(_specs.sizeofUnsignedLong * pml4_index_x86_64(vaddr)));
 
     if (!(pml4 & _PAGE_PRESENT)) {
         virtualMemoryError(
@@ -276,11 +375,11 @@ quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
                     .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
     }
 
-    pgd_paddr = (pml4) & PHYSICAL_PAGE_MASK;
+    pgd_paddr = (pml4) & PHYSICAL_PAGE_MASK_X86_64;
 
     // Lookup address for the pgd page directory
     pgd = extractULongFromPhysMem(pgd_paddr
-            + PAGEOFFSET(_specs.sizeofUnsignedLong * pgd_index(vaddr)));
+            + PAGEOFFSET(_specs.sizeofUnsignedLong * pgd_index_x86_64(vaddr)));
 
     if (!(pgd & _PAGE_PRESENT)) {
         virtualMemoryError(
@@ -288,11 +387,11 @@ quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
                     .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
     }
 
-    pmd_paddr = pgd & PHYSICAL_PAGE_MASK;
+    pmd_paddr = pgd & PHYSICAL_PAGE_MASK_X86_64;
 
     // Lookup address for the pmd page directory
     pmd = extractULongFromPhysMem(pmd_paddr
-            + PAGEOFFSET(_specs.sizeofUnsignedLong * pmd_index(vaddr)));
+            + PAGEOFFSET(_specs.sizeofUnsignedLong * pmd_index_x86_64(vaddr)));
 
     if (!(pmd & _PAGE_PRESENT)) {
         virtualMemoryError(
@@ -305,14 +404,14 @@ quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
     if (pmd & _PAGE_PSE) {
         // 2MB Page
         *pageSize = MEGABYTES(2);
-        physaddr = (pmd & PHYSICAL_PAGE_MASK) + (vaddr & ~_2MB_PAGE_MASK);
+        physaddr = (pmd & PHYSICAL_PAGE_MASK_X86_64) + (vaddr & ~_2MB_PAGE_MASK);
     }
     else {
-        pte_paddr = pmd & PHYSICAL_PAGE_MASK;
+        pte_paddr = pmd & PHYSICAL_PAGE_MASK_X86_64;
 
         // Lookup the final page table entry
         pte = extractULongFromPhysMem(pte_paddr
-                + PAGEOFFSET(_specs.sizeofUnsignedLong * pte_index(vaddr)));
+                + PAGEOFFSET(_specs.sizeofUnsignedLong * pte_index_x86_64(vaddr)));
 
         if (!(pte & (_PAGE_PRESENT))) {
             virtualMemoryError(
@@ -321,7 +420,7 @@ quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
         }
 
         *pageSize = KPAGE_SIZE;
-        physaddr = (pte & PHYSICAL_PAGE_MASK)
+        physaddr = (pte & PHYSICAL_PAGE_MASK_X86_64)
                 + (((quint64) (vaddr)) & KERNEL_PAGE_OFFSET_FOR_MASK);
     }
 
@@ -336,10 +435,6 @@ quint64 VirtualMemory::pageLookup(quint64 vaddr, int* pageSize)
 
 quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
 {
-    // TODO honor _sprecs.arch flag and use different address translations
-    if (_specs.arch != MemSpecs::x86_64)
-        virtualMemoryError("Architecture not implemented");
-
     quint64 physaddr = 0;
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
@@ -354,7 +449,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
             physaddr = ((vaddr) - _specs.pageOffset);
         }
         else {
-            // Is the address in canonical form?
+            // Is the 64 bit address in canonical form?
             if (_specs.arch == MemSpecs::x86_64) {
                 quint64 high_bits = 0xFFFF800000000000UL & vaddr;
                 if (high_bits != 0 && high_bits != 0xFFFF800000000000UL)
@@ -373,7 +468,10 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
     }
     else {
         // Otherwise use the address_lookup function
-        physaddr = pageLookup(vaddr, pageSize);
+        if (_specs.arch == MemSpecs::i386)
+            physaddr = pageLookup32(vaddr, pageSize);
+        else
+            physaddr = pageLookup64(vaddr, pageSize);
     }
 
     return physaddr;
