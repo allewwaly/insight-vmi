@@ -89,7 +89,7 @@ public:
 
     typedef QHash<BaseType::RealType, QString> RealTypeRevMap;
 
-    static BaseType::RealTypeRevMap getRealTypeRevMap();
+    static RealTypeRevMap getRealTypeRevMap();
 
     /**
      * Constructor
