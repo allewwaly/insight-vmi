@@ -241,21 +241,27 @@ void MemSpecParser::parseSystemMap(MemSpecs* specs)
     if (!sysMap.open(QIODevice::ReadOnly))
         memSpecParserError(QString("Cannot open file \"%1\" for reading.").arg(_systemMapFile));
 
-    bool ok = false;
+    bool lvl4_ok = false, swp_ok = false;
     QRegExp re("^\\s*([0-9a-fA-F]+)\\s+.\\s+(.*)$");
 
-    while (!ok && !sysMap.atEnd() && sysMap.readLine(buf, bufsize) > 0) {
+    while (!lvl4_ok && !sysMap.atEnd() && sysMap.readLine(buf, bufsize) > 0) {
         QString line(buf);
         if (line.contains("init_level4_pgt") && re.exactMatch(line))
             // Update the given MemSpecs object with the parsed key-value pair
-            specs->initLevel4Pgt = re.cap(1).toULong(&ok, 16);
+            specs->initLevel4Pgt = re.cap(1).toULong(&lvl4_ok, 16);
+        else if (line.contains("swapper_pg_dir") && re.exactMatch(line))
+            // Update the given MemSpecs object with the parsed key-value pair
+            specs->swapperPgDir = re.cap(1).toULong(&swp_ok, 16);
     }
 
     sysMap.close();
 
-    if (!ok)
-        memSpecParserError(QString("Could not parse required value "
-                "\"init_level4_pgt\" from file \"%1\"").arg(_systemMapFile));
+    // We expect to parse exactly one of them
+    if ( (!lvl4_ok && !swp_ok) || (lvl4_ok && swp_ok) ) {
+        memSpecParserError(QString("Could not parse one of the required values "
+                "\"init_level4_pgt\" or \"swapper_pg_dir\" from file \"%1\"")
+                .arg(_systemMapFile));
+    }
 }
 
 

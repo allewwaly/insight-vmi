@@ -90,8 +90,13 @@ struct MemSpecs
         modulesEnd(0),
         startKernelMap(0),
         initLevel4Pgt(0),
+        swapperPgDir(0),
         sizeofUnsignedLong(sizeof(unsigned long)),
+#ifdef __x86_64__
         arch(x86_64)
+#else
+        arch(i386)
+#endif
     {}
 
     /**
@@ -121,6 +126,7 @@ struct MemSpecs
     quint64 modulesEnd;
     quint64 startKernelMap;
     quint64 initLevel4Pgt;
+    quint64 swapperPgDir;
     int sizeofUnsignedLong;
     Architecture arch;
 };
