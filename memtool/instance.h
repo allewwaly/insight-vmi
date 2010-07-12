@@ -165,10 +165,94 @@ public:
 	 */
 	int typeIdOfMember(const QString& name) const;
 
-	/**
-	 * @return a string representation of this instance
-	 */
-	QString toString() const;
+    /**
+     * Explicit representation of this instance as qint8.
+     * @return the value of this type as a qint8
+     */
+    qint8 toInt8() const;
+
+    /**
+     * Explicit representation of this instance as quint8.
+     * @return the value of this type as a quint8
+     */
+    quint8 toUInt8() const;
+
+    /**
+     * Explicit representation of this instance as qint16.
+     * @return the value of this type as a qint16
+     */
+    qint16 toInt16() const;
+
+    /**
+     * Explicit representation of this instance as quint16.
+     * @return the value of this type as a quint16
+     */
+    quint16 toUInt16() const;
+
+    /**
+     * Explicit representation of this instance as qint32.
+     * @return the value of this type as a qint32
+     */
+    qint32 toInt32() const;
+
+    /**
+     * Explicit representation of this instance as quint32.
+     * @return the value of this type as a quint32
+     */
+    quint32 toUInt32() const;
+
+    /**
+     * Explicit representation of this instance as qint64.
+     * @return the value of this type as a qint64
+     */
+    qint64 toInt64() const;
+
+    /**
+     * Explicit representation of this instance as quint64.
+     * @return the value of this type as a quint64
+     */
+    quint64 toUInt64() const;
+
+    /**
+     * Explicit representation of this instance as float.
+     * @return the value of this type as a float
+     */
+    float toFloat() const;
+
+    /**
+     * Explicit representation of this instance as double.
+     * @return the value of this type as a double
+     */
+    double toDouble() const;
+
+    /**
+     * Explicit representation of this instance as a pointer.
+     * @return the value of this type as a variant
+     * @warning This function should only be called for a pointer type!
+     * @warning The pointer has the bit size of the host system! Use
+     * pointerSize() to retrieve the pointer size of the guest system.
+     */
+    void* toPointer() const;
+
+    /**
+     * Explicit representation of this instance as QVariant.
+     * @return the value of this type as a variant
+     */
+    template<class T>
+    QVariant toVariant() const;
+//    {
+//        return value<T>(mem, offset);
+//    }
+
+    /**
+     * @return a string representation of this instance
+     */
+    QString toString() const;
+
+    /**
+     * @return the size of a pointer for this instance in bytes
+     */
+    int pointerSize() const;
 
 private:
 	static const QStringList _emtpyStringList;

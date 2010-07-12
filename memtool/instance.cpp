@@ -165,6 +165,83 @@ int Instance::typeIdOfMember(const QString& name) const
 
 QString Instance::toString() const
 {
-	return _type ? _type->toString(_vmem, _address) : QString();
+	return _isNull ? QString() : _type->toString(_vmem, _address);
 }
 
+int Instance::pointerSize() const
+{
+    return _vmem ? _vmem->memSpecs().sizeofUnsignedLong : 8;
+}
+
+
+qint8 Instance::toInt8() const
+{
+    return _isNull ? 0 : _type->toInt8(_vmem, _address);
+}
+
+
+quint8 Instance::toUInt8() const
+{
+    return _isNull ? 0 : _type->toUInt8(_vmem, _address);
+}
+
+
+qint16 Instance::toInt16() const
+{
+    return _isNull ? 0 : _type->toInt16(_vmem, _address);
+}
+
+
+quint16 Instance::toUInt16() const
+{
+    return _isNull ? 0 : _type->toUInt16(_vmem, _address);
+}
+
+
+qint32 Instance::toInt32() const
+{
+    return _isNull ? 0 : _type->toInt32(_vmem, _address);
+}
+
+
+quint32 Instance::toUInt32() const
+{
+    return _isNull ? 0 : _type->toUInt32(_vmem, _address);
+}
+
+
+qint64 Instance::toInt64() const
+{
+    return _isNull ? 0 : _type->toInt64(_vmem, _address);
+}
+
+
+quint64 Instance::toUInt64() const
+{
+    return _isNull ? 0 : _type->toUInt64(_vmem, _address);
+}
+
+
+float Instance::toFloat() const
+{
+    return _isNull ? 0 : _type->toFloat(_vmem, _address);
+}
+
+
+double Instance::toDouble() const
+{
+    return _isNull ? 0 : _type->toDouble(_vmem, _address);
+}
+
+
+void* Instance::toPointer() const
+{
+    return _isNull ? (void*)0 : _type->toPointer(_vmem, _address);
+}
+
+
+template<class T>
+QVariant Instance::toVariant() const
+{
+    return _isNull ? QVariant() : _type->toVariant<T>(_vmem, _address);
+}
