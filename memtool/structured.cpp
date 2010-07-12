@@ -132,11 +132,14 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
 //    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
 
     QString s;
-    int offset_len = 1, name_len = 1, type_len = 1;
+    int index_len = 0, offset_len = 1, name_len = 1, type_len = 1;
     quint32 i = _size;
 
     while ( (i >>= 4) )
         offset_len++;
+
+    for (int i = _members.size() - 1; i > 0; i /= 10)
+        index_len++;
 
     for (int i = 0; i < _members.size(); ++i) {
         if (name_len < _members[i]->name().length())
@@ -154,6 +157,8 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
         if (!s.isEmpty())
             s += "\n";
 
+        // Note: The member index intentionally starts with zero, as this
+        // directly corresponds to the member index (useful for debugging)
 
         if (m->refType()) {
             // Output all types except structured types
@@ -161,13 +166,15 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
                  ( //(m->refType()->type() & rtTypedef) &&
                    (m->refType()->dereferencedType() & (rtStruct | rtUnion)) ) )
             {
-                s += QString("0x%1 %2 : %3 = ...")
+                s += QString("%0.  0x%1  %2 : %3 = ...")
+                        .arg(i, index_len)
                         .arg(m->offset(), offset_len, 16, QChar('0'))
                         .arg(m->name(), -name_len)
                         .arg(m->refType()->prettyName(), -type_len);
             }
             else {
-                s += QString("0x%1 %2 : %3 = %4")
+                s += QString("%0.  0x%1  %2 : %3 = %4")
+                        .arg(i, index_len)
                         .arg(m->offset(), offset_len, 16, QChar('0'))
                         .arg(m->name(), -name_len)
                         .arg(m->refType()->prettyName(), -type_len)
@@ -175,7 +182,8 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
             }
         }
         else {
-            s += QString("0x%1 %2 : %3 = (unresolved type 0x%3)")
+            s += QString("%0.  0x%1  %2 : %3 = (unresolved type 0x%3)")
+                    .arg(i, index_len)
                     .arg(m->offset(), offset_len, 16, QChar('0'))
                     .arg(m->name(), -name_len)
                     .arg(m->refType()->prettyName(), -type_len)
