@@ -42,6 +42,11 @@ public:
      */
     void setPhysMem(QIODevice* physMem);
 
+    /**
+     * @return the memory specifications of the virtual memory
+     */
+    const MemSpecs& memSpecs() const;
+
 protected:
     // Pure virtual functions of QIODevice
     virtual qint64 readData (char* data, qint64 maxSize);
