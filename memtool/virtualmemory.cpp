@@ -190,6 +190,12 @@ void VirtualMemory::setPhysMem(QIODevice* physMem)
 }
 
 
+const MemSpecs& VirtualMemory::memSpecs() const
+{
+    return _specs;
+}
+
+
 quint64 VirtualMemory::extractULongFromPhysMem(quint64 physaddr)
 {
     quint64 ret64 = 0;
