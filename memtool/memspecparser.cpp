@@ -20,14 +20,14 @@ const char* memspec_src =
     "#include <linux/module.h>\n"
     "#include <linux/mm.h>\n"
     "\n"
-    // cleanup some symbols
+    "// cleanup some symbols\n"
     "#undef __always_inline\n"
     "\n"
     "#include <stdio.h>\n"
     "\n"
-    // As long as there is no VMEMMAP_END defined, we have to define
-    // it ourselves (see Documentation/x86_64/mm.txt)
-    "#ifndef VMEMMAP_END\n"
+    "// As long as there is no VMEMMAP_END defined, we have to define\n"
+    "// it ourselves (see Documentation/x86_64/mm.txt)\n"
+    "#if defined(VMEMMAP_START) && ! defined(VMEMMAP_END)\n"
     "#define VMEMMAP_BITS 40\n"
     "#define VMEMMAP_END (VMEMMAP_START | ((1UL << VMEMMAP_BITS)-1))\n"
     "#endif\n"
@@ -43,6 +43,10 @@ const char* memspec_src =
     "void cleanup_module(void) {}\n"
     "\n"
     "int main() {\n"
+    "  // Define potentially unresolved symbols\n"
+    "  unsigned long __FIXADDR_TOP = 0;\n"
+    "  unsigned long high_memory = 0;\n"
+    "\n"
     "%MAIN_BODY%"       // this placeholder gets replaced later on
     "  return 0;\n"
     "}\n";
@@ -62,7 +66,7 @@ const char* memspec_makefile =
     "\t@rm -fv memspec\n"
     "\n"
     "memspec: memspec.o\n"
-    //      Just try both 64 bit and 32 bit cross-compilation\n"
+    //      Just try both 64 bit and 32 bit cross-compilation
     "\tgcc -m64 -o memspec memspec.o || gcc -m32 -o memspec memspec.o\n";
 
 
@@ -143,10 +147,17 @@ void MemSpecParser::setupBuildDir()
     QString src;
     KernelMemSpecList list = MemSpecs::supportedMemSpecs();
     for (int i = 0; i < list.size(); ++i) {
-        src += QString("  printf(\"%1 = %3\\n\", (%2));\n")
-                    .arg(list[i].keyFmt)
-                    .arg(list[i].valueFmt)
-                    .arg(list[i].outputFmt);
+        if (list[i].macroCond.isEmpty())
+            src += QString("  printf(\"%1 = %3\\n\", (%2));\n")
+                        .arg(list[i].keyFmt)
+                        .arg(list[i].valueFmt)
+                        .arg(list[i].outputFmt);
+        else
+            src += QString("#if %0\n  printf(\"%1 = %3\\n\", (%2));\n#endif\n")
+                        .arg(list[i].macroCond)
+                        .arg(list[i].keyFmt)
+                        .arg(list[i].valueFmt)
+                        .arg(list[i].outputFmt);
     }
     src = QString(memspec_src).replace("%MAIN_BODY%", src);
 

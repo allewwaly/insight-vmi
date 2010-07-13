@@ -49,10 +49,11 @@ struct KernelMemSpec
     KernelMemSpec() {}
 
     /// Constructor
-    KernelMemSpec(QString keyFmt, QString valueFmt, QString outputFmt) :
+    KernelMemSpec(QString keyFmt, QString valueFmt, QString outputFmt, QString macroCond = QString()) :
         keyFmt(keyFmt),
         valueFmt(valueFmt),
-        outputFmt(outputFmt)
+        outputFmt(outputFmt),
+        macroCond(macroCond)
     {}
 
     /// The identifier (the key) of a key-value pair.
@@ -63,6 +64,9 @@ struct KernelMemSpec
 
     /// The output format in which the value should be printed (printf syntax).
     QString outputFmt;
+
+    /// A conditional expression in C macro language that the evaluation is wrapped in
+    QString macroCond;
 };
 
 
@@ -91,6 +95,7 @@ struct MemSpecs
         startKernelMap(0),
         initLevel4Pgt(0),
         swapperPgDir(0),
+        highMemory(0),
         sizeofUnsignedLong(sizeof(unsigned long)),
 #ifdef __x86_64__
         arch(x86_64)
@@ -127,6 +132,7 @@ struct MemSpecs
     quint64 startKernelMap;
     quint64 initLevel4Pgt;
     quint64 swapperPgDir;
+    quint64 highMemory;   // this is set at runtime by MemoryDump::init()
     int sizeofUnsignedLong;
     Architecture arch;
 };
