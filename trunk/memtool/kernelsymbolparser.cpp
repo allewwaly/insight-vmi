@@ -71,6 +71,9 @@ namespace str {
     // Parses strings like:  7  (unsigned)
     // Captures:                 unsigned
     static const char* encRegex = "^[^(]*\\(([^)\\s]+)[^)]*\\)\\s*$";
+    // Parses strings like:  0x1ffff      (location list)
+    // Captures:             0x1ffff
+    static const char* boundRegex = "^\\s*((?:0x)?[0-9a-fA-F]+)(?:\\s+.*)?$";
 
 #   define LOC_ADDR   "addr"
 #   define LOC_OFFSET "plus_uconst"
@@ -85,6 +88,8 @@ namespace str {
 
     static const char* locAddr   = "DW_OP_" LOC_ADDR;
     static const char* locOffset = "DW_OP_" LOC_OFFSET;
+
+    static const char* regexErrorMsg = "Regex \"%1\" did not match the following string: %2";
 };
 
 
@@ -163,6 +168,7 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
     QRegExp rxParamStr(str::paramStrRegex);
     QRegExp rxEnc(str::encRegex);
     QRegExp rxLocation(str::locationRegex);
+    QRegExp rxBound(str::boundRegex);
     QRegExp rxId(str::idRegex);
 
     static const DataEncMap encMap = getDataEncMap();
@@ -197,7 +203,7 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
     }
     case psCompDir: {
         if (!rxParamStr.exactMatch(value))
-            parserError(QString("Regex \"%1\" did not match the following string: %1").arg(rxParamStr.pattern()).arg(value));
+            parserError(QString(str::regexErrorMsg).arg(rxParamStr.pattern()).arg(value));
         _pInfo->setSrcDir(rxParamStr.cap(1));
         break;
     }
@@ -217,7 +223,7 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
     }
     case psEncoding: {
         if (!rxEnc.exactMatch(value))
-            parserError(QString("Regex \"%1\" did not match the following string: %1").arg(rxEnc.pattern()).arg(value));
+            parserError(QString(str::regexErrorMsg).arg(rxEnc.pattern()).arg(value));
         _pInfo->setEnc(encMap.value(rxEnc.cap(1)));
         break;
     }
@@ -252,27 +258,29 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
     }
     case psName: {
         if (!rxParamStr.exactMatch(value))
-               parserError(QString("Regex \"%1\" did not match the following string: %1").arg(rxParamStr.pattern()).arg(value));
+               parserError(QString(str::regexErrorMsg).arg(rxParamStr.pattern()).arg(value));
         _pInfo->setName(rxParamStr.cap(1));
         break;
     }
     case psType: {
         if (!rxId.exactMatch(value))
-            parserError(QString("Regex \"%1\" did not match the following string: %1").arg(rxId.pattern()).arg(value));
+            parserError(QString(str::regexErrorMsg).arg(rxId.pattern()).arg(value));
         parseInt16(i, rxId.cap(1), &ok);
         _pInfo->setRefTypeId(i);
         break;
     }
     case psUpperBound: {
         // This can be decimal or integer encoded
-        parseInt(i, value, &ok);
+        if (!rxBound.exactMatch(value))
+            parserError(QString(str::regexErrorMsg).arg(rxBound.pattern()).arg(value));
+        parseInt(i, rxBound.cap(1), &ok);
         _pInfo->setUpperBound(i);
         break;
     }
     case psSibling: {
         // Sibiling is currently only parsed to skip the symbols that belong to a function
         if (!rxId.exactMatch(value))
-            parserError(QString("Regex \"%1\" did not match the following string: %1").arg(rxId.pattern()).arg(value));
+            parserError(QString(str::regexErrorMsg).arg(rxId.pattern()).arg(value));
         parseInt16(i, rxId.cap(1), &ok);
         _pInfo->setSibling(i);
         break;
