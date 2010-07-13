@@ -10,11 +10,13 @@
 #include "debug.h"
 
 // Offsets of the components of a virtual address in i386
+// See <linux/include/asm-x86/pgtable-2level-defs.h>
 #define PGDIR_SHIFT_X86       22
 #define PTRS_PER_PGD_X86    1024
 #define PTRS_PER_PTE_X86    1024
 
 // Offsets of the components of a virtual address in x86_64
+// See <linux/include/asm-x86/pgtable_64.h>
 #define PML4_SHIFT_X86_64      39
 #define PTRS_PER_PML4_X86_64   512
 #define PGDIR_SHIFT_X86_64     30
@@ -26,15 +28,23 @@
 // Kernel constants for memory and page sizes.
 // I think it's reasonable to hard-code them for now.
 #define MEGABYTES(x)  ((x) * (1048576))
+
+// See <linux/include/asm-x86/page_32.h>
 #define __PHYSICAL_MASK_SHIFT_X86     32
-#define __PHYSICAL_MASK_SHIFT_X86_64  40
 #define __PHYSICAL_MASK_X86           ((1UL << __PHYSICAL_MASK_SHIFT_X86) - 1)
-#define __PHYSICAL_MASK_X86_64        ((1UL << __PHYSICAL_MASK_SHIFT_X86_64) - 1)
 //#define __VIRTUAL_MASK_SHIFT_X86    32
+//#define __VIRTUAL_MASK_X86         ((1UL << __VIRTUAL_MASK_SHIFT_X86) - 1)
+
+// See <linux/include/asm-x86/page_64.h>
+#define __PHYSICAL_MASK_SHIFT_X86_64  40
+#define __PHYSICAL_MASK_X86_64        ((1UL << __PHYSICAL_MASK_SHIFT_X86_64) - 1)
 //#define __VIRTUAL_MASK_SHIFT_X86_64   48
 //#define __VIRTUAL_MASK_X86_64         ((1UL << __VIRTUAL_MASK_SHIFT_X86_64) - 1)
+
+// See <linux/include/asm-x86/page.h>
 #define PAGE_SHIFT             12
 #define KPAGE_SIZE              (1UL << PAGE_SHIFT)
+
 #define PHYSICAL_PAGE_MASK_X86       (~(KPAGE_SIZE-1) & (__PHYSICAL_MASK_X86 << PAGE_SHIFT))
 #define PHYSICAL_PAGE_MASK_X86_64    (~(KPAGE_SIZE-1) & (__PHYSICAL_MASK_X86_64 << PAGE_SHIFT))
 
@@ -47,22 +57,26 @@
 
 #define PAGEOFFSET(X)   ((X) & KERNEL_PAGE_OFFSET_FOR_MASK)
 
-// flags
+// Page flags, see <linux/include/asm-x86/pgtable.h>
 #define _PAGE_PRESENT   0x001
-#define _PAGE_PSE       0x080   /* 2MB page */
+#define _PAGE_PSE       0x080   /* 2MB or 4MB page */
 
 // Extract offsets from virtual addresses in x86_64
+// See <linux/include/asm-x86/pgtable.h>
+// See <linux/include/asm-x86/pgtable_32.h>
 #define pgd_index_x86(address)  (((address) >> PGDIR_SHIFT_X86) & (PTRS_PER_PGD_X86 - 1))
 #define pte_index_x86(address)  (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE_X86 - 1))
 
 // Extract offsets from virtual addresses in x86_64
+// See <linux/include/asm-x86/pgtable.h>
+// See <linux/include/asm-x86/pgtable_64.h>
 #define pml4_index_x86_64(address) (((address) >> PML4_SHIFT_X86_64) & (PTRS_PER_PML4_X86_64 - 1))
 #define pgd_index_x86_64(address)  (((address) >> PGDIR_SHIFT_X86_64) & (PTRS_PER_PGD_X86_64 - 1))
 #define pmd_index_x86_64(address)  (((address) >> PMD_SHIFT_X86_64) & (PTRS_PER_PMD_X86_64 - 1))
 #define pte_index_x86_64(address)  (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE_X86_64 - 1))
 
 
-VirtualMemory::VirtualMemory(MemSpecs specs, QIODevice* physMem)
+VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem)
     : _tlb(1000), _physMem(physMem), _specs(specs), _pos(-1)
 {
 }
@@ -435,6 +449,42 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize)
 
 quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
 {
+    return (_specs.arch == MemSpecs::i386) ?
+            virtualToPhysical32(vaddr, pageSize) :
+            virtualToPhysical64(vaddr, pageSize);
+}
+
+
+quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize)
+{
+    quint64 physaddr = 0;
+    // If we can do the job with a simple linear translation subtract the
+    // adequate constant from the virtual address
+    if(!(vaddr >= (_specs.vmallocStart + _specs.highMemory) && vaddr <= _specs.vmallocEnd))
+    {
+        if (vaddr >= _specs.pageOffset) {
+            physaddr = ((vaddr) - _specs.pageOffset);
+        }
+        else {
+            virtualMemoryError(
+                            QString("Error reading from virtual address 0x%1: "
+                                    "address below linear offsets, seems to be "
+                                    "user-land memory")
+                                .arg(vaddr, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
+        }
+        *pageSize = -1;
+    }
+    else {
+        // Otherwise use the address_lookup function
+        physaddr = pageLookup32(vaddr, pageSize);
+    }
+
+    return physaddr;
+}
+
+
+quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize)
+{
     quint64 physaddr = 0;
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
@@ -450,13 +500,11 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
         }
         else {
             // Is the 64 bit address in canonical form?
-            if (_specs.arch == MemSpecs::x86_64) {
-                quint64 high_bits = 0xFFFF800000000000UL & vaddr;
-                if (high_bits != 0 && high_bits != 0xFFFF800000000000UL)
-                    virtualMemoryError(
-                                    QString("Virtual address 0x%1 is not in canonical form")
-                                        .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
-            }
+            quint64 high_bits = 0xFFFF800000000000UL & vaddr;
+            if (high_bits != 0 && high_bits != 0xFFFF800000000000UL)
+                virtualMemoryError(
+                                QString("Virtual address 0x%1 is not in canonical form")
+                                    .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
 
             virtualMemoryError(
                             QString("Error reading from virtual address 0x%1: "
@@ -468,10 +516,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
     }
     else {
         // Otherwise use the address_lookup function
-        if (_specs.arch == MemSpecs::i386)
-            physaddr = pageLookup32(vaddr, pageSize);
-        else
-            physaddr = pageLookup64(vaddr, pageSize);
+        physaddr = pageLookup64(vaddr, pageSize);
     }
 
     return physaddr;
