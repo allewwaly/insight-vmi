@@ -7,53 +7,11 @@
 
 #include "memspecs.h"
 
-//    "       printf(\"%-16s = 0x%16lx\n\", \"START_KERNEL_map\", __START_KERNEL_map);\n"
-//    "       printf(\"%-16s = 0x%16lx\n\", \"PAGE_OFFSET\", __PAGE_OFFSET);\n"
-//    "       printf(\"%-16s = 0x%16lx\n\", \"VMALLOC_START\", VMALLOC_START);\n"
-//    "       printf(\"%-16s = 0x%16lx\n\", \"VMALLOC_END\", VMALLOC_END);\n"
-//    "       printf(\"%-16s = 0x%16lx\n\", \"MODULES_VADDR\", MODULES_VADDR);\n"
-//    "       printf(\"%-16s = 0x%16lx\n\", \"MODULES_END\", MODULES_END);\n"
-//    "       printf(\"%-16s = 0x%16lx\n\", \"VMEMMAP_START\", VMEMMAP_START);\n"
-//    "       printf(\"%-16s = 0x%16lx\n\", \"VMEMMAP_END\", VMEMMAP_END);\n"
-//    "       printf(\"%-16s = %d\n\", \"SIZEOF_UNSIGNED_LONG\", sizeof(unsigned long));\n"
-
-
 KernelMemSpecList MemSpecs::supportedMemSpecs()
 {
     KernelMemSpecList list;
 
-    list.append(KernelMemSpec(
-            "START_KERNEL_map",
-            "__START_KERNEL_map",
-            "%16lx"));
-    list.append(KernelMemSpec(
-            "PAGE_OFFSET",
-            "__PAGE_OFFSET",
-            "%16lx"));
-    list.append(KernelMemSpec(
-            "VMALLOC_START",
-            "VMALLOC_START",
-            "%16lx"));
-    list.append(KernelMemSpec(
-            "VMALLOC_END",
-            "VMALLOC_END",
-            "%16lx"));
-    list.append(KernelMemSpec(
-            "MODULES_VADDR",
-            "MODULES_VADDR",
-            "%16lx"));
-    list.append(KernelMemSpec(
-            "MODULES_END",
-            "MODULES_END",
-            "%16lx"));
-    list.append(KernelMemSpec(
-            "VMEMMAP_START",
-            "VMEMMAP_START",
-            "%16lx"));
-    list.append(KernelMemSpec(
-            "VMEMMAP_END",
-            "VMEMMAP_END",
-            "%16lx"));
+    // Both i386 and x86_64
     list.append(KernelMemSpec(
             "SIZEOF_UNSIGNED_LONG",
             "sizeof(unsigned long)",
@@ -62,6 +20,51 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
             "ARCHITECTURE",
             "ARCHITECTURE",
             "%s"));
+    // See <linux/include/asm-x86/page_32.h>
+    // See <linux/include/asm-x86/page_64.h>
+    list.append(KernelMemSpec(
+            "PAGE_OFFSET",
+            "__PAGE_OFFSET",
+            "%0.16lx"));
+    // See <linux/include/asm-x86/pgtable_32.h>
+    // See <linux/include/asm-x86/pgtable_64.h>
+    list.append(KernelMemSpec(
+            "VMALLOC_START",
+            "VMALLOC_START",
+            "%0.16lx"));
+    list.append(KernelMemSpec(
+            "VMALLOC_END",
+            "VMALLOC_END",
+            "%0.16lx"));
+
+    // x86_64 only
+    // See <linux/include/asm-x86/page_64.h>
+    list.append(KernelMemSpec(
+            "START_KERNEL_map",
+            "__START_KERNEL_map",
+            "%0.16lx",
+            "defined(__START_KERNEL_map)"));
+    // See <linux/include/asm-x86/pgtable_64.h>
+    list.append(KernelMemSpec(
+            "MODULES_VADDR",
+            "MODULES_VADDR",
+            "%0.16lx",
+            "defined(MODULES_VADDR)"));
+    list.append(KernelMemSpec(
+            "MODULES_END",
+            "MODULES_END",
+            "%0.16lx",
+            "defined(MODULES_VADDR) && defined(MODULES_END)"));
+    list.append(KernelMemSpec(
+            "VMEMMAP_START",
+            "VMEMMAP_START",
+            "%0.16lx",
+            "defined(VMEMMAP_START)"));
+    list.append(KernelMemSpec(
+            "VMEMMAP_END",
+            "VMEMMAP_END",
+            "%0.16lx",
+            "defined(VMEMMAP_START) && defined(VMEMMAP_END)"));
 
     return list;
 }
@@ -117,6 +120,7 @@ QDataStream& operator>>(QDataStream& in, MemSpecs& specs)
         >> specs.modulesEnd
         >> specs.startKernelMap
         >> specs.initLevel4Pgt
+        >> specs.swapperPgDir
         >> specs.sizeofUnsignedLong
         >> __arch;
 
@@ -137,6 +141,7 @@ QDataStream& operator<<(QDataStream& out, const MemSpecs& specs)
         << specs.modulesEnd
         << specs.startKernelMap
         << specs.initLevel4Pgt
+        << specs.swapperPgDir
         << specs.sizeofUnsignedLong
         << (qint32)specs.arch;
 
