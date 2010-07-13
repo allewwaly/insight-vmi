@@ -65,6 +65,20 @@ void MemoryDump::init()
                 QString("Error opening virtual memory (filename=\"%1\")").arg(_fileName),
                 __FILE__,
                 __LINE__);
+
+    // In i386 mode, the virtual address translation depends on the runtime
+    // value of "high_memory". We need to query its value and add it to
+    // _specs.vmallocStart before we can translate paged addresses.
+    if (_specs.arch == MemSpecs::i386) {
+        try {
+            Instance highMem = queryInstance("high_memory");
+            _specs.highMemory = highMem.toUInt32();
+        }
+        catch (QueryException e) {
+            genericError("Failed to initialize this MemoryDump instance with "
+                    "required run-time values from the dump. Error was: " + e.message);
+        }
+    }
 }
 
 
