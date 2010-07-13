@@ -20,7 +20,7 @@
 class VirtualMemory: public QIODevice
 {
 public:
-    VirtualMemory(MemSpecs specs, QIODevice* physMem = 0);
+    VirtualMemory(const MemSpecs& specs, QIODevice* physMem = 0);
     virtual ~VirtualMemory();
 
     // Re-implementations of QIODevice
@@ -81,6 +81,22 @@ private:
     quint64 virtualToPhysical(quint64 vaddr, int* pageSize);
 
     /**
+     * i386 specific translation
+     * @param vaddr virtual address
+     * @param pageSize here the size of the belonging page is returned
+     * @return physical address
+     */
+    quint64 virtualToPhysical32(quint64 vaddr, int* pageSize);
+
+    /**
+     * x86_64 specific translation
+     * @param vaddr virtual address
+     * @param pageSize here the size of the belonging page is returned
+     * @return physical address
+     */
+    quint64 virtualToPhysical64(quint64 vaddr, int* pageSize);
+
+    /**
      * Reads a value of size _specs.sizeofUnsignedLong from memory and returns
      * it as 64 bit integer
      * @param physaddr the physical address to read from
@@ -98,7 +114,9 @@ private:
     QCache<quint64, TLBEntry> _tlb;
 
     QIODevice* _physMem;
-    MemSpecs _specs;
+    // This must be a reference, not an object, since MemoryDump::init() might
+    // change values later on
+    const MemSpecs& _specs;
     quint64 _pos;
 };
 
