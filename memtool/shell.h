@@ -121,6 +121,7 @@ private:
     void cleanupPipedProcs();
     int eval(QString command);
     void hline(int width = 60);
+    int parseMemDumpIndex(QStringList &args);
     static QScriptValue scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng);
     //---------------------------------
@@ -136,6 +137,7 @@ private:
     int cmdMemoryLoad(QStringList args);
     int cmdMemoryUnload(QStringList args);
     int cmdMemoryList(QStringList args);
+    int cmdMemorySpecs(QStringList args);
     int cmdMemoryQuery(QStringList args);
     int cmdMemoryDump(QStringList args);
     int cmdScript(QStringList args);

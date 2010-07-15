@@ -66,10 +66,13 @@ Shell::Shell(KernelSymbols& symbols)
                 "  memory load   <file_name>   Load a memory dump\n"
                 "  memory unload <file_name>   Unload a memory dump by file name\n"
                 "  memory unload <file_index>  Unload a memory dump by its index\n"
-                "  memory list                 Show the loaded memory dumps\n"
-                "  memory query [index] <expr> Show the loaded memory dumps\n"
-                "  memory dump [index] <type> @ <address\n"
-                "                              Show the loaded memory dumps"));
+                "  memory list                 Show loaded memory dumps\n"
+                "  memory specs [index]        Show memory specifications for dump <index>\n"
+                "  memory query [index] <expr> Output a symbol from memory dump <index>\n"
+                "  memory dump [index] <type> @ <address>\n"
+                "                              Output a value from memory dump <index> at\n"
+                "                              <address> with as <type>, where <type>\n"
+                "                              must be one of \"char\", \"int\" or \"long\""));
 
     _commands.insert("script",
             Command(
@@ -709,6 +712,9 @@ int Shell::cmdMemory(QStringList args)
     else if (QString("list").startsWith(action) && (action.size() >= 2)) {
         return cmdMemoryList(args);
     }
+    else if (QString("specs").startsWith(action) && (action.size() >= 1)) {
+        return cmdMemorySpecs(args);
+    }
     else if (QString("query").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryQuery(args);
     }
@@ -720,6 +726,33 @@ int Shell::cmdMemory(QStringList args)
 
     return 0;
 }
+
+
+int Shell::parseMemDumpIndex(QStringList &args)
+{
+    bool ok = false;
+    int index = (args.size() > 0) ? (args[0].toInt(&ok) - 1) : -1;
+    if (ok) {
+        args.pop_front();
+        // Check the bounds
+        if (index < 0 || index >= _memDumps.size() || !_memDumps[index]) {
+            _err << "Memory dump index " << index + 1 << " does not exist." << endl;
+            return -1;
+        }
+    }
+    // Otherwise use the first valid index
+    else {
+        for (int i = 0; i < _memDumps.size() && index < 0; ++i)
+            if (_memDumps[i])
+                return i;
+    }
+    // No memory dumps loaded at all?
+    if (index < 0)
+        _err << "No memory dumps loaded." << endl;
+
+    return -1;
+}
+
 
 
 int Shell::cmdMemoryLoad(QStringList args)
@@ -770,19 +803,13 @@ int Shell::cmdMemoryUnload(QStringList args)
         return 0;
     }
 
-    QString fileName = args[0];
+    QString fileName;
 
     // Did the user specify a file index?
-    bool ok = false;
-    int index = fileName.toInt(&ok) - 1;
+    int index = parseMemDumpIndex(args);
 
-    if (ok) {
-        // Check the bounds
-        if (index < 0 || index >= _memDumps.size() || !_memDumps[index])
-            _err << "Memory dump index " << index + 1 << " does not exist." << endl;
-        else
-            fileName = _memDumps[index]->fileName();
-    }
+    if (index >= 0)
+        fileName = _memDumps[index]->fileName();
     // Not numeric, must have been a file name
     else {
         index = -1;
@@ -821,30 +848,24 @@ int Shell::cmdMemoryList(QStringList /*args*/)
 }
 
 
-int Shell::cmdMemoryQuery(QStringList args)
+int Shell::cmdMemorySpecs(QStringList args)
 {
     // See if we got an index to a specific memory dump
-    bool ok = false;
-    int index = (args.size() > 0) ? (args[0].toInt(&ok) - 1) : -1;
-    if (ok) {
-        args.pop_front();
-        // Check the bounds
-        if (index < 0 || index >= _memDumps.size() || !_memDumps[index]) {
-            _err << "Memory dump index " << index + 1 << " does not exist." << endl;
-            return 0;
-        }
-    }
-    // Otherwise use the first valid index
-    else {
-        for (int i = 0; i < _memDumps.size() && index < 0; ++i)
-            if (_memDumps[i])
-                index = i;
-    }
-    // No memory dumps loaded at all?
-    if (index < 0)
-        _err << "No memory dumps loaded." << endl;
+    int index = parseMemDumpIndex(args);
+    // Output the specs
+    if (index >= 0)
+        _out << _memDumps[index]->memSpecs().toString() << endl;
+
+    return 0;
+}
+
+
+int Shell::cmdMemoryQuery(QStringList args)
+{
+    // Get the memory dump index to use
+    int index = parseMemDumpIndex(args);
     // Perform the query
-    else
+    if (index >= 0)
         _out << _memDumps[index]->query(args.join(" ")) << endl;
 
     return 0;
@@ -853,28 +874,10 @@ int Shell::cmdMemoryQuery(QStringList args)
 
 int Shell::cmdMemoryDump(QStringList args)
 {
-    // See if we got an index to a specific memory dump
-    bool ok = false;
-    int index = (args.size() > 0) ? (args[0].toInt(&ok) - 1) : -1;
-    if (ok) {
-        args.pop_front();
-        // Check the bounds
-        if (index < 0 || index >= _memDumps.size() || !_memDumps[index]) {
-            _err << "Memory dump index " << index + 1 << " does not exist." << endl;
-            return 0;
-        }
-    }
-    // Otherwise use the first valid index
-    else {
-        for (int i = 0; i < _memDumps.size() && index < 0; ++i)
-            if (_memDumps[i])
-                index = i;
-    }
-    // No memory dumps loaded at all?
-    if (index < 0)
-        _err << "No memory dumps loaded." << endl;
+    // Get the memory dump index to use
+    int index = parseMemDumpIndex(args);
     // Perform the dump
-    else {
+    if (index >= 0) {
         QRegExp re("^\\s*([^@\\s]+)\\s*@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
 
         if (!re.exactMatch(args.join(" "))) {
@@ -882,6 +885,7 @@ int Shell::cmdMemoryDump(QStringList args)
             return 0;
         }
 
+        bool ok;
         quint64 addr = re.cap(2).toULong(&ok, 16);
         _out << _memDumps[index]->dump(re.cap(1), addr) << endl;
     }

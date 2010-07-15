@@ -78,11 +78,46 @@ public:
      */
     const QString& fileName() const;
 
+    /**
+     * Retrieves a string representation a symbol specified in dotted notation,
+     * e. g., "init_task.children.next". If \a queryString is empty, it returns
+     * a list of all known global symbols, one per line.
+     * @param queryString the symbol in dotted notation
+     * @return an string representation of the symbol's value for the
+     * specified symbol
+     *
+     * @exception QueryException the queried symbol does not exist or cannot
+     * be read
+     */
     QString query(const QString& queryString) const;
 
+    /**
+     * Retrieves an Instance object for a symbol specified in dotted notation,
+     * e. g., "init_task.children.next".
+     * @param queryString the symbol in dotted notation
+     * @return an Instance object for the specified symbol
+     *
+     * @exception QueryException the queried symbol does not exist or cannot
+     * be read
+     */
     Instance queryInstance(const QString& queryString) const;
 
+    /**
+     * Retrieves a string representation for an arbitrary memory region as the
+     * specified type. The only types supported so far are "char" (8 bit),
+     * "int" (32 bit) and "long" (64 bit).
+     * @param type the type to dump the memory at \a address, must be one of
+     * "char", "int" or "long"
+     * @param address the virtual address to read the value from
+     * @return a string representation of the memory region at \a address as
+     * type \a type
+     */
     QString dump(const QString& type, quint64 address) const;
+
+    /**
+     * @return the memory specification this MemDump object uses
+     */
+    const MemSpecs& memSpecs() const;
 
 private:
     void init();

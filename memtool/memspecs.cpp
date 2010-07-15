@@ -107,6 +107,39 @@ bool MemSpecs::setFromKeyValue(const QString& key, const QString& value)
 }
 
 
+QString MemSpecs::toString() const
+{
+    QString ret;
+    int key_w = -21;
+    int val_w = sizeofUnsignedLong << 1;
+
+    ret += QString("%1 = %2\n").arg("ARCHITECTURE", key_w).arg(arch == i386 ? "i386" : "x86_64");
+    ret += QString("%1 = %2\n").arg("sizeof(unsigned long)", key_w).arg(sizeofUnsignedLong);
+    ret += QString("%1 = 0x%2\n").arg("PAGE_OFFSET", key_w).arg(pageOffset, val_w, 16, QChar('0'));
+    if (vmallocStart > 0)
+        ret += QString("%1 = 0x%2\n").arg("VMALLOC_START", key_w).arg(vmallocStart, val_w, 16, QChar('0'));
+    if (vmallocEnd > 0)
+        ret += QString("%1 = 0x%2\n").arg("VMALLOC_END", key_w).arg(vmallocEnd, val_w, 16, QChar('0'));
+    if (vmemmapStart > 0)
+        ret += QString("%1 = 0x%2\n").arg("VMEMMAP_START", key_w).arg(vmemmapStart, val_w, 16, QChar('0'));
+    if (vmemmapEnd > 0)
+        ret += QString("%1 = 0x%2\n").arg("VMEMMAP_END", key_w).arg(vmemmapEnd, val_w, 16, QChar('0'));
+    if (modulesVaddr > 0)
+        ret += QString("%1 = 0x%2\n").arg("MODULES_VADDR", key_w).arg(modulesVaddr, val_w, 16, QChar('0'));
+    if (modulesEnd > 0)
+        ret += QString("%1 = 0x%2\n").arg("MODULES_END", key_w).arg(modulesEnd, val_w, 16, QChar('0'));
+    if (startKernelMap > 0)
+        ret += QString("%1 = 0x%2\n").arg("START_KERNEL_map", key_w).arg(startKernelMap, val_w, 16, QChar('0'));
+    if (initLevel4Pgt > 0)
+        ret += QString("%1 = 0x%2\n").arg("init_level5_pgt", key_w).arg(initLevel4Pgt, val_w, 16, QChar('0'));
+    if (swapperPgDir > 0)
+        ret += QString("%1 = 0x%2\n").arg("swapper_pg_dir", key_w).arg(swapperPgDir, val_w, 16, QChar('0'));
+    if (highMemory > 0)
+        ret += QString("%1 = 0x%2\n").arg("high_memory", key_w).arg(highMemory, val_w, 16, QChar('0'));
+    return ret;
+}
+
+
 QDataStream& operator>>(QDataStream& in, MemSpecs& specs)
 {
     qint32 __arch;
