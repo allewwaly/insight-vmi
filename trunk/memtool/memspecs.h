@@ -122,6 +122,12 @@ struct MemSpecs
      */
     static KernelMemSpecList supportedMemSpecs();
 
+    /**
+     * Outputs these specs as key = value pairs, one by line
+     * @return specs as string
+     */
+    QString toString() const;
+
     quint64 pageOffset;
     quint64 vmallocStart;
     quint64 vmallocEnd;

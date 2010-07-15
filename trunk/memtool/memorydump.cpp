@@ -193,3 +193,10 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 
     return QString();
 }
+
+
+const MemSpecs& MemoryDump::memSpecs() const
+{
+    return _specs;
+}
+
