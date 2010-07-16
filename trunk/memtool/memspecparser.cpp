@@ -19,6 +19,7 @@ const char* memspec_src =
     "#include <linux/kernel.h>\n"
     "#include <linux/module.h>\n"
     "#include <linux/mm.h>\n"
+	"#include <asm/highmem.h>\n"
     "\n"
     "// cleanup some symbols\n"
     "#undef __always_inline\n"
@@ -32,20 +33,17 @@ const char* memspec_src =
     "#define VMEMMAP_END (VMEMMAP_START | ((1UL << VMEMMAP_BITS)-1))\n"
     "#endif\n"
     "\n"
-    "#ifdef CONFIG_X86_64\n"
-    "#define ARCHITECTURE \"x86_64\"\n"
-    "#else\n"
-    "#define ARCHITECTURE \"i386\"\n"
-    "#endif\n"
-    "\n"
     "int init_module(void) { return 0; }\n"
     "\n"
     "void cleanup_module(void) {}\n"
     "\n"
     "int main() {\n"
     "  // Define potentially unresolved symbols\n"
+	"#ifndef __FIXADDR_TOP\n"
     "  unsigned long __FIXADDR_TOP = 0;\n"
+	"#endif\n"
     "  unsigned long high_memory = 0;\n"
+	"  unsigned long vmalloc_earlyreserve = %VMALLOC_EARLYRESERVE%;\n"
     "\n"
     "%MAIN_BODY%"       // this placeholder gets replaced later on
     "  return 0;\n"
@@ -71,7 +69,8 @@ const char* memspec_makefile =
 
 
 MemSpecParser::MemSpecParser(const QString& kernelSrcDir, const QString& systemMapFile)
-    : _autoRemoveBuildDir(true), _kernelSrcDir(kernelSrcDir), _systemMapFile(systemMapFile)
+    : _autoRemoveBuildDir(true), _kernelSrcDir(kernelSrcDir),
+      _systemMapFile(systemMapFile), _vmallocEarlyreserve(0)
 {
 }
 
@@ -159,7 +158,9 @@ void MemSpecParser::setupBuildDir()
                         .arg(list[i].valueFmt)
                         .arg(list[i].outputFmt);
     }
-    src = QString(memspec_src).replace("%MAIN_BODY%", src);
+    src = QString(memspec_src)
+    		.replace("%MAIN_BODY%", src)
+            .replace("%VMALLOC_EARLYRESERVE%", QString("0x%1UL").arg(_vmallocEarlyreserve, 0, 16));
 
     QFile srcfile(_buildDir + "/memspec.c");
     if (!srcfile.open(QIODevice::WriteOnly))
@@ -181,11 +182,13 @@ void MemSpecParser::setupBuildDir()
 }
 
 
-void MemSpecParser::buildHelperProg()
+void MemSpecParser::buildHelperProg(const MemSpecs& specs)
 {
     QProcess proc;
     QStringList cmdlines;
-    cmdlines += QString("make KDIR=%1").arg(_kernelSrcDir);
+    QString arch = (specs.arch == MemSpecs::x86_64) ? "x86_64" : "i386";
+
+    cmdlines += QString("make KDIR=%1 ARCH=%2").arg(_kernelSrcDir).arg(arch);
     cmdlines += QString("make memspec");
 
     for (int i = 0; i < cmdlines.size(); ++i) {
@@ -252,7 +255,7 @@ void MemSpecParser::parseSystemMap(MemSpecs* specs)
     if (!sysMap.open(QIODevice::ReadOnly))
         memSpecParserError(QString("Cannot open file \"%1\" for reading.").arg(_systemMapFile));
 
-    bool lvl4_ok = false, swp_ok = false;
+    bool lvl4_ok = false, swp_ok = false, ok;
     QRegExp re("^\\s*([0-9a-fA-F]+)\\s+.\\s+(.*)$");
 
     while (!lvl4_ok && !sysMap.atEnd() && sysMap.readLine(buf, bufsize) > 0) {
@@ -263,12 +266,15 @@ void MemSpecParser::parseSystemMap(MemSpecs* specs)
         else if (line.contains("swapper_pg_dir") && re.exactMatch(line))
             // Update the given MemSpecs object with the parsed key-value pair
             specs->swapperPgDir = re.cap(1).toULong(&swp_ok, 16);
+        else if (line.contains("vmalloc_earlyreserve") && re.exactMatch(line))
+            _vmallocEarlyreserve = re.cap(1).toULong(&ok, 16);
     }
 
     sysMap.close();
 
     // We expect to parse exactly one of them
-    if ( (!lvl4_ok && !swp_ok) || (lvl4_ok && swp_ok) ) {
+    if ( (specs->arch == MemSpecs::x86_64 && !lvl4_ok) ||
+    	 (specs->arch == MemSpecs::i386 && !swp_ok)) {
         memSpecParserError(QString("Could not parse one of the required values "
                 "\"init_level4_pgt\" or \"swapper_pg_dir\" from file \"%1\"")
                 .arg(_systemMapFile));
@@ -276,16 +282,50 @@ void MemSpecParser::parseSystemMap(MemSpecs* specs)
 }
 
 
+void MemSpecParser::parseKernelConfig(MemSpecs* specs)
+{
+	QFile config(_kernelSrcDir + "/.config");
+	if (!config.open(QIODevice::ReadOnly))
+		memSpecParserError(QString("Cannot open file \"%1\" for reading")
+				.arg(config.fileName()));
+
+	QString line;
+	const int bufsize = 1024;
+	char buf[1024];
+
+	QString i386 = "CONFIG_X86_32";
+	QString x8664 = "CONFIG_X86_64";
+
+	while (!config.atEnd()) {
+		config.readLine(buf, bufsize);
+		line = QString(buf).trimmed();
+		if (line.startsWith(QChar('#')))
+			continue;
+
+		if (line.startsWith(i386)) {
+			specs->arch = MemSpecs::i386;
+			return;
+		}
+		else if (line.startsWith(x8664)) {
+			specs->arch = MemSpecs::x86_64;
+			return;
+		}
+	}
+
+	// We should never come here
+	memSpecParserError(QString("Could not determine configured target architecture"
+			"from file \"%1\"").arg(config.fileName()));
+}
+
+
 MemSpecs MemSpecParser::parse()
 {
     // Check the kernel source path
     QDir kernelSrc(_kernelSrcDir);
-    if (! (kernelSrc.exists() &&
-           kernelSrc.exists("Makefile") &&
-           kernelSrc.exists("Kbuild")) )
+    if (! (kernelSrc.exists() && kernelSrc.exists("Makefile")) )
         memSpecParserError(QString("Directory \"%1\" does not seem to be a kernel source or header tree.").arg(kernelSrc.absolutePath()));
     if (! (kernelSrc.exists(".config") &&
-                kernelSrc.exists("Module.symvers")) )
+                kernelSrc.exists("include/linux/version.h")) )
         memSpecParserError(QString("Kernel source in \"%1\" does not seem to be configured properly.").arg(kernelSrc.absolutePath()));
 
     // Check the System.map file
@@ -294,12 +334,16 @@ MemSpecs MemSpecParser::parse()
 
     MemSpecs specs;
 
-    // Process the System.map file
+    // Determine configured system architecture
+    parseKernelConfig(&specs);
+
+    // Process the System.map file first to get potentially value for
+    // _vmallocEarlyreserve
     parseSystemMap(&specs);
 
     // Process the kernel source tree
     setupBuildDir();
-    buildHelperProg();
+    buildHelperProg(specs);
     parseHelperProg(&specs);
 
     return specs;
