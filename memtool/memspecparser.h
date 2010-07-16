@@ -105,8 +105,9 @@ private:
 
     /**
      * Builds the helper program in the directory \a buildDir.
+     * @param specs the MemSpec struct to read architecture from
      */
-    void buildHelperProg();
+    void buildHelperProg(const MemSpecs& specs);
 
     /**
      * Runs the helper program and parses the output.
@@ -120,6 +121,14 @@ private:
      */
     void parseSystemMap(MemSpecs* specs);
 
+
+    /**
+     * Parses the kernel's configuration file and determines the target
+     * architecture: i386 or x86_64
+     * @param specs the memory specification to store the architecture value
+     */
+    void parseKernelConfig(MemSpecs* specs);
+
     /**
      * Removes a directory and all contained files recursively.
      * @param dir the directory to remove
@@ -132,6 +141,7 @@ private:
     QString _systemMapFile;
     QString _buildDir;
     QByteArray _errorOutput;
+    quint64 _vmallocEarlyreserve;
 };
 
 #endif /* MEMSPECPARSER_H_ */
