@@ -104,9 +104,9 @@ public:
      */
     virtual uint hash() const
     {
-        if (!BaseType::_typeReadFromStream)
-            BaseType::_hash = NumericBaseType<T, realType>::hash() ^ _bitSize ^ rotl32(_bitOffset, 16);
-        return BaseType::_hash;
+        if (!NumericBaseType<T, realType>::_typeReadFromStream)
+            NumericBaseType<T, realType>::_hash = NumericBaseType<T, realType>::hash() ^ _bitSize ^ rotl32(_bitOffset, 16);
+        return NumericBaseType<T, realType>::_hash;
     }
 
     /**
