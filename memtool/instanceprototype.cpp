@@ -27,7 +27,7 @@ QString InstancePrototype::address() const
 {
 	Instance* inst;
     return (inst = thisInstance()) ?
-            QString("%1").arg(inst->address(), 0, inst->pointerSize() << 1, QChar('0')) :
+            QString("%1").arg(inst->address(), inst->pointerSize() << 1, 16, QChar('0')) :
             QString("0");
 }
 
