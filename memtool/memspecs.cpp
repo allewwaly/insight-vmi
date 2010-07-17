@@ -16,10 +16,6 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
             "SIZEOF_UNSIGNED_LONG",
             "sizeof(unsigned long)",
             "%d"));
-    list.append(KernelMemSpec(
-            "ARCHITECTURE",
-            "ARCHITECTURE",
-            "%s"));
     // See <linux/include/asm-x86/page_32.h>
     // See <linux/include/asm-x86/page_64.h>
     list.append(KernelMemSpec(
