@@ -274,18 +274,18 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize)
     quint64 pte_paddr;
     quint64 pte;
 
-    if (_specs.initLevel4Pgt == 0) {
-        virtualMemoryError("_specs.initLevel4Pgt not set\n");
+    if (_specs.swapperPgDir == 0) {
+        virtualMemoryError("_specs.swapperPgDir not set\n");
     }
 
     // First translate the virtual address of the base page directory to a
     // physical address
     quint64 swapper_pg_dir = 0;
-    if (_specs.swapperPgDir >= _specs.startKernelMap) {
+    /*if (_specs.swapperPgDir >= _specs.startKernelMap) {
         swapper_pg_dir = ((_specs.swapperPgDir)
                 - (quint64) _specs.startKernelMap);
     }
-    else if (_specs.swapperPgDir >= _specs.pageOffset) {
+    else*/ if (_specs.swapperPgDir >= _specs.pageOffset) {
         swapper_pg_dir = ((_specs.swapperPgDir) - _specs.pageOffset);
     }
     else {
@@ -295,8 +295,13 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize)
 
     // Lookup address for the pgd page directory. The size of one page table
     // entry is sizeof(unsigned long)
-    pgd = extractULongFromPhysMem(swapper_pg_dir
-            + PAGEOFFSET(_specs.sizeofUnsignedLong * pgd_index_x86(vaddr)));
+    quint64 pgd_index = pgd_index_x86(vaddr);
+    quint64 offset = _specs.sizeofUnsignedLong * pgd_index;
+    quint64 realOffset = PAGEOFFSET(offset);
+    quint64 physaddr = swapper_pg_dir + realOffset;
+    pgd = extractULongFromPhysMem(physaddr);
+//    pgd = extractULongFromPhysMem(swapper_pg_dir
+//            + PAGEOFFSET(_specs.sizeofUnsignedLong * pgd_index)); //pgd_index_x86(vaddr)));
 
     if (!(pgd & _PAGE_PRESENT)) {
         virtualMemoryError(
@@ -316,7 +321,7 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize)
                     .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
     }
 
-    quint64 physaddr = 0;
+    physaddr = 0;
 
     // Is this a 4kB or 4MB page?
     if (pgd & _PAGE_PSE) {
@@ -460,8 +465,12 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize)
     quint64 physaddr = 0;
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
-    if(!(vaddr >= (_specs.vmallocStart + _specs.highMemory) && vaddr <= _specs.vmallocEnd))
-    {
+
+    // FIXME Either this condition is wrong, or the value for vmallocStart
+    // or highMemory is wrong!
+
+//    if(!(vaddr >= (_specs.vmallocStart + _specs.highMemory) && vaddr <= _specs.vmallocEnd))
+//    {
         if (vaddr >= _specs.pageOffset) {
             physaddr = ((vaddr) - _specs.pageOffset);
         }
@@ -473,11 +482,11 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize)
                                 .arg(vaddr, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
         }
         *pageSize = -1;
-    }
-    else {
-        // Otherwise use the address_lookup function
-        physaddr = pageLookup32(vaddr, pageSize);
-    }
+//    }
+//    else {
+//        // Otherwise use the address_lookup function
+//        physaddr = pageLookup32(vaddr, pageSize);
+//    }
 
     return physaddr;
 }
