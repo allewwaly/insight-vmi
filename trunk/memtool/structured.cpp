@@ -17,8 +17,10 @@ Structured::Structured()
 Structured::Structured(const TypeInfo& info)
 	: BaseType(info), _members(info.members())
 {
-    for (int i = 0; i < _members.size(); i++)
+    for (int i = 0; i < _members.size(); i++) {
         _members[i]->_belongsTo = this;
+        _memberNames.append(_members[i]->name());
+    }
 }
 
 
@@ -27,6 +29,7 @@ Structured::~Structured()
 	for (int i = 0; i < _members.size(); i++)
 		delete _members[i];
 	_members.clear();
+	_memberNames.clear();
 }
 
 
@@ -65,13 +68,7 @@ void Structured::addMember(StructuredMember* member)
 
 bool Structured::memberExists(const QString& memberName) const
 {
-    for (MemberList::const_iterator it = _members.constBegin();
-        it != _members.constEnd(); ++it)
-    {
-        if ((*it)->name() == memberName)
-            return true;
-    }
-    return false;
+    return _memberNames.indexOf(memberName) >= 0;
 }
 
 
