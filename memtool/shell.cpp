@@ -750,7 +750,7 @@ int Shell::parseMemDumpIndex(QStringList &args)
     if (index < 0)
         _err << "No memory dumps loaded." << endl;
 
-    return -1;
+    return index;
 }
 
 
@@ -951,8 +951,11 @@ int Shell::cmdScript(QStringList args)
 
 QScriptValue Shell::scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng)
 {
-    if (ctx->argumentCount() > 0)
+    if (ctx->argumentCount() > 0) {
         ctx->throwError("Expected one or two arguments");
+        return QScriptValue();
+    }
+
     // Create a new script array with all members of _memDumps
     QScriptValue arr = eng->newArray(_memDumps.size());
     for (int i = 0; i < _memDumps.size(); ++i) {
@@ -966,26 +969,34 @@ QScriptValue Shell::scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng)
 
 QScriptValue Shell::scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng)
 {
-    if (ctx->argumentCount() < 1 || ctx->argumentCount() > 2)
+    if (ctx->argumentCount() < 1 || ctx->argumentCount() > 2) {
         ctx->throwError("Expected one or two arguments");
+        return QScriptValue();
+    }
 
     // First argument must be a query string
-    if (!ctx->argument(0).isString())
+    if (!ctx->argument(0).isString()) {
         ctx->throwError("First argument must be a string");
+        return QScriptValue();
+    }
     QString query = ctx->argument(0).toString();
 
     // Default memDump index is the first one
     int index = 0;
     while (index < _memDumps.size() && !_memDumps[index])
         index++;
-    if (index > _memDumps.size())
+    if (index >= _memDumps.size() || !_memDumps[index]) {
         ctx->throwError("No memory dumps loaded");
+        return QScriptValue();
+    }
 
     // Second argument is optional and defines the memDump index
     if (ctx->argumentCount() == 2) {
-        index = ctx->argument(1).isNumber() ? ctx->argument(1).toInt32() : -1;
-        if (index < 0 || index >= _memDumps.size() || !_memDumps[index])
-            ctx->throwError("Invalid memory dump index");
+        index = ctx->argument(1).isNumber() ? ctx->argument(1).toInt32() - 1 : -1;
+        if (index < 0 || index >= _memDumps.size() || !_memDumps[index]) {
+            ctx->throwError(QString("Invalid memory dump index: %1").arg(index + 1));
+            return QScriptValue();
+        }
     }
 
     // Get the instance
