@@ -8,6 +8,9 @@
 #include "shell.h"
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 #include <QtAlgorithms>
 #include <QProcess>
 #include <QCoreApplication>
@@ -132,9 +135,13 @@ QTextStream& Shell::err()
 
 QString Shell::readLine()
 {
-    QByteArray buf;
-    buf = _stdin.readLine();
-    return QString::fromLocal8Bit(buf.constData(), buf.size()).trimmed();
+    char* line = readline(">>> ");
+    add_history(line);
+
+    QString ret = QString::fromLocal8Bit(line, strlen(line)).trimmed();
+    free(line);
+
+    return ret;
 }
 
 
@@ -193,9 +200,11 @@ void Shell::run()
         cmdMemoryLoad(QStringList(programOptions.memFileNames().at(i)));
     }
 
+    using_history();
+
     // Enter command line loop
     while (ret == 0 && !_stdin.atEnd()) {
-        _out << ">>> " << flush;
+//        _out << ">>> " << flush;
 
         line = readLine();
 

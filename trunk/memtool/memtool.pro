@@ -77,3 +77,4 @@ HEADERS += instance.h \
     enum.h
 CONFIG += console
 QT += script
+LIBS += -lreadline
