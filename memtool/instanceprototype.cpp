@@ -250,7 +250,7 @@ Instance* InstancePrototype::thisInstance() const
 			context()->throwError("Called an Instance member function an "
 					"non-Instance object \"" + thisObject().toString() + "\"");
 		else
-			debugerr("Called an Instance member function an non-Instance "
+			debugerr("Called an Instance member function on a non-Instance "
 					"object \"" << thisObject().toString() << "\"");
 	}
 
