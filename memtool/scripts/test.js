@@ -36,7 +36,9 @@ newTestSection("Iterating over inst.memberNames()");
 
 var names = inst.memberNames();
 for (var i = 0; i < names.length; ++i)
-	print ((i+1) + ". member: " + names[i]);
+	print ((i+1) + ". member: " + names[i] + 
+			", type = \"" + inst[names[i]].typeName() + "\"" + 
+			", size = " + inst[names[i]].size() + " byte");
 
 //------------------------------------------------------------------------------
 newTestSection("Iterating over inst.members()")
