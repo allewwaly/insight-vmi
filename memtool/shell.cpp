@@ -15,6 +15,7 @@
 #include <QProcess>
 #include <QCoreApplication>
 #include <QScriptEngine>
+#include <QDir>
 #include "compileunit.h"
 #include "variable.h"
 #include "refbasetype.h"
@@ -24,6 +25,7 @@
 #include "memorydump.h"
 #include "instanceclass.h"
 
+const char* history_file = ".memtool/history";
 
 Shell* shell = 0;
 
@@ -113,11 +115,42 @@ Shell::Shell(KernelSymbols& symbols)
     _stderr.open(stderr, QIODevice::WriteOnly);
     _out.setDevice(&_stdout);
     _err.setDevice(&_stderr);
+
+    // Enable readline history
+    using_history();
+
+    // Load the readline history
+    QString histFile = QDir::home().absoluteFilePath(history_file);
+    if (QFile::exists(histFile)) {
+    	int ret = read_history(histFile.toLocal8Bit().constData());
+        if (ret)
+        	debugerr("Error #" << ret << " occured when trying to read the "
+        			"history data from \"" << histFile << "\"");
+    }
+
 }
 
 
 Shell::~Shell()
 {
+	// Create history path, if it does not exist
+    QStringList pathList = QString(history_file).split("/", QString::SkipEmptyParts);
+    QString file = pathList.last();
+    pathList.pop_back();
+    QString path = pathList.join("/");
+
+    if (!QDir::home().exists(path) && !QDir::home().mkpath(path)) {
+		debugerr("Error creating path for saving the history");
+    }
+    else {
+    	// Save the history for the next launch
+		QString histFile = QDir::home().absoluteFilePath(history_file);
+		QByteArray ba = histFile.toLocal8Bit();
+		int ret = write_history(ba.constData());
+		if (ret)
+			debugerr("Error #" << ret << " occured when trying to save the "
+					"history data to \"" << histFile << "\"");
+    }
 }
 
 
@@ -136,6 +169,14 @@ QTextStream& Shell::err()
 QString Shell::readLine()
 {
     char* line = readline(">>> ");
+
+    // If line is NULL, the user wants to exit.
+    if (!line) {
+    	_stdin.close();
+    	return QString();
+    }
+
+    // Add the line to the history
     add_history(line);
 
     QString ret = QString::fromLocal8Bit(line, strlen(line)).trimmed();
@@ -199,8 +240,6 @@ void Shell::run()
     for (int i = 0; i < programOptions.memFileNames().size(); ++i) {
         cmdMemoryLoad(QStringList(programOptions.memFileNames().at(i)));
     }
-
-    using_history();
 
     // Enter command line loop
     while (ret == 0 && !_stdin.atEnd()) {
