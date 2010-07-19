@@ -133,12 +133,13 @@ Shell::Shell(KernelSymbols& symbols)
 
 Shell::~Shell()
 {
-	// Create history path, if it does not exist
-    QStringList pathList = QString(history_file).split("/", QString::SkipEmptyParts);
+	// Construct the path name of the history file
+	QStringList pathList = QString(history_file).split("/", QString::SkipEmptyParts);
     QString file = pathList.last();
     pathList.pop_back();
     QString path = pathList.join("/");
 
+	// Create history path, if it does not exist
     if (!QDir::home().exists(path) && !QDir::home().mkpath(path)) {
 		debugerr("Error creating path for saving the history");
     }
