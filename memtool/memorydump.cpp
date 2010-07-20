@@ -70,6 +70,7 @@ void MemoryDump::init()
     // value of "high_memory". We need to query its value and add it to
     // _specs.vmallocStart before we can translate paged addresses.
     if (_specs.arch == MemSpecs::i386) {
+        // This symbol must exist
         try {
             Instance highMem = queryInstance("high_memory");
             _specs.highMemory = highMem.toUInt32();
@@ -78,6 +79,21 @@ void MemoryDump::init()
             genericError("Failed to initialize this MemoryDump instance with "
                     "required run-time values from the dump. Error was: " + e.message);
         }
+
+        // This symbol only exists depending on the kernel version
+        QString ve_name("vmalloc_earlyreserve");
+        if (_factory->findVarByName(ve_name)) {
+            try {
+                Instance ve = queryInstance(ve_name);
+                _specs.vmallocEarlyreserve = ve.toUInt32();
+            }
+            catch (QueryException e) {
+                genericError("Failed to initialize this MemoryDump instance with "
+                        "required run-time values from the dump. Error was: " + e.message);
+            }
+        }
+        else
+            _specs.vmallocEarlyreserve = 0;
     }
 }
 
@@ -118,8 +134,9 @@ Instance MemoryDump::queryInstance(const QString& queryString) const
             if (!instance.memberExists(comp))
                 queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(processed.join(".")).arg(comp));
             else
-                queryError(QString("The type 0x%2 of member \"%1\" is unresolved")
+                queryError(QString("The type 0x%3 of member \"%1.%2\" is unresolved")
                                                 .arg(processed.join("."))
+                                                .arg(comp)
                                                 .arg(instance.typeIdOfMember(comp), 0, 16));
         }
 
@@ -154,7 +171,7 @@ QString MemoryDump::query(const QString& queryString) const
         }
         else
             s += "(unresolved type)";
-        s += QString(" @ 0x%1\n").arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16);
+        s += QString(" @ 0x%1\n").arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'));
 
         ret = s + ret;
     }
@@ -165,7 +182,7 @@ QString MemoryDump::query(const QString& queryString) const
 
 QString MemoryDump::dump(const QString& type, quint64 address) const
 {
-    debugmsg(QString("address = 0x%1").arg(address, 16, 16, QChar('0')));
+    debugmsg(QString("address = 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
 
     if (!_vmem->seek(address))
         queryError(QString("Cannot seek address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
@@ -174,19 +191,19 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
         char c;
         if (_vmem->read(&c, sizeof(char)) != sizeof(char))
             queryError(QString("Cannot read memory from address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
-        return QString("%1 (0x%2)").arg(c).arg(c, (sizeof(char) << 1), 16, QChar('0'));
+        return QString("%1 (0x%2)").arg(c).arg(c, (sizeof(c) << 1), 16, QChar('0'));
     }
     if (type == "int") {
         qint32 i;
         if (_vmem->read((char*)&i, sizeof(qint32)) != sizeof(qint32))
             queryError(QString("Cannot read memory from address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
-        return QString("%1 (0x%2)").arg(i).arg(i, (sizeof(qint32) << 1), 16, QChar('0'));
+        return QString("%1 (0x%2)").arg(i).arg((quint32)i, (sizeof(i) << 1), 16, QChar('0'));
     }
     if (type == "long") {
         qint64 l;
         if (_vmem->read((char*)&l, sizeof(qint64)) != sizeof(qint64))
             queryError(QString("Cannot read memory from address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
-        return QString("%1 (0x%2)").arg(l).arg(l, (sizeof(qint64) << 1), 16, QChar('0'));
+        return QString("%1 (0x%2)").arg(l).arg((quint64)l, (sizeof(l) << 1), 16, QChar('0'));
     }
 
     queryError("Unknown type: " + type);

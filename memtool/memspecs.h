@@ -88,6 +88,7 @@ struct MemSpecs
         pageOffset(0),
         vmallocStart(0),
         vmallocEnd(0),
+        vmallocOffset(0),
         vmemmapStart(0),
         vmemmapEnd(0),
         modulesVaddr(0),
@@ -96,6 +97,8 @@ struct MemSpecs
         initLevel4Pgt(0),
         swapperPgDir(0),
         highMemory(0),
+//        vmallocEarlyreserveAddr(0),
+        vmallocEarlyreserve(0),
         sizeofUnsignedLong(sizeof(unsigned long)),
 #ifdef __x86_64__
         arch(x86_64)
@@ -128,9 +131,16 @@ struct MemSpecs
      */
     QString toString() const;
 
+    /**
+     * @return the real (calculated) VMALLOC_START address that can acutally
+     * be is used for address translation
+     */
+    quint64 realVmallocStart() const;
+
     quint64 pageOffset;
     quint64 vmallocStart;
     quint64 vmallocEnd;
+    quint64 vmallocOffset;
     quint64 vmemmapStart;
     quint64 vmemmapEnd;
     quint64 modulesVaddr;
@@ -138,7 +148,9 @@ struct MemSpecs
     quint64 startKernelMap;
     quint64 initLevel4Pgt;
     quint64 swapperPgDir;
-    quint64 highMemory;   // this is set at runtime by MemoryDump::init()
+    quint64 highMemory;          // this is set at runtime by MemoryDump::init()
+//    quint64 vmallocEarlyreserveAddr;
+    quint64 vmallocEarlyreserve; // this is set at runtime by MemoryDump::init()
     int sizeofUnsignedLong;
     Architecture arch;
 };

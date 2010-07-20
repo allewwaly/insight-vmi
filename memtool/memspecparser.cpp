@@ -21,6 +21,11 @@ const char* memspec_src =
     "#include <linux/mm.h>\n"
 	"#include <asm/highmem.h>\n"
     "\n"
+//    "// We don't support PAE by now, so bail out if it is enabled\n"
+//    "#ifdef CONFIG_X86_PAE\n"
+//    "#  error \"The kernel is compiled with physical address extension which we don't support!\"\n"
+//    "#endif\n"
+//    "\n"
     "// cleanup some symbols\n"
     "#undef __always_inline\n"
     "\n"
@@ -43,7 +48,7 @@ const char* memspec_src =
     "  unsigned long __FIXADDR_TOP = 0;\n"
 	"#endif\n"
     "  unsigned long high_memory = 0;\n"
-	"  unsigned long vmalloc_earlyreserve = %VMALLOC_EARLYRESERVE%;\n"
+	"  unsigned long vmalloc_earlyreserve = 0;\n"
     "\n"
     "%MAIN_BODY%"       // this placeholder gets replaced later on
     "  return 0;\n"
@@ -159,8 +164,7 @@ void MemSpecParser::setupBuildDir()
                         .arg(list[i].outputFmt);
     }
     src = QString(memspec_src)
-    		.replace("%MAIN_BODY%", src)
-            .replace("%VMALLOC_EARLYRESERVE%", QString("0x%1UL").arg(_vmallocEarlyreserve, 0, 16));
+    		.replace("%MAIN_BODY%", src);
 
     QFile srcfile(_buildDir + "/memspec.c");
     if (!srcfile.open(QIODevice::WriteOnly))
