@@ -167,9 +167,10 @@ QTextStream& Shell::err()
 }
 
 
-QString Shell::readLine()
+QString Shell::readLine(const QString& prompt)
 {
-    char* line = readline(">>> ");
+    QString p = prompt.isEmpty() ? QString(">>> ") : prompt;
+    char* line = readline(p.toLocal8Bit().constData());
 
     // If line is NULL, the user wants to exit.
     if (!line) {
@@ -1122,7 +1123,10 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
     const RefBaseType* r = dynamic_cast<const RefBaseType*>(t);
     if (r) {
-        _out << "  Ref. type ID:   " << "0x" << hex << r->refTypeId() << dec << endl;
+        QString id = r->refTypeId() < 0 ?
+                QString::number(r->refTypeId()) :
+                QString("0x%1").arg(r->refTypeId(), 0, 16);
+        _out << "  Ref. type ID:   " << id << endl;
         _out << "  Ref. type:      "
             <<  (r->refType() ? r->refType()->prettyName() : QString("(unresolved)"))
             << endl;
@@ -1139,6 +1143,9 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
 		for (int i = 0; i < s->members().size(); i++) {
 			StructuredMember* m = s->members().at(i);
+			QString id = m->refTypeId() < 0 ?
+			        QString::number(m->refTypeId()) :
+			        QString("0x%1").arg(m->refTypeId(), 0, 16);
 			_out << "    "
                     << QString("0x%1").arg(m->offset(), 4, 16, QChar('0'))
                     << "  "
@@ -1146,7 +1153,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 					<< qSetFieldWidth(0)
 					<< (m->refType() ?
 					        m->refType()->prettyName() :
-					        QString("(unresolved type, 0x%1)").arg(m->refTypeId(), 0, 16))
+					        QString("(unresolved type, %1)").arg(id))
 					<< endl;
 		}
 	}
@@ -1281,8 +1288,7 @@ int Shell::cmdSymbolsStore(QStringList args)
     if (QFile::exists(fileName)) {
         QString reply;
         do {
-            _out << "Ok to overwrite existing file? [Y/n] " << flush;
-            reply = readLine().toLower();
+            reply = readLine("Ok to overwrite existing file? [Y/n] ").toLower();
             if (reply.isEmpty())
                 reply = "y";
             else if (reply == "n")

@@ -90,9 +90,10 @@ public:
 
     /**
      * Reads a line of text from stdin and returns the reply.
+     * @param prompt the text prompt the user sees
      * @return line of text from stdin
      */
-    QString readLine();
+    QString readLine(const QString& prompt = QString());
 
 protected:
     /**
