@@ -68,6 +68,17 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
 
 	    shell->out()
             << "\rSuccessfully parsed the memory specifications in " << time << endl;
+
+        // Ask the user if he wants to keep the build directory
+	    debugmsg("Ask user to keep the build directory");
+        QString reply;
+        do {
+            QString prompt = QString("Keep build directory \"%1\"? [Y/n] ").arg(specParser.buildDir());
+            reply = shell->readLine(prompt).toLower();
+            if (reply.isEmpty())
+                reply = "y";
+        } while (reply != "y" && reply != "n");
+        specParser.setAutoRemoveBuildDir(reply == "n");
 	}
     catch (GenericException e) {
         shell->err()
@@ -83,8 +94,8 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
             // Ask the user if he wants to keep the build directory
             QString reply;
             do {
-                shell->out() << "Keep build directory \"" << specParser.buildDir() << "\"? [Y/n] " << flush;
-                reply = shell->readLine().toLower();
+                QString prompt = QString("Keep build directory \"%1\"? [Y/n] ").arg(specParser.buildDir());
+                reply = shell->readLine(prompt).toLower();
                 if (reply.isEmpty())
                     reply = "y";
             } while (reply != "y" && reply != "n");
