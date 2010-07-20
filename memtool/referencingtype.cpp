@@ -94,12 +94,13 @@ Instance ReferencingType::createRefInstance(size_t address,
     while ( (rbt = dynamic_cast<const RefBaseType*>(b)) ) {
 		// Resolve pointer references
 		if (rbt->type() & (BaseType::rtArray|BaseType::rtPointer)) {
-			// If this is a a type "char*", treat it as a string
+			// If this is a type "char*", treat it as a string
 			if (rbt->refType() && rbt->refType()->type() == BaseType::rtInt8)
-			{
 				// Stop here, so that toString() later on will print this as string
 				break;
-			}
+			// If this is a type "void*", don't resolve it anymore
+			else if (rbt->refTypeId() < 0)
+			    break;
 			// Otherwise resolve pointer reference, if this is a pointer
 			const Pointer* p = dynamic_cast<const Pointer*>(rbt);
 			if (p)
