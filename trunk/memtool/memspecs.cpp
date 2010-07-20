@@ -32,6 +32,10 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
             "VMALLOC_END",
             "VMALLOC_END",
             "%0.16lx"));
+    list.append(KernelMemSpec(
+            "VMALLOC_OFFSET",
+            "VMALLOC_OFFSET",
+            "%0.16lx"));
 
     // x86_64 only
     // See <linux/include/asm-x86/page_64.h>
@@ -78,6 +82,8 @@ bool MemSpecs::setFromKeyValue(const QString& key, const QString& value)
         vmallocStart = value.toULong(&ok, 16);
     else if (key == "VMALLOC_END")
         vmallocEnd = value.toULong(&ok, 16);
+    else if (key == "VMALLOC_OFFSET")
+        vmallocOffset = value.toULong(&ok, 16);
     else if (key == "MODULES_VADDR")
         modulesVaddr = value.toULong(&ok, 16);
     else if (key == "MODULES_END")
@@ -113,9 +119,11 @@ QString MemSpecs::toString() const
     ret += QString("%1 = %2\n").arg("sizeof(unsigned long)", key_w).arg(sizeofUnsignedLong);
     ret += QString("%1 = 0x%2\n").arg("PAGE_OFFSET", key_w).arg(pageOffset, val_w, 16, QChar('0'));
     if (vmallocStart > 0)
-        ret += QString("%1 = 0x%2\n").arg("VMALLOC_START", key_w).arg(vmallocStart, val_w, 16, QChar('0'));
+        ret += QString("%1 = 0x%2\n").arg("VMALLOC_START", key_w).arg(realVmallocStart(), val_w, 16, QChar('0'));
     if (vmallocEnd > 0)
         ret += QString("%1 = 0x%2\n").arg("VMALLOC_END", key_w).arg(vmallocEnd, val_w, 16, QChar('0'));
+    if (vmallocOffset > 0)
+        ret += QString("%1 = 0x%2\n").arg("VMALLOC_OFFSET", key_w).arg(vmallocOffset, val_w, 16, QChar('0'));
     if (vmemmapStart > 0)
         ret += QString("%1 = 0x%2\n").arg("VMEMMAP_START", key_w).arg(vmemmapStart, val_w, 16, QChar('0'));
     if (vmemmapEnd > 0)
@@ -132,7 +140,19 @@ QString MemSpecs::toString() const
         ret += QString("%1 = 0x%2\n").arg("swapper_pg_dir", key_w).arg(swapperPgDir, val_w, 16, QChar('0'));
     if (highMemory > 0)
         ret += QString("%1 = 0x%2\n").arg("high_memory", key_w).arg(highMemory, val_w, 16, QChar('0'));
+    if (vmallocEarlyreserve > 0)
+        ret += QString("%1 = 0x%2\n").arg("vmalloc_earlyreserve", key_w).arg(vmallocEarlyreserve, val_w, 16, QChar('0'));
     return ret;
+}
+
+
+quint64 MemSpecs::realVmallocStart() const
+{
+    if (arch == i386)
+        return (vmallocStart + highMemory + vmallocEarlyreserve) &
+                ~(vmallocOffset - 1);
+    else
+        return vmallocStart;
 }
 
 
@@ -143,6 +163,7 @@ QDataStream& operator>>(QDataStream& in, MemSpecs& specs)
     in  >> specs.pageOffset
         >> specs.vmallocStart
         >> specs.vmallocEnd
+        >> specs.vmallocOffset
         >> specs.vmemmapStart
         >> specs.vmemmapEnd
         >> specs.modulesVaddr
@@ -150,6 +171,7 @@ QDataStream& operator>>(QDataStream& in, MemSpecs& specs)
         >> specs.startKernelMap
         >> specs.initLevel4Pgt
         >> specs.swapperPgDir
+//        >> specs.vmallocEarlyreserveAddr
         >> specs.sizeofUnsignedLong
         >> __arch;
 
@@ -164,6 +186,7 @@ QDataStream& operator<<(QDataStream& out, const MemSpecs& specs)
     out << specs.pageOffset
         << specs.vmallocStart
         << specs.vmallocEnd
+        << specs.vmallocOffset
         << specs.vmemmapStart
         << specs.vmemmapEnd
         << specs.modulesVaddr
@@ -171,6 +194,7 @@ QDataStream& operator<<(QDataStream& out, const MemSpecs& specs)
         << specs.startKernelMap
         << specs.initLevel4Pgt
         << specs.swapperPgDir
+//        << specs.vmallocEarlyreserveAddr
         << specs.sizeofUnsignedLong
         << (qint32)specs.arch;
 
