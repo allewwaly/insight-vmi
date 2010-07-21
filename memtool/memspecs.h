@@ -97,14 +97,14 @@ struct MemSpecs
         initLevel4Pgt(0),
         swapperPgDir(0),
         highMemory(0),
-//        vmallocEarlyreserveAddr(0),
         vmallocEarlyreserve(0),
         sizeofUnsignedLong(sizeof(unsigned long)),
 #ifdef __x86_64__
-        arch(x86_64)
+        arch(x86_64),
 #else
-        arch(i386)
+        arch(i386),
 #endif
+        initialized(false)
     {}
 
     /**
@@ -148,11 +148,11 @@ struct MemSpecs
     quint64 startKernelMap;
     quint64 initLevel4Pgt;
     quint64 swapperPgDir;
-    quint64 highMemory;          // this is set at runtime by MemoryDump::init()
-//    quint64 vmallocEarlyreserveAddr;
-    quint64 vmallocEarlyreserve; // this is set at runtime by MemoryDump::init()
+    quint64 highMemory;          ///< This is set at runtime by MemoryDump::init()
+    quint64 vmallocEarlyreserve; ///< This is set at runtime by MemoryDump::init()
     int sizeofUnsignedLong;
     Architecture arch;
+    bool initialized;            ///< \c true after MemoryDump::init() is complete, \c false otherwise
 };
 
 

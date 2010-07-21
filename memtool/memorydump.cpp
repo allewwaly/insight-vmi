@@ -95,6 +95,9 @@ void MemoryDump::init()
         else
             _specs.vmallocEarlyreserve = 0;
     }
+
+    // Initialization done
+    _specs.initialized = true;
 }
 
 
