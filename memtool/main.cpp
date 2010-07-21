@@ -25,8 +25,8 @@ int main(int argc, char* argv[])
 	int ret = 0;
 
 	try {
-	    KernelSymbols sym;
-	    shell = new Shell(sym);
+	    shell = new Shell();
+        KernelSymbols& sym = shell->symbols();
 
 	    // Perform any initial action that might be given
 	    switch (programOptions.action()) {
