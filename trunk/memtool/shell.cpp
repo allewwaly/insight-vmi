@@ -30,10 +30,10 @@ const char* history_file = ".memtool/history";
 Shell* shell = 0;
 
 Shell::MemDumpArray Shell::_memDumps;
+KernelSymbols Shell::_sym;
 
 
-Shell::Shell(KernelSymbols& symbols)
-    : _sym(symbols)
+Shell::Shell()
 {
     // Register all commands
     _commands.insert("exit",
@@ -167,6 +167,17 @@ QTextStream& Shell::err()
 }
 
 
+KernelSymbols& Shell::symbols()
+{
+    return _sym;
+}
+
+
+const KernelSymbols& Shell::symbols() const
+{
+    return _sym;
+}
+
 QString Shell::readLine(const QString& prompt)
 {
     QString p = prompt.isEmpty() ? QString(">>> ") : prompt;
@@ -179,7 +190,8 @@ QString Shell::readLine(const QString& prompt)
     }
 
     // Add the line to the history
-    add_history(line);
+    if (strlen(line) > 0)
+        add_history(line);
 
     QString ret = QString::fromLocal8Bit(line, strlen(line)).trimmed();
     free(line);
@@ -971,6 +983,9 @@ int Shell::cmdScript(QStringList args)
     QScriptValue memDumpFunc = engine.newFunction(scriptListMemDumps);
     engine.globalObject().setProperty("getMemDumps", memDumpFunc);
 
+    QScriptValue listVarsFunc = engine.newFunction(scriptListVariables);
+    engine.globalObject().setProperty("listVariables", listVarsFunc);
+
     QScriptValue getInstanceFunc = engine.newFunction(scriptGetInstance, 2);
     engine.globalObject().setProperty("getInstance", getInstanceFunc);
 
@@ -1012,6 +1027,23 @@ QScriptValue Shell::scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng)
         if (_memDumps[i])
             arr.setProperty(i, _memDumps[i]->fileName());
     }
+
+    return arr;
+}
+
+
+QScriptValue Shell::scriptListVariables(QScriptContext* ctx, QScriptEngine* eng)
+{
+    if (ctx->argumentCount() != 0) {
+        ctx->throwError("No arguments expected");
+        return QScriptValue();
+    }
+
+    // Create a new script array with all variable names
+    const VariableList& vars = _sym.factory().vars();
+    QScriptValue arr = eng->newArray(vars.size());
+    for (int i = 0; i < vars.size(); ++i)
+        arr.setProperty(i, vars[i]->name());
 
     return arr;
 }

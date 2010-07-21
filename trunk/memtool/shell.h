@@ -67,9 +67,8 @@ class Shell: public QThread
 public:
     /**
      * Constructor
-     * @param symbols the debugging symbols to operate on
      */
-    Shell(KernelSymbols& symbols);
+    Shell();
 
     /**
      * Destructor
@@ -87,6 +86,16 @@ public:
      * @return the \c stderr stream of the shell
      */
     QTextStream& err();
+
+    /**
+     * @return the KernelSymbol object of this Shell object
+     */
+    KernelSymbols& symbols();
+
+    /**
+     * @return the KernelSymbol object of this Shell object, const version
+     */
+    const KernelSymbols& symbols() const;
 
     /**
      * Reads a line of text from stdin and returns the reply.
@@ -109,7 +118,7 @@ private slots:
 private:
     typedef QVarLengthArray<MemoryDump*, 16> MemDumpArray;
 
-    KernelSymbols& _sym;
+    static KernelSymbols _sym;
     QFile _stdin;
     QFile _stdout;
     QFile _stderr;
@@ -124,6 +133,7 @@ private:
     void hline(int width = 60);
     int parseMemDumpIndex(QStringList &args);
     static QScriptValue scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng);
+    static QScriptValue scriptListVariables(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng);
     //---------------------------------
     int cmdExit(QStringList args);
