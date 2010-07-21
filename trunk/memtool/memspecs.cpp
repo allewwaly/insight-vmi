@@ -6,6 +6,7 @@
  */
 
 #include "memspecs.h"
+#include "debug.h"
 
 KernelMemSpecList MemSpecs::supportedMemSpecs()
 {
@@ -148,6 +149,7 @@ QString MemSpecs::toString() const
 
 quint64 MemSpecs::realVmallocStart() const
 {
+	assert(initialized == true);
     if (arch == i386)
         return (vmallocStart + highMemory + vmallocEarlyreserve) &
                 ~(vmallocOffset - 1);
@@ -171,7 +173,6 @@ QDataStream& operator>>(QDataStream& in, MemSpecs& specs)
         >> specs.startKernelMap
         >> specs.initLevel4Pgt
         >> specs.swapperPgDir
-//        >> specs.vmallocEarlyreserveAddr
         >> specs.sizeofUnsignedLong
         >> __arch;
 
@@ -194,7 +195,6 @@ QDataStream& operator<<(QDataStream& out, const MemSpecs& specs)
         << specs.startKernelMap
         << specs.initLevel4Pgt
         << specs.swapperPgDir
-//        << specs.vmallocEarlyreserveAddr
         << specs.sizeofUnsignedLong
         << (qint32)specs.arch;
 

@@ -457,7 +457,11 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize)
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
 
-    if(!(vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd))
+    // During initialization, the VMALLOC_START might be incorrect (i.e., less
+    // than PAGE_OFFSET). This is reflected in the _specs.initialized variable.
+    // In that case we always assume linear translation.
+    if(!_specs.initialized ||
+    	!(vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd))
     {
         if (vaddr >= _specs.pageOffset) {
             physaddr = ((vaddr) - _specs.pageOffset);
@@ -485,7 +489,8 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize)
     quint64 physaddr = 0;
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
-    if(!((vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) ||
+    if(!(_specs.initialized ||
+         (vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) ||
          (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd)))
     {
