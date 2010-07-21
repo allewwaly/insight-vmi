@@ -131,7 +131,7 @@ bool VirtualMemory::seek(qint64 pos)
 //    try {
         int pageSize;
         qint64 physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
-        if ( (physAddr < 0) || physAddr >= physMem()->size() )
+        if ( (physAddr < 0) || !_physMem->seek(physAddr) )
             return false;
 
         return true;
@@ -451,6 +451,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
             virtualToPhysical64(vaddr, pageSize);
 }
 
+
 quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize)
 {
     quint64 physaddr = 0;
@@ -460,8 +461,10 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize)
     // During initialization, the VMALLOC_START might be incorrect (i.e., less
     // than PAGE_OFFSET). This is reflected in the _specs.initialized variable.
     // In that case we always assume linear translation.
-    if(!_specs.initialized ||
-    	!(vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd))
+    if (!(_specs.initialized &&
+         ((vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) ||
+          (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
+          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd))) )
     {
         if (vaddr >= _specs.pageOffset) {
             physaddr = ((vaddr) - _specs.pageOffset);
@@ -489,10 +492,10 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize)
     quint64 physaddr = 0;
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
-    if(!(_specs.initialized ||
-         (vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) ||
-         (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
-         (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd)))
+    if(!(_specs.initialized &&
+         ((vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) ||
+          (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
+          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd))) )
     {
         if (vaddr >= _specs.startKernelMap) {
             physaddr = ((vaddr) - _specs.startKernelMap);
