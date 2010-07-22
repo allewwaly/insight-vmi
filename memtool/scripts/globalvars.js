@@ -1,15 +1,19 @@
 
-// Retrieve list of all global variable names
-var varNames = listVariables();
+//var i = new Instance(0x2a48f);
+//
+//print(i.toString());
 
-for (var i = 0; i < varNames.length; ++i) {
+
+// Retrieve list of all global variable names
+var varIds = getVariableIds();
+
+for (var i = 0; i < varIds.length; ++i) {
+	print(i + ": 0x" + varIds[i].toString(16));
 	// Create an instance of each variable
-//	var inst = new Instance(varNames[i]);
-	print(i + ": " + varNames[i]);
+	var inst = new Instance(varIds[i]);
 	// Output some information about it
-//	if (inst.addressLow() == 0)
-//		print("### Error creating instance for \"" + varNames[i] + "\"");
-//	else	
-//		print(varNames[i] + ": " /*inst.typeName() +*/ 
-//				/*", size = " + inst.size() +*/ /*" bytes, real type = " + inst.type()*/ );
+	print("0x" + inst.Id().toString(16) + " " + 
+			inst.Name() + ": " + inst.TypeName() + " @ 0x" + inst.Address() + 
+			", size = " + inst.Size() + " bytes, real type = " + inst.Type());
 }
+
