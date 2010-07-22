@@ -53,8 +53,17 @@ QString Pointer::toString(QIODevice* mem, size_t offset) const
 
     QString errMsg;
 
-    // Is this possibly a string?
-    if (_refType && _refType->type() == rtInt8) {
+    // Pointer to referenced type's referenced type
+    const BaseType* refRefType = dynamic_cast<const RefBaseType*>(_refType) ?
+            dynamic_cast<const RefBaseType*>(_refType)->refType() :
+            0;
+    // Is this possibly a string (type "char*" or "const char*")?
+    if (_refType &&
+        (_refType->type() == rtInt8 ||
+         (_refType->type() == rtConst &&
+          refRefType &&
+          refRefType->type() == BaseType::rtInt8)))
+    {
         QString s = readString(mem, p, 255, &errMsg);
         if (errMsg.isEmpty())
             return QString("\"%1\"").arg(s);
