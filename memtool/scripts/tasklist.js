@@ -3,7 +3,7 @@ print("===================================================");
 
 function dumpInstance(inst)
 {
-	print(inst.name() + " = \"" + inst.typeName() + "\" @ 0x" + inst.address().toString(16));
+	print(inst.Name() + " = \"" + inst.TypeName() + "\" @ 0x" + inst.Address());
 	print(inst.toString());
 	print("-------------------------------------------------------");
 }
@@ -30,7 +30,7 @@ var addr_size = 18;
 
 function printList(p)
 {
-	if (p.isNull()) {
+	if (p.IsNull()) {
 		return;
 	}
 	
@@ -43,12 +43,12 @@ function printList(p)
 			ralign(it.gid.toString(), gid_size) +
 			"  " +
 			lalign(it.comm.toString(), cmd_size) +
-			lalign("0x" + it.address(), addr_size);
+			lalign("0x" + it.Address(), addr_size);
 
 		print(line);
 		
 		it = it.tasks.next;
-	} while (it.address() != p.address());
+	} while (it.pid.toUInt32() != 0);
 }
 
 function printHdr()
