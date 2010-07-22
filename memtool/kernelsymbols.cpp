@@ -69,16 +69,16 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
 	    shell->out()
             << "\rSuccessfully parsed the memory specifications in " << time << endl;
 
-        // Ask the user if he wants to keep the build directory
-	    debugmsg("Ask user to keep the build directory");
-        QString reply;
-        do {
-            QString prompt = QString("Keep build directory \"%1\"? [Y/n] ").arg(specParser.buildDir());
-            reply = shell->readLine(prompt).toLower();
-            if (reply.isEmpty())
-                reply = "y";
-        } while (reply != "y" && reply != "n");
-        specParser.setAutoRemoveBuildDir(reply == "n");
+//        // Ask the user if he wants to keep the build directory
+//	    debugmsg("Ask user to keep the build directory");
+//        QString reply;
+//        do {
+//            QString prompt = QString("Keep build directory \"%1\"? [Y/n] ").arg(specParser.buildDir());
+//            reply = shell->readLine(prompt).toLower();
+//            if (reply.isEmpty())
+//                reply = "y";
+//        } while (reply != "y" && reply != "n");
+//        specParser.setAutoRemoveBuildDir(reply == "n");
 	}
     catch (GenericException e) {
         shell->err()
