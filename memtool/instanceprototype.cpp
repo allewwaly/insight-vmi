@@ -67,6 +67,13 @@ bool InstancePrototype::IsAddressNull() const
 }
 
 
+bool InstancePrototype::IsAccessible() const
+{
+	Instance* inst;
+    return (inst = thisInstance()) ? inst->isAccessible() : false;
+}
+
+
 QString InstancePrototype::Name() const
 {
 	Instance* inst;

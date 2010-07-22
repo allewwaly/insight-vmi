@@ -32,6 +32,14 @@ public:
     virtual qint64 size() const;
 
     /**
+     * Seeks to the virtual memory position \a pos without throwing an exception
+     * if the virtual address translation fails.
+     * @param pos address to seek to
+     * @return \c true if the seek succeeded, \c false otherwise
+     */
+    bool safeSeek(qint64 pos);
+
+    /**
      * @return the device containing the physical memory
      */
     const QIODevice* physMem() const;
