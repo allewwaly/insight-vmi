@@ -123,6 +123,13 @@ public:
 	bool isValid() const;
 
 	/**
+	 * Checks if this instance is accessible, i. e., that its value can be read
+	 * from the memory dump through its virtual address.
+	 * @return \c true if the instance is accessible, \c false otherwise
+	 */
+	bool isAccessible() const;
+
+	/**
 	 * @return the number of members, if this is a struct, \c 0 otherwise
 	 */
 	int memberCount() const;

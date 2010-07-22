@@ -46,6 +46,8 @@ public slots:
 
 	bool IsAddressNull() const;
 
+	bool IsAccessible() const;
+
 	/**
 	 * @return the address as zero-padded string in hex format
      * \sa AddressLow(), AddressHigh()

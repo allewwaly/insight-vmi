@@ -127,18 +127,24 @@ bool VirtualMemory::seek(qint64 pos)
     _pos = (quint64) pos;
 //    QIODevice::seek(pos);
 
-    // If the address translation works, we consider the seek to succeed.
-//    try {
-        int pageSize;
-        qint64 physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
-        if ( (physAddr < 0) || !_physMem->seek(physAddr) )
-            return false;
+	int pageSize;
+	qint64 physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
+	if ( (physAddr < 0) || !_physMem->seek(physAddr) )
+		return false;
 
-        return true;
-//    }
-//    catch (VirtualMemoryException) {
-//        return false;
-//    }
+	return true;
+}
+
+
+bool VirtualMemory::safeSeek(qint64 pos)
+{
+    // If the address translation works, we consider the seek to succeed.
+    try {
+        return seek(pos);
+    }
+    catch (VirtualMemoryException) {
+        return false;
+    }
 }
 
 

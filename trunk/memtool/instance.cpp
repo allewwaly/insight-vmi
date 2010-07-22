@@ -130,6 +130,12 @@ bool Instance::isValid() const
 }
 
 
+bool Instance::isAccessible() const
+{
+	return !_isNull && _vmem->safeSeek(_address);
+}
+
+
 Instance Instance::member(int index) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_type);
