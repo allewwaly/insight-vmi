@@ -23,7 +23,14 @@ InstancePrototype::~InstancePrototype()
 }
 
 
-QString InstancePrototype::address() const
+int InstancePrototype::Id() const
+{
+    Instance* inst;
+    return (inst = thisInstance()) ? inst->id() : -1;
+}
+
+
+QString InstancePrototype::Address() const
 {
 	Instance* inst;
     return (inst = thisInstance()) ?
@@ -32,56 +39,63 @@ QString InstancePrototype::address() const
 }
 
 
-quint32 InstancePrototype::addressHigh() const
+quint32 InstancePrototype::AddressHigh() const
 {
     Instance* inst;
     return (inst = thisInstance()) ? (inst->address() >> 32) : 0;
 }
 
 
-quint32 InstancePrototype::addressLow() const
+quint32 InstancePrototype::AddressLow() const
 {
     Instance* inst;
     return (inst = thisInstance()) ? quint32(inst->address() & 0xFFFFFFFFUL) : 0;
 }
 
 
-bool InstancePrototype::isNull() const
+bool InstancePrototype::IsNull() const
 {
 	Instance* inst;
     return (inst = thisInstance()) ? inst->isNull() : true;
 }
 
 
-QString InstancePrototype::name() const
+bool InstancePrototype::IsAddressNull() const
+{
+    Instance* inst;
+    return (inst = thisInstance()) ? (inst->address() == 0) : true;
+}
+
+
+QString InstancePrototype::Name() const
 {
 	Instance* inst;
     return (inst = thisInstance()) ? inst->name() : QString();
 }
 
 
-QString InstancePrototype::parentName() const
+QString InstancePrototype::ParentName() const
 {
 	Instance* inst;
     return (inst = thisInstance()) ? inst->parentName() : QString();
 }
 
 
-QString InstancePrototype::fullName() const
+QString InstancePrototype::FullName() const
 {
 	Instance* inst;
     return (inst = thisInstance()) ? inst->fullName() : QString();
 }
 
 
-QStringList InstancePrototype::memberNames() const
+QStringList InstancePrototype::MemberNames() const
 {
     Instance* inst;
     return (inst = thisInstance()) ? inst->memberNames() : QStringList();
 }
 
 
-InstanceList InstancePrototype::members() const
+InstanceList InstancePrototype::Members() const
 {
 	Instance* inst;
     return (inst = thisInstance()) ? inst->members() : InstanceList();
@@ -95,14 +109,14 @@ InstanceList InstancePrototype::members() const
 //}
 
 
-QString InstancePrototype::typeName() const
+QString InstancePrototype::TypeName() const
 {
 	Instance* inst;
     return (inst = thisInstance()) ? inst->typeName() : QString();
 }
 
 
-QString InstancePrototype::type() const
+QString InstancePrototype::Type() const
 {
     // Init static member
     static BaseType::RealTypeRevMap realTypeNames =
@@ -114,35 +128,35 @@ QString InstancePrototype::type() const
 }
 
 
-quint32 InstancePrototype::size() const
+quint32 InstancePrototype::Size() const
 {
 	Instance* inst;
     return (inst = thisInstance()) ? inst->size() : 0;
 }
 
 
-bool InstancePrototype::memberExists(const QString& name) const
+bool InstancePrototype::MemberExists(const QString& name) const
 {
 	Instance* inst;
     return (inst = thisInstance()) ? inst->memberExists(name) : false;
 }
 
 
-Instance InstancePrototype::findMember(const QString& name) const
+Instance InstancePrototype::FindMember(const QString& name) const
 {
 	Instance* inst;
     return (inst = thisInstance()) ? inst->findMember(name) : Instance();
 }
 
 
-int InstancePrototype::typeIdOfMember(const QString& name) const
+int InstancePrototype::TypeIdOfMember(const QString& name) const
 {
 	Instance* inst;
     return (inst = thisInstance()) ? inst->typeIdOfMember(name) : -1;
 }
 
 
-int InstancePrototype::pointerSize() const
+int InstancePrototype::PointerSize() const
 {
     Instance* inst;
     return (inst = thisInstance()) ? inst->pointerSize() : 8;
@@ -247,11 +261,11 @@ Instance* InstancePrototype::thisInstance() const
 	Instance* inst = qscriptvalue_cast<Instance*>(thisObject().data());
 	if (!inst) {
 		if (context())
-			context()->throwError("Called an Instance member function an "
-					"non-Instance object \"" + thisObject().toString() + "\"");
+            context()->throwError("Called an Instance member function on a "
+                    "non-Instance object");
 		else
 			debugerr("Called an Instance member function on a non-Instance "
-					"object \"" << thisObject().toString() << "\"");
+                    "object");
 	}
 
     return inst;

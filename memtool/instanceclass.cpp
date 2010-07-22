@@ -46,21 +46,22 @@ private:
 //------------------------------------------------------------------------------
 
 InstanceClass::InstanceClass(QScriptEngine *eng)
-    : QObject(eng), QScriptClass(eng)
+    : QObject(eng), QScriptClass(eng), _proto(0)
 {
     qScriptRegisterMetaType<Instance>(eng, instToScriptValue, instFromScriptValue);
     qScriptRegisterMetaType<InstanceList>(eng, membersToScriptValue, membersFromScriptValue);
     qScriptRegisterMetaType<QStringList>(eng, stringListToScriptValue, stringListFromScriptValue);
 
-    _proto = eng->newQObject(new InstancePrototype(this),
+    _proto = new InstancePrototype(this);
+    _protoScriptVal = eng->newQObject(_proto,
                                QScriptEngine::QtOwnership,
                                QScriptEngine::SkipMethodsInEnumeration
                                | QScriptEngine::ExcludeSuperClassMethods
                                | QScriptEngine::ExcludeSuperClassProperties);
     QScriptValue global = eng->globalObject();
-    _proto.setPrototype(global.property("Object").property("prototype"));
+    _protoScriptVal.setPrototype(global.property("Object").property("prototype"));
 
-    _ctor = eng->newFunction(construct, _proto);
+    _ctor = eng->newFunction(construct, _protoScriptVal);
     _ctor.setData(qScriptValueFromValue(eng, this));
 }
 
@@ -78,8 +79,17 @@ QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue& object
         return 0;
 
     // If we have a member with that index, we handle it as a property
-    int index = inst->indexOfMember(name.toString());
+    QString nameStr = name.toString();
+    int index = inst->indexOfMember(nameStr);
     if (index >= 0) {
+        // Check if a slot with the same name exists in the prototype class
+        QByteArray slotName = QString("%1()").arg(nameStr).toAscii();
+        if (_proto->metaObject()->indexOfSlot(slotName.constData())) {
+            engine()->currentContext()->throwError(
+                    "Property clash for property \"" + nameStr + "\": is a "
+                    "struct member as well as a prototype function");
+            return 0;
+        }
     	*id = (uint) index;
         return flags;
     }
@@ -134,7 +144,7 @@ QString InstanceClass::name() const
 
 QScriptValue InstanceClass::prototype() const
 {
-    return _proto;
+    return _protoScriptVal;
 }
 
 
@@ -156,7 +166,7 @@ QScriptValue InstanceClass::newInstance(const Instance& inst)
 {
     QScriptValue data = engine()->newVariant(qVariantFromValue(inst));
     QScriptValue ret = engine()->newObject(this, data);
-    ret.setPrototype(_proto);
+    ret.setPrototype(_protoScriptVal);
     return ret;
 }
 

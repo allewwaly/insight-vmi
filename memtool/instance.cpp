@@ -19,22 +19,28 @@ const QStringList Instance::_emtpyStringList;
 
 
 Instance::Instance()
-	: _address(0),  _type(0), _vmem(0), _isNull(true)
+	: _id(-1), _address(0),  _type(0), _vmem(0), _isNull(true), _isValid(false)
 {
 }
 
 
 Instance::Instance(size_t address, const BaseType* type, const QString& name,
-		const QString& parentName, VirtualMemory* vmem)
-	: _address(address),  _type(type), _name(name), _parentName(parentName),
-	  _vmem(vmem), _isNull(true)
+		const QString& parentName, VirtualMemory* vmem, int id)
+	: _id(id), _address(address),  _type(type), _name(name), _parentName(parentName),
+	  _vmem(vmem), _isNull(true), _isValid(type != 0)
 {
-	_isNull = !_address || !_type || !_vmem;
+    _isNull = !_address || !_isValid;
 }
 
 
 Instance::~Instance()
 {
+}
+
+
+int Instance::id() const
+{
+    return _id;
 }
 
 
@@ -118,6 +124,12 @@ bool Instance::isNull() const
 }
 
 
+bool Instance::isValid() const
+{
+    return _isValid;
+}
+
+
 Instance Instance::member(int index) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_type);
@@ -165,7 +177,7 @@ int Instance::typeIdOfMember(const QString& name) const
 
 QString Instance::toString() const
 {
-	return _isNull ? QString() : _type->toString(_vmem, _address);
+	return _isNull ? QString("NULL") : _type->toString(_vmem, _address);
 }
 
 int Instance::pointerSize() const

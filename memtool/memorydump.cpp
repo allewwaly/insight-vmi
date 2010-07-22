@@ -110,7 +110,6 @@ const QString& MemoryDump::fileName() const
 Instance MemoryDump::queryInstance(const QString& queryString) const
 {
     QStringList components = queryString.split('.', QString::SkipEmptyParts);
-    QString ret;
 
     if (components.isEmpty())
         queryError("Empty query string given");
@@ -133,21 +132,64 @@ Instance MemoryDump::queryInstance(const QString& queryString) const
             queryError(QString("Member \"%1\" is not a struct or union").arg(processed.join(".")));
 
         Instance tmp = instance.findMember(comp);
-        if (tmp.isNull()) {
+        if (!tmp.isValid()) {
             if (!instance.memberExists(comp))
-                queryError(QString("Struct \"%1\" has no member named \"%2\"").arg(processed.join(".")).arg(comp));
-            else
+                queryError(QString("Struct \"%1\" has no member named \"%2\"")
+                        .arg(processed.join("."))
+                        .arg(comp));
+            else if (!tmp.type())
                 queryError(QString("The type 0x%3 of member \"%1.%2\" is unresolved")
-                                                .arg(processed.join("."))
-                                                .arg(comp)
-                                                .arg(instance.typeIdOfMember(comp), 0, 16));
+                                                    .arg(processed.join("."))
+                                                    .arg(comp)
+                                                    .arg(instance.typeIdOfMember(comp), 0, 16));
+            else
+                queryError(QString("The member \"%1.%2\" is invalid")
+                                                    .arg(processed.join("."))
+                                                    .arg(comp));
         }
+        else if (tmp.isNull())
+            queryError(QString("The member \"%1.%2\" is a null pointer and cannot be further resolved")
+                                                .arg(processed.join("."))
+                                                .arg(comp));
 
         instance = tmp;
         processed.append(comp);
     }
 
     return instance;
+}
+
+
+Instance MemoryDump::queryInstance(const int queryId) const
+{
+    // The very first component must be a variable
+    Variable* v = _factory->findVarById(queryId);
+
+    if (!v)
+        queryError(QString("Variable with ID 0x%1 does not exist").arg(queryId, 0, 16));
+
+    return v->toInstance(_vmem);
+}
+
+
+QString MemoryDump::query(const int queryId) const
+{
+    QString ret;
+
+    Instance instance = queryInstance(queryId);
+
+    QString s = QString("0x%1: ").arg(queryId, 0, 16);
+    if (!instance.isNull()) {
+        s += QString("%1 (ID 0x%2)").arg(instance.typeName()).arg(instance.type()->id(), 0, 16);
+        ret = instance.toString();
+    }
+    else
+        s += "(unresolved type)";
+    s += QString(" @ 0x%1\n").arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'));
+
+    ret = s + ret;
+
+    return ret;
 }
 
 

@@ -16,6 +16,7 @@
 // Forward declarations
 class QScriptContext;
 class QScriptEngine;
+class InstancePrototype;
 
 /**
  * This class wraps an Instance object for a QtScript environment.
@@ -67,7 +68,8 @@ private:
     static QScriptValue stringListToScriptValue(QScriptEngine* eng, const QStringList& list);
     static void stringListFromScriptValue(const QScriptValue& obj, QStringList& list);
 
-    QScriptValue _proto;
+    InstancePrototype* _proto;
+    QScriptValue _protoScriptVal;
     QScriptValue _ctor;
 };
 

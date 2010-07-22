@@ -79,6 +79,17 @@ public:
     const QString& fileName() const;
 
     /**
+     * Retrieves a string representation the variable with ID \a queryId.
+     * @param queryId the ID of the queried variable
+     * @return an string representation of the symbol's value for the
+     * specified symbol
+     *
+     * @exception QueryException the queried symbol does not exist or cannot
+     * be read
+     */
+    QString query(const int queryId) const;
+
+    /**
      * Retrieves a string representation a symbol specified in dotted notation,
      * e. g., "init_task.children.next". If \a queryString is empty, it returns
      * a list of all known global symbols, one per line.
@@ -90,6 +101,16 @@ public:
      * be read
      */
     QString query(const QString& queryString) const;
+
+    /**
+     * Retrieves an Instance object for the variable with ID \a queryId.
+     * @param queryId the ID of the queried variable
+     * @return an Instance object for the specified variable
+     *
+     * @exception QueryException the queried symbol does not exist or cannot
+     * be read
+     */
+    Instance queryInstance(const int queryId) const;
 
     /**
      * Retrieves an Instance object for a symbol specified in dotted notation,

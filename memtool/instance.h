@@ -39,12 +39,17 @@ public:
 	 * @param vmem the virtual memory device to read data from
 	 */
 	Instance(size_t address, const BaseType* type, const QString& name,
-			const QString& parentName, VirtualMemory* vmem);
+			const QString& parentName, VirtualMemory* vmem, int id = -1);
 
 	/**
 	 * Destructor
 	 */
 	virtual ~Instance();
+
+	/**
+	 * @return the ID of this instance, if it is a variable instance, -1 otherwise
+	 */
+	int id() const;
 
 	/**
 	 * @return the virtual address of the variable in memory
@@ -103,9 +108,19 @@ public:
 	quint32 size() const;
 
 	/**
+	 * Checks if this is a valid instance and its address is not null.
 	 * @return \c true if this object is null, \c false otherwise
+	 * \sa isValid()
 	 */
 	bool isNull() const;
+
+    /**
+     * Checks if this is a valid instance and its address is not null.
+     * @return \c true if this object is valid, \c false otherwise
+     * \warning This does \e not check if the address is null or not!
+     * \sa isNull()
+     */
+	bool isValid() const;
 
 	/**
 	 * @return the number of members, if this is a struct, \c 0 otherwise
@@ -256,13 +271,14 @@ public:
 
 private:
 	static const QStringList _emtpyStringList;
-
+	int _id;
 	size_t _address;
 	const BaseType* _type;
 	QString _name;
 	QString _parentName;
     VirtualMemory* _vmem;
     bool _isNull;
+    bool _isValid;
 };
 
 #endif /* INSTANCE_H_ */
