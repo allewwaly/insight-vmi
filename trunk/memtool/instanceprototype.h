@@ -42,34 +42,41 @@ public:
     virtual ~InstancePrototype();
 
 public slots:
-	bool isNull() const;
+	bool IsNull() const;
+
+	bool IsAddressNull() const;
 
 	/**
 	 * @return the address as zero-padded string in hex format
+     * \sa AddressLow(), AddressHigh()
 	 */
-    QString address() const;
+    QString Address() const;
 
     /**
      * @return the most significant 32 bits of the address as \c uint32
+     * \sa AddressLow(), Address()
      */
-    quint32 addressHigh() const;
+    quint32 AddressHigh() const;
 
     /**
      * @return the least significant 32 bits of the address as \c uint32
+     * \sa AddressHigh(), Address()
      */
-    quint32 addressLow() const;
+    quint32 AddressLow() const;
 
-    QString name() const;
-    QString parentName() const;
-    QString fullName() const;
-    QStringList memberNames() const;
-    InstanceList members() const;
-    QString type() const;
-    QString typeName() const;
-    quint32 size() const;
-    bool memberExists(const QString& name) const;
-    Instance findMember(const QString& name) const;
-    int typeIdOfMember(const QString& name) const;
+    int Id() const;
+    QString Name() const;
+    QString ParentName() const;
+    QString FullName() const;
+    QStringList MemberNames() const;
+    InstanceList Members() const;
+    QString Type() const;
+    QString TypeName() const;
+    quint32 Size() const;
+    bool MemberExists(const QString& name) const;
+    Instance FindMember(const QString& name) const;
+    int TypeIdOfMember(const QString& name) const;
+    int PointerSize() const;
 
     qint8 toInt8() const;
     quint8 toUInt8() const;
@@ -84,7 +91,6 @@ public slots:
     float toFloat() const;
     double toDouble() const;
     QString toString() const;
-    int pointerSize() const;
 
 private:
     inline Instance* thisInstance() const;

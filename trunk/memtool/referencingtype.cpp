@@ -79,8 +79,24 @@ void ReferencingType::writeTo(QDataStream& out) const
     out << _refTypeId;
 }
 
+
 Instance ReferencingType::createRefInstance(size_t address,
-		VirtualMemory* vmem, const QString& name, const QString& parent) const
+        VirtualMemory* vmem, const QString& name, const QString& parent) const
+{
+    return createRefInstance(address, vmem, name, parent, -1);
+}
+
+
+Instance ReferencingType::createRefInstance(size_t address,
+        VirtualMemory* vmem, const QString& name, int id) const
+{
+    return createRefInstance(address, vmem, name, QString(), id);
+}
+
+
+Instance ReferencingType::createRefInstance(size_t address,
+		VirtualMemory* vmem, const QString& name, const QString& parent,
+		int id) const
 {
 	if (!_refType)
 		return Instance();
@@ -91,11 +107,19 @@ Instance ReferencingType::createRefInstance(size_t address,
     const BaseType* b = _refType;
     const RefBaseType* rbt = 0;
 
-    while ( (rbt = dynamic_cast<const RefBaseType*>(b)) ) {
+    while ( addr && (rbt = dynamic_cast<const RefBaseType*>(b)) ) {
 		// Resolve pointer references
 		if (rbt->type() & (BaseType::rtArray|BaseType::rtPointer)) {
-			// If this is a type "char*", treat it as a string
-			if (rbt->refType() && rbt->refType()->type() == BaseType::rtInt8)
+		    // Pointer to referenced type's referenced type
+            const BaseType* rbtRef = dynamic_cast<const RefBaseType*>(rbt->refType()) ?
+                    dynamic_cast<const RefBaseType*>(rbt->refType())->refType() :
+                    0;
+			// If this is a type "char*" or "const char*", treat it as a string
+			if (rbt->refType() &&
+			    (rbt->refType()->type() == BaseType::rtInt8 ||
+			     (rbt->refType()->type() == BaseType::rtConst &&
+			      rbtRef &&
+			      rbtRef->type() == BaseType::rtInt8)))
 				// Stop here, so that toString() later on will print this as string
 				break;
 			// If this is a type "void*", don't resolve it anymore
@@ -109,6 +133,6 @@ Instance ReferencingType::createRefInstance(size_t address,
 		b = rbt->refType();
     }
 
-	return Instance(addr, b, name, parent, vmem);
+	return Instance(addr, b, name, parent, vmem, id);
 }
 

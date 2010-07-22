@@ -983,8 +983,11 @@ int Shell::cmdScript(QStringList args)
     QScriptValue memDumpFunc = engine.newFunction(scriptListMemDumps);
     engine.globalObject().setProperty("getMemDumps", memDumpFunc);
 
-    QScriptValue listVarsFunc = engine.newFunction(scriptListVariables);
-    engine.globalObject().setProperty("listVariables", listVarsFunc);
+    QScriptValue getVarNamesFunc = engine.newFunction(scriptListVariableNames);
+    engine.globalObject().setProperty("getVariableNames", getVarNamesFunc);
+
+    QScriptValue getVarIdsFunc = engine.newFunction(scriptListVariableIds);
+    engine.globalObject().setProperty("getVariableIds", getVarIdsFunc);
 
     QScriptValue getInstanceFunc = engine.newFunction(scriptGetInstance, 2);
     engine.globalObject().setProperty("getInstance", getInstanceFunc);
@@ -1032,7 +1035,7 @@ QScriptValue Shell::scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng)
 }
 
 
-QScriptValue Shell::scriptListVariables(QScriptContext* ctx, QScriptEngine* eng)
+QScriptValue Shell::scriptListVariableNames(QScriptContext* ctx, QScriptEngine* eng)
 {
     if (ctx->argumentCount() != 0) {
         ctx->throwError("No arguments expected");
@@ -1049,6 +1052,23 @@ QScriptValue Shell::scriptListVariables(QScriptContext* ctx, QScriptEngine* eng)
 }
 
 
+QScriptValue Shell::scriptListVariableIds(QScriptContext* ctx, QScriptEngine* eng)
+{
+    if (ctx->argumentCount() != 0) {
+        ctx->throwError("No arguments expected");
+        return QScriptValue();
+    }
+
+    // Create a new script array with all variable names
+    const VariableList& vars = _sym.factory().vars();
+    QScriptValue arr = eng->newArray(vars.size());
+    for (int i = 0; i < vars.size(); ++i)
+        arr.setProperty(i, vars[i]->id());
+
+    return arr;
+}
+
+
 QScriptValue Shell::scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng)
 {
     if (ctx->argumentCount() < 1 || ctx->argumentCount() > 2) {
@@ -1056,9 +1076,15 @@ QScriptValue Shell::scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng)
         return QScriptValue();
     }
 
-    // First argument must be a query string
-    if (!ctx->argument(0).isString()) {
-        ctx->throwError("First argument must be a string");
+    // First argument must be a query string or an ID
+    QString queryStr;
+    int queryId = -1;
+    if (ctx->argument(0).isString())
+        queryStr = ctx->argument(0).toString();
+    else if (ctx->argument(0).isNumber())
+        queryId = ctx->argument(0).toInt32();
+    else {
+        ctx->throwError("First argument must be a string or an integer value");
         return QScriptValue();
     }
     QString query = ctx->argument(0).toString();
@@ -1082,9 +1108,11 @@ QScriptValue Shell::scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng)
     }
 
     // Get the instance
-    Instance instance = _memDumps[index]->queryInstance(query);
+    Instance instance = queryStr.isNull() ?
+            _memDumps[index]->queryInstance(queryId) :
+            _memDumps[index]->queryInstance(queryStr);
 
-    if (instance.isNull())
+    if (!instance.isValid())
         return QScriptValue();
     else
         return InstanceClass::toScriptValue(instance, ctx, eng);

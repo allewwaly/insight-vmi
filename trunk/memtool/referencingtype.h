@@ -78,18 +78,42 @@ public:
 
 protected:
     /**
+     * Creates an Instance object of a StructuredMember object.
+     * @param address the address of the instance within \a vmem
+     * @param vmem the virtual memory object to read data from
+     * @param name the name of this instance
+     * @param parent the name of the parent (if it's not a variable instance)
+     * @return an Instance object for this member
+     */
+    Instance createRefInstance(size_t address, VirtualMemory* vmem,
+    		const QString& name, const QString& parent) const;
+
+    /**
+     * Creates an Instance object of a Variable object.
+     * @param address the address of the instance within \a vmem
+     * @param vmem the virtual memory object to read data from
+     * @param name the name of this instance
+     * @param id the id of the variable
+     * @return an Instance object for this member
+     */
+    Instance createRefInstance(size_t address, VirtualMemory* vmem,
+            const QString& name, int id) const;
+
+	const BaseType *_refType;  ///< holds the type this object is referencing
+    int _refTypeId;            ///< holds ID of the type this object is referencing
+
+private:
+    /**
      * Creates an Instance object of the \e referenced type.
      * @param address the address of the instance within \a vmem
      * @param vmem the virtual memory object to read data from
      * @param name the name of this instance
-     * @param parent the name of the parent
-     * @return an Instace object for this member
+     * @param parent the name of the parent (if it's not a variable instance)
+     * @param id the id of the instance (if it is a variable instance)
+     * @return an Instance object for this member
      */
-    Instance createRefInstance(size_t address, VirtualMemory* vmem,
-    		const QString& name, const QString& parent = QString()) const;
-
-	const BaseType *_refType;  ///< holds the type this object is referencing
-    int _refTypeId;            ///< holds ID of the type this object is referencing
+    inline Instance createRefInstance(size_t address, VirtualMemory* vmem,
+            const QString& name, const QString& parent, int id) const;
 };
 
 
