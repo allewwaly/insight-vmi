@@ -84,7 +84,7 @@ QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue& object
     if (index >= 0) {
         // Check if a slot with the same name exists in the prototype class
         QByteArray slotName = QString("%1()").arg(nameStr).toAscii();
-        if (_proto->metaObject()->indexOfSlot(slotName.constData())) {
+        if (_proto->metaObject()->indexOfSlot(slotName.constData()) >= 0) {
             engine()->currentContext()->throwError(
                     "Property clash for property \"" + nameStr + "\": is a "
                     "struct member as well as a prototype function");
