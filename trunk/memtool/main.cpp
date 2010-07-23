@@ -56,9 +56,12 @@ int main(int argc, char* argv[])
 	    return 1;
 	}
 
-	if (shell)
-	    delete shell;
-
+	if (shell){
+		while(!shell->isFinished()){
+		 	shell->quit();
+		}
+		delete shell;
+	}
     return ret;
 }
 
