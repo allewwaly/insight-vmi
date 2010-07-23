@@ -12,6 +12,7 @@
 #include <QScriptable>
 #include <QStringList>
 #include "instance.h"
+#include "genericexception.h"
 
 
 /**
@@ -96,6 +97,7 @@ public slots:
 
 private:
     inline Instance* thisInstance() const;
+    inline void injectScriptError(const GenericException& e) const;
 };
 
 #endif /* INSTANCEPROTOTYPE_H_ */
