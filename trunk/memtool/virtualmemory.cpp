@@ -124,13 +124,15 @@ bool VirtualMemory::seek(qint64 pos)
     if ( ((quint64) pos) > ((quint64) size()) || !isOpen() )
         return false;
 
-    _pos = (quint64) pos;
-//    QIODevice::seek(pos);
+    if (_pos == (quint64) pos)
+        return true;
 
 	int pageSize;
 	qint64 physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
 	if ( (physAddr < 0) || !_physMem->seek(physAddr) )
 		return false;
+
+	_pos = (quint64) pos;
 
 	return true;
 }
