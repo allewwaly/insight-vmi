@@ -172,94 +172,172 @@ int InstancePrototype::PointerSize() const
 
 qint8 InstancePrototype::toInt8() const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ? inst->toInt8() : 0;
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? inst->toInt8() : 0;
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return 0;
+    }
 }
 
 
 quint8 InstancePrototype::toUInt8() const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ? inst->toUInt8() : 0;
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? inst->toUInt8() : 0;
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return 0;
+    }
 }
 
 
 qint16 InstancePrototype::toInt16() const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ? inst->toInt16() : 0;
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? inst->toInt16() : 0;
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return 0;
+    }
 }
 
 
 quint16 InstancePrototype::toUInt16() const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ? inst->toUInt16() : 0;
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? inst->toUInt16() : 0;
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return 0;
+    }
 }
 
 
 qint32 InstancePrototype::toInt32() const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ? inst->toInt32() : 0;
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? inst->toInt32() : 0;
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return 0;
+    }
 }
 
 
 quint32 InstancePrototype::toUInt32() const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ? inst->toUInt32() : 0;
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? inst->toUInt32() : 0;
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return 0;
+    }
 }
 
 
 QString InstancePrototype::toInt64(int base) const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ?
-            QString::number(inst->toInt64(), base) : QString("0");
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ?
+                QString::number(inst->toInt64(), base) : QString("0");
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return 0;
+    }
 }
 
 
 QString InstancePrototype::toUInt64(int base) const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ?
-            QString::number(inst->toUInt64(), base) : QString("0");
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ?
+                QString::number(inst->toUInt64(), base) : QString("0");
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return "0";
+    }
 }
 
 
 quint32 InstancePrototype::toUInt64High() const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ? (inst->toUInt64() >> 32) : 0;
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? (inst->toUInt64() >> 32) : 0;
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return 0;
+    }
 }
 
 
 quint32 InstancePrototype::toUInt64Low() const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ? quint32(inst->toUInt64() & 0xFFFFFFFFUL) : 0;
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? quint32(inst->toUInt64() & 0xFFFFFFFFUL) : 0;
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return 0;
+    }
 }
 
 
 float InstancePrototype::toFloat() const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ? inst->toFloat() : 0;
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? inst->toFloat() : 0;
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return 0;
+    }
 }
 
 
 double InstancePrototype::toDouble() const
 {
-    Instance* inst;
-    return (inst = thisInstance()) ? inst->toDouble() : 0;
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? inst->toDouble() : 0;
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return 0;
+    }
 }
 
 
 QString InstancePrototype::toString() const
 {
-	Instance* inst;
-    return (inst = thisInstance()) ? inst->toString() : QString();
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? inst->toString() : QString();
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return QString();
+    }
 }
 
 
@@ -277,3 +355,17 @@ Instance* InstancePrototype::thisInstance() const
 
     return inst;
 }
+
+
+void InstancePrototype::injectScriptError(const GenericException& e) const
+{
+    if (context())
+        context()->throwError(
+                QString("%1:%2: %3")
+                    .arg(e.file)
+                    .arg(e.line)
+                    .arg( e.message));
+    else
+        throw e;
+}
+
