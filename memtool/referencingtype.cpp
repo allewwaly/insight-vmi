@@ -107,7 +107,7 @@ Instance ReferencingType::createRefInstance(size_t address,
     const BaseType* b = _refType;
     const RefBaseType* rbt = 0;
 
-    while ( addr && (rbt = dynamic_cast<const RefBaseType*>(b)) ) {
+    while ( (rbt = dynamic_cast<const RefBaseType*>(b)) ) {
 		// Resolve pointer references
 		if (rbt->type() & (BaseType::rtArray|BaseType::rtPointer)) {
 		    // Pointer to referenced type's referenced type
@@ -127,7 +127,7 @@ Instance ReferencingType::createRefInstance(size_t address,
 			    break;
 			// Otherwise resolve pointer reference, if this is a pointer
 			const Pointer* p = dynamic_cast<const Pointer*>(rbt);
-			if (p)
+			if (p && vmem->safeSeek(addr))
 				addr = ((size_t) p->toPointer(vmem, addr)) + p->macroExtraOffset();
 		}
 		b = rbt->refType();
