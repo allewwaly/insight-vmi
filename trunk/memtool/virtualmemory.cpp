@@ -121,6 +121,9 @@ bool VirtualMemory::reset()
 
 bool VirtualMemory::seek(qint64 pos)
 {
+    // Call inherited function
+    QIODevice::seek(pos);
+
     if ( ((quint64) pos) > ((quint64) size()) || !isOpen() )
         return false;
 
@@ -173,7 +176,7 @@ qint64 VirtualMemory::readData (char* data, qint64 maxSize)
         // Obtain physical address and page size
         quint64 physAddr = virtualToPhysical(_pos, &pageSize);
         // Set file position to physical address
-        if (!_physMem->seek(physAddr))
+        if (!_physMem->seek(physAddr) || _physMem->atEnd())
             virtualMemoryError(QString("Cannot seek to address 0x%1 "
                     "(translated from virtual address 0x%2")
                     .arg(physAddr, 8, 16, QChar('0'))
