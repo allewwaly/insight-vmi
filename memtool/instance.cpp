@@ -11,6 +11,7 @@
 #include "pointer.h"
 #include "virtualmemory.h"
 #include "debug.h"
+#include "array.h"
 #include <QScriptEngine>
 
 Q_DECLARE_METATYPE(Instance)
@@ -19,15 +20,15 @@ const QStringList Instance::_emtpyStringList;
 
 
 Instance::Instance()
-	: _id(-1), _address(0),  _type(0), _vmem(0), _isNull(true), _isValid(false)
+    : _id(-1), _address(0),  _type(0), _vmem(0), _isNull(true), _isValid(false)
 {
 }
 
 
 Instance::Instance(size_t address, const BaseType* type, const QString& name,
-		const QString& parentName, VirtualMemory* vmem, int id)
-	: _id(id), _address(address),  _type(type), _name(name), _parentName(parentName),
-	  _vmem(vmem), _isNull(true), _isValid(type != 0)
+        const QString& parentName, VirtualMemory* vmem, int id)
+    : _id(id), _address(address),  _type(type), _name(name),
+      _parentName(parentName), _vmem(vmem), _isNull(true), _isValid(type != 0)
 {
     _isNull = !_address || !_isValid;
 }
@@ -41,6 +42,12 @@ Instance::~Instance()
 int Instance::id() const
 {
     return _id;
+}
+
+
+int Instance::memDumpIndex() const
+{
+    return _vmem ? _vmem->memDumpIndex() : -1;
 }
 
 
@@ -133,6 +140,147 @@ bool Instance::isValid() const
 bool Instance::isAccessible() const
 {
 	return !_isNull && _vmem->safeSeek(_address);
+}
+
+bool Instance::equals(const Instance& other) const
+{
+    if (!isValid() || !other.isValid() || _type->hash() != other.type()->hash())
+        return false;
+
+    if (isNull() && other.isNull())
+        return true;
+
+    switch (_type->type()) {
+    case BaseType::rtBool8:
+    case BaseType::rtInt8:
+    case BaseType::rtUInt8:
+        return toUInt8() == other.toUInt8();
+
+    case BaseType::rtBool16:
+    case BaseType::rtInt16:
+    case BaseType::rtUInt16:
+        return toUInt16() == other.toUInt16();
+
+    case BaseType::rtBool32:
+    case BaseType::rtInt32:
+    case BaseType::rtUInt32:
+        return toUInt32() == other.toUInt32();
+
+    case BaseType::rtBool64:
+    case BaseType::rtInt64:
+    case BaseType::rtUInt64:
+        return toUInt64() == other.toUInt64();
+
+    case BaseType::rtFloat:
+        return toFloat() == other.toFloat();
+
+    case BaseType::rtDouble:
+        return toDouble() == other.toDouble();
+
+    case BaseType::rtEnum:
+        switch (size()) {
+        case 8: return toUInt64() == other.toUInt64();
+        case 4: return toUInt32() == other.toUInt32();
+        case 2: return toUInt16() == other.toUInt16();
+        default: return toUInt8() == other.toUInt8();
+        }
+
+    case BaseType::rtFuncPointer:
+        return address() == other.address();
+
+    case BaseType::rtArray: {
+        const Array* a1 = dynamic_cast<const Array*>(type());
+        const Array* a2 = dynamic_cast<const Array*>(other.type());
+
+        if (!a1 || ! a2 || a1->length() != a2->length())
+            return false;
+
+        for (int i = 0; i < a1->length(); ++i) {
+            Instance inst1 = arrayElem(i);
+            Instance inst2 = other.arrayElem(i);
+            if (!inst1.equals(inst2))
+                return false;
+        }
+        return true;
+    }
+
+    case BaseType::rtStruct:
+    case BaseType::rtUnion: {
+        const int cnt = memberCount();
+        for (int i = 0; i < cnt; ++i) {
+            Instance inst1 = member(i);
+            // Don't recurse into nested structs
+            if (inst1.type()->type() & (BaseType::rtStruct|BaseType::rtUnion))
+                continue;
+            Instance inst2 = other.member(i);
+            if (!inst1.equals(inst2))
+                return false;
+        }
+        return true;
+    }
+
+    case BaseType::rtPointer: {
+        const Pointer* p1 = dynamic_cast<const Pointer*>(type());
+        const Pointer* p2 = dynamic_cast<const Pointer*>(other.type());
+
+        if (!p1 || !p2 || p1->refTypeId() != p2->refTypeId())
+            return false;
+        // If this is an untyped void pointer, we just compare the virtual
+        // address.
+        if (p1->refTypeId() < 0)
+            return toPointer() == other.toPointer();
+        // No break here, let the switch fall through to the other referencing
+        // types following next
+    }
+
+    case BaseType::rtConst:
+    case BaseType::rtTypedef:
+    case BaseType::rtVolatile: {
+        int cnt1, cnt2;
+        Instance inst1 = dereference(&cnt1);
+        Instance inst2 = other.dereference(&cnt2);
+
+        if (cnt1 != cnt2)
+            return false;
+
+        return inst1.equals(inst2);
+    }
+
+    }
+
+    return false;
+}
+
+
+Instance Instance::arrayElem(int index) const
+{
+    const Pointer* p = dynamic_cast<const Pointer*>(_type);
+    if (!p || !p->refType())
+        return Instance();
+
+    return Instance(
+                _address + (index * p->refType()->size()),
+                p->refType(),
+                QString("%1[%2]").arg(_name).arg(index),
+                _parentName,
+                _vmem,
+                -1);
+}
+
+
+Instance Instance::dereference(int* derefCount) const
+{
+    if (isNull())
+        return *this;
+
+    if (_type->type() & (BaseType::rtPointer|BaseType::rtConst|BaseType::rtVolatile|BaseType::rtTypedef)) {
+        return _type->toInstance(_address, _vmem, _name, _parentName, derefCount);
+    }
+    else {
+        if (derefCount)
+            *derefCount = 0;
+        return *this;
+    }
 }
 
 

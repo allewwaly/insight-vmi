@@ -10,6 +10,7 @@
 
 #include "basetype.h"
 #include "referencingtype.h"
+#include "instance.h"
 
 class RefBaseType: public BaseType, public ReferencingType
 {
@@ -56,6 +57,20 @@ public:
      * @param out the data stream to write the data to, must be ready to write
      */
     virtual void writeTo(QDataStream& out) const;
+
+    /**
+     * Creates an Instance object of the referenced type. If that type again
+     * is a RefBaseType, it is further dereferenced.
+     * @param address the address of the instance within \a vmem
+     * @param vmem the virtual memory object to read data from
+     * @param name the name of this instance
+     * @param parent the name of the parent, i.e., nesting struct
+     * @param derefCount pointer to a counter variable for how many types have
+     * been followed to create the instance
+     * @return an Instance object for the dereferenced type
+     */
+     virtual Instance toInstance(size_t address, VirtualMemory* vmem,
+            const QString& name, const QString& parent, int* derefCount = 0) const;
 };
 
 

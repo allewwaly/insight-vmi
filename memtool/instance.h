@@ -37,9 +37,10 @@ public:
 	 * @param name the name of this instance
 	 * @param parentName the full name of the parent
 	 * @param vmem the virtual memory device to read data from
+     * @param id the ID of the variable this instance represents, if any
 	 */
 	Instance(size_t address, const BaseType* type, const QString& name,
-			const QString& parentName, VirtualMemory* vmem, int id = -1);
+            const QString& parentName, VirtualMemory* vmem, int id = -1);
 
 	/**
 	 * Destructor
@@ -50,6 +51,11 @@ public:
 	 * @return the ID of this instance, if it is a variable instance, -1 otherwise
 	 */
 	int id() const;
+
+    /**
+     * @return the array index of the memory dump this instance belongs to
+     */
+    int memDumpIndex() const;
 
 	/**
 	 * @return the virtual address of the variable in memory
@@ -128,6 +134,54 @@ public:
 	 * @return \c true if the instance is accessible, \c false otherwise
 	 */
 	bool isAccessible() const;
+
+	/**
+	 * Compares this Instance with \a other on a value basis. Two instances
+	 * must have the same BaseType as returned by type() to possibly be equal.
+	 * In addition, their following contents is compared to determine their
+	 * equality:
+	 *
+	 * \li NumericBaseType: the numeric value
+	 * \li Enum: the enumeration value
+	 * \li FuncPointer: the function's virtual address
+	 * \li Array: the array values, if the array length is known
+     * \li For any other RefBaseType (i.e., ConstType, Pointer, Typedef,
+     *      VolatileType), the equality decision is delegated to the referenced
+     *      type's equals() function.
+	 * \li Structured: all members of the above mention types are compared,
+	 *      but nested structs are ignored
+	 *
+	 * @param other the Instance object to compare this instance to
+	 * @return \c true if the two instannces are considered equal, \c false
+	 * otherwise
+	 */
+	bool equals(const Instance& other) const;
+
+	/**
+	 * Treats this Instance as an array instance and returns a new instance
+	 * of the same type at the memory position as this instance plus \a index
+	 * times the size of the array's value type. If this is not a Pointer or an
+	 * Array instance, then an invalid Instance is returned
+	 *
+	 * \warning The length() parameter of the underlying Array type is neither
+	 * checked against \a index nor modified. Be careful to only use the
+	 * length() parameter of the original instance (with array index 0), not on
+	 * any Instance object returned by this function.
+	 *
+	 * @param index array index to access
+	 * @return a Instance at memory position size() + \a index *
+	 * type()->refType()->size(), if this is a Pointer or an Array instance,
+	 * otherwise an empty Instance object
+	 */
+	Instance arrayElem(int index) const;
+
+	/**
+	 * Dereferences this instance as far as possible.
+	 * @param derefCount pointer to a counter variable for how many types have
+	 * been followed to create the instance
+	 * @return a dereferenced version of this instance
+	 */
+	Instance dereference(int* derefCount = 0) const;
 
 	/**
 	 * @return the number of members, if this is a struct, \c 0 otherwise

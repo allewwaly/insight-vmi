@@ -77,14 +77,22 @@
 #define pte_index_x86_64(address)  (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE_X86_64 - 1))
 
 
-VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem)
-    : _tlb(1000), _physMem(physMem), _specs(specs), _pos(-1)
+VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
+                             int memDumpIndex)
+    : _tlb(1000), _physMem(physMem), _specs(specs), _pos(-1),
+      _memDumpIndex(memDumpIndex)
 {
 }
 
 
 VirtualMemory::~VirtualMemory()
 {
+}
+
+
+int VirtualMemory::memDumpIndex() const
+{
+    return _memDumpIndex;
 }
 
 

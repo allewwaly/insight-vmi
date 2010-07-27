@@ -83,10 +83,13 @@ protected:
      * @param vmem the virtual memory object to read data from
      * @param name the name of this instance
      * @param parent the name of the parent (if it's not a variable instance)
+     * @param derefCount pointer to a counter variable for how many types have
+     * been followed to create the instance
      * @return an Instance object for this member
      */
     Instance createRefInstance(size_t address, VirtualMemory* vmem,
-    		const QString& name, const QString& parent) const;
+    		const QString& name, const QString& parent,
+    		int* derefCount = 0) const;
 
     /**
      * Creates an Instance object of a Variable object.
@@ -94,10 +97,12 @@ protected:
      * @param vmem the virtual memory object to read data from
      * @param name the name of this instance
      * @param id the id of the variable
+     * @param derefCount pointer to a counter variable for how many types have
+     * been followed to create the instance
      * @return an Instance object for this member
      */
     Instance createRefInstance(size_t address, VirtualMemory* vmem,
-            const QString& name, int id) const;
+            const QString& name, int id, int* derefCount = 0) const;
 
 	const BaseType *_refType;  ///< holds the type this object is referencing
     int _refTypeId;            ///< holds ID of the type this object is referencing
@@ -110,10 +115,13 @@ private:
      * @param name the name of this instance
      * @param parent the name of the parent (if it's not a variable instance)
      * @param id the id of the instance (if it is a variable instance)
+     * @param derefCount pointer to a counter variable for how many types have
+     * been followed to create the instance
      * @return an Instance object for this member
      */
     inline Instance createRefInstance(size_t address, VirtualMemory* vmem,
-            const QString& name, const QString& parent, int id) const;
+            const QString& name, const QString& parent, int id,
+            int* derefCount) const;
 };
 
 

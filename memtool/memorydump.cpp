@@ -19,22 +19,25 @@
 #define queryError(x) do { throw QueryException((x), __FILE__, __LINE__); } while (0)
 
 
-MemoryDump::MemoryDump(const MemSpecs& specs, QIODevice* mem, SymFactory* factory)
+MemoryDump::MemoryDump(const MemSpecs& specs, QIODevice* mem,
+                       SymFactory* factory, int index)
     : _specs(specs),
       _file(0),
-      _vmem(new VirtualMemory(_specs, mem)),
-      _factory(factory)
+      _vmem(new VirtualMemory(_specs, mem, index)),
+      _factory(factory),
+      _index(index)
 {
     init();
 }
 
 
 MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
-        const SymFactory* factory)
+        const SymFactory* factory, int index)
     : _specs(specs),
       _file(new QFile(fileName)),
-      _vmem(new VirtualMemory(_specs, _file)),
-      _factory(factory)
+      _vmem(new VirtualMemory(_specs, _file, index)),
+      _factory(factory),
+      _index(index)
 {
     _fileName = fileName;
     // Check existence
@@ -262,3 +265,8 @@ const MemSpecs& MemoryDump::memSpecs() const
     return _specs;
 }
 
+
+int MemoryDump::index() const
+{
+    return _index;
+}

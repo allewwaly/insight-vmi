@@ -20,7 +20,7 @@
 class VirtualMemory: public QIODevice
 {
 public:
-    VirtualMemory(const MemSpecs& specs, QIODevice* physMem = 0);
+    VirtualMemory(const MemSpecs& specs, QIODevice* physMem, int memDumpIndex);
     virtual ~VirtualMemory();
 
     // Re-implementations of QIODevice
@@ -54,6 +54,12 @@ public:
      * @return the memory specifications of the virtual memory
      */
     const MemSpecs& memSpecs() const;
+
+    /**
+     * @return the index of the underlying memory dump within the array of
+     * dumps
+     */
+    int memDumpIndex() const;
 
 protected:
     // Pure virtual functions of QIODevice
@@ -126,6 +132,7 @@ private:
     // change values later on
     const MemSpecs& _specs;
     quint64 _pos;
+    int _memDumpIndex;
 };
 
 #endif /* VIRTUALMEMORY_H_ */
