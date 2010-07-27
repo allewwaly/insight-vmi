@@ -64,7 +64,7 @@ namespace str {
     static const char* hdrRegex = "^\\s*<\\s*(?:0x)?[0-9a-fA-F]+><\\s*((?:0x)?[0-9a-fA-F]+)>:[^(]+\\(([^)]+)\\)\\s*$";
     // Parses strings like:  <2f>     DW_AT_encoding    : 7 (unsigned)
     // Captures:                      DW_AT_encoding      7 (unsigned)
-    static const char* paramRegex = "^\\s*<\\s*(?:0x)?[0-9a-fA-F]+>\\s*([^\\s]+)\\s*:\\s*([^\\s]+(?:\\s+[^\\s]+)*)\\s*$";
+    static const char* paramRegex = "^\\s*(?:<\\s*(?:0x)?[0-9a-fA-F]+>\\s*)?([^\\s]+)\\s*:\\s*([^\\s]+(?:\\s+[^\\s]+)*)\\s*$";
     // Parses strings like:  (indirect string, offset: 0xbc): unsigned char
     // Captures:                                              unsigned char
     static const char* paramStrRegex = "^\\s*(?:\\([^)]+\\):\\s*)?([^\\s()]+(?:\\s+[^\\s]+)*)\\s*$";
@@ -325,7 +325,7 @@ void KernelSymbolParser::parse()
             _bytesRead += len;
             // Skip all lines without interesting information
             line = QString(buf).trimmed();
-            if (len < 30 || line.isEmpty() || line[0] != '<')
+            if (len < 30 || line.isEmpty() || (line[0] != '<' && (line[0] != 'D' && line[1] != 'W')))
                 continue;
 
             // First see if a new header starts
