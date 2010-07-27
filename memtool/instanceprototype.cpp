@@ -62,10 +62,15 @@ quint32 InstancePrototype::AddressLow() const
 
 bool InstancePrototype::Equals(const Instance& other) const
 {
-    const Instance* inst1 = thisInstance();
-    return (inst1) ? inst1->equals(other) : false;
-//    const Instance* inst2 = other.instancePrototype()->thisInstance();
-//    return (inst1 && inst2) ? inst1->equals(*inst2) : false;
+    const Instance* inst = thisInstance();
+    return (inst) ? inst->equals(other) : false;
+}
+
+
+QStringList InstancePrototype::Differences(const Instance& other, bool recursive) const
+{
+    const Instance* inst = thisInstance();
+    return (inst) ? inst->differences(other, recursive) : QStringList(QString());
 }
 
 
@@ -89,6 +94,32 @@ bool InstancePrototype::IsAccessible() const
     return (inst = thisInstance()) ? inst->isAccessible() : false;
 }
 
+
+bool InstancePrototype::IsNumber() const
+{
+    Instance* inst;
+    return (inst = thisInstance()) && inst->type() ?
+            (inst->type()->type() & (IntegerTypes|FloatingTypes)) :
+            false;
+}
+
+
+bool InstancePrototype::IsInteger() const
+{
+    Instance* inst;
+    return (inst = thisInstance()) && inst->type() ?
+            (inst->type()->type() & IntegerTypes) :
+            false;
+}
+
+
+bool InstancePrototype::IsReal() const
+{
+    Instance* inst;
+    return (inst = thisInstance()) && inst->type() ?
+            (inst->type()->type() & FloatingTypes) :
+            false;
+}
 
 QString InstancePrototype::Name() const
 {
