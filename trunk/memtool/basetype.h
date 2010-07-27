@@ -9,6 +9,7 @@
 #include "genericexception.h"
 #include "sourceref.h"
 #include "typeinfo.h"
+#include "instance.h"
 
 /// Bitmask with all BaseType::RealType's that need further resolution
 extern const qint32 ReferencingTypes;
@@ -316,6 +317,19 @@ public:
         read(mem, (char*)&buf, sizeof(T));
         return buf;
     }
+
+    /**
+     * Creates an Instance object of this type.
+     * @param address the address of the instance within \a vmem
+     * @param vmem the virtual memory object to read data from
+     * @param name the name of this instance
+     * @param parent the name of the parent, i.e., nesting struct
+     * @param derefCount pointer to a counter variable for how many types have
+     * been followed to create the instance
+     * @return an Instance object for the dereferenced type
+     */
+    virtual Instance toInstance(size_t address, VirtualMemory* vmem,
+            const QString& name, const QString& parent, int* derefCount = 0) const;
 
     /**
      * This operator considers two types to be equal if their following data

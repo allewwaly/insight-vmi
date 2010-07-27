@@ -30,6 +30,13 @@ int InstancePrototype::Id() const
 }
 
 
+int InstancePrototype::MemDumpIndex() const
+{
+    Instance* inst;
+    return (inst = thisInstance()) ? inst->memDumpIndex() : -1;
+}
+
+
 QString InstancePrototype::Address() const
 {
 	Instance* inst;
@@ -50,6 +57,15 @@ quint32 InstancePrototype::AddressLow() const
 {
     Instance* inst;
     return (inst = thisInstance()) ? quint32(inst->address() & 0xFFFFFFFFUL) : 0;
+}
+
+
+bool InstancePrototype::Equals(const Instance& other) const
+{
+    const Instance* inst1 = thisInstance();
+    return (inst1) ? inst1->equals(other) : false;
+//    const Instance* inst2 = other.instancePrototype()->thisInstance();
+//    return (inst1 && inst2) ? inst1->equals(*inst2) : false;
 }
 
 

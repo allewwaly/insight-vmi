@@ -53,8 +53,10 @@ public:
      * @param specs the memory and architecture specifications
      * @param mem the memory image to operate on
      * @param factory the debugging symbols to use for memory interpretation
+     * @param index the index of this memory dump within the array of dumps
      */
-    MemoryDump(const MemSpecs& specs, QIODevice* mem, SymFactory* factory);
+    MemoryDump(const MemSpecs& specs, QIODevice* mem, SymFactory* factory,
+               int index);
 
     /**
      * This convenience constructor will create a QIODevice for the given file
@@ -62,11 +64,13 @@ public:
      * @param specs the memory and architecture specifications
      * @param fileName the name of a memory dump file to operate on
      * @param factory the debugging symbols to use for memory interpretation
+     * @param index the index of this memory dump within the array of dumps
      *
      * @exception FileNotFoundException the file given by \a fileName could not be found
      * @exception IOException error opening the file given by \a fileName
      */
-    MemoryDump(const MemSpecs& specs, const QString& fileName, const SymFactory* factory);
+    MemoryDump(const MemSpecs& specs, const QString& fileName,
+               const SymFactory* factory, int index);
 
     /**
      * Destructor
@@ -140,6 +144,11 @@ public:
      */
     const MemSpecs& memSpecs() const;
 
+    /**
+     * @return the index of this memory dump within the array of dumps
+     */
+    int index() const;
+
 private:
     void init();
 
@@ -148,6 +157,7 @@ private:
     QString _fileName;
     VirtualMemory* _vmem;
     const SymFactory* _factory;
+    int _index;
 };
 
 #endif /* MEMORYDUMP_H_ */

@@ -46,6 +46,13 @@ QString RefBaseType::toString(QIODevice* mem, size_t offset) const
 }
 
 
+Instance RefBaseType::toInstance(size_t address, VirtualMemory* vmem,
+        const QString& name, const QString& parent, int* derefCount) const
+{
+    return createRefInstance(address, vmem, name, parent, derefCount);
+}
+
+
 void RefBaseType::readFrom(QDataStream& in)
 {
     BaseType::readFrom(in);

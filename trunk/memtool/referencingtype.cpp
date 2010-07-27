@@ -81,23 +81,27 @@ void ReferencingType::writeTo(QDataStream& out) const
 
 
 Instance ReferencingType::createRefInstance(size_t address,
-        VirtualMemory* vmem, const QString& name, const QString& parent) const
+        VirtualMemory* vmem, const QString& name, const QString& parent,
+        int* derefCount) const
 {
-    return createRefInstance(address, vmem, name, parent, -1);
+    return createRefInstance(address, vmem, name, parent, -1, derefCount);
 }
 
 
 Instance ReferencingType::createRefInstance(size_t address,
-        VirtualMemory* vmem, const QString& name, int id) const
+        VirtualMemory* vmem, const QString& name, int id, int* derefCount) const
 {
-    return createRefInstance(address, vmem, name, QString(), id);
+    return createRefInstance(address, vmem, name, QString(), id, derefCount);
 }
 
 
 Instance ReferencingType::createRefInstance(size_t address,
 		VirtualMemory* vmem, const QString& name, const QString& parent,
-		int id) const
+		int id, int* derefCount) const
 {
+    if (derefCount)
+        *derefCount = 0;
+
 	if (!_refType)
 		return Instance();
 
@@ -127,10 +131,17 @@ Instance ReferencingType::createRefInstance(size_t address,
 			    break;
 			// Otherwise resolve pointer reference, if this is a pointer
 			const Pointer* p = dynamic_cast<const Pointer*>(rbt);
-			if (p && vmem->safeSeek(addr))
-				addr = ((size_t) p->toPointer(vmem, addr)) + p->macroExtraOffset();
+			if (p) {
+			    // If we cannot dereference the pointer, we have to stop here
+			    if (vmem->safeSeek(addr))
+			        addr = ((size_t) p->toPointer(vmem, addr)) + p->macroExtraOffset();
+			    else
+			        break;
+			}
 		}
 		b = rbt->refType();
+	    if (derefCount)
+	        (*derefCount)++;
     }
 
 	return Instance(addr, b, name, parent, vmem, id);

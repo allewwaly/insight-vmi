@@ -43,6 +43,8 @@ public:
     virtual ~InstancePrototype();
 
 public slots:
+    bool Equals(const Instance& other) const;
+
 	bool IsNull() const;
 
 	bool IsAddressNull() const;
@@ -68,6 +70,7 @@ public slots:
     quint32 AddressLow() const;
 
     int Id() const;
+    int MemDumpIndex() const;
     QString Name() const;
     QString ParentName() const;
     QString FullName() const;
