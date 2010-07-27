@@ -11,12 +11,17 @@
 #include "typeinfo.h"
 #include "instance.h"
 
+/// Bitmask with all integer-based BaseType::RealType's
+extern const qint32 IntegerTypes;
+
+/// Bitmask with all floating-point BaseType::RealType's
+extern const qint32 FloatingTypes;
+
 /// Bitmask with all BaseType::RealType's that need further resolution
 extern const qint32 ReferencingTypes;
 
 /// Bitmask with all BaseType::RealType's that cannot be further resolved
 extern const qint32 ElementaryTypes;
-
 
 /**
   Basic exception class for all type-related exceptions
