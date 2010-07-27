@@ -4,6 +4,26 @@
 
 #include <QIODevice>
 
+// The integer-based types
+const qint32 IntegerTypes =
+    BaseType::rtInt8        |
+    BaseType::rtUInt8       |
+    BaseType::rtBool8       |
+    BaseType::rtInt16       |
+    BaseType::rtUInt16      |
+    BaseType::rtBool16      |
+    BaseType::rtInt32       |
+    BaseType::rtUInt32      |
+    BaseType::rtBool32      |
+    BaseType::rtInt64       |
+    BaseType::rtUInt64      |
+    BaseType::rtBool64;
+
+// The floating-point types
+const qint32 FloatingTypes =
+    BaseType::rtFloat       |
+    BaseType::rtDouble;
+
 // These types need further resolution
 const qint32 ReferencingTypes =
     BaseType::rtPointer     |
