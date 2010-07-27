@@ -147,8 +147,13 @@ bool Instance::equals(const Instance& other) const
     if (!isValid() || !other.isValid() || _type->hash() != other.type()->hash())
         return false;
 
+    // If both are null, they are considered to be equal
     if (isNull() && other.isNull())
         return true;
+
+    // If any of the two is not accessible, compare their addresses
+    if (!isAccessible() || !other.isAccessible())
+        return _address == other.address();
 
     switch (_type->type()) {
     case BaseType::rtBool8:
@@ -250,6 +255,119 @@ bool Instance::equals(const Instance& other) const
 
     return false;
 }
+
+
+QStringList Instance::differences(const Instance& other, bool recursive) const
+{
+    QStringList result;
+    VisitedSet visited;
+
+    differencesRek(other, QString(), recursive, result, visited);
+    return result;
+}
+
+
+inline QString dotglue(const QString& s1, const QString& s2)
+{
+    return s1.isEmpty() ? s2 : s1 + "." + s2;
+}
+
+
+void Instance::differencesRek(const Instance& other,
+        const QString& relParent, bool includeNestedStructs,
+        QStringList& result, VisitedSet& visited) const
+{
+//    debugmsg("Comparing \"" << dotglue(relParent, _name) << "\"");
+
+    // Stop recursion if we have been here before
+    if (visited.contains(_address))
+        return;
+    else
+        visited.insert(_address);
+
+    if (!isValid() || !other.isValid() || _type->hash() != other.type()->hash()) {
+        result.append(relParent);
+        return;
+    }
+
+    // If both are null, they are considered to be equal
+    if (isNull() && other.isNull())
+        return;
+
+    switch (_type->type()) {
+    // For structs or unions we do a member-by-member comparison
+    case BaseType::rtStruct:
+    case BaseType::rtUnion: {
+            // New relative parent name in dotted notation
+            QString newRelParent = dotglue(relParent, _name);
+
+            const int cnt = memberCount();
+            for (int i = 0; i < cnt; ++i) {
+                Instance inst1 = member(i);
+                Instance inst2 = other.member(i);
+                // Assume invalid types to be different
+                if (!inst1.type() || !inst2.type()) {
+                    // Add to the list
+                    result.append(dotglue(relParent, inst1.name()));
+                    continue;
+                }
+                // Only recurse into nested structs if requested
+                if (inst1.type()->type() & (BaseType::rtStruct|BaseType::rtUnion)) {
+                    if (includeNestedStructs)
+                        inst1.differencesRek(inst2, newRelParent,
+                                includeNestedStructs, result, visited) ;
+                    else
+                        continue;
+                }
+                else {
+                    if (!inst1.equals(inst2))
+                        result.append(dotglue(relParent, inst1.name()));
+                }
+            }
+            return;
+    }
+    // Check if this is an untyped pointer
+    case BaseType::rtPointer: {
+         const Pointer* p1 = dynamic_cast<const Pointer*>(type());
+         const Pointer* p2 = dynamic_cast<const Pointer*>(other.type());
+
+         if (!p1 || !p2 || p1->refTypeId() != p2->refTypeId()) {
+             result.append(relParent);
+             return;
+         }
+         // If this is an untyped void pointer, we just compare the virtual
+         // address.
+         if (p1->refTypeId() < 0) {
+             if (toPointer() != other.toPointer())
+                 result.append(relParent);
+             return;
+         }
+         // No break here, let the switch fall through to the other referencing
+         // types following next
+    }
+    // We dereference referencing types and then call dereference() again
+    case BaseType::rtConst:
+    case BaseType::rtTypedef:
+    case BaseType::rtVolatile: {
+        int cnt1, cnt2;
+        Instance inst1 = dereference(&cnt1);
+        Instance inst2 = other.dereference(&cnt2);
+
+        if (cnt1 != cnt2)
+            result.append(relParent);
+        else
+            inst1.differencesRek(inst2, dotglue(relParent, _name),
+                    includeNestedStructs, result, visited);
+        return;
+    }
+    // For all other types, we just check if they are equal or not
+    default:
+        if (!equals(other))
+            result.append(relParent);
+        return;
+    }
+}
+
 
 
 Instance Instance::arrayElem(int index) const

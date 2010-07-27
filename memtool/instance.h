@@ -145,6 +145,7 @@ public:
 	 * \li Enum: the enumeration value
 	 * \li FuncPointer: the function's virtual address
 	 * \li Array: the array values, if the array length is known
+	 * \li untyped Pointer (void *): the virtual address pointed to
      * \li For any other RefBaseType (i.e., ConstType, Pointer, Typedef,
      *      VolatileType), the equality decision is delegated to the referenced
      *      type's equals() function.
@@ -152,10 +153,29 @@ public:
 	 *      but nested structs are ignored
 	 *
 	 * @param other the Instance object to compare this instance to
-	 * @return \c true if the two instannces are considered equal, \c false
+	 * @return \c true if the two instances are considered equal, \c false
 	 * otherwise
 	 */
 	bool equals(const Instance& other) const;
+
+    /**
+     * Compares this struct or union Instance with \a other using the equals()
+     * function and returns a list of member names that are different.
+     *
+     * If this instance is not a struct or union or is not of the same type as
+     * \a other, then a QStringList with just a single, empty string is
+     * returned.
+     *
+     * If this instance equals \a other for all members, then an empty
+     * QStringList is returned.
+     *
+     * @param other the Instance object to compare this instance to
+     * @param recursive if \c true, this function recurses into nested structs
+     *      or unions
+     * @return \c true if the two instannces are considered equal, \c false
+     * otherwise
+     */
+	QStringList differences(const Instance& other, bool recursive) const;
 
 	/**
 	 * Treats this Instance as an array instance and returns a new instance
@@ -331,6 +351,13 @@ public:
     int pointerSize() const;
 
 private:
+    typedef QSet<quint64> VisitedSet;
+
+    void differencesRek(const Instance& other, const QString& relParent,
+            bool includeNestedStructs, QStringList& result,
+            VisitedSet& visited) const;
+
+
 	static const QStringList _emtpyStringList;
 	int _id;
 	size_t _address;
