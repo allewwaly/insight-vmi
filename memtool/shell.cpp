@@ -310,7 +310,7 @@ int Shell::eval(QString command)
             _pipedProcs[i]->start(prog, args);
             _pipedProcs[i]->waitForStarted(-1);
             if (_pipedProcs[i]->state() != QProcess::Running) {
-                _err << "Error executing " << pipeCmds[i+1] << endl;
+                _err << "Error executing " << pipeCmds[i+1] << endl << flush;
                 cleanupPipedProcs();
                 return 0;
             }
@@ -358,6 +358,10 @@ int Shell::eval(QString command)
 
     // Regular cleanup
     cleanupPipedProcs();
+
+    // Flush the streams
+    _out << flush;
+    _err << flush;
 
     return ret;
 }
@@ -793,7 +797,7 @@ int Shell::cmdMemory(QStringList args)
 int Shell::parseMemDumpIndex(QStringList &args)
 {
     bool ok = false;
-    int index = (args.size() > 0) ? (args[0].toInt(&ok) - 1) : -1;
+    int index = (args.size() > 0) ? args[0].toInt(&ok) : -1;
     if (ok) {
         args.pop_front();
         // Check the bounds
@@ -850,8 +854,9 @@ int Shell::cmdMemoryLoad(QStringList args)
     }
 
     // Load memory dump
-    _memDumps[index] =  new MemoryDump(_sym.memSpecs(), fileName, &_sym.factory());
-    _out << "Loaded [" << index + 1 << "] " << fileName << endl;
+    _memDumps[index] =
+            new MemoryDump(_sym.memSpecs(), fileName, &_sym.factory(), index);
+    _out << "Loaded [" << index << "] " << fileName << endl;
 
     return 0;
 }
@@ -887,7 +892,7 @@ int Shell::cmdMemoryUnload(QStringList args)
     if (index >= 0) {
         delete _memDumps[index];
         _memDumps[index] = 0;
-        _out << "Unloaded [" << index + 1 << "] " << fileName << endl;
+        _out << "Unloaded [" << index << "] " << fileName << endl;
     }
 
     return 0;
@@ -899,7 +904,7 @@ int Shell::cmdMemoryList(QStringList /*args*/)
     QString out;
     for (int i = 0; i < _memDumps.size(); ++i) {
         if (_memDumps[i])
-            out += QString("  [%1] %2\n").arg(i + 1).arg(_memDumps[i]->fileName());
+            out += QString("  [%1] %2\n").arg(i).arg(_memDumps[i]->fileName());
     }
 
     if (out.isEmpty())
@@ -1100,9 +1105,9 @@ QScriptValue Shell::scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng)
 
     // Second argument is optional and defines the memDump index
     if (ctx->argumentCount() == 2) {
-        index = ctx->argument(1).isNumber() ? ctx->argument(1).toInt32() - 1 : -1;
+        index = ctx->argument(1).isNumber() ? ctx->argument(1).toInt32() : -1;
         if (index < 0 || index >= _memDumps.size() || !_memDumps[index]) {
-            ctx->throwError(QString("Invalid memory dump index: %1").arg(index + 1));
+            ctx->throwError(QString("Invalid memory dump index: %1").arg(index));
             return QScriptValue();
         }
     }
