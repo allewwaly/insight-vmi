@@ -43,14 +43,6 @@ public:
     virtual ~InstancePrototype();
 
 public slots:
-    bool Equals(const Instance& other) const;
-
-	bool IsNull() const;
-
-	bool IsAddressNull() const;
-
-	bool IsAccessible() const;
-
 	/**
 	 * @return the address as zero-padded string in hex format
      * \sa AddressLow(), AddressHigh()
@@ -83,6 +75,14 @@ public slots:
     Instance FindMember(const QString& name) const;
     int TypeIdOfMember(const QString& name) const;
     int PointerSize() const;
+    bool Equals(const Instance& other) const;
+    QStringList Differences(const Instance& other, bool recursive) const;
+    bool IsAddressNull() const;
+    bool IsNull() const;
+    bool IsAccessible() const;
+    bool IsNumber() const;
+    bool IsInteger() const;
+    bool IsReal() const;
 
     qint8 toInt8() const;
     quint8 toUInt8() const;
