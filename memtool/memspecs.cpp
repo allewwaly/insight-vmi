@@ -115,7 +115,7 @@ QString MemSpecs::toString() const
     QString ret;
     int key_w = -21;
     int val_w = sizeofUnsignedLong << 1;
-    QString pae = arch & pae_enabled ? " (PAE enabled)" : "";
+    QString pae = arch & pae_enabled ? " (PAE enabled)" : (arch & i386 ? " (PAE disabled)" : "");
 
     ret += QString("%1 = %2%3\n").arg("ARCHITECTURE", key_w).arg(arch & i386 ? "i386" : "x86_64").arg(pae);
     ret += QString("%1 = %2\n").arg("sizeof(unsigned long)", key_w).arg(sizeofUnsignedLong);

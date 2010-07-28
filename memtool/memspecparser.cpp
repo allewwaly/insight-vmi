@@ -297,8 +297,11 @@ void MemSpecParser::parseKernelConfig(MemSpecs* specs)
 	const int bufsize = 1024;
 	char buf[1024];
 
-	QString i386 = "CONFIG_X86_32";
-	QString x8664 = "CONFIG_X86_64";
+	QString i386  = "CONFIG_X86_32=";
+	QString x8664 = "CONFIG_X86_64=";
+    QString pae   = "CONFIG_X86_PAE=";
+
+	specs->arch = MemSpecs::undefined;
 
 	while (!config.atEnd()) {
 		config.readLine(buf, bufsize);
@@ -307,18 +310,20 @@ void MemSpecParser::parseKernelConfig(MemSpecs* specs)
 			continue;
 
 		if (line.startsWith(i386)) {
-			specs->arch = MemSpecs::i386;
-			return;
+			specs->arch |= MemSpecs::i386;
 		}
 		else if (line.startsWith(x8664)) {
-			specs->arch = MemSpecs::x86_64;
-			return;
+			specs->arch |= MemSpecs::x86_64;
 		}
+        else if (line.startsWith(pae)) {
+            specs->arch |= MemSpecs::pae_enabled;
+        }
 	}
 
-	// We should never come here
-	memSpecParserError(QString("Could not determine configured target architecture"
-			"from file \"%1\"").arg(config.fileName()));
+	// Make sure we found the architecture
+	if (specs->arch == MemSpecs::undefined)
+        memSpecParserError(QString("Could not determine configured target architecture"
+                "from file \"%1\"").arg(config.fileName()));
 }
 
 
