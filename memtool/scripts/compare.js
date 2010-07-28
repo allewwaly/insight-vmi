@@ -115,7 +115,13 @@ else {
     print();
     showDifferences(new Instance("init_mm", 0), new Instance("init_mm", 1), true);
     print();
-    
+    try {
+	    showDifferences(inst1, inst2, true);
+    }
+    catch(err) {
+    	print(err);
+    }
+    print();
 }
 
 
