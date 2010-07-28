@@ -62,15 +62,27 @@ quint32 InstancePrototype::AddressLow() const
 
 bool InstancePrototype::Equals(const Instance& other) const
 {
-    const Instance* inst = thisInstance();
-    return (inst) ? inst->equals(other) : false;
+    try {
+        const Instance* inst = thisInstance();
+        return (inst) ? inst->equals(other) : false;
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return false;
+    }
 }
 
 
 QStringList InstancePrototype::Differences(const Instance& other, bool recursive) const
 {
-    const Instance* inst = thisInstance();
-    return (inst) ? inst->differences(other, recursive) : QStringList(QString());
+    try {
+        const Instance* inst = thisInstance();
+        return (inst) ? inst->differences(other, recursive) : QStringList(QString());
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return QStringList(QString());
+    }
 }
 
 
