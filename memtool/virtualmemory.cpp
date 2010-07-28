@@ -82,6 +82,9 @@ VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
     : _tlb(1000), _physMem(physMem), _specs(specs), _pos(-1),
       _memDumpIndex(memDumpIndex)
 {
+    // Make sure the architecture is set
+    if ( !_specs.arch & (MemSpecs::i386|MemSpecs::x86_64) )
+        virtualMemoryError("No architecture set in memory specifications");
 }
 
 
@@ -465,7 +468,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize)
 
 quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
 {
-    return (_specs.arch == MemSpecs::i386) ?
+    return (_specs.arch & MemSpecs::i386) ?
             virtualToPhysical32(vaddr, pageSize) :
             virtualToPhysical64(vaddr, pageSize);
 }
