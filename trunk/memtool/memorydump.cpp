@@ -72,7 +72,7 @@ void MemoryDump::init()
     // In i386 mode, the virtual address translation depends on the runtime
     // value of "high_memory". We need to query its value and add it to
     // _specs.vmallocStart before we can translate paged addresses.
-    if (_specs.arch == MemSpecs::i386) {
+    if (_specs.arch & MemSpecs::i386) {
         // This symbol must exist
         try {
             Instance highMem = queryInstance("high_memory");

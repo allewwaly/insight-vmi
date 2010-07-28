@@ -163,10 +163,10 @@ bool VirtualMemory::safeSeek(qint64 pos)
 
 qint64 VirtualMemory::size() const
 {
-    switch (_specs.arch) {
-    case MemSpecs::i386:   return 0xFFFFFFFFUL;
-    case MemSpecs::x86_64: return 0xFFFFFFFFFFFFFFFFUL;
-    }
+    if (_specs.arch & MemSpecs::i386)
+        return 0xFFFFFFFFUL;
+    else if (_specs.arch & MemSpecs::x86_64)
+        return 0xFFFFFFFFFFFFFFFFUL;
     // Fallback
     return 0;
 }
