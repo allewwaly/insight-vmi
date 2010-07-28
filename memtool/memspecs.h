@@ -81,7 +81,13 @@ typedef QList<KernelMemSpec> KernelMemSpecList;
 struct MemSpecs
 {
     /// Architecture variants: i386 or x86_64
-    enum Architecture { i386, x86_64 };
+    enum Architecture {
+        undefined    = 0,        ///< architecture is not set
+        i386         = (1 << 0), ///< architecture is i386 with extended paging
+        x86_64       = (1 << 1), ///< architecture is AMD64
+        pae_enabled  = (1 << 2), ///< flag that indicates if PAE is enabled in i386 mode
+        i386_pae     = i386 & pae_enabled ///< architecture is i386 with PAE enabled
+    };
 
     /// Constructor
     MemSpecs() :
@@ -99,11 +105,7 @@ struct MemSpecs
         highMemory(0),
         vmallocEarlyreserve(0),
         sizeofUnsignedLong(sizeof(unsigned long)),
-#ifdef __x86_64__
-        arch(x86_64),
-#else
-        arch(i386),
-#endif
+        arch(undefined),
         initialized(false)
     {}
 
@@ -150,8 +152,8 @@ struct MemSpecs
     quint64 swapperPgDir;
     quint64 highMemory;          ///< This is set at runtime by MemoryDump::init()
     quint64 vmallocEarlyreserve; ///< This is set at runtime by MemoryDump::init()
-    int sizeofUnsignedLong;
-    Architecture arch;
+    qint32 sizeofUnsignedLong;
+    qint32 arch;                 ///< An Architecture value
     bool initialized;            ///< \c true after MemoryDump::init() is complete, \c false otherwise
 };
 

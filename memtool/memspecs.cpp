@@ -97,9 +97,9 @@ bool MemSpecs::setFromKeyValue(const QString& key, const QString& value)
         sizeofUnsignedLong = value.toInt(&ok);
     else if (key == "ARCHITECTURE") {
         if (value == "i386")
-            arch = i386;
+            arch |= i386;
         else if (value == "x86_64")
-            arch = x86_64;
+            arch |= x86_64;
         else
             ok = false;
     }
@@ -115,8 +115,9 @@ QString MemSpecs::toString() const
     QString ret;
     int key_w = -21;
     int val_w = sizeofUnsignedLong << 1;
+    QString pae = arch & pae_enabled ? " (PAE enabled)" : "";
 
-    ret += QString("%1 = %2\n").arg("ARCHITECTURE", key_w).arg(arch == i386 ? "i386" : "x86_64");
+    ret += QString("%1 = %2%3\n").arg("ARCHITECTURE", key_w).arg(arch & i386 ? "i386" : "x86_64").arg(pae);
     ret += QString("%1 = %2\n").arg("sizeof(unsigned long)", key_w).arg(sizeofUnsignedLong);
     ret += QString("%1 = 0x%2\n").arg("PAGE_OFFSET", key_w).arg(pageOffset, val_w, 16, QChar('0'));
     if (vmallocStart > 0)
@@ -150,7 +151,7 @@ QString MemSpecs::toString() const
 quint64 MemSpecs::realVmallocStart() const
 {
 	assert(initialized == true);
-    if (arch == i386)
+    if (arch & i386)
         return (vmallocStart + highMemory + vmallocEarlyreserve) &
                 ~(vmallocOffset - 1);
     else
@@ -160,8 +161,6 @@ quint64 MemSpecs::realVmallocStart() const
 
 QDataStream& operator>>(QDataStream& in, MemSpecs& specs)
 {
-    qint32 __arch;
-
     in  >> specs.pageOffset
         >> specs.vmallocStart
         >> specs.vmallocEnd
@@ -174,9 +173,7 @@ QDataStream& operator>>(QDataStream& in, MemSpecs& specs)
         >> specs.initLevel4Pgt
         >> specs.swapperPgDir
         >> specs.sizeofUnsignedLong
-        >> __arch;
-
-    specs.arch = (MemSpecs::Architecture) __arch;
+        >> specs.arch;
 
     return in;
 }
@@ -196,7 +193,7 @@ QDataStream& operator<<(QDataStream& out, const MemSpecs& specs)
         << specs.initLevel4Pgt
         << specs.swapperPgDir
         << specs.sizeofUnsignedLong
-        << (qint32)specs.arch;
+        << specs.arch;
 
     return out;
 }

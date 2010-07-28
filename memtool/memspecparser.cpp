@@ -190,7 +190,7 @@ void MemSpecParser::buildHelperProg(const MemSpecs& specs)
 {
     QProcess proc;
     QStringList cmdlines;
-    QString arch = (specs.arch == MemSpecs::x86_64) ? "x86_64" : "i386";
+    QString arch = (specs.arch & MemSpecs::x86_64) ? "x86_64" : "i386";
 
     cmdlines += QString("make KDIR=%1 ARCH=%2").arg(_kernelSrcDir).arg(arch);
     cmdlines += QString("make memspec");
@@ -277,8 +277,8 @@ void MemSpecParser::parseSystemMap(MemSpecs* specs)
     sysMap.close();
 
     // We expect to parse exactly one of them
-    if ( (specs->arch == MemSpecs::x86_64 && !lvl4_ok) ||
-    	 (specs->arch == MemSpecs::i386 && !swp_ok)) {
+    if ( ((specs->arch & MemSpecs::x86_64) && !lvl4_ok) ||
+    	 ((specs->arch & MemSpecs::i386) && !swp_ok)) {
         memSpecParserError(QString("Could not parse one of the required values "
                 "\"init_level4_pgt\" or \"swapper_pg_dir\" from file \"%1\"")
                 .arg(_systemMapFile));
