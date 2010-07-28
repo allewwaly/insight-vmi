@@ -68,6 +68,16 @@ protected:
 
 private:
     /**
+     * Looks up a virtual address in the translation look-aside buffer (TLB)
+     * and returns the physical address. This is independent of the architecture
+     * (32 or 64 bit mode).
+     * @param vaddr virtual address
+     * @param pageSize here the size of the belonging page is returned
+     * @return physical address, if TLB hit, \c 0 otherwise.
+     */
+    quint64 tlbLookup(quint64 vaddr, int* pageSize);
+
+    /**
      * Looks up a virtual address in the x86_64 page table and returns the
      * physical address.
      * @param vaddr virtual address
@@ -111,12 +121,13 @@ private:
     quint64 virtualToPhysical64(quint64 vaddr, int* pageSize);
 
     /**
-     * Reads a value of size _specs.sizeofUnsignedLong from memory and returns
-     * it as 64 bit integer
+     * Reads a value of type \a T from memory and returns it.
      * @param physaddr the physical address to read from
      * @return the read value
+     * \exception VirtualMemoryError, if value could not be read
      */
-    quint64 extractULongFromPhysMem(quint64 physaddr);
+    template <class T>
+    inline T extractFromPhysMem(quint64 physaddr);
 
     struct TLBEntry {
         TLBEntry(quint64 addr = 0, int size = 0)
