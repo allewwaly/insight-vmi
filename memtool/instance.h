@@ -102,6 +102,12 @@ public:
 	const BaseType* type() const;
 
 	/**
+	 * Changes the type of this instance to the provided type.
+	 * @param type the new type for this instance
+	 */
+	void setType(const BaseType* type);
+
+	/**
 	 * Convenience function to access type()->name()
 	 * @return the name of this instance's type
 	 */

@@ -113,6 +113,12 @@ const BaseType* Instance::type() const
 }
 
 
+void Instance::setType(const BaseType* type)
+{
+    _type = type;
+}
+
+
 QString Instance::typeName() const
 {
 	return _type ? _type->prettyName() : QString();
