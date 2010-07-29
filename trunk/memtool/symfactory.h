@@ -94,7 +94,7 @@ typedef QMultiHash<const BaseType*, BaseType*> BaseTypeMultiHash;
 // uint qHash(const BaseType* key);
 
 /**
- * Creates and holds all defined types
+ * Creates and holds all defined types and variables.
  */
 class SymFactory
 {
@@ -102,23 +102,55 @@ class SymFactory
     friend class KernelSymbolReader;
 
 public:
+    /// Specifies how the symbols have been acquired
     enum RestoreType {
-        rtParsing,
-        rtLoading
+        rtParsing,   ///< Symbols have been parsed from an object dump
+        rtLoading    ///< Symbols have been loaded from a custom symbol file
     };
 
+    /**
+     * Constructor
+     * @param memSpecs reference to the underlying memory specifications for the
+     * symbols
+     */
 	SymFactory(const MemSpecs& memSpecs);
 
+	/**
+	 * Destructor
+	 */
 	~SymFactory();
 
+	/**
+	 * Deletes all symbols and resets all internal values
+	 */
 	void clear();
 
+	/**
+	 * Retrieves a type by its ID.
+	 * @param id the ID of the type to retrieve
+	 * @return the requested type, if found, \c null otherwise
+	 */
 	BaseType* findBaseTypeById(int id) const;
 
+	/**
+     * Retrieves a variable by its ID.
+     * @param id the ID of the variable to retrieve
+     * @return the requested variable, if found, \c null otherwise
+	 */
 	Variable* findVarById(int id) const;
 
+	/**
+     * Retrieves a type by its name.
+     * @param name the name of the type to retrieve
+     * @return the requested type, if found, \c null otherwise
+	 */
 	BaseType* findBaseTypeByName(const QString& name) const;
 
+    /**
+     * Retrieves a variable by its name.
+     * @param name the name of the variable to retrieve
+     * @return the requested variable, if found, \c null otherwise
+     */
 	Variable* findVarByName(const QString& name) const;
 
 	/**
@@ -136,113 +168,127 @@ public:
 	 */
 	bool static isSymbolValid(const TypeInfo& info);
 
+	/**
+	 * Creates a new symbol based on the information provided in \a info and
+	 * adds it to the according internal lists and hashes.
+	 * @param info the type information for the new symbol, as typically parsed
+	 * from an object dump
+	 */
 	void addSymbol(const TypeInfo& info);
 
+	/**
+	 * Adds a previously created compile unit to the internal list.
+	 * \note The SymFactory takes the ownership of this object and will delete
+	 * it when it is itself deleted.
+	 * @param unit the compile unit to add
+	 */
     void addSymbol(CompileUnit* unit);
 
+    /**
+     * Adds a previously created variable to the internal list.
+     * \note The SymFactory takes the ownership of this object and will delete
+     * it when it is itself deleted.
+     * @param var the variable to add
+     */
     void addSymbol(Variable* var);
 
+    /**
+     * Adds a previously created base type to the internal list.
+     * \note The SymFactory takes the ownership of this object and will delete
+     * it when it is itself deleted.
+     * @param type
+     */
     void addSymbol(BaseType* type);
 
+    /**
+     * @return the list of all types owned by this factory
+     */
 	inline const BaseTypeList& types() const
 	{
 		return _types;
 	}
 
+	/**
+	 * @return the hash of all types by there ID
+	 */
     inline const BaseTypeIntHash& typesById() const
     {
         return _typesById;
     }
 
+    /**
+     * @return the hash of all types by there name
+     */
     inline const BaseTypeStringHash& typesByName() const
     {
         return _typesByName;
     }
 
+    /**
+     * @return the hash of all compile units by there ID
+     */
 	inline const CompileUnitIntHash& sources() const
 	{
 		return _sources;
 	}
 
+	/**
+	 * @return the list of all variables owned by this factory
+	 */
 	inline const VariableList& vars() const
 	{
 		return _vars;
 	}
 
+	/**
+	 * This function should be called after the last symbol has been added to
+	 * the factory, either after parsing or reading a custom symbol file is
+	 * complete.
+	 * @param rt the way how the symbols have been read, either parsed or loaded
+	 */
 	void symbolsFinished(RestoreType rt);
 
+	/**
+     * This function is mainly for debugging purposes.
+	 * @return some statistics about the types with missing references
+	 */
 	QString postponedTypesStats() const;
+
+	/**
+	 * This function is mainly for debugging purposes.
+	 * @return some statistics about the contents of the typesByHash hash
+	 */
 	QString typesByHashStats() const;
 
 protected:
+	/**
+	 * Creates or retrieves a BaseType based on the information provided in
+	 * \a info and returns it. If that type has already been created, it is
+	 * found and returned, otherwise a new type is created and added to the
+	 * internal lists.
+	 * @param info the type information to create a type from
+	 * @return a BaseType object corresponding to \a info
+	 */
 	template<class T>
-	inline T* getTypeInstance(const TypeInfo& info)
-	{
-	    // Create a new type from the info
-		T* t = new T(info);
+	T* getTypeInstance(const TypeInfo& info);
 
-		if (!t)
-		    genericError("Out of memory.");
-
-        // If this is an array or pointer, make sure their size is set
-        // correctly
-        if (info.symType() & (hsArrayType | hsPointerType)) {
-            Pointer* p = dynamic_cast<Pointer*>(t);
-            assert(p != 0);
-            if (p->size() == 0)
-                p->setSize(_memSpecs.sizeofUnsignedLong);
-        }
-
-        RefBaseType* rbt = 0;
-        // Try to resolve the reference for the hash
-        if ( (rbt = dynamic_cast<RefBaseType*>(t)) ) {
-            rbt->setRefType(findBaseTypeById(rbt->refTypeId()));
-        }
-
-		// Try to find the type based on its hash, but only if we don't have
-        // any unresolved types
-		uint hash = t->hash();
-		bool foundByHash = false;
-
-		if ((!rbt || rbt->refType()) && _typesByHash.contains(hash)) {
-			BaseTypeList list = _typesByHash.values(hash);
-
-			// Go through the list and make sure we found the correct type
-			for (int i = 0; i < list.size(); i++) {
-				if (*list[i] == *t ) {
-					// We found it, so delete the previously created object
-					// and return the found one
-					delete t;
-					t = dynamic_cast<T*>(list[i]);
-					foundByHash = true;
-					_typeFoundByHash++;
-					break;
-				}
-			}
-		}
-		// Either the hash did not contain this type or it was just a
-		// collision, so add it to the type-by-hash table.
-		if (!foundByHash) {
-			// If this is a structured type, then try to resolve the referenced
-			// types of all members.
-            if (info.symType() & (hsStructureType | hsUnionType)) {
-				Structured* s = dynamic_cast<Structured*>(t);
-				assert(s != 0);
-				resolveReferences(s);
-			}
-			// We don't need to re-calc the hash here because for
-			// structs or unions it does not depend on the member's hash,
-			// so it has not changed.
-			_typesByHash.insert(hash, t);
-		}
-
-		insert(info, t);
-
-		return t;
-	}
-
+	/**
+     * Creates a Variable based on the information provided in
+     * \a info and returns it.
+     * @param info the type information to create a variable from
+     * @return a Variable object corresponding to \a info
+	 */
 	Variable* getVarInstance(const TypeInfo& info);
 
+	/**
+	 * Creates or retrieves an elementary numeric BaseType for integers,
+	 * booleans or floats based on the information provided in \a info and
+	 * returns it. If that type has already been created, it is found and
+	 * returned, otherwise a new type is created and added to the internal
+	 * lists.
+     * @param info the type information to create a numeric type from
+     * @return a NumericBaseType object corresponding to \a info
+	 */
 	BaseType* getNumericInstance(const TypeInfo& info);
 
     /**
@@ -290,9 +336,36 @@ protected:
      */
     void updateTypeRelations(const int new_id, const QString& new_name, BaseType* target);
 
+    /**
+     * Inserts the given type \a type into the internal lists and hashes as if
+     * \a type had the ID as provided in \a info. If the type is just appears
+     * with a different ID, then it is just added as an alias. Otherwise it is
+     * added as a completely new type.
+     * @param info the type information for which \a type as been retrieved
+     * @param type the type to (re-)insert
+     */
 	void insert(const TypeInfo& info, BaseType* type);
+
+	/**
+	 * Inserts the given type \a type as a new type into the internal lists and
+	 * hashes. No check is performed if that type has already been inserted
+	 * previously.
+	 * @param type the type to insert
+	 */
     void insert(BaseType* type);
-	void insert(CompileUnit* unit);
+
+    /**
+     * Inserts the given compile unit \a unit as a new unit into the internal
+     * lists and hashes.
+     * @param unit the compile unit to insert
+     */
+    void insert(CompileUnit* unit);
+
+    /**
+     * Inserts the given variable \a var as a new variable into the internal
+     * lists and hashes.
+     * @param var the variable to insert
+     */
 	void insert(Variable* var);
 
 private:

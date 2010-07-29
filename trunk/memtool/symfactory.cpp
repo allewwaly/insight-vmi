@@ -215,6 +215,73 @@ BaseType* SymFactory::createEmptyType(BaseType::RealType type)
 }
 
 
+template<class T>
+T* SymFactory::getTypeInstance(const TypeInfo& info)
+{
+    // Create a new type from the info
+    T* t = new T(info);
+
+    if (!t)
+        genericError("Out of memory.");
+
+    // If this is an array or pointer, make sure their size is set
+    // correctly
+    if (info.symType() & (hsArrayType | hsPointerType)) {
+        Pointer* p = dynamic_cast<Pointer*>(t);
+        assert(p != 0);
+        if (p->size() == 0)
+            p->setSize(_memSpecs.sizeofUnsignedLong);
+    }
+
+    RefBaseType* rbt = 0;
+    // Try to resolve the reference for the hash
+    if ( (rbt = dynamic_cast<RefBaseType*>(t)) ) {
+        rbt->setRefType(findBaseTypeById(rbt->refTypeId()));
+    }
+
+    // Try to find the type based on its hash, but only if we don't have
+    // any unresolved types
+    uint hash = t->hash();
+    bool foundByHash = false;
+
+    if ((!rbt || rbt->refType()) && _typesByHash.contains(hash)) {
+        BaseTypeList list = _typesByHash.values(hash);
+
+        // Go through the list and make sure we found the correct type
+        for (int i = 0; i < list.size(); i++) {
+            if (*list[i] == *t ) {
+                // We found it, so delete the previously created object
+                // and return the found one
+                delete t;
+                t = dynamic_cast<T*>(list[i]);
+                foundByHash = true;
+                _typeFoundByHash++;
+                break;
+            }
+        }
+    }
+    // Either the hash did not contain this type or it was just a
+    // collision, so add it to the type-by-hash table.
+    if (!foundByHash) {
+        // If this is a structured type, then try to resolve the referenced
+        // types of all members.
+        if (info.symType() & (hsStructureType | hsUnionType)) {
+            Structured* s = dynamic_cast<Structured*>(t);
+            assert(s != 0);
+            resolveReferences(s);
+        }
+        // We don't need to re-calc the hash here because for
+        // structs or unions it does not depend on the member's hash,
+        // so it has not changed.
+        _typesByHash.insert(hash, t);
+    }
+
+    insert(info, t);
+
+    return t;
+}
+
+
 BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 {
 	BaseType* t = 0;
