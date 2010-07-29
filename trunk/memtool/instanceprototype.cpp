@@ -8,6 +8,7 @@
 #include "instanceprototype.h"
 #include <QScriptEngine>
 #include "basetype.h"
+#include "shell.h"
 #include "debug.h"
 
 Q_DECLARE_METATYPE(Instance*)
@@ -229,6 +230,32 @@ int InstancePrototype::PointerSize() const
 }
 
 
+void InstancePrototype::ChangeType(const QString& typeName)
+{
+    Instance* inst = thisInstance();
+    if (!inst)
+        return;
+    const BaseType* t = shell->symbols().factory().findBaseTypeByName(typeName);
+    if (t)
+        inst->setType(t);
+    else if (context())
+        context()->throwError(QString("Type not found: \"%1\"").arg(typeName));
+}
+
+
+void InstancePrototype::ChangeType(int typeId)
+{
+    Instance* inst = thisInstance();
+    if (!inst)
+        return;
+    const BaseType* t = shell->symbols().factory().findBaseTypeById(typeId);
+    if (t)
+        inst->setType(t);
+    else if (context())
+        context()->throwError(QString("Type ID not found: 0x%1").arg(typeId, 0, 16));
+}
+
+
 qint8 InstancePrototype::toInt8() const
 {
     try {
@@ -423,7 +450,7 @@ void InstancePrototype::injectScriptError(const GenericException& e) const
                 QString("%1:%2: %3")
                     .arg(e.file)
                     .arg(e.line)
-                    .arg( e.message));
+                    .arg(e.message));
     else
         throw e;
 }
