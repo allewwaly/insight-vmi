@@ -83,6 +83,8 @@ public slots:
     bool IsNumber() const;
     bool IsInteger() const;
     bool IsReal() const;
+    void ChangeType(const QString& typeName);
+    void ChangeType(int typeId);
 
     qint8 toInt8() const;
     quint8 toUInt8() const;
