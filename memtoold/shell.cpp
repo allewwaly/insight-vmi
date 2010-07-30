@@ -25,8 +25,6 @@
 #include "memorydump.h"
 #include "instanceclass.h"
 
-const char* history_file = ".memtool/history";
-
 Shell* shell = 0;
 
 Shell::MemDumpArray Shell::_memDumps;
@@ -1332,35 +1330,10 @@ int Shell::cmdSymbolsParse(QStringList args)
     }
 
     // Either use the given objdump file, or create it on the fly
-    if (mode == mDbgKernel) {
-    	QProcess proc;
-    	proc.setReadChannel(QProcess::StandardOutput);
-
-    	QString cmd = "objdump";
-    	QStringList args;
-    	args << "-W" << objdump;
-
-    	// Start objdump process
-    	proc.start(cmd, args, QIODevice::ReadOnly);
-    	if (proc.waitForStarted(-1))
-			// Parse its output
-			_sym.parseSymbols(&proc, kernelSrc, sysmap);
-    	else {
-    		_err << "Could not execute \"" << cmd << "\". Make sure the "
-    				<< cmd << " utility is installed and can be found through "
-    				<< "the PATH variable." << endl;
-    	}
-    	// Did the process exit normally?
-    	if (proc.exitCode()) {
-    		_err << "Error encountered executing \"" << cmd << " "
-    				<< args.join(" ") << "\":" << endl
-    				<< QString::fromLocal8Bit(proc.readAllStandardError())
-					<< endl;
-    	}
-    }
-    else {
+    if (mode == mDbgKernel)
+		_sym.parseSymbols(kernelSrc);
+    else
     	_sym.parseSymbols(objdump, kernelSrc, sysmap);
-    }
 
     return 0;
 }

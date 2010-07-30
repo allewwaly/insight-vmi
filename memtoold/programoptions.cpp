@@ -8,47 +8,66 @@
 #include "programoptions.h"
 #include <iostream>
 #include <iomanip>
-#include <QFile>
+#include <QFileInfo>
 #include <QCoreApplication>
 
 ProgramOptions programOptions;
 
-const int OPTION_COUNT = 4;
+const int OPTION_COUNT = 5;
 
 const struct Option options[OPTION_COUNT] = {
+        {
+                "-d",
+                "--daemon",
+                "Start as a background process and detach console",
+                acNone,
+                opDaemonize,
+                ntOption,
+                0 // conflicting options
+        },
         {
                 "-p",
                 "--parse",
                 "Parse the debugging symbols from the given objdump file",
                 acParseSymbols,
+                opNone,
                 ntInFileName,
-                acLoadSymbols // conflicting actions
+                0 // conflicting options
         },
         {
                 "-l",
                 "--load",
                 "Read in previously saved debugging symbols",
                 acLoadSymbols,
+                opNone,
                 ntInFileName,
-                acParseSymbols // conflicting actions
+                0 // conflicting options
         },
         {
                 "-m",
                 "--memory",
                 "Load a memory dump",
                 acNone,
+                opNone,
                 ntMemFileName,
-                0 // conflicting actions
+                0 // conflicting options
         },
         {
                 "-h",
                 "--help",
                 "Show this help",
                 acUsage,
+                opNone,
                 ntOption,
                 0
         }
 };
+
+
+const char* history_file = ".memtool/history";
+const char* lock_file = ".memtool/memtool.lock";
+const char* log_file = ".memtool/memtool.log";
+const char* sock_file = ".memtool/memtool.sock";
 
 
 //------------------------------------------------------------------------------
@@ -116,6 +135,10 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
                             << std::endl;
                         return false;
                     }
+                    // Is this an option?
+                    if (options[i].option != opNone) {
+                        _activeOptions |= options[i].option;
+                    }
                     // Is this an action?
                     if (options[i].action != acNone) {
                         // Do we already have an active action?
@@ -126,8 +149,8 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
                             return false;
                         }
                         _action = options[i].action;
-                        _activeOptions |= options[i].action;
                     }
+                    // What do we expect next?
                     nextToken = options[i].nextToken;
                 }
             }
@@ -137,16 +160,18 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
             }
             break;
 
-        case ntInFileName:
+        case ntInFileName: {
             _inFileName = arg;
-            if (!QFile::exists(_inFileName)) {
+            QFileInfo info(_inFileName);
+            if (!info.exists()) {
                 std::cerr
-                    << "The file \"" << _inFileName.toStdString()
+                    << "The file or directory \"" << _inFileName.toStdString()
                     << "\" does not exist." << std::endl;
                 return false;
             }
             nextToken = ntOption;
             break;
+        }
 
         case ntMemFileName:
             if (!QFile::exists(arg)) {

@@ -54,6 +54,14 @@ public:
 	        const QString systemMap);
 
 	/**
+	 * Parses the kernel debugging symbols from the kernel source tree
+	 * \a kernelSrc. The Linux kernel \c vmlinux with debugging symbols and the
+	 * \c System.map file must be directly located in \a kernelSrc.
+     * @param kernelSrc path to configured and built kernel source
+	 */
+	void parseSymbols(const QString& kernelSrc);
+
+	/**
 	 * Loads the kernel debugging symbols from the given device.
 	 * @param from device to load the symbols from
 	 */
