@@ -9,6 +9,8 @@
 
 #include <QIODevice>
 #include <QFile>
+#include <QProcess>
+#include <QCoreApplication>
 #include <QRegExp>
 #include <QHash>
 #include <QTime>
@@ -145,6 +147,40 @@ void KernelSymbols::parseSymbols(const QString& objdump,
 	parseSymbols(&file, kernelSrc, systemMap);
 
 	file.close();
+}
+
+
+void KernelSymbols::parseSymbols(const QString& kernelSrc)
+{
+	QString kernel = kernelSrc + (kernelSrc.endsWith('/') ? "vmlinux" : "/vmlinux");
+	QString sysmap = kernelSrc + (kernelSrc.endsWith('/') ? "System.map" : "/System.map");
+
+	QProcess proc;
+	proc.setReadChannel(QProcess::StandardOutput);
+
+	QString cmd = "objdump";
+	QStringList args;
+	args << "-W" << kernel;
+
+	// Start objdump process
+	proc.start(cmd, args, QIODevice::ReadOnly);
+	if (proc.waitForStarted(-1))
+		// Parse its output
+		parseSymbols(&proc, kernelSrc, sysmap);
+	else {
+		genericError(
+				QString("Could not execute \"%1\". Make sure the "
+					"%1 utility is installed and can be found through "
+				    "the PATH variable.").arg(cmd));
+	}
+	// Did the process exit normally?
+	if (proc.exitCode()) {
+		genericError(
+				QString("Error encountered executing \"%1 %2\":\n%3")
+					.arg(cmd)
+					.arg(args.join(" "))
+					.arg(QString::fromLocal8Bit(proc.readAllStandardError())));
+	}
 }
 
 

@@ -19,6 +19,12 @@ enum Action {
     acLoadSymbols     = (1 << 2)
 };
 
+/// Options that can be set from the command line
+enum Options {
+	opNone            = 0,
+	opDaemonize       = (1 << 0)
+};
+
 /// The expected next token when parsing the command line arguments
 enum NextToken {
     ntOption,
@@ -31,7 +37,8 @@ struct Option {
     const char* shortOpt;   ///< the short option to trigger this argument
     const char *longOpt;    ///< the long option to trigger this argument
     const char *help;       ///< short help text describing this option
-    Action action;          ///< the action that is triggered by this option
+    Action action;          ///< the action that is triggered by this parameter
+    Options option;         ///< the option that is set by this parameter
     NextToken nextToken;    ///< the expected next token that should follow this option
     int conflictOptions;    ///< options this option conflicts (bitwise or'ed)
 };
@@ -42,6 +49,17 @@ extern const int OPTION_COUNT;
 /// Available command line options
 extern const struct Option options[];
 
+/// File to save the history to, relative to home directory
+extern const char* history_file;
+
+/// Locking file
+extern const char* lock_file;
+
+/// Logging file
+extern const char* log_file;
+
+/// Socket to communicate between daemon and CLI tool
+extern const char* sock_file;
 
 /**
  * Holds the option of a program instance
