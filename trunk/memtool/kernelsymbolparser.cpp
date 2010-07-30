@@ -11,6 +11,8 @@
 #include "shell.h"
 #include <QRegExp>
 #include <QTime>
+#include <QProcess>
+#include <QCoreApplication>
 
 
 #define parseInt(i, s, pb) \
@@ -305,6 +307,9 @@ void KernelSymbolParser::parse()
     static const HdrSymMap hdrMap = getHdrSymMap();
     static const ParamSymMap paramMap = getParamSymMap();
 
+	// Try to cast a reference to a QProcess object
+	QProcess* objdumpProc = dynamic_cast<QProcess*>(_from);
+
     QString line;
     ParamSymbolType paramSym;
     qint32 i;
@@ -319,8 +324,21 @@ void KernelSymbolParser::parse()
     operationStarted();
 
     try {
-        while (!_from->atEnd()) {
+        while ( !_from->atEnd() ||
+        	    (objdumpProc && objdumpProc->state() != QProcess::NotRunning) )
+        {
+        	// Make sure one line is available for sequential devices
+        	if (_from->isSequential() && !_from->canReadLine()) {
+        		QCoreApplication::processEvents();
+        		continue;
+        	}
+
             int len = _from->readLine(buf, bufSize);
+            if (len == 0)
+            	continue;
+            if (len < 0)
+            	parserError("An error occured reading from objdump input file");
+
             _line++;
             _bytesRead += len;
             // Skip all lines without interesting information

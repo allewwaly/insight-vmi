@@ -102,9 +102,12 @@ Shell::Shell()
                 "Allows to load, store or parse the kernel symbols",
                 "This command allows to load, store or parse the kernel "
                 "debugging symbols that are to be used.\n"
-                "  symbols parse <objdump> <System.map> <kernel_tree>\n"
+                "  symbols parse <kernel_src>     Parse the symbols from a kernel source\n"
+                "                                 tree. Uses \"vmlinux\" and \"System.map\"\n"
+                "                                 from that directory.\n"
+                "  symbols parse <objdump> <System.map> <kernel_headers>\n"
                 "                                 Parse the symbols from an objdump output, a\n"
-                "                                 System.map file and a kernel source tree\n"
+                "                                 System.map file and a kernel headers dir.\n"
                 "  symbols store <ksym_file>      Saves the parsed symbols to a file\n"
                 "  symbols save <ksym_file>       Alias for \"store\"\n"
                 "  symbols load <ksym_file>       Loads previously stored symbols for usage"));
@@ -1294,13 +1297,31 @@ int Shell::cmdSymbols(QStringList args)
 
 int Shell::cmdSymbolsParse(QStringList args)
 {
-    // Show cmdHelp, of an invalid number of arguments is given
-    if (args.size() != 3)
-        return cmdHelp(QStringList("symbols"));
+    QString objdump, sysmap, kernelSrc;
+    enum Mode { mObjdump, mDbgKernel };
+    Mode mode;
 
-    QString objdump = args[0], sysmap = args[1], kernelSrc = args[2];
+    if (args.size() == 1) {
+    	mode = mDbgKernel;
+    	kernelSrc = args[0];
+    	objdump = kernelSrc + (kernelSrc.endsWith('/') ? "vmlinux" : "/vmlinux");
+    	sysmap = kernelSrc + (kernelSrc.endsWith('/') ? "System.map" : "/System.map");
+    }
+    else if (args.size() == 3) {
+    	mode = mObjdump;
+    	objdump = args[0];
+    	sysmap = args[1];
+    	kernelSrc = args[2];
+    }
+    else
+        // Show cmdHelp, of an invalid number of arguments is given
+    	return cmdHelp(QStringList("symbols"));
 
     // Check files for existence
+    if (!QFile::exists(kernelSrc)) {
+        _err << "Directory not found: " << kernelSrc << endl;
+        return 0;
+    }
     if (!QFile::exists(objdump)) {
         _err << "File not found: " << objdump << endl;
         return 0;
@@ -1309,12 +1330,37 @@ int Shell::cmdSymbolsParse(QStringList args)
         _err << "File not found: " << sysmap << endl;
         return 0;
     }
-    if (!QFile::exists(kernelSrc)) {
-        _err << "Directory not found: " << kernelSrc << endl;
-        return 0;
-    }
 
-    _sym.parseSymbols(objdump, kernelSrc, sysmap);
+    // Either use the given objdump file, or create it on the fly
+    if (mode == mDbgKernel) {
+    	QProcess proc;
+    	proc.setReadChannel(QProcess::StandardOutput);
+
+    	QString cmd = "objdump";
+    	QStringList args;
+    	args << "-W" << objdump;
+
+    	// Start objdump process
+    	proc.start(cmd, args, QIODevice::ReadOnly);
+    	if (proc.waitForStarted(-1))
+			// Parse its output
+			_sym.parseSymbols(&proc, kernelSrc, sysmap);
+    	else {
+    		_err << "Could not execute \"" << cmd << "\". Make sure the "
+    				<< cmd << " utility is installed and can be found through "
+    				<< "the PATH variable." << endl;
+    	}
+    	// Did the process exit normally?
+    	if (proc.exitCode()) {
+    		_err << "Error encountered executing \"" << cmd << " "
+    				<< args.join(" ") << "\":" << endl
+    				<< QString::fromLocal8Bit(proc.readAllStandardError())
+					<< endl;
+    	}
+    }
+    else {
+    	_sym.parseSymbols(objdump, kernelSrc, sysmap);
+    }
 
     return 0;
 }
