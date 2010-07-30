@@ -1,11 +1,138 @@
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QDateTime>
+#include <sys/types.h>
+#include <unistd.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdlib.h>
 
 #include "debug.h"
 #include "kernelsymbols.h"
 #include "shell.h"
 #include "genericexception.h"
 #include "programoptions.h"
+
+//void log_message(char *filename, char *message)
+//{
+//	FILE *logfile;
+//	logfile = fopen(filename, "a");
+//	if (!logfile)
+//		return;
+//	fprintf(logfile, "%s\n", message);
+//	fclose(logfile);
+//}
+
+/**
+ * Signal handler for the Linux signals sent to daemon process, for more
+ * signals, refer to
+ * http://www.comptechdoc.org/os/linux/programming/linux_pgsignals.html
+ */
+void signal_handler(int sig)
+{
+	switch (sig) {
+	case SIGHUP:
+//		log_message(LOG_FILE, "hangup signal catched");
+		break;
+	case SIGTERM:
+//		log_message(LOG_FILE, "terminate signal catched");
+		QCoreApplication::exit(0);
+		break;
+	}
+}
+
+/**
+ * Creates a background process out of the application, source code taken from:
+ * http://www.enderunix.org/docs/eng/daemon.php
+ * with some minor modifications
+ */
+void init_daemon()
+{
+	// Check if our parent's ID is already 1 (i.e., we are already daemonized
+	if (getppid() == 1) {
+		fprintf(stderr, "This process already is a child of \"init\".\n");
+		return;
+	}
+	// Create a new process
+	pid_t pid = fork();
+	if (pid < 0) {
+		fprintf(stderr, "Cannot fork this process (error no. %d), aborting.\n",
+				errno);
+		exit(1);
+	}
+	// Parent receives child's PID and exits
+	if (pid > 0) {
+		printf("Started daemon with PID %d.\n", pid);
+		exit(0);
+	}
+	else
+		printf("Child with PID %d continues.\n", getpid());
+
+	// Child continues as daemon
+
+	// Create a new session with this process as process group leader
+	pid_t sid = setsid();
+	if (sid < 0) {
+		fprintf(stderr, "Cannot create a new session (error no. %d), "
+				"aborting.\n", errno);
+		exit(2);
+	}
+
+	// Set permissions for newly created files
+	umask(027);
+
+	QDir home = QDir::home();
+
+	// Change running directory to home
+	chdir((char*) home.absolutePath().toAscii().data());
+
+	// Create a lock file
+	QByteArray lockFile = home.absoluteFilePath(lock_file).toLocal8Bit();
+	int lock_fd = open(lockFile.data(), O_RDWR | O_CREAT, 0640);
+	if (lock_fd < 0) {
+		fprintf(stderr, "Cannot open lock file \"%s\" (error no. %d), "
+				"aborting.\n", lockFile.data(), errno);
+		exit(3);
+	}
+	// Try to lock the file
+	if (lockf(lock_fd, F_TLOCK, 0) < 0) {
+		fprintf(stdout, "Daemon already running.\n");
+		exit(0);
+	}
+
+	// Write PID to lock file
+	QByteArray myPid = QString("%1\n").arg(getpid()).toLocal8Bit();
+	write(lock_fd, myPid.data(), myPid.size());
+
+	// Register signal handler for interesting signals
+	signal(SIGCHLD, SIG_IGN);       // ignore child
+	signal(SIGTSTP, SIG_IGN); 		// ignore tty signals
+	signal(SIGTTOU, SIG_IGN);
+	signal(SIGTTIN, SIG_IGN);
+	signal(SIGHUP, signal_handler);  // catch hangup signal
+	signal(SIGTERM, signal_handler); // catch kill signal
+
+	// Close all file descriptors that the parent might have previously opened,
+	// including stdin, stdout, and stderr
+	for (int i = getdtablesize(); i >= 0; --i)
+		close(i);
+	close(0);
+
+	// Use /dev/null for stdin and, stdout
+	int fd = open("/dev/null", O_RDWR);
+	dup(fd);
+	// Use log file for stderr
+	QByteArray logFile = home.absoluteFilePath(log_file).toLocal8Bit();
+	open(logFile.data(), O_CREAT|O_APPEND|O_WRONLY, 0640);
+
+	// Start a new logging session
+	std::cerr
+		<< QDateTime::currentDateTime().toString(Qt::SystemLocaleShortDate).toStdString()
+		<< " Memtool started with PID " << getpid() << "." << std::endl;
+}
+
 
 
 /**
@@ -25,6 +152,9 @@ int main(int argc, char* argv[])
 	int ret = 0;
 
 	try {
+		if (programOptions.activeOptions() & opDaemonize)
+			init_daemon();
+
 	    shell = new Shell();
         KernelSymbols& sym = shell->symbols();
 
@@ -33,8 +163,7 @@ int main(int argc, char* argv[])
 	    case acNone:
 	        break;
 	    case acParseSymbols:
-		    // TODO fix me
-//	        sym.parseSymbols(programOptions.inFileName());
+	        sym.parseSymbols(programOptions.inFileName());
 	        break;
 	    case acLoadSymbols:
 	        sym.loadSymbols(programOptions.inFileName());

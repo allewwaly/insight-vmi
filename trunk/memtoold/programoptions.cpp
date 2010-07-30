@@ -28,7 +28,7 @@ const struct Option options[OPTION_COUNT] = {
         {
                 "-p",
                 "--parse",
-                "Parse the debugging symbols from the given objdump file",
+                "Parse the debugging symbols from the given kernel source directory",
                 acParseSymbols,
                 opNone,
                 ntInFileName,
