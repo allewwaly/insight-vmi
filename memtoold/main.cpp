@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <memtool/constdefs.h>
 
 #include "debug.h"
 #include "kernelsymbols.h"
@@ -32,13 +33,15 @@
  */
 void signal_handler(int sig)
 {
+    debugerr("Received signal " << sig);
 	switch (sig) {
 	case SIGHUP:
 //		log_message(LOG_FILE, "hangup signal catched");
 		break;
 	case SIGTERM:
 //		log_message(LOG_FILE, "terminate signal catched");
-		QCoreApplication::exit(0);
+	    if (shell)
+	        shell->shutdown();
 		break;
 	}
 }
@@ -152,10 +155,11 @@ int main(int argc, char* argv[])
 	int ret = 0;
 
 	try {
-		if (programOptions.activeOptions() & opDaemonize)
+	    bool daemonize = (programOptions.activeOptions() & opDaemonize);
+		if (daemonize)
 			init_daemon();
 
-	    shell = new Shell();
+	    shell = new Shell(daemonize);
         KernelSymbols& sym = shell->symbols();
 
 	    // Perform any initial action that might be given
@@ -174,9 +178,11 @@ int main(int argc, char* argv[])
 	    }
 
         // Start the interactive shell
+	    debugerr(getpid() <<  " Starting interactive shell");
 		shell->start();
 
 		ret = app.exec();
+        debugerr(getpid() <<  " Application exited");
 	}
 	catch (GenericException e) {
 	    shell->err()
