@@ -49,18 +49,6 @@ extern const int OPTION_COUNT;
 /// Available command line options
 extern const struct Option options[];
 
-/// File to save the history to, relative to home directory
-extern const char* history_file;
-
-/// Locking file
-extern const char* lock_file;
-
-/// Logging file
-extern const char* log_file;
-
-/// Socket to communicate between daemon and CLI tool
-extern const char* sock_file;
-
 /**
  * Holds the option of a program instance
  */
