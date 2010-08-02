@@ -11,11 +11,15 @@
 #include <stdlib.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <memtool/constdefs.h>
 #include <QtAlgorithms>
 #include <QProcess>
 #include <QCoreApplication>
 #include <QScriptEngine>
 #include <QDir>
+#include <QLocalSocket>
+#include <QLocalServer>
+#include <QMutexLocker>
 #include "compileunit.h"
 #include "variable.h"
 #include "refbasetype.h"
@@ -31,7 +35,9 @@ Shell::MemDumpArray Shell::_memDumps;
 KernelSymbols Shell::_sym;
 
 
-Shell::Shell()
+Shell::Shell(bool listenOnSocket)
+    : _listenOnSocket(listenOnSocket), _interactive(!listenOnSocket),
+      _clSocket(0), _srvSocket(0)
 {
     // Register all commands
     _commands.insert("exit",
@@ -110,25 +116,47 @@ Shell::Shell()
                 "  symbols save <ksym_file>       Alias for \"store\"\n"
                 "  symbols load <ksym_file>       Loads previously stored symbols for usage"));
 
+    // Interactive shell or socket connections?
+    if (_listenOnSocket) {
+        QString sockFileName = QDir::home().absoluteFilePath(sock_file);
+        QFile sockFile(sockFileName);
+        // Delete stale socket file, if it exists
+        if (sockFile.exists() && !sockFile.remove())
+            genericError(QString("Cannot remove stale socket file \"%1\"")
+                    .arg(sockFileName));
+
+        // Create and open socket
+        _srvSocket = new QLocalServer(this);
+        _srvSocket->setMaxPendingConnections(1);
+        connect(_srvSocket, SIGNAL(newConnection()), SLOT(handleNewConnection()));
+
+        if (!_srvSocket->listen(sockFileName))
+            genericError(QString("Cannot open socket file \"%1\"")
+                    .arg(sockFileName));
+    }
+    else {
+        // Enable readline history
+        using_history();
+
+        // Load the readline history
+        QString histFile = QDir::home().absoluteFilePath(history_file);
+        if (QFile::exists(histFile)) {
+            int ret = read_history(histFile.toLocal8Bit().constData());
+            if (ret)
+                debugerr("Error #" << ret << " occured when trying to read the "
+                        "history data from \"" << histFile << "\"");
+        }
+    }
+
     // Open the console devices
     _stdin.open(stdin, QIODevice::ReadOnly);
     _stdout.open(stdout, QIODevice::WriteOnly);
     _stderr.open(stderr, QIODevice::WriteOnly);
+    // The devices for the streams are either stdout and stderr (interactive
+    // mode), or they are /dev/null and a log file (daemon mode). If a socket
+    // connects in daemon mode, the device for stdout will become the socket.
     _out.setDevice(&_stdout);
     _err.setDevice(&_stderr);
-
-    // Enable readline history
-    using_history();
-
-    // Load the readline history
-    QString histFile = QDir::home().absoluteFilePath(history_file);
-    if (QFile::exists(histFile)) {
-    	int ret = read_history(histFile.toLocal8Bit().constData());
-        if (ret)
-        	debugerr("Error #" << ret << " occured when trying to read the "
-        			"history data from \"" << histFile << "\"");
-    }
-
 }
 
 
@@ -145,13 +173,24 @@ Shell::~Shell()
 		debugerr("Error creating path for saving the history");
     }
     else {
-    	// Save the history for the next launch
-		QString histFile = QDir::home().absoluteFilePath(history_file);
-		QByteArray ba = histFile.toLocal8Bit();
-		int ret = write_history(ba.constData());
-		if (ret)
-			debugerr("Error #" << ret << " occured when trying to save the "
-					"history data to \"" << histFile << "\"");
+        // Only save history for interactive sessions
+        if (!_listenOnSocket) {
+            // Save the history for the next launch
+            QString histFile = QDir::home().absoluteFilePath(history_file);
+            QByteArray ba = histFile.toLocal8Bit();
+            int ret = write_history(ba.constData());
+            if (ret)
+                debugerr("Error #" << ret << " occured when trying to save the "
+                        "history data to \"" << histFile << "\"");
+        }
+    }
+
+    if (_clSocket)
+        delete _clSocket;
+
+    if (_srvSocket) {
+        _srvSocket->close();
+        delete _srvSocket;
     }
 }
 
@@ -179,25 +218,111 @@ const KernelSymbols& Shell::symbols() const
     return _sym;
 }
 
+
+bool Shell::interactive() const
+{
+    return _interactive;
+}
+
+
+int Shell::lastStatus() const
+{
+    return _lastStatus;
+}
+
 QString Shell::readLine(const QString& prompt)
 {
+    QString ret;
     QString p = prompt.isEmpty() ? QString(">>> ") : prompt;
-    char* line = readline(p.toLocal8Bit().constData());
 
-    // If line is NULL, the user wants to exit.
-    if (!line) {
-    	_stdin.close();
-    	return QString();
+    // Read input from stdin or from socket?
+    if (_listenOnSocket) {
+        // Print prompt in interactive mode
+        if (_interactive)
+            _out << p << flush;
+        // Wait until a complete line is readable
+        _sockSem.acquire(1);
+        // Read input from socket
+        ret = QString::fromLocal8Bit(_clSocket->readLine().data());
+        // Hold mutex while checking socket data
+        QMutexLocker lock(&_sockSemLock);
+        // If we can still read a line, count up semaphore again
+        if (_clSocket->canReadLine())
+            _sockSem.release(1);
+    }
+    else {
+        // Read input from stdin
+        char* line = readline(p.toLocal8Bit().constData());
+
+        // If line is NULL, the user wants to exit.
+        if (!line) {
+            _finished = true;
+            return QString();
+        }
+
+        // Add the line to the history in interactive sessions
+        if (_listenOnSocket && strlen(line) > 0)
+            add_history(line);
+
+        ret = QString::fromLocal8Bit(line, strlen(line)).trimmed();
+        free(line);
     }
 
-    // Add the line to the history
-    if (strlen(line) > 0)
-        add_history(line);
-
-    QString ret = QString::fromLocal8Bit(line, strlen(line)).trimmed();
-    free(line);
-
     return ret;
+}
+
+
+void Shell::handleNewConnection()
+{
+    QLocalSocket* sock = _srvSocket->nextPendingConnection();
+    if (!sock)
+        return;
+    // We only accept one connection at a time, so if we already have a socket,
+    // we disconnect it immediately
+    if (_clSocket && _clSocket->isOpen()) {
+        sock->write("Too many connections, currently only one connection is "
+                "supported at a time\n");
+        sock->waitForBytesWritten(-1);
+        sock->close();
+        sock->deleteLater();
+    }
+    else {
+        _interactive = false;
+        _clSocket = sock;
+        connect(_clSocket, SIGNAL(readyRead()), SLOT(handleSockReadyRead()));
+        connect(_clSocket, SIGNAL(disconnected()), SLOT(handleSockDisconnected()));
+        // Use the socket as output device
+        _out.setDevice(_clSocket);
+    }
+}
+
+
+void Shell::handleSockReadyRead()
+{
+    if (!_clSocket)
+        return;
+
+    QMutexLocker lock(&_sockSemLock);
+    // Count up semaphore if at least one line can be read
+    if (_sockSem.available() < 0 && _clSocket->canReadLine())
+        _sockSem.release(1);
+}
+
+
+void Shell::handleSockDisconnected()
+{
+    if (_clSocket) {
+        // Reset the output device
+        _out.setDevice(&_stdout);
+        _out.flush();
+        // Delete the socket
+        _clSocket->deleteLater();
+        _clSocket = 0;
+        // Reset semaphore to zero
+        QMutexLocker lock(&_sockSemLock);
+        while (_sockSem.available() > 0)
+            _sockSem.acquire(1);
+    }
 }
 
 
@@ -248,7 +373,8 @@ void Shell::cleanupPipedProcs()
 
 void Shell::run()
 {
-    int ret = 0;
+    _lastStatus = 0;
+    _finished = false;
     QString line, cmd;
 
     // Handle the command line params
@@ -257,13 +383,23 @@ void Shell::run()
     }
 
     // Enter command line loop
-    while (ret == 0 && !_stdin.atEnd()) {
-//        _out << ">>> " << flush;
-
+    while (_lastStatus == 0 && !_finished) {
         line = readLine();
+        // Don't process that line if we got killed
+        if (_finished)
+            break;
 
         try {
-            ret = eval(line);
+            _lastStatus = eval(line);
+            // If we are communicating over the socket, make sure all data
+            // was received before we continue
+            if (_clSocket) {
+                _out.flush();
+                _clSocket->waitForBytesWritten(-1);
+                // Close socket if this is a non-interactive session
+                if (!_interactive)
+                    _clSocket->close();
+            }
         }
         catch (GenericException e) {
                 _err
@@ -272,8 +408,20 @@ void Shell::run()
         }
     }
 
-    _out << "Done, exiting." << endl;
-    QCoreApplication::exit(ret);
+    debugerr(getpid() << " Loop done, ret = " << _lastStatus << ", _finished = " << _finished);
+
+    if (_interactive)
+        _out << "Done, exiting." << endl;
+
+    QCoreApplication::exit(_lastStatus);
+}
+
+
+void Shell::shutdown()
+{
+    _finished = true;
+    QMutexLocker lock(&_sockSemLock);
+    _sockSem.release();
 }
 
 
@@ -370,6 +518,7 @@ int Shell::eval(QString command)
 
 int Shell::cmdExit(QStringList)
 {
+    _finished = true;
     return 1;
 }
 
@@ -1369,7 +1518,7 @@ int Shell::cmdSymbolsStore(QStringList args)
     QString fileName = args[0];
 
     // Check file for existence
-    if (QFile::exists(fileName)) {
+    if (QFile::exists(fileName) && _interactive) {
         QString reply;
         do {
             reply = readLine("Ok to overwrite existing file? [Y/n] ").toLower();

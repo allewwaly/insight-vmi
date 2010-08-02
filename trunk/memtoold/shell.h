@@ -15,6 +15,8 @@
 #include <QThread>
 #include <QVarLengthArray>
 #include <QScriptValue>
+#include <QSemaphore>
+#include <QMutex>
 #include "kernelsymbols.h"
 
 // Forward declaration
@@ -22,6 +24,8 @@ class MemoryDump;
 class QProcess;
 class QScriptContext;
 class QScriptEngine;
+class QLocalServer;
+class QLocalSocket;
 
 
 /**
@@ -68,7 +72,7 @@ public:
     /**
      * Constructor
      */
-    Shell();
+    Shell(bool listenOnSocket = false);
 
     /**
      * Destructor
@@ -104,6 +108,24 @@ public:
      */
     QString readLine(const QString& prompt = QString());
 
+    /**
+     * This flag indicates whether we are in an interactive session or not.
+     * If non-interactive, the shell is less verbose (no progress information,
+     * no prompts, no questions).
+     * @return
+     */
+    bool interactive() const;
+
+    /**
+     * @return the exit code of the last executed command
+     */
+    int lastStatus() const;
+
+    /**
+     * Terminates the shell immediately
+     */
+    void shutdown();
+
 protected:
     /**
      * Starts the interactive shell and does not return until the user invokes
@@ -114,6 +136,21 @@ protected:
 private slots:
     void pipeEndReadyReadStdOut();
     void pipeEndReadyReadStdErr();
+
+    /**
+     * Handles new connections to the local socket
+     */
+    void handleNewConnection();
+
+    /**
+     * Handles new data that is made available through the client socket
+     */
+    void handleSockReadyRead();
+
+    /**
+     * Handes disconnected() signals from the client socket
+     */
+    void handleSockDisconnected();
 
 private:
     typedef QVarLengthArray<MemoryDump*, 16> MemDumpArray;
@@ -127,6 +164,14 @@ private:
     QHash<QString, Command> _commands;
     static MemDumpArray _memDumps;
     QList<QProcess*> _pipedProcs;
+    bool _listenOnSocket;
+    bool _interactive;
+    QLocalSocket* _clSocket;
+    QLocalServer* _srvSocket;
+    QSemaphore _sockSem;
+    QMutex _sockSemLock;
+    bool _finished;
+    int _lastStatus;
 
     void cleanupPipedProcs();
     int eval(QString command);

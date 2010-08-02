@@ -76,5 +76,7 @@ HEADERS += instance.h \
     basetype.h \
     enum.h
 CONFIG += console
-QT += script
-LIBS += -lreadline
+QT += script \
+    network
+LIBS += -lreadline -L ../libmemtool -lmemtool
+INCLUDEPATH += ../libmemtool/include
