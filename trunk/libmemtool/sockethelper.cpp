@@ -13,7 +13,8 @@ SocketHelper::SocketHelper(QLocalSocket* socket, QObject* parent)
     : QObject(parent), _socket(socket)
 {
     // Connect the signals
-    connect(_socket, SIGNAL(readyRead()), SLOT(handleReadyRead()), Qt::DirectConnection);
+    connect(_socket, SIGNAL(readyRead()), SLOT(handleReadyRead()),
+    		Qt::DirectConnection);
 }
 
 
