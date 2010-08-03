@@ -218,8 +218,6 @@ void Shell::run()
     // Write out any available output
     if (!output.isEmpty())
         _out << output << endl;
-
-    QCoreApplication::exit(0);
 }
 
 
