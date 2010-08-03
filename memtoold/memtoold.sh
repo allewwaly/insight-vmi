@@ -3,7 +3,7 @@
 LIB="libmemtool.so.1"
 
 
-if [ -d ../libmemtool/$LIB ]; then
+if [ -r ../libmemtool/$LIB ]; then
 	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+LD_LIBRARY_PATH:}../libmemtool"
 elif [ -r ./$LIB ]; then
 	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+LD_LIBRARY_PATH:}."
