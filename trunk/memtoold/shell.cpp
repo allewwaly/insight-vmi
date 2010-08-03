@@ -242,13 +242,16 @@ QString Shell::readLine(const QString& prompt)
             _out << p << flush;
         // Wait until a complete line is readable
         _sockSem.acquire(1);
-        // Read input from socket
-        ret = QString::fromLocal8Bit(_clSocket->readLine().data());
-        // Hold mutex while checking socket data
-        QMutexLocker lock(&_sockSemLock);
-        // If we can still read a line, count up semaphore again
-        if (_clSocket->canReadLine())
-            _sockSem.release(1);
+        // The socket my still be null if we received a kill signal
+        if (_clSocket) {
+            // Read input from socket
+            ret = QString::fromLocal8Bit(_clSocket->readLine().data());
+            // Hold mutex while checking socket data
+            QMutexLocker lock(&_sockSemLock);
+            // If we can still read a line, count up semaphore again
+            if (_clSocket->canReadLine())
+                _sockSem.release(1);
+        }
     }
     else {
         // Read input from stdin
@@ -407,11 +410,6 @@ void Shell::run()
                     << "Message: " << e.message << endl;
         }
     }
-
-    debugerr(getpid() << " Loop done, ret = " << _lastStatus << ", _finished = " << _finished);
-
-    if (_interactive)
-        _out << "Done, exiting." << endl;
 
     QCoreApplication::exit(_lastStatus);
 }

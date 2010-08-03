@@ -16,15 +16,18 @@
 #include "genericexception.h"
 #include "programoptions.h"
 
-//void log_message(char *filename, char *message)
-//{
-//	FILE *logfile;
-//	logfile = fopen(filename, "a");
-//	if (!logfile)
-//		return;
-//	fprintf(logfile, "%s\n", message);
-//	fclose(logfile);
-//}
+
+/**
+ * Log a message to stderr, prepended with the current date and time.
+ * @param msg the message to log
+ */
+void log_message(const QString& msg)
+{
+    std::cerr
+        << QDateTime::currentDateTime().toString(Qt::SystemLocaleShortDate).toStdString()
+        << " " << msg << std::endl;
+}
+
 
 /**
  * Signal handler for the Linux signals sent to daemon process, for more
@@ -33,18 +36,20 @@
  */
 void signal_handler(int sig)
 {
-    debugerr("Received signal " << sig);
 	switch (sig) {
+
 	case SIGHUP:
-//		log_message(LOG_FILE, "hangup signal catched");
 		break;
+
 	case SIGTERM:
-//		log_message(LOG_FILE, "terminate signal catched");
-	    if (shell)
+	    if (shell) {
 	        shell->shutdown();
+	        shell->wait();
+	    }
 		break;
 	}
 }
+
 
 /**
  * Creates a background process out of the application, source code taken from:
@@ -66,12 +71,8 @@ void init_daemon()
 		exit(1);
 	}
 	// Parent receives child's PID and exits
-	if (pid > 0) {
-		printf("Started daemon with PID %d.\n", pid);
+	if (pid > 0)
 		exit(0);
-	}
-	else
-		printf("Child with PID %d continues.\n", getpid());
 
 	// Child continues as daemon
 
@@ -99,11 +100,30 @@ void init_daemon()
 				"aborting.\n", lockFile.data(), errno);
 		exit(3);
 	}
-	// Try to lock the file
+
+    // Try to lock the file
 	if (lockf(lock_fd, F_TLOCK, 0) < 0) {
-		fprintf(stdout, "Daemon already running.\n");
+	    // Read in the PID
+	    const int bufsize = 1024;
+	    char buf[bufsize] = {0};
+	    ssize_t len = read(lock_fd, buf, bufsize-1);
+	    if (len < 0) {
+	        fprintf(stderr, "Cannot read PID from lock file \"%s\" (error no. %d), "
+	                "aborting.\n", lockFile.data(), errno);
+	        exit(4);
+	    }
+	    for (int i = 0; i < len; ++i) {
+	        if (buf[i] < '0' || buf[i] > '9') {
+	            buf[i] = 0;
+	            break;
+	        }
+	    }
+
+		printf("Daemon already running with PID %s.\n", buf);
 		exit(0);
 	}
+	else
+        printf("Started daemon with PID %d.\n", getpid());
 
 	// Write PID to lock file
 	QByteArray myPid = QString("%1\n").arg(getpid()).toLocal8Bit();
@@ -118,10 +138,10 @@ void init_daemon()
 	signal(SIGTERM, signal_handler); // catch kill signal
 
 	// Close all file descriptors that the parent might have previously opened,
-	// including stdin, stdout, and stderr
+	// including stdin, stdout, and stderr, but exclude lock_fd
 	for (int i = getdtablesize(); i >= 0; --i)
-		close(i);
-	close(0);
+		if (i != lock_fd)
+		    close(i);
 
 	// Use /dev/null for stdin and, stdout
 	int fd = open("/dev/null", O_RDWR);
@@ -129,13 +149,7 @@ void init_daemon()
 	// Use log file for stderr
 	QByteArray logFile = home.absoluteFilePath(log_file).toLocal8Bit();
 	open(logFile.data(), O_CREAT|O_APPEND|O_WRONLY, 0640);
-
-	// Start a new logging session
-	std::cerr
-		<< QDateTime::currentDateTime().toString(Qt::SystemLocaleShortDate).toStdString()
-		<< " Memtool started with PID " << getpid() << "." << std::endl;
 }
-
 
 
 /**
@@ -153,11 +167,14 @@ int main(int argc, char* argv[])
         return 1;
 
 	int ret = 0;
+    bool daemonize = (programOptions.activeOptions() & opDaemonize);
 
 	try {
-	    bool daemonize = (programOptions.activeOptions() & opDaemonize);
-		if (daemonize)
+		if (daemonize) {
 			init_daemon();
+		    // Start a new logging session
+			log_message(QString("Memtool started with PID %1.").arg(getpid()));
+		}
 
 	    shell = new Shell(daemonize);
         KernelSymbols& sym = shell->symbols();
@@ -178,20 +195,29 @@ int main(int argc, char* argv[])
 	    }
 
         // Start the interactive shell
-	    debugerr(getpid() <<  " Starting interactive shell");
 		shell->start();
 
 		ret = app.exec();
-        debugerr(getpid() <<  " Application exited");
+
+		if (daemonize)
+            log_message(QString("Memtool exited with return code %1.").arg(ret));
+		if (shell->interactive())
+		    shell->out() << "Done, exiting." << endl;
 	}
 	catch (GenericException e) {
-	    shell->err()
-			<< "Caught exception at " << e.file << ":" << e.line << endl
-			<< "Message: " << e.message << endl;
+	    QString msg = QString("Caught exception at %1:%2\nMessage: %3")
+	            .arg(e.file)
+	            .arg(e.line)
+	            .arg(e.message);
+	    if (daemonize)
+	        log_message(msg);
+	    else
+	        shell->err() << msg << endl;
 	    return 1;
 	}
 
-	if (shell){
+	// Wait for the shell to exit
+	if (shell) {
 		while(!shell->isFinished()){
 		 	shell->quit();
 		}
