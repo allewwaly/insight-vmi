@@ -12,14 +12,26 @@
 #include <memtool/memtool.h>
 #include <memtool/memtoolexception.h>
 #include "sockethelper.h"
+#include "debug.h"
 
-// static variable instances
-QLocalSocket* Memtool::_socket = new QLocalSocket();
-SocketHelper* Memtool::_helper = new SocketHelper(Memtool::_socket);
+//// static variable instances
+//QLocalSocket* Memtool::_socket = new QLocalSocket();
+//SocketHelper* Memtool::_helper = new SocketHelper(Memtool::_socket);
 
 
-Memtool::Memtool()
+Memtool::Memtool(QObject* parent)
+    : _socket(new QLocalSocket(parent)),
+      _helper(new SocketHelper(_socket, parent))
 {
+//    _socket->moveToThread(QCoreApplication::instance()->thread());
+//    _helper->moveToThread(QCoreApplication::instance()->thread());
+}
+
+
+Memtool::~Memtool()
+{
+    delete _helper;
+    delete _socket;
 }
 
 
@@ -36,7 +48,12 @@ bool Memtool::start()
 
     QString cmd = "memtoold";
     QStringList args("--daemon");
-    return QProcess::startDetached(cmd, args);
+
+    QProcess proc;
+    proc.start(cmd, args);
+    proc.waitForFinished(-1);
+
+    return proc.exitCode() == 0 && proc.error() == QProcess::UnknownError;
 }
 
 
@@ -51,15 +68,21 @@ bool Memtool::stop()
 
 bool Memtool::connect()
 {
-    static QString sockFileName = QDir::home().absoluteFilePath(sock_file);
+    QString sockFileName = QDir::home().absoluteFilePath(sock_file);
     if (!QFile::exists(sockFileName))
         return false;
+
+    debugmsg(QString("Socket's thread = 0x%1, parent's thread = 0x%2")
+             .arg((quint64)_socket->thread(), 0, 16)
+             .arg((quint64)_socket->parent()->thread(), 0, 16));
+
     // Are we already connected?
     if (_socket->state() == QLocalSocket::ConnectingState ||
         _socket->state() == QLocalSocket::ConnectedState)
         return true;
     // Try to connect
     _socket->connectToServer(sockFileName, QIODevice::ReadWrite);
+
     return _socket->waitForConnected(1000);
 }
 
