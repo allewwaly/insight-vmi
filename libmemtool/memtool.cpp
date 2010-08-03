@@ -8,23 +8,26 @@
 #include <QLocalSocket>
 #include <QDir>
 #include <QProcess>
+#include <QThread>
+#include <QCoreApplication>
 #include <memtool/constdefs.h>
 #include <memtool/memtool.h>
 #include <memtool/memtoolexception.h>
 #include "sockethelper.h"
 #include "debug.h"
 
-//// static variable instances
-//QLocalSocket* Memtool::_socket = new QLocalSocket();
-//SocketHelper* Memtool::_helper = new SocketHelper(Memtool::_socket);
-
 
 Memtool::Memtool(QObject* parent)
-    : _socket(new QLocalSocket(parent)),
-      _helper(new SocketHelper(_socket, parent))
+    : _socket(new QLocalSocket()),
+      _helper(new SocketHelper(_socket))
 {
-//    _socket->moveToThread(QCoreApplication::instance()->thread());
-//    _helper->moveToThread(QCoreApplication::instance()->thread());
+	// If the parent is a thread, move the members' event loop handling to that
+	// thread
+	QThread* pthread = dynamic_cast<QThread*>(parent);
+	if (pthread) {
+		_socket->moveToThread(pthread);
+		_helper->moveToThread(pthread);
+	}
 }
 
 
@@ -72,9 +75,13 @@ bool Memtool::connect()
     if (!QFile::exists(sockFileName))
         return false;
 
-    debugmsg(QString("Socket's thread = 0x%1, parent's thread = 0x%2")
-             .arg((quint64)_socket->thread(), 0, 16)
-             .arg((quint64)_socket->parent()->thread(), 0, 16));
+//    if (_socket->parent())
+//		debugmsg(QString("Socket's thread = 0x%1, parent's thread = 0x%2")
+//				 .arg((quint64)_socket->thread(), 0, 16)
+//				 .arg((quint64)_socket->parent()->thread(), 0, 16));
+//    else
+//		debugmsg(QString("Socket's thread = 0x%1, socket has no parent")
+//				 .arg((quint64)_socket->thread(), 0, 16));
 
     // Are we already connected?
     if (_socket->state() == QLocalSocket::ConnectingState ||
@@ -89,6 +96,7 @@ bool Memtool::connect()
 
 QString Memtool::eval(const QString& cmd)
 {
+	debugenter();
     if (!connect())
         memtoolError("Could not connect to memtool daemon");
 
@@ -97,8 +105,28 @@ QString Memtool::eval(const QString& cmd)
     // Execute the command and wait for the socket to be closed
     _socket->write(realCmd.toLocal8Bit());
     _socket->flush();
-    _socket->waitForDisconnected(-1);
 
+    debugmsg("Before _socket->waitForDisconnected(-1);");
+    _socket->waitForDisconnected(500);
+    QCoreApplication::processEvents();
+    switch(_socket->state()) {
+    case QLocalSocket::UnconnectedState:
+    	debugmsg("Socket is unconnected");
+    	break;
+    case QLocalSocket::ConnectingState:
+    	debugmsg("Socket is connecting");
+    	break;
+    case QLocalSocket::ConnectedState:
+    	debugmsg("Socket is connected");
+    	break;
+    case QLocalSocket::ClosingState:
+    	debugmsg("Socket is closing");
+    	break;
+    }
+    _socket->waitForDisconnected(-1);
+    debugmsg("After _socket->waitForDisconnected(-1);");
+
+    debugleave();
     return QString::fromLocal8Bit(_helper->data().data());
 }
 
