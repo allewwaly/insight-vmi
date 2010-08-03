@@ -9,6 +9,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <memtool/constdefs.h>
@@ -29,6 +30,11 @@
 #include "memorydump.h"
 #include "instanceclass.h"
 
+// Register socket enums for the Qt meta type system
+Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
+Q_DECLARE_METATYPE(QAbstractSocket::SocketError);
+
+
 Shell* shell = 0;
 
 Shell::MemDumpArray Shell::_memDumps;
@@ -39,6 +45,9 @@ Shell::Shell(bool listenOnSocket)
     : _listenOnSocket(listenOnSocket), _interactive(!listenOnSocket),
       _clSocket(0), _srvSocket(0)
 {
+	qRegisterMetaType<QAbstractSocket::SocketState>();
+	qRegisterMetaType<QAbstractSocket::SocketError>();
+
     // Register all commands
     _commands.insert("exit",
             Command(
@@ -241,11 +250,13 @@ QString Shell::readLine(const QString& prompt)
         if (_interactive)
             _out << p << flush;
         // Wait until a complete line is readable
+    	debugerr("Before _sockSem.acquire(1)");
         _sockSem.acquire(1);
+    	debugerr("After _sockSem.acquire(1)");
         // The socket my still be null if we received a kill signal
         if (_clSocket) {
             // Read input from socket
-            ret = QString::fromLocal8Bit(_clSocket->readLine().data());
+            ret = QString::fromLocal8Bit(_clSocket->readLine().data()).trimmed();
             // Hold mutex while checking socket data
             QMutexLocker lock(&_sockSemLock);
             // If we can still read a line, count up semaphore again
@@ -280,6 +291,9 @@ void Shell::handleNewConnection()
     QLocalSocket* sock = _srvSocket->nextPendingConnection();
     if (!sock)
         return;
+    // Move event loop to this thread
+//    debugerr("Moving to this thread");
+//    sock->moveToThread(this);
     // We only accept one connection at a time, so if we already have a socket,
     // we disconnect it immediately
     if (_clSocket && _clSocket->isOpen()) {
@@ -302,13 +316,15 @@ void Shell::handleNewConnection()
 
 void Shell::handleSockReadyRead()
 {
+	debugerr("Entering " << __PRETTY_FUNCTION__);
     if (!_clSocket)
         return;
 
     QMutexLocker lock(&_sockSemLock);
     // Count up semaphore if at least one line can be read
-    if (_sockSem.available() < 0 && _clSocket->canReadLine())
+    if (_sockSem.available() <= 0 && _clSocket->canReadLine())
         _sockSem.release(1);
+	debugerr("Leaving " << __PRETTY_FUNCTION__);
 }
 
 
@@ -387,13 +403,17 @@ void Shell::run()
 
     // Enter command line loop
     while (_lastStatus == 0 && !_finished) {
+    	debugerr("Before readline()");
         line = readLine();
+    	debugerr("After readline()");
         // Don't process that line if we got killed
         if (_finished)
             break;
 
         try {
+        	debugerr("Evaluating: \"" << line.replace("\n", "\\n") << "\"");
             _lastStatus = eval(line);
+        	debugerr("Done evaluating: \"" << line.replace("\n", "\\n") << "\"");
             // If we are communicating over the socket, make sure all data
             // was received before we continue
             if (_clSocket) {
@@ -401,7 +421,11 @@ void Shell::run()
                 _clSocket->waitForBytesWritten(-1);
                 // Close socket if this is a non-interactive session
                 if (!_interactive)
-                    _clSocket->close();
+                    _clSocket->disconnectFromServer();
+                if (_interactive)
+                	debugerr("Interactive session, continuing");
+                else
+                	debugerr("Non-interactive session, closing socket");
             }
         }
         catch (GenericException e) {
@@ -411,7 +435,13 @@ void Shell::run()
         }
     }
 
+    if (_srvSocket)
+    	_srvSocket->close();
+
     QCoreApplication::exit(_lastStatus);
+//    QCoreApplication::processEvents();
+    debugerr("Leaving " << __PRETTY_FUNCTION__);
+//    _exit(_lastStatus);
 }
 
 
@@ -497,9 +527,9 @@ int Shell::eval(QString command)
                 }
             }
             else if (match_count > 1)
-                _out << "Command prefix \"" << cmd << "\" is ambiguous." << endl;
+                _err << "Command prefix \"" << cmd << "\" is ambiguous." << endl;
             else
-                _out << "Command not recognized: " << cmd << endl;
+            	_err << "Command not recognized: " << cmd << endl;
         }
     }
 
@@ -516,6 +546,7 @@ int Shell::eval(QString command)
 
 int Shell::cmdExit(QStringList)
 {
+	debugerr("Entering " << __PRETTY_FUNCTION__);
     _finished = true;
     return 1;
 }
