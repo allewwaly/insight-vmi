@@ -3,7 +3,7 @@
 
 #include "programoptions.h"
 #include "shell.h"
-
+#include "debug.h"
 
 
 int main(int argc, char *argv[])
@@ -23,7 +23,5 @@ int main(int argc, char *argv[])
     shell->start();
     shell->wait();
 
-//    return 0;
-
-    return shell->wait(100) ? 0 : app.exec();
+    return shell->wait(100) ? shell->lastStatus() : app.exec();
 }

@@ -68,10 +68,10 @@ public:
      */
     bool interactive() const;
 
-//    /**
-//     * @return the exit code of the last executed command
-//     */
-//    int lastStatus() const;
+    /**
+     * @return the exit code of the last executed command
+     */
+    int lastStatus() const;
 
 //    /**
 //     * Terminates the shell immediately
@@ -91,7 +91,7 @@ private:
     bool _interactive;
     Memtool* _memtool;
 //    bool _finished;
-//    int _lastStatus;
+    int _lastStatus;
 
 };
 
