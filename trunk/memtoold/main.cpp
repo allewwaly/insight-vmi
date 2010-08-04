@@ -44,8 +44,12 @@ void signal_handler(int sig)
 	// Terminal interrupt
     case SIGINT:
         // Try to terminate a script
-        if (shell)
-            shell->terminateScript();
+        if (shell) {
+            if (shell->interactive())
+                shell->terminateScript();
+            else
+                shell->shutdown();
+        }
         break;
 
     // Terminal quit
@@ -54,7 +58,7 @@ void signal_handler(int sig)
     case SIGTERM:
 	    if (shell) {
 	        shell->shutdown();
-	        shell->wait();
+//	        shell->wait();
 	    }
 	    else
 	        exit(0);
@@ -69,10 +73,10 @@ void signal_handler(int sig)
 void init_signals()
 {
     // Register signal handler for interesting signals
-    signal(SIGCHLD, SIG_IGN);       // ignore child
-    signal(SIGTSTP, SIG_IGN);       // ignore tty signals
-    signal(SIGTTOU, SIG_IGN);       // ignore writes from background child processes
-    signal(SIGTTIN, SIG_IGN);       // ignore reads from background child processes
+//    signal(SIGCHLD, SIG_IGN);       // ignore child
+//    signal(SIGTSTP, SIG_IGN);       // ignore tty signals
+//    signal(SIGTTOU, SIG_IGN);       // ignore writes from background child processes
+//    signal(SIGTTIN, SIG_IGN);       // ignore reads from background child processes
     signal(SIGHUP, signal_handler);   // catch hangup signal
     signal(SIGTERM, signal_handler);  // catch kill signal
     signal(SIGINT, signal_handler);   // catch terminal interrupt
