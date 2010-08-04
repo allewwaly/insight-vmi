@@ -164,28 +164,30 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
             break;
 
         case ntInFileName: {
-            _inFileName = arg;
-            QFileInfo info(_inFileName);
+            QFileInfo info(arg);
             if (!info.exists()) {
                 std::cerr
-                    << "The file or directory \"" << _inFileName.toStdString()
+                    << "The file or directory \"" << arg.toStdString()
                     << "\" does not exist." << std::endl;
                 return false;
             }
+            _inFileName = info.absoluteFilePath();
             nextToken = ntOption;
             break;
         }
 
-        case ntMemFileName:
-            if (!QFile::exists(arg)) {
+        case ntMemFileName: {
+            QFileInfo info(arg);
+            if (!info.exists()) {
                 std::cerr
                     << "The file \"" << arg.toStdString()
                     << "\" does not exist." << std::endl;
                 return false;
             }
-            _memFileNames.append(arg);
+            _memFileNames.append(info.absoluteFilePath());
             nextToken = ntOption;
             break;
+        }
         }
     }
 
