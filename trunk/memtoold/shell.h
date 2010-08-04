@@ -126,6 +126,13 @@ public:
      */
     void shutdown();
 
+    /**
+     * Terminates any script that is currently executed, if any
+     * @return \c true if a script was executint and has been terminated,
+     * \c false otherwise
+     */
+    bool terminateScript();
+
 protected:
     /**
      * Starts the interactive shell and does not return until the user invokes
@@ -172,8 +179,12 @@ private:
     QMutex _sockSemLock;
     bool _finished;
     int _lastStatus;
+    QMutex _engineLock;
+    QScriptEngine* _engine;
 
     void cleanupPipedProcs();
+    void initScriptEngine();
+    void cleanupScriptEngine();
     int eval(QString command);
     void hline(int width = 60);
     int parseMemDumpIndex(QStringList &args);
