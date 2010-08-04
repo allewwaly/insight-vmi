@@ -210,9 +210,7 @@ int main(int argc, char* argv[])
 			log_message(QString("Memtool started with PID %1.").arg(getpid()));
 		}
 
-        debugerr("Before shell = new Shell(daemonize))");
 	    shell = new Shell(daemonize);
-	    debugerr("After shell = new Shell(daemonize))");
         KernelSymbols& sym = shell->symbols();
 
 	    // Perform any initial action that might be given
@@ -233,9 +231,7 @@ int main(int argc, char* argv[])
         // Start the interactive shell
 		shell->start();
 
-		debugerr("Before app.exec()");
 		ret = app.exec();
-		debugerr("After app.exec()");
 
 		if (daemonize)
             log_message(QString("Memtool exited with return code %1.").arg(ret));
