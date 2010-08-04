@@ -39,6 +39,11 @@ Shell* shell = 0;
 
 Shell::MemDumpArray Shell::_memDumps;
 KernelSymbols Shell::_sym;
+QFile Shell::_stdin;
+QFile Shell::_stdout;
+QFile Shell::_stderr;
+QTextStream Shell::_out;
+QTextStream Shell::_err;
 
 
 Shell::Shell(bool listenOnSocket)
@@ -142,7 +147,7 @@ void Shell::prepare()
 
         // Create and open socket
         _srvSocket = new QLocalServer();
-        _srvSocket->moveToThread(QCoreApplication::instance()->thread());
+        _srvSocket->moveToThread(QThread::currentThread());
         _srvSocket->setMaxPendingConnections(1);
         connect(_srvSocket, SIGNAL(newConnection()), SLOT(handleNewConnection()));
 
@@ -293,9 +298,6 @@ void Shell::handleNewConnection()
     QLocalSocket* sock = _srvSocket->nextPendingConnection();
     if (!sock)
         return;
-    // Move event loop to this thread
-//    debugerr("Moving to this thread");
-//    sock->moveToThread(this);
     // We only accept one connection at a time, so if we already have a socket,
     // we disconnect it immediately
     if (_clSocket && _clSocket->isOpen()) {
@@ -358,8 +360,14 @@ void Shell::pipeEndReadyReadStdOut()
     if (_pipedProcs.isEmpty())
         return;
     // Only the last process writes to stdout
-    _stdout.write(_pipedProcs.last()->readAllStandardOutput());
-    _stdout.flush();
+    QIODevice* out;
+    if (_listenOnSocket && _clSocket)
+        out = _clSocket;
+    else
+        out = &_stdout;
+
+    out->write(_pipedProcs.last()->readAllStandardOutput());
+    _stdout.flush(); // can't hurt to flush stdout
 }
 
 
@@ -380,14 +388,24 @@ void Shell::cleanupPipedProcs()
         return;
 
     // Reset the output to stdout
-    _out.setDevice(&_stdout);
+    _out.flush();
+    if (_listenOnSocket && _clSocket)
+        _out.setDevice(_clSocket);
+    else
+        _out.setDevice(&_stdout);
+
     // Close write channel and wait for process to terminate from first to last
     for (int i = 0; i < _pipedProcs.size(); ++i) {
         if (!_pipedProcs[i])
             continue;
         _pipedProcs[i]->closeWriteChannel();
         _pipedProcs[i]->waitForBytesWritten(-1);
-        _pipedProcs[i]->waitForFinished(-1);
+        while (!_pipedProcs[i]->waitForFinished(1000)) {
+            debugerr("Waiting for PID " << _pipedProcs[i]->pid()
+                     << ", current state is " << _pipedProcs[i]->state());
+            break;
+        }
+//        _pipedProcs[i]->waitForFinished(-1);
         QCoreApplication::processEvents();
         // Reset pipe and delete process
         _pipedProcs[i]->deleteLater();
@@ -448,11 +466,12 @@ int Shell::eval(QString command)
 	QStringList pipeCmds = command.split(QRegExp("\\s*\\|\\s*"), QString::KeepEmptyParts);
 	assert(_pipedProcs.isEmpty() == true);
 
-	// Setup piped processes
-	if (pipeCmds.size() > 1) {
+	// Setup piped processes if no socket connection
+	if (!_listenOnSocket && pipeCmds.size() > 1) {
         // First, create piped processes in reverse order, i.e., right to left
         for (int i = 1; i < pipeCmds.size(); ++i) {
             QProcess* proc = new QProcess();
+            proc->moveToThread(QThread::currentThread());
             // Connect with previously created process
             if (!_pipedProcs.isEmpty())
                 proc->setStandardOutputProcess(_pipedProcs.first());
@@ -1232,6 +1251,9 @@ void Shell::initScriptEngine()
     _engine = new QScriptEngine();
     _engine->setProcessEventsInterval(200);
 
+    QScriptValue printFunc = _engine->newFunction(scriptPrint);
+    _engine->globalObject().setProperty("print", printFunc);
+
     QScriptValue memDumpFunc = _engine->newFunction(scriptListMemDumps);
     _engine->globalObject().setProperty("getMemDumps", memDumpFunc);
 
@@ -1371,6 +1393,19 @@ QScriptValue Shell::scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng)
         return QScriptValue();
     else
         return InstanceClass::toScriptValue(instance, ctx, eng);
+}
+
+
+QScriptValue Shell::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
+{
+    for (int i = 0; i < ctx->argumentCount(); ++i) {
+        if (i > 0)
+            _out << " ";
+        _out << ctx->argument(i).toString();
+    }
+    _out << endl;
+
+    return eng->undefinedValue();
 }
 
 

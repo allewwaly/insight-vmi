@@ -163,11 +163,11 @@ private:
     typedef QVarLengthArray<MemoryDump*, 16> MemDumpArray;
 
     static KernelSymbols _sym;
-    QFile _stdin;
-    QFile _stdout;
-    QFile _stderr;
-    QTextStream _out;
-    QTextStream _err;
+    static QFile _stdin;
+    static QFile _stdout;
+    static QFile _stderr;
+    static QTextStream _out;
+    static QTextStream _err;
     QHash<QString, Command> _commands;
     static MemDumpArray _memDumps;
     QList<QProcess*> _pipedProcs;
@@ -194,6 +194,7 @@ private:
     static QScriptValue scriptListVariableNames(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptListVariableIds(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng);
+    static QScriptValue scriptPrint(QScriptContext* ctx, QScriptEngine* eng);
     //---------------------------------
     int cmdExit(QStringList args);
     int cmdHelp(QStringList args);
