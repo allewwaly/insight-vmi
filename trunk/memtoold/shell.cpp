@@ -125,6 +125,12 @@ Shell::Shell(bool listenOnSocket)
                 "  symbols save <ksym_file>       Alias for \"store\"\n"
                 "  symbols load <ksym_file>       Loads previously stored symbols for usage"));
 
+    prepare();
+}
+
+
+void Shell::prepare()
+{
     // Interactive shell or socket connections?
     if (_listenOnSocket) {
         QString sockFileName = QDir::home().absoluteFilePath(sock_file);
@@ -135,7 +141,8 @@ Shell::Shell(bool listenOnSocket)
                     .arg(sockFileName));
 
         // Create and open socket
-        _srvSocket = new QLocalServer(this);
+        _srvSocket = new QLocalServer();
+        _srvSocket->moveToThread(QCoreApplication::instance()->thread());
         _srvSocket->setMaxPendingConnections(1);
         connect(_srvSocket, SIGNAL(newConnection()), SLOT(handleNewConnection()));
 
@@ -257,11 +264,6 @@ QString Shell::readLine(const QString& prompt)
         if (_clSocket) {
             // Read input from socket
             ret = QString::fromLocal8Bit(_clSocket->readLine().data()).trimmed();
-            // Hold mutex while checking socket data
-            QMutexLocker lock(&_sockSemLock);
-            // If we can still read a line, count up semaphore again
-            if (_clSocket->canReadLine())
-                _sockSem.release(1);
         }
     }
     else {
@@ -320,10 +322,16 @@ void Shell::handleSockReadyRead()
     if (!_clSocket)
         return;
 
-    QMutexLocker lock(&_sockSemLock);
     // Count up semaphore if at least one line can be read
-    if (_sockSem.available() <= 0 && _clSocket->canReadLine())
-        _sockSem.release(1);
+    while (_clSocket && _clSocket->canReadLine()) {
+        {
+            QMutexLocker lock(&_sockSemLock);
+            if (_sockSem.available() <= 0)
+                _sockSem.release(1);
+        }
+        evalLine();
+    }
+
 	debugerr("Leaving " << __PRETTY_FUNCTION__);
 }
 
@@ -401,42 +409,22 @@ void Shell::run()
         cmdMemoryLoad(QStringList(programOptions.memFileNames().at(i)));
     }
 
-    // Enter command line loop
-    while (_lastStatus == 0 && !_finished) {
-    	debugerr("Before readline()");
-        line = readLine();
-    	debugerr("After readline()");
-        // Don't process that line if we got killed
-        if (_finished)
-            break;
-
-        try {
-        	debugerr("Evaluating: \"" << line.replace("\n", "\\n") << "\"");
-            _lastStatus = eval(line);
-        	debugerr("Done evaluating: \"" << line.replace("\n", "\\n") << "\"");
-            // If we are communicating over the socket, make sure all data
-            // was received before we continue
-            if (_clSocket) {
-                _out.flush();
-                _clSocket->waitForBytesWritten(-1);
-                // Close socket if this is a non-interactive session
-                if (!_interactive)
-                    _clSocket->disconnectFromServer();
-                if (_interactive)
-                	debugerr("Interactive session, continuing");
-                else
-                	debugerr("Non-interactive session, closing socket");
-            }
-        }
-        catch (GenericException e) {
-                _err
-                    << "Caught exception at " << e.file << ":" << e.line << endl
-                    << "Message: " << e.message << endl;
-        }
+    // Read input from shell or from socket?
+    if (_listenOnSocket) {
+        // Enter event loop
+        debugerr("Starting the Shell's event loop");
+        exec();
     }
+    else {
+        // Enter command line loop
+        debugerr("Entering command line loop");
+        while (_lastStatus == 0 && !_finished) {
+            evalLine();
+        }
 
-    if (_srvSocket)
-    	_srvSocket->close();
+        if (_srvSocket)
+            _srvSocket->close();
+    }
 
     QCoreApplication::exit(_lastStatus);
 //    QCoreApplication::processEvents();
@@ -448,6 +436,7 @@ void Shell::run()
 void Shell::shutdown()
 {
     _finished = true;
+    this->exit(0);
     QMutexLocker lock(&_sockSemLock);
     _sockSem.release();
 }
@@ -544,11 +533,49 @@ int Shell::eval(QString command)
 }
 
 
+int Shell::evalLine()
+{
+    debugerr("Before readline()");
+    QString line = readLine();
+    debugerr("After readline()");
+    // Don't process that line if we got killed
+    if (_finished)
+        return 1;
+
+    try {
+        debugerr("Evaluating: \"" << line.replace("\n", "\\n") << "\"");
+        _lastStatus = eval(line);
+        debugerr("Done evaluating: \"" << line.replace("\n", "\\n") << "\"");
+        // If we are communicating over the socket, make sure all data
+        // was received before we continue
+        if (_clSocket) {
+            _out.flush();
+            _clSocket->waitForBytesWritten(-1);
+            // Close socket if this is a non-interactive session
+            if (!_interactive)
+                _clSocket->close();
+            if (_interactive)
+                debugerr("Interactive session, continuing");
+            else
+                debugerr("Non-interactive session, closing socket");
+        }
+    }
+    catch (GenericException e) {
+            _err
+                << "Caught exception at " << e.file << ":" << e.line << endl
+                << "Message: " << e.message << endl;
+    }
+    return _lastStatus;
+}
+
+
 int Shell::cmdExit(QStringList)
 {
 	debugerr("Entering " << __PRETTY_FUNCTION__);
     _finished = true;
-    return 1;
+    // End event loop
+    this->exit(0);
+    return 0;
 }
 
 
