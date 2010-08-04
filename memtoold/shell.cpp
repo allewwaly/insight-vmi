@@ -43,7 +43,7 @@ KernelSymbols Shell::_sym;
 
 Shell::Shell(bool listenOnSocket)
     : _listenOnSocket(listenOnSocket), _interactive(!listenOnSocket),
-      _clSocket(0), _srvSocket(0)
+      _clSocket(0), _srvSocket(0), _engine(0)
 {
 	qRegisterMetaType<QAbstractSocket::SocketState>();
 	qRegisterMetaType<QAbstractSocket::SocketError>();
@@ -275,7 +275,7 @@ QString Shell::readLine(const QString& prompt)
         }
 
         // Add the line to the history in interactive sessions
-        if (_listenOnSocket && strlen(line) > 0)
+        if (strlen(line) > 0)
             add_history(line);
 
         ret = QString::fromLocal8Bit(line, strlen(line)).trimmed();
@@ -1163,41 +1163,85 @@ int Shell::cmdScript(QStringList args)
     file.close();
 
     // Prepare the script engine
-    QScriptEngine engine;
-    QScriptValue memDumpFunc = engine.newFunction(scriptListMemDumps);
-    engine.globalObject().setProperty("getMemDumps", memDumpFunc);
+    initScriptEngine();
 
-    QScriptValue getVarNamesFunc = engine.newFunction(scriptListVariableNames);
-    engine.globalObject().setProperty("getVariableNames", getVarNamesFunc);
+    try {
+        // Execute the script
+        QScriptValue ret = _engine->evaluate(scriptCode, fileName);
 
-    QScriptValue getVarIdsFunc = engine.newFunction(scriptListVariableIds);
-    engine.globalObject().setProperty("getVariableIds", getVarIdsFunc);
-
-    QScriptValue getInstanceFunc = engine.newFunction(scriptGetInstance, 2);
-    engine.globalObject().setProperty("getInstance", getInstanceFunc);
-
-    InstanceClass* instClass = new InstanceClass(&engine);
-    engine.globalObject().setProperty("Instance", instClass->constructor());
-
-    // Execute the script
-    QScriptValue ret = engine.evaluate(scriptCode, fileName);
-
-    if (ret.isError()) {
-        if (engine.hasUncaughtException()) {
-        	_err << "Exception occured on " << fileName << ":"
-        			<< engine.uncaughtExceptionLineNumber() << ": " << endl
-        			<< engine.uncaughtException().toString() << endl;
-        	QStringList bt = engine.uncaughtExceptionBacktrace();
-        	for (int i = 0; i < bt.size(); ++i)
-        		_err << "    " << bt[i] << endl;
+        if (ret.isError()) {
+            if (_engine->hasUncaughtException()) {
+                _err << "Exception occured on " << fileName << ":"
+                        << _engine->uncaughtExceptionLineNumber() << ": " << endl
+                        << _engine->uncaughtException().toString() << endl;
+                QStringList bt = _engine->uncaughtExceptionBacktrace();
+                for (int i = 0; i < bt.size(); ++i)
+                    _err << "    " << bt[i] << endl;
+            }
+            else
+                _err << ret.toString() << endl;
         }
-        else
-        	_err << ret.toString() << endl;
+        else if (!ret.isUndefined())
+            _out << ret.toString() << endl;
+
+        cleanupScriptEngine();
     }
-    else if (!ret.isUndefined())
-        _out << ret.toString() << endl;
+    catch(...) {
+        cleanupScriptEngine();
+        throw;
+    }
 
     return 0;
+}
+
+
+void Shell::initScriptEngine()
+{
+    // Hold the engine lock before testing and using the _engine pointer
+    QMutexLocker lock(&_engineLock);
+    if (_engine)
+        delete _engine;
+    // Prepare the script engine
+    _engine = new QScriptEngine();
+    _engine->setProcessEventsInterval(200);
+
+    QScriptValue memDumpFunc = _engine->newFunction(scriptListMemDumps);
+    _engine->globalObject().setProperty("getMemDumps", memDumpFunc);
+
+    QScriptValue getVarNamesFunc = _engine->newFunction(scriptListVariableNames);
+    _engine->globalObject().setProperty("getVariableNames", getVarNamesFunc);
+
+    QScriptValue getVarIdsFunc = _engine->newFunction(scriptListVariableIds);
+    _engine->globalObject().setProperty("getVariableIds", getVarIdsFunc);
+
+    QScriptValue getInstanceFunc = _engine->newFunction(scriptGetInstance, 2);
+    _engine->globalObject().setProperty("getInstance", getInstanceFunc);
+
+    InstanceClass* instClass = new InstanceClass(_engine);
+    _engine->globalObject().setProperty("Instance", instClass->constructor());
+}
+
+
+void Shell::cleanupScriptEngine()
+{
+    // Hold the engine lock before testing and using the _engine pointer
+    QMutexLocker lock(&_engineLock);
+    if (_engine) {
+        delete _engine;
+        _engine = 0;
+    }
+}
+
+
+bool Shell::terminateScript()
+{
+    // Hold the engine lock before testing and using the _engine pointer
+    QMutexLocker lock(&_engineLock);
+    if (_engine && _engine->isEvaluating()) {
+        _engine->abortEvaluation();
+        return true;
+    }
+    return false;
 }
 
 

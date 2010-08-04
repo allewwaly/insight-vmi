@@ -41,13 +41,42 @@ void signal_handler(int sig)
 	case SIGHUP:
 		break;
 
-	case SIGTERM:
+	// Terminal interrupt
+    case SIGINT:
+        // Try to terminate a script
+        if (shell)
+            shell->terminateScript();
+        break;
+
+    // Terminal quit
+    case SIGQUIT:
+    // Termination
+    case SIGTERM:
 	    if (shell) {
 	        shell->shutdown();
 	        shell->wait();
 	    }
+	    else
+	        exit(0);
 		break;
 	}
+}
+
+
+/**
+ * Registers signal handlers
+ */
+void init_signals()
+{
+    // Register signal handler for interesting signals
+    signal(SIGCHLD, SIG_IGN);       // ignore child
+    signal(SIGTSTP, SIG_IGN);       // ignore tty signals
+    signal(SIGTTOU, SIG_IGN);       // ignore writes from background child processes
+    signal(SIGTTIN, SIG_IGN);       // ignore reads from background child processes
+    signal(SIGHUP, signal_handler);   // catch hangup signal
+    signal(SIGTERM, signal_handler);  // catch kill signal
+    signal(SIGINT, signal_handler);   // catch terminal interrupt
+    signal(SIGQUIT, signal_handler);  // catch terminal quit
 }
 
 
@@ -63,25 +92,29 @@ void init_daemon()
 		fprintf(stderr, "This process already is a child of \"init\".\n");
 		return;
 	}
-	// Create a new process
-	pid_t pid = fork();
-	if (pid < 0) {
-		fprintf(stderr, "Cannot fork this process (error no. %d), aborting.\n",
-				errno);
-		exit(1);
-	}
-	// Parent receives child's PID and exits
-	if (pid > 0)
-		exit(0);
 
-	// Child continues as daemon
+    // Spawn a background process, if required
+	if (! (programOptions.activeOptions() & opForeground) ) {
+        // Create a new process
+        pid_t pid = fork();
+        if (pid < 0) {
+            fprintf(stderr, "Cannot fork this process (error no. %d), aborting.\n",
+                    errno);
+            exit(1);
+        }
+        // Parent receives child's PID and exits
+        if (pid > 0)
+            exit(0);
 
-	// Create a new session with this process as process group leader
-	pid_t sid = setsid();
-	if (sid < 0) {
-		fprintf(stderr, "Cannot create a new session (error no. %d), "
-				"aborting.\n", errno);
-		exit(2);
+        // Child continues as daemon
+
+        // Create a new session with this process as process group leader
+        pid_t sid = setsid();
+        if (sid < 0) {
+            fprintf(stderr, "Cannot create a new session (error no. %d), "
+                    "aborting.\n", errno);
+            exit(2);
+        }
 	}
 
 	// Set permissions for newly created files
@@ -129,26 +162,21 @@ void init_daemon()
 	QByteArray myPid = QString("%1\n").arg(getpid()).toLocal8Bit();
 	write(lock_fd, myPid.data(), myPid.size());
 
-	// Register signal handler for interesting signals
-	signal(SIGCHLD, SIG_IGN);       // ignore child
-	signal(SIGTSTP, SIG_IGN); 		// ignore tty signals
-	signal(SIGTTOU, SIG_IGN);
-	signal(SIGTTIN, SIG_IGN);
-	signal(SIGHUP, signal_handler);  // catch hangup signal
-	signal(SIGTERM, signal_handler); // catch kill signal
+	// Detach background daemon from stdin, stdout and stderr
+    if (! (programOptions.activeOptions() & opForeground) ) {
+        // Close all file descriptors that the parent might have previously opened,
+        // including stdin, stdout, and stderr, but exclude lock_fd
+        for (int i = getdtablesize(); i >= 0; --i)
+            if (i != lock_fd)
+                close(i);
 
-	// Close all file descriptors that the parent might have previously opened,
-	// including stdin, stdout, and stderr, but exclude lock_fd
-	for (int i = getdtablesize(); i >= 0; --i)
-		if (i != lock_fd)
-		    close(i);
-
-	// Use /dev/null for stdin and, stdout
-	int fd = open("/dev/null", O_RDWR);
-	dup(fd);
-	// Use log file for stderr
-	QByteArray logFile = home.absoluteFilePath(log_file).toLocal8Bit();
-	open(logFile.data(), O_CREAT|O_APPEND|O_WRONLY, 0640);
+        // Use /dev/null for stdin and, stdout
+        int fd = open("/dev/null", O_RDWR);
+        dup(fd);
+        // Use log file for stderr
+        QByteArray logFile = home.absoluteFilePath(log_file).toLocal8Bit();
+        open(logFile.data(), O_CREAT|O_APPEND|O_WRONLY, 0640);
+    }
 }
 
 
@@ -170,6 +198,8 @@ int main(int argc, char* argv[])
     bool daemonize = (programOptions.activeOptions() & opDaemonize);
 
 	try {
+	    init_signals();
+
 		if (daemonize) {
 			init_daemon();
 		    // Start a new logging session
@@ -219,13 +249,14 @@ int main(int argc, char* argv[])
 	    return 1;
 	}
 
-//	// Wait for the shell to exit
-//	if (shell) {
-//		while(!shell->isFinished()){
-//		 	shell->quit();
-//		}
-//		delete shell;
-//	}
+	// Wait for the shell to exit
+	if (shell) {
+		while (!shell->isFinished()) {
+		 	shell->quit();
+		 	QCoreApplication::processEvents();
+		}
+		delete shell;
+	}
     return ret;
 }
 
