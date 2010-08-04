@@ -22,7 +22,8 @@ enum Action {
 /// Options that can be set from the command line
 enum Options {
 	opNone            = 0,
-	opDaemonize       = (1 << 0)
+	opDaemonize       = (1 << 0),
+	opForeground      = (1 << 1)
 };
 
 /// The expected next token when parsing the command line arguments
