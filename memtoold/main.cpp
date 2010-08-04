@@ -206,8 +206,9 @@ int main(int argc, char* argv[])
 			log_message(QString("Memtool started with PID %1.").arg(getpid()));
 		}
 
+        debugerr("Before shell = new Shell(daemonize))");
 	    shell = new Shell(daemonize);
-	    debugerr("Before app.exec()");
+	    debugerr("After shell = new Shell(daemonize))");
         KernelSymbols& sym = shell->symbols();
 
 	    // Perform any initial action that might be given

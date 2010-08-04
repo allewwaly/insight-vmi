@@ -182,10 +182,12 @@ private:
     QMutex _engineLock;
     QScriptEngine* _engine;
 
+    void prepare();
     void cleanupPipedProcs();
     void initScriptEngine();
     void cleanupScriptEngine();
     int eval(QString command);
+    int evalLine();
     void hline(int width = 60);
     int parseMemDumpIndex(QStringList &args);
     static QScriptValue scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng);
