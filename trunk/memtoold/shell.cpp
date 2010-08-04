@@ -262,9 +262,7 @@ QString Shell::readLine(const QString& prompt)
         if (_interactive)
             _out << p << flush;
         // Wait until a complete line is readable
-    	debugerr("Before _sockSem.acquire(1)");
         _sockSem.acquire(1);
-    	debugerr("After _sockSem.acquire(1)");
         // The socket my still be null if we received a kill signal
         if (_clSocket) {
             // Read input from socket
@@ -320,7 +318,6 @@ void Shell::handleNewConnection()
 
 void Shell::handleSockReadyRead()
 {
-	debugerr("Entering " << __PRETTY_FUNCTION__);
     if (!_clSocket)
         return;
 
@@ -333,8 +330,6 @@ void Shell::handleSockReadyRead()
         }
         evalLine();
     }
-
-	debugerr("Leaving " << __PRETTY_FUNCTION__);
 }
 
 
@@ -400,12 +395,7 @@ void Shell::cleanupPipedProcs()
             continue;
         _pipedProcs[i]->closeWriteChannel();
         _pipedProcs[i]->waitForBytesWritten(-1);
-        while (!_pipedProcs[i]->waitForFinished(1000)) {
-            debugerr("Waiting for PID " << _pipedProcs[i]->pid()
-                     << ", current state is " << _pipedProcs[i]->state());
-            break;
-        }
-//        _pipedProcs[i]->waitForFinished(-1);
+        _pipedProcs[i]->waitForFinished(-1);
         QCoreApplication::processEvents();
         // Reset pipe and delete process
         _pipedProcs[i]->deleteLater();
@@ -430,24 +420,18 @@ void Shell::run()
     // Read input from shell or from socket?
     if (_listenOnSocket) {
         // Enter event loop
-        debugerr("Starting the Shell's event loop");
         exec();
     }
     else {
         // Enter command line loop
-        debugerr("Entering command line loop");
-        while (_lastStatus == 0 && !_finished) {
+        while (_lastStatus == 0 && !_finished)
             evalLine();
-        }
 
         if (_srvSocket)
             _srvSocket->close();
     }
 
     QCoreApplication::exit(_lastStatus);
-//    QCoreApplication::processEvents();
-    debugerr("Leaving " << __PRETTY_FUNCTION__);
-//    _exit(_lastStatus);
 }
 
 
@@ -554,17 +538,13 @@ int Shell::eval(QString command)
 
 int Shell::evalLine()
 {
-    debugerr("Before readline()");
     QString line = readLine();
-    debugerr("After readline()");
     // Don't process that line if we got killed
     if (_finished)
         return 1;
 
     try {
-        debugerr("Evaluating: \"" << line.replace("\n", "\\n") << "\"");
         _lastStatus = eval(line);
-        debugerr("Done evaluating: \"" << line.replace("\n", "\\n") << "\"");
         // If we are communicating over the socket, make sure all data
         // was received before we continue
         if (_clSocket) {
@@ -573,10 +553,6 @@ int Shell::evalLine()
             // Close socket if this is a non-interactive session
             if (!_interactive)
                 _clSocket->close();
-            if (_interactive)
-                debugerr("Interactive session, continuing");
-            else
-                debugerr("Non-interactive session, closing socket");
         }
     }
     catch (GenericException e) {
@@ -590,7 +566,6 @@ int Shell::evalLine()
 
 int Shell::cmdExit(QStringList)
 {
-	debugerr("Entering " << __PRETTY_FUNCTION__);
     _finished = true;
     // End event loop
     this->exit(0);
