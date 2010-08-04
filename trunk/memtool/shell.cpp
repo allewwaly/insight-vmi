@@ -26,7 +26,7 @@ Shell* shell = 0;
 
 
 Shell::Shell(bool interactive, QObject* parent)
-    : QThread(parent), _interactive(interactive), _memtool(0)
+    : QThread(parent), _interactive(interactive), _memtool(0), _lastStatus(0)
 {
     // Open the console devices
     _stdin.open(stdin, QIODevice::ReadOnly);
@@ -88,10 +88,11 @@ bool Shell::interactive() const
 }
 
 
-//int Shell::lastStatus() const
-//{
-//    return _lastStatus;
-//}
+int Shell::lastStatus() const
+{
+    return _lastStatus;
+}
+
 
 QString Shell::readLine(const QString& prompt)
 {
@@ -137,6 +138,7 @@ bool Shell::questionYesNo(const QString& question)
 void Shell::run()
 {
     QString output;
+    _lastStatus = 0;
 
     try {
         switch (programOptions.action()) {
@@ -149,8 +151,10 @@ void Shell::run()
                 _out << "Memtool daemon already running." << endl;
             else if (_memtool->start())
                 _out << "Memtool daemon successfully started." << endl;
-            else
+            else {
                 _err << "Error starting memtool daemon." << endl;
+                _lastStatus = 1;
+            }
             break;
 
         case acDaemonStop:
@@ -158,8 +162,10 @@ void Shell::run()
                 _out << "Memtool daemon is not running." << endl;
             else if (_memtool->stop())
                 _out << "Memtool daemon successfully stopped." << endl;
-            else
+            else {
                 _err << "Error stopping memtool daemon." << endl;
+                _lastStatus = 2;
+            }
             break;
 
         case acDaemonStatus:
@@ -173,7 +179,7 @@ void Shell::run()
             QString fileName = QDir().absoluteFilePath(programOptions.fileName());
             if (!QFile::exists(fileName)) {
                 _err << "File not found: \"" << fileName << "\"" << endl;
-                QCoreApplication::exit(1);
+                _lastStatus = 3;
             }
             output = _memtool->eval("symbols load " + fileName);
             break;
@@ -193,11 +199,11 @@ void Shell::run()
             QFileInfo dir(dirName);
             if (!dir.exists()) {
                 _err << "Directory not found : \"" << dirName << "\"" << endl;
-                QCoreApplication::exit(1);
+                _lastStatus = 4;
             }
             else if (!dir.isDir()) {
                 _err << "Not a directory: \"" << dirName << "\"" << endl;
-                QCoreApplication::exit(1);
+                _lastStatus = 5;
             }
             else
                 output = _memtool->eval("symbols parse " + dirName);
@@ -212,12 +218,14 @@ void Shell::run()
     catch (MemtoolException e) {
         _err << "Caught exception at " << e.file << ":" << e.line << ":" << endl
             << e.message << endl;
-        QCoreApplication::exit(2);
+        _lastStatus = 6;
     }
 
     // Write out any available output
     if (!output.isEmpty())
         _out << output << endl;
+
+    QCoreApplication::exit(_lastStatus);
 }
 
 
