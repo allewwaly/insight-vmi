@@ -13,7 +13,7 @@
 
 ProgramOptions programOptions;
 
-const int OPTION_COUNT = 5;
+const int OPTION_COUNT = 6;
 
 const struct Option options[OPTION_COUNT] = {
         {
@@ -22,6 +22,15 @@ const struct Option options[OPTION_COUNT] = {
                 "Start as a background process and detach console",
                 acNone,
                 opDaemonize,
+                ntOption,
+                0 // conflicting options
+        },
+        {
+                "-f",
+                "--foreground",
+                "Start as daemon but don't detach console",
+                acNone,
+                opForeground,
                 ntOption,
                 0 // conflicting options
         },
@@ -179,6 +188,10 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
             break;
         }
     }
+
+    // The foreground option always implies the daemonize option
+    if (_activeOptions & opForeground)
+        _activeOptions |= opDaemonize;
 
     return true;
 }
