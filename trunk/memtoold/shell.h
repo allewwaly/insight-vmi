@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QHash>
 #include <QStringList>
+#include <QDataStream>
 #include <QTextStream>
 #include <QThread>
 #include <QVarLengthArray>
@@ -54,6 +55,8 @@ class Shell: public QThread
         QString helpShort;
         /// Long help text for this command
         QString helpLong;
+        /// Exclude this command in the online help
+        bool exclude;
 
         /**
          * Constructor
@@ -63,8 +66,10 @@ class Shell: public QThread
          */
         Command(ShellCallback callback = 0,
                 const QString& helpShort = QString(),
-                const QString& helpLong = QString())
-            : callback(callback), helpShort(helpShort), helpLong(helpLong)
+                const QString& helpLong = QString(),
+                bool exclude = false)
+            : callback(callback), helpShort(helpShort), helpLong(helpLong),
+              exclude(exclude)
         {}
     };
 
@@ -168,6 +173,7 @@ private:
     static QFile _stderr;
     static QTextStream _out;
     static QTextStream _err;
+    static QDataStream _binout;
     QHash<QString, Command> _commands;
     static MemDumpArray _memDumps;
     QList<QProcess*> _pipedProcs;
@@ -219,6 +225,9 @@ private:
     int cmdSymbolsParse(QStringList args);
     int cmdSymbolsLoad(QStringList args);
     int cmdSymbolsStore(QStringList args);
+    int cmdBinary(QStringList args);
+    int cmdBinaryMemDumpList(QStringList args);
+    int cmdBinaryInstance(QStringList args);
 };
 
 /// Globally accessible shell object

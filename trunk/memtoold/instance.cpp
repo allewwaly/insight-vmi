@@ -458,6 +458,7 @@ QString Instance::toString() const
 	return _isNull ? QString("NULL") : _type->toString(_vmem, _address);
 }
 
+
 int Instance::pointerSize() const
 {
     return _vmem ? _vmem->memSpecs().sizeofUnsignedLong : 8;
