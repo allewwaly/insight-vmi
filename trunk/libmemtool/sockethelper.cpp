@@ -7,7 +7,7 @@
 
 #include "sockethelper.h"
 #include <QLocalSocket>
-
+#include "debug.h"
 
 SocketHelper::SocketHelper(QLocalSocket* socket, QObject* parent)
     : QObject(parent), _socket(socket)
@@ -32,6 +32,12 @@ QByteArray& SocketHelper::data()
 
 void SocketHelper::handleReadyRead()
 {
-    _data += _socket->readAll();
+    QByteArray buf = _socket->readAll();
+    _data += buf;
+//    for (int i = 0; i < buf.size(); ++i)
+//        if ( (buf[i] & 0x80) || !(buf[i] & 0x60) )
+//            buf[i] = '.';
+
+//    debugmsg("Received " << buf.size() << " byte:\n" << QString::fromAscii(buf));
 }
 

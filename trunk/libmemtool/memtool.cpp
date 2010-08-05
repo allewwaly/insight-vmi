@@ -9,12 +9,21 @@
 #include <QDir>
 #include <QProcess>
 #include <QThread>
+#include <QDataStream>
 #include <QCoreApplication>
 #include <memtool/constdefs.h>
 #include <memtool/memtool.h>
 #include <memtool/memtoolexception.h>
 #include "sockethelper.h"
 #include "debug.h"
+
+const char* connect_fail_msg = "Could not connect to memtool daemon";
+
+#define connectOrFail() \
+    do { \
+        if (!connect()) \
+            memtoolError(connect_fail_msg);\
+    } while (0)
 
 
 Memtool::Memtool(QObject* parent)
@@ -38,40 +47,9 @@ Memtool::~Memtool()
 }
 
 
-bool Memtool::isRunning()
-{
-    return connect();
-}
-
-
-bool Memtool::start()
-{
-    if (isRunning())
-        return true;
-
-    QString cmd = "memtoold";
-    QStringList args("--daemon");
-
-    QProcess proc;
-    proc.start(cmd, args);
-    proc.waitForFinished(-1);
-
-    return proc.exitCode() == 0 && proc.error() == QProcess::UnknownError;
-}
-
-
-bool Memtool::stop()
-{
-    if (isRunning())
-        eval("exit");
-
-    return true;
-}
-
-
 bool Memtool::connect()
 {
-    QString sockFileName = QDir::home().absoluteFilePath(sock_file);
+    QString sockFileName = QDir::home().absoluteFilePath(mt_sock_file);
     if (!QFile::exists(sockFileName))
         return false;
 
@@ -86,17 +64,84 @@ bool Memtool::connect()
 }
 
 
-QString Memtool::eval(const QString& cmd)
+QByteArray Memtool::binEval(const QString& cmd)
 {
-    if (!connect())
-        memtoolError("Could not connect to memtool daemon");
+    connectOrFail();
 
     _helper->reset();
     QString realCmd = cmd.trimmed() + "\n";
     // Execute the command and wait for the socket to be closed
     _socket->write(realCmd.toLocal8Bit());
     _socket->waitForDisconnected(-1);
-    return QString::fromLocal8Bit(_helper->data().data());
+    return _helper->data();
 }
 
+
+QString Memtool::eval(const QString& cmd)
+{
+    return QString::fromLocal8Bit(binEval(cmd));
+}
+
+
+bool Memtool::isDaemonRunning()
+{
+    return connect();
+}
+
+
+bool Memtool::daemonStart()
+{
+    if (isDaemonRunning())
+        return true;
+
+    QString cmd = "memtoold";
+    QStringList args("--daemon");
+
+    QProcess proc;
+    proc.start(cmd, args);
+    proc.waitForFinished(-1);
+
+    return proc.exitCode() == 0 && proc.error() == QProcess::UnknownError;
+}
+
+
+bool Memtool::daemonStop()
+{
+    if (isDaemonRunning())
+        eval("exit");
+
+    return true;
+}
+
+
+QStringList Memtool::memDumpList()
+{
+    connectOrFail();
+    QByteArray ba = binEval(QString("binary %1").arg((int)bdMemDumpList));
+    QStringList ret;
+    QDataStream in(ba);
+    in >> ret;
+    return ret;
+}
+
+
+bool Memtool::memDumpLoad(const QString& fileName)
+{
+    connectOrFail();
+    QString ret = eval(QString("memory load %1").arg(fileName));
+    return !ret.isEmpty();
+}
+
+
+bool Memtool::memDumpUnload(const QString& fileName)
+{
+    connectOrFail();
+    QString ret = eval(QString("memory unload %1").arg(fileName));
+    return !ret.isEmpty();
+}
+
+bool Memtool::memDumpUnload(int index)
+{
+    return memDumpUnload(QString::number(index));
+}
 
