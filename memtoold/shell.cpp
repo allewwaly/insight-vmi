@@ -44,6 +44,7 @@ QFile Shell::_stdout;
 QFile Shell::_stderr;
 QTextStream Shell::_out;
 QTextStream Shell::_err;
+QDataStream Shell::_binout;
 
 
 Shell::Shell(bool listenOnSocket)
@@ -130,6 +131,13 @@ Shell::Shell(bool listenOnSocket)
                 "  symbols save <ksym_file>       Alias for \"store\"\n"
                 "  symbols load <ksym_file>       Loads previously stored symbols for usage"));
 
+    _commands.insert("binary",
+            Command(
+                &Shell::cmdBinary,
+                "Allows to retrieve binary data through a socket connection",
+                "This command is only meant for communication between the "
+                "memtool daemon and the frontend application."));
+
     prepare();
 }
 
@@ -138,7 +146,7 @@ void Shell::prepare()
 {
     // Interactive shell or socket connections?
     if (_listenOnSocket) {
-        QString sockFileName = QDir::home().absoluteFilePath(sock_file);
+        QString sockFileName = QDir::home().absoluteFilePath(mt_sock_file);
         QFile sockFile(sockFileName);
         // Delete stale socket file, if it exists
         if (sockFile.exists() && !sockFile.remove())
@@ -160,7 +168,7 @@ void Shell::prepare()
         using_history();
 
         // Load the readline history
-        QString histFile = QDir::home().absoluteFilePath(history_file);
+        QString histFile = QDir::home().absoluteFilePath(mt_history_file);
         if (QFile::exists(histFile)) {
             int ret = read_history(histFile.toLocal8Bit().constData());
             if (ret)
@@ -184,7 +192,7 @@ void Shell::prepare()
 Shell::~Shell()
 {
 	// Construct the path name of the history file
-	QStringList pathList = QString(history_file).split("/", QString::SkipEmptyParts);
+	QStringList pathList = QString(mt_history_file).split("/", QString::SkipEmptyParts);
     QString file = pathList.last();
     pathList.pop_back();
     QString path = pathList.join("/");
@@ -197,7 +205,7 @@ Shell::~Shell()
         // Only save history for interactive sessions
         if (!_listenOnSocket) {
             // Save the history for the next launch
-            QString histFile = QDir::home().absoluteFilePath(history_file);
+            QString histFile = QDir::home().absoluteFilePath(mt_history_file);
             QByteArray ba = histFile.toLocal8Bit();
             int ret = write_history(ba.constData());
             if (ret)
@@ -312,6 +320,7 @@ void Shell::handleNewConnection()
         connect(_clSocket, SIGNAL(disconnected()), SLOT(handleSockDisconnected()));
         // Use the socket as output device
         _out.setDevice(_clSocket);
+        _binout.setDevice(_clSocket);
     }
 }
 
@@ -339,6 +348,7 @@ void Shell::handleSockDisconnected()
         // Reset the output device
         _out.setDevice(&_stdout);
         _out.flush();
+        _binout.setDevice(0);
         // Delete the socket
         _clSocket->deleteLater();
         _clSocket = 0;
@@ -384,10 +394,14 @@ void Shell::cleanupPipedProcs()
 
     // Reset the output to stdout
     _out.flush();
-    if (_listenOnSocket && _clSocket)
+    if (_listenOnSocket && _clSocket) {
         _out.setDevice(_clSocket);
-    else
+        _binout.setDevice(_clSocket);
+    }
+    else {
         _out.setDevice(&_stdout);
+        _binout.setDevice(0);
+    }
 
     // Close write channel and wait for process to terminate from first to last
     for (int i = 0; i < _pipedProcs.size(); ++i) {
@@ -424,7 +438,7 @@ void Shell::run()
     }
     else {
         // Enter command line loop
-        while (_lastStatus == 0 && !_finished)
+        while (!_finished)
             evalLine();
 
         if (_srvSocket)
@@ -465,6 +479,7 @@ int Shell::eval(QString command)
         }
         // Next, connect the stdout to the pipe
         _out.setDevice(_pipedProcs.first());
+        _binout.setDevice(_pipedProcs.first());
         connect(_pipedProcs.last(),
                 SIGNAL(readyReadStandardOutput()),
                 SLOT(pipeEndReadyReadStdOut()));
@@ -651,7 +666,8 @@ int Shell::cmdList(QStringList args)
         }
     }
 
-    return cmdHelp(QStringList("list"));
+    cmdHelp(QStringList("list"));
+    return 1;
 }
 
 
@@ -987,10 +1003,10 @@ int Shell::cmdMemory(QStringList args)
     else if (QString("dump").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryDump(args);
     }
-    else
-        return cmdHelp(QStringList("memory"));
-
-    return 0;
+    else {
+        cmdHelp(QStringList("memory"));
+        return 1;
+    }
 }
 
 
@@ -1026,7 +1042,7 @@ int Shell::cmdMemoryLoad(QStringList args)
     // Check argument size
     if (args.size() != 1) {
         _err << "No file name given." << endl;
-        return 0;
+        return 1;
     }
     QString fileName = args[0];
 
@@ -1034,7 +1050,7 @@ int Shell::cmdMemoryLoad(QStringList args)
     QFile file(fileName);
     if (!file.exists()) {
         _err << "File not found: " << fileName << endl;
-        return 0;
+        return 2;
     }
 
     // Find an unused index and check if the file is already loaded
@@ -1067,7 +1083,7 @@ int Shell::cmdMemoryUnload(QStringList args)
     // Check argument size
     if (args.size() != 1) {
         _err << "No file name or index given." << endl;
-        return 0;
+        return 1;
     }
 
     QString fileName;
@@ -1093,9 +1109,10 @@ int Shell::cmdMemoryUnload(QStringList args)
         delete _memDumps[index];
         _memDumps[index] = 0;
         _out << "Unloaded [" << index << "] " << fileName << endl;
+        return 0;
     }
 
-    return 0;
+    return 2;
 }
 
 
@@ -1120,10 +1137,12 @@ int Shell::cmdMemorySpecs(QStringList args)
     // See if we got an index to a specific memory dump
     int index = parseMemDumpIndex(args);
     // Output the specs
-    if (index >= 0)
+    if (index >= 0) {
         _out << _memDumps[index]->memSpecs().toString() << endl;
+        return 0;
+    }
 
-    return 0;
+    return 1;
 }
 
 
@@ -1132,10 +1151,11 @@ int Shell::cmdMemoryQuery(QStringList args)
     // Get the memory dump index to use
     int index = parseMemDumpIndex(args);
     // Perform the query
-    if (index >= 0)
+    if (index >= 0) {
         _out << _memDumps[index]->query(args.join(" ")) << endl;
-
-    return 0;
+        return 0;
+    }
+    return 1;
 }
 
 
@@ -1149,35 +1169,38 @@ int Shell::cmdMemoryDump(QStringList args)
 
         if (!re.exactMatch(args.join(" "))) {
             _err << "Usage: memory dump [index] <char|int|long> @ <address>" << endl;
-            return 0;
+            return 1;
         }
 
         bool ok;
         quint64 addr = re.cap(2).toULong(&ok, 16);
         _out << _memDumps[index]->dump(re.cap(1), addr) << endl;
+        return 0;
     }
 
-    return 0;
+    return 2;
 }
 
 
 int Shell::cmdScript(QStringList args)
 {
-    if (args.size() != 1)
-        return cmdHelp(QStringList("script"));
+    if (args.size() != 1) {
+        cmdHelp(QStringList("script"));
+        return 1;
+    }
 
     QString fileName = args[0];
 
     QFile file(fileName);
     if (!file.exists()) {
         _err << "File not found: " << fileName << endl;
-        return 0;
+        return 2;
     }
 
     // Try to read in the whole file
     if (!file.open(QIODevice::ReadOnly)) {
         _err << "Cannot open file \"" << fileName << "\" for reading." << endl;
-        return 0;
+        return 3;
     }
     QTextStream stream(&file);
     QString scriptCode(stream.readAll());
@@ -1185,12 +1208,13 @@ int Shell::cmdScript(QStringList args)
 
     // Prepare the script engine
     initScriptEngine();
+    int ret = 0;
 
     try {
         // Execute the script
-        QScriptValue ret = _engine->evaluate(scriptCode, fileName);
+        QScriptValue result = _engine->evaluate(scriptCode, fileName);
 
-        if (ret.isError()) {
+        if (result.isError()) {
             if (_engine->hasUncaughtException()) {
                 _err << "Exception occured on " << fileName << ":"
                         << _engine->uncaughtExceptionLineNumber() << ": " << endl
@@ -1200,10 +1224,11 @@ int Shell::cmdScript(QStringList args)
                     _err << "    " << bt[i] << endl;
             }
             else
-                _err << ret.toString() << endl;
+                _err << result.toString() << endl;
+            ret = 4;
         }
-        else if (!ret.isUndefined())
-            _out << ret.toString() << endl;
+        else if (!result.isUndefined())
+            _out << result.toString() << endl;
 
         cleanupScriptEngine();
     }
@@ -1212,7 +1237,7 @@ int Shell::cmdScript(QStringList args)
         throw;
     }
 
-    return 0;
+    return ret;
 }
 
 
@@ -1387,8 +1412,10 @@ QScriptValue Shell::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
 int Shell::cmdShow(QStringList args)
 {
     // Show cmdHelp, of no argument is given
-    if (args.isEmpty())
-    	return cmdHelp(QStringList("show"));
+    if (args.isEmpty()) {
+    	cmdHelp(QStringList("show"));
+    	return 1;
+    }
 
     QString s = args.front();
 
@@ -1433,7 +1460,7 @@ int Shell::cmdShow(QStringList args)
     // If we came here, we were not successful
 	_out << "No type or variable by name or ID \"" << s << "\" found." << endl;
 
-	return 0;
+	return 2;
 }
 
 
@@ -1524,7 +1551,6 @@ int Shell::cmdShowVariable(const Variable* v)
 		_out << "  Type:           " << QString("(unresolved)") << endl;
 	}
 
-
 	return 0;
 }
 
@@ -1532,23 +1558,25 @@ int Shell::cmdShowVariable(const Variable* v)
 int Shell::cmdSymbols(QStringList args)
 {
     // Show cmdHelp, of an invalid number of arguments is given
-    if (args.size() < 2)
-        return cmdHelp(QStringList("symbols"));
+    if (args.size() < 2) {
+        cmdHelp(QStringList("symbols"));
+        return 1;
+    }
 
     QString action = args[0].toLower();
     args.pop_front();
 
     // Perform the action
     if (QString("parse").startsWith(action))
-        cmdSymbolsParse(args);
+        return cmdSymbolsParse(args);
     else if (QString("store").startsWith(action) || QString("save").startsWith(action))
-        cmdSymbolsStore(args);
+        return cmdSymbolsStore(args);
     else if (QString("load").startsWith(action))
-        cmdSymbolsLoad(args);
-    else
-        return cmdHelp(QStringList("symbols"));
-
-    return 0;
+        return cmdSymbolsLoad(args);
+    else {
+        cmdHelp(QStringList("symbols"));
+        return 2;
+    }
 }
 
 
@@ -1570,22 +1598,24 @@ int Shell::cmdSymbolsParse(QStringList args)
     	sysmap = args[1];
     	kernelSrc = args[2];
     }
-    else
+    else {
         // Show cmdHelp, of an invalid number of arguments is given
-    	return cmdHelp(QStringList("symbols"));
+    	cmdHelp(QStringList("symbols"));
+    	return 1;
+    }
 
     // Check files for existence
     if (!QFile::exists(kernelSrc)) {
         _err << "Directory not found: " << kernelSrc << endl;
-        return 0;
+        return 2;
     }
     if (!QFile::exists(objdump)) {
         _err << "File not found: " << objdump << endl;
-        return 0;
+        return 3;
     }
     if (!QFile::exists(sysmap)) {
         _err << "File not found: " << sysmap << endl;
-        return 0;
+        return 4;
     }
 
     // Either use the given objdump file, or create it on the fly
@@ -1601,16 +1631,17 @@ int Shell::cmdSymbolsParse(QStringList args)
 int Shell::cmdSymbolsLoad(QStringList args)
 {
     // Show cmdHelp, of an invalid number of arguments is given
-    if (args.size() != 1)
-        return cmdHelp(QStringList("symbols"));
+    if (args.size() != 1) {
+        cmdHelp(QStringList("symbols"));
+        return 1;
+    }
 
     QString fileName = args[0];
 
     // Check file for existence
-    // Check files for existence
     if (!QFile::exists(fileName)) {
         _err << "File not found: " << fileName << endl;
-        return 0;
+        return 2;
     }
 
     _sym.loadSymbols(fileName);
@@ -1622,8 +1653,10 @@ int Shell::cmdSymbolsLoad(QStringList args)
 int Shell::cmdSymbolsStore(QStringList args)
 {
     // Show cmdHelp, of an invalid number of arguments is given
-    if (args.size() != 1)
-        return cmdHelp(QStringList("symbols"));
+    if (args.size() != 1) {
+        cmdHelp(QStringList("symbols"));
+        return 1;
+    }
 
     QString fileName = args[0];
 
@@ -1644,3 +1677,62 @@ int Shell::cmdSymbolsStore(QStringList args)
     return 0;
 }
 
+
+int Shell::cmdBinary(QStringList args)
+{
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() < 1) {
+        cmdHelp(QStringList("binary"));
+        return 1;
+    }
+
+    bool ok = false;
+    int type = args[0].toInt(&ok);
+    args.pop_front();
+    if (!ok)
+        return cmdHelp(QStringList("binary"));
+
+    switch (type) {
+    case bdMemDumpList:
+        return cmdBinaryMemDumpList(args);
+    case bdInstance:
+        return cmdBinaryInstance(args);
+    default:
+        _err << "Unknown index for binary data : " << type << endl;
+        return 2;
+    }
+}
+
+
+int Shell::cmdBinaryMemDumpList(QStringList /*args*/)
+{
+    QStringList files;
+    for (int i = 0; i < _memDumps.size(); ++i) {
+        if (_memDumps[i]) {
+            // Eventually pad the list with null strings
+            while (files.size() < i)
+                files.append(QString());
+            files.append(_memDumps[i]->fileName());
+        }
+    }
+    _binout << files;
+    return 0;
+}
+
+
+int Shell::cmdBinaryInstance(QStringList args)
+{
+    // Did the user specify a file index?
+    int index = parseMemDumpIndex(args);
+
+    if (index < 0)
+        return 1;
+
+    if (args.size() != 1) {
+        _err << "No query sting given." << endl;
+        return 2;
+    }
+
+    Instance inst = _memDumps[index]->queryInstance(args[0]);
+    // TODO implement me
+}

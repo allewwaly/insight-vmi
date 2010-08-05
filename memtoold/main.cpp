@@ -130,7 +130,7 @@ void init_daemon()
 	chdir((char*) home.absolutePath().toAscii().data());
 
 	// Create a lock file
-	QByteArray lockFile = home.absoluteFilePath(lock_file).toLocal8Bit();
+	QByteArray lockFile = home.absoluteFilePath(mt_lock_file).toLocal8Bit();
 	int lock_fd = open(lockFile.data(), O_RDWR | O_CREAT, 0640);
 	if (lock_fd < 0) {
 		fprintf(stderr, "Cannot open lock file \"%s\" (error no. %d), "
@@ -178,7 +178,7 @@ void init_daemon()
         int fd = open("/dev/null", O_RDWR);
         dup(fd);
         // Use log file for stderr
-        QByteArray logFile = home.absoluteFilePath(log_file).toLocal8Bit();
+        QByteArray logFile = home.absoluteFilePath(mt_log_file).toLocal8Bit();
         open(logFile.data(), O_CREAT|O_APPEND|O_WRONLY, 0640);
     }
 }
