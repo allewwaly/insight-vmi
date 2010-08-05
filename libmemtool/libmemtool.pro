@@ -8,9 +8,11 @@ QT -= gui
 HEADERS += include/memtool/memtool.h \
     sockethelper.h \
     include/memtool/memtoolexception.h \
-    include/memtool/constdefs.h
+    include/memtool/constdefs.h \
+    debug.h
 SOURCES += sockethelper.cpp \
     memtoolexception.cpp \
     memtool.cpp \
-    constdefs.cpp
+    constdefs.cpp \
+    debug.cpp
 INCLUDEPATH += ./include
