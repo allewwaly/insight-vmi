@@ -5,12 +5,14 @@ DEFINES += LIBMEMTOOL_LIBRARY
 QT += core \
     network
 QT -= gui
-HEADERS += include/memtool/memtool.h \
+HEADERS += devicemuxer.h \
+    include/memtool/memtool.h \
     sockethelper.h \
     include/memtool/memtoolexception.h \
     include/memtool/constdefs.h \
     debug.h
-SOURCES += sockethelper.cpp \
+SOURCES += devicemuxer.cpp \
+    sockethelper.cpp \
     memtoolexception.cpp \
     memtool.cpp \
     constdefs.cpp \
