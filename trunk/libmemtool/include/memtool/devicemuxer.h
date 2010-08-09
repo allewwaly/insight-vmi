@@ -14,6 +14,7 @@
 
 // forward declarations
 class QMutex;
+class QWaitCondition;
 class DeviceMuxer;
 class MuxerChannel;
 
@@ -63,6 +64,27 @@ public:
      * @return all available data for channel \a channel
      */
     QByteArray readAll(channel_t channel);
+
+    /**
+     * Blocks the caller until all data for channel \a channel has been written
+     * or until \a msecs milliseconds elapsed.
+     * @param msecs the time to wait for bytes to be written, -1 waits forever
+     * @param channel the channel to wait for
+     * @return \c true if the bytes have been written, \c false if a timeout
+     * or an error occurred
+     */
+    bool waitForBytesWritten(channel_t channel, int msecs);
+
+    /**
+     * Blocks the caller until the readyRead() signal for channel \a channel
+     * has been emmited or until \a msecs milliseconds elapsed.
+     * @param msecs the time to wait for the readyRead() singal, -1 waits
+     * forever
+     * @param channel the channel to wait for
+     * @return \c true if the signal has been received, \c false if a timeout
+     * or an error occurred
+     */
+    bool waitForReadyRead(channel_t channel, int msecs);
 
     /**
      * @return the QOIDevice that this multiplexer is operating on
@@ -116,14 +138,23 @@ signals:
     void deviceChanged(QIODevice* oldDev, QIODevice* newDev);
 
 private:
+    void init();
+
     /// Defines a hash to hold the data per channel
     typedef QHash<channel_t, QByteArray> ChannelDataHash;
+    /// Defines a hash to hold the signal emission status
+    typedef QHash<channel_t, bool> ChannelBoolHash;
+
     /// Holds the data per channel
     ChannelDataHash _data;
+    ChannelBoolHash _readyReadEmitted;
+    QByteArray _buffer;
     QIODevice* _device;
     QMutex *_dataLock;
     QMutex *_readLock;
     QMutex* _writeLock;
+    QWaitCondition* _readyReadNotification;
+    QMutex* _readyReadLock;
 };
 
 
@@ -171,6 +202,20 @@ public:
      * @return
      */
     virtual qint64 bytesAvailable() const;
+
+    /**
+     * Re-implemented from QIODevice.
+     * @param msecs
+     * @return
+     */
+    virtual bool waitForBytesWritten(int msecs);
+
+    /**
+     * Re-implemented from QIODevice.
+     * @param msecs
+     * @return
+     */
+    virtual bool waitForReadyRead(int msecs);
 
     /**
      * @return the ID of this channel
