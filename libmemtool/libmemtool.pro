@@ -5,7 +5,7 @@ DEFINES += LIBMEMTOOL_LIBRARY
 QT += core \
     network
 QT -= gui
-HEADERS += devicemuxer.h \
+HEADERS += include/memtool/devicemuxer.h \
     include/memtool/memtool.h \
     sockethelper.h \
     include/memtool/memtoolexception.h \
@@ -18,3 +18,4 @@ SOURCES += devicemuxer.cpp \
     constdefs.cpp \
     debug.cpp
 INCLUDEPATH += ./include
+SUBDIRS = tests

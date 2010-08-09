@@ -5,80 +5,106 @@
  *      Author: chrschn
  */
 
-#include "devicemuxer.h"
+#include <memtool/devicemuxer.h>
 #include <string.h>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QWaitCondition>
 #include <QDataStream>
 #include <QCoreApplication>
 #include <QLinkedList>
+#include <QTime>
 #include "debug.h"
 
 
 //------------------------------------------------------------------------------
 
 DeviceMuxer::DeviceMuxer()
-    : _device(0), _dataLock(new QMutex()), _readLock(new QMutex()),
-      _writeLock(new QMutex())
+    : _device(0), _dataLock(0), _readLock(0), _writeLock(0),
+      _readyReadNotification(0), _readyReadLock(0)
 {
+    init();
 }
 
 
 DeviceMuxer::DeviceMuxer(QIODevice* device, QObject* parent)
-    : QObject(parent), _device(0), _dataLock(new QMutex()),
-      _readLock(new QMutex()), _writeLock(new QMutex())
+    : QObject(parent), _device(0), _dataLock(0), _readLock(0), _writeLock(0),
+      _readyReadNotification(0), _readyReadLock(0)
 {
+    init();
     setDevice(device);
 }
 
 
 DeviceMuxer::~DeviceMuxer()
 {
-    delete _dataLock;
-    delete _readLock;
-    delete _writeLock;
+    if (_dataLock) delete _dataLock;
+    if (_readLock) delete _readLock;
+    if (_writeLock) delete _writeLock;
+    if (_readyReadNotification) delete _readyReadNotification;
+    if (_readyReadLock) delete _readyReadLock;
+}
+
+
+void DeviceMuxer::init()
+{
+    _dataLock = new QMutex();
+    _readLock = new QMutex();
+    _writeLock = new QMutex();
+    _readyReadNotification = new QWaitCondition();
+    _readyReadLock = new QMutex();
 }
 
 
 void DeviceMuxer::handleReadyRead()
 {
+    if (!_device)
+        return;
+
     channel_t chan;
     quint16  dataSize;
     int hdrSize = sizeof(chan) + sizeof(dataSize);
 
-    while (_device->bytesAvailable() >= hdrSize) {
-        QMutexLocker rLock(_readLock);
+    QMutexLocker rLock(_readLock);
+    _buffer.append(_device->readAll());
+    rLock.unlock();
+
+    while (_buffer.size() >= hdrSize) {
+        rLock.relock();
         // read the channel no. and size from the device
-        QByteArray buf = _device->read(hdrSize);
-        assert(buf.size() == hdrSize);
         // Extract the channel no.
-        memcpy(&chan, buf.constData(), sizeof(chan));
+        memcpy(&chan, _buffer.constData(), sizeof(chan));
         // Extract the size
-        memcpy(&dataSize, buf.constData() + sizeof(chan), sizeof(dataSize));
+        memcpy(&dataSize, _buffer.constData() + sizeof(chan), sizeof(dataSize));
         // Now try to read out the data
-        while (_device->bytesAvailable() < dataSize)
+        while (_buffer.size() < hdrSize + dataSize) {
             QCoreApplication::processEvents();
-        buf.clear();
-        // Make sure we read exactly packetSize many bytes
-        do {
-            buf.append(_device->read(dataSize - buf.size()));
-        } while (buf.size() < dataSize);
+            _buffer.append(_device->readAll());
+        }
+        QMutexLocker dLock(_dataLock);
+        _data[chan].append(_buffer.constData() + hdrSize, dataSize);
+        dLock.unlock();
+
+        _buffer.remove(0, hdrSize + dataSize);
         // Release the read lock
         rLock.unlock();
 
-        QMutexLocker dLock(_dataLock);
-        _data[chan].append(buf);
-        dLock.unlock();
-
         // Emit a signal after all locks are released
+        _readyReadEmitted[chan] = true;
+        _readyReadNotification->wakeAll();
         emit readyRead(chan);
+
+        rLock.relock();
+        _buffer.append(_device->readAll());
+        rLock.unlock();
     }
 }
 
 
 qint64 DeviceMuxer::readData(channel_t chan, char* data, qint64 maxSize)
 {
-    QMutexLocker lock(_dataLock);
+    QMutexLocker rLock(_readLock);
+    QMutexLocker dlock(_dataLock);
     QByteArray& buf = _data[chan];
     // Determine length, copy data and remove from buffer
     qint64 size = buf.size() < maxSize ? buf.size() : maxSize;
@@ -114,6 +140,12 @@ qint64 DeviceMuxer::writeData(channel_t chan, const char* data, qint64 maxSize)
             qint64 written = _device->write(buf);
             if (written > 0)
                 buf.remove(0, written);
+            else if (written < 0) {
+                if (toWrite < maxSize)
+                    return maxSize - toWrite; // return the written size
+                else
+                    return written; // return the error code
+            }
         }
         // Advance position
         toWrite -= len;
@@ -139,6 +171,72 @@ QByteArray DeviceMuxer::readAll(channel_t channel)
 }
 
 
+bool DeviceMuxer::waitForBytesWritten(channel_t /*channel*/, int msecs)
+{
+    if (!_device)
+        return false;
+
+    QTime* timer = (msecs < 0) ? 0 : new QTime();
+    if (timer)
+        timer->start();
+    bool locked = false, ret = false;
+
+    while (!timer || (timer->elapsed() < msecs)) {
+        // Try to get the write lock
+        locked = _writeLock->tryLock();
+        // How much time left?
+        int remaining = timer ? msecs - timer->elapsed() : -1;
+        if (timer && remaining < 0)
+            remaining = 0;
+        // If we hold the lock, flush the device and leave the loop
+        if (locked) {
+            ret = _device->waitForBytesWritten(remaining);
+            break;
+        }
+        // Otherwise process all events and try again
+        else {
+            if (timer)
+                QCoreApplication::processEvents(QEventLoop::AllEvents, remaining);
+            else
+                QCoreApplication::processEvents();
+        }
+    }
+
+    if (timer)
+        delete timer;
+    if (locked)
+        _writeLock->unlock();
+
+    return ret;
+}
+
+
+bool DeviceMuxer::waitForReadyRead(channel_t channel, int msecs)
+{
+    QTime* timer = (msecs < 0) ? 0 : new QTime();
+    if (timer)
+        timer->start();
+
+    _readyReadEmitted[channel] = false;
+    // Wait until we have some more data in buf
+    while ( !_readyReadEmitted[channel] &&
+            (!timer || (timer->elapsed() < msecs)) )
+    {
+        _readyReadLock->lock();
+        // How much time left?
+        int remaining = timer ? msecs - timer->elapsed() : -1;
+        if (timer && remaining < 0)
+            remaining = 0;
+        // Wait for signal emmission to avoid busy waiting
+        _readyReadNotification->wait(_readyReadLock, remaining);
+
+        _readyReadLock->unlock();
+    }
+
+    return _readyReadEmitted[channel] && bytesAvailable(channel) > 0;
+}
+
+
 QIODevice* DeviceMuxer::device()
 {
     return _device;
@@ -154,8 +252,8 @@ void DeviceMuxer::setDevice(QIODevice* dev)
     if (_device) {
         disconnect(_device, SIGNAL(readyRead()),
                 this, SLOT(handleReadyRead()));
-        disconnect(_device, SIGNAL(readChannelFinished()),
-                this, SLOT(handleReadChannelFinished()));
+//        disconnect(_device, SIGNAL(readChannelFinished()),
+//                this, SIGNAL(readChannelFinished()));
     }
 
     QIODevice* oldDev = _device;
@@ -165,8 +263,6 @@ void DeviceMuxer::setDevice(QIODevice* dev)
     if (_device) {
         connect(_device, SIGNAL(readyRead()),
                 this, SLOT(handleReadyRead()));
-        connect(_device, SIGNAL(readChannelFinished()),
-                this, SLOT(handleReadChannelFinished()));
     }
 
     emit deviceChanged(oldDev, _device);
@@ -220,6 +316,18 @@ qint64 MuxerChannel::bytesAvailable() const
 }
 
 
+bool MuxerChannel::waitForBytesWritten(int msecs)
+{
+    return _muxer ? _muxer->waitForBytesWritten(_channel, msecs) : false;
+}
+
+
+bool MuxerChannel::waitForReadyRead(int msecs)
+{
+    return _muxer ? _muxer->waitForReadyRead(_channel, msecs) : false;
+}
+
+
 qint64 MuxerChannel::readData(char* data, qint64 maxSize)
 {
     return _muxer ? _muxer->readData(_channel, data, maxSize) : -1;
@@ -258,7 +366,7 @@ void MuxerChannel::setMuxer(DeviceMuxer* mux)
         disconnect(_muxer, SIGNAL(readyRead(channel_t)),
                    this, SLOT(handleReadyRead(channel_t)));
         disconnect(_muxer, SIGNAL(deviceChanged(QIODevice*, QIODevice*)),
-                   this, SLOT(handleReadyRead(channel_t)));
+                   this, SLOT(handleDeviceChanged(QIODevice*, QIODevice*)));
         disconnect(_muxer->device(), SIGNAL(readChannelFinished()),
                    this, SIGNAL(readChannelFinished()));
     }
@@ -269,7 +377,7 @@ void MuxerChannel::setMuxer(DeviceMuxer* mux)
         connect(_muxer, SIGNAL(readyRead(channel_t)),
                 this, SLOT(handleReadyRead(channel_t)));
         connect(_muxer, SIGNAL(deviceChanged(QIODevice*, QIODevice*)),
-                this, SLOT(handleReadyRead(channel_t)));
+                this, SLOT(handleDeviceChanged(QIODevice*, QIODevice*)));
         connect(_muxer->device(), SIGNAL(readChannelFinished()),
                 this, SIGNAL(readChannelFinished()));
     }
