@@ -47,8 +47,10 @@ void signal_handler(int sig)
         if (shell) {
             if (shell->interactive())
                 shell->terminateScript();
-            else
+            else {
                 shell->shutdown();
+                shell->wait();
+            }
         }
         break;
 
@@ -58,7 +60,7 @@ void signal_handler(int sig)
     case SIGTERM:
 	    if (shell) {
 	        shell->shutdown();
-//	        shell->wait();
+	        shell->wait();
 	    }
 	    else
 	        exit(0);
