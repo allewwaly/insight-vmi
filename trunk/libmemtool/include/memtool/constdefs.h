@@ -8,6 +8,14 @@
 #ifndef CONSTDEFS_H_
 #define CONSTDEFS_H_
 
+/// Multiplexer channels used to communicate with the memtool daemon
+enum MuxerChannels {
+	mcStdOut,
+	mcStdErr,
+	mcBinary,
+	mcReturn
+};
+
 /// Binary data that can be retrieved from the memtool daemon
 enum BinaryData {
     bdMemDumpList,
