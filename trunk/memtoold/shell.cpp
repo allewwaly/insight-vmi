@@ -13,6 +13,8 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <memtool/constdefs.h>
+#include <memtool/devicemuxer.h>
+#include <memtool/memtool.h>
 #include <QtAlgorithms>
 #include <QProcess>
 #include <QCoreApplication>
@@ -34,6 +36,7 @@
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
 Q_DECLARE_METATYPE(QAbstractSocket::SocketError);
 
+#define safe_delete(x) do { if ( (x) ) { delete x; x = 0; } } while (0)
 
 Shell* shell = 0;
 
@@ -44,12 +47,14 @@ QFile Shell::_stdout;
 QFile Shell::_stderr;
 QTextStream Shell::_out;
 QTextStream Shell::_err;
-QDataStream Shell::_binout;
+QDataStream Shell::_bin;
+QDataStream Shell::_ret;
 
 
 Shell::Shell(bool listenOnSocket)
     : _listenOnSocket(listenOnSocket), _interactive(!listenOnSocket),
-      _clSocket(0), _srvSocket(0), _engine(0)
+      _clSocket(0), _srvSocket(0), _socketMuxer(0), _outChan(0), _errChan(0),
+      _binChan(0), _retChan(0), _engine(0)
 {
 	qRegisterMetaType<QAbstractSocket::SocketState>();
 	qRegisterMetaType<QAbstractSocket::SocketError>();
@@ -162,6 +167,23 @@ void Shell::prepare()
         if (!_srvSocket->listen(sockFileName))
             genericError(QString("Cannot open socket file \"%1\"")
                     .arg(sockFileName));
+        // Create the muxer devices
+        _socketMuxer = new DeviceMuxer();
+        _socketMuxer->moveToThread(QThread::currentThread());
+
+        _outChan = new MuxerChannel(_socketMuxer, mcStdOut);
+        _outChan->moveToThread(QThread::currentThread());
+        _errChan = new MuxerChannel(_socketMuxer, mcStdErr);
+        _errChan->moveToThread(QThread::currentThread());
+        _retChan = new MuxerChannel(_socketMuxer, mcReturn);
+        _retChan->moveToThread(QThread::currentThread());
+        _binChan = new MuxerChannel(_socketMuxer, mcBinary);
+        _binChan->moveToThread(QThread::currentThread());
+
+        _outChan->open(QIODevice::WriteOnly);
+        _errChan->open(QIODevice::WriteOnly);
+        _binChan->open(QIODevice::WriteOnly);
+        _retChan->open(QIODevice::WriteOnly);
     }
     else {
         // Enable readline history
@@ -214,13 +236,15 @@ Shell::~Shell()
         }
     }
 
-    if (_clSocket)
-        delete _clSocket;
+    safe_delete(_clSocket);
+    if (_srvSocket) _srvSocket->close();
+    safe_delete(_srvSocket);
 
-    if (_srvSocket) {
-        _srvSocket->close();
-        delete _srvSocket;
-    }
+    safe_delete(_outChan);
+    safe_delete(_errChan);
+    safe_delete(_binChan);
+    safe_delete(_retChan);
+    safe_delete(_socketMuxer);
 }
 
 
@@ -259,6 +283,7 @@ int Shell::lastStatus() const
     return _lastStatus;
 }
 
+
 QString Shell::readLine(const QString& prompt)
 {
     QString ret;
@@ -271,7 +296,7 @@ QString Shell::readLine(const QString& prompt)
             _out << p << flush;
         // Wait until a complete line is readable
         _sockSem.acquire(1);
-        // The socket my still be null if we received a kill signal
+        // The socket might already be null if we received a kill signal
         if (_clSocket) {
             // Read input from socket
             ret = QString::fromLocal8Bit(_clSocket->readLine().data()).trimmed();
@@ -307,9 +332,13 @@ void Shell::handleNewConnection()
     // We only accept one connection at a time, so if we already have a socket,
     // we disconnect it immediately
     if (_clSocket && _clSocket->isOpen()) {
-        sock->write("Too many connections, currently only one connection is "
-                "supported at a time\n");
-        sock->waitForBytesWritten(-1);
+    	if (sock->waitForConnected(1000)) {
+			DeviceMuxer mux(sock);
+			MuxerChannel retChan(&mux, mcReturn, QIODevice::WriteOnly);
+			QDataStream ret(&retChan);
+			ret << (int) crTooManyConnections;
+			sock->waitForBytesWritten(-1);
+    	}
         sock->close();
         sock->deleteLater();
     }
@@ -318,9 +347,14 @@ void Shell::handleNewConnection()
         _clSocket = sock;
         connect(_clSocket, SIGNAL(readyRead()), SLOT(handleSockReadyRead()));
         connect(_clSocket, SIGNAL(disconnected()), SLOT(handleSockDisconnected()));
-        // Use the socket as output device
-        _out.setDevice(_clSocket);
-        _binout.setDevice(_clSocket);
+        // Use the socket channels as output devices
+        _socketMuxer->setDevice(_clSocket);
+        _out.setDevice(_outChan);
+        _err.setDevice(_errChan);
+        _bin.setDevice(_binChan);
+        _ret.setDevice(_retChan);
+        // Confirm the connection
+        _ret << (int) crOk;
     }
 }
 
@@ -346,9 +380,13 @@ void Shell::handleSockDisconnected()
 {
     if (_clSocket) {
         // Reset the output device
+    	_socketMuxer->setDevice(0);
         _out.setDevice(&_stdout);
+        _err.setDevice(&_stderr);
         _out.flush();
-        _binout.setDevice(0);
+        _err.flush();
+        _bin.setDevice(0);
+        _ret.setDevice(0);
         // Delete the socket
         _clSocket->deleteLater();
         _clSocket = 0;
@@ -367,7 +405,7 @@ void Shell::pipeEndReadyReadStdOut()
     // Only the last process writes to stdout
     QIODevice* out;
     if (_listenOnSocket && _clSocket)
-        out = _clSocket;
+        out = _outChan;
     else
         out = &_stdout;
 
@@ -396,11 +434,11 @@ void Shell::cleanupPipedProcs()
     _out.flush();
     if (_listenOnSocket && _clSocket) {
         _out.setDevice(_clSocket);
-        _binout.setDevice(_clSocket);
+        _bin.setDevice(_clSocket);
     }
     else {
         _out.setDevice(&_stdout);
-        _binout.setDevice(0);
+        _bin.setDevice(0);
     }
 
     // Close write channel and wait for process to terminate from first to last
@@ -460,7 +498,7 @@ void Shell::shutdown()
 
 int Shell::eval(QString command)
 {
-    int ret = 0;
+    int ret = 1;
 	QStringList pipeCmds = command.split(QRegExp("\\s*\\|\\s*"), QString::KeepEmptyParts);
 	assert(_pipedProcs.isEmpty() == true);
 
@@ -479,7 +517,7 @@ int Shell::eval(QString command)
         }
         // Next, connect the stdout to the pipe
         _out.setDevice(_pipedProcs.first());
-        _binout.setDevice(_pipedProcs.first());
+        _bin.setDevice(_pipedProcs.first());
         connect(_pipedProcs.last(),
                 SIGNAL(readyReadStandardOutput()),
                 SLOT(pipeEndReadyReadStdOut()));
@@ -564,16 +602,22 @@ int Shell::evalLine()
         // was received before we continue
         if (_clSocket) {
             _out.flush();
+            _err.flush();
+            _ret << _lastStatus;
             _clSocket->waitForBytesWritten(-1);
-            // Close socket if this is a non-interactive session
-            if (!_interactive)
-                _clSocket->close();
         }
     }
     catch (GenericException e) {
             _err
                 << "Caught exception at " << e.file << ":" << e.line << endl
                 << "Message: " << e.message << endl;
+            // Write a return status to the socket
+            if (_clSocket) {
+                _out.flush();
+                _err.flush();
+                _ret << _lastStatus;
+                _clSocket->waitForBytesWritten(-1);
+            }
     }
     return _lastStatus;
 }
@@ -1715,7 +1759,7 @@ int Shell::cmdBinaryMemDumpList(QStringList /*args*/)
             files.append(_memDumps[i]->fileName());
         }
     }
-    _binout << files;
+    _bin << files;
     return 0;
 }
 

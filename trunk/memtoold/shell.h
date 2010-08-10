@@ -27,6 +27,8 @@ class QScriptContext;
 class QScriptEngine;
 class QLocalServer;
 class QLocalSocket;
+class DeviceMuxer;
+class MuxerChannel;
 
 
 /**
@@ -173,7 +175,8 @@ private:
     static QFile _stderr;
     static QTextStream _out;
     static QTextStream _err;
-    static QDataStream _binout;
+    static QDataStream _bin;
+    static QDataStream _ret;
     QHash<QString, Command> _commands;
     static MemDumpArray _memDumps;
     QList<QProcess*> _pipedProcs;
@@ -181,6 +184,11 @@ private:
     bool _interactive;
     QLocalSocket* _clSocket;
     QLocalServer* _srvSocket;
+    DeviceMuxer* _socketMuxer;
+    MuxerChannel* _outChan;
+    MuxerChannel* _errChan;
+    MuxerChannel* _binChan;
+    MuxerChannel* _retChan;
     QSemaphore _sockSem;
     QMutex _sockSemLock;
     bool _finished;
