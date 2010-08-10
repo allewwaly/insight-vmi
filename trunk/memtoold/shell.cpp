@@ -433,8 +433,8 @@ void Shell::cleanupPipedProcs()
     // Reset the output to stdout
     _out.flush();
     if (_listenOnSocket && _clSocket) {
-        _out.setDevice(_clSocket);
-        _bin.setDevice(_clSocket);
+        _out.setDevice(_outChan);
+        _bin.setDevice(_binChan);
     }
     else {
         _out.setDevice(&_stdout);
@@ -503,7 +503,7 @@ int Shell::eval(QString command)
 	assert(_pipedProcs.isEmpty() == true);
 
 	// Setup piped processes if no socket connection
-	if (!_listenOnSocket && pipeCmds.size() > 1) {
+	if (pipeCmds.size() > 1) {
         // First, create piped processes in reverse order, i.e., right to left
         for (int i = 1; i < pipeCmds.size(); ++i) {
             QProcess* proc = new QProcess();
