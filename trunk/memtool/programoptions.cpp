@@ -13,12 +13,12 @@
 
 ProgramOptions programOptions;
 
-const int OPTION_COUNT = 8;
+const int OPTION_COUNT = 11;
 
 const struct Option options[OPTION_COUNT] = {
         {
-                "-p",
-                "--parse",
+                "-sp",
+                "--parse-symbols",
                 "Parse the debugging symbols from the given kernel source directory",
                 acSymbolsParse,
                 opNone,
@@ -26,8 +26,8 @@ const struct Option options[OPTION_COUNT] = {
                 0 // conflicting options
         },
         {
-                "-l",
-                "--load",
+                "-sl",
+                "--load-symbols",
                 "Read in previously saved debugging symbols",
                 acSymbolsLoad,
                 opNone,
@@ -35,7 +35,7 @@ const struct Option options[OPTION_COUNT] = {
                 0 // conflicting options
         },
         {
-                "-s",
+                "-ss",
                 "--store",
                 "Store the currently loaded debugging symbols",
                 acSymbolsStore,
@@ -44,7 +44,7 @@ const struct Option options[OPTION_COUNT] = {
                 0 // conflicting options
         },
         {
-                "-r",
+                "-ds",
                 "--start",
                 "Start the memtool daemon, if not already running",
                 acDaemonStart,
@@ -53,7 +53,7 @@ const struct Option options[OPTION_COUNT] = {
                 0 // conflicting options
         },
         {
-                "-k",
+                "-dk",
                 "--stop",
                 "Stop the memtool daemon, if it is running",
                 acDaemonStop,
@@ -62,12 +62,39 @@ const struct Option options[OPTION_COUNT] = {
                 0 // conflicting options
         },
         {
-                "-u",
+                "-dr",
                 "--status",
                 "Show the status of the memtool daemon",
                 acDaemonStatus,
                 opNone,
                 ntOption,
+                0 // conflicting options
+        },
+        {
+                "-md",
+                "--list-memdumps",
+                "List the currently loaded memory dumps",
+                acMemDumpList,
+                opNone,
+                ntCommand,
+                0 // conflicting options
+        },
+        {
+                "-ml",
+                "--load-memdump",
+                "Load a memory dump from a file",
+                acMemDumpLoad,
+                opNone,
+                ntFileName,
+                0 // conflicting options
+        },
+        {
+                "-mu",
+                "--unload-memdump",
+                "Unload a previously loaded memory dump",
+                acMemDumpUnload,
+                opNone,
+                ntFileNameOrIndex,
                 0 // conflicting options
         },
         {
@@ -122,6 +149,9 @@ void ProgramOptions::cmdOptionsUsage()
         case ntMemFileName:
         case ntFileName:
             opts += " <file>";
+            break;
+        case ntFileNameOrIndex:
+            opts += " <file>|<index>";
             break;
         case ntCommand:
             opts += " <command>";
@@ -190,6 +220,16 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
                 return false;
             }
             break;
+
+        case ntFileNameOrIndex: {
+            bool ok = false;
+            arg.toInt(&ok);
+            if (ok) {
+                _fileName = arg;
+                break;
+            }
+            // No break here, try to parse a file name instead
+        }
 
         case ntFileName: {
             _fileName = arg;
