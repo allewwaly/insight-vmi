@@ -14,14 +14,17 @@
 /// Actions that can be triggered from the command line
 enum Action {
     acNone            = 0,
-    acUsage           = (1 << 0),
-    acSymbolsParse    = (1 << 1),
-    acSymbolsLoad     = (1 << 2),
-    acSymbolsStore    = (1 << 3),
-    acDaemonStart     = (1 << 4),
-    acDaemonStop      = (1 << 5),
-    acDaemonStatus    = (1 << 6),
-    acEval            = (1 << 7)
+    acUsage,
+    acSymbolsParse,
+    acSymbolsLoad,
+    acSymbolsStore,
+    acDaemonStart,
+    acDaemonStop,
+    acDaemonStatus,
+    acEval,
+    acMemDumpList,
+    acMemDumpLoad,
+    acMemDumpUnload
 };
 
 /// Options that can be set from the command line
@@ -34,6 +37,7 @@ enum Options {
 enum NextToken {
     ntOption,
     ntFileName,
+    ntFileNameOrIndex,
     ntMemFileName,
     ntCommand
 };

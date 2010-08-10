@@ -46,7 +46,7 @@ Shell::Shell(bool interactive, QObject* parent)
 Shell::~Shell()
 {
 	// Construct the path name of the history file
-	QStringList pathList = QString(history_file).split("/", QString::SkipEmptyParts);
+	QStringList pathList = QString(mt_history_file).split("/", QString::SkipEmptyParts);
     QString file = pathList.last();
     pathList.pop_back();
     QString path = pathList.join("/");
@@ -59,7 +59,7 @@ Shell::~Shell()
         // Only save history for interactive sessions
 //        if (!_listenOnSocket) {
             // Save the history for the next launch
-            QString histFile = QDir::home().absoluteFilePath(history_file);
+            QString histFile = QDir::home().absoluteFilePath(mt_history_file);
             QByteArray ba = histFile.toLocal8Bit();
             int ret = write_history(ba.constData());
             if (ret)
@@ -142,14 +142,15 @@ void Shell::run()
 
     try {
         switch (programOptions.action()) {
+        case acNone:
         case acUsage:
             ProgramOptions::cmdOptionsUsage();
             break;
 
         case acDaemonStart:
-            if (_memtool->isRunning())
+            if (_memtool->isDaemonRunning())
                 _out << "Memtool daemon already running." << endl;
-            else if (_memtool->start())
+            else if (_memtool->daemonStart())
                 _out << "Memtool daemon successfully started." << endl;
             else {
                 _err << "Error starting memtool daemon." << endl;
@@ -158,9 +159,9 @@ void Shell::run()
             break;
 
         case acDaemonStop:
-            if (!_memtool->isRunning())
+            if (!_memtool->isDaemonRunning())
                 _out << "Memtool daemon is not running." << endl;
-            else if (_memtool->stop())
+            else if (_memtool->daemonStop())
                 _out << "Memtool daemon successfully stopped." << endl;
             else {
                 _err << "Error stopping memtool daemon." << endl;
@@ -169,7 +170,7 @@ void Shell::run()
             break;
 
         case acDaemonStatus:
-            if (_memtool->isRunning())
+            if (_memtool->isDaemonRunning())
                 _out << "Memtool daemon is running." << endl;
             else
                 _out << "Memtool daemon not running." << endl;
@@ -213,7 +214,38 @@ void Shell::run()
         case acEval:
             output = _memtool->eval(programOptions.command());
             break;
+
+        case acMemDumpList: {
+            QStringList list = _memtool->memDumpList();
+            if (list.isEmpty())
+                output = "No memory dumps loaded.";
+            for (int i = 0; i < list.size(); ++i)
+                if (!list[i].isEmpty())
+                    output += QString("[%1] %2\n").arg(i).arg(list[i]);
+            break;
         }
+
+        case acMemDumpLoad:
+            if (_memtool->memDumpLoad(programOptions.fileName()))
+                output = QString("Successfully loaded \"%1\"")
+                            .arg(programOptions.fileName());
+            else {
+                _err << "Error loading \"" << programOptions.fileName() << "\"" << endl;
+                _lastStatus = 6;
+            }
+            break;
+
+        case acMemDumpUnload:
+            if (_memtool->memDumpUnload(programOptions.fileName()))
+                output = QString("Successfully unloaded \"%1\"")
+                            .arg(programOptions.fileName());
+            else {
+                _err << "Error unloading \"" << programOptions.fileName() << "\"" << endl;
+                _lastStatus = 7;
+            }
+            break;
+        } // end of switch()
+
     }
     catch (MemtoolException e) {
         _err << "Caught exception at " << e.file << ":" << e.line << ":" << endl
@@ -222,8 +254,11 @@ void Shell::run()
     }
 
     // Write out any available output
-    if (!output.isEmpty())
-        _out << output << endl;
+    if (!output.isEmpty()) {
+        _out << output << flush;
+        if (!output.endsWith('\n'))
+            _out << endl;
+    }
 
     QCoreApplication::exit(_lastStatus);
 }
