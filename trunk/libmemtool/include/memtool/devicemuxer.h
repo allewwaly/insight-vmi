@@ -14,11 +14,13 @@
 
 // forward declarations
 class QMutex;
-class QWaitCondition;
 class DeviceMuxer;
 class MuxerChannel;
 
 //------------------------------------------------------------------------------
+
+/// Type for the channel identifier
+typedef quint16 channel_t;
 
 /**
  * This class provides multiple logical channels for any QIODevices. The
@@ -32,9 +34,6 @@ class DeviceMuxer: public QObject
     friend class MuxerChannel;
 
 public:
-    /// Type for the channel identifier
-    typedef quint16 channel_t;
-
     /**
      * Constructor
      */
@@ -97,6 +96,11 @@ public:
      */
     void setDevice(QIODevice* dev);
 
+    /**
+     * Wipes all data that hasn't been read yet.
+     */
+    void clear();
+
 protected:
     /**
      * Internal function for MuxerChannel to write data
@@ -138,6 +142,9 @@ signals:
     void deviceChanged(QIODevice* oldDev, QIODevice* newDev);
 
 private:
+    /**
+     * Internal initialization function
+     */
     void init();
 
     /// Defines a hash to hold the data per channel
@@ -153,8 +160,6 @@ private:
     QMutex *_dataLock;
     QMutex *_readLock;
     QMutex* _writeLock;
-    QWaitCondition* _readyReadNotification;
-    QMutex* _readyReadLock;
 };
 
 
@@ -170,9 +175,6 @@ class MuxerChannel: public QIODevice
 {
     Q_OBJECT
 public:
-    /// Type for the channel identifier
-    typedef DeviceMuxer::channel_t channel_t;
-
     /**
      * Constructor
      */
@@ -185,6 +187,16 @@ public:
      * @param parent parent object
      */
     MuxerChannel(DeviceMuxer* mux, channel_t channel, QObject* parent = 0);
+
+    /**
+     * Constructor
+     * @param mux the multiplexer to operate on
+     * @param channel the ID of this channel
+     * @param mode the mode to open this device
+     * @param parent parent object
+     */
+    MuxerChannel(DeviceMuxer* mux, channel_t channel, OpenMode mode,
+    		QObject* parent = 0);
 
     /**
      * Destructor
@@ -270,15 +282,8 @@ private slots:
     void handleDeviceChanged(QIODevice* oldDev, QIODevice* newDev);
 
 private:
-    /**
-     * Internal initialization function
-     */
-    void init();
-
     DeviceMuxer* _muxer;
     channel_t _channel;
-    QMutex* _bufLock;
-    QMutex* _readLock;
 };
 
 #endif /* DEVICEMUXER_H_ */

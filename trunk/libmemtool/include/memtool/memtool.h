@@ -17,6 +17,15 @@ class QObject;
 class QLocalSocket;
 class SocketHelper;
 
+/// Result of a connection attempt
+enum ConnectResult {
+	crOk                 = 0,   ///< Connection successfully established
+	crDaemonNotRunning   = 1,   ///< Connection failed, daemon is not running
+	crTooManyConnections = 2,   ///< Server refused connection,
+	crUnknownError       = 3    ///< An unknown error occurred
+};
+
+
 /**
  * \brief Interface class to interact with the memtool daemon
  *
@@ -30,14 +39,26 @@ class Memtool
 public:
     /**
      * Constructor
-     * @param parent the parent object
      */
-    Memtool(QObject* parent = 0);
+    Memtool();
 
     /**
      * Destructor
      */
     ~Memtool();
+
+    /**
+     * Tries to connect to the memtool daemon.
+     * @return zero if connection established or already connected, or a
+     * non-zero error code as defined in ConnectResult
+     * \sa ConnectResult
+     */
+    int connectToDaemon();
+
+    /**
+     * Disconnects from the memtool daemon.
+     */
+    void disconnectFromDaemon();
 
     /**
      * Checks if the memtool daemon is running.
@@ -94,30 +115,79 @@ public:
 
     /**
      * Evaluates the given command \a cmd in memtool's shell syntax and returns
-     * the output.
+     * the error code of the evaluation or zero, if no error occured.
+     *
+     * Use readAllStdOut(), readAllStdErr() or readAllBinary() to retrieve the
+     * output of the evaluated command after the function returns.
+     *
+     * \note This function wipes all unread data that was received in response
+     * to any previous eval() call before performing any action.
+     *
      * @param cmd the command to evaluate
-     * @return the output as returned from the memtool daemon
+     * @return zero, if no error occured, or a non-zero error code otherwise
      * \exception MemtoolError if the connection to the memtool daemon fails
+     *
+     * \sa readAllStdOut(), readAllStdErr(), readAllBinary()
      */
-    QString eval(const QString& cmd);
+    int eval(const QString& cmd);
+
+    /**
+     * Returns the output to stdout that was received in response to the last
+     * call to eval().
+     * @return output of the last eval() command
+     * \sa readAllStdErr(), readAllBinary()
+     */
+    QString readAllStdOut();
+
+    /**
+     * Returns the output to stderr that was received in response to the last
+     * call to eval().
+     * @return error messages of the last eval() command
+     * \sa readAllStdOut(), readAllBinary()
+     */
+    QString readAllStdErr();
+
+    /**
+     * Returns any binary data that was received in response to the last call
+     * to eval().
+     * @return output of the last eval() command
+     * \sa readAllStdOut(), readAllStdErr()
+     */
+    QByteArray readAllBinary();
+
+    /**
+     * Returns \c true if data received from out() is automatically written to
+     * stdout, \c false otherwise. The default value is \c false.
+     * @return \c true if data received from out() is automatically written to
+     * stdout, \c false otherwise
+     */
+    bool outToStdOut() const;
+
+    /**
+     * Controls whether data received on the out() channel is automatically
+     * written to stdout.
+     * @param value \c true to enable automatic writing to stdout, \c false to
+     * disable it
+     */
+    void setOutToStdOut(bool value);
+
+    /**
+     * Returns \c true if data received from err() is automatically written to
+     * stderr, \c false otherwise. The default value is \c false.
+     * @return \c true if data received from err() is automatically written to
+     * stderr, \c false otherwise
+     */
+    bool errToStdErr() const;
+
+    /**
+     * Controls whether data received on the err() channel is automatically
+     * written to stderr.
+     * @param value \c true to enable automatic writing to stderr, \c false to
+     * disable it
+     */
+    void setErrToStdErr(bool value);
 
 private:
-    /**
-     * Tries to connect to the memtool daemon.
-     * @return \c true if connection estalbished or already connected, \c false
-     * otherwise
-     */
-    bool connect();
-
-    /**
-     * Evaluates the given command \a cmd in memtool's shell syntax and returns
-     * the output.
-     * @param cmd the command to evaluate
-     * @return the output as returned from the memtool daemon
-     * \exception MemtoolError if the connection to the memtool daemon fails
-     */
-    QByteArray binEval(const QString& cmd);
-
     /// the global socket object to connect to the daemon
     QLocalSocket* _socket;
 
