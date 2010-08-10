@@ -14,6 +14,7 @@
 #include <QLinkedList>
 #include <QTime>
 #include <QMetaType>
+#include <QThread>
 #include "debug.h"
 
 // Register this type in Qt's meta-type system
@@ -194,6 +195,7 @@ bool DeviceMuxer::waitForBytesWritten(channel_t /*channel*/, int msecs)
                 QCoreApplication::processEvents(QEventLoop::AllEvents, remaining);
             else
                 QCoreApplication::processEvents();
+            QThread::yieldCurrentThread();
         }
     }
 
@@ -222,6 +224,7 @@ bool DeviceMuxer::waitForReadyRead(channel_t channel, int msecs)
         if (timer && remaining < 0)
             remaining = 0;
         QCoreApplication::processEvents(QEventLoop::AllEvents, remaining);
+        QThread::yieldCurrentThread();
     }
 
     return _readyReadEmitted[channel] || bytesAvailable(channel) > 0;
