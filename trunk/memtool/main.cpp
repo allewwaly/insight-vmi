@@ -1,5 +1,6 @@
 #include <QtCore>
 #include <QCoreApplication>
+#include <QThread>
 
 #include "programoptions.h"
 #include "shell.h"
@@ -16,12 +17,12 @@ int main(int argc, char *argv[])
     if (!programOptions.parseCmdOptions(args))
         return 1;
 
-    shell = new Shell(false);
+    shell = new Shell(programOptions.action() == acNone);
+    shell->moveToThread(QThread::currentThread());
 
     app.connect(shell, SIGNAL(terminated()), &app, SLOT(quit()));
 
     shell->start();
-    shell->wait();
 
-    return shell->wait(100) ? shell->lastStatus() : app.exec();
+    return shell->isFinished() ? shell->lastStatus() : app.exec();
 }

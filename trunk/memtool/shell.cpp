@@ -10,17 +10,12 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <memtool/constdefs.h>
+#include <memtool/memtool.h>
 #include <memtool/memtoolexception.h>
 #include <QCoreApplication>
-//#include <QMetaType>
-//#include <QAbstractSocket>
 #include <QDir>
 #include "programoptions.h"
 #include "debug.h"
-
-// Strange Qt error
-//Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
-//Q_DECLARE_METATYPE(QAbstractSocket::SocketError);
 
 Shell* shell = 0;
 
@@ -35,38 +30,14 @@ Shell::Shell(bool interactive, QObject* parent)
     _in.setDevice(&_stdin);
     _out.setDevice(&_stdout);
     _err.setDevice(&_stderr);
-
-    _memtool = new Memtool(this);
-
-//    qRegisterMetaType<QAbstractSocket::SocketState>();
-//    qRegisterMetaType<QAbstractSocket::SocketError>();
 }
 
 
 Shell::~Shell()
 {
-	// Construct the path name of the history file
-	QStringList pathList = QString(mt_history_file).split("/", QString::SkipEmptyParts);
-    QString file = pathList.last();
-    pathList.pop_back();
-    QString path = pathList.join("/");
-
-	// Create history path, if it does not exist
-    if (!QDir::home().exists(path) && !QDir::home().mkpath(path)) {
-		debugerr("Error creating path for saving the history");
-    }
-    else {
-        // Only save history for interactive sessions
-//        if (!_listenOnSocket) {
-            // Save the history for the next launch
-            QString histFile = QDir::home().absoluteFilePath(mt_history_file);
-            QByteArray ba = histFile.toLocal8Bit();
-            int ret = write_history(ba.constData());
-            if (ret)
-                debugerr("Error #" << ret << " occured when trying to save the "
-                        "history data to \"" << histFile << "\"");
-//        }
-    }
+	saveHistory();
+    if (_memtool)
+    	delete _memtool;
 }
 
 
@@ -104,7 +75,7 @@ QString Shell::readLine(const QString& prompt)
 
     // If line is NULL, the user wants to exit.
     if (!line) {
-//        _finished = true;
+        _finished = true;
         return QString();
     }
 
@@ -135,14 +106,125 @@ bool Shell::questionYesNo(const QString& question)
 }
 
 
+void Shell::loadHistory()
+{
+    // Load the readline history
+    QString histFile = QDir::home().absoluteFilePath(mt_history_file);
+    if (QFile::exists(histFile)) {
+        int ret = read_history(histFile.toLocal8Bit().constData());
+        if (ret)
+            debugerr("Error #" << ret << " occured when trying to read the "
+                    "history data from \"" << histFile << "\"");
+    }
+}
+
+
+void Shell::saveHistory()
+{
+    // Only save history for interactive sessions
+    if (!_interactive)
+    	return;
+
+	// Construct the path name of the history file
+	QStringList pathList = QString(mt_history_file).split("/", QString::SkipEmptyParts);
+    QString file = pathList.last();
+    pathList.pop_back();
+    QString path = pathList.join("/");
+
+	// Create history path, if it does not exist
+    if (!QDir::home().exists(path) && !QDir::home().mkpath(path)) {
+		debugerr("Error creating path for saving the history");
+    }
+    else {
+		// Save the history for the next launch
+		QString histFile = QDir::home().absoluteFilePath(mt_history_file);
+		QByteArray ba = histFile.toLocal8Bit();
+		int ret = write_history(ba.constData());
+		if (ret)
+			debugerr("Error #" << ret << " occured when trying to save the "
+					"history data to \"" << histFile << "\"");
+    }
+}
+
+
+void Shell::shellLoop()
+{
+	_interactive = true;
+    // Enable readline history
+    using_history();
+    loadHistory();
+
+	_out << "Type \"exit\" to leave this shell." << endl << endl;
+	_finished = false;
+
+	while (true) {
+		QString line = readLine();
+
+		if (_finished) {
+			_out << endl;
+			break;
+		}
+
+		if (!line.isEmpty()) {
+			try {
+				if (line.toLower() == "exit")
+					break;
+				_lastStatus = _memtool->eval(line);
+			}
+		    catch (MemtoolException e) {
+		        _err << "Caught exception at " << e.file << ":" << e.line << ":"
+		        	<< endl
+		            << e.message << endl;
+		        _lastStatus = -1;
+		    }
+		}
+	}
+
+	saveHistory();
+}
+
+
+void Shell::printConnectionError(int error)
+{
+	switch (error) {
+	case crOk:
+		break;
+	case crDaemonNotRunning:
+		_err << "Memtool daemon is not running." << endl;
+		break;
+	case crTooManyConnections:
+		_err << "Too many connections, currently only one connection is "
+				"supported at a time." << endl;
+		break;
+	default:
+		_err << "An unknown error occured while connecting to the memtool "
+			"daemon, error code is " << error << "." << endl;
+	}
+}
+
+
 void Shell::run()
 {
     QString output;
     _lastStatus = 0;
 
+    // Create the object in this thread
+    _memtool = new Memtool();
+    _memtool->setOutToStdOut(true);
+    _memtool->setErrToStdErr(true);
+
+    // Try to connect to daemon
+    int connRes = _memtool->connectToDaemon();
+
     try {
         switch (programOptions.action()) {
         case acNone:
+        	if (connRes == crOk)
+        		shellLoop();
+        	else
+        		printConnectionError(connRes);
+        	break;
+
         case acUsage:
             ProgramOptions::cmdOptionsUsage();
             break;
@@ -159,8 +241,10 @@ void Shell::run()
             break;
 
         case acDaemonStop:
-            if (!_memtool->isDaemonRunning())
+            if (connRes == crDaemonNotRunning)
                 _out << "Memtool daemon is not running." << endl;
+            else if (connRes != crOk)
+            	printConnectionError(connRes);
             else if (_memtool->daemonStop())
                 _out << "Memtool daemon successfully stopped." << endl;
             else {
@@ -170,6 +254,7 @@ void Shell::run()
             break;
 
         case acDaemonStatus:
+        	_memtool->setErrToStdErr(false);
             if (_memtool->isDaemonRunning())
                 _out << "Memtool daemon is running." << endl;
             else
@@ -182,16 +267,23 @@ void Shell::run()
                 _err << "File not found: \"" << fileName << "\"" << endl;
                 _lastStatus = 3;
             }
-            output = _memtool->eval("symbols load " + fileName);
+            else if (connRes != crOk)
+        		printConnectionError(connRes);
+            else
+            	_lastStatus = _memtool->eval("symbols load " + fileName);
             break;
         }
 
         case acSymbolsStore: {
-            QString fileName = QDir().absoluteFilePath(programOptions.fileName());
-            if (!QFile::exists(fileName) ||
-                    questionYesNo(QString("Overwrite file \"%1\"?")
-                            .arg(programOptions.fileName())))
-                output = _memtool->eval("symbols store " + fileName);
+        	if (connRes != crOk)
+        		printConnectionError(connRes);
+        	else {
+				QString fileName = QDir().absoluteFilePath(programOptions.fileName());
+				if (!QFile::exists(fileName) ||
+						questionYesNo(QString("Overwrite file \"%1\"?")
+								.arg(programOptions.fileName())))
+					_lastStatus = _memtool->eval("symbols store " + fileName);
+        	}
             break;
         }
 
@@ -206,37 +298,55 @@ void Shell::run()
                 _err << "Not a directory: \"" << dirName << "\"" << endl;
                 _lastStatus = 5;
             }
+            else if (connRes != crOk)
+            	printConnectionError(connRes);
             else
-                output = _memtool->eval("symbols parse " + dirName);
+            	_lastStatus = _memtool->eval("symbols parse " + dirName);
             break;
         }
 
         case acEval:
-            output = _memtool->eval(programOptions.command());
+        	if (connRes != crOk)
+        		printConnectionError(connRes);
+        	else
+        		_lastStatus = _memtool->eval(programOptions.command());
             break;
 
-        case acMemDumpList: {
-            QStringList list = _memtool->memDumpList();
-            if (list.isEmpty())
-                output = "No memory dumps loaded.";
-            for (int i = 0; i < list.size(); ++i)
-                if (!list[i].isEmpty())
-                    output += QString("[%1] %2\n").arg(i).arg(list[i]);
+        case acMemDumpList:
+        	if (connRes != crOk)
+        		printConnectionError(connRes);
+        	else {
+				QStringList list = _memtool->memDumpList();
+				if (list.isEmpty())
+					output = "No memory dumps loaded.";
+				for (int i = 0; i < list.size(); ++i)
+					if (!list[i].isEmpty())
+						output += QString("[%1] %2\n").arg(i).arg(list[i]);
+        	}
+            break;
+
+        case acMemDumpLoad: {
+            QString fileName = QDir().absoluteFilePath(programOptions.fileName());
+            if (!QFile::exists(fileName)) {
+                _err << "File not found: \"" << fileName << "\"" << endl;
+                _lastStatus = 3;
+            }
+            else if (connRes != crOk)
+        		printConnectionError(connRes);
+            else if (_memtool->memDumpLoad(programOptions.fileName()))
+				output = QString("Successfully loaded \"%1\"")
+							.arg(programOptions.fileName());
+			else {
+				_err << "Error loading \"" << programOptions.fileName() << "\"" << endl;
+				_lastStatus = 6;
+            }
             break;
         }
 
-        case acMemDumpLoad:
-            if (_memtool->memDumpLoad(programOptions.fileName()))
-                output = QString("Successfully loaded \"%1\"")
-                            .arg(programOptions.fileName());
-            else {
-                _err << "Error loading \"" << programOptions.fileName() << "\"" << endl;
-                _lastStatus = 6;
-            }
-            break;
-
         case acMemDumpUnload:
-            if (_memtool->memDumpUnload(programOptions.fileName()))
+            if (connRes != crOk)
+        		printConnectionError(connRes);
+            else if (_memtool->memDumpUnload(programOptions.fileName()))
                 output = QString("Successfully unloaded \"%1\"")
                             .arg(programOptions.fileName());
             else {
@@ -259,6 +369,9 @@ void Shell::run()
         if (!output.endsWith('\n'))
             _out << endl;
     }
+
+    delete _memtool;
+    _memtool = 0;
 
     QCoreApplication::exit(_lastStatus);
 }

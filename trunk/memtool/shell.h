@@ -12,7 +12,8 @@
 #include <QStringList>
 #include <QTextStream>
 #include <QThread>
-#include <memtool/memtool.h>
+
+class Memtool;
 
 
 class Shell: public QThread
@@ -73,6 +74,12 @@ public:
      */
     int lastStatus() const;
 
+
+    /**
+     * Enters an interactive shell
+     */
+    void shellLoop();
+
 //    /**
 //     * Terminates the shell immediately
 //     */
@@ -82,6 +89,10 @@ protected:
     virtual void run();
 
 private:
+    void loadHistory();
+    void saveHistory();
+    void printConnectionError(int error);
+
     QFile _stdin;
     QFile _stdout;
     QFile _stderr;
@@ -90,7 +101,7 @@ private:
     QTextStream _err;
     bool _interactive;
     Memtool* _memtool;
-//    bool _finished;
+    bool _finished;
     int _lastStatus;
 
 };
