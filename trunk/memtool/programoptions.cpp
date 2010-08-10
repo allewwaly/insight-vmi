@@ -163,7 +163,7 @@ void ProgramOptions::cmdOptionsUsage()
 
         std::cout
             << "  " << std::left << std::setw(24) << opts.toStdString()
-            << options[i].help
+            << "  " << options[i].help
             << std::endl;
     }
 }
