@@ -256,7 +256,7 @@ void DeviceMuxer::setDevice(QIODevice* dev)
     // Connect signals to new device
     if (_device) {
         connect(_device, SIGNAL(readyRead()),
-                this, SLOT(handleReadyRead()));
+                this, SLOT(handleReadyRead()), Qt::QueuedConnection);
     }
 
     emit deviceChanged(oldDev, _device);

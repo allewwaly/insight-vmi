@@ -10,10 +10,12 @@
 
 #include <QObject>
 #include <QByteArray>
+#include <QLocalSocket>
 
 class QLocalSocket;
 class DeviceMuxer;
 class MuxerChannel;
+class EventLoopThread;
 
 /**
  * Helper class that inherits QObject in able to handle the readyRead() signal
@@ -25,9 +27,14 @@ class SocketHelper: public QObject
 public:
     /**
      * Constructor
-     * @param socket the socket to read the data from
+     * @param parent the parent object
      */
-    SocketHelper(QLocalSocket* socket, QObject* parent = 0);
+    SocketHelper(QObject* parent = 0);
+
+    /**
+     * Destructor
+     */
+    ~SocketHelper();
 
     /**
      * @return the stdout channel of the multiplexed socket
@@ -84,6 +91,43 @@ public:
      */
     void clear();
 
+    /**
+     * @return the socket object this socket helper wraps
+     */
+    const QLocalSocket* socket() const;
+
+    /**
+     * @return QLocalSocket::state()
+     */
+    QLocalSocket::LocalSocketState state() const;
+
+    /**
+     * Calls the local socket's waitForConnected() method.
+     * @param msecs
+     * @return QLocalSocket::waitForConnected()
+     */
+    bool waitForConnected (int msecs = 30000);
+
+public slots:
+    /**
+     * Connects the socket to the server listening at \a name in ReadWrite mode.
+     * @param name the socket file a server is listening on
+     */
+    void connectToServer(QString name);
+
+    /**
+     * Disconnects from the server.
+     */
+    void disconnectFromServer();
+
+    /**
+     * Writes the content of \a byteArray to the device. Returns the number of
+     * bytes that were actually written, or -1 if an error occurred.
+     * @param byteArray data to write
+     * @return number of bytes written, or -1 in case of an error
+     */
+    qint64 write(const QByteArray& byteArray);
+
 private slots:
     /**
      * Internal signal handler
@@ -96,6 +140,7 @@ private slots:
     void handleErrReadyRead();
 
 private:
+    EventLoopThread* _thread;
     QLocalSocket* _socket;
     DeviceMuxer* _socketMuxer;
     MuxerChannel* _outChan;
@@ -104,6 +149,7 @@ private:
     MuxerChannel* _retChan;
     bool _outToStdOut;
     bool _errToStdErr;
+    qint64 _lastWrittenCount;
 };
 
 #endif /* SOCKETHELPER_H_ */
