@@ -1,4 +1,20 @@
 
+function lalign(s, len)
+{
+	while (len > 0 && s.length < len)
+		s += " ";
+	return s;
+}
+
+//------------------------------------------------------------------------------
+function ralign(s, len)
+{
+	while (len > 0 && s.length < len)
+		s = " " + s;
+	return s;
+}
+
+//------------------------------------------------------------------------------
 function newTestSection(title)
 {
 	print();
@@ -7,6 +23,7 @@ function newTestSection(title)
 	print("------------------------------------------------------------------------");
 }
 
+//------------------------------------------------------------------------------
 print("Creating instance of \"init_task.children\"");
 var inst = new Instance("init_task.children");
 
@@ -34,8 +51,9 @@ print("inst.toString() = " + inst.toString());
 //------------------------------------------------------------------------------
 newTestSection("Iterating over inst.MemberNames()");
 
+var i;
 var names = inst.MemberNames();
-for (var i = 0; i < names.length; ++i)
+for (i = 0; i < names.length; ++i)
 	print ((i+1) + ". member: " + names[i] + 
 			", type = \"" + inst[names[i]].TypeName() + "\"" + 
 			", size = " + inst[names[i]].Size() + " byte");
@@ -44,7 +62,7 @@ for (var i = 0; i < names.length; ++i)
 newTestSection("Iterating over inst.Members()")
 
 var members = inst.Members();
-for (var i = 0; i < members.length; ++i)
+for (i = 0; i < members.length; ++i)
 	print ((i+1) + ". member: " + members[i].FullName() + " @ 0x" + members[i].Address());
 
 //------------------------------------------------------------------------------
@@ -100,5 +118,40 @@ print("member1 instanceof \"Instance\" = " + (member1 instanceof Instance));
 print("member2 instanceof \"Instance\" = " + (member2 instanceof Instance));
 
 
+//------------------------------------------------------------------------------
+newTestSection("Testing address operations");
+var w = 50;
+var save = inst.Address();
+print(lalign("inst.Address() = ", w) + ralign("0x" + inst.Address(), 18));
+i = 16;
+inst.AddToAddress(i);
+print(lalign("Adding offset 0x" + i.toString(16) + " => ", w) + ralign("0x" + inst.Address(), 18));
+i = -8;
+inst.AddToAddress(i);
+print(lalign("Adding offset 0x" + i.toString(16) + " => ", w) + ralign("0x" + inst.Address(), 18));
+inst.AddToAddress(i);
+print(lalign("Adding offset 0x" + i.toString(16) + " => ", w) + ralign("0x" + inst.Address(), 18));
+i = 0xcafebabe;
+inst.SetAddressHigh(i);
+print(lalign("Setting address high to 0x" + i.toString(16) + " => ", w) + ralign("0x" + inst.Address(), 18));
+i = 0xdeadbeef;
+inst.SetAddressLow(i);
+print(lalign("Setting address low to 0x" + i.toString(16) + " => ", w) + ralign("0x" + inst.Address(), 18));
+var s = "0123456789abcdef";
+inst.SetAddress(s);
+print(lalign("Setting address to \"" + s + "\" => ", w) + ralign("0x" + inst.Address(), 18));
+s = "0xfedcba9876543210";
+inst.SetAddress(s);
+print(lalign("Setting address to \"" + s + "\" => ", w) + ralign("0x" + inst.Address(), 18));
+try {
+	s = "Hello, world!";
+	inst.SetAddress(s);
+	print(lalign("Setting address to \"" + s + "\" => ", w) + ralign("0x" + inst.Address(), 18));
+}
+catch (e) {
+	print(lalign(e + " => ", w) + ralign("0x" + inst.Address(), 18));
+}
+inst.SetAddress(save);
+print(lalign("Restoring original address => ", w) + ralign("0x" + inst.Address(), 18));
 
 
