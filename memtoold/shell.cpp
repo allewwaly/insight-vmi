@@ -1209,16 +1209,16 @@ int Shell::cmdMemoryDump(QStringList args)
     int index = parseMemDumpIndex(args);
     // Perform the dump
     if (index >= 0) {
-        QRegExp re("^\\s*([^@\\s]+)\\s*@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
+        QRegExp re("^\\s*([^@]+)\\s*@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
 
         if (!re.exactMatch(args.join(" "))) {
-            _err << "Usage: memory dump [index] <char|int|long> @ <address>" << endl;
+            _err << "Usage: memory dump [index] <char|int|long|type> @ <address>" << endl;
             return 1;
         }
 
         bool ok;
         quint64 addr = re.cap(2).toULong(&ok, 16);
-        _out << _memDumps[index]->dump(re.cap(1), addr) << endl;
+        _out << _memDumps[index]->dump(re.cap(1).trimmed(), addr) << endl;
         return 0;
     }
 

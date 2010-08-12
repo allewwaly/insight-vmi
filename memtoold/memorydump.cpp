@@ -254,6 +254,41 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
         return QString("%1 (0x%2)").arg(l).arg((quint64)l, (sizeof(l) << 1), 16, QChar('0'));
     }
 
+    // Try to find the given type by name
+    QList<BaseType *> results = _factory->typesByName().values(type);
+
+    if(results.size() > 0) {
+    	// Check if type is ambiguous
+    	if (results.size() > 1) {
+    		QString reply = "Warning: Found multiple types for " + type + ":\n";
+
+    		for(int i = 0; i < results.size(); i ++) {
+    			reply += QString("\t-> 0x%1 - %2\n").arg(results.at(i)->id(), 0, 16).arg(results.at(i)->name());
+    		}
+
+    		return reply;
+    	}
+    	else {
+    		Instance i = results.at(0)->toInstance(address, _vmem, "user defined", "user defined");
+    		return i.toString();
+    	}
+    }
+
+    // Try to find the given type by id
+    bool okay;
+    QString typeCopy = type;
+
+    if(type.startsWith("0x")) {
+    	typeCopy.remove(0, 2);
+    }
+
+    BaseType* t = _factory->findBaseTypeById(typeCopy.toUInt(&okay, 16));
+
+    if(t != 0 && okay) {
+    	Instance i = t->toInstance(address, _vmem, "user defined", "user defined");
+    	return i.toString();
+    }
+
     queryError("Unknown type: " + type);
 
     return QString();
