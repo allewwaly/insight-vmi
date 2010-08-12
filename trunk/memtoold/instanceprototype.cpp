@@ -13,6 +13,8 @@
 
 Q_DECLARE_METATYPE(Instance*)
 
+#define INT32MASK 0xFFFFFFFFUL
+
 InstancePrototype::InstancePrototype(QObject *parent)
     : QObject(parent)
 {
@@ -47,6 +49,22 @@ QString InstancePrototype::Address() const
 }
 
 
+void InstancePrototype::SetAddress(QString addrStr)
+{
+    Instance* inst = thisInstance();
+    if (!inst)
+        return;
+    bool ok = false;
+    if (addrStr.startsWith("0x"))
+        addrStr.remove(0, 2);
+    quint64 addr = addrStr.toULongLong(&ok, 16);
+    if (ok)
+        inst->setAddress(addr);
+    else
+        injectScriptError(QString("Illegal number: %1").arg(addrStr));
+}
+
+
 quint32 InstancePrototype::AddressHigh() const
 {
     Instance* inst;
@@ -54,10 +72,36 @@ quint32 InstancePrototype::AddressHigh() const
 }
 
 
+void InstancePrototype::SetAddressHigh(quint32 addrHigh)
+{
+    Instance* inst = thisInstance();
+    if (inst)
+        inst->setAddress((inst->address() & INT32MASK) |
+                         (((quint64) addrHigh) << 32));
+}
+
+
 quint32 InstancePrototype::AddressLow() const
 {
     Instance* inst;
-    return (inst = thisInstance()) ? quint32(inst->address() & 0xFFFFFFFFUL) : 0;
+    return (inst = thisInstance()) ? quint32(inst->address() & INT32MASK) : 0;
+}
+
+
+void InstancePrototype::SetAddressLow(quint32 addrLow)
+{
+    Instance* inst = thisInstance();
+    if (inst)
+        inst->setAddress((inst->address() & (INT32MASK << 32)) | addrLow);
+}
+
+
+
+void InstancePrototype::AddToAddress(int offset)
+{
+    Instance* inst = thisInstance();
+    if (inst)
+        inst->addToAddress(offset);
 }
 
 
@@ -453,5 +497,14 @@ void InstancePrototype::injectScriptError(const GenericException& e) const
                     .arg(e.message));
     else
         throw e;
+}
+
+
+void InstancePrototype::injectScriptError(const QString& msg) const
+{
+    if (context())
+        context()->throwError(msg);
+    else
+        genericError(msg);
 }
 
