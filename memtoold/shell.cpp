@@ -101,7 +101,8 @@ Shell::Shell(bool listenOnSocket)
                 "  memory dump [index] <type> @ <address>\n"
                 "                              Output a value from memory dump <index> at\n"
                 "                              <address> with as <type>, where <type>\n"
-                "                              must be one of \"char\", \"int\" or \"long\""));
+                "                              must be one of \"char\", \"int\", \"long\",\n"
+                "                              a valid type name, or a valid type id"));
 
     _commands.insert("script",
             Command(
@@ -1212,7 +1213,7 @@ int Shell::cmdMemoryDump(QStringList args)
         QRegExp re("^\\s*([^@]+)\\s*@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
 
         if (!re.exactMatch(args.join(" "))) {
-            _err << "Usage: memory dump [index] <char|int|long|type> @ <address>" << endl;
+            _err << "Usage: memory dump [index] <char|int|long|type-name|type-id> @ <address>" << endl;
             return 1;
         }
 
