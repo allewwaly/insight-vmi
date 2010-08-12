@@ -1,6 +1,7 @@
 TEMPLATE = app
 TARGET = memtool
 QT += core network
+CONFIG += debug
 HEADERS += debug.h \
     shell.h \
     programoptions.h

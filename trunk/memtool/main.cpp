@@ -18,11 +18,9 @@ int main(int argc, char *argv[])
         return 1;
 
     shell = new Shell(programOptions.action() == acNone);
-    shell->moveToThread(QThread::currentThread());
-
-    app.connect(shell, SIGNAL(terminated()), &app, SLOT(quit()));
 
     shell->start();
+    shell->wait(-1);
 
-    return shell->isFinished() ? shell->lastStatus() : app.exec();
+    return shell->lastStatus();
 }

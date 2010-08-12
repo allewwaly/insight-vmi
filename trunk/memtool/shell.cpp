@@ -30,6 +30,11 @@ Shell::Shell(bool interactive, QObject* parent)
     _in.setDevice(&_stdin);
     _out.setDevice(&_stdout);
     _err.setDevice(&_stderr);
+
+    // Create the object in this thread
+    _memtool = new Memtool();
+    _memtool->setOutToStdOut(true);
+    _memtool->setErrToStdErr(true);
 }
 
 
@@ -197,7 +202,7 @@ void Shell::printConnectionError(int error)
 				"supported at a time." << endl;
 		break;
 	default:
-		_err << "An unknown error occured while connecting to the memtool "
+		_err << "An unknown error occurred while connecting to the memtool "
 			"daemon, error code is " << error << "." << endl;
 	}
 }
@@ -207,11 +212,6 @@ void Shell::run()
 {
     QString output;
     _lastStatus = 0;
-
-    // Create the object in this thread
-    _memtool = new Memtool();
-    _memtool->setOutToStdOut(true);
-    _memtool->setErrToStdErr(true);
 
     // Try to connect to daemon
     int connRes = _memtool->connectToDaemon();
@@ -369,9 +369,6 @@ void Shell::run()
         if (!output.endsWith('\n'))
             _out << endl;
     }
-
-    delete _memtool;
-    _memtool = 0;
 
     QCoreApplication::exit(_lastStatus);
 }
