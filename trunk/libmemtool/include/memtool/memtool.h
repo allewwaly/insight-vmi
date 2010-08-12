@@ -14,7 +14,6 @@
 
 // forward declaration
 class QObject;
-class QLocalSocket;
 class SocketHelper;
 
 /// Result of a connection attempt
@@ -188,9 +187,6 @@ public:
     void setErrToStdErr(bool value);
 
 private:
-    /// the global socket object to connect to the daemon
-    QLocalSocket* _socket;
-
     /// the socket helper object to handle signals from the socket
     SocketHelper* _helper;
 };

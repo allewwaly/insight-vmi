@@ -5,7 +5,6 @@
  *      Author: chrschn
  */
 
-#include <QLocalSocket>
 #include <QDir>
 #include <QProcess>
 #include <QThread>
@@ -19,7 +18,6 @@
 #include "sockethelper.h"
 #include "debug.h"
 
-const char* connect_fail_msg = "Could not connect to memtool daemon";
 // Register type that might need to be queued
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState)
 static int socket_state_id = qRegisterMetaType<QAbstractSocket::SocketState>();
@@ -30,24 +28,19 @@ void socket_state_id_foo() { Q_UNUSED(socket_state_id); }
 #define connectOrFail() \
     do { \
         if (connectToDaemon() != crOk) \
-            memtoolError(connect_fail_msg);\
+            memtoolError("Could not connect to memtool daemon");\
     } while (0)
 
 
 Memtool::Memtool()
-    : _socket(new QLocalSocket()),
-      _helper(new SocketHelper(_socket))
+    : _helper(new SocketHelper())
 {
-	// Move the members' event loop handling to current thread
-	_socket->moveToThread(QThread::currentThread());
-	_helper->moveToThread(QThread::currentThread());
 }
 
 
 Memtool::~Memtool()
 {
     delete _helper;
-    delete _socket;
 }
 
 
@@ -58,12 +51,14 @@ int Memtool::connectToDaemon()
         return crDaemonNotRunning;
 
     // Are we already connected?
-    if (_socket->state() == QLocalSocket::ConnectingState ||
-        _socket->state() == QLocalSocket::ConnectedState)
+    if (_helper->state() == QLocalSocket::ConnectingState ||
+            _helper->state() == QLocalSocket::ConnectedState)
         return crOk;
+
     // Try to connect
-    _socket->connectToServer(sockFileName, QIODevice::ReadWrite);
-    if (!_socket->waitForConnected(1000))
+    _helper->connectToServer(sockFileName);
+
+    if (!_helper->waitForConnected(1000))
     	return crDaemonNotRunning;
     // Wait for connection acknowledgment
     if (!_helper->ret()->waitForReadyRead(5000))
@@ -80,10 +75,10 @@ int Memtool::connectToDaemon()
 void Memtool::disconnectFromDaemon()
 {
     // Are we already connected?
-    if (_socket->state() == QLocalSocket::ConnectingState &&
-        _socket->state() == QLocalSocket::ConnectedState)
+    if (_helper->state() == QLocalSocket::ConnectingState &&
+            _helper->state() == QLocalSocket::ConnectedState)
 		// Disconnect
-		_socket->disconnectFromServer();
+        _helper->disconnectFromServer();
 }
 
 
@@ -94,7 +89,7 @@ int Memtool::eval(const QString& cmd)
     _helper->clear();
     QString realCmd = cmd.trimmed() + "\n";
     // Execute the command and wait until we received a return value
-    _socket->write(realCmd.toLocal8Bit());
+    _helper->write(realCmd.toLocal8Bit());
     _helper->ret()->waitForReadyRead(-1);
     // Try to read the return value
     int ret = 0;
