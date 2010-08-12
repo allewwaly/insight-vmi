@@ -1103,7 +1103,7 @@ int Shell::cmdMemoryLoad(QStringList args)
         if (!_memDumps[i] && index < 0)
             index = i;
         if (_memDumps[i] && _memDumps[i]->fileName() == fileName) {
-            _out << "File already loaded as [" << i + 1 << "] " << fileName << endl;
+            _out << "File already loaded as [" << i << "] " << fileName << endl;
             return 0;
         }
     }
