@@ -21,6 +21,7 @@
 
 const char* connect_fail_msg = "Could not connect to memtool daemon";
 // Register type that might need to be queued
+Q_DECLARE_METATYPE(QAbstractSocket::SocketState)
 static int socket_state_id = qRegisterMetaType<QAbstractSocket::SocketState>();
 // Use the symbol socket_state_id once to make the compiler happy
 void socket_state_id_foo() { Q_UNUSED(socket_state_id); }
