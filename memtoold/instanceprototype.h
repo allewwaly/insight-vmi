@@ -50,16 +50,41 @@ public slots:
     QString Address() const;
 
     /**
+     * Sets the address of this instance to the given address. The address must
+     * be given as hex encoded string, which may optionally start with "0x".
+     * @param addr the hex enocded address to set
+     */
+    void SetAddress(QString addr);
+
+    /**
      * @return the most significant 32 bits of the address as \c uint32
      * \sa AddressLow(), Address()
      */
     quint32 AddressHigh() const;
 
     /**
+     * Sets the most significant 32 bits of the address.
+     * @param addrHigh the most significant 32 bits of the address
+     */
+    void SetAddressHigh(quint32 addrHigh);
+
+    /**
      * @return the least significant 32 bits of the address as \c uint32
      * \sa AddressHigh(), Address()
      */
     quint32 AddressLow() const;
+
+    /**
+     * Sets the least significant 32 bits of the address.
+     * @param addrLow the least significant 32 bits of the address
+     */
+    void SetAddressLow(quint32 addrLow);
+
+    /**
+     * Adds \a offset to the virtual address.
+     * @param offset the offset to add
+     */
+    void AddToAddress(int offset);
 
     int Id() const;
     int MemDumpIndex() const;
@@ -103,6 +128,7 @@ public slots:
 private:
     inline Instance* thisInstance() const;
     inline void injectScriptError(const GenericException& e) const;
+    inline void injectScriptError(const QString& msg) const;
 };
 
 #endif /* INSTANCEPROTOTYPE_H_ */

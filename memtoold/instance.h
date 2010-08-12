@@ -63,6 +63,18 @@ public:
 	quint64 address() const;
 
 	/**
+	 * Sets the virtual addres of the variable in memory
+	 * @param addr the new virtual address
+	 */
+	void setAddress(quint64 addr);
+
+	/**
+	 * Adds \a offset to the virtual address.
+	 * @param offset the offset to add
+	 */
+	void addToAddress(quint64 offset);
+
+	/**
 	 * This gives you the (short) name of this Instance, i. e., its name its
 	 * parent's struct, e. g. \c next.
 	 * @return the name of this instance

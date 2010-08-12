@@ -57,6 +57,20 @@ quint64 Instance::address() const
 }
 
 
+void Instance::setAddress(quint64 addr)
+{
+    _address = addr;
+    _isNull = !_address || !_isValid;
+}
+
+
+void Instance::addToAddress(quint64 offset)
+{
+    _address += offset;
+    _isNull = !_address || !_isValid;
+}
+
+
 QString Instance::name() const
 {
 	return _name;
