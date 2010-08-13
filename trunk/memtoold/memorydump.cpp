@@ -109,25 +109,12 @@ const QString& MemoryDump::fileName() const
     return _fileName;
 }
 
+Instance MemoryDump::queryInstance(QStringList& components, const Instance& inst) const
+{		
+	Instance instance = inst;
+	QStringList processed(inst.name());
 
-Instance MemoryDump::queryInstance(const QString& queryString) const
-{
-    QStringList components = queryString.split('.', QString::SkipEmptyParts);
-
-    if (components.isEmpty())
-        queryError("Empty query string given");
-
-    QStringList processed(components.first());
-    components.pop_front();
-
-    // The very first component must be a variable
-    Variable* v = _factory->findVarByName(processed.first());
-
-    if (!v)
-        queryError(QString("Variable does not exist: %1").arg(processed.first()));
-
-    Instance instance = v->toInstance(_vmem);
-    while (!instance.isNull() && !components.isEmpty()) {
+	while (!instance.isNull() && !components.isEmpty()) {
         // Resolve member
         QString comp = components.front();
         components.pop_front();
@@ -160,6 +147,31 @@ Instance MemoryDump::queryInstance(const QString& queryString) const
     }
 
     return instance;
+}
+
+Instance MemoryDump::queryInstance(const QString& queryString) const
+{
+    QStringList components = queryString.split('.', QString::SkipEmptyParts);
+
+    if (components.isEmpty())
+        queryError("Empty query string given");
+
+    QStringList processed(components.first());
+    components.pop_front();
+
+    // The very first component must be a variable
+    Variable* v = _factory->findVarByName(processed.first());
+
+    if (!v)
+        queryError(QString("Variable does not exist: %1").arg(processed.first()));
+
+    Instance instance = v->toInstance(_vmem);
+	
+	// Return data
+	if(components.isEmpty())
+		return instance;
+	else
+		return queryInstance(components, instance);
 }
 
 
@@ -254,8 +266,10 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
         return QString("%1 (0x%2)").arg(l).arg((quint64)l, (sizeof(l) << 1), 16, QChar('0'));
     }
 
+	// Split the type in case we want a member from a structure
+	QStringList components = type.split('.', QString::SkipEmptyParts);
     // Try to find the given type by name
-    QList<BaseType *> results = _factory->typesByName().values(type);
+    QList<BaseType *> results = _factory->typesByName().values(components.first());
 
     if(results.size() > 0) {
     	// Check if type is ambiguous
@@ -270,23 +284,39 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
     	}
     	else {
     		Instance i = results.at(0)->toInstance(address, _vmem, "user defined", "user defined");
-    		return i.toString();
+			// Remove first entry from the query
+			components.pop_front();
+			
+			// More to query?
+			if(!components.isEmpty()) {
+				i = queryInstance(components, i);
+			}
+			
+			return QString("%1 (ID 0x%2)").arg(i.typeName()).arg(i.type()->id(), 0, 16) + "\n" + i.toString();
     	}
     }
 
     // Try to find the given type by id
     bool okay;
-    QString typeCopy = type;
 
-    if(type.startsWith("0x")) {
-    	typeCopy.remove(0, 2);
+    if(components.first().startsWith("0x")) {
+    	components.first().remove(0, 2);
     }
 
-    BaseType* t = _factory->findBaseTypeById(typeCopy.toUInt(&okay, 16));
+    BaseType* t = _factory->findBaseTypeById(components.first().toUInt(&okay, 16));
 
     if(t != 0 && okay) {
     	Instance i = t->toInstance(address, _vmem, "user defined", "user defined");
-    	return i.toString();
+		
+		// Remove first entry from the query
+		components.pop_front();
+		
+		// More to query?
+		if(components.isEmpty()) {
+			i = queryInstance(components, i);
+		}
+		
+		return QString("%1 (ID 0x%2)").arg(i.typeName()).arg(i.type()->id(), 0, 16) + "\n" + i.toString();
     }
 
     queryError("Unknown type: " + type);
