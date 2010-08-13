@@ -126,6 +126,19 @@ public:
      * be read
      */
     Instance queryInstance(const QString& queryString) const;
+	
+	/**
+     * Retrieves an Instance object following a list of symbols starting from
+	 * a given instance, e. g., [children, next], task_struct.
+     * @param components the list of symbols to follow
+	 * @param inst the instance object to start from
+     * @return an Instance object specified by the symbol list and the given 
+	 * instance
+     *
+     * @exception QueryException the queried symbol does not exist or cannot
+     * be read
+     */
+    Instance queryInstance(QStringList& components, const Instance& inst) const;
 
     /**
      * Retrieves a string representation for an arbitrary memory region as the

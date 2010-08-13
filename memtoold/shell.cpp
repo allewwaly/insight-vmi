@@ -100,9 +100,12 @@ Shell::Shell(bool listenOnSocket)
                 "  memory query [index] <expr> Output a symbol from memory dump <index>\n"
                 "  memory dump [index] <type> @ <address>\n"
                 "                              Output a value from memory dump <index> at\n"
-                "                              <address> with as <type>, where <type>\n"
+                "                              <address> as <type>, where <type>\n"
                 "                              must be one of \"char\", \"int\", \"long\",\n"
-                "                              a valid type name, or a valid type id"));
+                "                              a valid type name, or a valid type id.\n"
+				"                              Notice, that a type name or a type id\n"
+				"                              can be followed by a query string in case\n"
+				"                              a member of a struct should be dumped."));
 
     _commands.insert("script",
             Command(
@@ -1213,7 +1216,7 @@ int Shell::cmdMemoryDump(QStringList args)
         QRegExp re("^\\s*([^@]+)\\s*@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
 
         if (!re.exactMatch(args.join(" "))) {
-            _err << "Usage: memory dump [index] <char|int|long|type-name|type-id> @ <address>" << endl;
+            _err << "Usage: memory dump [index] <char|int|long|type-name|type-id>(.<member>)* @ <address>" << endl;
             return 1;
         }
 
