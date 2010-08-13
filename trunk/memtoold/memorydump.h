@@ -11,6 +11,7 @@
 #include "filenotfoundexception.h"
 #include "virtualmemory.h"
 #include "instance.h"
+#include "basetype.h"
 
 // forward declarations
 class QFile;
@@ -128,24 +129,44 @@ public:
     Instance queryInstance(const QString& queryString) const;
 	
 	/**
-     * Retrieves an Instance object following a list of symbols starting from
-	 * a given instance, e. g., [children, next], task_struct.
-     * @param components the list of symbols to follow
-	 * @param inst the instance object to start from
-     * @return an Instance object specified by the symbol list and the given 
-	 * instance
+     * Retrieves the next Instance object following the given symbol,
+	 * e. g., "children", task_struct.
+     * @param component the symbol to follow
+	 * @param instance the instance object to start from
+     * @return an Instance object specified by the symbol and the given  instance
      *
      * @exception QueryException the queried symbol does not exist or cannot
      * be read
      */
-    Instance queryInstance(QStringList& components, const Instance& inst) const;
+    Instance getNextInstance(const QString& component, const Instance& instance) const;
+	
+	/**
+	 * Get an Instance object with the given type from the given address.
+     * @param type the type of Instance object to be created
+	 * @param address the address the Instance object will be build from
+	 * @param fullName the full name of the new Instance object
+     * @return a new Instance object of the given type
+     *
+     * @exception QueryException the queried symbol does not exist or cannot
+     * be read
+     */
+    Instance getInstanceAt(const QString& type, const size_t address, const QString& fullName) const;
+	
+	/**
+	 * Get the Type object of a type given as string.
+     * @param type the type name or id of Type object to be created
+     * @return a pointer to the Type object
+     *
+     * @exception QueryException the queried type does not exist
+     */
+	BaseType* getType(const QString& type) const;
 
     /**
      * Retrieves a string representation for an arbitrary memory region as the
      * specified type. The only types supported so far are "char" (8 bit),
      * "int" (32 bit) and "long" (64 bit).
      * @param type the type to dump the memory at \a address, must be one of
-     * "char", "int" or "long"
+     * "char", "int", "long", or expr
      * @param address the virtual address to read the value from
      * @return a string representation of the memory region at \a address as
      * type \a type
