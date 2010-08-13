@@ -51,6 +51,10 @@ SocketHelper::~SocketHelper()
     safe_delete(_outChan);
     safe_delete(_socketMuxer);
     safe_delete(_socket);
+    if (_thread->isRunning()) {
+        _thread->exit(0);
+        _thread->wait(-1);
+    }
     if (_thread->parent() != this)
         safe_delete(_thread);
 }
