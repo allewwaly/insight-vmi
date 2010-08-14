@@ -164,15 +164,18 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	QString typeString;
 	QString symbol;
 	QString offsetString;
+	QString arrayIndexString;
 	quint32 offset = 0;
+	quint32 arrayIndex = 0;
 	size_t address;
 	bool okay;
-	BaseType* type;
+	BaseType* type = 0;
 	Structured* structd;
 	StructuredMember* structdMember;
+	Pointer* pointer;
 
-	// A component should have the form (<symbol>)?<symbol>
-	QRegExp re("^\\s*(\\(\\s*([^\\s-]+)(\\s*-\\s*([^\\s]+))?\\s*\\))?\\s*([^\\s]+)\\s*");
+	// A component should have the form (<symbol>(-offset)?)?<symbol>([index])?
+	QRegExp re("^\\s*(\\(\\s*([A-Za-z0-9_]+)(\\s*-\\s*([A-Za-z0-9_]+))?\\s*\\))?\\s*([A-Za-z0-9_]+)(\\[(\\d+)\\])?\\s*");
 	 
 	if (!re.exactMatch(component)) {
 		queryError(QString("Could not parse a part of the query string: %1").arg(component));
@@ -182,6 +185,9 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	typeString = re.cap(2);
 	offsetString = re.cap(4).trimmed();
 	symbol = re.cap(5);
+	arrayIndexString = re.cap(7);
+	
+	// debugmsg(QString("2: %1, 3: %2, 4: %3, 5: %4, 6: %5, 7: %6").arg(re.cap(2)).arg(re.cap(3)).arg(re.cap(4)).arg(re.cap(5)).arg(re.cap(6)).arg(re.cap(7)));
 
 	if(typeString != "") {
 		cast = true;
@@ -257,13 +263,34 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 
 		// Get address
 		if(result.type()->type() & (BaseType::rtPointer)) {
+			// Manipulate pointer to enable list navigation
+			//pointer = (Pointer *)(result.type());
+			//pointer->setMacroExtraOffset(offset);
+			//pointer->setRefType(type);
 			address = (size_t)result.toPointer() - offset;
 		}
 		else {
 			address = result.address() - offset;
+			//queryError(QString("Casting has only be implemented for pointer, but %1 is of type %2.")
+			//				.arg(result.fullName()).arg(result.typeName()));
 		}
 		
 		result = getInstanceAt(typeString, address, result.fullName());	
+	}
+	
+	// Add array index
+	if(arrayIndexString != "") {
+		arrayIndex = arrayIndexString.toUInt(&okay, 10);
+		
+		if(okay) {
+			// Update address
+			result.addToAddress(arrayIndex * result.type()->size());
+		}
+		else {
+			queryError(QString("Given array index %1 could not be converted to a number.")
+							.arg(arrayIndexString));
+		}
+		
 	}
 	
 	return result;
@@ -354,8 +381,6 @@ QString MemoryDump::query(const QString& queryString) const
 
 QString MemoryDump::dump(const QString& type, quint64 address) const
 {
-    debugmsg(QString("address = 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
-
     if (!_vmem->seek(address))
         queryError(QString("Cannot seek address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
 
@@ -391,7 +416,8 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 			components.pop_front();
 		}
 			
-		return result.toString();
+		return QString("%1 (ID 0x%2) @ %3\n").arg(result.typeName()).arg(result.type()->id(), 0, 16).arg(result.address(), 0, 16) + 
+				result.toString();
 	}
 
     queryError("Unknown type: " + type);
