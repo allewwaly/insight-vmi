@@ -163,11 +163,12 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
                  ( //(m->refType()->type() & rtTypedef) &&
                    (m->refType()->dereferencedType() & (rtStruct | rtUnion)) ) )
             {
-                s += QString("%0.  0x%1  %2 : %3 = ...")
+                s += QString("%0.  0x%1  %2 : %3 = %4")
                         .arg(i, index_len)
                         .arg(m->offset(), offset_len, 16, QChar('0'))
                         .arg(m->name(), -name_len)
-                        .arg(m->refType()->prettyName(), -type_len);
+                        .arg(m->refType()->prettyName(), -type_len)
+						.arg(m->refType()->toUInt32(mem, offset + m->offset()), 0, 16);
             }
             else {
                 s += QString("%0.  0x%1  %2 : %3 = %4")
