@@ -60,9 +60,9 @@ QString Variable::toString(QIODevice* mem) const
 }
 
 
-Instance Variable::toInstance(VirtualMemory* vmem) const
+Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes) const
 {
-	return createRefInstance(_offset, vmem, _name, _id);
+	return createRefInstance(_offset, vmem, _name, _id, resolveTypes);
 }
 
 

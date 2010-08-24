@@ -9,6 +9,7 @@
 #include <QScriptEngine>
 #include <QScriptClassPropertyIterator>
 #include "instanceprototype.h"
+#include "basetype.h"
 #include "debug.h"
 
 Q_DECLARE_METATYPE(Instance)
@@ -109,7 +110,7 @@ QScriptValue InstanceClass::property(const QScriptValue& object,
     // We should never be called without a valid id
     assert(id < (uint)inst->memberCount());
 
-    Instance member = inst->member(id);
+    Instance member = inst->member(id, BaseType::trAny);
     assert(!member.isNull());
 
     return newInstance(member);
@@ -343,7 +344,8 @@ void InstanceClassPropertyIterator::toBack()
 QScriptString InstanceClassPropertyIterator::name() const
 {
     Instance *inst = qscriptvalue_cast<Instance*>(object().data());
-    return object().engine()->toStringHandle(inst->member(m_last).name());
+    return object().engine()->toStringHandle(
+            inst->member(m_last, BaseType::trAny).name());
 }
 
 

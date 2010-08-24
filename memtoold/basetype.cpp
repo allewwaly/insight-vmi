@@ -28,11 +28,11 @@ const qint32 FloatingTypes =
 const qint32 ReferencingTypes =
     BaseType::rtPointer     |
     BaseType::rtArray       |
-    BaseType::rtStruct      |
-    BaseType::rtUnion       |
     BaseType::rtConst       |
     BaseType::rtVolatile    |
-    BaseType::rtTypedef;
+    BaseType::rtTypedef     |
+    BaseType::rtStruct      |
+    BaseType::rtUnion;
 
 // These types cannot be resolved anymore
 const qint32 ElementaryTypes =
@@ -138,7 +138,8 @@ BaseType::RealTypeRevMap BaseType::getRealTypeRevMap()
 
 
 Instance BaseType::toInstance(size_t address, VirtualMemory* vmem,
-        const QString& name, const QString& parent, int* /*derefCount*/) const
+        const QString& name, const QString& parent, int /*resolveTypes*/,
+        int* /*derefCount*/) const
 {
     return Instance(address, this, name, parent, vmem, -1);
 }

@@ -116,7 +116,7 @@ InstanceList Instance::members() const
 	InstanceList ret;
 	QString fullName = this->fullName();
 	for (int i = 0; i < list.count(); ++i)
-		ret.append(list[i]->toInstance(_address, _vmem, fullName));
+		ret.append(list[i]->toInstance(_address, _vmem, fullName, BaseType::trLexical));
 	return ret;
 }
 
@@ -233,11 +233,11 @@ bool Instance::equals(const Instance& other) const
     case BaseType::rtUnion: {
         const int cnt = memberCount();
         for (int i = 0; i < cnt; ++i) {
-            Instance inst1 = member(i);
+            Instance inst1 = member(i, BaseType::trAny);
             // Don't recurse into nested structs
             if (inst1.type()->type() & (BaseType::rtStruct|BaseType::rtUnion))
                 continue;
-            Instance inst2 = other.member(i);
+            Instance inst2 = other.member(i, BaseType::trAny);
             if (!inst1.equals(inst2))
                 return false;
         }
@@ -262,8 +262,8 @@ bool Instance::equals(const Instance& other) const
     case BaseType::rtTypedef:
     case BaseType::rtVolatile: {
         int cnt1, cnt2;
-        Instance inst1 = dereference(&cnt1);
-        Instance inst2 = other.dereference(&cnt2);
+        Instance inst1 = dereference(BaseType::trAny, &cnt1);
+        Instance inst2 = other.dereference(BaseType::trAny, &cnt2);
 
         if (cnt1 != cnt2)
             return false;
@@ -271,7 +271,7 @@ bool Instance::equals(const Instance& other) const
         return inst1.equals(inst2);
     }
 
-    }
+    } // end of switch
 
     return false;
 }
@@ -323,8 +323,8 @@ void Instance::differencesRek(const Instance& other,
 
             const int cnt = memberCount();
             for (int i = 0; i < cnt; ++i) {
-                Instance inst1 = member(i);
-                Instance inst2 = other.member(i);
+                Instance inst1 = member(i, BaseType::trAny);
+                Instance inst2 = other.member(i, BaseType::trAny);
                 // Assume invalid types to be different
                 if (!inst1.type() || !inst2.type()) {
                     // Add to the list
@@ -370,8 +370,8 @@ void Instance::differencesRek(const Instance& other,
     case BaseType::rtTypedef:
     case BaseType::rtVolatile: {
         int cnt1, cnt2;
-        Instance inst1 = dereference(&cnt1);
-        Instance inst2 = other.dereference(&cnt2);
+        Instance inst1 = dereference(BaseType::trAny, &cnt1);
+        Instance inst2 = other.dereference(BaseType::trAny, &cnt2);
 
         if (cnt1 != cnt2)
             result.append(relParent);
@@ -406,27 +406,27 @@ Instance Instance::arrayElem(int index) const
 }
 
 
-Instance Instance::dereference(int* derefCount) const
+Instance Instance::dereference(int resolveTypes, int* derefCount) const
 {
     if (isNull())
         return *this;
 
-    if (_type->type() & (BaseType::rtPointer|BaseType::rtConst|BaseType::rtVolatile|BaseType::rtTypedef)) {
-        return _type->toInstance(_address, _vmem, _name, _parentName, derefCount);
-    }
-    else {
-        if (derefCount)
-            *derefCount = 0;
-        return *this;
-    }
+    if (resolveTypes && _type)
+        return _type->toInstance(_address, _vmem, _name, _parentName,
+                resolveTypes, derefCount);
+
+    if (derefCount)
+        *derefCount = 0;
+    return *this;
 }
 
 
-Instance Instance::member(int index) const
+Instance Instance::member(int index, int resolveTypes) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_type);
 	if (s && index >= 0 && index < s->members().size())
-		return s->members().at(index)->toInstance(_address, _vmem, fullName());
+		return s->members().at(index)->toInstance(_address, _vmem, fullName(),
+		        resolveTypes);
 	return Instance();
 }
 
@@ -438,14 +438,14 @@ bool Instance::memberExists(const QString& name) const
 }
 
 
-Instance Instance::findMember(const QString& name) const
+Instance Instance::findMember(const QString& name, int resolveTypes) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_type);
 	const StructuredMember* m = 0;
 	if ( !s || !(m = s->findMember(name)) )
 		return Instance();
 
-	return m->toInstance(_address, _vmem, fullName());
+	return m->toInstance(_address, _vmem, fullName(), resolveTypes);
 }
 
 

@@ -76,10 +76,12 @@ public:
      * @param structAddress the virtual memory address of the containing (parent) struct
      * @param vmem the virtual memory object to read data from
      * @param parent the name of all members which lead to this member
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
      * @return an Instace object for this member
      */
     Instance toInstance(size_t structAddress, VirtualMemory* vmem,
-    		const QString& parent) const;
+    		const QString& parent, int resolveTypes = BaseType::trLexical) const;
 
 private:
 	size_t _offset;          ///< the member's offset within the struct;

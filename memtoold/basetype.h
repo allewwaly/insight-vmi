@@ -63,9 +63,16 @@ public:
 };
 
 
+/**
+ * This class is the base of all types that may ever occur in debugging symbols.
+ * These are basically all elementary types (numbers and pointers), composed
+ * types such as structs or unions, and lexical types such as typedefs and
+ * const or volatile types.
+ */
 class BaseType: public Symbol, public SourceRef
 {
 public:
+    /// The actual type that a BaseType object represents
     enum RealType {
         rtInt8        = (1 <<  0),
         rtUInt8       = (1 <<  1),
@@ -93,8 +100,21 @@ public:
         // Don't forget to add new types to getRealTypeRevMap()
     };
 
+    /// Specifies how referencing types should be resolved
+    enum TypeResolution {
+        trNone = 0,                                 ///< no resolution is performed
+        trLexical = rtConst|rtVolatile|rtTypedef,   ///< resolve rtConst, rtVolatile, rtTypedef only
+        trLexicalAndPointers = trLexical|rtPointer, ///< resolve as for trLexical plus rtPointer
+        trAny = 0xFFFFFFFF                          ///< resolve all types
+    };
+
+    /// A QHash that maps RealType's to strings
     typedef QHash<BaseType::RealType, QString> RealTypeRevMap;
 
+    /**
+     * @return a QHash that maps all RealType's to their corresponding string
+     * representation
+     */
     static RealTypeRevMap getRealTypeRevMap();
 
     /**
@@ -329,12 +349,16 @@ public:
      * @param vmem the virtual memory object to read data from
      * @param name the name of this instance
      * @param parent the name of the parent, i.e., nesting struct
+     * @param resolveTypes which types to automatically resolve, see
+     * TypeResolution
      * @param derefCount pointer to a counter variable for how many types have
      * been followed to create the instance
      * @return an Instance object for the dereferenced type
+     * \sa BaseType::TypeResolution
      */
     virtual Instance toInstance(size_t address, VirtualMemory* vmem,
-            const QString& name, const QString& parent, int* derefCount = 0) const;
+            const QString& name, const QString& parent,
+            int resolveTypes = trLexical, int* derefCount = 0) const;
 
     /**
      * This operator considers two types to be equal if their following data
