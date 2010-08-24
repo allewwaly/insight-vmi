@@ -61,6 +61,17 @@ public:
      */
     int memDumpIndex() const;
 
+    /**
+     * Translates a virtual kernel address to a physical address, either by
+     * linear translation (* \a pageSize == -1) or by page table look-up,
+     * depending on the address.
+     * @param vaddr virtual address
+     * @param pageSize here the size of the belonging page is returned, or -1,
+     * if the address is within linear space
+     * @return physical address
+     */
+    quint64 virtualToPhysical(quint64 vaddr, int* pageSize);
+
 protected:
     // Pure virtual functions of QIODevice
     virtual qint64 readData (char* data, qint64 maxSize);
@@ -94,15 +105,6 @@ private:
      * @return physical address
      */
     quint64 pageLookup32(quint64 vaddr, int* pageSize);
-
-    /**
-     * Translates a virtual kernel address to a physical address, either by
-     * linear translation or by page table look-up, depending on the address.
-     * @param vaddr virtual address
-     * @param pageSize here the size of the belonging page is returned
-     * @return physical address
-     */
-    quint64 virtualToPhysical(quint64 vaddr, int* pageSize);
 
     /**
      * i386 specific translation
