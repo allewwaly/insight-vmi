@@ -47,9 +47,10 @@ QString RefBaseType::toString(QIODevice* mem, size_t offset) const
 
 
 Instance RefBaseType::toInstance(size_t address, VirtualMemory* vmem,
-        const QString& name, const QString& parent, int* derefCount) const
+        const QString& name, const QString& parent, int resolveTypes,
+        int* derefCount) const
 {
-    return createRefInstance(address, vmem, name, parent, derefCount);
+    return createRefInstance(address, vmem, name, parent, resolveTypes, derefCount);
 }
 
 

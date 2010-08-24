@@ -127,7 +127,9 @@ BaseType* MemoryDump::getType(const QString& type) const
 			error = QString("Found multiple types for %1:\n").arg(type);
 			
 			for(int i = 0; i < results.size(); i ++) {
-				error += QString("\t-> 0x%1 - %2\n").arg(results.at(i)->id(), 0, 16).arg(results.at(i)->name());
+				error += QString("\t-> 0x%1 - %2\n")
+				        .arg(results.at(i)->id(), 0, 16)
+				        .arg(results.at(i)->name());
 			}
 
 			queryError(error);
@@ -152,15 +154,21 @@ BaseType* MemoryDump::getType(const QString& type) const
 	return result;
 }
 
-Instance MemoryDump::getInstanceAt(const QString& type, const size_t address, const QString& fullName) const
-{	
-	return getType(type)->toInstance(address, _vmem, "user", fullName);
+
+Instance MemoryDump::getInstanceAt(const QString& type, const size_t address,
+        const QString& fullName) const
+{
+    BaseType* t = getType(type);
+	return t ?
+	       t->toInstance(address, _vmem, "user", fullName,
+	               BaseType::trLexicalAndPointers) :
+	       Instance();
 }
+
 
 Instance MemoryDump::getNextInstance(const QString& component, const Instance& instance) const
 {
 	Instance result;
-	bool cast;
 	QString typeString;
 	QString symbol;
 	QString offsetString;
@@ -170,15 +178,16 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	size_t address;
 	bool okay;
 	BaseType* type = 0;
-	Structured* structd;
-	StructuredMember* structdMember;
-	Pointer* pointer;
+	Structured* structd = 0;
+	StructuredMember* structdMember = 0;
+//	Pointer* pointer;
 
 	// A component should have the form (<symbol>(-offset)?)?<symbol>([index])?
 	QRegExp re("^\\s*(\\(\\s*([A-Za-z0-9_]+)(\\s*-\\s*([A-Za-z0-9_]+))?\\s*\\))?\\s*([A-Za-z0-9_]+)(\\[(\\d+)\\])?\\s*");
 	 
 	if (!re.exactMatch(component)) {
-		queryError(QString("Could not parse a part of the query string: %1").arg(component));
+		queryError(QString("Could not parse a part of the query string: %1")
+		            .arg(component));
     }
 	
 	// Set variables according to the matching
@@ -189,68 +198,68 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	
 	// debugmsg(QString("2: %1, 3: %2, 4: %3, 5: %4, 6: %5, 7: %6").arg(re.cap(2)).arg(re.cap(3)).arg(re.cap(4)).arg(re.cap(5)).arg(re.cap(6)).arg(re.cap(7)));
 
-	if(typeString != "") {
-		cast = true;
-	}
-	else {
-		cast = false;
-	}
-	
 	// If the given instance is Null, we interpret this as the first component
 	// in the query string and will therefore try to resolve the variable.
-	if(instance.isNull()) {
+	if (instance.isNull()) {
 		 Variable* v = _factory->findVarByName(symbol);
 
 		if (!v)
 			queryError(QString("Variable does not exist: %1").arg(symbol));
 
-		result = v->toInstance(_vmem);
+		result = v->toInstance(_vmem, BaseType::trAny);
 	}
 	else {
 		// We have a instance therefore we resolve the member
 		if (!instance.type()->type() & (BaseType::rtStruct|BaseType::rtUnion))
-            queryError(QString("Member \"%1\" is not a struct or union").arg(instance.fullName()));
+            queryError(QString("Member \"%1\" is not a struct or union")
+                        .arg(instance.fullName()));
 
-        result = instance.findMember(symbol);
+        result = instance.findMember(symbol, BaseType::trAny);
         if (!result.isValid()) {
             if (!instance.memberExists(symbol))
                 queryError(QString("Struct \"%1\" has no member named \"%2\"")
-                        .arg(instance.typeName())
-                        .arg(symbol));
+                            .arg(instance.typeName())
+                            .arg(symbol));
             else if (!result.type())
-                queryError(QString("The type 0x%3 of member \"%1.%2\" is unresolved")
-                                                    .arg(instance.fullName())
-                                                    .arg(symbol)
-                                                    .arg(instance.typeIdOfMember(symbol), 0, 16));
+                queryError(QString("The type 0x%3 of member \"%1.%2\" is "
+                            "unresolved")
+                            .arg(instance.fullName())
+                            .arg(symbol)
+                            .arg(instance.typeIdOfMember(symbol), 0, 16));
             else
                 queryError(QString("The member \"%1.%2\" is invalid")
-                                                    .arg(instance.fullName())
-                                                    .arg(symbol));
+                            .arg(instance.fullName())
+                            .arg(symbol));
         }
         else if (result.isNull())
-            queryError(QString("The member \"%1.%2\" is a null pointer and cannot be further resolved")
-                                                .arg(instance.fullName())
-                                                .arg(symbol));
+            queryError(QString("The member \"%1.%2\" is a null pointer and "
+                        "cannot be further resolved")
+                        .arg(instance.fullName())
+                        .arg(symbol));
 	}
 	
 	// Cast the instance if necessary
-	if(cast) {
+	if (!typeString.isEmpty()) {
 		// Is a offset given?
-		if(offsetString != "") {
+		if (!offsetString.isEmpty()) {
 			// Is the offset given as string or as int?
 			offset = offsetString.toUInt(&okay, 10);
 			
-			if(!okay) {
+			if (!okay) {
 				// String.
 				type = getType(typeString);
 				
-				if (!type->type() & (BaseType::rtStruct|BaseType::rtUnion))
-					queryError(QString("The given type \"%1\" is not a struct or union and therefore has no offset").arg(typeString));
+				if (!type ||
+				    !(type->type() & (BaseType::rtStruct|BaseType::rtUnion)))
+					queryError(QString("The given type \"%1\" is not a struct "
+					            "or union and therefore has no offset")
+					            .arg(typeString));
 				
 				structd = dynamic_cast<Structured *>(type);
 				
 				if (!structd->memberExists(offsetString)) {
-					queryError(QString("Struct of type \"%1\" has no member named \"%2\"")
+					queryError(QString("Struct of type \"%1\" has no member "
+					            "named \"%2\"")
 								.arg(typeString)
 								.arg(offsetString));
 				}
@@ -262,7 +271,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		}
 
 		// Get address
-		if(result.type()->type() & (BaseType::rtPointer)) {
+		if (result.type()->type() & (BaseType::rtPointer)) {
 			// Manipulate pointer to enable list navigation
 			//pointer = (Pointer *)(result.type());
 			//pointer->setMacroExtraOffset(offset);
@@ -279,15 +288,16 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	}
 	
 	// Add array index
-	if(arrayIndexString != "") {
+	if (arrayIndexString != "") {
 		arrayIndex = arrayIndexString.toUInt(&okay, 10);
 		
-		if(okay) {
+		if (okay) {
 			// Update address
 			result.addToAddress(arrayIndex * result.type()->size());
 		}
 		else {
-			queryError(QString("Given array index %1 could not be converted to a number.")
+			queryError(QString("Given array index %1 could not be converted "
+			                "to a number.")
 							.arg(arrayIndexString));
 		}
 		
@@ -320,9 +330,10 @@ Instance MemoryDump::queryInstance(const int queryId) const
     Variable* v = _factory->findVarById(queryId);
 
     if (!v)
-        queryError(QString("Variable with ID 0x%1 does not exist").arg(queryId, 0, 16));
+        queryError(QString("Variable with ID 0x%1 does not exist")
+                .arg(queryId, 0, 16));
 
-    return v->toInstance(_vmem);
+    return v->toInstance(_vmem, BaseType::rtArray);
 }
 
 

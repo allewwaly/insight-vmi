@@ -256,7 +256,8 @@ bool InstancePrototype::MemberExists(const QString& name) const
 Instance InstancePrototype::FindMember(const QString& name) const
 {
 	Instance* inst;
-    return (inst = thisInstance()) ? inst->findMember(name) : Instance();
+    return (inst = thisInstance()) ?
+            inst->findMember(name, BaseType::trAny) : Instance();
 }
 
 

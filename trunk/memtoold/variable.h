@@ -88,9 +88,12 @@ public:
     /**
      * Creates an Instance object from this variable.
      * @param vmem the virtual memory object to read data from
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
      * @return an Instace object for this member
      */
-    Instance toInstance(VirtualMemory* vmem) const;
+    Instance toInstance(VirtualMemory* vmem, int resolveTypes =
+            BaseType::trLexical) const;
 
 	/**
 	 * Reads a serialized version of this object from \a in.

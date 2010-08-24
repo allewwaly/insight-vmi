@@ -75,7 +75,7 @@ HEADERS += instance.h \
     numeric.h \
     basetype.h \
     enum.h
-CONFIG += console
+CONFIG += console debug
 QT += script \
     network
 LIBS += -lreadline -L ../libmemtool -lmemtool

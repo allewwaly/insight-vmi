@@ -82,22 +82,25 @@ void ReferencingType::writeTo(QDataStream& out) const
 
 Instance ReferencingType::createRefInstance(size_t address,
         VirtualMemory* vmem, const QString& name, const QString& parent,
-        int* derefCount) const
+        int resolveTypes, int* derefCount) const
 {
-    return createRefInstance(address, vmem, name, parent, -1, derefCount);
+    return createRefInstance(address, vmem, name, parent, -1, resolveTypes,
+            derefCount);
 }
 
 
 Instance ReferencingType::createRefInstance(size_t address,
-        VirtualMemory* vmem, const QString& name, int id, int* derefCount) const
+        VirtualMemory* vmem, const QString& name, int id, int resolveTypes,
+        int* derefCount) const
 {
-    return createRefInstance(address, vmem, name, QString(), id, derefCount);
+    return createRefInstance(address, vmem, name, QString(), id,
+            resolveTypes, derefCount);
 }
 
 
 Instance ReferencingType::createRefInstance(size_t address,
 		VirtualMemory* vmem, const QString& name, const QString& parent,
-		int id, int* derefCount) const
+		int id, int resolveTypes, int* derefCount) const
 {
     if (derefCount)
         *derefCount = 0;
@@ -110,8 +113,12 @@ Instance ReferencingType::createRefInstance(size_t address,
     // The "cursor" for resolving the type
     const BaseType* b = _refType;
     const RefBaseType* rbt = 0;
+    if (derefCount)
+        (*derefCount)++;
 
-    while ( (rbt = dynamic_cast<const RefBaseType*>(b)) ) {
+    while ( (b->type() & resolveTypes) &&
+            (rbt = dynamic_cast<const RefBaseType*>(b)) )
+    {
 		// Resolve pointer references
 		if (rbt->type() & (BaseType::rtArray|BaseType::rtPointer)) {
 		    // Pointer to referenced type's referenced type

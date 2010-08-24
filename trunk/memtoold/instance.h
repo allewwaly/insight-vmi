@@ -139,8 +139,8 @@ public:
 	bool isNull() const;
 
     /**
-     * Checks if this is a valid instance and its address is not null.
-     * @return \c true if this object is valid, \c false otherwise
+     * Checks if this instance has type.
+     * @return \c true if this object has a type, \c false otherwise
      * \warning This does \e not check if the address is null or not!
      * \sa isNull()
      */
@@ -215,11 +215,14 @@ public:
 
 	/**
 	 * Dereferences this instance as far as possible.
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
 	 * @param derefCount pointer to a counter variable for how many types have
 	 * been followed to create the instance
 	 * @return a dereferenced version of this instance
+	 * \sa BaseType::TypeResolution
 	 */
-	Instance dereference(int* derefCount = 0) const;
+	Instance dereference(int resolveTypes, int* derefCount = 0) const;
 
 	/**
 	 * @return the number of members, if this is a struct, \c 0 otherwise
@@ -239,9 +242,12 @@ public:
 	 * see if it is valid or not.
 	 *
 	 * @param index index into the member list
-	 * @return
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
+	 * @return Instance object of the specified member
+     * \sa BaseType::TypeResolution
 	 */
-	Instance member(int index) const;
+	Instance member(int index, int resolveTypes) const;
 
 	/**
 	 * Checks if a member with the given name \a name exists in this instance.
@@ -259,10 +265,13 @@ public:
 	 * see if it is valid or not.
 	 *
 	 * @param name the name of the member to find
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
 	 * @return a new Instance object if the member was found, or an empty
 	 * object otherwise
+     * \sa BaseType::TypeResolution
 	 */
-	Instance findMember(const QString& name) const;
+	Instance findMember(const QString& name, int resolveTypes) const;
 
 	/**
 	 * Retrieves the index of the member with name \a name. This index can be

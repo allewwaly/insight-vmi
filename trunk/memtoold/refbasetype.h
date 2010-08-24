@@ -65,12 +65,16 @@ public:
      * @param vmem the virtual memory object to read data from
      * @param name the name of this instance
      * @param parent the name of the parent, i.e., nesting struct
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
      * @param derefCount pointer to a counter variable for how many types have
      * been followed to create the instance
      * @return an Instance object for the dereferenced type
+     * \sa BaseType::TypeResolution
      */
      virtual Instance toInstance(size_t address, VirtualMemory* vmem,
-            const QString& name, const QString& parent, int* derefCount = 0) const;
+            const QString& name, const QString& parent, int resolveTypes =
+            trLexical, int* derefCount = 0) const;
 };
 
 
