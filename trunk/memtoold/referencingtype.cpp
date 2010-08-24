@@ -116,6 +116,14 @@ Instance ReferencingType::createRefInstance(size_t address,
     if (derefCount)
         (*derefCount)++;
 
+    // If this is a pointer, we already have to dereference the initial address
+    const Pointer* p = dynamic_cast<const Pointer*>(this);
+    if (p) {
+        if (vmem->safeSeek(addr))
+            addr = ((size_t)p->toPointer(vmem, addr)) + p->macroExtraOffset();
+    }
+
+
     while ( (b->type() & resolveTypes) &&
             (rbt = dynamic_cast<const RefBaseType*>(b)) )
     {
@@ -137,8 +145,7 @@ Instance ReferencingType::createRefInstance(size_t address,
 			else if (rbt->refTypeId() < 0)
 			    break;
 			// Otherwise resolve pointer reference, if this is a pointer
-			const Pointer* p = dynamic_cast<const Pointer*>(rbt);
-			if (p) {
+			if ( (p = dynamic_cast<const Pointer*>(rbt)) ) {
 			    // If we cannot dereference the pointer, we have to stop here
 			    if (vmem->safeSeek(addr))
 			        addr = ((size_t) p->toPointer(vmem, addr)) + p->macroExtraOffset();
