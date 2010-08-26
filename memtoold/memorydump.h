@@ -12,6 +12,9 @@
 #include "virtualmemory.h"
 #include "instance.h"
 #include "basetype.h"
+#include <QMultiHash>
+#include <QMap>
+#include <QPair>
 
 // forward declarations
 class QFile;
@@ -40,6 +43,14 @@ public:
     {
     }
 };
+
+
+typedef QMultiHash<quint64, Instance> PointerInstanceHash;
+typedef QMultiHash<int, Instance> IdInstanceHash;
+typedef QMap<quint64, Instance> PointerInstanceMap;
+typedef QPair<int, Instance> IntInstPair;
+typedef QMap<quint64, IntInstPair> PointerIntInstanceMap;
+
 
 
 /**
@@ -144,13 +155,14 @@ public:
 	 * Get an Instance object with the given type from the given address.
      * @param type the type of Instance object to be created
 	 * @param address the address the Instance object will be build from
-	 * @param fullName the full name of the new Instance object
+	 * @param parentNames the parent's name components of the new Instance object
      * @return a new Instance object of the given type
      *
      * @exception QueryException the queried symbol does not exist or cannot
      * be read
      */
-    Instance getInstanceAt(const QString& type, const size_t address, const QString& fullName) const;
+    Instance getInstanceAt(const QString& type, const size_t address,
+            const QStringList& parentNames) const;
 	
 	/**
 	 * Get the Type object of a type given as string.
@@ -183,6 +195,11 @@ public:
      */
     int index() const;
 
+    /**
+     * Initializes the reverse mapping of addresses and instances.
+     */
+    void setupRevMap();
+
 private:
     void init();
 
@@ -192,6 +209,10 @@ private:
     VirtualMemory* _vmem;
     const SymFactory* _factory;
     int _index;
+    PointerInstanceHash _pointersTo; ///< holds all pointers that point to a certain address
+    IdInstanceHash _typeInstances;   ///< holds all instances of a given type ID
+    PointerInstanceMap _vmemMap;     ///< map of all used kernel-space virtual memory
+    PointerIntInstanceMap _pmemMap;     ///< map of all used physical memory
 };
 
 #endif /* MEMORYDUMP_H_ */

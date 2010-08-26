@@ -225,6 +225,7 @@ private:
     int cmdMemorySpecs(QStringList args);
     int cmdMemoryQuery(QStringList args);
     int cmdMemoryDump(QStringList args);
+    int cmdMemoryRevmap(QStringList args);
     int cmdScript(QStringList args);
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t);
@@ -235,7 +236,7 @@ private:
     int cmdSymbolsStore(QStringList args);
     int cmdBinary(QStringList args);
     int cmdBinaryMemDumpList(QStringList args);
-    int cmdBinaryInstance(QStringList args);
+//    int cmdBinaryInstance(QStringList args);
 };
 
 /// Globally accessible shell object

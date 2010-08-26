@@ -8,6 +8,7 @@
 #include "instanceclass.h"
 #include <QScriptEngine>
 #include <QScriptClassPropertyIterator>
+#include "instancedata.h"
 #include "instanceprototype.h"
 #include "basetype.h"
 #include "debug.h"

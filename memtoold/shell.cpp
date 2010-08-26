@@ -23,6 +23,7 @@
 #include <QLocalSocket>
 #include <QLocalServer>
 #include <QMutexLocker>
+#include <QTime>
 #include "compileunit.h"
 #include "variable.h"
 #include "refbasetype.h"
@@ -31,6 +32,7 @@
 #include "programoptions.h"
 #include "memorydump.h"
 #include "instanceclass.h"
+#include "instancedata.h"
 
 // Register socket enums for the Qt meta type system
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
@@ -105,7 +107,9 @@ Shell::Shell(bool listenOnSocket)
                 "                              a valid type name, or a valid type id.\n"
 				"                              Notice, that a type name or a type id\n"
 				"                              can be followed by a query string in case\n"
-				"                              a member of a struct should be dumped."));
+				"                              a member of a struct should be dumped.\n"
+                "  memory revmap [index]       Build reverse mapping for dump <index>"
+                ));
 
     _commands.insert("script",
             Command(
@@ -479,6 +483,8 @@ void Shell::run()
         exec();
     }
     else {
+        debugmsg("old sizeof(Instance) = " << 64);
+        debugmsg("sizeof(Instance) = " << sizeof(Instance));
         // Enter command line loop
         while (!_finished)
             evalLine();
@@ -1051,6 +1057,9 @@ int Shell::cmdMemory(QStringList args)
     else if (QString("dump").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryDump(args);
     }
+    else if (QString("revmap").startsWith(action) && (action.size() >= 1)) {
+        return cmdMemoryRevmap(args);
+    }
     else {
         cmdHelp(QStringList("memory"));
         return 1;
@@ -1157,6 +1166,7 @@ int Shell::cmdMemoryUnload(QStringList args)
         delete _memDumps[index];
         _memDumps[index] = 0;
         _out << "Unloaded [" << index << "] " << fileName << endl;
+        debugmsg("InstanceData::parentDeleted() called " << InstanceData::parentNamesCopyCtr << " times");
         return 0;
     }
 
@@ -1227,6 +1237,34 @@ int Shell::cmdMemoryDump(QStringList args)
     }
 
     return 2;
+}
+
+
+int Shell::cmdMemoryRevmap(QStringList args)
+{
+    // Get the memory dump index to use
+    int index = parseMemDumpIndex(args);
+    // Build reverse mapping
+    if (index >= 0) {
+        QTime timer;
+        timer.start();
+        _memDumps[index]->setupRevMap();
+        int elapsed = timer.elapsed();
+        int min = (elapsed / 1000) / 60;
+        int sec = (elapsed / 1000) % 60;
+        int msec = elapsed % 1000;
+
+        _out << "Built reverse mapping for memory dump [" << index << "] in "
+                << QString("%1:%2.%3 minutes")
+                    .arg(min)
+                    .arg(sec, 2, 10, QChar('0'))
+                    .arg(msec, 3, 10, QChar('0'))
+                << endl;
+
+        return 0;
+    }
+
+    return 1;
 }
 
 
@@ -1634,12 +1672,16 @@ int Shell::cmdSymbolsParse(QStringList args)
     enum Mode { mObjdump, mDbgKernel };
     Mode mode;
 
+    // If we only got one argument, it must be the directory of a compiled
+    // kernel source, and we extract the symbols from the kernel on-the-fly
     if (args.size() == 1) {
     	mode = mDbgKernel;
     	kernelSrc = args[0];
     	objdump = kernelSrc + (kernelSrc.endsWith('/') ? "vmlinux" : "/vmlinux");
     	sysmap = kernelSrc + (kernelSrc.endsWith('/') ? "System.map" : "/System.map");
     }
+    // Otherwise the user has to specify the objdump, System.map and kernel
+    // headers directory separately
     else if (args.size() == 3) {
     	mode = mObjdump;
     	objdump = args[0];
@@ -1743,8 +1785,8 @@ int Shell::cmdBinary(QStringList args)
     switch (type) {
     case bdMemDumpList:
         return cmdBinaryMemDumpList(args);
-    case bdInstance:
-        return cmdBinaryInstance(args);
+//    case bdInstance:
+//        return cmdBinaryInstance(args);
     default:
         _err << "Unknown index for binary data : " << type << endl;
         return 2;
@@ -1768,19 +1810,19 @@ int Shell::cmdBinaryMemDumpList(QStringList /*args*/)
 }
 
 
-int Shell::cmdBinaryInstance(QStringList args)
-{
-    // Did the user specify a file index?
-    int index = parseMemDumpIndex(args);
+//int Shell::cmdBinaryInstance(QStringList args)
+//{
+//    // Did the user specify a file index?
+//    int index = parseMemDumpIndex(args);
 
-    if (index < 0)
-        return 1;
+//    if (index < 0)
+//        return 1;
 
-    if (args.size() != 1) {
-        _err << "No query sting given." << endl;
-        return 2;
-    }
+//    if (args.size() != 1) {
+//        _err << "No query sting given." << endl;
+//        return 2;
+//    }
 
-    Instance inst = _memDumps[index]->queryInstance(args[0]);
-    // TODO implement me
-}
+//    Instance inst = _memDumps[index]->queryInstance(args[0]);
+//    // TODO implement me
+//}
