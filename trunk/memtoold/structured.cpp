@@ -6,6 +6,7 @@
  */
 
 #include "structured.h"
+#include "refbasetype.h"
 #include "debug.h"
 
 
@@ -159,16 +160,31 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
 
         if (m->refType()) {
             // Output all types except structured types
-            if ( //(m->refType()->type() & (rtStruct | rtUnion)) ||
-                 ( //(m->refType()->type() & rtTypedef) &&
-                   (m->refType()->dereferencedType() & (rtStruct | rtUnion)) ) )
-            {
+            if (m->refType()->dereferencedType() & (rtStruct | rtUnion)) {
+                // Resolve the memory address of that struct
+                quint64 addr = offset + m->offset();
+                const BaseType* t = m->refType();
+                while ( addr && !(t->type() & (rtStruct | rtUnion)) ) {
+                    const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
+                    if (rbt->type() & rtPointer)
+                        addr = (quint64) rbt->toPointer(mem, addr);
+                    t = rbt->refType();
+                }
+
+                QString addrStr;
+                if (addr == offset + m->offset())
+                    addrStr = "...";
+                else if (addr)
+                    addrStr = QString("... @ 0x%1").arg(addr, 0, 16);
+                else
+                    addrStr = "NULL";
+
                 s += QString("%0.  0x%1  %2 : %3 = %4")
                         .arg(i, index_len)
                         .arg(m->offset(), offset_len, 16, QChar('0'))
                         .arg(m->name(), -name_len)
                         .arg(m->refType()->prettyName(), -type_len)
-						.arg(m->refType()->toUInt32(mem, offset + m->offset()), 0, 16);
+						.arg(addrStr);
             }
             else {
                 s += QString("%0.  0x%1  %2 : %3 = %4")
