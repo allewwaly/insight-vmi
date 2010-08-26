@@ -106,6 +106,12 @@ QString Instance::name() const
 }
 
 
+void Instance::setName(const QString& name)
+{
+    _d->name = name;
+}
+
+
 QString Instance::parentName() const
 {
     return parentNameComponents().join(".");

@@ -295,8 +295,15 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		arrayIndex = arrayIndexString.toUInt(&okay, 10);
 		
 		if (okay) {
-			// Update address
-			result.addToAddress(arrayIndex * result.type()->size());
+		    // Is this a pointer or an array type?
+		    Instance tmp = result.arrayElem(arrayIndex);
+		    if (!tmp.isNull())
+		        result = tmp.dereference(BaseType::trLexicalAndPointers);
+            // Manually update the address
+		    else {
+                result.addToAddress(arrayIndex * result.type()->size());
+                result.setName(QString("%1[%2]").arg(result.name()).arg(arrayIndex));
+		    }
 		}
 		else {
 			queryError(QString("Given array index %1 could not be converted "

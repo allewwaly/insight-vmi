@@ -103,6 +103,12 @@ public:
 	QString name() const;
 
 	/**
+	 * Sets the name of this instance
+	 * @param name new name for this instance
+	 */
+	void setName(const QString& name);
+
+	/**
 	 * This function returns the full name of the parent's struct, as it was
 	 * found, e. g. \c init_task.children
 	 * @return the full name of the parent's struct
