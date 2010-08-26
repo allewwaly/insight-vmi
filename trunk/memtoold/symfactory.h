@@ -309,12 +309,20 @@ protected:
     bool isNewType(const int new_id, BaseType* type) const;
 
     /**
-     * Checks if \a type represents the special type \c struct \c list_head.
+     * Checks if \a type represents the special type <tt>struct list_head</tt>.
      * @param type the type to check
-     * @return \c true if \a type is \c struct \c list_head, or \c false
+     * @return \c true if \a type is <tt>struct list_head</tt>, or \c false
      * otherwise
      */
     bool isStructListHead(const BaseType* type) const;
+
+    /**
+     * Checks if \a type represents the special type <tt>struct hlist_node</tt>.
+     * @param type the type to check
+     * @return \c true if \a type is <tt>struct hlist_node</tt>, or \c false
+     * otherwise
+     */
+    bool isStructHListNode(const BaseType* type) const;
 
     /**
      * This is an overloaded convenience function.
@@ -370,16 +378,30 @@ protected:
 
 private:
 	/**
-	 * Generates a working "struct list_head" from a given, generic one.
+	 * Generates a working <tt>struct list_head</tt> from a given, generic one.
 	 *
 	 * It creates a new Struct object from \a member->refType() with exactly
 	 * two members: two Pointer objects "next" and "prev" which point to the
 	 * type of \a parent. In addition, the Pointer::macroExtraOffset() is
-	 * set accordingly.	 *
-	 * @param member the StructuredMember to create a "struct list_head" from
-	 * @return
+	 * set accordingly.
+	 * @param member the StructuredMember to create a <tt>struct list_head</tt>
+	 * from
+	 * @return the resulting Struct type
 	 */
 	Struct* makeStructListHead(StructuredMember* member);
+
+    /**
+     * Generates a working <tt>struct hlist_node</tt> from a given, generic one.
+     *
+     * It creates a new Struct object from \a member->refType() with exactly
+     * two members: two Pointer objects "next" and "pprev" which point to the
+     * type of \a parent. In addition, the Pointer::macroExtraOffset() is
+     * set accordingly.
+     * @param member the StructuredMember to create a <tt>struct hlist_node</tt>
+     * from
+     * @return the resulting Struct type
+     */
+    Struct* makeStructHListNode(StructuredMember* member);
 
 	/**
      * Tries to resolve the type reference of a ReferencingType object \a ref.
@@ -430,6 +452,7 @@ private:
 	VariableStringHash _varsByName;   ///< Holds all Variable objects, indexed by name
 	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
 	BaseTypeList _types;              ///< Holds all BaseType objects which were parsed or read from symbol files
+    BaseTypeList _customTypes;        ///< Holds all BaseType objects which were internally created
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
@@ -439,6 +462,7 @@ private:
 
 	int _typeFoundByHash;
 	int _structListHeadCount;
+	int _structHListNodeCount;
 };
 
 #endif /* TYPEFACTORY_H_ */

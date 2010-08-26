@@ -29,7 +29,8 @@
 //------------------------------------------------------------------------------
 
 SymFactory::SymFactory(const MemSpecs& memSpecs)
-	: _memSpecs(memSpecs), _typeFoundByHash(0), _structListHeadCount(0)
+	: _memSpecs(memSpecs), _typeFoundByHash(0), _structListHeadCount(0),
+	  _structHListNodeCount(0)
 {
 }
 
@@ -62,6 +63,14 @@ void SymFactory::clear()
 	}
 	_types.clear();
 
+    // Delete all custom types
+    for (BaseTypeList::iterator it = _customTypes.begin();
+            it != _customTypes.end(); ++it)
+    {
+        delete *it;
+    }
+	_customTypes.clear();
+
 	// Clear all further hashes and lists
 	_typesById.clear();
 	_typesByName.clear();
@@ -79,6 +88,7 @@ void SymFactory::clear()
 	// Reset other vars
 	_typeFoundByHash = 0;
 	_structListHeadCount = 0;
+	_structHListNodeCount = 0;
 }
 
 
@@ -410,6 +420,7 @@ bool SymFactory::isNewType(const int new_id, BaseType* type) const
     return new_id == type->id();
 }
 
+
 bool SymFactory::isStructListHead(const BaseType* type) const
 {
     const Struct* s = dynamic_cast<const Struct*>(type);
@@ -430,6 +441,31 @@ bool SymFactory::isStructListHead(const BaseType* type) const
             (!next->refType() ||
              next->refType()->type() == BaseType::rtPointer) &&
             prev->name() == "prev" &&
+            (!prev->refType() ||
+             prev->refType()->type() == BaseType::rtPointer));
+}
+
+
+bool SymFactory::isStructHListNode(const BaseType* type) const
+{
+    const Struct* s = dynamic_cast<const Struct*>(type);
+
+    if (!s)
+        return false;
+
+    // Check name and member size
+    if (s->name() != "hlist_node" || s->members().size() != 2)
+        return false;
+
+    // Check the members
+    const StructuredMember* next = s->members().at(0);
+    const StructuredMember* prev = s->members().at(1);
+    return s->id() == siHListNode ||
+           (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
+            next->name() == "next" &&
+            (!next->refType() ||
+             next->refType()->type() == BaseType::rtPointer) &&
+            prev->name() == "pprev" &&
             (!prev->refType() ||
              prev->refType()->type() == BaseType::rtPointer));
 }
@@ -718,6 +754,7 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     // Create a new struct a special ID. This way, the type will be recognized
     // as "struct list_head" when the symbols are stored and loaded again.
     Struct* ret = new Struct();
+    _customTypes.append(ret);
     Structured* parent = member->belongsTo();
 
     ret->setName("list_head");
@@ -735,34 +772,98 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     }
 
     // Create "next" pointer
-    Pointer* pnext = new Pointer();
-    pnext->setId(0);
-    pnext->setRefTypeId(parent->id());
-    pnext->setRefType(parent);
-    pnext->setSize(_memSpecs.sizeofUnsignedLong);
+    Pointer* nextPtr = new Pointer();
+    _customTypes.append(nextPtr);
+    nextPtr->setId(0);
+    nextPtr->setRefTypeId(parent->id());
+    nextPtr->setRefType(parent);
+    nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
     // To dereference this pointer, the member's offset has to be subtracted
-    pnext->setMacroExtraOffset(extraOffset);
+    nextPtr->setMacroExtraOffset(extraOffset);
 
     StructuredMember* next = new StructuredMember();
     next->setId(0);
     next->setName("next");
     next->setOffset(0);
-    next->setRefTypeId(pnext->id());
-    next->setRefType(pnext);
+    next->setRefTypeId(nextPtr->id());
+    next->setRefType(nextPtr);
     ret->addMember(next);
 
     //Create "prev" pointer
-    Pointer* pprev = new Pointer(*pnext);
+    Pointer* prevPtr = new Pointer(*nextPtr);
+    _customTypes.append(prevPtr);
     StructuredMember* prev = new StructuredMember();
     prev->setId(0);
     prev->setName("prev");
     prev->setOffset(_memSpecs.sizeofUnsignedLong);
-    prev->setRefTypeId(pprev->id());
-    prev->setRefType(pprev);
+    prev->setRefTypeId(prevPtr->id());
+    prev->setRefType(prevPtr);
     ret->addMember(prev);
 
-    _helperTypes.append(pnext);
-    _helperTypes.append(pprev);
+    _helperTypes.append(nextPtr);
+    _helperTypes.append(prevPtr);
+    _helperTypes.append(ret);
+
+    return ret;
+}
+
+
+Struct* SymFactory::makeStructHListNode(StructuredMember* member)
+{
+    assert(member != 0);
+
+    // Create a new struct a special ID. This way, the type will be recognized
+    // as "struct list_head" when the symbols are stored and loaded again.
+    Struct* ret = new Struct();
+    _customTypes.append(ret);
+    Structured* parent = member->belongsTo();
+
+    ret->setName("hlist_node");
+    ret->setId(siHListNode);
+    ret->setSize(2 * _memSpecs.sizeofUnsignedLong);
+
+    size_t extraOffset = -member->offset();
+
+    // Create "next" pointer
+    Pointer* nextPtr = new Pointer();
+    _customTypes.append(nextPtr);
+    nextPtr->setId(0);
+    nextPtr->setRefTypeId(parent->id());
+    nextPtr->setRefType(parent);
+    nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
+    // To dereference this pointer, the member's offset has to be subtracted
+    nextPtr->setMacroExtraOffset(extraOffset);
+
+    StructuredMember* next = new StructuredMember();
+    next->setId(0);
+    next->setName("next");
+    next->setOffset(0);
+    next->setRefTypeId(nextPtr->id());
+    next->setRefType(nextPtr);
+    ret->addMember(next);
+
+    // Create "prev" pointer from the next pointer
+    Pointer* prevPtr = new Pointer(*nextPtr);
+    _customTypes.append(prevPtr);
+
+    // Create the "pprev" pointer which points to the "prev" pointer
+    Pointer* pprevPtr = new Pointer();
+    _customTypes.append(pprevPtr);
+    pprevPtr->setId(0);
+    pprevPtr->setRefTypeId(prevPtr->id());
+    pprevPtr->setRefType(prevPtr);
+    pprevPtr->setSize(_memSpecs.sizeofUnsignedLong);
+
+    StructuredMember* pprev = new StructuredMember();
+    pprev->setId(0);
+    pprev->setName("pprev");
+    pprev->setOffset(_memSpecs.sizeofUnsignedLong);
+    pprev->setRefTypeId(pprevPtr->id());
+    pprev->setRefType(pprevPtr);
+    ret->addMember(pprev);
+
+    _helperTypes.append(nextPtr);
+    _helperTypes.append(pprevPtr);
     _helperTypes.append(ret);
 
     return ret;
@@ -787,6 +888,13 @@ bool SymFactory::resolveReference(StructuredMember* member)
         member->setRefType(list_head);
         member->setRefTypeId(list_head->id());
         _structListHeadCount++;
+        return true;
+    }
+    else if (member->refTypeId() == siHListNode || isStructHListNode(base)) {
+        Struct* hlist_node = makeStructHListNode(member);
+        member->setRefType(hlist_node);
+        member->setRefTypeId(hlist_node->id());
+        _structHListNodeCount++;
         return true;
     }
     else
@@ -818,16 +926,17 @@ void SymFactory::symbolsFinished(RestoreType rt)
 
     shell->out() << qSetFieldWidth(10) << right;
 
-    shell->out() << "  | No. of types:             " << _types.size() << endl;
-    shell->out() << "  | No. of types by name:     " << _typesByName.size() << endl;
-    shell->out() << "  | No. of types by ID:       " << _typesById.size() << endl;
-    shell->out() << "  | No. of types by hash:     " << _typesByHash.size() << endl;
-//    shell->out() << "  | Types found by hash:      " << _typeFoundByHash << endl;
-    shell->out() << "  | No of \"struct list_head\": " << _structListHeadCount << endl;
-//    shell->out() << "  | Postponed types:          " << << _postponedTypes.size() << endl;
-    shell->out() << "  | No. of variables:         " << _vars.size() << endl;
-    shell->out() << "  | No. of variables by ID:   " << _varsById.size() << endl;
-    shell->out() << "  | No. of variables by name: " << _varsByName.size() << endl;
+    shell->out() << "  | No. of types:              " << _types.size() << endl;
+    shell->out() << "  | No. of types by name:      " << _typesByName.size() << endl;
+    shell->out() << "  | No. of types by ID:        " << _typesById.size() << endl;
+    shell->out() << "  | No. of types by hash:      " << _typesByHash.size() << endl;
+//    shell->out() << "  | Types found by hash:       " << _typeFoundByHash << endl;
+    shell->out() << "  | No of \"struct list_head\":  " << _structListHeadCount << endl;
+    shell->out() << "  | No of \"struct hlist_node\": " << _structHListNodeCount << endl;
+//    shell->out() << "  | Postponed types:           " << << _postponedTypes.size() << endl;
+    shell->out() << "  | No. of variables:          " << _vars.size() << endl;
+    shell->out() << "  | No. of variables by ID:    " << _varsById.size() << endl;
+    shell->out() << "  | No. of variables by name:  " << _varsByName.size() << endl;
 
     shell->out() << qSetFieldWidth(0) << left;
 
