@@ -81,6 +81,15 @@ QString Array::toString(QIODevice* mem, size_t offset) const
 }
 
 
+uint Array::size() const
+{
+    if (_refType && _length > 0)
+        return _refType->size() * _length;
+    else
+        return Pointer::size();
+}
+
+
 qint32 Array::length() const
 {
     return _length;
