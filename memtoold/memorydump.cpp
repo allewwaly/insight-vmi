@@ -209,7 +209,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		if (!v)
 			queryError(QString("Variable does not exist: %1").arg(symbol));
 
-		result = v->toInstance(_vmem, BaseType::trAny);
+		result = v->toInstance(_vmem, BaseType::trLexicalAndPointers);
 	}
 	else {
 		// We have a instance therefore we resolve the member
@@ -217,7 +217,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
             queryError(QString("Member \"%1\" is not a struct or union")
                         .arg(instance.fullName()));
 
-        result = instance.findMember(symbol, BaseType::trAny);
+        result = instance.findMember(symbol, BaseType::trLexicalAndPointers);
         if (!result.isValid()) {
             if (!instance.memberExists(symbol))
                 queryError(QString("Struct \"%1\" has no member named \"%2\"")
