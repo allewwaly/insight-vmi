@@ -6,7 +6,7 @@
  */
 
 #include "structured.h"
-#include "refbasetype.h"
+#include "pointer.h"
 #include "debug.h"
 
 
@@ -162,20 +162,38 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
             // Output all types except structured types
             if (m->refType()->dereferencedType() & (rtStruct | rtUnion)) {
                 // Resolve the memory address of that struct
-                quint64 addr = offset + m->offset();
+                quint64 addr = offset + m->offset(), macroExtraOffset = 0;
                 const BaseType* t = m->refType();
+                bool wasPointer = false;
                 while ( addr && !(t->type() & (rtStruct | rtUnion)) ) {
                     const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
-                    if (rbt->type() & rtPointer)
+                    if (rbt->type() & rtPointer) {
                         addr = (quint64) rbt->toPointer(mem, addr);
+                        macroExtraOffset = addr ?
+                                dynamic_cast<const Pointer*>(t)->macroExtraOffset() :
+                                0;
+                        addr += macroExtraOffset;
+                        wasPointer = true;
+                    }
                     t = rbt->refType();
                 }
 
                 QString addrStr;
-                if (addr == offset + m->offset())
+                if (!wasPointer)
                     addrStr = "...";
-                else if (addr)
-                    addrStr = QString("... @ 0x%1").arg(addr, 0, 16);
+                else if (addr) {
+                    qint64 meo = (qint64) macroExtraOffset;
+                    if (macroExtraOffset)
+                        addrStr = QString("... @ 0x%1 %2 0x%3 = 0x%4")
+                            .arg(addr - macroExtraOffset, 0, 16)
+                            .arg(meo < 0 ? "-" : "+")
+                            .arg(meo < 0 ? -meo : meo, 0, 16)
+                            .arg(addr, 0, 16);
+                    else
+                        addrStr = QString("... @ 0x%1").arg(addr, 0, 16);
+                    if (addr == offset)
+                        addrStr += " (self)";
+                }
                 else
                     addrStr = "NULL";
 
@@ -233,11 +251,6 @@ QString Struct::prettyName() const
 }
 
 
-//QString Struct::toString(QIODevice* mem, size_t offset) const
-//{
-//	return QString("NOT IMPLEMENTED in %1:%2").arg(__FILE__).arg(__LINE__);
-//}
-
 //------------------------------------------------------------------------------
 Union::Union()
 {
@@ -260,12 +273,5 @@ QString Union::prettyName() const
 {
     return _name.isEmpty() ? QString("union") : QString("union %1").arg(_name);
 }
-
-
-//QString Union::toString(QIODevice* mem, size_t offset) const
-//{
-//	return QString("NOT IMPLEMENTED in %1:%2").arg(__FILE__).arg(__LINE__);
-//}
-
 
 
