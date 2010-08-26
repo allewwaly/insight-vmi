@@ -16,7 +16,7 @@
  */
 enum SpecialIds {
     siHListNode      = 0x7FFFFFFE,  ///< kernel hash chain list (<tt>struct hlist_node</tt>)
-    siListHead       = 0x7FFFFFFF   ///< kernel linked list (<tt>struct \c list_head</tt>)
+    siListHead       = 0x7FFFFFFF   ///< kernel linked list (<tt>struct list_head</tt>)
 };
 
 
