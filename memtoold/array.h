@@ -49,6 +49,11 @@ public:
      */
     virtual QString toString(QIODevice* mem, size_t offset) const;
 
+    /**
+     * @return the size of this type in bytes
+     */
+    virtual uint size() const;
+
 	/**
 	 * @return the length if this array if it was defined, -1 otherwise
 	 */
