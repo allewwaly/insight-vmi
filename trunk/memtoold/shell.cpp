@@ -485,6 +485,7 @@ void Shell::run()
     else {
         debugmsg("old sizeof(Instance) = " << 64);
         debugmsg("sizeof(Instance) = " << sizeof(Instance));
+        debugmsg("sizeof(InstanceData) = " << sizeof(InstanceData));
         // Enter command line loop
         while (!_finished)
             evalLine();

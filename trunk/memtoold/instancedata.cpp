@@ -85,14 +85,14 @@ void InstanceData::removeChild(const InstanceData* child) const
 void InstanceData::parentDeleted() const
 {
     ++parentNamesCopyCtr;
-    _parentNames = _parent->parentNames();
-    // Limit to to 20 components
-    if (_parentNames.size() > 19) {
-        while (_parentNames.size() > 19)
-            _parentNames.pop_front();
-        _parentNames.front() = "...";
-    }
-    _parentNames += _parent->name;
+//    _parentNames = _parent->parentNames();
+//    // Limit to to 20 components
+//    if (_parentNames.size() > 19) {
+//        while (_parentNames.size() > 19)
+//            _parentNames.pop_front();
+//        _parentNames.front() = "...";
+//    }
+//    _parentNames += _parent->name;
     _parent = 0;
 }
 
