@@ -17,6 +17,7 @@
 #include "structured.h"
 #include "refbasetype.h"
 #include "pointer.h"
+#include "array.h"
 #include "virtualmemoryexception.h"
 
 
@@ -549,8 +550,27 @@ void MemoryDump::setupRevMap()
                         << " at " << e.file << ":" << e.line << ": " << e.message);
             }
         }
+        // If this is an array, add all elements
+        else if (inst.type()->type() & BaseType::rtArray) {
+            const Array* a = dynamic_cast<const Array*>(inst.type());
+            if (a->length() > 0) {
+                // Add all elements to the stack that haven't been visited
+                for (int i = 0; i < a->length(); ++i) {
+                    try {
+                        Instance e = inst.arrayElem(i);
+                        if (!_vmemMap.contains(e.address()))
+                            stack.push(e);
+                    }
+                    catch (GenericException e) {
+                        debugerr("Caught exception for instance " << inst.name() //inst.fullName()
+                                << " at " << e.file << ":" << e.line << ": " << e.message);
+                    }
+                }
+            }
+        }
+        // If this is a struct, add all members
         else if (inst.memberCount() > 0) {
-            // Add all struct members to the stack, that haven't been visited
+            // Add all struct members to the stack that haven't been visited
             for (int i = 0; i < inst.memberCount(); ++i) {
                 try {
                     Instance m = inst.member(i, BaseType::trLexical);
