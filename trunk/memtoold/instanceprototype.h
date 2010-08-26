@@ -13,6 +13,7 @@
 #include <QStringList>
 #include "instance.h"
 #include "genericexception.h"
+#include "instancedata.h"
 
 
 /**

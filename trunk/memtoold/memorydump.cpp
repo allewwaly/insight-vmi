@@ -10,11 +10,14 @@
 #include <QFile>
 #include <QStringList>
 #include <QRegExp>
+#include <QStack>
+#include "instancedata.h"
 #include "symfactory.h"
 #include "variable.h"
 #include "structured.h"
 #include "refbasetype.h"
 #include "pointer.h"
+#include "virtualmemoryexception.h"
 
 
 #define queryError(x) do { throw QueryException((x), __FILE__, __LINE__); } while (0)
@@ -156,11 +159,11 @@ BaseType* MemoryDump::getType(const QString& type) const
 
 
 Instance MemoryDump::getInstanceAt(const QString& type, const size_t address,
-        const QString& fullName) const
+        const QStringList& parentNames) const
 {
     BaseType* t = getType(type);
 	return t ?
-	       t->toInstance(address, _vmem, "user", fullName,
+	       t->toInstance(address, _vmem, "user", parentNames,
 	               BaseType::trLexicalAndPointers) :
 	       Instance();
 }
@@ -284,7 +287,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 			//				.arg(result.fullName()).arg(result.typeName()));
 		}
 		
-		result = getInstanceAt(typeString, address, result.fullName());	
+		result = getInstanceAt(typeString, address, result.fullNameComponents());
 	}
 	
 	// Add array index
@@ -419,7 +422,7 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 	
     if (!components.isEmpty()) {
 		// Get first instance
-		result = getInstanceAt(components.first(), address, "user");
+		result = getInstanceAt(components.first(), address, QStringList("user"));
 		components.pop_front();
 	
 		while (!components.isEmpty()) {
@@ -447,3 +450,115 @@ int MemoryDump::index() const
 {
     return _index;
 }
+
+
+void MemoryDump::setupRevMap()
+{
+    // Clean up everything
+    _pointersTo.clear();
+    _typeInstances.clear();
+    _pmemMap.clear();
+    _vmemMap.clear();
+
+    QStack<Instance> stack;
+
+    // Go through the global vars and add their instances on the stack
+    for (VariableList::const_iterator it = _factory->vars().constBegin();
+            it != _factory->vars().constEnd(); ++it)
+    {
+        try {
+            Instance inst = (*it)->toInstance(_vmem, BaseType::trLexical);
+            if (!inst.isNull())
+                stack.push(inst);
+        }
+        catch (GenericException e) {
+            debugerr("Caught exception for variable " << (*it)->name()
+                    << " at " << e.file << ":" << e.line << ":" << e.message);
+        }
+    }
+
+
+    // Now work through the whole stack
+    while (!stack.isEmpty()) {
+        // Take top element from stack
+        Instance inst = stack.pop();
+
+        // Insert in non-critical (exception prone) mappings
+        _typeInstances.insert(inst.type()->id(), inst);
+        _vmemMap.insert(inst.address(), inst);
+
+        // try to save the physical mapping
+        try {
+            int pageSize;
+            quint64 physAddr = _vmem->virtualToPhysical(inst.address(), &pageSize);
+            // We currently handle linear memory regions only
+            if (pageSize < 0)
+                _pmemMap.insert(physAddr, IntInstPair(pageSize, inst));
+            else {
+                // Add all pages a type belongs to
+                quint32 size = inst.size();
+                quint64 addr = inst.address();
+                quint64 pageMask = ~(pageSize - 1);
+                int ctr = 0;
+                while (size > 0) {
+                    // Add a memory mapping
+                    _pmemMap.insert(addr, IntInstPair(pageSize, inst));
+                    // How much space is left on current page?
+                    quint32 sizeOnPage = pageSize - (addr & ~pageMask);
+                    // Subtract the available space from left-over size
+                    size = (sizeOnPage >= size) ? 0 : size - sizeOnPage;
+                    // Advance address
+                    addr += sizeOnPage;
+                    ++ctr;
+                }
+                // Debug message, just out out curiosity ;-)
+                if (ctr > 1)
+                    debugmsg(QString("Type %1 at 0x%2 with size %3 spans %4 pages.")
+                                .arg(inst.typeName())
+                                .arg(inst.address(), 0, 16)
+                                .arg(inst.size())
+                                .arg(ctr));
+            }
+        }
+        catch (VirtualMemoryException) {
+            // do nothing
+        }
+
+        // If this is a pointer, add where it's pointing to
+        if (inst.type()->type() & BaseType::rtPointer) {
+            try {
+                quint64 addr = (quint64) inst.toPointer();
+                _pointersTo.insert(addr, inst);
+                if (!_vmemMap.contains(addr)) {
+                    // Add dereferenced type to the stack, if not already visited
+                    int cnt = 0;
+                    inst = inst.dereference(BaseType::trLexical, &cnt);
+                    if (cnt)
+                        stack.push(inst);
+                }
+            }
+            catch (GenericException e) {
+                debugerr("Caught exception for instance " << inst.name() //inst.fullName()
+                        << " at " << e.file << ":" << e.line << ": " << e.message);
+            }
+        }
+        else if (inst.memberCount() > 0) {
+            // Add all struct members to the stack, that haven't been visited
+            for (int i = 0; i < inst.memberCount(); ++i) {
+                try {
+                    Instance m = inst.member(i, BaseType::trLexical);
+                    if (!_vmemMap.contains(m.address()))
+                        stack.push(m);
+                }
+                catch (GenericException e) {
+                    debugerr("Caught exception for instance " << inst.name() //inst.fullName()
+                            << "." << inst.memberNames().at(i) << " at "
+                            << e.file << ":" << e.line << ": " << e.message);
+                }
+            }
+        }
+    }
+
+    debugmsg("InstanceData::parentDeleted() called " << InstanceData::parentNamesCopyCtr << " times");
+}
+

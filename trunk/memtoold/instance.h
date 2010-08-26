@@ -11,13 +11,16 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QSharedDataPointer>
 
 class BaseType;
 class VirtualMemory;
 class Instance;
+class InstanceData;
 
 /// A list of Instance objects
 typedef QList<Instance> InstanceList;
+
 
 /**
  * This class wraps a variable instance in a memory dump.
@@ -35,12 +38,30 @@ public:
 	 * @param address the address of that instance
 	 * @param type the underlying BaseType of this instance
 	 * @param name the name of this instance
-	 * @param parentName the full name of the parent
+	 * @param parentNames the full name of the parent
 	 * @param vmem the virtual memory device to read data from
      * @param id the ID of the variable this instance represents, if any
 	 */
 	Instance(size_t address, const BaseType* type, const QString& name,
-            const QString& parentName, VirtualMemory* vmem, int id = -1);
+            const QStringList& parentNames, VirtualMemory* vmem, int id = -1);
+
+    /**
+     * Constructor
+     * @param address the address of that instance
+     * @param type the underlying BaseType of this instance
+     * @param name the name of this instance
+     * @param parent the parent instance
+     * @param vmem the virtual memory device to read data from
+     * @param id the ID of the variable this instance represents, if any
+     */
+    Instance(size_t address, const BaseType* type, const QString& name,
+            const Instance* parent, VirtualMemory* vmem, int id = -1);
+
+    /**
+     * Copy constructor
+     * @param other object to copy from
+     */
+    Instance(const Instance& other);
 
 	/**
 	 * Destructor
@@ -89,12 +110,26 @@ public:
 	QString parentName() const;
 
 	/**
+	 * This function returns all component names of the parent's struct, as it
+	 * was found, e. g. \c init_task, \c children
+	 * @return a list of the name components of the parent's struct
+	 */
+	QStringList parentNameComponents() const;
+
+	/**
 	 * Use this function to retrieve the full name of this instance as it was
 	 * found following the names and members of structs in dotted notation,
 	 * i.e., \c init_task.children.next.
 	 * @return the full name of this instance
 	 */
 	QString fullName() const;
+
+    /**
+     * Use this function to retrieve all components of the full name of this
+     * instance as it was found following the names and members of structs.
+     * @return the full name components of this instance
+     */
+    QStringList fullNameComponents() const;
 
 	/**
 	 * Gives access to the names of all members if this instance.
@@ -384,16 +419,7 @@ private:
             bool includeNestedStructs, QStringList& result,
             VisitedSet& visited) const;
 
-
-	static const QStringList _emtpyStringList;
-	int _id;
-	size_t _address;
-	const BaseType* _type;
-	QString _name;
-	QString _parentName;
-    VirtualMemory* _vmem;
-    bool _isNull;
-    bool _isValid;
+	QSharedDataPointer<InstanceData> _d;
 };
 
 #endif /* INSTANCE_H_ */

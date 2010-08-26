@@ -81,11 +81,20 @@ void ReferencingType::writeTo(QDataStream& out) const
 
 
 Instance ReferencingType::createRefInstance(size_t address,
-        VirtualMemory* vmem, const QString& name, const QString& parent,
+        VirtualMemory* vmem, const QString& name, const Instance* parent,
         int resolveTypes, int* derefCount) const
 {
-    return createRefInstance(address, vmem, name, parent, -1, resolveTypes,
-            derefCount);
+    return createRefInstance(address, vmem, name, parent, QStringList(), -1,
+            resolveTypes, derefCount);
+}
+
+
+Instance ReferencingType::createRefInstance(size_t address,
+        VirtualMemory* vmem, const QString& name, const QStringList& parentNames,
+        int resolveTypes, int* derefCount) const
+{
+    return createRefInstance(address, vmem, name, 0, parentNames, -1,
+            resolveTypes, derefCount);
 }
 
 
@@ -93,14 +102,15 @@ Instance ReferencingType::createRefInstance(size_t address,
         VirtualMemory* vmem, const QString& name, int id, int resolveTypes,
         int* derefCount) const
 {
-    return createRefInstance(address, vmem, name, QString(), id,
+    return createRefInstance(address, vmem, name, 0, QStringList(), id,
             resolveTypes, derefCount);
 }
 
 
 Instance ReferencingType::createRefInstance(size_t address,
-		VirtualMemory* vmem, const QString& name, const QString& parent,
-		int id, int resolveTypes, int* derefCount) const
+		VirtualMemory* vmem, const QString& name, const Instance* parent,
+		const QStringList& parentNames, int id, int resolveTypes,
+		int* derefCount) const
 {
     if (derefCount)
         *derefCount = 0;
@@ -158,6 +168,9 @@ Instance ReferencingType::createRefInstance(size_t address,
 	        (*derefCount)++;
     }
 
-	return Instance(addr, b, name, parent, vmem, id);
+    if (parent)
+        return Instance(addr, b, name, parent, vmem, id);
+    else
+        return Instance(addr, b, name, parentNames, vmem, id);
 }
 

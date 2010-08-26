@@ -1,4 +1,5 @@
-SOURCES += instance.cpp \
+SOURCES += instancedata.cpp \
+    instance.cpp \
     instanceprototype.cpp \
     instanceclass.cpp \
     memspecs.cpp \
@@ -34,7 +35,8 @@ SOURCES += instance.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += instance.h \
+HEADERS += instancedata.h \
+    instance.h \
     instanceprototype.h \
     instanceclass.h \
     virtualmemoryexception.h \
@@ -75,8 +77,12 @@ HEADERS += instance.h \
     numeric.h \
     basetype.h \
     enum.h
-CONFIG += console debug
+CONFIG += console \
+    debug
 QT += script \
     network
-LIBS += -lreadline -L ../libmemtool -lmemtool
+LIBS += -lreadline \
+    -L \
+    ../libmemtool \
+    -lmemtool
 INCLUDEPATH += ../libmemtool/include
