@@ -64,12 +64,12 @@ void SymFactory::clear()
 	_types.clear();
 
     // Delete all custom types
-    for (BaseTypeList::iterator it = _customTypes.begin();
-            it != _customTypes.end(); ++it)
-    {
-        delete *it;
-    }
-	_customTypes.clear();
+//    for (BaseTypeList::iterator it = _customTypes.begin();
+//            it != _customTypes.end(); ++it)
+//    {
+//        delete *it;
+//    }
+//	_customTypes.clear();
 
 	// Clear all further hashes and lists
 	_typesById.clear();
