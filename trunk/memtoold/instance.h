@@ -12,11 +12,12 @@
 #include <QString>
 #include <QStringList>
 #include <QSharedDataPointer>
+#include "instancedata.h"
 
 class BaseType;
 class VirtualMemory;
 class Instance;
-class InstanceData;
+//class InstanceData;
 
 /// A list of Instance objects
 typedef QList<Instance> InstanceList;
@@ -43,7 +44,7 @@ public:
      * @param id the ID of the variable this instance represents, if any
 	 */
 	Instance(size_t address, const BaseType* type, const QString& name,
-            const QStringList& parentNames, VirtualMemory* vmem, int id = -1);
+            const ConstPStringList& parentNames, VirtualMemory* vmem, int id = -1);
 
     /**
      * Constructor
@@ -120,7 +121,7 @@ public:
 	 * was found, e. g. \c init_task, \c children
 	 * @return a list of the name components of the parent's struct
 	 */
-	QStringList parentNameComponents() const;
+	ConstPStringList parentNameComponents() const;
 
 	/**
 	 * Use this function to retrieve the full name of this instance as it was
@@ -135,7 +136,7 @@ public:
      * instance as it was found following the names and members of structs.
      * @return the full name components of this instance
      */
-    QStringList fullNameComponents() const;
+	ConstPStringList fullNameComponents() const;
 
 	/**
 	 * Gives access to the names of all members if this instance.
@@ -418,6 +419,8 @@ public:
      */
     int pointerSize() const;
 
+    static qint64 objectCount();
+
 private:
     typedef QSet<quint64> VisitedSet;
 
@@ -426,6 +429,8 @@ private:
             VisitedSet& visited) const;
 
 	QSharedDataPointer<InstanceData> _d;
+
+	static qint64 _objectCount;
 };
 
 #endif /* INSTANCE_H_ */

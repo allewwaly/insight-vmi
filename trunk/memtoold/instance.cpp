@@ -21,6 +21,17 @@ Q_DECLARE_METATYPE(Instance)
 
 static const QStringList _emtpyStringList;
 
+qint64 Instance::_objectCount = 0;
+
+
+qint64 Instance::objectCount()
+{
+	return _objectCount;
+}
+
+
+//-----------------------------------------------------------------------------
+
 
 Instance::Instance()
 {
@@ -29,17 +40,18 @@ Instance::Instance()
 
 
 Instance::Instance(size_t address, const BaseType* type, const QString& name,
-        const QStringList& parentNames, VirtualMemory* vmem, int id)
+        const ConstPStringList& parentNames, VirtualMemory* vmem, int id)
 {
     _d = new InstanceData;
     _d->id = id;
     _d->address = address;
     _d->type = type;
-    _d->name = name;
+    _d->setName(name);
     _d->setParentNames(parentNames);
     _d->vmem = vmem;
     _d->isValid = type != 0;
     _d->isNull = !_d->address || !_d->isValid;
+    ++_objectCount;
 }
 
 
@@ -50,21 +62,24 @@ Instance::Instance(size_t address, const BaseType* type, const QString& name,
     _d->id = id;
     _d->address = address;
     _d->type = type;
-    _d->name = name;
+    _d->setName(name);
     _d->vmem = vmem;
     _d->isValid = type != 0;
     _d->isNull = !_d->address || !_d->isValid;
+    ++_objectCount;
 }
 
 
 Instance::Instance(const Instance& other)
     : _d(other._d)
 {
+	++_objectCount;
 }
 
 
 Instance::~Instance()
 {
+	--_objectCount;
 }
 
 
@@ -102,23 +117,30 @@ void Instance::addToAddress(quint64 offset)
 
 QString Instance::name() const
 {
-	return _d->name;
+	return _d->name();
 }
 
 
 void Instance::setName(const QString& name)
 {
-    _d->name = name;
+    _d->setName(name);
 }
 
 
 QString Instance::parentName() const
 {
-    return parentNameComponents().join(".");
+	ConstPStringList comp = parentNameComponents();
+	QString ret;
+	for (int i = 0; i < comp.size(); ++i) {
+		if (i > 0)
+			ret += '.';
+		ret += comp[i];
+	}
+    return ret;
 }
 
 
-QStringList Instance::parentNameComponents() const
+ConstPStringList Instance::parentNameComponents() const
 {
     return _d->parentNames();
 }
@@ -126,15 +148,20 @@ QStringList Instance::parentNameComponents() const
 
 QString Instance::fullName() const
 {
-    return fullNameComponents().join(".");
+	ConstPStringList comp = fullNameComponents();
+	QString ret;
+	for (int i = 0; i < comp.size(); ++i) {
+		if (i > 0)
+			ret += '.';
+		ret += comp[i];
+	}
+    return ret;
 }
 
 
-QStringList Instance::fullNameComponents() const
+ConstPStringList Instance::fullNameComponents() const
 {
-    QStringList result = _d->parentNames();
-    result += _d->name;
-    return result;
+    return _d->fullNames();
 }
 
 
@@ -364,7 +391,7 @@ void Instance::differencesRek(const Instance& other,
     case BaseType::rtStruct:
     case BaseType::rtUnion: {
             // New relative parent name in dotted notation
-            QString newRelParent = dotglue(relParent, _d->name);
+            QString newRelParent = dotglue(relParent, _d->name());
 
             const int cnt = memberCount();
             for (int i = 0; i < cnt; ++i) {
@@ -421,7 +448,7 @@ void Instance::differencesRek(const Instance& other,
         if (cnt1 != cnt2)
             result.append(relParent);
         else
-            inst1.differencesRek(inst2, dotglue(relParent, _d->name),
+            inst1.differencesRek(inst2, dotglue(relParent, _d->name()),
                     includeNestedStructs, result, visited);
         return;
     }
@@ -444,7 +471,7 @@ Instance Instance::arrayElem(int index) const
     return Instance(
                 _d->address + (index * p->refType()->size()),
                 p->refType(),
-                QString("%1[%2]").arg(_d->name).arg(index),
+                QString("%1[%2]").arg(_d->name()).arg(index),
                 _d->parentNames(),
                 _d->vmem,
                 -1);
@@ -457,8 +484,8 @@ Instance Instance::dereference(int resolveTypes, int* derefCount) const
         return *this;
 
     if (resolveTypes && _d->type)
-        return _d->type->toInstance(_d->address, _d->vmem, _d->name,
-                _d->parentNames(), resolveTypes, derefCount);
+        return _d->type->toInstance(_d->address, _d->vmem, _d->name(),
+                this, resolveTypes, derefCount);
 
     if (derefCount)
         *derefCount = 0;

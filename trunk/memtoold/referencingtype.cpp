@@ -84,13 +84,13 @@ Instance ReferencingType::createRefInstance(size_t address,
         VirtualMemory* vmem, const QString& name, const Instance* parent,
         int resolveTypes, int* derefCount) const
 {
-    return createRefInstance(address, vmem, name, parent, QStringList(), -1,
-            resolveTypes, derefCount);
+    return createRefInstance(address, vmem, name, parent, ConstPStringList(),
+    		-1, resolveTypes, derefCount);
 }
 
 
 Instance ReferencingType::createRefInstance(size_t address,
-        VirtualMemory* vmem, const QString& name, const QStringList& parentNames,
+        VirtualMemory* vmem, const QString& name, const ConstPStringList& parentNames,
         int resolveTypes, int* derefCount) const
 {
     return createRefInstance(address, vmem, name, 0, parentNames, -1,
@@ -102,14 +102,14 @@ Instance ReferencingType::createRefInstance(size_t address,
         VirtualMemory* vmem, const QString& name, int id, int resolveTypes,
         int* derefCount) const
 {
-    return createRefInstance(address, vmem, name, 0, QStringList(), id,
+    return createRefInstance(address, vmem, name, 0, ConstPStringList(), id,
             resolveTypes, derefCount);
 }
 
 
 Instance ReferencingType::createRefInstance(size_t address,
 		VirtualMemory* vmem, const QString& name, const Instance* parent,
-		const QStringList& parentNames, int id, int resolveTypes,
+		const ConstPStringList& parentNames, int id, int resolveTypes,
 		int* derefCount) const
 {
     if (derefCount)
