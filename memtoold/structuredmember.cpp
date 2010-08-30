@@ -21,6 +21,9 @@ StructuredMember::StructuredMember(const TypeInfo& info)
 	: Symbol(info), ReferencingType(info), SourceRef(info),
 	  _offset(info.dataMemberLocation()), _belongsTo(0)
 {
+    // This happens for members of unions
+    if (info.dataMemberLocation() < 0)
+        _offset = 0;
 }
 
 
@@ -69,7 +72,8 @@ void StructuredMember::readFrom(QDataStream& in)
     SourceRef::readFrom(in);
     quint64 offset;
     in >> offset;
-    _offset = offset;
+    // Fix old symbol informations
+    _offset = (((qint64)offset) < 0) ? 0 : offset;
 }
 
 
