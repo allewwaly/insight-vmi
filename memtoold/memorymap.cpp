@@ -16,6 +16,22 @@
 #include "debug.h"
 
 
+// static variable
+StringSet MemoryMap::_names;
+
+
+const QString& MemoryMap::insertName(const QString& name)
+{
+    StringSet::const_iterator it = _names.constFind(name);
+    if (it == _names.constEnd())
+        it = _names.insert(name);
+    return *it;
+}
+
+
+//------------------------------------------------------------------------------
+
+
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _factory(factory), _vmem(vmem)
 {
@@ -68,6 +84,7 @@ void MemoryMap::build()
             if (!inst.isNull()) {
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
+                _vmemMap.insert(node->address(), node);
                 stack.push(node);
             }
         }
@@ -83,7 +100,9 @@ void MemoryMap::build()
 
         if (timer.elapsed() > 500) {
             timer.restart();
-            debugmsg("Processed " << processed << " instances.");
+            debugmsg("Processed " << processed << " instances, "
+                    << "_vmemMap.size() = " << _vmemMap.size()
+                    << ", stack.size() = " << stack.size());
         }
 
         // Take top element from stack
@@ -91,9 +110,8 @@ void MemoryMap::build()
         Instance inst = node->toInstance();
         ++processed;
 
-        // Insert in non-critical (exception prone) mappings
+        // Insert in non-critical (non-exception prone) mappings
         _typeInstances.insert(node->type()->id(), node);
-        _vmemMap.insert(node->address(), node);
 
         // try to save the physical mapping
         try {
@@ -119,17 +137,18 @@ void MemoryMap::build()
                     addr += sizeOnPage;
                     ++ctr;
                 }
-                // Debug message, just out out curiosity ;-)
-                if (ctr > 1)
-                    debugmsg(QString("Type %1 at 0x%2 with size %3 spans %4 pages.")
-                                .arg(node->type()->name())
-                                .arg(node->address(), 0, 16)
-                                .arg(node->size())
-                                .arg(ctr));
+//                // Debug message, just out out curiosity ;-)
+//                if (ctr > 1)
+//                    debugmsg(QString("Type %1 at 0x%2 with size %3 spans %4 pages.")
+//                                .arg(node->type()->name())
+//                                .arg(node->address(), 0, 16)
+//                                .arg(node->size())
+//                                .arg(ctr));
             }
         }
         catch (VirtualMemoryException) {
-            // do nothing
+            // Don't proceed any further in case of an exception
+            continue;
         }
 
         // If this is a pointer, add where it's pointing to
@@ -140,9 +159,12 @@ void MemoryMap::build()
                 if (!_vmemMap.contains(addr)) {
                     // Add dereferenced type to the stack, if not already visited
                     int cnt = 0;
-                    inst = inst.dereference(BaseType::trLexical, &cnt);
-                    if (cnt)
-                        stack.push(new MemoryMapNode(this, inst, node));
+                    inst = inst.dereference(BaseType::trLexicalAndPointers, &cnt);
+                    if (cnt && !_vmemMap.contains(inst.address())) {
+                        MemoryMapNode* child = node->addChild(inst);
+                        _vmemMap.insert(child->address(), child);
+                        stack.push(child);
+                    }
                 }
             }
             catch (GenericException e) {
@@ -158,8 +180,11 @@ void MemoryMap::build()
                 for (int i = 0; i < a->length(); ++i) {
                     try {
                         Instance e = inst.arrayElem(i);
-                        if (!_vmemMap.contains(e.address()))
-                            stack.push(new MemoryMapNode(this, e, node));
+                        if (!_vmemMap.contains(e.address())) {
+                            MemoryMapNode* child = node->addChild(e);
+                            _vmemMap.insert(child->address(), child);
+                            stack.push(child);
+                        }
                     }
                     catch (GenericException e) {
 //                        debugerr("Caught exception for instance " << inst.name() //inst.fullName()
@@ -174,8 +199,11 @@ void MemoryMap::build()
             for (int i = 0; i < inst.memberCount(); ++i) {
                 try {
                     Instance m = inst.member(i, BaseType::trLexical);
-                    if (!_vmemMap.contains(m.address()))
-                        stack.push(new MemoryMapNode(this, m, node));
+                    if (!_vmemMap.contains(m.address())) {
+                        MemoryMapNode* child = node->addChild(m);
+                        _vmemMap.insert(child->address(), child);
+                        stack.push(child);
+                    }
                 }
                 catch (GenericException e) {
 //                    debugerr("Caught exception for instance " << inst.name() //inst.fullName()
@@ -185,6 +213,4 @@ void MemoryMap::build()
             }
         }
     }
-
-//    debugmsg("InstanceData::parentDeleted() called " << InstanceData::parentNamesCopyCtr << " times");
 }

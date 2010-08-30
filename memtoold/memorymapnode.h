@@ -42,6 +42,7 @@ public:
 
 	const NodeList& children() const;
 	void addChild(MemoryMapNode* child);
+	MemoryMapNode* addChild(const Instance& inst);
 
     /**
      * @return the virtual address of the variable in memory

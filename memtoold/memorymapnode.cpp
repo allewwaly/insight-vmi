@@ -11,16 +11,18 @@
 
 MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
         quint64 address, const BaseType* type, int id, MemoryMapNode* parent)
-	: _belongsTo(belongsTo), _parent(parent), _name(name), _address(address),
-	  _type(type), _id(id)
+	: _belongsTo(belongsTo), _parent(parent),
+	  _name(MemoryMap::insertName(name)), _address(address), _type(type),
+	  _id(id)
 {
 }
 
 
 MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
         MemoryMapNode* parent)
-    : _belongsTo(belongsTo), _parent(parent), _name(inst.name()),
-      _address(inst.address()), _type(inst.type()), _id(inst.id())
+    : _belongsTo(belongsTo), _parent(parent),
+      _name(MemoryMap::insertName(inst.name())), _address(inst.address()),
+      _type(inst.type()), _id(inst.id())
 {
 }
 
@@ -71,6 +73,11 @@ QString MemoryMapNode::fullName() const
 QStringList MemoryMapNode::fullNameComponents() const
 {
 	QStringList ret = parentNameComponents();
+    // If this is the child of an array or pointer, then suppress the father's
+	// name
+    if (_parent && _parent->type() &&
+            (_parent->type()->type() & (BaseType::rtArray|BaseType::rtPointer)))
+        ret.removeLast();
 	ret += name();
 	return ret;
 }
@@ -86,6 +93,14 @@ void MemoryMapNode::addChild(MemoryMapNode* child)
 {
 	_children.append(child);
 	child->_parent = this;
+}
+
+
+MemoryMapNode* MemoryMapNode::addChild(const Instance& inst)
+{
+    MemoryMapNode* child = new MemoryMapNode(_belongsTo, inst, this);
+    addChild(child);
+    return child;
 }
 
 
