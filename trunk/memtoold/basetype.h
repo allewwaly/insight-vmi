@@ -361,23 +361,6 @@ public:
             int resolveTypes = trLexical, int* derefCount = 0) const;
 
     /**
-     * Creates an Instance object of this type.
-     * @param address the address of the instance within \a vmem
-     * @param vmem the virtual memory object to read data from
-     * @param name the name of this instance
-     * @param parent the parent instance of this instance
-     * @param resolveTypes which types to automatically resolve, see
-     * TypeResolution
-     * @param derefCount pointer to a counter variable for how many types have
-     * been followed to create the instance
-     * @return an Instance object for the dereferenced type
-     * \sa BaseType::TypeResolution
-     */
-    virtual Instance toInstance(size_t address, VirtualMemory* vmem,
-            const QString& name, const Instance* parent,
-            int resolveTypes = trLexical, int* derefCount = 0) const;
-
-    /**
      * This operator considers two types to be equal if their following data
      * is equal:
      * @li type()

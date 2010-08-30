@@ -55,15 +55,6 @@ Instance RefBaseType::toInstance(size_t address, VirtualMemory* vmem,
 }
 
 
-Instance RefBaseType::toInstance(size_t address, VirtualMemory* vmem,
-        const QString& name, const Instance* parent,
-        int resolveTypes, int* derefCount) const
-{
-    return createRefInstance(address, vmem, name, parent, resolveTypes,
-            derefCount);
-}
-
-
 void RefBaseType::readFrom(QDataStream& in)
 {
     BaseType::readFrom(in);

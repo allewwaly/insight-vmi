@@ -82,22 +82,6 @@ protected:
      * @param address the address of the instance within \a vmem
      * @param vmem the virtual memory object to read data from
      * @param name the name of this instance
-     * @param parent the parent instance (if it's not a variable instance)
-     * @param resolveTypes bitwise or'ed BaseType::RealType's that should
-     * be resolved
-     * @param derefCount pointer to a counter variable for how many types have
-     * been followed to create the instance
-     * @return an Instance object for this member
-     */
-    Instance createRefInstance(size_t address, VirtualMemory* vmem,
-    		const QString& name, const Instance* parent,
-    		int resolveTypes, int* derefCount = 0) const;
-
-    /**
-     * Creates an Instance object of a StructuredMember object.
-     * @param address the address of the instance within \a vmem
-     * @param vmem the virtual memory object to read data from
-     * @param name the name of this instance
      * @param parentNames the name components of the parent (if it's not a
      * variable instance)
      * @param resolveTypes bitwise or'ed BaseType::RealType's that should
@@ -146,9 +130,8 @@ private:
      * @return an Instance object for this member
      */
     inline Instance createRefInstance(size_t address, VirtualMemory* vmem,
-            const QString& name, const Instance* parent,
-            const QStringList& parentNames, int id, int resolveTypes,
-            int* derefCount) const;
+            const QString& name, const QStringList& parentNames, int id,
+            int resolveTypes, int* derefCount) const;
 };
 
 

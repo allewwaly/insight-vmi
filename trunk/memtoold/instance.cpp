@@ -55,23 +55,6 @@ Instance::Instance(size_t address, const BaseType* type, const QString& name,
 }
 
 
-Instance::Instance(size_t address, const BaseType* type, const QString& name,
-        const Instance* parent, VirtualMemory* vmem, int id)
-{
-    _d = new InstanceData;
-    _d->id = id;
-    _d->address = address;
-    _d->type = type;
-    _d->setName(name);
-    if (parent)
-        _d->setParentNames(parent->fullNameComponents());
-    _d->vmem = vmem;
-    _d->isValid = type != 0;
-    _d->isNull = !_d->address || !_d->isValid;
-    ++_objectCount;
-}
-
-
 Instance::Instance(const Instance& other)
     : _d(other._d)
 {
@@ -475,7 +458,7 @@ Instance Instance::dereference(int resolveTypes, int* derefCount) const
 
     if (resolveTypes && _d->type)
         return _d->type->toInstance(_d->address, _d->vmem, _d->name(),
-                this, resolveTypes, derefCount);
+                _d->parentNames(), resolveTypes, derefCount);
 
     if (derefCount)
         *derefCount = 0;
