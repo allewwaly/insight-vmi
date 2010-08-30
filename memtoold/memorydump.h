@@ -162,7 +162,7 @@ public:
      * be read
      */
     Instance getInstanceAt(const QString& type, const size_t address,
-            const QStringList& parentNames) const;
+            const ConstPStringList& parentNames) const;
 	
 	/**
 	 * Get the Type object of a type given as string.

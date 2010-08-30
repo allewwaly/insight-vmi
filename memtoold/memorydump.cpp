@@ -11,6 +11,7 @@
 #include <QStringList>
 #include <QRegExp>
 #include <QStack>
+#include <QTime>
 #include "instancedata.h"
 #include "symfactory.h"
 #include "variable.h"
@@ -160,7 +161,7 @@ BaseType* MemoryDump::getType(const QString& type) const
 
 
 Instance MemoryDump::getInstanceAt(const QString& type, const size_t address,
-        const QStringList& parentNames) const
+        const ConstPStringList& parentNames) const
 {
     BaseType* t = getType(type);
 	return t ?
@@ -430,7 +431,9 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 	
     if (!components.isEmpty()) {
 		// Get first instance
-		result = getInstanceAt(components.first(), address, QStringList("user"));
+    	ConstPStringList comp;
+    	comp += InstanceData::insertName("user");
+		result = getInstanceAt(components.first(), address, comp);
 		components.pop_front();
 	
 		while (!components.isEmpty()) {
@@ -470,6 +473,10 @@ void MemoryDump::setupRevMap()
 
     QStack<Instance> stack;
 
+    QTime timer;
+    timer.start();
+    qint64 processed = 0;
+
     // Go through the global vars and add their instances on the stack
     for (VariableList::const_iterator it = _factory->vars().constBegin();
             it != _factory->vars().constEnd(); ++it)
@@ -488,8 +495,38 @@ void MemoryDump::setupRevMap()
 
     // Now work through the whole stack
     while (!stack.isEmpty()) {
+
+    	if (timer.elapsed() > 500) {
+    		timer.restart();
+
+    		qint64 instMem = Instance::objectCount() * sizeof(Instance);
+    		qint64 instDataMem = InstanceData::objectCount() * sizeof(InstanceData);
+    		qint64 parentPtrMem = InstanceData::parentNameTotalCnt() * sizeof(ConstPStringList::value_type);
+    		qint64 namesMem = InstanceData::namesMemUsage();
+    		qint64 totalMem = instMem + instDataMem + parentPtrMem + namesMem;
+
+    		debugmsg("Processed " << processed << " instances.");
+    		debugmsg(QString("No. of Instance objects:     %1, %2 MB")
+    				.arg(Instance::objectCount(), 10)
+    				.arg(instMem / (1024*1024), 4));
+    		debugmsg(QString("No. of InstanceData objects: %1, %2 MB")
+    				.arg(InstanceData::objectCount(), 10)
+    				.arg(instDataMem / (1024*1024), 4));
+    		debugmsg(QString("No. of name strings:         %1, %2 MB")
+    				.arg(InstanceData::namesCount(), 10)
+    				.arg(namesMem / (1024*1024), 4));
+    		debugmsg(QString("No. of parent name ptrs:     %1, %2 MB")
+    				.arg(InstanceData::parentNameTotalCnt(), 10)
+    				.arg(parentPtrMem / (1024*1024), 4));
+    		debugmsg(QString("Total mem usage:             %1  %2 MB")
+    				.arg(QString(), 10)
+    				.arg(totalMem / (1024*1024), 4));
+    	}
+
+
         // Take top element from stack
         Instance inst = stack.pop();
+        ++processed;
 
         // Insert in non-critical (exception prone) mappings
         _typeInstances.insert(inst.type()->id(), inst);
@@ -546,8 +583,8 @@ void MemoryDump::setupRevMap()
                 }
             }
             catch (GenericException e) {
-                debugerr("Caught exception for instance " << inst.name() //inst.fullName()
-                        << " at " << e.file << ":" << e.line << ": " << e.message);
+//                debugerr("Caught exception for instance " << inst.name() //inst.fullName()
+//                        << " at " << e.file << ":" << e.line << ": " << e.message);
             }
         }
         // If this is an array, add all elements
@@ -562,8 +599,8 @@ void MemoryDump::setupRevMap()
                             stack.push(e);
                     }
                     catch (GenericException e) {
-                        debugerr("Caught exception for instance " << inst.name() //inst.fullName()
-                                << " at " << e.file << ":" << e.line << ": " << e.message);
+//                        debugerr("Caught exception for instance " << inst.name() //inst.fullName()
+//                                << " at " << e.file << ":" << e.line << ": " << e.message);
                     }
                 }
             }
@@ -578,9 +615,9 @@ void MemoryDump::setupRevMap()
                         stack.push(m);
                 }
                 catch (GenericException e) {
-                    debugerr("Caught exception for instance " << inst.name() //inst.fullName()
-                            << "." << inst.memberNames().at(i) << " at "
-                            << e.file << ":" << e.line << ": " << e.message);
+//                    debugerr("Caught exception for instance " << inst.name() //inst.fullName()
+//                            << "." << inst.memberNames().at(i) << " at "
+//                            << e.file << ":" << e.line << ": " << e.message);
                 }
             }
         }

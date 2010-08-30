@@ -1,4 +1,6 @@
-SOURCES += instancedata.cpp \
+SOURCES += memorymapnode.cpp \
+    memorymap.cpp \
+    instancedata.cpp \
     instance.cpp \
     instanceprototype.cpp \
     instanceclass.cpp \
@@ -35,7 +37,9 @@ SOURCES += instancedata.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += instancedata.h \
+HEADERS += memorymapnode.h \
+    memorymap.h \
+    instancedata.h \
     instance.h \
     instanceprototype.h \
     instanceclass.h \
