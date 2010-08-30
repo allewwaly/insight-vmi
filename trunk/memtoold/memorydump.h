@@ -12,14 +12,12 @@
 #include "virtualmemory.h"
 #include "instance.h"
 #include "basetype.h"
-#include <QMultiHash>
-#include <QMap>
-#include <QPair>
 
 // forward declarations
 class QFile;
 class QIODevice;
 class SymFactory;
+class MemoryMap;
 
 /**
  * Exception class for queries
@@ -43,14 +41,6 @@ public:
     {
     }
 };
-
-
-typedef QMultiHash<quint64, Instance> PointerNodeHash;
-typedef QMultiHash<int, Instance> IntNodeHash;
-typedef QMap<quint64, Instance> PointerNodeMap;
-typedef QPair<int, Instance> IntInstPair;
-typedef QMap<quint64, IntInstPair> PointerIntNodeMap;
-
 
 
 /**
@@ -209,10 +199,7 @@ private:
     VirtualMemory* _vmem;
     const SymFactory* _factory;
     int _index;
-    PointerNodeHash _pointersTo; ///< holds all pointers that point to a certain address
-    IntNodeHash _typeInstances;   ///< holds all instances of a given type ID
-    PointerNodeMap _vmemMap;     ///< map of all used kernel-space virtual memory
-    PointerIntNodeMap _pmemMap;     ///< map of all used physical memory
+    MemoryMap* _map;
 };
 
 #endif /* MEMORYDUMP_H_ */
