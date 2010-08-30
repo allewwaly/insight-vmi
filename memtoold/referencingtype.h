@@ -107,7 +107,7 @@ protected:
      * @return an Instance object for this member
      */
     Instance createRefInstance(size_t address, VirtualMemory* vmem,
-            const QString& name, const ConstPStringList& parentNames,
+            const QString& name, const QStringList& parentNames,
             int resolveTypes, int* derefCount = 0) const;
 
     /**
@@ -147,7 +147,7 @@ private:
      */
     inline Instance createRefInstance(size_t address, VirtualMemory* vmem,
             const QString& name, const Instance* parent,
-            const ConstPStringList& parentNames, int id, int resolveTypes,
+            const QStringList& parentNames, int id, int resolveTypes,
             int* derefCount) const;
 };
 

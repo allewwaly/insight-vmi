@@ -1167,7 +1167,6 @@ int Shell::cmdMemoryUnload(QStringList args)
         delete _memDumps[index];
         _memDumps[index] = 0;
         _out << "Unloaded [" << index << "] " << fileName << endl;
-        debugmsg("InstanceData::parentDeleted() called " << InstanceData::parentNamesCopyCtr << " times");
         return 0;
     }
 

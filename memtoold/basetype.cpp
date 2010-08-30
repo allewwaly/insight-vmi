@@ -138,7 +138,7 @@ BaseType::RealTypeRevMap BaseType::getRealTypeRevMap()
 
 
 Instance BaseType::toInstance(size_t address, VirtualMemory* vmem,
-        const QString& name, const ConstPStringList& parentNames,
+        const QString& name, const QStringList& parentNames,
         int /*resolveTypes*/, int* /*derefCount*/) const
 {
     return Instance(address, this, name, parentNames, vmem, -1);

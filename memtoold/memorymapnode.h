@@ -22,15 +22,19 @@ typedef QList<MemoryMapNode*> NodeList;
 class MemoryMapNode
 {
 public:
-	MemoryMapNode(MemoryMap* belongsTo, const QString& name,
-			const BaseType* type, MemoryMapNode* parent = 0);
+	MemoryMapNode(MemoryMap* belongsTo, const QString& name, quint64 address,
+			const BaseType* type, int id, MemoryMapNode* parent = 0);
+
+    MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
+            MemoryMapNode* parent = 0);
+
 	virtual ~MemoryMapNode();
 
 	const MemoryMap* belongsTo() const;
 
 	MemoryMapNode* parent();
 	QString parentName() const;
-	QStringList parentNameComponents();
+	QStringList parentNameComponents() const;
 
 	const QString& name() const;
 	QString fullName() const;
@@ -38,6 +42,17 @@ public:
 
 	const NodeList& children() const;
 	void addChild(MemoryMapNode* child);
+
+    /**
+     * @return the virtual address of the variable in memory
+     */
+    quint64 address() const;
+
+    /**
+     * Convenience function to access type()->size()
+     * @return the size of this instance's type
+     */
+    quint32 size() const;
 
 	const BaseType* type() const;
 
@@ -49,7 +64,9 @@ private:
 	MemoryMapNode* _parent;
 
 	const QString& _name;
+	quint64 _address;
 	const BaseType* _type;
+    int _id;
 };
 
 #endif /* MEMORYMAPNODE_H_ */

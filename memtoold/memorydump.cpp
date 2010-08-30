@@ -10,16 +10,8 @@
 #include <QFile>
 #include <QStringList>
 #include <QRegExp>
-#include <QStack>
-#include <QTime>
-#include "instancedata.h"
 #include "symfactory.h"
 #include "variable.h"
-#include "structured.h"
-#include "refbasetype.h"
-#include "pointer.h"
-#include "array.h"
-#include "virtualmemoryexception.h"
 
 
 #define queryError(x) do { throw QueryException((x), __FILE__, __LINE__); } while (0)
@@ -161,7 +153,7 @@ BaseType* MemoryDump::getType(const QString& type) const
 
 
 Instance MemoryDump::getInstanceAt(const QString& type, const size_t address,
-        const ConstPStringList& parentNames) const
+        const QStringList& parentNames) const
 {
     BaseType* t = getType(type);
 	return t ?
@@ -345,7 +337,8 @@ Instance MemoryDump::queryInstance(const int queryId) const
         queryError(QString("Variable with ID 0x%1 does not exist")
                 .arg(queryId, 0, 16));
 
-    return v->toInstance(_vmem, BaseType::rtArray);
+//    return v->toInstance(_vmem, BaseType::rtArray);
+    return v->toInstance(_vmem, BaseType::trLexicalAndPointers);
 }
 
 
@@ -431,9 +424,7 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 	
     if (!components.isEmpty()) {
 		// Get first instance
-    	ConstPStringList comp;
-    	comp += InstanceData::insertName("user");
-		result = getInstanceAt(components.first(), address, comp);
+		result = getInstanceAt(components.first(), address, QStringList("user"));
 		components.pop_front();
 	
 		while (!components.isEmpty()) {
@@ -465,6 +456,7 @@ int MemoryDump::index() const
 
 void MemoryDump::setupRevMap()
 {
+    /*
     // Clean up everything
     _pointersTo.clear();
     _typeInstances.clear();
@@ -624,5 +616,6 @@ void MemoryDump::setupRevMap()
     }
 
     debugmsg("InstanceData::parentDeleted() called " << InstanceData::parentNamesCopyCtr << " times");
+*/
 }
 

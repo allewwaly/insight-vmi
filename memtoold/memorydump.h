@@ -45,11 +45,11 @@ public:
 };
 
 
-typedef QMultiHash<quint64, Instance> PointerInstanceHash;
-typedef QMultiHash<int, Instance> IdInstanceHash;
-typedef QMap<quint64, Instance> PointerInstanceMap;
+typedef QMultiHash<quint64, Instance> PointerNodeHash;
+typedef QMultiHash<int, Instance> IntNodeHash;
+typedef QMap<quint64, Instance> PointerNodeMap;
 typedef QPair<int, Instance> IntInstPair;
-typedef QMap<quint64, IntInstPair> PointerIntInstanceMap;
+typedef QMap<quint64, IntInstPair> PointerIntNodeMap;
 
 
 
@@ -162,7 +162,7 @@ public:
      * be read
      */
     Instance getInstanceAt(const QString& type, const size_t address,
-            const ConstPStringList& parentNames) const;
+            const QStringList& parentNames) const;
 	
 	/**
 	 * Get the Type object of a type given as string.
@@ -209,10 +209,10 @@ private:
     VirtualMemory* _vmem;
     const SymFactory* _factory;
     int _index;
-    PointerInstanceHash _pointersTo; ///< holds all pointers that point to a certain address
-    IdInstanceHash _typeInstances;   ///< holds all instances of a given type ID
-    PointerInstanceMap _vmemMap;     ///< map of all used kernel-space virtual memory
-    PointerIntInstanceMap _pmemMap;     ///< map of all used physical memory
+    PointerNodeHash _pointersTo; ///< holds all pointers that point to a certain address
+    IntNodeHash _typeInstances;   ///< holds all instances of a given type ID
+    PointerNodeMap _vmemMap;     ///< map of all used kernel-space virtual memory
+    PointerIntNodeMap _pmemMap;     ///< map of all used physical memory
 };
 
 #endif /* MEMORYDUMP_H_ */
