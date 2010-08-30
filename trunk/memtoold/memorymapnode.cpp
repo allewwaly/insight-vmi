@@ -6,16 +6,29 @@
  */
 
 #include "memorymapnode.h"
+#include "basetype.h"
+#include "memorymap.h"
 
 MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
-		const BaseType* type, MemoryMapNode* parent)
-	: _belongsTo(belongsTo), _name(name), _type(type), _parent(parent)
+        quint64 address, const BaseType* type, int id, MemoryMapNode* parent)
+	: _belongsTo(belongsTo), _parent(parent), _name(name), _address(address),
+	  _type(type), _id(id)
+{
+}
+
+
+MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
+        MemoryMapNode* parent)
+    : _belongsTo(belongsTo), _parent(parent), _name(inst.name()),
+      _address(inst.address()), _type(inst.type()), _id(inst.id())
 {
 }
 
 
 MemoryMapNode::~MemoryMapNode()
 {
+    for (NodeList::iterator it = _children.begin(); it != _children.end(); ++it)
+        delete *it;
 }
 
 
@@ -37,7 +50,7 @@ QString MemoryMapNode::parentName() const
 }
 
 
-QStringList MemoryMapNode::parentNameComponents()
+QStringList MemoryMapNode::parentNameComponents() const
 {
 	return _parent ? _parent->fullNameComponents() : QStringList();
 }
@@ -72,6 +85,19 @@ const NodeList& MemoryMapNode::children() const
 void MemoryMapNode::addChild(MemoryMapNode* child)
 {
 	_children.append(child);
+	child->_parent = this;
+}
+
+
+quint64 MemoryMapNode::address() const
+{
+    return _address;
+}
+
+
+quint32 MemoryMapNode::size() const
+{
+    return _type ? _type->size() : 0;
 }
 
 
@@ -83,6 +109,7 @@ const BaseType* MemoryMapNode::type() const
 
 Instance MemoryMapNode::toInstance() const
 {
-	// TODO implement me
+    return Instance(_address, _type, _name, parentNameComponents(),
+            _belongsTo->vmem(), _id);
 }
 

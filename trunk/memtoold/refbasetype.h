@@ -74,7 +74,7 @@ public:
      * \sa BaseType::TypeResolution
      */
      virtual Instance toInstance(size_t address, VirtualMemory* vmem,
-            const QString& name, const ConstPStringList& parentNames,
+            const QString& name, const QStringList& parentNames,
             int resolveTypes = trLexical, int* derefCount = 0) const;
 
      /**

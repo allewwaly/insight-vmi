@@ -40,7 +40,7 @@ Instance::Instance()
 
 
 Instance::Instance(size_t address, const BaseType* type, const QString& name,
-        const ConstPStringList& parentNames, VirtualMemory* vmem, int id)
+        const QStringList& parentNames, VirtualMemory* vmem, int id)
 {
     _d = new InstanceData;
     _d->id = id;
@@ -58,11 +58,13 @@ Instance::Instance(size_t address, const BaseType* type, const QString& name,
 Instance::Instance(size_t address, const BaseType* type, const QString& name,
         const Instance* parent, VirtualMemory* vmem, int id)
 {
-    _d = new InstanceData(parent->_d.constData());
+    _d = new InstanceData;
     _d->id = id;
     _d->address = address;
     _d->type = type;
     _d->setName(name);
+    if (parent)
+        _d->setParentNames(parent->fullNameComponents());
     _d->vmem = vmem;
     _d->isValid = type != 0;
     _d->isNull = !_d->address || !_d->isValid;
@@ -129,18 +131,12 @@ void Instance::setName(const QString& name)
 
 QString Instance::parentName() const
 {
-	ConstPStringList comp = parentNameComponents();
-	QString ret;
-	for (int i = 0; i < comp.size(); ++i) {
-		if (i > 0)
-			ret += '.';
-		ret += comp[i];
-	}
-    return ret;
+    QStringList comp = parentNameComponents();
+    return comp.join(".");
 }
 
 
-ConstPStringList Instance::parentNameComponents() const
+QStringList Instance::parentNameComponents() const
 {
     return _d->parentNames();
 }
@@ -148,18 +144,12 @@ ConstPStringList Instance::parentNameComponents() const
 
 QString Instance::fullName() const
 {
-	ConstPStringList comp = fullNameComponents();
-	QString ret;
-	for (int i = 0; i < comp.size(); ++i) {
-		if (i > 0)
-			ret += '.';
-		ret += comp[i];
-	}
-    return ret;
+    QStringList comp = fullNameComponents();
+    return comp.join(".");
 }
 
 
-ConstPStringList Instance::fullNameComponents() const
+QStringList Instance::fullNameComponents() const
 {
     return _d->fullNames();
 }

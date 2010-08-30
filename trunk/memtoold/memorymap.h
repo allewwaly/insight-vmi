@@ -15,31 +15,41 @@
 #include <QPair>
 #include "memorymapnode.h"
 
+class SymFactory;
+class VirtualMemory;
 
 typedef QSet<QString> StringSet;
-typedef QMultiHash<quint64, MemoryMapNode*> PointerInstanceHash;
-typedef QMultiHash<int, MemoryMapNode*> IdInstanceHash;
-typedef QMap<quint64, MemoryMapNode*> PointerInstanceMap;
-typedef QPair<int, MemoryMapNode*> IntInstPair;
-typedef QMap<quint64, IntInstPair> PointerIntInstanceMap;
+typedef QMultiHash<quint64, MemoryMapNode*> PointerNodeHash;
+typedef QMultiHash<int, MemoryMapNode*> IntNodeHash;
+typedef QMap<quint64, MemoryMapNode*> PointerNodeMap;
+typedef QPair<int, MemoryMapNode*> IntNodePair;
+typedef QMap<quint64, IntNodePair> PointerIntNodeMap;
 
 
 class MemoryMap
 {
 public:
-	MemoryMap();
+	MemoryMap(const SymFactory* factory, VirtualMemory* vmem);
 	virtual ~MemoryMap();
 
-	static const QString& insertName(const QString& name);
+	void clear();
+
+	void build();
+
+    VirtualMemory* vmem();
+
+    static const QString& insertName(const QString& name);
 
 private:
 	static StringSet _names;
 
+    const SymFactory* _factory;
+    VirtualMemory* _vmem;
 	NodeList _roots;
-    PointerInstanceHash _pointersTo; ///< holds all pointers that point to a certain address
-    IdInstanceHash _typeInstances;   ///< holds all instances of a given type ID
-    PointerInstanceMap _vmemMap;     ///< map of all used kernel-space virtual memory
-    PointerIntInstanceMap _pmemMap;     ///< map of all used physical memory
+    PointerNodeHash _pointersTo; ///< holds all pointers that point to a certain address
+    IntNodeHash _typeInstances;  ///< holds all instances of a given type ID
+    PointerNodeMap _vmemMap;     ///< map of all used kernel-space virtual memory
+    PointerIntNodeMap _pmemMap;  ///< map of all used physical memory
 };
 
 #endif /* MEMORYMAP_H_ */

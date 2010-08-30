@@ -44,7 +44,7 @@ public:
      * @param id the ID of the variable this instance represents, if any
 	 */
 	Instance(size_t address, const BaseType* type, const QString& name,
-            const ConstPStringList& parentNames, VirtualMemory* vmem, int id = -1);
+            const QStringList& parentNames, VirtualMemory* vmem, int id = -1);
 
     /**
      * Constructor
@@ -121,7 +121,7 @@ public:
 	 * was found, e. g. \c init_task, \c children
 	 * @return a list of the name components of the parent's struct
 	 */
-	ConstPStringList parentNameComponents() const;
+	QStringList parentNameComponents() const;
 
 	/**
 	 * Use this function to retrieve the full name of this instance as it was
@@ -136,7 +136,7 @@ public:
      * instance as it was found following the names and members of structs.
      * @return the full name components of this instance
      */
-	ConstPStringList fullNameComponents() const;
+	QStringList fullNameComponents() const;
 
 	/**
 	 * Gives access to the names of all members if this instance.
