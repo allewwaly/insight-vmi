@@ -145,14 +145,6 @@ Instance BaseType::toInstance(size_t address, VirtualMemory* vmem,
 }
 
 
-Instance BaseType::toInstance(size_t address, VirtualMemory* vmem,
-        const QString& name, const Instance* parent,
-        int /*resolveTypes*/, int* /*derefCount*/) const
-{
-    return Instance(address, this, name, parent, vmem, -1);
-}
-
-
 bool BaseType::operator==(const BaseType& other) const
 {
     return

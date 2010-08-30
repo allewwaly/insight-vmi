@@ -47,18 +47,6 @@ public:
             const QStringList& parentNames, VirtualMemory* vmem, int id = -1);
 
     /**
-     * Constructor
-     * @param address the address of that instance
-     * @param type the underlying BaseType of this instance
-     * @param name the name of this instance
-     * @param parent the parent instance
-     * @param vmem the virtual memory device to read data from
-     * @param id the ID of the variable this instance represents, if any
-     */
-    Instance(size_t address, const BaseType* type, const QString& name,
-            const Instance* parent, VirtualMemory* vmem, int id = -1);
-
-    /**
      * Copy constructor
      * @param other object to copy from
      */
