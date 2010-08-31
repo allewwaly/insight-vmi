@@ -13,6 +13,7 @@
 #include <QMultiHash>
 #include <QMap>
 #include <QPair>
+#include <QStack>
 #include "memorymapnode.h"
 
 class SymFactory;
@@ -42,6 +43,10 @@ public:
 
 private:
 	static StringSet _names;
+
+	bool containedInVmemMap(const Instance& inst) const;
+	bool addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
+	        QStack<MemoryMapNode*>* stack);
 
     const SymFactory* _factory;
     VirtualMemory* _vmem;
