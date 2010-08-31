@@ -135,10 +135,33 @@ public:
 
     /**
      * Terminates any script that is currently executed, if any
-     * @return \c true if a script was executint and has been terminated,
+     * @return \c true if a script was executed and has been terminated,
      * \c false otherwise
      */
     bool terminateScript();
+
+    /**
+     * @return \c true if the user has exited the shell or if shutdown() has
+     * been called, \c false otherwise
+     */
+    bool shuttingDown() const;
+
+    /**
+     * Requests the shell to interrupt any currently running operation.
+     */
+    void interrupt();
+
+    /**
+     * @return \c true if interrupt() has been called during execution of the
+     * running operation, \c false otherwise
+     */
+    bool interrupted() const;
+
+    /**
+     * @return \c true if a command is currently evaluated and the operation is
+     * still in progress, \c false otherwise
+     */
+    bool executing() const;
 
 protected:
     /**
@@ -182,6 +205,7 @@ private:
     QList<QProcess*> _pipedProcs;
     bool _listenOnSocket;
     bool _interactive;
+    bool _executing;
     QLocalSocket* _clSocket;
     QLocalServer* _srvSocket;
     DeviceMuxer* _socketMuxer;
@@ -192,6 +216,7 @@ private:
     QSemaphore _sockSem;
     QMutex _sockSemLock;
     bool _finished;
+    bool _interrupted;
     int _lastStatus;
     QMutex _engineLock;
     QScriptEngine* _engine;

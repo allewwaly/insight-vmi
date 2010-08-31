@@ -33,6 +33,8 @@
 #include "memorydump.h"
 #include "instanceclass.h"
 #include "instancedata.h"
+#include "varsetter.h"
+#include "memorymapnode.h"
 
 // Register socket enums for the Qt meta type system
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
@@ -486,6 +488,7 @@ void Shell::run()
         debugmsg("old sizeof(Instance) = " << 64);
         debugmsg("sizeof(Instance) = " << sizeof(Instance));
         debugmsg("sizeof(InstanceData) = " << sizeof(InstanceData));
+        debugmsg("sizeof(MemoryMapNode) = " << sizeof(MemoryMapNode));
         // Enter command line loop
         while (!_finished)
             evalLine();
@@ -500,6 +503,7 @@ void Shell::run()
 
 void Shell::shutdown()
 {
+    interrupt();
     _finished = true;
     this->exit(0);
     QMutexLocker lock(&_sockSemLock);
@@ -507,11 +511,40 @@ void Shell::shutdown()
 }
 
 
+bool Shell::shuttingDown() const
+{
+    return _finished;
+}
+
+
+void Shell::interrupt()
+{
+    if (executing()) {
+        _interrupted = true;
+        terminateScript();
+    }
+}
+
+
+bool Shell::interrupted() const
+{
+    return _interrupted;
+}
+
+
+bool Shell::executing() const
+{
+    return _executing;
+}
+
+
 int Shell::eval(QString command)
 {
     int ret = 1;
+    VarSetter<bool> setter1(&_executing, true, false);
+    _interrupted = false;
+
 	QStringList pipeCmds = command.split(QRegExp("\\s*\\|\\s*"), QString::KeepEmptyParts);
-	assert(_pipedProcs.isEmpty() == true);
 
 	// Setup piped processes if no socket connection
 	if (pipeCmds.size() > 1) {
@@ -1254,6 +1287,7 @@ int Shell::cmdMemoryRevmap(QStringList args)
         int sec = (elapsed / 1000) % 60;
         int msec = elapsed % 1000;
 
+        if (!interrupted())
         _out << "Built reverse mapping for memory dump [" << index << "] in "
                 << QString("%1:%2.%3 minutes")
                     .arg(min)
