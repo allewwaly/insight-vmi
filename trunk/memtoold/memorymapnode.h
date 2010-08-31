@@ -57,7 +57,7 @@ public:
 
 	const BaseType* type() const;
 
-	Instance toInstance() const;
+	Instance toInstance(bool includeParentNameComponents = true) const;
 
 private:
 	MemoryMap* _belongsTo;

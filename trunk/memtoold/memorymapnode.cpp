@@ -122,9 +122,10 @@ const BaseType* MemoryMapNode::type() const
 }
 
 
-Instance MemoryMapNode::toInstance() const
+Instance MemoryMapNode::toInstance(bool includeParentNameComponents) const
 {
-    return Instance(_address, _type, _name, parentNameComponents(),
+    return Instance(_address, _type, _name,
+            includeParentNameComponents ? parentNameComponents() : QStringList(),
             _belongsTo->vmem(), _id);
 }
 
