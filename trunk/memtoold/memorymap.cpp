@@ -6,7 +6,6 @@
  */
 
 #include "memorymap.h"
-#include <QStack>
 #include <QTime>
 #include "symfactory.h"
 #include "variable.h"
@@ -84,7 +83,7 @@ void MemoryMap::build()
             if (!inst.isNull()) {
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
-                _vmemMap.insert(node->address(), node);
+                _vmemMap.insertMulti(node->address(), node);
                 stack.push(node);
             }
         }
@@ -119,7 +118,7 @@ void MemoryMap::build()
             quint64 physAddr = _vmem->virtualToPhysical(node->address(), &pageSize);
             // Linear memory region or paged memory?
             if (pageSize < 0)
-                _pmemMap.insert(physAddr, IntNodePair(pageSize, node));
+                _pmemMap.insertMulti(physAddr, IntNodePair(pageSize, node));
             else {
                 // Add all pages a type belongs to
                 quint32 size = node->size();
@@ -128,7 +127,7 @@ void MemoryMap::build()
                 int ctr = 0;
                 while (size > 0) {
                     // Add a memory mapping
-                    _pmemMap.insert(addr, IntNodePair(pageSize, node));
+                    _pmemMap.insertMulti(addr, IntNodePair(pageSize, node));
                     // How much space is left on current page?
                     quint32 sizeOnPage = pageSize - (addr & ~pageMask);
                     // Subtract the available space from left-over size
@@ -156,16 +155,11 @@ void MemoryMap::build()
             try {
                 quint64 addr = (quint64) inst.toPointer();
                 _pointersTo.insert(addr, node);
-                if (!_vmemMap.contains(addr)) {
-                    // Add dereferenced type to the stack, if not already visited
-                    int cnt = 0;
-                    inst = inst.dereference(BaseType::trLexicalAndPointers, &cnt);
-                    if (cnt && !_vmemMap.contains(inst.address())) {
-                        MemoryMapNode* child = node->addChild(inst);
-                        _vmemMap.insert(child->address(), child);
-                        stack.push(child);
-                    }
-                }
+                // Add dereferenced type to the stack, if not already visited
+                int cnt = 0;
+                inst = inst.dereference(BaseType::trLexicalAndPointers, &cnt);
+                if (cnt)
+                    addChildIfNotExistend(inst, node, &stack);
             }
             catch (GenericException e) {
 //                debugerr("Caught exception for instance " << inst.name() //inst.fullName()
@@ -180,11 +174,7 @@ void MemoryMap::build()
                 for (int i = 0; i < a->length(); ++i) {
                     try {
                         Instance e = inst.arrayElem(i);
-                        if (!_vmemMap.contains(e.address())) {
-                            MemoryMapNode* child = node->addChild(e);
-                            _vmemMap.insert(child->address(), child);
-                            stack.push(child);
-                        }
+                        addChildIfNotExistend(e, node, &stack);
                     }
                     catch (GenericException e) {
 //                        debugerr("Caught exception for instance " << inst.name() //inst.fullName()
@@ -199,11 +189,7 @@ void MemoryMap::build()
             for (int i = 0; i < inst.memberCount(); ++i) {
                 try {
                     Instance m = inst.member(i, BaseType::trLexical);
-                    if (!_vmemMap.contains(m.address())) {
-                        MemoryMapNode* child = node->addChild(m);
-                        _vmemMap.insert(child->address(), child);
-                        stack.push(child);
-                    }
+                    addChildIfNotExistend(m, node, &stack);
                 }
                 catch (GenericException e) {
 //                    debugerr("Caught exception for instance " << inst.name() //inst.fullName()
@@ -214,3 +200,31 @@ void MemoryMap::build()
         }
     }
 }
+
+
+bool MemoryMap::containedInVmemMap(const Instance& inst) const
+{
+    if (!_vmemMap.contains(inst.address()))
+        return false;
+    // Check if the list contains the same type with the same address
+    QList<PointerNodeMap::mapped_type> list = _vmemMap.values(inst.address());
+    for (int i = 0; i < list.size(); ++i)
+        if (list[i]->type() && list[i]->type()->id() == inst.id())
+            return true;
+    return false;
+}
+
+
+bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
+        QStack<MemoryMapNode*>* stack)
+{
+    if (!containedInVmemMap(inst)) {
+        MemoryMapNode* child = node->addChild(inst);
+        _vmemMap.insertMulti(child->address(), child);
+        stack->push(child);
+        return true;
+    }
+    else
+        return false;
+}
+
