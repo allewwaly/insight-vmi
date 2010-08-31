@@ -7,11 +7,13 @@
 
 #include "memorymap.h"
 #include <QTime>
+#include <QQueue>
 #include "symfactory.h"
 #include "variable.h"
 #include "virtualmemory.h"
 #include "virtualmemoryexception.h"
 #include "array.h"
+#include "shell.h"
 #include "debug.h"
 
 
@@ -68,7 +70,7 @@ void MemoryMap::build()
     // Clean up everything
     clear();
 
-    QStack<MemoryMapNode*> stack;
+    QQueue<MemoryMapNode*> queue;
 
     QTime timer;
     timer.start();
@@ -84,7 +86,7 @@ void MemoryMap::build()
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
                 _vmemMap.insertMulti(node->address(), node);
-                stack.push(node);
+                queue.enqueue(node);
             }
         }
         catch (GenericException e) {
@@ -95,18 +97,17 @@ void MemoryMap::build()
 
 
     // Now work through the whole stack
-    while (!stack.isEmpty()) {
+    while (!shell->interrupted() && !queue.isEmpty()) {
 
-        if (timer.elapsed() > 500) {
+        if (processed == 0 || timer.elapsed() > 2000) {
             timer.restart();
             debugmsg("Processed " << processed << " instances, "
                     << "_vmemMap.size() = " << _vmemMap.size()
-                    << ", stack.size() = " << stack.size());
+                    << ", stack.size() = " << queue.size());
         }
 
         // Take top element from stack
-        MemoryMapNode* node = stack.pop();
-        Instance inst = node->toInstance();
+        MemoryMapNode* node = queue.dequeue();
         ++processed;
 
         // Insert in non-critical (non-exception prone) mappings
@@ -146,9 +147,14 @@ void MemoryMap::build()
             }
         }
         catch (VirtualMemoryException) {
+//            debugerr("Caught exception for instance " << inst.name() //inst.fullName()
+//                    << " at " << e.file << ":" << e.line << ": " << e.message);
             // Don't proceed any further in case of an exception
             continue;
         }
+
+        // Create an instance from the node
+        Instance inst = node->toInstance(false);
 
         // If this is a pointer, add where it's pointing to
         if (node->type()->type() & BaseType::rtPointer) {
@@ -158,8 +164,9 @@ void MemoryMap::build()
                 // Add dereferenced type to the stack, if not already visited
                 int cnt = 0;
                 inst = inst.dereference(BaseType::trLexicalAndPointers, &cnt);
+//                inst = inst.dereference(BaseType::trLexical, &cnt);
                 if (cnt)
-                    addChildIfNotExistend(inst, node, &stack);
+                    addChildIfNotExistend(inst, node, &queue);
             }
             catch (GenericException e) {
 //                debugerr("Caught exception for instance " << inst.name() //inst.fullName()
@@ -174,7 +181,7 @@ void MemoryMap::build()
                 for (int i = 0; i < a->length(); ++i) {
                     try {
                         Instance e = inst.arrayElem(i);
-                        addChildIfNotExistend(e, node, &stack);
+                        addChildIfNotExistend(e, node, &queue);
                     }
                     catch (GenericException e) {
 //                        debugerr("Caught exception for instance " << inst.name() //inst.fullName()
@@ -189,7 +196,7 @@ void MemoryMap::build()
             for (int i = 0; i < inst.memberCount(); ++i) {
                 try {
                     Instance m = inst.member(i, BaseType::trLexical);
-                    addChildIfNotExistend(m, node, &stack);
+                    addChildIfNotExistend(m, node, &queue);
                 }
                 catch (GenericException e) {
 //                    debugerr("Caught exception for instance " << inst.name() //inst.fullName()
@@ -198,30 +205,98 @@ void MemoryMap::build()
                 }
             }
         }
+
+        // emergency stop
+        if (processed >= 5822165)
+            break;
+    }
+
+    int nonAligned = 0;
+    QList<PointerNodeMap::key_type> keys = _vmemMap.uniqueKeys();
+    QMap<int, PointerNodeMap::key_type> keyCnt;
+    for (int i = 0; i < keys.size(); ++i) {
+        if (keys[i] % 4)
+            ++nonAligned;
+        int cnt = _vmemMap.count(keys[i]);
+        keyCnt.insertMulti(cnt, keys[i]);
+        while (keyCnt.size() > 100)
+            keyCnt.erase(keyCnt.begin());
+    }
+
+    debugmsg("Processed " << processed << " instances at "
+            << keys.size() << " addresses (" << nonAligned
+            << " not aligned), "
+            << "_vmemMap.size() = " << _vmemMap.size()
+            << ", stack.size() = " << queue.size() );
+
+
+    QMap<int, PointerNodeMap::key_type>::iterator it;
+    for (it = keyCnt.begin(); it != keyCnt.end(); ++it) {
+        QString s;
+        PointerNodeMap::iterator n;
+        QList<PointerNodeMap::mapped_type> list = _vmemMap.values(*it);
+//        QList<int> idList;
+        for (int i = 0; i < list.size(); ++i) {
+            int id = list[i]->type()->id();
+//            idList += list[i]->type()->id();
+//        }
+//        qSort(idList);
+//        for (int i = 0; i < idList.size(); ++i) {
+//            if (i > 0)
+//                s += ", ";
+            s += QString("\t%1: %2\n")
+                    .arg(id, 8, 16)
+                    .arg(list[i]->fullName());
+        }
+
+        debugmsg(QString("List for address 0x%1 has %2 elements" /*": \n%3"*/)
+                .arg(it.value(), 0, 16)
+                .arg(it.key())
+                /*.arg(s)*/);
     }
 }
 
 
 bool MemoryMap::containedInVmemMap(const Instance& inst) const
 {
-    if (!_vmemMap.contains(inst.address()))
-        return false;
+    // Don't add null pointers
+    if (inst.isNull())
+        return true;
+
     // Check if the list contains the same type with the same address
-    QList<PointerNodeMap::mapped_type> list = _vmemMap.values(inst.address());
-    for (int i = 0; i < list.size(); ++i)
-        if (list[i]->type() && list[i]->type()->id() == inst.id())
+    PointerNodeMap::const_iterator it = _vmemMap.constFind(inst.address());
+//    return it != _vmemMap.constEnd();
+    while (it != _vmemMap.constEnd() && it.key() == inst.address()) {
+        if (it.value()->type() && it.value()->type()->hash() == inst.type()->hash())
             return true;
+        ++it;
+    }
+
     return false;
 }
 
 
 bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
-        QStack<MemoryMapNode*>* stack)
+        QQueue<MemoryMapNode*>* queue)
 {
-    if (!containedInVmemMap(inst)) {
-        MemoryMapNode* child = node->addChild(inst);
+    static const int interestingTypes =
+            BaseType::trLexical |
+            BaseType::rtArray |
+            BaseType::rtFuncPointer |
+            BaseType::rtPointer |
+            BaseType::rtStruct |
+            BaseType::rtUnion;
+
+    // Dereference, if required
+    const Instance i = (inst.type()->type() & BaseType::trLexical) ?
+            inst.dereference(BaseType::trLexical) : inst;
+
+    if (i.type() && (i.type()->type() & interestingTypes) &&
+            !containedInVmemMap(i))
+    {
+        MemoryMapNode* child = node->addChild(i);
         _vmemMap.insertMulti(child->address(), child);
-        stack->push(child);
+        queue->enqueue(child);
         return true;
     }
     else
