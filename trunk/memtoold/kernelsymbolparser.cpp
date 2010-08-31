@@ -324,8 +324,9 @@ void KernelSymbolParser::parse()
     operationStarted();
 
     try {
-        while ( !_from->atEnd() ||
-        	    (objdumpProc && objdumpProc->state() != QProcess::NotRunning) )
+        while ( !shell->interrupted() &&
+                ( !_from->atEnd() ||
+        	      (objdumpProc && objdumpProc->state() != QProcess::NotRunning) ) )
         {
         	// Make sure one line is available for sequential devices
         	if (_from->isSequential() && !_from->canReadLine()) {

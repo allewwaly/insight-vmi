@@ -37,7 +37,8 @@ SOURCES += memorymapnode.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += memorymapnode.h \
+HEADERS += varsetter.h \
+    memorymapnode.h \
     memorymap.h \
     instancedata.h \
     instance.h \

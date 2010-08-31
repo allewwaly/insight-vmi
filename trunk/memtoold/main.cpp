@@ -45,8 +45,9 @@ void signal_handler(int sig)
     case SIGINT:
         // Try to terminate a script
         if (shell) {
-            if (shell->interactive())
-                shell->terminateScript();
+            if (shell->interactive()) {
+                shell->interrupt();
+            }
             else {
                 shell->shutdown();
                 shell->wait();
