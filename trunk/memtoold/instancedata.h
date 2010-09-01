@@ -34,14 +34,10 @@ public:
     size_t address;
     const BaseType* type;
     VirtualMemory* vmem;
+    QString name;
+    QStringList parentNames;
     bool isNull;
     bool isValid;
-
-    QString name() const;
-    void setName(const QString& name);
-
-    QStringList parentNames() const;
-    void setParentNames(const QStringList& names);
 
     QStringList fullNames() const;
 
@@ -50,8 +46,6 @@ public:
 private:
     static qint64 _objectCount;
 
-    QString _name;
-    QStringList _parentNames;
 };
 
 #endif /* INSTANCEDATA_H_ */

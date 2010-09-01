@@ -46,8 +46,8 @@ Instance::Instance(size_t address, const BaseType* type, const QString& name,
     _d->id = id;
     _d->address = address;
     _d->type = type;
-    _d->setName(name);
-    _d->setParentNames(parentNames);
+    _d->name = name;
+    _d->parentNames = parentNames;
     _d->vmem = vmem;
     _d->isValid = type != 0;
     _d->isNull = !_d->address || !_d->isValid;
@@ -102,13 +102,13 @@ void Instance::addToAddress(quint64 offset)
 
 QString Instance::name() const
 {
-	return _d->name();
+	return _d->name;
 }
 
 
 void Instance::setName(const QString& name)
 {
-    _d->setName(name);
+    _d->name = name;
 }
 
 
@@ -121,7 +121,7 @@ QString Instance::parentName() const
 
 QStringList Instance::parentNameComponents() const
 {
-    return _d->parentNames();
+    return _d->parentNames;
 }
 
 
@@ -364,7 +364,7 @@ void Instance::differencesRek(const Instance& other,
     case BaseType::rtStruct:
     case BaseType::rtUnion: {
             // New relative parent name in dotted notation
-            QString newRelParent = dotglue(relParent, _d->name());
+            QString newRelParent = dotglue(relParent, _d->name);
 
             const int cnt = memberCount();
             for (int i = 0; i < cnt; ++i) {
@@ -421,7 +421,7 @@ void Instance::differencesRek(const Instance& other,
         if (cnt1 != cnt2)
             result.append(relParent);
         else
-            inst1.differencesRek(inst2, dotglue(relParent, _d->name()),
+            inst1.differencesRek(inst2, dotglue(relParent, _d->name),
                     includeNestedStructs, result, visited);
         return;
     }
@@ -444,8 +444,8 @@ Instance Instance::arrayElem(int index) const
     return Instance(
                 _d->address + (index * p->refType()->size()),
                 p->refType(),
-                QString("%1[%2]").arg(_d->name()).arg(index),
-                _d->parentNames(),
+                QString("%1[%2]").arg(_d->name).arg(index),
+                _d->parentNames,
                 _d->vmem,
                 -1);
 }
@@ -457,8 +457,8 @@ Instance Instance::dereference(int resolveTypes, int* derefCount) const
         return *this;
 
     if (resolveTypes && _d->type)
-        return _d->type->toInstance(_d->address, _d->vmem, _d->name(),
-                _d->parentNames(), resolveTypes, derefCount);
+        return _d->type->toInstance(_d->address, _d->vmem, _d->name,
+                _d->parentNames, resolveTypes, derefCount);
 
     if (derefCount)
         *derefCount = 0;
