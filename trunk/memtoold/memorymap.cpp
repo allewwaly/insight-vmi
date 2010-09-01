@@ -103,7 +103,8 @@ void MemoryMap::build()
             timer.restart();
             debugmsg("Processed " << processed << " instances, "
                     << "_vmemMap.size() = " << _vmemMap.size()
-                    << ", stack.size() = " << queue.size());
+                    << ", _pmemMap.size() = " << _pmemMap.size()
+                    << ", queue.size() = " << queue.size());
         }
 
         // Take top element from stack
@@ -212,23 +213,40 @@ void MemoryMap::build()
     }
 
     int nonAligned = 0;
-    QList<PointerNodeMap::key_type> keys = _vmemMap.uniqueKeys();
+    QList<PointerNodeMap::key_type> vkeys = _vmemMap.uniqueKeys();
     QMap<int, PointerNodeMap::key_type> keyCnt;
-    for (int i = 0; i < keys.size(); ++i) {
-        if (keys[i] % 4)
+    for (int i = 0; i < vkeys.size(); ++i) {
+        if (vkeys[i] % 4)
             ++nonAligned;
-        int cnt = _vmemMap.count(keys[i]);
-        keyCnt.insertMulti(cnt, keys[i]);
+        int cnt = _vmemMap.count(vkeys[i]);
+        keyCnt.insertMulti(cnt, vkeys[i]);
         while (keyCnt.size() > 100)
             keyCnt.erase(keyCnt.begin());
     }
 
-    debugmsg("Processed " << processed << " instances at "
-            << keys.size() << " addresses (" << nonAligned
-            << " not aligned), "
-            << "_vmemMap.size() = " << _vmemMap.size()
-            << ", stack.size() = " << queue.size() );
+    debugmsg("Processed " << processed << " instances");
+    debugmsg(_vmemMap.size() << " nodes at "
+            << vkeys.size() << " virtual addresses (" << nonAligned
+            << " not aligned)");
+    debugmsg(_pmemMap.size() << " nodes at " << _pmemMap.uniqueKeys().size()
+            << " physical addresses");
+    debugmsg(_pointersTo.size() << " pointers to "
+            << _pointersTo.uniqueKeys().size() << " addresses");
+    debugmsg("stack.size() = " << queue.size());
 
+    // calculate average type size
+    qint64 totalTypeSize = 0;
+    qint64 totalTypeCnt = 0;
+    QList<IntNodeHash::key_type> tkeys = _typeInstances.uniqueKeys();
+    for (int i = 0; i < tkeys.size(); ++i) {
+        int cnt = _typeInstances.count(tkeys[i]);
+        totalTypeSize += cnt * _typeInstances.value(tkeys[i])->size();
+        totalTypeCnt += cnt;
+    }
+
+    debugmsg("Total of " << tkeys.size() << " types found, average size: "
+            << QString::number(totalTypeSize / (double) totalTypeCnt, 'f', 1)
+            << " byte");
 
     QMap<int, PointerNodeMap::key_type>::iterator it;
     for (it = keyCnt.begin(); it != keyCnt.end(); ++it) {
@@ -250,8 +268,8 @@ void MemoryMap::build()
         }
 
         debugmsg(QString("List for address 0x%1 has %2 elements" /*": \n%3"*/)
-                .arg(it.value(), 0, 16)
-                .arg(it.key())
+                .arg(it.value(), _vmem->memSpecs().sizeofUnsignedLong << 1, 16, QChar('0'))
+                .arg(it.key(), 4)
                 /*.arg(s)*/);
     }
 }

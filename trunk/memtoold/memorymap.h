@@ -11,7 +11,7 @@
 #include <QString>
 #include <QSet>
 #include <QMultiHash>
-#include <QMap>
+#include <QMultiMap>
 #include <QPair>
 #include <QQueue>
 #include "memorymapnode.h"
@@ -22,9 +22,9 @@ class VirtualMemory;
 typedef QSet<QString> StringSet;
 typedef QMultiHash<quint64, MemoryMapNode*> PointerNodeHash;
 typedef QMultiHash<int, MemoryMapNode*> IntNodeHash;
-typedef QMap<quint64, MemoryMapNode*> PointerNodeMap;
+typedef QMultiMap<quint64, MemoryMapNode*> PointerNodeMap;
 typedef QPair<int, MemoryMapNode*> IntNodePair;
-typedef QMap<quint64, IntNodePair> PointerIntNodeMap;
+typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 
 
 class MemoryMap
