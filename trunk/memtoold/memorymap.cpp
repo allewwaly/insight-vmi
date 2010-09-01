@@ -206,9 +206,9 @@ void MemoryMap::build()
             }
         }
 
-        // emergency stop
-        if (processed >= 5822165)
-            break;
+//        // emergency stop
+//        if (processed >= 5822165)
+//            break;
     }
 
     int nonAligned = 0;
