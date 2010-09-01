@@ -251,6 +251,8 @@ private:
     int cmdMemoryQuery(QStringList args);
     int cmdMemoryDump(QStringList args);
     int cmdMemoryRevmap(QStringList args);
+    int cmdMemoryRevmapBuild(int index);
+    int cmdMemoryRevmapVisualize(int index);
     int cmdScript(QStringList args);
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t);

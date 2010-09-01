@@ -1,5 +1,5 @@
 
-#include <QCoreApplication>
+#include <QApplication>
 #include <QDir>
 #include <QDateTime>
 #include <sys/types.h>
@@ -15,6 +15,7 @@
 #include "shell.h"
 #include "genericexception.h"
 #include "programoptions.h"
+#include "memorymapwidget.h"
 
 
 /**
@@ -193,7 +194,10 @@ void init_daemon()
  */
 int main(int argc, char* argv[])
 {
-	QCoreApplication app(argc, argv);
+	QApplication app(argc, argv);
+	mapWidget = new MemoryMapWidget;
+    mapWidget->resize(800, 600);
+//    mapWidget->show();
 
 	// Parse the command line options
 	QStringList args = app.arguments();

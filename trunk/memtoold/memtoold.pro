@@ -1,4 +1,5 @@
-SOURCES += memorymapnode.cpp \
+SOURCES += memorymapwidget.cpp \
+    memorymapnode.cpp \
     memorymap.cpp \
     instancedata.cpp \
     instance.cpp \
@@ -37,7 +38,8 @@ SOURCES += memorymapnode.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += varsetter.h \
+HEADERS += memorymapwidget.h \
+    varsetter.h \
     memorymapnode.h \
     memorymap.h \
     instancedata.h \
@@ -85,7 +87,8 @@ HEADERS += varsetter.h \
 CONFIG += console \
     debug
 QT += script \
-    network
+    network \
+    gui
 LIBS += -lreadline \
     -L \
     ../libmemtool \
