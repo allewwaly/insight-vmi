@@ -24,6 +24,7 @@
 #include <QLocalServer>
 #include <QMutexLocker>
 #include <QTime>
+#include <QTimer>
 #include "compileunit.h"
 #include "variable.h"
 #include "refbasetype.h"
@@ -34,7 +35,8 @@
 #include "instanceclass.h"
 #include "instancedata.h"
 #include "varsetter.h"
-#include "memorymapnode.h"
+#include "memorymap.h"
+#include "memorymapwidget.h"
 
 // Register socket enums for the Qt meta type system
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
@@ -1277,28 +1279,63 @@ int Shell::cmdMemoryRevmap(QStringList args)
 {
     // Get the memory dump index to use
     int index = parseMemDumpIndex(args);
-    // Build reverse mapping
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() < 1)
+        return cmdHelp(QStringList("memory"));
+    // Is the index valid?
     if (index >= 0) {
-        QTime timer;
-        timer.start();
-        _memDumps[index]->setupRevMap();
-        int elapsed = timer.elapsed();
-        int min = (elapsed / 1000) / 60;
-        int sec = (elapsed / 1000) % 60;
-        int msec = elapsed % 1000;
-
-        if (!interrupted())
-        _out << "Built reverse mapping for memory dump [" << index << "] in "
-                << QString("%1:%2.%3 minutes")
-                    .arg(min)
-                    .arg(sec, 2, 10, QChar('0'))
-                    .arg(msec, 3, 10, QChar('0'))
-                << endl;
-
-        return 0;
+        if (QString("build").startsWith(args[0]))
+            return cmdMemoryRevmapBuild(index);
+        else if (QString("visualize").startsWith(args[0]))
+            return cmdMemoryRevmapVisualize(index);
+        else {
+            _err << "Unknown command: " << args[0] << endl;
+            return 2;
+        }
     }
 
     return 1;
+}
+
+
+int Shell::cmdMemoryRevmapBuild(int index)
+{
+    QTime timer;
+    timer.start();
+    _memDumps[index]->setupRevMap();
+    int elapsed = timer.elapsed();
+    int min = (elapsed / 1000) / 60;
+    int sec = (elapsed / 1000) % 60;
+    int msec = elapsed % 1000;
+
+    if (!interrupted())
+    _out << "Built reverse mapping for memory dump [" << index << "] in "
+            << QString("%1:%2.%3 minutes")
+                .arg(min)
+                .arg(sec, 2, 10, QChar('0'))
+                .arg(msec, 3, 10, QChar('0'))
+            << endl;
+
+    return 0;
+}
+
+
+int Shell::cmdMemoryRevmapVisualize(int index)
+{
+    if (!_memDumps[index]->map() || _memDumps[index]->map()->vmemMap().isEmpty())
+    {
+        _err << "The memory mapping has not yet been build for memory dump "
+                << index << ". Try \"help memory\" to learn how to build it."
+                << endl;
+        return 1;
+    }
+
+//    mapWidget->setMap(_memDumps[index]->map());
+//    QTimer::singleShot(1, mapWidget, SLOT(show()));
+//    QTimer::singleShot(10, mapWidget, SLOT(raise()));
+    QMetaObject::invokeMethod(mapWidget, SLOT(show()), Qt::QueuedConnection);
+
+    return 0;
 }
 
 

@@ -465,3 +465,9 @@ void MemoryDump::setupRevMap()
     _map->build();
     // TODO do something useful here
 }
+
+
+const MemoryMap* MemoryDump::map() const
+{
+    return _map;
+}

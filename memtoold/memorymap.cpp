@@ -65,6 +65,12 @@ VirtualMemory* MemoryMap::vmem()
 }
 
 
+const VirtualMemory* MemoryMap::vmem() const
+{
+    return _vmem;
+}
+
+
 void MemoryMap::build()
 {
     // Clean up everything
@@ -105,9 +111,12 @@ void MemoryMap::build()
                     << "_vmemMap.size() = " << _vmemMap.size()
                     << ", _pmemMap.size() = " << _pmemMap.size()
                     << ", queue.size() = " << queue.size());
+
+            if (processed > 0)
+                break;
         }
 
-        // Take top element from stack
+        // Take top element from queue
         MemoryMapNode* node = queue.dequeue();
         ++processed;
 
@@ -321,3 +330,26 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
         return false;
 }
 
+
+const NodeList& MemoryMap::roots() const
+{
+    return _roots;
+}
+
+
+const PointerNodeMap& MemoryMap::vmemMap() const
+{
+    return _vmemMap;
+}
+
+
+const PointerIntNodeMap& MemoryMap::pmemMap() const
+{
+    return _pmemMap;
+}
+
+
+const PointerNodeHash& MemoryMap::pointersTo() const
+{
+    return _pointersTo;
+}

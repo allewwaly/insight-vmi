@@ -38,6 +38,15 @@ public:
 	void build();
 
     VirtualMemory* vmem();
+    const VirtualMemory* vmem() const;
+
+    const NodeList& roots() const;
+
+    const PointerNodeMap& vmemMap() const;
+
+    const PointerIntNodeMap& pmemMap() const;
+
+    const PointerNodeHash& pointersTo() const;
 
     static const QString& insertName(const QString& name);
 

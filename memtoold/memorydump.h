@@ -186,6 +186,11 @@ public:
     int index() const;
 
     /**
+     * @return the memory map of this dump
+     */
+    const MemoryMap* map() const;
+
+    /**
      * Initializes the reverse mapping of addresses and instances.
      */
     void setupRevMap();
