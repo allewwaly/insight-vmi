@@ -1,0 +1,46 @@
+Source: memorytool
+Section: unknown
+Priority: extra
+Maintainer: Thomas Kittel <kittel@in.tum.de>
+Build-Depends: debhelper (>= 7.0.50~), libreadline6-dev
+Standards-Version: 3.8.4
+Homepage: <insert the upstream URL, if relevant>
+#Vcs-Git: git://git.debian.org/collab-maint/memorytool.git
+#Vcs-Browser: http://git.debian.org/?p=collab-maint/memorytool.git;a=summary
+
+Package: memorytool
+Architecture: i386 amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, libreadline6, memorytool-daemon
+Description: <insert up to 60 chars description>
+ <insert long description, indented with spaces>
+
+Package: memorytool-daemon
+Architecture: i386 amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, libreadline6, libmemorytool
+Recommends: memorytool-scripts
+Description: <insert up to 60 chars description>
+ <insert long description, indented with spaces>
+
+Package: memorytool-scripts
+Architecture: i386 amd64
+Depends: ${misc:Depends}
+Description: <insert up to 60 chars description>
+ <insert long description, indented with spaces>
+
+Package: libmemorytool
+Architecture: i386 amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: <insert up to 60 chars description>
+ <insert long description, indented with spaces>
+
+Package: libmemorytool-dev
+Architecture: i386 amd64
+Depends: ${misc:Depends}, libmemorytool
+Recommends: memorytool-daemon
+Description: <insert up to 60 chars description>
+ <insert long description, indented with spaces>
+
+Package: memorytool-doc
+Architecture: all
+Description: documentation for memorytool
+ <insert long description, indented with spaces>
