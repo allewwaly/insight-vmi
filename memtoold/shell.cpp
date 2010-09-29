@@ -36,7 +36,7 @@
 #include "instancedata.h"
 #include "varsetter.h"
 #include "memorymap.h"
-#include "memorymapwidget.h"
+#include "memorymapwindow.h"
 
 // Register socket enums for the Qt meta type system
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
@@ -112,7 +112,9 @@ Shell::Shell(bool listenOnSocket)
 				"                              Notice, that a type name or a type id\n"
 				"                              can be followed by a query string in case\n"
 				"                              a member of a struct should be dumped.\n"
-                "  memory revmap [index]       Build reverse mapping for dump <index>"
+                "  memory revmap [index] build|visualize\n"
+                "                              Build or visualize a reverse mapping for \n"
+                "                              dump <index>"
                 ));
 
     _commands.insert("script",
@@ -1330,10 +1332,10 @@ int Shell::cmdMemoryRevmapVisualize(int index)
         return 1;
     }
 
-//    mapWidget->setMap(_memDumps[index]->map());
-//    QTimer::singleShot(1, mapWidget, SLOT(show()));
-//    QTimer::singleShot(10, mapWidget, SLOT(raise()));
-    QMetaObject::invokeMethod(mapWidget, SLOT(show()), Qt::QueuedConnection);
+    memMapWindow->setMap(_memDumps[index]->map());
+
+    if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
+        debugerr("Error invoking show() on memMapWindow");
 
     return 0;
 }

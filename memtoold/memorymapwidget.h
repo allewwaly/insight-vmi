@@ -50,9 +50,9 @@ public:
 
 protected:
     void closeEvent(QCloseEvent* e);
-    void changeEvent(QEvent* e);
     void paintEvent(QPaintEvent* e);
     void mouseMoveEvent(QMouseEvent* e);
+    void resizeEvent(QResizeEvent* event);
 
 private:
     void buildVisMemMap();
@@ -72,7 +72,5 @@ private:
 signals:
     void addressChanged(quint64 address);
 };
-
-extern MemoryMapWidget* mapWidget;
 
 #endif /* MEMORYMAPWIDGET_H_ */

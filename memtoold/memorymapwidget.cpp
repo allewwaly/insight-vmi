@@ -11,12 +11,11 @@
 #include <QPaintEvent>
 #include <QMultiMap>
 #include <QSet>
+#include <QTime>
 #include <math.h>
 #include "memorymap.h"
 #include "virtualmemory.h"
 #include "debug.h"
-
-MemoryMapWidget* mapWidget = 0;
 
 static const int margin = 3;
 
@@ -34,11 +33,10 @@ MemoryMapWidget::MemoryMapWidget(const MemoryMap* map, QWidget *parent)
     : QWidget(parent), _map(map), _visMapValid(false), _address(-1),
       _bytesPerPixelX(0), _bytesPerPixelY(0), _cols(0), _rows(0)
 {
-    setWindowTitle(tr("Difference view"));
+//    setWindowTitle(tr("Difference view"));
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setContentsMargins(margin, margin, margin, margin);
     setMouseTracking(true);
-    resize(400, 300);
 }
 
 
@@ -65,22 +63,13 @@ void MemoryMapWidget::buildVisMemMap()
     _mappings.clear();
     _maxIntensity = 0;
 
-    // Paint the bytes as squares into the area
-    double ratio = width() / (double) height();
-    _cols = (qint64) ceil(sqrt(virtAddrSpace() * ratio));
-    _rows = virtAddrSpace() / _cols;
-    if (virtAddrSpace() % _cols != 0)
-        _rows++;
-
-    _bytesPerPixelX = _cols / (double) drawWidth();
-    _bytesPerPixelY = _rows / (double) drawHeight();
-
     if (_map) {
         // Holds the currently active nodes, ordered by their end address
         typedef QMultiMap<quint64, const MemoryMapNode*> NodeMap;
         NodeMap nodes;
-        // Holds the addresses at which we have to stop
-        QSet<quint64> addresses;
+        // Holds the addresses at which we have to stop (the mapped int-value is
+        // never used!)
+        QMap<quint64, int> addresses;
 
         quint64 lastAddr = 0;
         int lastObjCount = 0;
@@ -102,14 +91,15 @@ void MemoryMapWidget::buildVisMemMap()
             // address
             if (curAddr == lastAddr) {
                 nodes.insert(curAddr + node->size(), node);
-                addresses.insert(curAddr + node->size());
+                addresses.insert(curAddr + node->size(), 0);
             }
             else {
-                addresses.insert(curAddr);
+                addresses.insert(curAddr, 0);
                 // Go through all addresses which are <= curAddr
-                QSet<quint64>::iterator addr_it = addresses.begin();
+                QMap<quint64, int>::iterator addr_it = addresses.begin();
+
                 do {
-                    quint64 addr = *addr_it;
+                    quint64 addr = addr_it.key();
                     // Remove all nodes that are out of scope
                     NodeMap::iterator nit = nodes.begin();
                     while (nit != nodes.end() && nit.key() < addr)
@@ -117,36 +107,62 @@ void MemoryMapWidget::buildVisMemMap()
                     // Length of MapPiece object
                     quint64 length = addr - lastAddr;
 
-                    // Can we merge this with the previous piece?
-                    if (!_mappings.isEmpty() &&
-                            _mappings.last().address + _mappings.last().length == lastAddr &&
-                            _mappings.last().intensity == lastObjCount)
-                    {
-                        _mappings.last().length += length;
-                        ++piecesMerged;
+                    if (lastAddr > addr) {
+                        debugerr(QString("lastAddr = 0x%1, addr = 0x%2")
+                                .arg(lastAddr, 8, 16, QChar('0'))
+                                .arg(addr, 8, 16, QChar('0')));
                     }
-                    // No, create a new one
-                    else {
-                        _mappings.append(VisMapPiece(lastAddr, length, ptUsed,
-                                lastObjCount));
-                        if (lastObjCount > _maxIntensity)
-                            _maxIntensity = lastObjCount;
+
+                    // Can we merge this with the previous piece?
+                    if (lastObjCount > 0) {
+                        if (!_mappings.isEmpty() &&
+                                _mappings.last().address + _mappings.last().length == lastAddr &&
+                                _mappings.last().intensity == lastObjCount)
+                        {
+                            _mappings.last().length += length;
+                            ++piecesMerged;
+                        }
+                        // No, create a new one
+                        else {
+                            _mappings.append(VisMapPiece(lastAddr, length, ptUsed,
+                                    lastObjCount));
+                            if (lastObjCount > _maxIntensity)
+                                _maxIntensity = lastObjCount;
+                        }
+                        if (_mappings.last().length > 0xFFFFFF)
+                            debugmsg(QString("[%1] addr = 0x%2, intensity = %3, len = %4")
+                                                    .arg(_mappings.size() - 1)
+                                                    .arg(_mappings.last().address, 8, 16, QChar('0'))
+                                                    .arg(_mappings.last().intensity, 3)
+                                                    .arg(_mappings.last().length));
                     }
 
                     // Update the last object count and address
                     lastObjCount = nodes.size(); // no. of "active" nodes
-                    lastAddr = curAddr;
+                    lastAddr = addr;
 
                     // Remove used address and advance iterator
-                    addr_it = addresses.erase(addr_it);
+                    addresses.erase(addr_it);
+                    addr_it = addresses.begin();
                     // Stop if we've reached the current address
-                } while (*addr_it < curAddr && addr_it != addresses.end());
+                } while (addr_it.key() < curAddr && addr_it != addresses.end());
             }
 
-            lastAddr = curAddr;
+//            lastAddr = curAddr;
         }
 
-        debugmsg(__PRETTY_FUNCTION__ << ": piecesMerged = " << piecesMerged);
+        debugmsg(__PRETTY_FUNCTION__ << ": piecesMerged = " << piecesMerged
+                << ", remaining pieces = " << _mappings.count());
+
+        if (_mappings.count() < 20) {
+            for (int i = 0; i < _mappings.size(); ++i) {
+                debugmsg(QString("[%1] addr = 0x%2, intensity = %3, len = %4")
+                        .arg(i)
+                        .arg(_mappings[i].address, 8, 16, QChar('0'))
+                        .arg(_mappings[i].intensity, 3)
+                        .arg(_mappings[i].length));
+            }
+        }
     }
 
     _visMapValid = true;
@@ -156,21 +172,24 @@ void MemoryMapWidget::buildVisMemMap()
 
 void MemoryMapWidget::closeEvent(QCloseEvent* e)
 {
-    hide();
-    e->ignore();
+    e->accept();
 }
 
 
-void MemoryMapWidget::changeEvent(QEvent *e)
+void MemoryMapWidget::resizeEvent(QResizeEvent* e)
 {
-    switch (e->type()) {
-    case QEvent::Resize:
-        _visMapValid = false;
-    default:
-        break;
-    }
-}
+    // Paint the bytes as squares into the visible widget area
+    double ratio = width() / (double) height();
+    _cols = (qint64) ceil(sqrt(virtAddrSpace() * ratio));
+    _rows = virtAddrSpace() / _cols;
+    if (virtAddrSpace() % _cols != 0)
+        _rows++;
 
+    _bytesPerPixelX = _cols / (double) drawWidth();
+    _bytesPerPixelY = _rows / (double) drawHeight();
+
+    e->accept();
+}
 
 
 void MemoryMapWidget::mouseMoveEvent(QMouseEvent *e)
@@ -205,30 +224,52 @@ void MemoryMapWidget::paintEvent(QPaintEvent * /*e*/)
 
     // Draw in "byte"-coordinates, scale bytes to entire widget
     painter.translate(margin, margin);
-    painter.scale(drawWidth() / (double)_cols, drawHeight() / (double)_rows);
+    painter.scale(1.0 / _bytesPerPixelX, 1.0 / _bytesPerPixelY);
     // Clear widget
     painter.setPen(Qt::NoPen);
     painter.setBrush(bgColor);
     painter.drawRect(0, 0, _cols, _rows);
     // Draw the whole address space  as "unused"
     painter.setBrush(unusedColor);
-    int h = virtAddrSpace() / _cols;
+    quint64 h = virtAddrSpace() / _cols;
     if (h >= 1)
         painter.drawRect(0, 0, _cols, h);
 
     painter.drawRect(0, h, virtAddrSpace() - (_cols * h), 1);
+//    painter.end();
+
     // Draw all used parts
     painter.setBrush(usedColor);
+//    QTime timer;
+//    timer.start();
+    int lastIntensity = 255;
     for (int i = 0; i < _mappings.size(); ++i) {
-        int len = _mappings[i].length;
+
+//        if (!painter.isActive()) {
+//            painter.begin(this);
+//            painter.translate(margin, margin);
+//            painter.scale(1.0 / _bytesPerPixelX, 1.0 / _bytesPerPixelY);
+//            painter.setPen(Qt::NoPen);
+//        }
+
+        if (_mappings[i].intensity != lastIntensity) {
+            usedColor.setRedF(_mappings[i].intensity / (float)_maxIntensity);
+            painter.setBrush(usedColor);
+        }
+
+        quint64 len = _mappings[i].length;
         // Find the row and column of the offset
-        int r = _mappings[i].address / _cols;
-        int c = _mappings[i].address % _cols;
-        // Draw the fist line
+        quint64 r = _mappings[i].address / _cols;
+        quint64 c = _mappings[i].address % _cols;
+
+        // The memory region is drawn in three operations: the first line, the
+        // middle (rectangular) block, and finally the list line.
+
+        // Draw the first line
         if (c != 0) {
-            int currLen = (_cols - c > len) ? len : _cols - c;
+            quint64 currLen = (_cols - c > len) ? len : _cols - c;
             painter.drawRect(c, r, currLen, 1);
-            // Shorten length by drawn bytes
+            // Shorten remaining length by no. of bytes drawn
             len -= currLen;
             // Next drawing starts in next line
             r++;
@@ -239,13 +280,19 @@ void MemoryMapWidget::paintEvent(QPaintEvent * /*e*/)
             painter.drawRect(0, r, _cols, h);
             // Shorten length by drawn bytes
             len %= _cols;
-            // Next drawing starts in next line
+            // Next drawing starts h lines below
             r += h;
         }
         // Draw the last line
         if (len > 0) {
             painter.drawRect(0, r, len, 1);
         }
+
+//        // Flush the painter from time to time
+//        if (timer.elapsed() > 500) {
+//            painter.end();
+//            timer.restart();
+//        }
     }
 
     // Only draw grid lines if we have at least 3 pixel per byte
@@ -283,6 +330,6 @@ void MemoryMapWidget::setMap(const MemoryMap* map)
         return;
     _map = map;
     _visMapValid = false;
-    repaint();
+    update();
 }
 
