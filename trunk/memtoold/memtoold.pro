@@ -1,4 +1,5 @@
-SOURCES += memorymapwidget.cpp \
+SOURCES += memorymapwindow.cpp \
+    memorymapwidget.cpp \
     memorymapnode.cpp \
     memorymap.cpp \
     instancedata.cpp \
@@ -38,7 +39,8 @@ SOURCES += memorymapwidget.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += memorymapwidget.h \
+HEADERS += memorymapwindow.h \
+    memorymapwidget.h \
     varsetter.h \
     memorymapnode.h \
     memorymap.h \
@@ -94,3 +96,4 @@ LIBS += -lreadline \
     ../libmemtool \
     -lmemtool
 INCLUDEPATH += ../libmemtool/include
+FORMS = memorymapwindow.ui

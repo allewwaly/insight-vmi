@@ -15,7 +15,7 @@
 #include "shell.h"
 #include "genericexception.h"
 #include "programoptions.h"
-#include "memorymapwidget.h"
+#include "memorymapwindow.h"
 
 
 /**
@@ -195,9 +195,9 @@ void init_daemon()
 int main(int argc, char* argv[])
 {
 	QApplication app(argc, argv);
-	mapWidget = new MemoryMapWidget;
-    mapWidget->resize(800, 600);
-//    mapWidget->show();
+	memMapWindow = new MemoryMapWindow();
+	memMapWindow->resize(800, 600);
+	memMapWindow->setAttribute(Qt::WA_QuitOnClose, false);
 
 	// Parse the command line options
 	QStringList args = app.arguments();

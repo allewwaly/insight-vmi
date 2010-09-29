@@ -112,8 +112,10 @@ void MemoryMap::build()
                     << ", _pmemMap.size() = " << _pmemMap.size()
                     << ", queue.size() = " << queue.size());
 
-            if (processed > 0)
-                break;
+//            if (processed > 0) {
+//                debugmsg(">>> Breaking revmap generation <<<");
+//                break;
+//            }
         }
 
         // Take top element from queue
@@ -216,9 +218,11 @@ void MemoryMap::build()
             }
         }
 
-//        // emergency stop
-//        if (processed >= 5822165)
-//            break;
+        // emergency stop
+        if (processed >= 5822165) {
+            debugmsg(">>> Breaking revmap generation <<<");
+            break;
+        }
     }
 
     int nonAligned = 0;
@@ -256,7 +260,7 @@ void MemoryMap::build()
     debugmsg("Total of " << tkeys.size() << " types found, average size: "
             << QString::number(totalTypeSize / (double) totalTypeCnt, 'f', 1)
             << " byte");
-
+/*
     QMap<int, PointerNodeMap::key_type>::iterator it;
     for (it = keyCnt.begin(); it != keyCnt.end(); ++it) {
         QString s;
@@ -276,11 +280,11 @@ void MemoryMap::build()
                     .arg(list[i]->fullName());
         }
 
-        debugmsg(QString("List for address 0x%1 has %2 elements" /*": \n%3"*/)
+        debugmsg(QString("List for address 0x%1 has %2 elements")
                 .arg(it.value(), _vmem->memSpecs().sizeofUnsignedLong << 1, 16, QChar('0'))
-                .arg(it.key(), 4)
-                /*.arg(s)*/);
+                .arg(it.key(), 4));
     }
+*/
 }
 
 
@@ -292,7 +296,10 @@ bool MemoryMap::containedInVmemMap(const Instance& inst) const
 
     // Check if the list contains the same type with the same address
     PointerNodeMap::const_iterator it = _vmemMap.constFind(inst.address());
+
+//    // TODO Add all pointers, not just the first one
 //    return it != _vmemMap.constEnd();
+
     while (it != _vmemMap.constEnd() && it.key() == inst.address()) {
         if (it.value()->type() && it.value()->type()->hash() == inst.type()->hash())
             return true;
