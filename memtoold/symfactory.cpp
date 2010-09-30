@@ -764,7 +764,7 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     // Which macro offset should be used? In the kernel, the "childen" list_head
     // in the struct "task_struct" actually points to the next "sibling", not
     // to the next "children". So we catch special cases like this here.
-    size_t extraOffset = -member->offset();
+    int extraOffset = -member->offset();
     if (member->name() == "children") {
         StructuredMember *sibling = parent->findMember("sibling");
         if (sibling)
@@ -822,7 +822,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     ret->setId(siHListNode);
     ret->setSize(2 * _memSpecs.sizeofUnsignedLong);
 
-    size_t extraOffset = -member->offset();
+    int extraOffset = -member->offset();
 
     // Create "next" pointer
     Pointer* nextPtr = new Pointer();

@@ -49,7 +49,7 @@ public:
      * \sa setMacroOffset()
      * @return additional offset
      */
-    size_t macroExtraOffset() const;
+    int macroExtraOffset() const;
 
     /**
      * This sets the additional offset to consider when de-referencing this
@@ -58,7 +58,7 @@ public:
      * tables.
      * @param offset the additional offset
      */
-    void setMacroExtraOffset(size_t offset);
+    void setMacroExtraOffset(int offset);
 
 protected:
     /**
@@ -74,7 +74,7 @@ protected:
 
     // Doesn't need to be saved in writeTo() because it's only set when creating
     // special struct types.
-    size_t _macroExtraOffset;  ///< Additional offset to consider when de-referencing this pointer
+    int _macroExtraOffset;  ///< Additional offset to consider when de-referencing this pointer
 };
 
 #endif /* POINTER_H_ */

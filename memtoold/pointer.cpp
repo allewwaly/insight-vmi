@@ -110,13 +110,13 @@ QString Pointer::readString(QIODevice* mem, size_t offset, const int len, QStrin
 }
 
 
-size_t Pointer::macroExtraOffset() const
+int Pointer::macroExtraOffset() const
 {
     return _macroExtraOffset;
 }
 
 
-void Pointer::setMacroExtraOffset(size_t offset)
+void Pointer::setMacroExtraOffset(int offset)
 {
     _macroExtraOffset = offset;
 }

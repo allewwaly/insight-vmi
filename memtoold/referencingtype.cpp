@@ -10,6 +10,8 @@
 #include "refbasetype.h"
 #include "pointer.h"
 #include "virtualmemory.h"
+#include "debug.h"
+#include "genericexception.h"
 #include <assert.h>
 
 ReferencingType::ReferencingType()
@@ -111,21 +113,32 @@ Instance ReferencingType::createRefInstance(size_t address,
 
     // We need to keep track of the address
     size_t addr = address;
+#ifdef DEBUG
+    if ((vmem->memSpecs().arch & MemSpecs::i386) && (addr >= (1UL << 32)))
+        genericError(QString("Address 0x%1 exceeds 32 bit address space")
+                .arg(addr, 0, 16));
+#endif
+
     // The "cursor" for resolving the type
     const BaseType* b = _refType;
     const RefBaseType* rbt = 0;
     if (derefCount)
         (*derefCount)++;
+    bool done = false;
 
     // If this is a pointer, we already have to dereference the initial address
     const Pointer* p = dynamic_cast<const Pointer*>(this);
     if (p) {
-        if (vmem->safeSeek(addr))
-            addr = ((size_t)p->toPointer(vmem, addr)) + p->macroExtraOffset();
+        if (vmem->safeSeek(addr)) {
+            size_t derefAddr = (size_t)p->toPointer(vmem, addr);
+            if (derefAddr && derefAddr >= (size_t) -p->macroExtraOffset())
+                addr = derefAddr + p->macroExtraOffset();
+            else
+                done = true;
+        }
     }
 
-
-    while ( (b->type() & resolveTypes) &&
+    while ( !done && (b->type() & resolveTypes) &&
             (rbt = dynamic_cast<const RefBaseType*>(b)) )
     {
 		// Resolve pointer references
@@ -148,8 +161,13 @@ Instance ReferencingType::createRefInstance(size_t address,
 			// Otherwise resolve pointer reference, if this is a pointer
 			if ( (p = dynamic_cast<const Pointer*>(rbt)) ) {
 			    // If we cannot dereference the pointer, we have to stop here
-			    if (vmem->safeSeek(addr))
-			        addr = ((size_t) p->toPointer(vmem, addr)) + p->macroExtraOffset();
+			    if (vmem->safeSeek(addr)) {
+		            size_t derefAddr = (size_t)p->toPointer(vmem, addr);
+		            if (derefAddr && derefAddr >= (size_t) -p->macroExtraOffset())
+		                addr = derefAddr + p->macroExtraOffset();
+		            else
+		                break;
+			    }
 			    else
 			        break;
 			}

@@ -513,6 +513,12 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
 
 quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize)
 {
+    // Make sure the address is within a valid range
+    if ((_specs.arch & MemSpecs::i386) && (vaddr >= (1UL << 32)))
+        virtualMemoryError(
+                QString("Virtual address 0x%1 exceeds 32 bit address space")
+                        .arg(vaddr, 0, 16));
+
     quint64 physaddr = 0;
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address

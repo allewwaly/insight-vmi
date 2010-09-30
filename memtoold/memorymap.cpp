@@ -71,6 +71,15 @@ const VirtualMemory* MemoryMap::vmem() const
 }
 
 
+bool MemoryMap::fitsInVmem(quint64 addr, quint64 size) const
+{
+    if (_vmem->memSpecs().arch == MemSpecs::x86_64)
+        return addr + size > addr;
+    else
+        return addr + size <= (1UL << 32);
+}
+
+
 void MemoryMap::build()
 {
     // Clean up everything
@@ -88,7 +97,11 @@ void MemoryMap::build()
     {
         try {
             Instance inst = (*it)->toInstance(_vmem, BaseType::trLexical);
-            if (!inst.isNull()) {
+#ifdef DEBUG
+            if (_vmem->memSpecs().arch & MemSpecs::i386)
+                assert(inst.address() <= 0xFFFFFFFFUL);
+#endif
+            if (!inst.isNull() && fitsInVmem(inst.address(), inst.size())) {
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
                 _vmemMap.insertMulti(node->address(), node);
@@ -111,11 +124,12 @@ void MemoryMap::build()
                     << "_vmemMap.size() = " << _vmemMap.size()
                     << ", _pmemMap.size() = " << _pmemMap.size()
                     << ", queue.size() = " << queue.size());
-
+#ifdef DEBUG
 //            if (processed > 0) {
 //                debugmsg(">>> Breaking revmap generation <<<");
 //                break;
 //            }
+#endif
         }
 
         // Take top element from queue
@@ -149,6 +163,7 @@ void MemoryMap::build()
                     addr += sizeOnPage;
                     ++ctr;
                 }
+#ifdef DEBUG
 //                // Debug message, just out out curiosity ;-)
 //                if (ctr > 1)
 //                    debugmsg(QString("Type %1 at 0x%2 with size %3 spans %4 pages.")
@@ -156,6 +171,7 @@ void MemoryMap::build()
 //                                .arg(node->address(), 0, 16)
 //                                .arg(node->size())
 //                                .arg(ctr));
+#endif
             }
         }
         catch (VirtualMemoryException) {
@@ -171,7 +187,7 @@ void MemoryMap::build()
         // If this is a pointer, add where it's pointing to
         if (node->type()->type() & BaseType::rtPointer) {
             try {
-                quint64 addr = (quint64) inst.toPointer();
+                quint64 addr = (quint64) inst.toPointer(); // TODO Don't add null pointers
                 _pointersTo.insert(addr, node);
                 // Add dereferenced type to the stack, if not already visited
                 int cnt = 0;
@@ -217,12 +233,13 @@ void MemoryMap::build()
                 }
             }
         }
-
+#ifdef DEBUG
         // emergency stop
         if (processed >= 5822165) {
             debugmsg(">>> Breaking revmap generation <<<");
             break;
         }
+#endif
     }
 
     int nonAligned = 0;
@@ -325,8 +342,14 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
     const Instance i = (inst.type()->type() & BaseType::trLexical) ?
             inst.dereference(BaseType::trLexical) : inst;
 
+#ifdef DEBUG
+    if (_vmem->memSpecs().arch & MemSpecs::i386)
+        assert(i.address() <= 0xFFFFFFFFUL);
+#endif
+
     if (i.type() && (i.type()->type() & interestingTypes) &&
-            !containedInVmemMap(i))
+            !containedInVmemMap(i) &&
+            fitsInVmem(i.address(), i.size()) )
     {
         MemoryMapNode* child = node->addChild(i);
         _vmemMap.insertMulti(child->address(), child);

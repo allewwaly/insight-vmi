@@ -3,6 +3,7 @@
 #include "memorymapwidget.h"
 #include <QStatusBar>
 #include <QVBoxLayout>
+#include <QCheckBox>
 
 MemoryMapWindow* memMapWindow = 0;
 
@@ -11,12 +12,21 @@ MemoryMapWindow::MemoryMapWindow(QWidget *parent)
     : QMainWindow(parent), _memMapWidget(0)
 {
 	ui.setupUi(this);
+
 	setWindowTitle(tr("MemoryTool - Differences View"));
+
 	_memMapWidget = new MemoryMapWidget(0, this);
-	setCentralWidget(_memMapWidget);
+	QCheckBox* checkBox = new QCheckBox(this);
+	checkBox->setText(tr("Enable anti-aliasing"));
+	checkBox->setChecked(false);
+
+	centralWidget()->layout()->addWidget(checkBox);
+    centralWidget()->layout()->addWidget(_memMapWidget);
 
 	connect(_memMapWidget, SIGNAL(addressChanged(quint64)),
 	        SLOT(virtualAddressChanged(quint64)));
+	connect(checkBox, SIGNAL(toggled(bool)),
+	        _memMapWidget, SLOT(setAntiAliasing(bool)));
 }
 
 
