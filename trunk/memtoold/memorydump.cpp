@@ -276,7 +276,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		if (result.type()->type() & (BaseType::rtPointer)) {
 			// Manipulate pointer to enable list navigation
 			//pointer = (Pointer *)(result.type());
-			//pointer->setMacroExtraOffset(offset);
+//			pointer->setMacroExtraOffset(offset);
 			//pointer->setRefType(type);
 			address = (size_t)result.toPointer() - offset;
 		}

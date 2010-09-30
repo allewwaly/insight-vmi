@@ -162,7 +162,8 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
             // Output all types except structured types
             if (m->refType()->dereferencedType() & (rtStruct | rtUnion)) {
                 // Resolve the memory address of that struct
-                quint64 addr = offset + m->offset(), macroExtraOffset = 0;
+                quint64 addr = offset + m->offset();
+                int macroExtraOffset = 0;
                 const BaseType* t = m->refType();
                 bool wasPointer = false;
                 while ( addr && !(t->type() & (rtStruct | rtUnion)) ) {

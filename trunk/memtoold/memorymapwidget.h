@@ -47,6 +47,10 @@ public:
 
     const MemoryMap* map() const;
     void setMap(const MemoryMap* map);
+    bool antiAliasing() const;
+
+public slots:
+    void setAntiAliasing(bool value);
 
 protected:
     void closeEvent(QCloseEvent* e);
@@ -68,6 +72,7 @@ private:
     qint64 _cols;
     qint64 _rows;
     int _maxIntensity;
+    bool _antialiasing;
 
 signals:
     void addressChanged(quint64 address);

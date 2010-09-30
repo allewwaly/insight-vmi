@@ -8,6 +8,8 @@
 #include "memorymapnode.h"
 #include "basetype.h"
 #include "memorymap.h"
+#include "genericexception.h"
+#include "virtualmemory.h"
 
 MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
         quint64 address, const BaseType* type, int id, MemoryMapNode* parent)
@@ -15,6 +17,10 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
 	  _name(MemoryMap::insertName(name)), _address(address), _type(type),
 	  _id(id)
 {
+    if (_belongsTo && (_belongsTo->vmem()->memSpecs().arch & MemSpecs::i386))
+        if (_address >= (1UL << 32))
+            genericError(QString("Address 0x%1 exceeds 32 bit address space")
+                    .arg(_address, 0, 16));
 }
 
 
@@ -24,6 +30,10 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
       _name(MemoryMap::insertName(inst.name())), _address(inst.address()),
       _type(inst.type()), _id(inst.id())
 {
+    if (_belongsTo && (_belongsTo->vmem()->memSpecs().arch & MemSpecs::i386))
+        if (_address >= (1UL << 32))
+            genericError(QString("Address 0x%1 exceeds 32 bit address space")
+                    .arg(_address, 0, 16));
 }
 
 

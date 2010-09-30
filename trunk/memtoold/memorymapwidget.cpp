@@ -10,7 +10,7 @@
 #include <QPainter>
 #include <QPaintEvent>
 #include <QMultiMap>
-#include <QSet>
+#include <QLinkedList>
 #include <QTime>
 #include <math.h>
 #include "memorymap.h"
@@ -53,6 +53,20 @@ quint64 MemoryMapWidget::virtAddrSpace() const
 }
 
 
+template<class T>
+void insertSorted(T& list, const typename T::value_type value,
+        bool eliminateDoubles = true)
+{
+    typename T::iterator it = list.begin();
+    while ((it != list.end()) && (*it <= value)) {
+        if (eliminateDoubles && (*it == value))
+            return;
+        ++it;
+    }
+    list.insert(it, value);
+}
+
+
 void MemoryMapWidget::buildVisMemMap()
 {
     if (_visMapValid)
@@ -67,9 +81,8 @@ void MemoryMapWidget::buildVisMemMap()
         // Holds the currently active nodes, ordered by their end address
         typedef QMultiMap<quint64, const MemoryMapNode*> NodeMap;
         NodeMap nodes;
-        // Holds the addresses at which we have to stop (the mapped int-value is
-        // never used!)
-        QMap<quint64, int> addresses;
+        // Holds the sorted (!!!) addresses at which we have to stop
+        QLinkedList<quint64> addresses;
 
         quint64 lastAddr = 0;
         int lastObjCount = 0;
@@ -78,6 +91,8 @@ void MemoryMapWidget::buildVisMemMap()
         for (PointerNodeMap::const_iterator vmap_it = _map->vmemMap().constBegin();
                 vmap_it != _map->vmemMap().constEnd(); ++vmap_it)
         {
+            // The map contains multiple nodes with the same start address,
+            // so curAddr == lastAddr is very likely
             quint64 curAddr = vmap_it.key();
             const MemoryMapNode* node = vmap_it.value();
 
@@ -87,31 +102,49 @@ void MemoryMapWidget::buildVisMemMap()
                 lastObjCount = _map->vmemMap().count(curAddr);
             }
 
-            // Add all nodes with the same address into a map ordered by their end
-            // address
+            // Add all nodes with the same address into a map ordered by their
+            // end address
             if (curAddr == lastAddr) {
                 nodes.insert(curAddr + node->size(), node);
-                addresses.insert(curAddr + node->size(), 0);
+                quint64 endAddr = curAddr + node->size();
+#ifdef DEBUG
+                if (endAddr < curAddr)
+                    assert(endAddr >= curAddr);
+#endif
+                insertSorted(addresses, endAddr);
             }
+            // We've moved on to the next address
             else {
-                addresses.insert(curAddr, 0);
-                // Go through all addresses which are <= curAddr
-                QMap<quint64, int>::iterator addr_it = addresses.begin();
+                insertSorted(addresses, curAddr);
 
+                // Go through all addresses which are <= curAddr
                 do {
-                    quint64 addr = addr_it.key();
+#ifdef DEBUG
+                    // Make sure the list is sorted
+//                    quint64 __prevAddr = addresses.front();
+//                    QLinkedList<quint64>::iterator it = addresses.begin();
+//                    while (++it != addresses.end()) {
+//                        assert(__prevAddr < *it);
+//                        __prevAddr = *it;
+//                    }
+#endif
+                    quint64 addr = addresses.front();
+                    addresses.pop_front();
+#ifdef DEBUG
+//                    if (lastAddr >= addr) {
+//                        debugerr(QString("lastAddr = 0x%1 >= addr = 0x%2")
+//                                .arg(lastAddr, 8, 16, QChar('0'))
+//                                .arg(addr, 8, 16, QChar('0')));
+//                    }
+//                    assert(lastAddr < addr);
+                    assert(addr <= curAddr);
+#endif
                     // Remove all nodes that are out of scope
                     NodeMap::iterator nit = nodes.begin();
-                    while (nit != nodes.end() && nit.key() < addr)
+                    while (nit != nodes.end() && nit.key() <= addr)
                         nit = nodes.erase(nit);
                     // Length of MapPiece object
                     quint64 length = addr - lastAddr;
-
-                    if (lastAddr > addr) {
-                        debugerr(QString("lastAddr = 0x%1, addr = 0x%2")
-                                .arg(lastAddr, 8, 16, QChar('0'))
-                                .arg(addr, 8, 16, QChar('0')));
-                    }
 
                     // Can we merge this with the previous piece?
                     if (lastObjCount > 0) {
@@ -129,28 +162,28 @@ void MemoryMapWidget::buildVisMemMap()
                             if (lastObjCount > _maxIntensity)
                                 _maxIntensity = lastObjCount;
                         }
+#ifdef DEBUG
                         if (_mappings.last().length > 0xFFFFFF)
                             debugmsg(QString("[%1] addr = 0x%2, intensity = %3, len = %4")
                                                     .arg(_mappings.size() - 1)
                                                     .arg(_mappings.last().address, 8, 16, QChar('0'))
                                                     .arg(_mappings.last().intensity, 3)
                                                     .arg(_mappings.last().length));
+#endif
                     }
 
                     // Update the last object count and address
                     lastObjCount = nodes.size(); // no. of "active" nodes
                     lastAddr = addr;
 
-                    // Remove used address and advance iterator
-                    addresses.erase(addr_it);
-                    addr_it = addresses.begin();
                     // Stop if we've reached the current address
-                } while (addr_it.key() < curAddr && addr_it != addresses.end());
+                } while (!addresses.isEmpty() &&  addresses.front() <= curAddr);
             }
 
 //            lastAddr = curAddr;
         }
 
+#ifdef DEBUG
         debugmsg(__PRETTY_FUNCTION__ << ": piecesMerged = " << piecesMerged
                 << ", remaining pieces = " << _mappings.count());
 
@@ -163,6 +196,8 @@ void MemoryMapWidget::buildVisMemMap()
                         .arg(_mappings[i].length));
             }
         }
+#endif
+
     }
 
     _visMapValid = true;
@@ -215,12 +250,13 @@ void MemoryMapWidget::paintEvent(QPaintEvent * /*e*/)
 {
     buildVisMemMap();
 
-    QColor unusedColor(80, 255, 80);
-    QColor usedColor(255, 80, 80);
+    QColor unusedColor(255, 255, 255);
+    QColor usedColor(0, 0, 0);
     QColor gridColor(255, 255, 255);
     QColor bgColor(255, 255, 255);
     QPainter painter(this);
-//    painter.setRenderHint(QPainter::Antialiasing);
+    if (_antialiasing)
+        painter.setRenderHint(QPainter::Antialiasing);
 
     // Draw in "byte"-coordinates, scale bytes to entire widget
     painter.translate(margin, margin);
@@ -253,7 +289,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * /*e*/)
 //        }
 
         if (_mappings[i].intensity != lastIntensity) {
-            usedColor.setRedF(_mappings[i].intensity / (float)_maxIntensity);
+//            usedColor.setRedF(_mappings[i].intensity / (float)_maxIntensity);
             painter.setBrush(usedColor);
         }
 
@@ -332,4 +368,19 @@ void MemoryMapWidget::setMap(const MemoryMap* map)
     _visMapValid = false;
     update();
 }
+
+
+bool MemoryMapWidget::antiAliasing() const
+{
+    return _antialiasing;
+}
+
+
+void MemoryMapWidget::setAntiAliasing(bool value)
+{
+    _antialiasing = value;
+    update();
+}
+
+
 
