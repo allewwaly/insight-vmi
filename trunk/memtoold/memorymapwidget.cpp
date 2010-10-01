@@ -300,21 +300,12 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
         painter.drawRect(0, 0, _cols, h);
 
     painter.drawRect(0, h, virtAddrSpace() - (_cols * h), 1);
-//    painter.end();
 
     // Draw all used parts
     painter.setBrush(usedColor);
-//    QTime timer;
-//    timer.start();
     int lastIntensity = 255;
-    for (int i = 0; i < _mappings.size(); ++i) {
 
-//        if (!painter.isActive()) {
-//            painter.begin(this);
-//            painter.translate(margin, margin);
-//            painter.scale(1.0 / _bytesPerPixelX, 1.0 / _bytesPerPixelY);
-//            painter.setPen(Qt::NoPen);
-//        }
+    for (int i = 0; i < _mappings.size(); ++i) {
 
         if (_mappings[i].intensity != lastIntensity) {
 //            usedColor.setRedF(_mappings[i].intensity / (float)_maxIntensity);
@@ -351,12 +342,6 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
         if (len > 0) {
             painter.drawRect(0, r, len, 1);
         }
-
-//        // Flush the painter from time to time
-//        if (timer.elapsed() > 500) {
-//            painter.end();
-//            timer.restart();
-//        }
     }
 
     // Only draw grid lines if we have at least 3 pixel per byte
