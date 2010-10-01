@@ -44,17 +44,22 @@ public:
     explicit MemoryMapWidget(const MemoryMap* map = 0, QWidget *parent = 0);
     virtual ~MemoryMapWidget();
 
-    quint64 virtAddrSpace() const;
+    quint64 totalAddrSpace() const;
+    quint64 visibleAddrSpaceStart() const;
+    quint64 visibleAddrSpaceEnd() const;
+    quint64 visibleAddrSpaceLength() const;
 
     const MemoryMap* map() const;
     void setMap(const MemoryMap* map);
     bool antiAliasing() const;
     bool isPainting() const;
     bool isBuilding() const;
+    bool showOnlyKernelSpace() const;
 
 public slots:
     void setAntiAliasing(bool value);
     void forceMapRecreaction();
+    void setShowOnlyKernelSpace(bool value);
 
 protected:
     void closeEvent(QCloseEvent* e);
@@ -81,6 +86,8 @@ private:
     bool _antialiasing;
     bool _isPainting;
     bool _isBuilding;
+    bool _showOnlyKernelSpace;
+    quint64 _shownAddrSpaceOffset;
 
 signals:
     void addressChanged(quint64 address);
