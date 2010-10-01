@@ -18,6 +18,7 @@ class MemoryMap;
 
 enum VisMapPieceTypes {
     ptUnused,
+    ptPartlyUsed,
     ptUsed
 };
 
