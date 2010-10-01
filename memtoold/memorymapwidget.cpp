@@ -35,7 +35,8 @@ VisMapPiece::VisMapPiece(quint64 start, quint64 length, int type,
 MemoryMapWidget::MemoryMapWidget(const MemoryMap* map, QWidget *parent)
     : QWidget(parent), _map(map), _visMapValid(false), _address(-1),
       _bytesPerPixelX(0), _bytesPerPixelY(0), _cols(0), _rows(0),
-      _antialiasing(false), _isPainting(false),_isBuilding(false)
+      _antialiasing(false), _isPainting(false),_isBuilding(false),
+      _showOnlyKernelSpace(false), _shownAddrSpaceOffset(0)
 {
 //    setWindowTitle(tr("Difference view"));
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -49,11 +50,37 @@ MemoryMapWidget::~MemoryMapWidget()
 }
 
 
-quint64 MemoryMapWidget::virtAddrSpace() const
+quint64 MemoryMapWidget::visibleAddrSpaceStart() const
 {
-    return _map && _map->vmem() &&
-            _map->vmem()->memSpecs().arch == MemSpecs::x86_64 ?
+    return _showOnlyKernelSpace ?
+            _map->vmem()->memSpecs().pageOffset :
+            0;
+}
+
+
+quint64 MemoryMapWidget::visibleAddrSpaceEnd() const
+{
+    return (_map && _map->vmem() &&
+            _map->vmem()->memSpecs().arch == MemSpecs::x86_64) ?
             0xFFFFFFFFFFFFFFFFUL : 0xFFFFFFFFUL;
+}
+
+
+quint64 MemoryMapWidget::visibleAddrSpaceLength() const
+{
+    quint64 length = visibleAddrSpaceEnd() - visibleAddrSpaceStart();
+    // Correct the size, if below the 64 bit boundary
+    if (length < 0xFFFFFFFFFFFFFFFF)
+        ++length;
+    return length;
+}
+
+
+quint64 MemoryMapWidget::totalAddrSpace() const
+{
+    return (_map && _map->vmem() &&
+            _map->vmem()->memSpecs().arch == MemSpecs::x86_64) ?
+            0xFFFFFFFFFFFFFFFFUL : (1UL << 32);
 }
 
 
@@ -230,19 +257,19 @@ void MemoryMapWidget::closeEvent(QCloseEvent* e)
 }
 
 
-void MemoryMapWidget::resizeEvent(QResizeEvent* e)
+void MemoryMapWidget::resizeEvent(QResizeEvent* /*e*/)
 {
     // Paint the bytes as squares into the visible widget area
+    quint64 addrSpaceLen = visibleAddrSpaceLength();
+
     double ratio = width() / (double) height();
-    _cols = (qint64) ceil(sqrt(virtAddrSpace() * ratio));
-    _rows = virtAddrSpace() / _cols;
-    if (virtAddrSpace() % _cols != 0)
+    _cols = (qint64) ceil(sqrt(addrSpaceLen * ratio));
+    _rows = addrSpaceLen / _cols;
+    if (addrSpaceLen % _cols != 0)
         _rows++;
 
     _bytesPerPixelX = _cols / (double) drawWidth();
     _bytesPerPixelY = _rows / (double) drawHeight();
-
-    e->accept();
 }
 
 
@@ -256,9 +283,9 @@ void MemoryMapWidget::mouseMoveEvent(QMouseEvent *e)
     if (x < 0 || y < 0 || x >= drawWidth || y >= drawHeight) return;
     quint64 col = (quint64)(_bytesPerPixelX * x);
     quint64 row = (quint64)(_bytesPerPixelY * y);
-    quint64 addr = row * _cols + col;
+    quint64 addr = row * _cols + col + visibleAddrSpaceStart();
 
-    if (_address != addr && addr < virtAddrSpace()) {
+    if (_address != addr && addr < visibleAddrSpaceEnd()) {
         _address = addr;
         emit addressChanged(_address);
     }
@@ -293,17 +320,21 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
     painter.drawRect(0, 0, _cols, _rows);
     // Draw the whole address space  as "unused"
     painter.setBrush(unusedColor);
-    quint64 h = virtAddrSpace() / _cols;
+    quint64 h = totalAddrSpace() / _cols;
     if (h >= 1)
         painter.drawRect(0, 0, _cols, h);
 
-    painter.drawRect(0, h, virtAddrSpace() - (_cols * h), 1);
+    painter.drawRect(0, h, totalAddrSpace() - (_cols * h), 1);
 
     // Draw all used parts
     painter.setBrush(usedColor);
     int lastIntensity = 255;
 
     for (int i = 0; i < _mappings.size(); ++i) {
+
+        if (_mappings[i].address + _mappings[i].length < visibleAddrSpaceStart() ||
+                _mappings[i].address > visibleAddrSpaceEnd())
+            continue;
 
         if (_mappings[i].intensity != lastIntensity) {
 //            usedColor.setRedF(_mappings[i].intensity / (float)_maxIntensity);
@@ -312,8 +343,17 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
 
         quint64 len = _mappings[i].length;
         // Find the row and column of the offset
-        quint64 r = _mappings[i].address / _cols;
-        quint64 c = _mappings[i].address % _cols;
+        quint64 relAddr;
+        // Beware of overflows when calcluating the relative address
+        if (visibleAddrSpaceStart() > _mappings[i].address) {
+            relAddr = 0;
+            // shorten length to the visible part
+            len -= visibleAddrSpaceStart() - _mappings[i].address;
+        }
+        else
+            relAddr = _mappings[i].address - visibleAddrSpaceStart();
+        quint64 r = relAddr / _cols;
+        quint64 c = relAddr % _cols;
 
         // The memory region is drawn in three operations: the first line, the
         // middle (rectangular) block, and finally the list line.
@@ -409,4 +449,20 @@ void MemoryMapWidget::forceMapRecreaction()
 {
     _visMapValid = false;
     QTimer::singleShot(0, this, SLOT(buildVisMemMap()));
+}
+
+
+void MemoryMapWidget::setShowOnlyKernelSpace(bool value)
+{
+    if (_showOnlyKernelSpace == value)
+        return;
+    _showOnlyKernelSpace = value;
+    resizeEvent(0);
+    update();
+}
+
+
+bool MemoryMapWidget::showOnlyKernelSpace() const
+{
+    return _showOnlyKernelSpace;
 }

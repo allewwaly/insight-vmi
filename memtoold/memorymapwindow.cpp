@@ -3,6 +3,7 @@
 #include "memorymapwidget.h"
 #include <QStatusBar>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QCheckBox>
 #include <QLabel>
 #include <QProgressBar>
@@ -23,17 +24,29 @@ MemoryMapWindow::MemoryMapWindow(QWidget *parent)
 	// Setup main window area
 	_memMapWidget = new MemoryMapWidget(0, this);
 
-	QCheckBox* checkBox = new QCheckBox(this);
-	checkBox->setText(tr("Enable anti-aliasing"));
-	checkBox->setChecked(false);
+	QCheckBox* cbAntiAlias = new QCheckBox(this);
+	cbAntiAlias->setText(tr("Enable anti-aliasing"));
+	cbAntiAlias->setChecked(false);
 
-	centralWidget()->layout()->addWidget(checkBox);
+	QCheckBox* cbKernelSpaceOnly = new QCheckBox(this);
+	cbKernelSpaceOnly->setText(tr("Show only kernel space"));
+	cbKernelSpaceOnly->setChecked(false);
+
+	QHBoxLayout* topLayout = new QHBoxLayout();
+	topLayout->addWidget(cbAntiAlias);
+	topLayout->addWidget(cbKernelSpaceOnly);
+
+	centralWidget()->layout()->addItem(topLayout);
     centralWidget()->layout()->addWidget(_memMapWidget);
 
 	connect(_memMapWidget, SIGNAL(addressChanged(quint64)),
 	        SLOT(virtualAddressChanged(quint64)));
-	connect(checkBox, SIGNAL(toggled(bool)),
+	connect(cbAntiAlias, SIGNAL(toggled(bool)),
 	        _memMapWidget, SLOT(setAntiAliasing(bool)));
+	connect(cbKernelSpaceOnly, SIGNAL(toggled(bool)),
+	        _memMapWidget, SLOT(setShowOnlyKernelSpace(bool)));
+
+
 
 	// Setup status bar
 //	_sbCursorPosition = new QLabel(this);
@@ -67,7 +80,7 @@ MemoryMapWindow::~MemoryMapWindow()
 
 void MemoryMapWindow::virtualAddressChanged(quint64 address)
 {
-    int width = _memMapWidget->virtAddrSpace() > 0xFFFFFFFFUL ? 16 : 8;
+    int width = _memMapWidget->totalAddrSpace() > (1UL << 32) ? 16 : 8;
     QString s = QString(LBL_MOVE_CURSOR_POS)
                     .arg(address, width, 16, QChar('0'));
 //    _sbCursorPosition->setText(s);
