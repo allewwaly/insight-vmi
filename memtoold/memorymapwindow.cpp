@@ -4,8 +4,13 @@
 #include <QStatusBar>
 #include <QVBoxLayout>
 #include <QCheckBox>
+#include <QLabel>
+#include <QProgressBar>
 
 MemoryMapWindow* memMapWindow = 0;
+
+const char* LBL_MOVE_CURSOR_POS = "Position: 0x%1";
+const char* LBL_BUILDING = "Processing map";
 
 
 MemoryMapWindow::MemoryMapWindow(QWidget *parent)
@@ -15,7 +20,9 @@ MemoryMapWindow::MemoryMapWindow(QWidget *parent)
 
 	setWindowTitle(tr("MemoryTool - Differences View"));
 
+	// Setup main window area
 	_memMapWidget = new MemoryMapWidget(0, this);
+
 	QCheckBox* checkBox = new QCheckBox(this);
 	checkBox->setText(tr("Enable anti-aliasing"));
 	checkBox->setChecked(false);
@@ -27,6 +34,29 @@ MemoryMapWindow::MemoryMapWindow(QWidget *parent)
 	        SLOT(virtualAddressChanged(quint64)));
 	connect(checkBox, SIGNAL(toggled(bool)),
 	        _memMapWidget, SLOT(setAntiAliasing(bool)));
+
+	// Setup status bar
+//	_sbCursorPosition = new QLabel(this);
+//	statusBar()->addPermanentWidget(_sbCursorPosition);
+
+	_sbBuildingMsg = new QLabel(this);
+	_sbBuildingMsg->setText(LBL_BUILDING);
+	_sbBuildingMsg->hide();
+	statusBar()->addPermanentWidget(_sbBuildingMsg);
+
+	_sbBuildingProgBar = new QProgressBar(this);
+	_sbBuildingProgBar->setMinimum(0);
+	_sbBuildingProgBar->setMaximum(100);
+	_sbBuildingProgBar->setValue(0);
+	_sbBuildingProgBar->hide();
+    connect(_memMapWidget, SIGNAL(buildingProgress(int)),
+            _sbBuildingProgBar, SLOT(setValue(int)));
+    statusBar()->addPermanentWidget(_sbBuildingProgBar);
+
+    connect(_memMapWidget, SIGNAL(buildingStarted()),
+            SLOT(memMapBuildingStarted()));
+    connect(_memMapWidget, SIGNAL(buildingStopped()),
+            SLOT(memMapBuildingStopped()));
 }
 
 
@@ -38,12 +68,35 @@ MemoryMapWindow::~MemoryMapWindow()
 void MemoryMapWindow::virtualAddressChanged(quint64 address)
 {
     int width = _memMapWidget->virtAddrSpace() > 0xFFFFFFFFUL ? 16 : 8;
-    QString s = QString("Position: 0x%1").arg(address, width, 16, QChar('0'));
+    QString s = QString(LBL_MOVE_CURSOR_POS)
+                    .arg(address, width, 16, QChar('0'));
+//    _sbCursorPosition->setText(s);
     statusBar()->showMessage(s);
 }
 
 
-void MemoryMapWindow::setMap(const MemoryMap* map)
+void MemoryMapWindow::memMapBuildingStarted()
 {
-    _memMapWidget->setMap(map);
+    _sbBuildingMsg->show();
+    _sbBuildingProgBar->show();
+}
+
+
+void MemoryMapWindow::memMapBuildingStopped()
+{
+    _sbBuildingProgBar->hide();
+    _sbBuildingMsg->hide();
+    _memMapWidget->update();
+}
+
+
+//void MemoryMapWindow::setMap(const MemoryMap* map)
+//{
+//    _memMapWidget->setMap(map);
+//}
+
+
+MemoryMapWidget* MemoryMapWindow::mapWidget()
+{
+    return _memMapWidget;
 }
