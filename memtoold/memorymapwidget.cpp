@@ -189,8 +189,6 @@ void MemoryMapWidget::buildVisMemMap()
                 } while (!addresses.isEmpty() &&  addresses.front() <= curAddr);
             }
 
-//            lastAddr = curAddr;
-
             // Emit a signal of the building progress
             int i = (int) (++processed / (float)total * 100.0);
             if (i != progress) {

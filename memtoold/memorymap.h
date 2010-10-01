@@ -56,6 +56,8 @@ private:
 	static StringSet _names;
 
 	bool fitsInVmem(quint64 addr, quint64 size) const;
+	bool addressIsValid(quint64 address) const;
+    bool addressIsValid(const Instance& inst) const;
 	bool containedInVmemMap(const Instance& inst) const;
 	bool addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
 	        QQueue<MemoryMapNode*>* stack);

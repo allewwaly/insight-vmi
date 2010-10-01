@@ -197,7 +197,7 @@ void MemoryMap::build()
                 int cnt = 0;
                 inst = inst.dereference(BaseType::trLexicalAndPointers, &cnt);
 //                inst = inst.dereference(BaseType::trLexical, &cnt);
-                if (cnt)
+                if (cnt && addressIsValid(inst))
                     addChildIfNotExistend(inst, node, &queue);
             }
             catch (GenericException e) {
@@ -213,7 +213,8 @@ void MemoryMap::build()
                 for (int i = 0; i < a->length(); ++i) {
                     try {
                         Instance e = inst.arrayElem(i);
-                        addChildIfNotExistend(e, node, &queue);
+                        if (addressIsValid(e))
+                            addChildIfNotExistend(e, node, &queue);
                     }
                     catch (GenericException e) {
 //                        debugerr("Caught exception for instance " << inst.name() //inst.fullName()
@@ -228,7 +229,8 @@ void MemoryMap::build()
             for (int i = 0; i < inst.memberCount(); ++i) {
                 try {
                     Instance m = inst.member(i, BaseType::trLexical);
-                    addChildIfNotExistend(m, node, &queue);
+                    if (addressIsValid(m))
+                        addChildIfNotExistend(m, node, &queue);
                 }
                 catch (GenericException e) {
 //                    debugerr("Caught exception for instance " << inst.name() //inst.fullName()
@@ -331,6 +333,28 @@ bool MemoryMap::containedInVmemMap(const Instance& inst) const
 }
 
 
+bool MemoryMap::addressIsValid(quint64 address) const
+{
+    // Make sure the address is within the virtual address space
+    if ((_vmem->memSpecs().arch & MemSpecs::i386) &&
+        address > 0xFFFFFFFFUL)
+        return false;
+
+    // Throw out user-land addresses
+    if (address < _vmem->memSpecs().pageOffset)
+        return false;
+
+    return address > 0;
+}
+
+
+bool MemoryMap::addressIsValid(const Instance& inst) const
+{
+    return addressIsValid(inst.address()) &&
+            fitsInVmem(inst.address(), inst.size());
+}
+
+
 bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
         QQueue<MemoryMapNode*>* queue)
 {
@@ -346,14 +370,8 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
     const Instance i = (inst.type()->type() & BaseType::trLexical) ?
             inst.dereference(BaseType::trLexical) : inst;
 
-#ifdef DEBUG
-    if (_vmem->memSpecs().arch & MemSpecs::i386)
-        assert(i.address() <= 0xFFFFFFFFUL);
-#endif
-
     if (i.type() && (i.type()->type() & interestingTypes) &&
-            !containedInVmemMap(i) &&
-            fitsInVmem(i.address(), i.size()) )
+            !containedInVmemMap(i))
     {
         MemoryMapNode* child = node->addChild(i);
         _vmemMap.insertMulti(child->address(), child);
