@@ -6,15 +6,18 @@
  */
 
 #include "memorymapwidget.h"
+#include <QApplication>
 #include <QEvent>
 #include <QPainter>
 #include <QPaintEvent>
 #include <QMultiMap>
 #include <QLinkedList>
 #include <QTime>
+#include <QTimer>
 #include <math.h>
 #include "memorymap.h"
 #include "virtualmemory.h"
+#include "varsetter.h"
 #include "debug.h"
 
 static const int margin = 3;
@@ -31,7 +34,8 @@ VisMapPiece::VisMapPiece(quint64 start, quint64 length, int type,
 
 MemoryMapWidget::MemoryMapWidget(const MemoryMap* map, QWidget *parent)
     : QWidget(parent), _map(map), _visMapValid(false), _address(-1),
-      _bytesPerPixelX(0), _bytesPerPixelY(0), _cols(0), _rows(0)
+      _bytesPerPixelX(0), _bytesPerPixelY(0), _cols(0), _rows(0),
+      _antialiasing(false), _isPainting(false),_isBuilding(false)
 {
 //    setWindowTitle(tr("Difference view"));
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -72,12 +76,15 @@ void MemoryMapWidget::buildVisMemMap()
     if (_visMapValid)
         return;
 
-    debugenter();
+    VarSetter<bool> building(&_isBuilding, true, false);
+
+    emit buildingStarted();
 
     _mappings.clear();
     _maxIntensity = 0;
 
     if (_map) {
+        int progress = 0;
         // Holds the currently active nodes, ordered by their end address
         typedef QMultiMap<quint64, const MemoryMapNode*> NodeMap;
         NodeMap nodes;
@@ -87,9 +94,11 @@ void MemoryMapWidget::buildVisMemMap()
         quint64 lastAddr = 0;
         int lastObjCount = 0;
         int piecesMerged = 0;
+        qint64 processed = 0, total = _map->vmemMap().size();
 
         for (PointerNodeMap::const_iterator vmap_it = _map->vmemMap().constBegin();
-                vmap_it != _map->vmemMap().constEnd(); ++vmap_it)
+                vmap_it != _map->vmemMap().constEnd() && processed < total;
+                ++vmap_it)
         {
             // The map contains multiple nodes with the same start address,
             // so curAddr == lastAddr is very likely
@@ -181,6 +190,15 @@ void MemoryMapWidget::buildVisMemMap()
             }
 
 //            lastAddr = curAddr;
+
+            // Emit a signal of the building progress
+            int i = (int) (++processed / (float)total * 100.0);
+            if (i != progress) {
+                progress = i;
+                emit buildingProgress(progress);
+            }
+
+            QApplication::processEvents();
         }
 
 #ifdef DEBUG
@@ -201,7 +219,10 @@ void MemoryMapWidget::buildVisMemMap()
     }
 
     _visMapValid = true;
-    debugleave();
+    emit buildingStopped();
+
+    // Repaint the widget
+    update();
 }
 
 
@@ -246,9 +267,16 @@ void MemoryMapWidget::mouseMoveEvent(QMouseEvent *e)
 }
 
 
-void MemoryMapWidget::paintEvent(QPaintEvent * /*e*/)
+void MemoryMapWidget::paintEvent(QPaintEvent * e)
 {
-    buildVisMemMap();
+    // Set _isPainting to true now and to false on exit
+    if (_isPainting) {
+        debugmsg("Ignoring paint event");
+        e->ignore();
+        return;
+    }
+
+    VarSetter<bool> painting(&_isPainting, true, false);
 
     QColor unusedColor(255, 255, 255);
     QColor usedColor(0, 0, 0);
@@ -365,8 +393,7 @@ void MemoryMapWidget::setMap(const MemoryMap* map)
     if (_map == map)
         return;
     _map = map;
-    _visMapValid = false;
-    update();
+    forceMapRecreaction();
 }
 
 
@@ -383,4 +410,20 @@ void MemoryMapWidget::setAntiAliasing(bool value)
 }
 
 
+bool MemoryMapWidget::isPainting() const
+{
+    return _isPainting;
+}
 
+
+bool MemoryMapWidget::isBuilding() const
+{
+    return _isBuilding;
+}
+
+
+void MemoryMapWidget::forceMapRecreaction()
+{
+    _visMapValid = false;
+    QTimer::singleShot(0, this, SLOT(buildVisMemMap()));
+}

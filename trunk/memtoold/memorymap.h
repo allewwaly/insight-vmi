@@ -50,6 +50,8 @@ public:
 
     static const QString& insertName(const QString& name);
 
+    bool isBuilding() const;
+
 private:
 	static StringSet _names;
 
@@ -65,6 +67,7 @@ private:
     IntNodeHash _typeInstances;  ///< holds all instances of a given type ID
     PointerNodeMap _vmemMap;     ///< map of all used kernel-space virtual memory
     PointerIntNodeMap _pmemMap;  ///< map of all used physical memory
+    bool _isBuilding;
 };
 
 #endif /* MEMORYMAP_H_ */

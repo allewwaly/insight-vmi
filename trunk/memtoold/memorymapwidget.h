@@ -48,9 +48,12 @@ public:
     const MemoryMap* map() const;
     void setMap(const MemoryMap* map);
     bool antiAliasing() const;
+    bool isPainting() const;
+    bool isBuilding() const;
 
 public slots:
     void setAntiAliasing(bool value);
+    void forceMapRecreaction();
 
 protected:
     void closeEvent(QCloseEvent* e);
@@ -58,8 +61,10 @@ protected:
     void mouseMoveEvent(QMouseEvent* e);
     void resizeEvent(QResizeEvent* event);
 
-private:
+private slots:
     void buildVisMemMap();
+
+private:
     int drawWidth() const;
     int drawHeight() const;
 
@@ -73,9 +78,14 @@ private:
     qint64 _rows;
     int _maxIntensity;
     bool _antialiasing;
+    bool _isPainting;
+    bool _isBuilding;
 
 signals:
     void addressChanged(quint64 address);
+    void buildingStarted();
+    void buildingStopped();
+    void buildingProgress(int);
 };
 
 #endif /* MEMORYMAPWIDGET_H_ */

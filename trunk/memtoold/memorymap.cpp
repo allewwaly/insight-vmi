@@ -14,6 +14,7 @@
 #include "virtualmemoryexception.h"
 #include "array.h"
 #include "shell.h"
+#include "varsetter.h"
 #include "debug.h"
 
 
@@ -34,7 +35,7 @@ const QString& MemoryMap::insertName(const QString& name)
 
 
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
-    : _factory(factory), _vmem(vmem)
+    : _factory(factory), _vmem(vmem), _isBuilding(false)
 {
 }
 
@@ -82,6 +83,9 @@ bool MemoryMap::fitsInVmem(quint64 addr, quint64 size) const
 
 void MemoryMap::build()
 {
+    // Set _isBuilding to true now and to false later
+    VarSetter<bool> building(&_isBuilding, true, false);
+
     // Clean up everything
     clear();
 
@@ -235,7 +239,7 @@ void MemoryMap::build()
         }
 #ifdef DEBUG
         // emergency stop
-        if (processed >= 5822165) {
+        if (processed >= 5000000) {
             debugmsg(">>> Breaking revmap generation <<<");
             break;
         }
@@ -382,4 +386,10 @@ const PointerIntNodeMap& MemoryMap::pmemMap() const
 const PointerNodeHash& MemoryMap::pointersTo() const
 {
     return _pointersTo;
+}
+
+
+bool MemoryMap::isBuilding() const
+{
+    return _isBuilding;
 }

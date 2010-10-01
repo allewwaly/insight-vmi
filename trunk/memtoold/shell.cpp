@@ -37,6 +37,7 @@
 #include "varsetter.h"
 #include "memorymap.h"
 #include "memorymapwindow.h"
+#include "memorymapwidget.h"
 
 // Register socket enums for the Qt meta type system
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
@@ -212,6 +213,9 @@ void Shell::prepare()
                         "history data from \"" << histFile << "\"");
         }
     }
+
+    connect(&_memMapVisTimer, SIGNAL(timeout()), SLOT(memMapVisTimerTimeout()));
+    _memMapVisTimer.setInterval(500);
 
     // Open the console devices
     _stdin.open(stdin, QIODevice::ReadOnly);
@@ -489,10 +493,6 @@ void Shell::run()
         exec();
     }
     else {
-        debugmsg("old sizeof(Instance) = " << 64);
-        debugmsg("sizeof(Instance) = " << sizeof(Instance));
-        debugmsg("sizeof(InstanceData) = " << sizeof(InstanceData));
-        debugmsg("sizeof(MemoryMapNode) = " << sizeof(MemoryMapNode));
         // Enter command line loop
         while (!_finished)
             evalLine();
@@ -1302,6 +1302,13 @@ int Shell::cmdMemoryRevmap(QStringList args)
 
 int Shell::cmdMemoryRevmapBuild(int index)
 {
+    // Show the memory map window so that the user can see the progress
+    memMapWindow->mapWidget()->setMap(_memDumps[index]->map());
+    if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
+        debugerr("Error invoking show() on memMapWindow");
+    _memMapLastPaint.start();
+    _memMapVisTimer.start();
+
     QTime timer;
     timer.start();
     _memDumps[index]->setupRevMap();
@@ -1318,6 +1325,8 @@ int Shell::cmdMemoryRevmapBuild(int index)
                 .arg(msec, 3, 10, QChar('0'))
             << endl;
 
+    memMapWindow->mapWidget()->forceMapRecreaction();
+
     return 0;
 }
 
@@ -1332,12 +1341,32 @@ int Shell::cmdMemoryRevmapVisualize(int index)
         return 1;
     }
 
-    memMapWindow->setMap(_memDumps[index]->map());
+    memMapWindow->mapWidget()->setMap(_memDumps[index]->map());
+    memMapWindow->mapWidget()->forceMapRecreaction();
 
     if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
         debugerr("Error invoking show() on memMapWindow");
 
     return 0;
+}
+
+
+void Shell::memMapVisTimerTimeout()
+{
+    // If memory map is still being built, force an update of the display
+    if (memMapWindow->isVisible() &&
+            memMapWindow->mapWidget()->map()->isBuilding())
+    {
+        if (!memMapWindow->mapWidget()->isPainting() &&
+                !memMapWindow->mapWidget()->isBuilding() &&
+                _memMapLastPaint.elapsed() > 1000)
+        {
+            memMapWindow->mapWidget()->forceMapRecreaction();
+            _memMapLastPaint.restart();
+        }
+    }
+    else
+        _memMapVisTimer.stop();
 }
 
 
@@ -1899,3 +1928,5 @@ int Shell::cmdBinaryMemDumpList(QStringList /*args*/)
 //    Instance inst = _memDumps[index]->queryInstance(args[0]);
 //    // TODO implement me
 //}
+
+
