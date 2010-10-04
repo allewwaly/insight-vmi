@@ -13,8 +13,8 @@
 #include <QMultiHash>
 #include <QMultiMap>
 #include <QPair>
-#include <QQueue>
 #include "memorymapnode.h"
+#include "debug.h"
 
 class SymFactory;
 class VirtualMemory;
@@ -37,6 +37,8 @@ typedef QPair<int, MemoryMapNode*> IntNodePair;
 /// An address-indexed map of pairs of an integer and a MemoryMapNode pointer
 typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 
+/// Holds the nodes to be visited, sorted by their probability
+typedef QMultiMap<float, MemoryMapNode*> NodeQueue;
 
 /**
  * This class represents a map of used virtual and physical memory. It allows
@@ -132,6 +134,15 @@ public:
      */
     static const QString& insertName(const QString& name);
 
+#ifdef DEBUG
+	quint32 degPerGenerationCnt;
+	quint32 degForUnalignedAddrCnt;
+	quint32 degForUserlandAddrCnt;
+	quint32 degForInvalidAddrCnt;
+	quint32 degForNonAlignedChildAddrCnt;
+	quint32 degForInvalidChildAddrCnt;
+#endif
+
 private:
     /// Holds the static list of kernel object names. \sa insertName()
 	static StringSet _names;
@@ -151,14 +162,14 @@ private:
 	 * @param address the address to check
 	 * @return \c true if the address is valid, \c false otherwise
 	 */
-	bool addressIsValid(quint64 address) const;
+	bool addressIsWellFormed(quint64 address) const;
 
 	/**
 	 * Checks if the address of a given Instance appears to be valid.
 	 * @param inst the Instance object to check
 	 * @return \c true if the address if \a inst is valid, \c false otherwise
 	 */
-    bool addressIsValid(const Instance& inst) const;
+    bool addressIsWellFormed(const Instance& inst) const;
 
     /**
      * Checks if a given Instance object already exists in the virtual memory
@@ -182,7 +193,7 @@ private:
 	 * already existed in the virtual memory mapping
 	 */
 	bool addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
-	        QQueue<MemoryMapNode*>* queue);
+	        NodeQueue* queue);
 
     const SymFactory* _factory;  ///< holds the SymFactory to operate on
     VirtualMemory* _vmem;        ///< the virtual memory object this map is being built for
