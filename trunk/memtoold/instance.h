@@ -277,7 +277,28 @@ public:
 	 * @return Instance object of the specified member
      * \sa BaseType::TypeResolution
 	 */
-	Instance member(int index, int resolveTypes) const;
+	Instance member(int index, int resolveTypes = 0) const;
+
+	/**
+	 * Gives access to the BaseType's of a member, if this is a struct or union.
+	 * If this is no struct or union or if \a index is out ouf bounds, null is
+	 * returned
+	 *
+	 * @param index index into the member list
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
+	 * @return pointer to the type of member \a index, or 0 if this is no struct
+	 * or union or \a index is out of bounds
+	 */
+	const BaseType* memberType(int index, int resolveTypes = 0) const;
+
+	/**
+	 * Calculates the virtual address of a member, if this is a struct or union.
+	 * @param index index into the member list
+	 * @return the virtual address of member \a index, or 0 if this is no struct
+	 * or union
+	 */
+	quint64 memberAddress(int index) const;
 
 	/**
 	 * Checks if a member with the given name \a name exists in this instance.
