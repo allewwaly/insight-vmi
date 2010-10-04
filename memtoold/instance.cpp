@@ -477,6 +477,26 @@ Instance Instance::member(int index, int resolveTypes) const
 }
 
 
+const BaseType* Instance::memberType(int index, int resolveTypes) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d->type);
+	if (s && index >= 0 && index < s->members().size()) {
+		return s->members().at(index)->refTypeDeep(resolveTypes);
+	}
+	return 0;
+}
+
+
+quint64 Instance::memberAddress(int index) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d->type);
+	if (s && index >= 0 && index < s->members().size()) {
+		return _d->address + s->members().at(index)->offset();
+	}
+	return 0;
+}
+
+
 bool Instance::memberExists(const QString& name) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d->type);
