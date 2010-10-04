@@ -7,7 +7,6 @@
 
 #include "memorymap.h"
 #include <QTime>
-#include <QQueue>
 #include "symfactory.h"
 #include "variable.h"
 #include "virtualmemory.h"
@@ -16,6 +15,8 @@
 #include "shell.h"
 #include "varsetter.h"
 #include "debug.h"
+
+
 
 
 // static variable
@@ -37,6 +38,7 @@ const QString& MemoryMap::insertName(const QString& name)
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _factory(factory), _vmem(vmem), _isBuilding(false)
 {
+	clear();
 }
 
 
@@ -57,6 +59,15 @@ void MemoryMap::clear()
     _typeInstances.clear();
     _pmemMap.clear();
     _vmemMap.clear();
+
+#ifdef DEBUG
+	degPerGenerationCnt = 0;
+	degForUnalignedAddrCnt = 0;
+	degForUserlandAddrCnt = 0;
+	degForInvalidAddrCnt = 0;
+	degForNonAlignedChildAddrCnt = 0;
+	degForInvalidChildAddrCnt = 0;
+#endif
 }
 
 
@@ -89,7 +100,8 @@ void MemoryMap::build()
     // Clean up everything
     clear();
 
-    QQueue<MemoryMapNode*> queue;
+    // Holds the nodes to be visited, sorted by their probability
+    NodeQueue queue;
 
     QTime timer;
     timer.start();
@@ -109,7 +121,7 @@ void MemoryMap::build()
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
                 _vmemMap.insertMulti(node->address(), node);
-                queue.enqueue(node);
+                queue.insert(node->probability(), node);
             }
         }
         catch (GenericException e) {
@@ -120,6 +132,7 @@ void MemoryMap::build()
 
 
     // Now work through the whole stack
+    MemoryMapNode* node = 0;
     while (!shell->interrupted() && !queue.isEmpty()) {
 
         if (processed == 0 || timer.elapsed() > 2000) {
@@ -127,7 +140,8 @@ void MemoryMap::build()
             debugmsg("Processed " << processed << " instances, "
                     << "_vmemMap.size() = " << _vmemMap.size()
                     << ", _pmemMap.size() = " << _pmemMap.size()
-                    << ", queue.size() = " << queue.size());
+                    << ", queue.size() = " << queue.size()
+                    << ", probability = " << (node ? node->probability() : 1.0));
 #ifdef DEBUG
 //            if (processed > 0) {
 //                debugmsg(">>> Breaking revmap generation <<<");
@@ -136,8 +150,12 @@ void MemoryMap::build()
 #endif
         }
 
-        // Take top element from queue
-        MemoryMapNode* node = queue.dequeue();
+        // Take element with highest probability
+        {
+			NodeQueue::iterator it = --queue.end();
+			node = it.value();
+			queue.erase(it);
+        }
         ++processed;
 
         // Insert in non-critical (non-exception prone) mappings
@@ -197,7 +215,7 @@ void MemoryMap::build()
                 int cnt = 0;
                 inst = inst.dereference(BaseType::trLexicalAndPointers, &cnt);
 //                inst = inst.dereference(BaseType::trLexical, &cnt);
-                if (cnt && addressIsValid(inst))
+                if (cnt && addressIsWellFormed(inst))
                     addChildIfNotExistend(inst, node, &queue);
             }
             catch (GenericException e) {
@@ -213,7 +231,7 @@ void MemoryMap::build()
                 for (int i = 0; i < a->length(); ++i) {
                     try {
                         Instance e = inst.arrayElem(i);
-                        if (addressIsValid(e))
+                        if (addressIsWellFormed(e))
                             addChildIfNotExistend(e, node, &queue);
                     }
                     catch (GenericException e) {
@@ -229,7 +247,7 @@ void MemoryMap::build()
             for (int i = 0; i < inst.memberCount(); ++i) {
                 try {
                     Instance m = inst.member(i, BaseType::trLexical);
-                    if (addressIsValid(m))
+                    if (addressIsWellFormed(m))
                         addChildIfNotExistend(m, node, &queue);
                 }
                 catch (GenericException e) {
@@ -283,6 +301,14 @@ void MemoryMap::build()
     debugmsg("Total of " << tkeys.size() << " types found, average size: "
             << QString::number(totalTypeSize / (double) totalTypeCnt, 'f', 1)
             << " byte");
+
+    debugmsg("degForInvalidAddrCnt         = " << degForInvalidAddrCnt);
+    debugmsg("degForInvalidChildAddrCnt    = " << degForInvalidChildAddrCnt);
+    debugmsg("degForNonAlignedChildAddrCnt = " << degForNonAlignedChildAddrCnt);
+    debugmsg("degForUnalignedAddrCnt       = " << degForUnalignedAddrCnt);
+    debugmsg("degForUserlandAddrCnt        = " << degForUserlandAddrCnt);
+    debugmsg("degPerGenerationCnt          = " << degPerGenerationCnt);
+
 /*
     QMap<int, PointerNodeMap::key_type>::iterator it;
     for (it = keyCnt.begin(); it != keyCnt.end(); ++it) {
@@ -333,30 +359,36 @@ bool MemoryMap::containedInVmemMap(const Instance& inst) const
 }
 
 
-bool MemoryMap::addressIsValid(quint64 address) const
+bool MemoryMap::addressIsWellFormed(quint64 address) const
 {
     // Make sure the address is within the virtual address space
     if ((_vmem->memSpecs().arch & MemSpecs::i386) &&
         address > 0xFFFFFFFFUL)
         return false;
+    else {
+        // Is the 64 bit address in canonical form?
+        quint64 high_bits = address >> 47;
+        if (high_bits != 0 && high_bits != 0x1FFFFUL)
+        	return false;
+    }
 
-    // Throw out user-land addresses
-    if (address < _vmem->memSpecs().pageOffset)
-        return false;
+//    // Throw out user-land addresses
+//    if (address < _vmem->memSpecs().pageOffset)
+//        return false;
 
     return address > 0;
 }
 
 
-bool MemoryMap::addressIsValid(const Instance& inst) const
+bool MemoryMap::addressIsWellFormed(const Instance& inst) const
 {
-    return addressIsValid(inst.address()) &&
+    return addressIsWellFormed(inst.address()) &&
             fitsInVmem(inst.address(), inst.size());
 }
 
 
 bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
-        QQueue<MemoryMapNode*>* queue)
+        NodeQueue* queue)
 {
     static const int interestingTypes =
             BaseType::trLexical |
@@ -375,7 +407,7 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
     {
         MemoryMapNode* child = node->addChild(i);
         _vmemMap.insertMulti(child->address(), child);
-        queue->enqueue(child);
+        queue->insert(child->probability(), child);
         return true;
     }
     else

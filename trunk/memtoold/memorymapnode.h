@@ -100,8 +100,8 @@ public:
 	const NodeList& children() const;
 
 	/**
-	 * Adds a new descendant to this node. This transfers owndership to this
-	 * node. When this node is destryoed, all child notes are recursively as
+	 * Adds a new descendant to this node. This transfers ownership to this
+	 * node. When this node is destroyed, all child notes are recursively as
 	 * well.
 	 * \sa ~MemoryMapNode()
 	 * @param child the child node to add to this node
@@ -133,9 +133,15 @@ public:
 	const BaseType* type() const;
 
 	/**
+	 * @return the probability that this node is "sane" and is actually used
+	 * by the operating system
+	 */
+	float probability() const;
+
+	/**
 	 * Generates an Instance object from this node. The parameter
 	 * \a includeParentNameComponents allows to control whether a list of all
-	 * fully qualifed name components should be generated and added to the
+	 * fully qualified name components should be generated and added to the
 	 * Instance returned. The generation of the name components list is a
 	 * costly operation and should be avoided if it is not required.
 	 * @param includeParentNameComponents set to \c true if the created Instance
@@ -145,7 +151,17 @@ public:
 	 */
 	Instance toInstance(bool includeParentNameComponents = true) const;
 
+
 private:
+	/**
+	 * Re-calculates the probability of this node being "sane" and used by the
+	 * operating system.
+	 * \sa probability()
+	 * @param givenInst pointer to the instance this node was created from,
+	 * if available
+	 */
+	void updateProbability(const Instance* givenInst = 0);
+
 	MemoryMap* _belongsTo;   ///< the MemoryMap this node belongs to
 	NodeList _children;      ///< list of all children
 	MemoryMapNode* _parent;  ///< parent node, if any, otherwise null
@@ -154,6 +170,7 @@ private:
 	quint64 _address;        ///< virtual address of this node
 	const BaseType* _type;   ///< type of this node
     int _id;                 ///< ID of this node, if based on a variable
+    float _probability;      ///< probability of "correctness" of this node
 };
 
 #endif /* MEMORYMAPNODE_H_ */
