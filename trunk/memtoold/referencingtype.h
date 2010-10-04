@@ -41,9 +41,11 @@ public:
     /**
      * Follows all referencing types' references until a non-referencing
      * type was found.
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
      * @return the type this and all chained referencing types point to
      */
-    const BaseType* refTypeDeep() const;
+    const BaseType* refTypeDeep(int resolveTypes) const;
 
     /**
      * Set the base type this pointer points to
