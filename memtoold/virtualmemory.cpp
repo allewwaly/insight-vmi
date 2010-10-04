@@ -577,8 +577,8 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize)
         }
         else {
             // Is the 64 bit address in canonical form?
-            quint64 high_bits = 0xFFFF800000000000UL & vaddr;
-            if (high_bits != 0 && high_bits != 0xFFFF800000000000UL)
+            quint64 high_bits = vaddr >> 47;
+            if (high_bits != 0 && high_bits != 0x1FFFFUL)
                 virtualMemoryError(
                                 QString("Virtual address 0x%1 is not in canonical form")
                                     .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
