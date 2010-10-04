@@ -37,11 +37,11 @@ const BaseType* ReferencingType::refType() const
 }
 
 
-const BaseType* ReferencingType::refTypeDeep() const
+const BaseType* ReferencingType::refTypeDeep(int resolveTypes) const
 {
     const ReferencingType* prev = this;
     const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(_refType);
-    while (rbt) {
+    while (rbt && (rbt->type() & resolveTypes)) {
         prev = rbt;
         rbt = dynamic_cast<const RefBaseType*>(rbt->refType());
     }
