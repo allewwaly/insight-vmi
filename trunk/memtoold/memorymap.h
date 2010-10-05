@@ -14,6 +14,7 @@
 #include <QMultiMap>
 #include <QPair>
 #include "memorymapnode.h"
+#include "priorityqueue.h"
 #include "debug.h"
 
 class SymFactory;
@@ -38,7 +39,7 @@ typedef QPair<int, MemoryMapNode*> IntNodePair;
 typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 
 /// Holds the nodes to be visited, sorted by their probability
-typedef QMultiMap<float, MemoryMapNode*> NodeQueue;
+typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
 
 /**
  * This class represents a map of used virtual and physical memory. It allows
