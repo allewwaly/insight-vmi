@@ -39,7 +39,8 @@ SOURCES += memorymapwindow.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += memorymapwindow.h \
+HEADERS += priorityqueue.h \
+    memorymapwindow.h \
     memorymapwidget.h \
     varsetter.h \
     memorymapnode.h \

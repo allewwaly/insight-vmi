@@ -151,11 +151,7 @@ void MemoryMap::build()
         }
 
         // Take element with highest probability
-        {
-			NodeQueue::iterator it = --queue.end();
-			node = it.value();
-			queue.erase(it);
-        }
+        node = queue.takeLargest();
         ++processed;
 
         // Insert in non-critical (non-exception prone) mappings
