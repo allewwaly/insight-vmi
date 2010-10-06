@@ -23,6 +23,9 @@ class VirtualMemory;
 /// A set of strings
 typedef QSet<QString> StringSet;
 
+/// A set of long integers
+typedef QSet<quint64> ULongSet;
+
 /// A address-indexed hash of MemoryMapNode pointers
 typedef QMultiHash<quint64, MemoryMapNode*> PointerNodeHash;
 
@@ -203,6 +206,7 @@ private:
     IntNodeHash _typeInstances;  ///< holds all instances of a given type ID
     PointerNodeMap _vmemMap;     ///< map of all used kernel-space virtual memory
     PointerIntNodeMap _pmemMap;  ///< map of all used physical memory
+    ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
 };
 

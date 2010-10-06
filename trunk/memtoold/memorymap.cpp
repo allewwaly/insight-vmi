@@ -59,6 +59,7 @@ void MemoryMap::clear()
     _typeInstances.clear();
     _pmemMap.clear();
     _vmemMap.clear();
+    _vmemAddresses.clear();
 
 #ifdef DEBUG
 	degPerGenerationCnt = 0;
@@ -121,6 +122,7 @@ void MemoryMap::build()
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
                 _vmemMap.insertMulti(node->address(), node);
+                _vmemAddresses.insert(node->address());
                 queue.insert(node->probability(), node);
             }
         }
@@ -137,10 +139,11 @@ void MemoryMap::build()
 
         if (processed == 0 || timer.elapsed() > 2000) {
             timer.restart();
-            debugmsg("Processed " << processed << " instances, "
-                    << "_vmemMap.size() = " << _vmemMap.size()
-                    << ", _pmemMap.size() = " << _pmemMap.size()
-                    << ", queue.size() = " << queue.size()
+            debugmsg("Processed " << processed << " instances"
+                    << ", vmemAddr = " << _vmemAddresses.size()
+                    << ", vmemMap = " << _vmemMap.size()
+                    << ", pmemMap = " << _pmemMap.size()
+                    << ", queue = " << queue.size()
                     << ", probability = " << (node ? node->probability() : 1.0));
 #ifdef DEBUG
 //            if (processed > 0) {
@@ -263,20 +266,22 @@ void MemoryMap::build()
     }
 
     int nonAligned = 0;
-    QList<PointerNodeMap::key_type> vkeys = _vmemMap.uniqueKeys();
     QMap<int, PointerNodeMap::key_type> keyCnt;
-    for (int i = 0; i < vkeys.size(); ++i) {
-        if (vkeys[i] % 4)
+    for (ULongSet::iterator it = _vmemAddresses.begin();
+            it != _vmemAddresses.end(); ++it)
+    {
+        ULongSet::key_type addr = *it;
+        if (addr % 4)
             ++nonAligned;
-        int cnt = _vmemMap.count(vkeys[i]);
-        keyCnt.insertMulti(cnt, vkeys[i]);
+        int cnt = _vmemMap.count(addr);
+        keyCnt.insertMulti(cnt, addr);
         while (keyCnt.size() > 100)
             keyCnt.erase(keyCnt.begin());
     }
 
     debugmsg("Processed " << processed << " instances");
     debugmsg(_vmemMap.size() << " nodes at "
-            << vkeys.size() << " virtual addresses (" << nonAligned
+            << _vmemAddresses.size() << " virtual addresses (" << nonAligned
             << " not aligned)");
     debugmsg(_pmemMap.size() << " nodes at " << _pmemMap.uniqueKeys().size()
             << " physical addresses");
@@ -338,6 +343,10 @@ bool MemoryMap::containedInVmemMap(const Instance& inst) const
     // Don't add null pointers
     if (inst.isNull())
         return true;
+
+    // Check the address in the hash first for performance reasons
+    if (!_vmemAddresses.contains(inst.address()))
+        return false;
 
     // Check if the list contains the same type with the same address
     PointerNodeMap::const_iterator it = _vmemMap.constFind(inst.address());
@@ -403,6 +412,7 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
     {
         MemoryMapNode* child = node->addChild(i);
         _vmemMap.insertMulti(child->address(), child);
+        _vmemAddresses.insert(child->address());
         queue->insert(child->probability(), child);
         return true;
     }
