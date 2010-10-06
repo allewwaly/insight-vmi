@@ -9,6 +9,7 @@
 #define MEMORYMAPWIDGET_H_
 
 #include <QWidget>
+#include <QMutex>
 
 class QEvent;
 class QPaintEvent;
@@ -88,6 +89,7 @@ private:
     bool _isBuilding;
     bool _showOnlyKernelSpace;
     quint64 _shownAddrSpaceOffset;
+    QMutex _buildMutex;
 
 signals:
     void addressChanged(quint64 address);

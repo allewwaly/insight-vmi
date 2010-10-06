@@ -100,8 +100,7 @@ void insertSorted(T& list, const typename T::value_type value,
 
 void MemoryMapWidget::buildVisMemMap()
 {
-    debugenter();
-    if (_visMapValid)
+    if (_visMapValid || !_buildMutex.tryLock())
         return;
 
     VarSetter<bool> building(&_isBuilding, true, false);
@@ -246,6 +245,8 @@ void MemoryMapWidget::buildVisMemMap()
 
     _visMapValid = true;
     emit buildingStopped();
+
+    _buildMutex.unlock();
 
     // Repaint the widget
     update();
@@ -448,9 +449,9 @@ bool MemoryMapWidget::isBuilding() const
 
 void MemoryMapWidget::forceMapRecreaction()
 {
-    debugenter();
     _visMapValid = false;
-    QTimer::singleShot(1, this, SLOT(buildVisMemMap()));
+    if (!QMetaObject::invokeMethod(this, "buildVisMemMap"))
+        debugerr("Cannot invoke buildVisMemMap() on this widget!");
 }
 
 
