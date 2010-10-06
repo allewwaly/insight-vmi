@@ -26,11 +26,11 @@ enum VisMapPieceTypes {
 struct VisMapPiece
 {
     VisMapPiece(quint64 start = 0, quint64 length = 0, int type = ptUsed,
-            int intensity = 0);
+            unsigned char probability = 0);
     quint64 address;
     quint64 length;
     int type;
-    int intensity;
+    unsigned char probability;
 };
 
 typedef QList<VisMapPiece> MapPieceList;
