@@ -21,12 +21,13 @@
 #include "debug.h"
 
 static const int margin = 3;
+static const unsigned char MAX_PROB = 16;
 
 //------------------------------------------------------------------------------
 
 VisMapPiece::VisMapPiece(quint64 start, quint64 length, int type,
-        int intensity)
-    : address(start), length(length), type(type), intensity(intensity)
+        unsigned char probability)
+    : address(start), length(length), type(type), probability(probability)
 {
 }
 
@@ -119,9 +120,10 @@ void MemoryMapWidget::buildVisMemMap()
         QLinkedList<quint64> addresses;
 
         quint64 lastAddr = 0;
-        int lastObjCount = 0;
+        unsigned char lastProbability = 0;
         int piecesMerged = 0;
         qint64 processed = 0, total = _map->vmemMap().size();
+        bool nodesWasEmpty = false;
 
         for (PointerNodeMap::const_iterator vmap_it = _map->vmemMap().constBegin();
                 vmap_it != _map->vmemMap().constEnd() && processed < total;
@@ -135,7 +137,7 @@ void MemoryMapWidget::buildVisMemMap()
             // Init everything in the first round
             if (!lastAddr) {
                 lastAddr = curAddr;
-                lastObjCount = _map->vmemMap().count(curAddr);
+                lastProbability = (unsigned char)(MAX_PROB * node->probability());
             }
 
             // Add all nodes with the same address into a map ordered by their
@@ -164,8 +166,7 @@ void MemoryMapWidget::buildVisMemMap()
 //                        __prevAddr = *it;
 //                    }
 #endif
-                    quint64 addr = addresses.front();
-                    addresses.pop_front();
+                    quint64 addr = addresses.takeFirst();
 #ifdef DEBUG
 //                    if (lastAddr >= addr) {
 //                        debugerr(QString("lastAddr = 0x%1 >= addr = 0x%2")
@@ -183,10 +184,10 @@ void MemoryMapWidget::buildVisMemMap()
                     quint64 length = addr - lastAddr;
 
                     // Can we merge this with the previous piece?
-                    if (lastObjCount > 0) {
+                    if (!nodesWasEmpty) {
                         if (!_mappings.isEmpty() &&
                                 _mappings.last().address + _mappings.last().length == lastAddr &&
-                                _mappings.last().intensity == lastObjCount)
+                                _mappings.last().probability == lastProbability)
                         {
                             _mappings.last().length += length;
                             ++piecesMerged;
@@ -194,22 +195,31 @@ void MemoryMapWidget::buildVisMemMap()
                         // No, create a new one
                         else {
                             _mappings.append(VisMapPiece(lastAddr, length, ptUsed,
-                                    lastObjCount));
-                            if (lastObjCount > _maxIntensity)
-                                _maxIntensity = lastObjCount;
+                                    lastProbability));
+//                            if (lastProbability > _maxIntensity)
+//                                _maxIntensity = lastProbability;
                         }
 #ifdef DEBUG
                         if (_mappings.last().length > 0xFFFFFF)
                             debugmsg(QString("[%1] addr = 0x%2, intensity = %3, len = %4")
                                                     .arg(_mappings.size() - 1)
                                                     .arg(_mappings.last().address, 8, 16, QChar('0'))
-                                                    .arg(_mappings.last().intensity, 3)
+                                                    .arg(_mappings.last().probability, 3)
                                                     .arg(_mappings.last().length));
 #endif
                     }
 
-                    // Update the last object count and address
-                    lastObjCount = nodes.size(); // no. of "active" nodes
+                    // Update the max. probability
+                    lastProbability = 0;
+                    for (NodeMap::const_iterator it = nodes.constBegin();
+                            it != nodes.constEnd(); ++it)
+                    {
+                        unsigned char p =
+                                (unsigned char)(MAX_PROB * it.value()->probability());
+                        if (lastProbability < p)
+                            lastProbability = p;
+                    }
+                    nodesWasEmpty = nodes.isEmpty(); // any "active" nodes?
                     lastAddr = addr;
 
                     // Stop if we've reached the current address
@@ -235,7 +245,7 @@ void MemoryMapWidget::buildVisMemMap()
                 debugmsg(QString("[%1] addr = 0x%2, intensity = %3, len = %4")
                         .arg(i)
                         .arg(_mappings[i].address, 8, 16, QChar('0'))
-                        .arg(_mappings[i].intensity, 3)
+                        .arg(_mappings[i].probability, 3)
                         .arg(_mappings[i].length));
             }
         }
@@ -309,6 +319,27 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
     QColor usedColor(0, 0, 0);
     QColor gridColor(255, 255, 255);
     QColor bgColor(255, 255, 255);
+
+    static const QColor probColor[MAX_PROB+1] = {
+            QColor(255,   0, 0),  //  0
+            QColor(255,  16, 0),  //  1
+            QColor(255,  32, 0),  //  2
+            QColor(255,  48, 0),  //  3
+            QColor(255,  64, 0),  //  4
+            QColor(255,  80, 0),  //  5
+            QColor(255,  96, 0),  //  6
+            QColor(255, 112, 0),  //  7
+            QColor(255, 128, 0),  //  8
+            QColor(224, 128, 0),  //  9
+            QColor(192, 128, 0),  // 10
+            QColor(160, 128, 0),  // 11
+            QColor(128, 128, 0),  // 12
+            QColor( 96, 128, 0),  // 13
+            QColor( 64, 128, 0),  // 14
+            QColor( 32, 128, 0),  // 15
+            QColor(  0, 128, 0)   // 16
+    };
+
     QPainter painter(this);
     if (_antialiasing)
         painter.setRenderHint(QPainter::Antialiasing);
@@ -330,7 +361,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
 
     // Draw all used parts
     painter.setBrush(usedColor);
-    int lastIntensity = 255;
+    int lastColor = -1;
 
     for (int i = 0; i < _mappings.size(); ++i) {
 
@@ -338,9 +369,9 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
                 _mappings[i].address > visibleAddrSpaceEnd())
             continue;
 
-        if (_mappings[i].intensity != lastIntensity) {
-//            usedColor.setRedF(_mappings[i].intensity / (float)_maxIntensity);
-            painter.setBrush(usedColor);
+        if (_mappings[i].probability != lastColor) {
+            lastColor = _mappings[i].probability;
+            painter.setBrush(probColor[lastColor]);
         }
 
         quint64 len = _mappings[i].length;
