@@ -1342,7 +1342,7 @@ int Shell::cmdMemoryRevmapVisualize(int index)
     }
 
     memMapWindow->mapWidget()->setMap(_memDumps[index]->map());
-    memMapWindow->mapWidget()->forceMapRecreaction();
+//    memMapWindow->mapWidget()->forceMapRecreaction();
 
     if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
         debugerr("Error invoking show() on memMapWindow");
