@@ -13,6 +13,8 @@
 #include "genericexception.h"
 #include "memspecs.h"
 
+static const quint64 PADDR_ERROR = 0xFFFFFFFFFFFFFFFFUL;
+
 /**
  * This class provides read access to a virtual address space and performs
  * the virtual to physical address translation.
@@ -68,9 +70,16 @@ public:
      * @param vaddr virtual address
      * @param pageSize here the size of the belonging page is returned, or -1,
      * if the address is within linear space
-     * @return physical address
+     * @param enableExceptions if \c true, a VirtualMemoryException is thrown
+     * if address translation fails, including detailed information about the
+     * error, if \c false then a return value of PADDR_ERROR indicates an error
+     * in the address translation
+     * @return physical address in case of success, PADDR_ERROR in case of
+     * address resolution failure
+     * \exception VirtualMemoryException
      */
-    quint64 virtualToPhysical(quint64 vaddr, int* pageSize);
+    quint64 virtualToPhysical(quint64 vaddr, int* pageSize,
+            bool enableExceptions = true);
 
 protected:
     // Pure virtual functions of QIODevice
@@ -93,43 +102,73 @@ private:
      * physical address.
      * @param vaddr virtual address
      * @param pageSize here the size of the belonging page is returned
-     * @return physical address
+     * @param enableExceptions if \c true, a VirtualMemoryException is thrown
+     * if address translation fails, including detailed information about the
+     * error, if \c false then a return value of PADDR_ERROR indicates an error
+     * in the address translation
+     * @return physical address in case of success, PADDR_ERROR in case of
+     * address resolution failure
      */
-    quint64 pageLookup64(quint64 vaddr, int* pageSize);
+    quint64 pageLookup64(quint64 vaddr, int* pageSize,
+            bool enableExceptions);
 
     /**
      * Looks up a virtual address in the i386 page table and returns the
      * physical address.
      * @param vaddr virtual address
      * @param pageSize here the size of the belonging page is returned
-     * @return physical address
+     * @param enableExceptions if \c true, a VirtualMemoryException is thrown
+     * if address translation fails, including detailed information about the
+     * error, if \c false then a return value of PADDR_ERROR indicates an error
+     * in the address translation
+     * @return physical address in case of success, PADDR_ERROR in case of
+     * address resolution failure
      */
-    quint64 pageLookup32(quint64 vaddr, int* pageSize);
+    quint64 pageLookup32(quint64 vaddr, int* pageSize,
+            bool enableExceptions);
 
     /**
      * i386 specific translation
      * @param vaddr virtual address
      * @param pageSize here the size of the belonging page is returned
-     * @return physical address
+     * @param enableExceptions if \c true, a VirtualMemoryException is thrown
+     * if address translation fails, including detailed information about the
+     * error, if \c false then a return value of PADDR_ERROR indicates an error
+     * in the address translation
+     * @return physical address in case of success, PADDR_ERROR in case of
+     * address resolution failure
      */
-    quint64 virtualToPhysical32(quint64 vaddr, int* pageSize);
+    quint64 virtualToPhysical32(quint64 vaddr, int* pageSize,
+            bool enableExceptions);
 
     /**
      * x86_64 specific translation
      * @param vaddr virtual address
      * @param pageSize here the size of the belonging page is returned
-     * @return physical address
+     * @param enableExceptions if \c true, a VirtualMemoryException is thrown
+     * if address translation fails, including detailed information about the
+     * error, if \c false then a return value of PADDR_ERROR indicates an error
+     * in the address translation
+     * @return physical address in case of success, PADDR_ERROR in case of
+     * address resolution failure
      */
-    quint64 virtualToPhysical64(quint64 vaddr, int* pageSize);
+    quint64 virtualToPhysical64(quint64 vaddr, int* pageSize,
+            bool enableExceptions);
 
     /**
      * Reads a value of type \a T from memory and returns it.
      * @param physaddr the physical address to read from
+     * @param enableExceptions if \c true, a VirtualMemoryException is thrown
+     * if reading from memory fails, if \c false then no exception is thrown,
+     * but \a ok is set accordingly
+     * @param ok this value is set to \c true in case the operation succeeds,
+     * and to \c false otherwise
      * @return the read value
      * \exception VirtualMemoryError, if value could not be read
      */
     template <class T>
-    inline T extractFromPhysMem(quint64 physaddr);
+    inline T extractFromPhysMem(quint64 physaddr, bool enableExceptions,
+            bool* ok);
 
     struct TLBEntry {
         TLBEntry(quint64 addr = 0, int size = 0)

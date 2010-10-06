@@ -95,11 +95,24 @@
 #define pmd_index_x86_64(address)  (((address) >> PMD_SHIFT_X86_64) & (PTRS_PER_PMD_X86_64 - 1))
 #define pte_index_x86_64(address)  (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE_X86_64 - 1))
 
-#define virtualMemoryPageError(vaddr, level) \
-    virtualMemoryError(\
-        QString("Error reading from virtual address 0x%1: page not present in %2") \
-            .arg(vaddr, _specs.sizeofUnsignedLong << 1, 16, QChar('0')) \
-            .arg(level))
+#define virtualMemoryPageError(vaddr, level, throwExceptions) \
+    do { \
+        if (throwExceptions) \
+            virtualMemoryError(\
+                QString("Error reading from virtual address 0x%1: page not present in %2") \
+                    .arg(vaddr, _specs.sizeofUnsignedLong << 1, 16, QChar('0')) \
+                    .arg(level)); \
+        else \
+            return PADDR_ERROR; \
+    } while (0)
+
+#define virtualMemoryOtherError(x, throwExceptions) \
+    do { \
+        if (throwExceptions) \
+            virtualMemoryError(x); \
+        else \
+            return PADDR_ERROR; \
+    } while (0)
 
 
 
@@ -182,7 +195,19 @@ bool VirtualMemory::safeSeek(qint64 pos)
 {
     // If the address translation works, we consider the seek to succeed.
     try {
-        return seek(pos);
+        if ( ((quint64) pos) > ((quint64) size()) || !isOpen() )
+            return false;
+
+        if (_pos == (quint64) pos)
+            return true;
+
+        int pageSize;
+        qint64 physAddr =
+                (qint64)virtualToPhysical((quint64) pos, &pageSize, false);
+
+        return (physAddr != (qint64)PADDR_ERROR) &&
+               (physAddr >= 0) &&
+               _physMem->seek(physAddr);
     }
     catch (VirtualMemoryException) {
         return false;
@@ -201,7 +226,7 @@ qint64 VirtualMemory::size() const
 }
 
 
-qint64 VirtualMemory::readData (char* data, qint64 maxSize)
+qint64 VirtualMemory::readData(char* data, qint64 maxSize)
 {
     assert(_physMem != 0);
     assert(_physMem->isReadable());
@@ -244,7 +269,7 @@ qint64 VirtualMemory::readData (char* data, qint64 maxSize)
 }
 
 
-qint64 VirtualMemory::writeData (const char* data, qint64 maxSize)
+qint64 VirtualMemory::writeData(const char* data, qint64 maxSize)
 {
     // We don't support writing
     Q_UNUSED(data);
@@ -274,19 +299,27 @@ const MemSpecs& VirtualMemory::memSpecs() const
 
 
 template <class T>
-T VirtualMemory::extractFromPhysMem(quint64 physaddr)
+T VirtualMemory::extractFromPhysMem(quint64 physaddr, bool enableExceptions,
+        bool* ok)
 {
     T ret = 0;
+    if (ok)
+        *ok = false;
 
-    if (!_physMem->seek(physaddr))
-        virtualMemoryError(QString("Cannot seek to physical address 0x%1").arg(physaddr, 8, 16, QChar('0')));
+    if (!_physMem->seek(physaddr)) {
+        if (enableExceptions)
+            virtualMemoryError(QString("Cannot seek to physical address 0x%1").arg(physaddr, 8, 16, QChar('0')));
+    }
+    else if (_physMem->read((char*) &ret, sizeof(T)) == sizeof(T)) {
+        if (ok)
+            *ok = true;
+    }
+    else {
+        if (enableExceptions)
+            virtualMemoryError("Error reading from physical memory device.");
+    }
 
-    if (_physMem->read((char*) &ret, sizeof(T)) == sizeof(T))
-        return ret;
-
-    // We don't come here if the operation succeeded
-    virtualMemoryError("Error reading from physical memory device.");
-    return 0;
+    return ret;
 }
 
 
@@ -305,7 +338,8 @@ quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 }
 
 
-quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize)
+quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
+        bool enableExceptions)
 {
     quint64 pgd_addr;  // page global directory address
     quint64 pgd;
@@ -314,9 +348,11 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize)
     quint64 pte_paddr; // page table address
     quint64 pte;
     quint64 physaddr = 0;
+    bool ok;
 
     if (_specs.swapperPgDir == 0) {
-        virtualMemoryError("_specs.swapperPgDir not set\n");
+        virtualMemoryOtherError("_specs.swapperPgDir not set\n",
+                enableExceptions);
     }
 
     // First translate the virtual address of the base page directory to a
@@ -335,19 +371,27 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize)
         // Lookup address for the pgd page directory. The size of one page table
         // entry in PAE mode is 64 bit.
         pgd = extractFromPhysMem<quint64>(pgd_addr
-                + PAGEOFFSET(pgd_index_x86_pae(vaddr) << 3));
+                + PAGEOFFSET(pgd_index_x86_pae(vaddr) << 3),
+                enableExceptions, &ok);
+
+        if (!enableExceptions && !ok)
+            return PADDR_ERROR;
 
         if (!(pgd & _PAGE_PRESENT))
-            virtualMemoryPageError(vaddr, "pgd");
+            virtualMemoryPageError(vaddr, "pgd", enableExceptions);
 
         pmd_paddr = pgd & PHYSICAL_PAGE_MASK_X86_PAE;
 
         // Lookup address for the pmd page directory
         pmd = extractFromPhysMem<quint64>(pmd_paddr
-                + PAGEOFFSET(pmd_index_x86_pae(vaddr) << 3));
+                + PAGEOFFSET(pmd_index_x86_pae(vaddr) << 3),
+                enableExceptions, &ok);
+
+        if (!enableExceptions && !ok)
+            return PADDR_ERROR;
 
         if (!(pmd & _PAGE_PRESENT))
-            virtualMemoryPageError(vaddr, "pmd");
+            virtualMemoryPageError(vaddr, "pmd", enableExceptions);
 
         // Is this a 4kB or 2MB page?
         if (pmd & _PAGE_PSE) {
@@ -362,10 +406,14 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize)
 
             // Lookup the final page table entry
             pte = extractFromPhysMem<quint64>(pte_paddr
-                    + PAGEOFFSET(pte_index_x86_pae(vaddr) << 3));
+                    + PAGEOFFSET(pte_index_x86_pae(vaddr) << 3),
+                    enableExceptions, &ok);
+
+            if (!enableExceptions && !ok)
+                return PADDR_ERROR;
 
             if (!(pte & _PAGE_PRESENT))
-                virtualMemoryPageError(vaddr, "pte");
+                virtualMemoryPageError(vaddr, "pte", enableExceptions);
 
             *pageSize = KPAGE_SIZE;
             physaddr = (__VIRTUAL_MASK_X86 & (pte & PHYSICAL_PAGE_MASK_X86_PAE)) |
@@ -380,10 +428,14 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize)
         // Lookup address for the pgd page directory. The size of one page table
         // entry in non-PAE mode is 32 bit.
         pgd = extractFromPhysMem<quint32>(pgd_addr
-                + PAGEOFFSET(pgd_index_x86(vaddr) << 2));
+                + PAGEOFFSET(pgd_index_x86(vaddr) << 2),
+                enableExceptions, &ok);
+
+        if (!enableExceptions && !ok)
+            return PADDR_ERROR;
 
         if (!(pgd & _PAGE_PRESENT))
-            virtualMemoryPageError(vaddr, "pgd");
+            virtualMemoryPageError(vaddr, "pgd", enableExceptions);
 
         // Is this a 4kB or 4MB page?
         if (pgd & _PAGE_PSE) {
@@ -397,10 +449,14 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize)
 
             // Lookup the final page table entry
             pte = extractFromPhysMem<quint32>(pte_paddr
-                    + PAGEOFFSET(pte_index_x86(vaddr) << 2));
+                    + PAGEOFFSET(pte_index_x86(vaddr) << 2),
+                    enableExceptions, &ok);
+
+            if (!enableExceptions && !ok)
+                return PADDR_ERROR;
 
             if (!(pte & _PAGE_PRESENT))
-                virtualMemoryPageError(vaddr, "pte");
+                virtualMemoryPageError(vaddr, "pte", enableExceptions);
 
             *pageSize = KPAGE_SIZE;
             physaddr = (pte & PHYSICAL_PAGE_MASK_X86)
@@ -417,7 +473,8 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize)
 }
 
 
-quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize)
+quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
+        bool enableExceptions)
 {
     quint64 pgd_addr;  // page global directory address
     quint64 pgd;
@@ -428,9 +485,11 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize)
     quint64 pte_paddr; // page table address
     quint64 pte;
     quint64 physaddr = 0;
+    bool ok;
 
     if (_specs.initLevel4Pgt == 0) {
-        virtualMemoryError("_specs.initLevel4Pgt not set\n");
+        virtualMemoryOtherError("_specs.initLevel4Pgt not set\n",
+                enableExceptions);
     }
 
     // First translate the virtual address of the base page directory to a
@@ -450,29 +509,41 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize)
     // Lookup address for the pgd page directory. The size of one page table
     // entry is 64 bit.
     pgd = extractFromPhysMem<quint64>(pgd_addr
-            + PAGEOFFSET(pml4_index_x86_64(vaddr) << 3));
+            + PAGEOFFSET(pml4_index_x86_64(vaddr) << 3),
+            enableExceptions, &ok);
+
+    if (!enableExceptions && !ok)
+        return PADDR_ERROR;
 
     if (!(pgd & _PAGE_PRESENT))
-        virtualMemoryPageError(vaddr, "pgd");
+        virtualMemoryPageError(vaddr, "pgd", enableExceptions);
 
     pud_paddr = (pgd) & PHYSICAL_PAGE_MASK_X86_64;
 
     // Lookup address for the pgd page directory
     pud = extractFromPhysMem<quint64>(pud_paddr
-            + PAGEOFFSET(pgd_index_x86_64(vaddr) << 3));
+            + PAGEOFFSET(pgd_index_x86_64(vaddr) << 3),
+            enableExceptions, &ok);
+
+    if (!enableExceptions && !ok)
+        return PADDR_ERROR;
 
     if (!(pud & _PAGE_PRESENT))
-        virtualMemoryPageError(vaddr, "pud");
+        virtualMemoryPageError(vaddr, "pud", enableExceptions);
 
 
     pmd_paddr = pud & PHYSICAL_PAGE_MASK_X86_64;
 
     // Lookup address for the pmd page directory
     pmd = extractFromPhysMem<quint64>(pmd_paddr
-            + PAGEOFFSET(pmd_index_x86_64(vaddr) << 3));
+            + PAGEOFFSET(pmd_index_x86_64(vaddr) << 3),
+            enableExceptions, &ok);
+
+    if (!enableExceptions && !ok)
+        return PADDR_ERROR;
 
     if (!(pmd & _PAGE_PRESENT))
-        virtualMemoryPageError(vaddr, "pmd");
+        virtualMemoryPageError(vaddr, "pmd", enableExceptions);
 
     if (pmd & _PAGE_PSE) {
         // 2MB Page
@@ -484,10 +555,14 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize)
 
         // Lookup the final page table entry
         pte = extractFromPhysMem<quint64>(pte_paddr
-                + PAGEOFFSET(pte_index_x86_64(vaddr) << 3));
+                + PAGEOFFSET(pte_index_x86_64(vaddr) << 3),
+                enableExceptions, &ok);
+
+        if (!enableExceptions && !ok)
+            return PADDR_ERROR;
 
         if (!(pte & (_PAGE_PRESENT)))
-            virtualMemoryPageError(vaddr, "pte");
+            virtualMemoryPageError(vaddr, "pte", enableExceptions);
 
         *pageSize = KPAGE_SIZE;
         physaddr = (pte & PHYSICAL_PAGE_MASK_X86_64)
@@ -503,21 +578,24 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize)
 }
 
 
-quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize)
+quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
+        bool enableExceptions)
 {
     return (_specs.arch & MemSpecs::i386) ?
-            virtualToPhysical32(vaddr, pageSize) :
-            virtualToPhysical64(vaddr, pageSize);
+            virtualToPhysical32(vaddr, pageSize, enableExceptions) :
+            virtualToPhysical64(vaddr, pageSize, enableExceptions);
 }
 
 
-quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize)
+quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
+        bool enableExceptions)
 {
     // Make sure the address is within a valid range
     if ((_specs.arch & MemSpecs::i386) && (vaddr >= (1UL << 32)))
-        virtualMemoryError(
+        virtualMemoryOtherError(
                 QString("Virtual address 0x%1 exceeds 32 bit address space")
-                        .arg(vaddr, 0, 16));
+                        .arg(vaddr, 0, 16),
+                        enableExceptions);
 
     quint64 physaddr = 0;
     // If we can do the job with a simple linear translation subtract the
@@ -540,11 +618,12 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize)
             physaddr = ((vaddr) - _specs.pageOffset);
         }
         else {
-            virtualMemoryError(
+            virtualMemoryOtherError(
                             QString("Error reading from virtual address 0x%1: "
                                     "address below linear offsets, seems to be "
                                     "user-land memory")
-                                .arg(vaddr, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
+                                .arg(vaddr, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')),
+                            enableExceptions);
         }
         *pageSize = -1;
     }
@@ -552,14 +631,15 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize)
         // Check the TLB first.
         if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
             // No hit, so use the address lookup function
-            physaddr = pageLookup32(vaddr, pageSize);
+            physaddr = pageLookup32(vaddr, pageSize, enableExceptions);
     }
 
     return physaddr;
 }
 
 
-quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize)
+quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
+        bool enableExceptions)
 {
     quint64 physaddr = 0;
     // If we can do the job with a simple linear translation subtract the
@@ -579,15 +659,17 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize)
             // Is the 64 bit address in canonical form?
             quint64 high_bits = vaddr >> 47;
             if (high_bits != 0 && high_bits != 0x1FFFFUL)
-                virtualMemoryError(
+                virtualMemoryOtherError(
                                 QString("Virtual address 0x%1 is not in canonical form")
-                                    .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')));
+                                    .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')),
+                                enableExceptions);
 
-            virtualMemoryError(
+            virtualMemoryOtherError(
                             QString("Error reading from virtual address 0x%1: "
                                     "address below linear offsets, seems to be "
                                     "user-land memory")
-                                .arg(vaddr, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
+                                .arg(vaddr, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')),
+                            enableExceptions);
         }
         *pageSize = -1;
     }
@@ -595,7 +677,7 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize)
         // Check the TLB first.
         if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
             // No hit, so use one of the address lookup functions
-            physaddr = pageLookup64(vaddr, pageSize);
+            physaddr = pageLookup64(vaddr, pageSize, enableExceptions);
     }
 
     return physaddr;
