@@ -100,6 +100,7 @@ void insertSorted(T& list, const typename T::value_type value,
 
 void MemoryMapWidget::buildVisMemMap()
 {
+    debugenter();
     if (_visMapValid)
         return;
 
@@ -447,8 +448,9 @@ bool MemoryMapWidget::isBuilding() const
 
 void MemoryMapWidget::forceMapRecreaction()
 {
+    debugenter();
     _visMapValid = false;
-    QTimer::singleShot(0, this, SLOT(buildVisMemMap()));
+    QTimer::singleShot(1, this, SLOT(buildVisMemMap()));
 }
 
 
