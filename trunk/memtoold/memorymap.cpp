@@ -106,7 +106,7 @@ void MemoryMap::build()
 
     QTime timer;
     timer.start();
-    qint64 processed = 0;
+    qint64 processed = 0, prev_queue_size = 0;
 
     // Go through the global vars and add their instances on the stack
     for (VariableList::const_iterator it = _factory->vars().constBegin();
@@ -138,13 +138,20 @@ void MemoryMap::build()
     while (!shell->interrupted() && !queue.isEmpty()) {
 
         if (processed == 0 || timer.elapsed() > 2000) {
+            QChar indicator = '=';
+            if (prev_queue_size < queue.size())
+                indicator = '+';
+            else if (prev_queue_size > queue.size())
+                indicator = '-';
+
             timer.restart();
             debugmsg("Processed " << processed << " instances"
                     << ", vmemAddr = " << _vmemAddresses.size()
                     << ", vmemMap = " << _vmemMap.size()
                     << ", pmemMap = " << _pmemMap.size()
-                    << ", queue = " << queue.size()
+                    << ", queue = " << queue.size() << " " << indicator
                     << ", probability = " << (node ? node->probability() : 1.0));
+            prev_queue_size = queue.size();
 #ifdef DEBUG
 //            if (processed > 0) {
 //                debugmsg(">>> Breaking revmap generation <<<");
