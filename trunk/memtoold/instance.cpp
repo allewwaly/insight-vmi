@@ -444,7 +444,7 @@ Instance Instance::arrayElem(int index) const
     return Instance(
                 _d->address + (index * p->refType()->size()),
                 p->refType(),
-                QString("%1[%2]").arg(_d->name).arg(index),
+                _d->name + '[' + QString::number(index) + ']',
                 _d->parentNames,
                 _d->vmem,
                 -1);
