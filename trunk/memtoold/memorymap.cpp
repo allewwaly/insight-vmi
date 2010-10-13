@@ -343,25 +343,30 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node)
     const Instance i = (inst.type()->type() & BaseType::trLexical) ?
             inst.dereference(BaseType::trLexical) : inst;
 
-    if (i.type() && (i.type()->type() & interestingTypes))
+    bool result = false;
+
+    if (!i.isNull() && i.type() && (i.type()->type() & interestingTypes))
     {
         // Hold the lock while looking up or adding addresses to any mapping
-        QMutexLocker lock(&_shared.vmemMapLock);
+        _shared.findAndAddChildLock.lock();
 
         if (!containedInVmemMap(i)) {
             MemoryMapNode* child = node->addChild(i);
-            _vmemMap.insertMulti(child->address(), child);
             _vmemAddresses.insert(child->address());
-            lock.unlock();
+            _vmemMap.insertMulti(child->address(), child);
+
+            _shared.findAndAddChildLock.unlock();
 
             _shared.queueLock.lock();
             _shared.queue.insert(child->probability(), child);
             _shared.queueLock.unlock();
-            return true;
+            result = true;
         }
+        else
+            _shared.findAndAddChildLock.unlock();
     }
 
-    return false;
+    return result;
 }
 
 
