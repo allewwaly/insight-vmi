@@ -10,6 +10,7 @@
 
 #include <QIODevice>
 #include <QCache>
+#include <QMutex>
 #include "genericexception.h"
 #include "memspecs.h"
 
@@ -80,6 +81,23 @@ public:
      */
     quint64 virtualToPhysical(quint64 vaddr, int* pageSize,
             bool enableExceptions = true);
+
+    /**
+     * @return \c true if thread safety is turned on, \c false otherwise
+     * \sa setThreadSafety()
+     */
+    bool isThreadSafe() const;
+
+    /**
+     * Activates or deactivates thread safety in multi-threaded envirmonments.
+     * If active, all accesses to reentrant data structures will be guarded
+     * by a QMutex, thus becoming thread-safe. Deactivate this to increase
+     * performance if no multi-threading is used.
+     * @param safe \c true enables thread safety, \c disables it.
+     * @return \c true if thread safety was already enabled, \c false otherwise
+     * \sa isThreadSafe()
+     */
+    bool setThreadSafety(bool safe);
 
 protected:
     // Pure virtual functions of QIODevice
@@ -185,6 +203,9 @@ private:
     const MemSpecs& _specs;
     quint64 _pos;
     int _memDumpIndex;
+    bool _threadSafe;
+    QMutex _tlbMutex;
+    QMutex _physMemMutex;
 };
 
 #endif /* VIRTUALMEMORY_H_ */
