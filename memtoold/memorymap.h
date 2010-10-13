@@ -58,7 +58,8 @@ struct BuilderSharedState
     NodeQueue queue;
     MemoryMapNode* lastNode;
     qint64 processed;
-    QMutex queueLock, pmemMapLock, vmemMapLock, typeInstancesLock, pointersToLock;
+    QMutex findAndAddChildLock, queueLock, pmemMapLock,
+        typeInstancesLock, pointersToLock;
 };
 
 
