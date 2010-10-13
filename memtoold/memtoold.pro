@@ -1,4 +1,5 @@
-SOURCES += memorymapwindow.cpp \
+SOURCES += memorymapbuilder.cpp \
+    memorymapwindow.cpp \
     memorymapwidget.cpp \
     memorymapnode.cpp \
     memorymap.cpp \
@@ -39,7 +40,8 @@ SOURCES += memorymapwindow.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += priorityqueue.h \
+HEADERS += memorymapbuilder.h \
+    priorityqueue.h \
     memorymapwindow.h \
     memorymapwidget.h \
     varsetter.h \

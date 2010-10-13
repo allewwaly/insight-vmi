@@ -14,6 +14,7 @@
 #include "array.h"
 #include "shell.h"
 #include "varsetter.h"
+#include "memorymapbuilder.h"
 #include "debug.h"
 
 
@@ -100,13 +101,19 @@ void MemoryMap::build()
 
     // Clean up everything
     clear();
-
-    // Holds the nodes to be visited, sorted by their probability
-    NodeQueue queue;
+    _shared.reset();
 
     QTime timer;
     timer.start();
-    qint64 processed = 0, prev_queue_size = 0;
+    qint64 prev_queue_size = 0;
+
+    // NON-PARALLEL PART OF BUILDING PROCESS
+
+    // How many threads to create?
+    const int threadCount = QThread::idealThreadCount() > 0 ?
+            QThread::idealThreadCount() : 1;
+
+    debugmsg("Building reverse map with " << threadCount << " threads.");
 
     // Go through the global vars and add their instances on the stack
     for (VariableList::const_iterator it = _factory->vars().constBegin();
@@ -123,7 +130,7 @@ void MemoryMap::build()
                 _roots.append(node);
                 _vmemMap.insertMulti(node->address(), node);
                 _vmemAddresses.insert(node->address());
-                queue.insert(node->probability(), node);
+                _shared.queue.insert(node->probability(), node);
             }
         }
         catch (GenericException e) {
@@ -132,26 +139,38 @@ void MemoryMap::build()
         }
     }
 
+    // PARALLEL PART OF BUILDING PROCESS
 
-    // Now work through the whole stack
-    MemoryMapNode* node = 0;
-    while (!shell->interrupted() && !queue.isEmpty()) {
+    // Enable thread safety for VirtualMemory object
+    bool wasThreadSafe = _vmem->setThreadSafety(threadCount > 1);
 
-        if (processed == 0 || timer.elapsed() > 2000) {
+    // Create the builder threads
+    MemoryMapBuilder* threads[threadCount];
+    for (int i = 0; i < threadCount; ++i) {
+        threads[i] = new MemoryMapBuilder(this);
+        threads[i]->start();
+    }
+
+    // Let the builders do the work, but regularly output some statistics
+    while (!shell->interrupted() && !_shared.queue.isEmpty()) {
+
+        if (_shared.processed == 0 || timer.elapsed() > 2000) {
             QChar indicator = '=';
-            if (prev_queue_size < queue.size())
+            qint64 queue_size = _shared.queue.size();
+            if (prev_queue_size < queue_size)
                 indicator = '+';
-            else if (prev_queue_size > queue.size())
+            else if (prev_queue_size > queue_size)
                 indicator = '-';
 
             timer.restart();
-            debugmsg("Processed " << processed << " instances"
+            MemoryMapNode* node = _shared.lastNode;
+            debugmsg("Processed " << _shared.processed << " instances"
                     << ", vmemAddr = " << _vmemAddresses.size()
                     << ", vmemMap = " << _vmemMap.size()
                     << ", pmemMap = " << _pmemMap.size()
-                    << ", queue = " << queue.size() << " " << indicator
+                    << ", queue = " << queue_size << " " << indicator
                     << ", probability = " << (node ? node->probability() : 1.0));
-            prev_queue_size = queue.size();
+            prev_queue_size = queue_size;
 #ifdef DEBUG
 //            if (processed > 0) {
 //                debugmsg(">>> Breaking revmap generation <<<");
@@ -160,118 +179,29 @@ void MemoryMap::build()
 #endif
         }
 
-        // Take element with highest probability
-        node = queue.takeLargest();
-        ++processed;
-
-        // Insert in non-critical (non-exception prone) mappings
-        _typeInstances.insert(node->type()->id(), node);
-
-        // try to save the physical mapping
-        try {
-            int pageSize;
-            quint64 physAddr = _vmem->virtualToPhysical(node->address(), &pageSize);
-            // Linear memory region or paged memory?
-            if (pageSize < 0)
-                _pmemMap.insertMulti(physAddr, IntNodePair(pageSize, node));
-            else {
-                // Add all pages a type belongs to
-                quint32 size = node->size();
-                quint64 addr = node->address();
-                quint64 pageMask = ~(pageSize - 1);
-                int ctr = 0;
-                while (size > 0) {
-                    // Add a memory mapping
-                    _pmemMap.insertMulti(addr, IntNodePair(pageSize, node));
-                    // How much space is left on current page?
-                    quint32 sizeOnPage = pageSize - (addr & ~pageMask);
-                    // Subtract the available space from left-over size
-                    size = (sizeOnPage >= size) ? 0 : size - sizeOnPage;
-                    // Advance address
-                    addr += sizeOnPage;
-                    ++ctr;
-                }
-#ifdef DEBUG
-//                // Debug message, just out out curiosity ;-)
-//                if (ctr > 1)
-//                    debugmsg(QString("Type %1 at 0x%2 with size %3 spans %4 pages.")
-//                                .arg(node->type()->name())
-//                                .arg(node->address(), 0, 16)
-//                                .arg(node->size())
-//                                .arg(ctr));
-#endif
-            }
-        }
-        catch (VirtualMemoryException) {
-//            debugerr("Caught exception for instance " << inst.name() //inst.fullName()
-//                    << " at " << e.file << ":" << e.line << ": " << e.message);
-            // Don't proceed any further in case of an exception
-            continue;
-        }
-
-        // Create an instance from the node
-        Instance inst = node->toInstance(false);
-
-        // If this is a pointer, add where it's pointing to
-        if (node->type()->type() & BaseType::rtPointer) {
-            try {
-                quint64 addr = (quint64) inst.toPointer(); // TODO Don't add null pointers
-                _pointersTo.insert(addr, node);
-                // Add dereferenced type to the stack, if not already visited
-                int cnt = 0;
-                inst = inst.dereference(BaseType::trLexicalAndPointers, &cnt);
-//                inst = inst.dereference(BaseType::trLexical, &cnt);
-                if (cnt && addressIsWellFormed(inst))
-                    addChildIfNotExistend(inst, node, &queue);
-            }
-            catch (GenericException e) {
-//                debugerr("Caught exception for instance " << inst.name() //inst.fullName()
-//                        << " at " << e.file << ":" << e.line << ": " << e.message);
-            }
-        }
-        // If this is an array, add all elements
-        else if (node->type()->type() & BaseType::rtArray) {
-            const Array* a = dynamic_cast<const Array*>(node->type());
-            if (a->length() > 0) {
-                // Add all elements to the stack that haven't been visited
-                for (int i = 0; i < a->length(); ++i) {
-                    try {
-                        Instance e = inst.arrayElem(i);
-                        if (addressIsWellFormed(e))
-                            addChildIfNotExistend(e, node, &queue);
-                    }
-                    catch (GenericException e) {
-//                        debugerr("Caught exception for instance " << inst.name() //inst.fullName()
-//                                << " at " << e.file << ":" << e.line << ": " << e.message);
-                    }
-                }
-            }
-        }
-        // If this is a struct, add all members
-        else if (inst.memberCount() > 0) {
-            // Add all struct members to the stack that haven't been visited
-            for (int i = 0; i < inst.memberCount(); ++i) {
-                try {
-                    Instance m = inst.member(i, BaseType::trLexical);
-                    if (addressIsWellFormed(m))
-                        addChildIfNotExistend(m, node, &queue);
-                }
-                catch (GenericException e) {
-//                    debugerr("Caught exception for instance " << inst.name() //inst.fullName()
-//                            << "." << inst.memberNames().at(i) << " at "
-//                            << e.file << ":" << e.line << ": " << e.message);
-                }
-            }
-        }
 #ifdef DEBUG
         // emergency stop
-        if (processed >= 5000000) {
+        if (_shared.processed >= 5000000) {
             debugmsg(">>> Breaking revmap generation <<<");
             break;
         }
 #endif
     }
 
+    // Interrupt all threads, doesn't harm if they are not running anymore
+    for (int i = 0; i < threadCount; ++i)
+        threads[i]->interrupt();
+    // Now wait for all threads and free them again
+    for (int i = 0; i < threadCount; ++i) {
+        if (threads[i]->isRunning())
+            threads[i]->wait();
+        delete threads[i];
+    }
+
+    // Restore previous value
+    _vmem->setThreadSafety(wasThreadSafe);
+
+    // Gather some statistics about the memory map
     int nonAligned = 0;
     QMap<int, PointerNodeMap::key_type> keyCnt;
     for (ULongSet::iterator it = _vmemAddresses.begin();
@@ -286,7 +216,7 @@ void MemoryMap::build()
             keyCnt.erase(keyCnt.begin());
     }
 
-    debugmsg("Processed " << processed << " instances");
+    debugmsg("Processed " << _shared.processed << " instances");
     debugmsg(_vmemMap.size() << " nodes at "
             << _vmemAddresses.size() << " virtual addresses (" << nonAligned
             << " not aligned)");
@@ -294,7 +224,7 @@ void MemoryMap::build()
             << " physical addresses");
     debugmsg(_pointersTo.size() << " pointers to "
             << _pointersTo.uniqueKeys().size() << " addresses");
-    debugmsg("stack.size() = " << queue.size());
+    debugmsg("stack.size() = " << _shared.queue.size());
 
     // calculate average type size
     qint64 totalTypeSize = 0;
@@ -399,8 +329,7 @@ bool MemoryMap::addressIsWellFormed(const Instance& inst) const
 }
 
 
-bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
-        NodeQueue* queue)
+bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node)
 {
     static const int interestingTypes =
             BaseType::trLexical |
@@ -414,17 +343,25 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
     const Instance i = (inst.type()->type() & BaseType::trLexical) ?
             inst.dereference(BaseType::trLexical) : inst;
 
-    if (i.type() && (i.type()->type() & interestingTypes) &&
-            !containedInVmemMap(i))
+    if (i.type() && (i.type()->type() & interestingTypes))
     {
-        MemoryMapNode* child = node->addChild(i);
-        _vmemMap.insertMulti(child->address(), child);
-        _vmemAddresses.insert(child->address());
-        queue->insert(child->probability(), child);
-        return true;
+        // Hold the lock while looking up or adding addresses to any mapping
+        QMutexLocker lock(&_shared.vmemMapLock);
+
+        if (!containedInVmemMap(i)) {
+            MemoryMapNode* child = node->addChild(i);
+            _vmemMap.insertMulti(child->address(), child);
+            _vmemAddresses.insert(child->address());
+            lock.unlock();
+
+            _shared.queueLock.lock();
+            _shared.queue.insert(child->probability(), child);
+            _shared.queueLock.unlock();
+            return true;
+        }
     }
-    else
-        return false;
+
+    return false;
 }
 
 
