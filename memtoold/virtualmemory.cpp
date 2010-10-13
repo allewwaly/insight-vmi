@@ -119,7 +119,7 @@
 VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
                              int memDumpIndex)
     : _tlb(1000), _physMem(physMem), _specs(specs), _pos(-1),
-      _memDumpIndex(memDumpIndex)
+      _memDumpIndex(memDumpIndex), _threadSafe(false)
 {
     // Make sure the architecture is set
     if ( !_specs.arch & (MemSpecs::i386|MemSpecs::x86_64) )
@@ -146,12 +146,19 @@ bool VirtualMemory::isSequential() const
 
 bool VirtualMemory::open(OpenMode mode)
 {
+    bool doLock = _threadSafe;
     // Make sure no write attempt is made
     if (mode & (WriteOnly|Append|Truncate))
         return false;
     _pos = 0;
     // Call inherited function and open physical memory file
-    return _physMem && QIODevice::open(mode|Unbuffered) && (_physMem->isOpen() || _physMem->open(ReadOnly));
+    if (doLock) _physMemMutex.lock();
+    bool result = _physMem &&
+                  QIODevice::open(mode|Unbuffered) &&
+                  (_physMem->isOpen() || _physMem->open(ReadOnly));
+    if (doLock) _physMemMutex.unlock();
+
+    return result;
 }
 
 
@@ -182,8 +189,17 @@ bool VirtualMemory::seek(qint64 pos)
 
 	int pageSize;
 	qint64 physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
-	if ( (physAddr < 0) || !_physMem->seek(physAddr) )
-		return false;
+	if (physAddr < 0)
+	    return false;
+
+	bool doLock = _threadSafe;
+
+    if (doLock) _physMemMutex.lock();
+	bool seekOk = _physMem->seek(physAddr);
+	if (doLock) _physMemMutex.unlock();
+
+	if (!seekOk)
+	    return false;
 
 	_pos = (quint64) pos;
 
@@ -205,9 +221,16 @@ bool VirtualMemory::safeSeek(qint64 pos)
         qint64 physAddr =
                 (qint64)virtualToPhysical((quint64) pos, &pageSize, false);
 
-        return (physAddr != (qint64)PADDR_ERROR) &&
-               (physAddr >= 0) &&
-               _physMem->seek(physAddr);
+        if (! (physAddr != (qint64)PADDR_ERROR) && (physAddr >= 0) )
+            return false;
+
+        bool doLock = _threadSafe;
+
+        if (doLock) _physMemMutex.lock();
+        bool seekOk = _physMem->seek(physAddr);
+        if (doLock) _physMemMutex.unlock();
+
+        return seekOk;
     }
     catch (VirtualMemoryException) {
         return false;
@@ -235,14 +258,23 @@ qint64 VirtualMemory::readData(char* data, qint64 maxSize)
     qint64 totalRead = 0, ret = 0;
 
     while (maxSize > 0) {
+        bool doLock = _threadSafe;
         // Obtain physical address and page size
         quint64 physAddr = virtualToPhysical(_pos, &pageSize);
+
+        if (doLock) _physMemMutex.lock();
+
         // Set file position to physical address
-        if (!_physMem->seek(physAddr) /* || _physMem->atEnd() */ )
+        if (!_physMem->seek(physAddr) /* || _physMem->atEnd() */ ) {
+            if (doLock) {
+                _physMemMutex.unlock();
+                doLock = false; // don't unlock twice
+            }
             virtualMemoryError(QString("Cannot seek to address 0x%1 "
                     "(translated from virtual address 0x%2")
                     .arg(physAddr, 8, 16, QChar('0'))
                     .arg(_pos, _specs.sizeofUnsignedLong, 16, QChar('0')));
+        }
         // A page size of -1 means the address belongs to linear space
         if (pageSize < 0) {
             ret = _physMem->read(data, maxSize);
@@ -253,6 +285,9 @@ qint64 VirtualMemory::readData(char* data, qint64 maxSize)
             qint64 remPageSize = pageSize - pageOffset;
             ret = _physMem->read(data, maxSize > remPageSize ? remPageSize : maxSize);
         }
+
+        if (doLock) _physMemMutex.unlock();
+
         // Advance positions
         if (ret > 0) {
             _pos += (quint64)ret;
@@ -286,9 +321,18 @@ const QIODevice* VirtualMemory::physMem() const
 
 void VirtualMemory::setPhysMem(QIODevice* physMem)
 {
-    if (_physMem != physMem)
+    bool doLock = _threadSafe;
+
+    if (doLock) _physMemMutex.lock();
+
+    if (_physMem != physMem) {
+        if (doLock) _tlbMutex.lock();
         _tlb.clear();
+        if (doLock) _tlbMutex.unlock();
+    }
     _physMem = physMem;
+
+    if (doLock) _physMemMutex.unlock();
 }
 
 
@@ -306,15 +350,23 @@ T VirtualMemory::extractFromPhysMem(quint64 physaddr, bool enableExceptions,
     if (ok)
         *ok = false;
 
+    bool doLock = _threadSafe;
+
+    if (doLock) _physMemMutex.lock();
+
     if (!_physMem->seek(physaddr)) {
+        if (doLock) _physMemMutex.unlock();
         if (enableExceptions)
-            virtualMemoryError(QString("Cannot seek to physical address 0x%1").arg(physaddr, 8, 16, QChar('0')));
+            virtualMemoryError(QString("Cannot seek to physical address 0x%1")
+                    .arg(physaddr, 8, 16, QChar('0')));
     }
     else if (_physMem->read((char*) &ret, sizeof(T)) == sizeof(T)) {
+        if (doLock) _physMemMutex.unlock();
         if (ok)
             *ok = true;
     }
     else {
+        if (doLock) _physMemMutex.unlock();
         if (enableExceptions)
             virtualMemoryError("Error reading from physical memory device.");
     }
@@ -325,22 +377,30 @@ T VirtualMemory::extractFromPhysMem(quint64 physaddr, bool enableExceptions,
 
 quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 {
+    bool doLock = _threadSafe;
+    quint64 result = 0;
     // For the key, the small page size (4k) is always assumed.
     TLBEntry* tlbEntry;
-    if ( (tlbEntry =_tlb[vaddr & PAGEMASK]) ) {
+
+    if (doLock) _tlbMutex.lock();
+
+    if ( (tlbEntry = _tlb[vaddr & PAGEMASK]) ) {
         // Return page size and address
         *pageSize = tlbEntry->size;
         quint64 mask = tlbEntry->size - 1UL;
-        return tlbEntry->addr | (vaddr & mask);
+        result = tlbEntry->addr | (vaddr & mask);
     }
-    else
-        return 0;
+
+    if (doLock) _tlbMutex.unlock();
+
+    return result;
 }
 
 
 quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
         bool enableExceptions)
 {
+    bool doLock = _threadSafe;
     quint64 pgd_addr;  // page global directory address
     quint64 pgd;
     quint64 pmd_paddr; // page middle directory address (only for PAE)
@@ -465,9 +525,11 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
     }
 
     // Create TLB entry. Always use small page size (4k) as key into cache.
+    if (doLock) _tlbMutex.lock();
     _tlb.insert(
             vaddr & PAGEMASK,
             new TLBEntry(physaddr & ~((*pageSize) - 1), *pageSize));
+    if (doLock) _tlbMutex.unlock();
 
     return physaddr;
 }
@@ -476,6 +538,7 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
 quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
         bool enableExceptions)
 {
+    bool doLock = _threadSafe;
     quint64 pgd_addr;  // page global directory address
     quint64 pgd;
     quint64 pud_paddr; // page upper directory address
@@ -570,9 +633,11 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
     }
 
     // Create TLB entry. Always use small page size (4k) as key into cache.
+    if (doLock) _tlbMutex.lock();
     _tlb.insert(
             vaddr & PAGEMASK,
             new TLBEntry(physaddr & ~((*pageSize) - 1), *pageSize));
+    if (doLock) _tlbMutex.unlock();
 
     return physaddr;
 }
@@ -683,3 +748,16 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
     return physaddr;
 }
 
+
+bool VirtualMemory::isThreadSafe() const
+{
+    return _threadSafe;
+}
+
+
+bool VirtualMemory::setThreadSafety(bool safe)
+{
+    bool old = _threadSafe;
+    _threadSafe = safe;
+    return old;
+}
