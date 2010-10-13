@@ -87,6 +87,8 @@ void MemoryMapBuilder::run()
             }
         }
         catch (VirtualMemoryException) {
+            // Lock the mutex again before we jump to the loop condition checking
+            queueLock.relock();
             // Don't proceed any further in case of an exception
             continue;
         }
