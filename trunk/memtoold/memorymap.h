@@ -13,12 +13,14 @@
 #include <QMultiHash>
 #include <QMultiMap>
 #include <QPair>
+#include <QMutex>
 #include "memorymapnode.h"
 #include "priorityqueue.h"
 #include "debug.h"
 
 class SymFactory;
 class VirtualMemory;
+class MemoryMapBuilder;
 
 /// A set of strings
 typedef QSet<QString> StringSet;
@@ -45,12 +47,29 @@ typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
 
 /**
+ * Holds all variables that are shared amount the builder threads.
+ * \sa MemoryMapBuilder
+ */
+struct BuilderSharedState
+{
+    BuilderSharedState() { reset(); }
+    void reset() { queue.clear(); processed = 0; lastNode = 0; }
+
+    NodeQueue queue;
+    MemoryMapNode* lastNode;
+    qint64 processed;
+    QMutex queueLock, pmemMapLock, vmemMapLock, typeInstancesLock, pointersToLock;
+};
+
+
+/**
  * This class represents a map of used virtual and physical memory. It allows
  * fast answers to queries like "which struct resides at virtual/physical
  * address X".
  */
 class MemoryMap
 {
+    friend class MemoryMapBuilder;
 public:
 	/**
 	 * Constructor
@@ -192,12 +211,10 @@ private:
 	 * added, it is also appended to the queue \a queue for further processing.
 	 * @param inst the instance to create a new node from
 	 * @param node the parent node of the new node to be created
-	 * @param queue the queue to append the new node to
 	 * @return \c true if a new node was added, \c false if that instance
 	 * already existed in the virtual memory mapping
 	 */
-	bool addChildIfNotExistend(const Instance& inst, MemoryMapNode* node,
-	        NodeQueue* queue);
+	bool addChildIfNotExistend(const Instance& inst, MemoryMapNode* node);
 
     const SymFactory* _factory;  ///< holds the SymFactory to operate on
     VirtualMemory* _vmem;        ///< the virtual memory object this map is being built for
@@ -208,6 +225,7 @@ private:
     PointerIntNodeMap _pmemMap;  ///< map of all used physical memory
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
+    BuilderSharedState _shared;  ///< all variables that are shared amount the builder threads
 };
 
 #endif /* MEMORYMAP_H_ */
