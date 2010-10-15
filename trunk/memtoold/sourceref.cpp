@@ -19,30 +19,6 @@ SourceRef::SourceRef(const TypeInfo& info)
 }
 
 
-int SourceRef::srcFile() const
-{
-	return _srcFile;
-}
-
-
-void SourceRef::setSrcFile(int id)
-{
-	_srcFile = id;
-}
-
-
-int SourceRef::srcLine() const
-{
-	return _srcLine;
-}
-
-
-void SourceRef::setSrcLine(int line)
-{
-	_srcLine = line;
-}
-
-
 void SourceRef::readFrom(QDataStream& in)
 {
     in >> _srcFile >> _srcLine;

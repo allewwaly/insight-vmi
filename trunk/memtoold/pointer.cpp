@@ -109,14 +109,3 @@ QString Pointer::readString(QIODevice* mem, size_t offset, const int len, QStrin
     return QString();
 }
 
-
-int Pointer::macroExtraOffset() const
-{
-    return _macroExtraOffset;
-}
-
-
-void Pointer::setMacroExtraOffset(int offset)
-{
-    _macroExtraOffset = offset;
-}

@@ -48,18 +48,6 @@ MemoryMapNode::~MemoryMapNode()
 }
 
 
-const MemoryMap* MemoryMapNode::belongsTo() const
-{
-	return _belongsTo;
-}
-
-
-MemoryMapNode* MemoryMapNode::parent()
-{
-	return _parent;
-}
-
-
 QString MemoryMapNode::parentName() const
 {
 	return _parent ? _parent->fullName() : QString();
@@ -69,12 +57,6 @@ QString MemoryMapNode::parentName() const
 QStringList MemoryMapNode::parentNameComponents() const
 {
 	return _parent ? _parent->fullNameComponents() : QStringList();
-}
-
-
-const QString& MemoryMapNode::name() const
-{
-	return _name;
 }
 
 
@@ -97,12 +79,6 @@ QStringList MemoryMapNode::fullNameComponents() const
 }
 
 
-const NodeList& MemoryMapNode::children() const
-{
-	return _children;
-}
-
-
 void MemoryMapNode::addChild(MemoryMapNode* child)
 {
 	_children.append(child);
@@ -116,30 +92,6 @@ MemoryMapNode* MemoryMapNode::addChild(const Instance& inst)
     MemoryMapNode* child = new MemoryMapNode(_belongsTo, inst, this);
     addChild(child);
     return child;
-}
-
-
-quint64 MemoryMapNode::address() const
-{
-    return _address;
-}
-
-
-quint32 MemoryMapNode::size() const
-{
-    return _type ? _type->size() : 0;
-}
-
-
-const BaseType* MemoryMapNode::type() const
-{
-	return _type;
-}
-
-
-float MemoryMapNode::probability() const
-{
-	return _probability;
 }
 
 

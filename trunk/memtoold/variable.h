@@ -114,6 +114,18 @@ protected:
 };
 
 
+inline size_t Variable::offset() const
+{
+    return _offset;
+}
+
+
+inline void Variable::setOffset(size_t offset)
+{
+    _offset = offset;
+}
+
+
 /**
 * Operator for native usage of the Variable class for streams
 * @param in data stream to read from

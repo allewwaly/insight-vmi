@@ -30,7 +30,7 @@ public:
     /**
      * @return the directory name of this compilation unit
      */
-	const QString& dir() const;
+    const QString& dir() const;
 
     /**
      * Reads a serialized version of this object from \a in.
@@ -49,6 +49,12 @@ public:
 private:
     QString _dir; ///< Holds the directory name of this compilation unit
 };
+
+
+inline const QString& CompileUnit::dir() const
+{
+    return _dir;
+}
 
 
 /**

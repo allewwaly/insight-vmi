@@ -90,18 +90,6 @@ uint Array::size() const
 }
 
 
-qint32 Array::length() const
-{
-    return _length;
-}
-
-
-void Array::setLength(qint32 len)
-{
-	_length = len;
-}
-
-
 void Array::readFrom(QDataStream& in)
 {
     Pointer::readFrom(in);

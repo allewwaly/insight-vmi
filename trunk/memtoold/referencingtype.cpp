@@ -31,12 +31,6 @@ ReferencingType::~ReferencingType()
 }
 
 
-const BaseType* ReferencingType::refType() const
-{
-	return _refType;
-}
-
-
 const BaseType* ReferencingType::refTypeDeep(int resolveTypes) const
 {
     const ReferencingType* prev = this;
@@ -46,26 +40,6 @@ const BaseType* ReferencingType::refTypeDeep(int resolveTypes) const
         rbt = dynamic_cast<const RefBaseType*>(rbt->refType());
     }
     return prev->refType();
-}
-
-
-void ReferencingType::setRefType(const BaseType* type)
-{
-	_refType = type;
-	if (_refType && _refTypeId < 0)
-	    _refTypeId = _refType->id();
-}
-
-
-int ReferencingType::refTypeId() const
-{
-    return _refTypeId;
-}
-
-
-void ReferencingType::setRefTypeId(int id)
-{
-    _refTypeId = id;
 }
 
 

@@ -132,12 +132,6 @@ VirtualMemory::~VirtualMemory()
 }
 
 
-int VirtualMemory::memDumpIndex() const
-{
-    return _memDumpIndex;
-}
-
-
 bool VirtualMemory::isSequential() const
 {
     return true;
@@ -313,12 +307,6 @@ qint64 VirtualMemory::writeData(const char* data, qint64 maxSize)
 }
 
 
-const QIODevice* VirtualMemory::physMem() const
-{
-    return _physMem;
-}
-
-
 void VirtualMemory::setPhysMem(QIODevice* physMem)
 {
     bool doLock = _threadSafe;
@@ -333,12 +321,6 @@ void VirtualMemory::setPhysMem(QIODevice* physMem)
     _physMem = physMem;
 
     if (doLock) _physMemMutex.unlock();
-}
-
-
-const MemSpecs& VirtualMemory::memSpecs() const
-{
-    return _specs;
 }
 
 
@@ -375,7 +357,7 @@ T VirtualMemory::extractFromPhysMem(quint64 physaddr, bool enableExceptions,
 }
 
 
-quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
+inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 {
     bool doLock = _threadSafe;
     quint64 result = 0;
@@ -746,18 +728,4 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
     }
 
     return physaddr;
-}
-
-
-bool VirtualMemory::isThreadSafe() const
-{
-    return _threadSafe;
-}
-
-
-bool VirtualMemory::setThreadSafety(bool safe)
-{
-    bool old = _threadSafe;
-    _threadSafe = safe;
-    return old;
 }

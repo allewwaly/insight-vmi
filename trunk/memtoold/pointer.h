@@ -77,4 +77,16 @@ protected:
     int _macroExtraOffset;  ///< Additional offset to consider when de-referencing this pointer
 };
 
+
+inline int Pointer::macroExtraOffset() const
+{
+    return _macroExtraOffset;
+}
+
+
+inline void Pointer::setMacroExtraOffset(int offset)
+{
+    _macroExtraOffset = offset;
+}
+
 #endif /* POINTER_H_ */

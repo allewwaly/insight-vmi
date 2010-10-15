@@ -10,8 +10,8 @@
 
 #include "typeinfo.h"
 #include "instance.h"
+#include "basetype.h"
 
-class BaseType;
 
 class ReferencingType
 {
@@ -135,6 +135,33 @@ private:
             const QString& name, const QStringList& parentNames, int id,
             int resolveTypes, int* derefCount) const;
 };
+
+
+inline const BaseType* ReferencingType::refType() const
+{
+    return _refType;
+}
+
+
+inline void ReferencingType::setRefType(const BaseType* type)
+{
+    _refType = type;
+    if (_refType && _refTypeId < 0)
+        _refTypeId = _refType->id();
+}
+
+
+inline int ReferencingType::refTypeId() const
+{
+    return _refTypeId;
+}
+
+
+inline void ReferencingType::setRefTypeId(int id)
+{
+    _refTypeId = id;
+}
+
 
 
 #endif /* REFERENCINGTYPE_H_ */

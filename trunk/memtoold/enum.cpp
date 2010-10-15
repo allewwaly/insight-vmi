@@ -54,18 +54,6 @@ QString Enum::toString(QIODevice* mem, size_t offset) const
 }
 
 
-const Enum::EnumHash& Enum::enumValues() const
-{
-	return _enumValues;
-}
-
-
-void Enum::setEnumValues(const EnumHash& values)
-{
-	_enumValues = values;
-}
-
-
 void Enum::readFrom(QDataStream& in)
 {
     BaseType::readFrom(in);

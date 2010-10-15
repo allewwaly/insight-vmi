@@ -112,7 +112,7 @@ public:
     /**
      * @return the bit size of this bit-split integer declaration
      */
-    int bitSize() const
+    inline int bitSize() const
     {
         return _bitSize;
     }
@@ -121,7 +121,7 @@ public:
      * Sets the bit size of this bit-split integer declaration
      * @param size new bit size of bit-split integer declaration
      */
-    void setBitSize(int size)
+    inline void setBitSize(int size)
     {
         _bitSize = size;
     }
@@ -129,7 +129,7 @@ public:
     /**
      * @return the bit offset of this bit-split integer declaration
      */
-    int bitOffset() const
+    inline int bitOffset() const
     {
         return _bitOffset;
     }
@@ -138,7 +138,7 @@ public:
      * Sets the bit offset of this bit-split integer declaration
      * @param offset new bit offset of bit-split integer declaration
      */
-    void setBitOffset(int offset)
+    inline void setBitOffset(int offset)
     {
         _bitOffset = offset;
     }
