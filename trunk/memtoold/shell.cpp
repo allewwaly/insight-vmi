@@ -1302,12 +1302,12 @@ int Shell::cmdMemoryRevmap(QStringList args)
 
 int Shell::cmdMemoryRevmapBuild(int index)
 {
-    // Show the memory map window so that the user can see the progress
-    memMapWindow->mapWidget()->setMap(_memDumps[index]->map());
-    if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
-        debugerr("Error invoking show() on memMapWindow");
-    _memMapLastPaint.start();
-    _memMapVisTimer.start();
+//    // Show the memory map window so that the user can see the progress
+//    memMapWindow->mapWidget()->setMap(_memDumps[index]->map());
+//    if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
+//        debugerr("Error invoking show() on memMapWindow");
+//    _memMapLastPaint.start();
+//    _memMapVisTimer.start();
 
     QTime timer;
     timer.start();

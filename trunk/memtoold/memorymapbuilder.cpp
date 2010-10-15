@@ -16,8 +16,8 @@
 #include "debug.h"
 
 
-MemoryMapBuilder::MemoryMapBuilder(MemoryMap* map)
-    : _map(map), _interrupted(false)
+MemoryMapBuilder::MemoryMapBuilder(MemoryMap* map, int index)
+    : _index(index), _map(map), _interrupted(false)
 {
 }
 
@@ -33,11 +33,17 @@ void MemoryMapBuilder::interrupt()
 }
 
 
+int MemoryMapBuilder::index() const
+{
+    return _index;
+}
+
+
 void MemoryMapBuilder::run()
 {
     _interrupted = false;
     // Holds the data that is shared among all threads
-    BuilderSharedState* shared = &_map->_shared;
+    BuilderSharedState* shared = _map->_shared;
 
     MemoryMapNode* node = 0;
 
@@ -108,7 +114,7 @@ void MemoryMapBuilder::run()
                 inst = inst.dereference(BaseType::trLexicalAndPointers, &cnt);
 //                inst = inst.dereference(BaseType::trLexical, &cnt);
                 if (cnt && _map->addressIsWellFormed(inst))
-                    _map->addChildIfNotExistend(inst, node);
+                    _map->addChildIfNotExistend(inst, node, _index);
             }
             catch (GenericException e) {
                 // Do nothing
@@ -123,7 +129,7 @@ void MemoryMapBuilder::run()
                     try {
                         Instance e = inst.arrayElem(i);
                         if (_map->addressIsWellFormed(e))
-                            _map->addChildIfNotExistend(e, node);
+                            _map->addChildIfNotExistend(e, node, _index);
                     }
                     catch (GenericException e) {
                         // Do nothing
@@ -138,7 +144,7 @@ void MemoryMapBuilder::run()
                 try {
                     Instance m = inst.member(i, BaseType::trLexical);
                     if (_map->addressIsWellFormed(m))
-                        _map->addChildIfNotExistend(m, node);
+                        _map->addChildIfNotExistend(m, node, _index);
                 }
                 catch (GenericException e) {
                     // Do nothing

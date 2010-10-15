@@ -14,6 +14,8 @@
 #include <QMultiMap>
 #include <QPair>
 #include <QMutex>
+#include <QWaitCondition>
+#include <QReadWriteLock>
 #include "memorymapnode.h"
 #include "priorityqueue.h"
 #include "debug.h"
@@ -46,20 +48,39 @@ typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 /// Holds the nodes to be visited, sorted by their probability
 typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
 
+#define MAX_BUILDER_THREADS 16
+
 /**
  * Holds all variables that are shared amount the builder threads.
  * \sa MemoryMapBuilder
  */
 struct BuilderSharedState
 {
-    BuilderSharedState() { reset(); }
-    void reset() { queue.clear(); processed = 0; lastNode = 0; }
+    BuilderSharedState()
+    {
+        reset();
+    }
 
+    void reset()
+    {
+        queue.clear();
+        processed = threadCount = vmemReading = vmemWriting = 0;
+        lastNode = 0;
+        for (int i = 0; i < MAX_BUILDER_THREADS; ++i)
+            currAddresses[i] = 0;
+    }
+
+    int threadCount, vmemReading, vmemWriting;
+    quint64 currAddresses[MAX_BUILDER_THREADS];
+    QMutex perThreadLock[MAX_BUILDER_THREADS];
+    QWaitCondition threadDone[MAX_BUILDER_THREADS];
     NodeQueue queue;
     MemoryMapNode* lastNode;
     qint64 processed;
-    QMutex findAndAddChildLock, queueLock, pmemMapLock,
-        typeInstancesLock, pointersToLock;
+    QMutex findAndAddChildLock, queueLock, pmemMapLock, currAddressesLock,
+        typeInstancesLock, pointersToLock, vmemReadingLock, vmemWritingLock,
+        mapNodeLock;
+    QWaitCondition vmemReadingDone, vmemWritingDone;
 };
 
 
@@ -150,6 +171,17 @@ public:
     bool isBuilding() const;
 
     /**
+     * Calculates the probability for the given Instance \a inst and
+     * \a parentProbabilty.
+     * @param inst Instance to calculate probability for
+     * @param parentProbability the anticipated probability of the parent node.
+     * Passing a negative number means that \a inst has no parent.
+     * @return calculated probability
+     */
+    float calculateNodeProbability(const Instance* inst,
+            float parentProbability = -1.0) const;
+
+    /**
      * Inserts the given name \a name in the static list of names and returns
      * a reference to it. This static function was introduced to only hold one
      * copy of any kernel object name in memory, thus saving memory.
@@ -159,12 +191,12 @@ public:
     static const QString& insertName(const QString& name);
 
 #ifdef DEBUG
-	quint32 degPerGenerationCnt;
-	quint32 degForUnalignedAddrCnt;
-	quint32 degForUserlandAddrCnt;
-	quint32 degForInvalidAddrCnt;
-	quint32 degForNonAlignedChildAddrCnt;
-	quint32 degForInvalidChildAddrCnt;
+	mutable quint32 degPerGenerationCnt;
+	mutable quint32 degForUnalignedAddrCnt;
+	mutable quint32 degForUserlandAddrCnt;
+	mutable quint32 degForInvalidAddrCnt;
+	mutable quint32 degForNonAlignedChildAddrCnt;
+	mutable quint32 degForInvalidChildAddrCnt;
 #endif
 
 private:
@@ -201,21 +233,23 @@ private:
      * BaseType::hash() of the instance's type is compared. Only if address and
      * hash match, the instance is considered to be already existent.
      * @param inst the Instance object to check for existence
+     * @param parent the parent node of \a inst
      * @return \c true if an instance already exists at the address of \a inst
      * and the hash of both types are equal, \c false otherwise
      */
-	bool containedInVmemMap(const Instance& inst) const;
+	bool objectIsSane(const Instance& inst, const MemoryMapNode* parent);
 
 	/**
 	 * Adds a new node for Instance \a inst as child of \a node, if \a inst is
 	 * not already contained in the virtual memory mapping. If a new node is
 	 * added, it is also appended to the queue \a queue for further processing.
 	 * @param inst the instance to create a new node from
-	 * @param node the parent node of the new node to be created
+	 * @param parent the parent node of the new node to be created
 	 * @return \c true if a new node was added, \c false if that instance
 	 * already existed in the virtual memory mapping
 	 */
-	bool addChildIfNotExistend(const Instance& inst, MemoryMapNode* node);
+	bool addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,
+	        int threadIndex);
 
     const SymFactory* _factory;  ///< holds the SymFactory to operate on
     VirtualMemory* _vmem;        ///< the virtual memory object this map is being built for
@@ -226,7 +260,7 @@ private:
     PointerIntNodeMap _pmemMap;  ///< map of all used physical memory
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
-    BuilderSharedState _shared;  ///< all variables that are shared amount the builder threads
+    BuilderSharedState* _shared; ///< all variables that are shared amount the builder threads
 };
 
 #endif /* MEMORYMAP_H_ */

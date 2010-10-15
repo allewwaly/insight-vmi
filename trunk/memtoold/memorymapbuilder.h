@@ -19,15 +19,17 @@ class MemoryMap;
 class MemoryMapBuilder: public QThread
 {
 public:
-    MemoryMapBuilder(MemoryMap* map);
+    MemoryMapBuilder(MemoryMap* map, int index);
     virtual ~MemoryMapBuilder();
 
     void interrupt();
+    int index() const;
 
 protected:
     virtual void run();
 
 private:
+    const int _index;
     MemoryMap* _map;
     bool _interrupted;
 };
