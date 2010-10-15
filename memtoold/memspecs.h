@@ -134,7 +134,7 @@ struct MemSpecs
     QString toString() const;
 
     /**
-     * @return the real (calculated) VMALLOC_START address that can acutally
+     * @return the real (calculated) VMALLOC_START address that can actually
      * be is used for address translation
      */
     quint64 realVmallocStart() const;
