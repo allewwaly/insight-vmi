@@ -151,7 +151,6 @@ public:
 	 */
 	Instance toInstance(bool includeParentNameComponents = true) const;
 
-
 private:
 	/**
 	 * Re-calculates the probability of this node being "sane" and used by the
