@@ -66,4 +66,28 @@ protected:
 	int _srcLine;        ///< line number within the source the type's declaration
 };
 
+
+inline int SourceRef::srcFile() const
+{
+    return _srcFile;
+}
+
+
+inline void SourceRef::setSrcFile(int id)
+{
+    _srcFile = id;
+}
+
+
+inline int SourceRef::srcLine() const
+{
+    return _srcLine;
+}
+
+
+inline void SourceRef::setSrcLine(int line)
+{
+    _srcLine = line;
+}
+
 #endif /* SOURCEREF_H_ */

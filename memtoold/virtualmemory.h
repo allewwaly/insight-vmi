@@ -208,4 +208,36 @@ private:
     QMutex _physMemMutex;
 };
 
+
+inline int VirtualMemory::memDumpIndex() const
+{
+    return _memDumpIndex;
+}
+
+
+inline const QIODevice* VirtualMemory::physMem() const
+{
+    return _physMem;
+}
+
+
+inline const MemSpecs& VirtualMemory::memSpecs() const
+{
+    return _specs;
+}
+
+
+inline bool VirtualMemory::isThreadSafe() const
+{
+    return _threadSafe;
+}
+
+
+inline bool VirtualMemory::setThreadSafety(bool safe)
+{
+    bool old = _threadSafe;
+    _threadSafe = safe;
+    return old;
+}
+
 #endif /* VIRTUALMEMORY_H_ */

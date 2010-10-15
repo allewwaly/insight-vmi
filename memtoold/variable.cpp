@@ -22,18 +22,6 @@ Variable::Variable(const TypeInfo& info)
 }
 
 
-size_t Variable::offset() const
-{
-	return _offset;
-}
-
-
-void Variable::setOffset(size_t offset)
-{
-	_offset = offset;
-}
-
-
 QString Variable::prettyName() const
 {
     // Shorten the type name, if required

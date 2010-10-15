@@ -96,7 +96,7 @@ public:
         rtConst       = (1 << 19),
         rtVolatile    = (1 << 20),
         rtTypedef     = (1 << 21),
-        rtFuncPointer = (1 << 22)
+        rtFuncPointer = (1 << 22),
         // Don't forget to add new types to getRealTypeRevMap()
     };
 
@@ -105,6 +105,7 @@ public:
         trNone = 0,                                 ///< no resolution is performed
         trLexical = rtConst|rtVolatile|rtTypedef,   ///< resolve rtConst, rtVolatile, rtTypedef only
         trLexicalAndPointers = trLexical|rtPointer, ///< resolve as for trLexical plus rtPointer
+        trStructured = rtStruct|rtUnion,            ///< structs or unions
         trAny = 0xFFFFFFFF                          ///< resolve all types
     };
 

@@ -52,7 +52,7 @@ public:
 	/**
 	 * @return the names and values of the defined enumerators
 	 */
-	const EnumHash& enumValues() const;
+    const EnumHash& enumValues() const;
 
 	/**
 	 * Sets the names and values of the defined enumerators.
@@ -77,6 +77,18 @@ public:
 protected:
 	EnumHash _enumValues;
 };
+
+
+inline const Enum::EnumHash& Enum::enumValues() const
+{
+    return _enumValues;
+}
+
+
+inline void Enum::setEnumValues(const EnumHash& values)
+{
+    _enumValues = values;
+}
 
 
 

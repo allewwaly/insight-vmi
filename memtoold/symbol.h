@@ -90,4 +90,29 @@ protected:
     QString _name;       ///< name of this type, e.g. "int"
 };
 
+
+inline QString Symbol::name() const
+{
+    return _name;
+}
+
+
+inline void Symbol::setName(const QString& name)
+{
+    _name = name;
+}
+
+
+inline int Symbol::id() const
+{
+    return _id;
+}
+
+
+inline void Symbol::setId(int id)
+{
+    _id = id;
+}
+
+
 #endif /* SYMBOL_H_ */

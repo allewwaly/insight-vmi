@@ -140,25 +140,26 @@ QStringList Instance::fullNameComponents() const
 
 int Instance::memberCount() const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
-	return s ? s->members().size() : 0;
+    if (!_d->type || !(_d->type->type() & BaseType::trStructured))
+        return 0;
+	return dynamic_cast<const Structured*>(_d->type)->members().size();
 }
 
 
 const QStringList& Instance::memberNames() const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
-	return s ? s->memberNames() : _emtpyStringList;
+    if (!_d->type || !(_d->type->type() & BaseType::trStructured))
+        return _emtpyStringList;
+	return dynamic_cast<const Structured*>(_d->type)->memberNames();
 }
 
 
 InstanceList Instance::members() const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
-	if (!s)
-		return InstanceList();
+    if (!_d->type || !(_d->type->type() & BaseType::trStructured))
+        return InstanceList();
 
-	const MemberList& list = s->members();
+	const MemberList& list = dynamic_cast<const Structured*>(_d->type)->members();
 	InstanceList ret;
 	for (int i = 0; i < list.count(); ++i)
 		ret.append(list[i]->toInstance(_d->address, _d->vmem, this, BaseType::trLexical));
@@ -437,8 +438,11 @@ void Instance::differencesRek(const Instance& other,
 
 Instance Instance::arrayElem(int index) const
 {
+    if (!_d->type || !(_d->type->type() & BaseType::rtPointer))
+        return Instance();
+
     const Pointer* p = dynamic_cast<const Pointer*>(_d->type);
-    if (!p || !p->refType())
+    if (!p->refType())
         return Instance();
 
     return Instance(
@@ -499,8 +503,10 @@ quint64 Instance::memberAddress(int index) const
 
 bool Instance::memberExists(const QString& name) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
-	return s ? s->memberExists(name) : false;
+    if (!_d->type || !(_d->type->type() & BaseType::trStructured))
+        return false;
+
+	return dynamic_cast<const Structured*>(_d->type)->memberExists(name);
 }
 
 

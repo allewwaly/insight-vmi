@@ -57,7 +57,7 @@ public:
 	/**
 	 * @return the length if this array if it was defined, -1 otherwise
 	 */
-	qint32 length() const;
+    qint32 length() const;
 
 	/**
 	 * Sets the defined length for this array
@@ -82,6 +82,19 @@ public:
 protected:
 	qint32 _length;   ///< the length if this array (if it was defined)
 };
+
+
+inline qint32 Array::length() const
+{
+    return _length;
+}
+
+
+inline void Array::setLength(qint32 len)
+{
+    _length = len;
+}
+
 
 
 #endif /* ARRAY_H_ */

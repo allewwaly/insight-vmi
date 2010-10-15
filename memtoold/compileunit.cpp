@@ -18,12 +18,6 @@ CompileUnit::CompileUnit(const TypeInfo& info)
 }
 
 
-const QString& CompileUnit::dir() const
-{
-    return _dir;
-}
-
-
 void CompileUnit::readFrom(QDataStream& in)
 {
     Symbol::readFrom(in);

@@ -10,11 +10,11 @@
 
 #include <QString>
 #include <QList>
+#include "basetype.h"
 #include "instance.h"
 
 class MemoryMap;
 class MemoryMapNode;
-class BaseType;
 
 /// A list of MemoryMapNode's
 typedef QList<MemoryMapNode*> NodeList;
@@ -119,7 +119,7 @@ public:
     /**
      * @return the virtual address of the variable in memory
      */
-    quint64 address() const;
+	quint64 address() const;
 
     /**
      * Convenience function to access type()->size().
@@ -130,7 +130,7 @@ public:
     /**
      * @return the BaseType this node represents
      */
-	const BaseType* type() const;
+    const BaseType* type() const;
 
 	/**
 	 * @return the probability that this node is "sane" and is actually used
@@ -171,5 +171,54 @@ private:
     int _id;                 ///< ID of this node, if based on a variable
     float _probability;      ///< probability of "correctness" of this node
 };
+
+
+inline quint64 MemoryMapNode::address() const
+{
+    return _address;
+}
+
+
+inline const NodeList& MemoryMapNode::children() const
+{
+    return _children;
+}
+
+
+inline const MemoryMap* MemoryMapNode::belongsTo() const
+{
+    return _belongsTo;
+}
+
+
+inline MemoryMapNode* MemoryMapNode::parent()
+{
+    return _parent;
+}
+
+
+inline const QString& MemoryMapNode::name() const
+{
+    return _name;
+}
+
+
+inline quint32 MemoryMapNode::size() const
+{
+    return _type ? _type->size() : 0;
+}
+
+
+inline const BaseType* MemoryMapNode::type() const
+{
+    return _type;
+}
+
+
+inline float MemoryMapNode::probability() const
+{
+    return _probability;
+}
+
 
 #endif /* MEMORYMAPNODE_H_ */

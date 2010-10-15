@@ -24,33 +24,9 @@ Symbol::~Symbol()
 }
 
 
-QString Symbol::name() const
-{
-	return _name;
-}
-
-
-void Symbol::setName(const QString& name)
-{
-	_name = name;
-}
-
-
 QString Symbol::prettyName() const
 {
     return _name;
-}
-
-
-int Symbol::id() const
-{
-	return _id;
-}
-
-
-void Symbol::setId(int id)
-{
-    _id = id;
 }
 
 
