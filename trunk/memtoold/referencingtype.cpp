@@ -113,6 +113,8 @@ inline Instance ReferencingType::createRefInstance(size_t address,
             else
                 done = true;
         }
+        else
+            done = true;
     }
 
     while ( !done && (b->type() & resolveTypes) &&
