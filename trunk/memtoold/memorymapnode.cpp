@@ -120,4 +120,5 @@ void MemoryMapNode::updateProbability(const Instance* givenInst)
         // All children need to update the probability as well
         for (int i = 0; i < _children.size(); ++i)
             _children[i]->updateProbability();
-    }}
+    }
+}
