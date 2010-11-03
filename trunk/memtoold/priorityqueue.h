@@ -30,7 +30,7 @@ template<class Key, class T>
 class PriorityQueue
 {
 public:
-    typedef QMap<Key, T> map_type;
+    typedef QMultiMap<Key, T> map_type;
 
     /// Iterator type for this container
     typedef typename map_type::iterator iterator;
@@ -43,7 +43,7 @@ public:
     /**
      * Constructor
      */
-    PriorityQueue()
+    PriorityQueue() : _count(0)
     {
     }
 
@@ -60,6 +60,7 @@ public:
     inline void clear()
     {
         _map.clear();
+        _count = 0;
     }
 
     /**
@@ -133,7 +134,8 @@ public:
      */
     inline void insert(Key key, T value)
     {
-        _map.insert(key, value);
+        _map.insertMulti(key, value);
+        ++_count;
     }
 
     /**
@@ -148,6 +150,7 @@ public:
         typename map_type::iterator it = _map.begin();
         T item = it.value();
         _map.erase(it);
+        --_count;
         return item;
     }
 
@@ -164,6 +167,7 @@ public:
         while (--it == _map.end());
         T item = it.value();
         _map.erase(it);
+        --_count;
         return item;
     }
 
@@ -174,7 +178,8 @@ public:
      */
     inline int count() const
     {
-        return _map.size();
+//        return _map.size();
+        return _count;
     }
 
     /**
@@ -184,7 +189,8 @@ public:
      */
     inline int size() const
     {
-        return _map.size();
+//        return _map.size();
+        return _count;
     }
 
     /**
@@ -255,6 +261,7 @@ public:
 
 private:
     map_type _map;
+    int _count;
 };
 
 #endif /* PRIORITYQUEUE_H_ */
