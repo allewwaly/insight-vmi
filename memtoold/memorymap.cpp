@@ -507,27 +507,43 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
         degForUnalignedAddrCnt++;
     }
 
+
     // If this a union or struct, we have to consider the pointer members
     if ( inst->type() &&
-         (inst->type()->dereferencedType() & (BaseType::rtStruct|BaseType::rtUnion)) )
+         (inst->type()->dereferencedType() & BaseType::trStructured) )
     {
+        const Structured* structured =
+                dynamic_cast<const Structured*>(
+                        inst->type()->dereferencedBaseType());
         // Check address of all descendant pointers
-        for (int i = 0; i < inst->memberCount(); ++i) {
-            const BaseType* m_type = inst->memberType(i, BaseType::trLexical);
-            if (m_type && (m_type->type() & BaseType::rtPointer)) {
+        for (int i = 0; i < structured->members().size(); ++i) {
+            // TODO make sure this is correct!
+            const BaseType* m_type =
+                    structured->members().at(i)->refTypeDeep(BaseType::trLexical);
+//            const BaseType* m_type = inst->memberType(i, BaseType::trLexical);
+
+            if (m_type && m_type->type() & BaseType::rtPointer) {
                 try {
-                    quint64 m_addr =
-                            (quint64)m_type->toPointer(_vmem,
-                                                       inst->memberAddress(i));
-                    // Check validity
-                    if (! _vmem->safeSeek((qint64) m_addr) ) {
+                    quint64 m_addr = inst->address() + structured->members().at(i)->offset();
+//                    quint64 m_addr = inst->memberAddress(i);
+                    // Try a safeSeek first to avoid costly throws of exceptions
+                    if (_vmem->safeSeek(m_addr)) {
+                        m_addr = (quint64)m_type->toPointer(_vmem, m_addr);
+                        // Check validity
+                        if (! _vmem->safeSeek((qint64) m_addr) ) {
+                            prob *= degForInvalidChildAddr;
+                            degForInvalidChildAddrCnt++;
+                        }
+                        // Check alignment
+                        else if (m_addr & 0x3UL) {
+                            prob *= degForNonAlignedChildAddr;
+                            degForNonAlignedChildAddrCnt++;
+                        }
+                    }
+                    else {
+                        // Address was invalid
                         prob *= degForInvalidChildAddr;
                         degForInvalidChildAddrCnt++;
-                    }
-                    // Check alignment
-                    else if (m_addr & 0x3UL) {
-                        prob *= degForNonAlignedChildAddr;
-                        degForNonAlignedChildAddrCnt++;
                     }
                 }
                 catch (MemAccessException) {
@@ -543,7 +559,6 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
             }
         }
     }
-
     return prob;
 }
 
