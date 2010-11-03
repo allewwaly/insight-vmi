@@ -27,7 +27,7 @@ InstanceData::InstanceData()
 
 
 InstanceData::InstanceData(const InstanceData& other)
-    : QSharedData(other), id(other.id), address(other.address),
+    : /*QSharedData(other),*/ id(other.id), address(other.address),
       type(other.type), vmem(other.vmem), name(other.name),
       parentNames(other.parentNames), isNull(other.isNull),
       isValid(other.isValid)

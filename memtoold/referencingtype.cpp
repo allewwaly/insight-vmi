@@ -33,6 +33,9 @@ ReferencingType::~ReferencingType()
 
 const BaseType* ReferencingType::refTypeDeep(int resolveTypes) const
 {
+    if ( !_refType && !(_refType->type() & resolveTypes) )
+        return _refType;
+
     const ReferencingType* prev = this;
     const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(_refType);
     while (rbt && (rbt->type() & resolveTypes)) {
@@ -74,7 +77,7 @@ Instance ReferencingType::createRefInstance(size_t address,
 }
 
 
-Instance ReferencingType::createRefInstance(size_t address,
+inline Instance ReferencingType::createRefInstance(size_t address,
 		VirtualMemory* vmem, const QString& name,
 		const QStringList& parentNames, int id, int resolveTypes,
 		int* derefCount) const
@@ -116,7 +119,7 @@ Instance ReferencingType::createRefInstance(size_t address,
             (rbt = dynamic_cast<const RefBaseType*>(b)) )
     {
 		// Resolve pointer references
-		if (rbt->type() & (BaseType::rtArray|BaseType::rtPointer)) {
+		if (rbt->type() & BaseType::trPointersAndArrays) {
 		    // Pointer to referenced type's referenced type
             const BaseType* rbtRef = dynamic_cast<const RefBaseType*>(rbt->refType()) ?
                     dynamic_cast<const RefBaseType*>(rbt->refType())->refType() :

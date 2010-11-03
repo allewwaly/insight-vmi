@@ -8,7 +8,7 @@
 #ifndef INSTANCEDATA_H_
 #define INSTANCEDATA_H_
 
-#include <QSharedData>
+//#include <QSharedData>
 #include <QStringList>
 #include <QSet>
 
@@ -23,7 +23,7 @@ typedef QSet<QString> StringSet;
  * same Instance object
  * \sa Instance
  */
-class InstanceData : public QSharedData
+class InstanceData //: public QSharedData
 {
 public:
     InstanceData();

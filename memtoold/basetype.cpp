@@ -69,6 +69,9 @@ BaseType::BaseType(const TypeInfo& info)
 
 BaseType::RealType BaseType::dereferencedType() const
 {
+    if (! (type() & trLexicalPointersArrays) )
+        return type();
+
     const BaseType* prev = this;
     const RefBaseType* curr = dynamic_cast<const RefBaseType*>(prev);
     while (curr && curr->refType()) {

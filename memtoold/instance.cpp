@@ -68,47 +68,9 @@ Instance::~Instance()
 }
 
 
-int Instance::id() const
-{
-    return _d->id;
-}
-
-
 int Instance::memDumpIndex() const
 {
     return _d->vmem ? _d->vmem->memDumpIndex() : -1;
-}
-
-
-quint64 Instance::address() const
-{
-	return _d->address;
-}
-
-
-void Instance::setAddress(quint64 addr)
-{
-    _d->address = addr;
-    _d->isNull = !_d->address || !_d->isValid;
-}
-
-
-void Instance::addToAddress(quint64 offset)
-{
-    _d->address += offset;
-    _d->isNull = !_d->address || !_d->isValid;
-}
-
-
-QString Instance::name() const
-{
-	return _d->name;
-}
-
-
-void Instance::setName(const QString& name)
-{
-    _d->name = name;
 }
 
 
@@ -166,47 +128,6 @@ InstanceList Instance::members() const
 	return ret;
 }
 
-
-const BaseType* Instance::type() const
-{
-	return _d->type;
-}
-
-
-void Instance::setType(const BaseType* type)
-{
-    _d->type = type;
-}
-
-
-QString Instance::typeName() const
-{
-	return _d->type ? _d->type->prettyName() : QString();
-}
-
-
-quint32 Instance::size() const
-{
-	return _d->type ? _d->type->size() : 0;
-}
-
-
-bool Instance::isNull() const
-{
-	return _d->isNull;
-}
-
-
-bool Instance::isValid() const
-{
-    return _d->isValid;
-}
-
-
-bool Instance::isAccessible() const
-{
-	return !_d->isNull && _d->vmem->safeSeek(_d->address);
-}
 
 bool Instance::equals(const Instance& other) const
 {
@@ -536,89 +457,4 @@ int Instance::typeIdOfMember(const QString& name) const
 		return 0;
 	else
 		return m->refTypeId();
-}
-
-
-QString Instance::toString() const
-{
-	return _d->isNull ? QString("NULL") : _d->type->toString(_d->vmem, _d->address);
-}
-
-
-int Instance::pointerSize() const
-{
-    return _d->vmem ? _d->vmem->memSpecs().sizeofUnsignedLong : 8;
-}
-
-
-qint8 Instance::toInt8() const
-{
-    return _d->isNull ? 0 : _d->type->toInt8(_d->vmem, _d->address);
-}
-
-
-quint8 Instance::toUInt8() const
-{
-    return _d->isNull ? 0 : _d->type->toUInt8(_d->vmem, _d->address);
-}
-
-
-qint16 Instance::toInt16() const
-{
-    return _d->isNull ? 0 : _d->type->toInt16(_d->vmem, _d->address);
-}
-
-
-quint16 Instance::toUInt16() const
-{
-    return _d->isNull ? 0 : _d->type->toUInt16(_d->vmem, _d->address);
-}
-
-
-qint32 Instance::toInt32() const
-{
-    return _d->isNull ? 0 : _d->type->toInt32(_d->vmem, _d->address);
-}
-
-
-quint32 Instance::toUInt32() const
-{
-    return _d->isNull ? 0 : _d->type->toUInt32(_d->vmem, _d->address);
-}
-
-
-qint64 Instance::toInt64() const
-{
-    return _d->isNull ? 0 : _d->type->toInt64(_d->vmem, _d->address);
-}
-
-
-quint64 Instance::toUInt64() const
-{
-    return _d->isNull ? 0 : _d->type->toUInt64(_d->vmem, _d->address);
-}
-
-
-float Instance::toFloat() const
-{
-    return _d->isNull ? 0 : _d->type->toFloat(_d->vmem, _d->address);
-}
-
-
-double Instance::toDouble() const
-{
-    return _d->isNull ? 0 : _d->type->toDouble(_d->vmem, _d->address);
-}
-
-
-void* Instance::toPointer() const
-{
-    return _d->isNull ? (void*)0 : _d->type->toPointer(_d->vmem, _d->address);
-}
-
-
-template<class T>
-QVariant Instance::toVariant() const
-{
-    return _d->isNull ? QVariant() : _d->type->toVariant<T>(_d->vmem, _d->address);
 }

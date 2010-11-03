@@ -9,7 +9,7 @@
 #include "genericexception.h"
 #include "sourceref.h"
 #include "typeinfo.h"
-#include "instance.h"
+#include "instance_def.h"
 
 /// Bitmask with all integer-based BaseType::RealType's
 extern const qint32 IntegerTypes;
@@ -105,6 +105,8 @@ public:
         trNone = 0,                                 ///< no resolution is performed
         trLexical = rtConst|rtVolatile|rtTypedef,   ///< resolve rtConst, rtVolatile, rtTypedef only
         trLexicalAndPointers = trLexical|rtPointer, ///< resolve as for trLexical plus rtPointer
+        trPointersAndArrays = rtPointer|rtArray,    ///< resolve rtPointer and rtArray
+        trLexicalPointersArrays = trLexicalAndPointers|rtArray, ///< resolve as for trLexicalAndPointers plus rtArray
         trStructured = rtStruct|rtUnion,            ///< structs or unions
         trAny = 0xFFFFFFFF                          ///< resolve all types
     };
