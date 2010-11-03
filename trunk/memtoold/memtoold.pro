@@ -40,7 +40,8 @@ SOURCES += memorymapbuilder.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += memorymapbuilder.h \
+HEADERS += instance_def.h \
+    memorymapbuilder.h \
     priorityqueue.h \
     memorymapwindow.h \
     memorymapwidget.h \
