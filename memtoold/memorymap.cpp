@@ -120,16 +120,12 @@ void MemoryMap::build()
 
     debugmsg("Building reverse map with " << _shared->threadCount << " threads.");
 
-    // Go through the global vars and add their instances on the stack
+    // Go through the global vars and add their instances to the queue
     for (VariableList::const_iterator it = _factory->vars().constBegin();
             it != _factory->vars().constEnd(); ++it)
     {
         try {
             Instance inst = (*it)->toInstance(_vmem, BaseType::trLexical);
-#ifdef DEBUG
-            if (_vmem->memSpecs().arch & MemSpecs::i386)
-                assert(inst.address() <= 0xFFFFFFFFUL);
-#endif
             if (!inst.isNull() && fitsInVmem(inst.address(), inst.size())) {
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
@@ -156,10 +152,13 @@ void MemoryMap::build()
         threads[i]->start();
     }
 
+    bool firstLoop = true;
+
     // Let the builders do the work, but regularly output some statistics
     while (!shell->interrupted() && !_shared->queue.isEmpty()) {
 
-        if (_shared->processed == 0 || timer.elapsed() > 2000) {
+        if (firstLoop || timer.elapsed() > 1000) {
+            firstLoop = false;
             QChar indicator = '=';
             qint64 queue_size = _shared->queue.size();
             if (prev_queue_size < queue_size)
@@ -184,13 +183,13 @@ void MemoryMap::build()
 #endif
         }
 
-#ifdef DEBUG
-        // emergency stop
-        if (_shared->processed >= 5000000) {
-            debugmsg(">>> Breaking revmap generation <<<");
-            break;
-        }
-#endif
+//#ifdef DEBUG
+//        // emergency stop
+//        if (_shared->processed >= 5000000) {
+//            debugmsg(">>> Breaking revmap generation <<<");
+//            break;
+//        }
+//#endif
 
         QThread::yieldCurrentThread();
     }
@@ -492,11 +491,6 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
     if (parentProbability >= 0)
         degPerGenerationCnt++;
 
-    // Check alignment
-    if (inst->address() & 0x3UL) {
-        prob *= degForUnalignedAddr;
-        degForUnalignedAddrCnt++;
-    }
     // Check userland address
     if (inst->address() < _vmem->memSpecs().pageOffset) {
         prob *= degForUserlandAddr;
@@ -506,6 +500,11 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
     if (! _vmem->safeSeek((qint64) inst->address()) ) {
         prob *= degForInvalidAddr;
         degForInvalidAddrCnt++;
+    }
+    // Check alignment
+    else if (inst->address() & 0x3UL) {
+        prob *= degForUnalignedAddr;
+        degForUnalignedAddrCnt++;
     }
 
     // If this a union or struct, we have to consider the pointer members
@@ -520,22 +519,26 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
                     quint64 m_addr =
                             (quint64)m_type->toPointer(_vmem,
                                                        inst->memberAddress(i));
-                    // Check alignment
-                    if (m_addr & 0x3UL) {
-                        prob *= degForNonAlignedChildAddr;
-                        degForNonAlignedChildAddrCnt++;
-                    }
                     // Check validity
                     if (! _vmem->safeSeek((qint64) m_addr) ) {
                         prob *= degForInvalidChildAddr;
                         degForInvalidChildAddrCnt++;
                     }
+                    // Check alignment
+                    else if (m_addr & 0x3UL) {
+                        prob *= degForNonAlignedChildAddr;
+                        degForNonAlignedChildAddrCnt++;
+                    }
                 }
                 catch (MemAccessException) {
-                    break;
+                    // Address was invalid
+                    prob *= degForInvalidChildAddr;
+                    degForInvalidChildAddrCnt++;
                 }
                 catch (VirtualMemoryException) {
-                    break;
+                    // Address was invalid
+                    prob *= degForInvalidChildAddr;
+                    degForInvalidChildAddrCnt++;
                 }
             }
         }
