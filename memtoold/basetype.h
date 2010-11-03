@@ -139,10 +139,24 @@ public:
     /**
      * If this is a referencing type, all types are successively dereferenced
      * until the final non-referencing type is revealed
-     * @return non-referencing type if this is a referencing type, type()
+     * @param resolveTypes which types to automatically resolve, see
+     * TypeResolution
+     * @return non-referencing RealType if this is a referencing type, type()
      * otherwise
      */
-    RealType dereferencedType() const;
+    RealType dereferencedType(
+            int resolveTypes = trLexicalPointersArrays) const;
+
+    /**
+     * If this is a referencing type, all types are successively dereferenced
+     * until the final non-referencing type is revealed
+     * @param resolveTypes which types to automatically resolve, see
+     * TypeResolution
+     * @return non-referencing base type if this is a referencing type, \c this
+     * otherwise
+     */
+    const BaseType* dereferencedBaseType(
+            int resolveTypes = trLexicalPointersArrays) const;
 
     /**
      * Create a hash of that type based on type(), size() and name().
