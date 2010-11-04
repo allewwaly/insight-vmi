@@ -7,6 +7,7 @@
 
 #include "memorymap.h"
 #include <QTime>
+#include <unistd.h>
 #include "symfactory.h"
 #include "variable.h"
 #include "virtualmemory.h"
@@ -175,23 +176,18 @@ void MemoryMap::build()
                     << ", queue = " << queue_size << " " << indicator
                     << ", probability = " << (node ? node->probability() : 1.0));
             prev_queue_size = queue_size;
-#ifdef DEBUG
-//            if (processed > 0) {
-//                debugmsg(">>> Breaking revmap generation <<<");
-//                break;
-//            }
-#endif
         }
 
 //#ifdef DEBUG
 //        // emergency stop
-//        if (_shared->processed >= 5000000) {
+//        if (_shared->processed >= 50000) {
 //            debugmsg(">>> Breaking revmap generation <<<");
 //            break;
 //        }
 //#endif
 
-        QThread::yieldCurrentThread();
+        // Sleep for 100ms
+        usleep(100*1000);
     }
 
     // Interrupt all threads, doesn't harm if they are not running anymore
@@ -252,6 +248,7 @@ void MemoryMap::build()
     debugmsg("degForUnalignedAddrCnt       = " << degForUnalignedAddrCnt);
     debugmsg("degForUserlandAddrCnt        = " << degForUserlandAddrCnt);
     debugmsg("degPerGenerationCnt          = " << degPerGenerationCnt);
+
 
 /*
     QMap<int, PointerNodeMap::key_type>::iterator it;
@@ -507,20 +504,20 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
         degForUnalignedAddrCnt++;
     }
 
+    // Find the BaseType of this instance, dereference any lexical type(s)
+    const BaseType* instType = inst->type() ?
+            inst->type()->dereferencedBaseType(BaseType::trLexical) : 0;
 
     // If this a union or struct, we have to consider the pointer members
-    if ( inst->type() &&
-         (inst->type()->dereferencedType() & BaseType::trStructured) )
+    if ( instType &&
+         (instType->type() & BaseType::trStructured) )
     {
         const Structured* structured =
-                dynamic_cast<const Structured*>(
-                        inst->type()->dereferencedBaseType());
+                dynamic_cast<const Structured*>(instType);
         // Check address of all descendant pointers
         for (int i = 0; i < structured->members().size(); ++i) {
-            // TODO make sure this is correct!
             const BaseType* m_type =
                     structured->members().at(i)->refTypeDeep(BaseType::trLexical);
-//            const BaseType* m_type = inst->memberType(i, BaseType::trLexical);
 
             if (m_type && m_type->type() & BaseType::rtPointer) {
                 try {
