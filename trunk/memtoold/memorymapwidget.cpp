@@ -14,6 +14,11 @@
 #include <QLinkedList>
 #include <QTime>
 #include <QTimer>
+#include <QHelpEvent>
+#include <QToolTip>
+#include <QTextDocument>
+#include <QTextCursor>
+#include <QTextTable>
 #include <math.h>
 #include "memorymap.h"
 #include "virtualmemory.h"
@@ -21,7 +26,28 @@
 #include "debug.h"
 
 static const int margin = 3;
+static const int cellSize = 16;
 static const unsigned char MAX_PROB = 16;
+
+static const QColor probColor[MAX_PROB+1] = {
+        QColor(255,   0, 0),  //  0
+        QColor(255,  16, 0),  //  1
+        QColor(255,  32, 0),  //  2
+        QColor(255,  48, 0),  //  3
+        QColor(255,  64, 0),  //  4
+        QColor(255,  80, 0),  //  5
+        QColor(255,  96, 0),  //  6
+        QColor(255, 112, 0),  //  7
+        QColor(255, 128, 0),  //  8
+        QColor(224, 128, 0),  //  9
+        QColor(192, 128, 0),  // 10
+        QColor(160, 128, 0),  // 11
+        QColor(128, 128, 0),  // 12
+        QColor( 96, 128, 0),  // 13
+        QColor( 64, 128, 0),  // 14
+        QColor( 32, 128, 0),  // 15
+        QColor(  0, 128, 0)   // 16
+};
 
 //------------------------------------------------------------------------------
 
@@ -35,7 +61,7 @@ VisMapPiece::VisMapPiece(quint64 start, quint64 length, int type,
 
 MemoryMapWidget::MemoryMapWidget(const MemoryMap* map, QWidget *parent)
     : QWidget(parent), _map(map), _visMapValid(false), _address(-1),
-      _bytesPerPixelX(0), _bytesPerPixelY(0), _cols(0), _rows(0),
+      _bytesPerPixelF(0), _cols(0), _rows(0),
       _antialiasing(false), _isPainting(false),_isBuilding(false),
       _showOnlyKernelSpace(false), _shownAddrSpaceOffset(0)
 {
@@ -274,28 +300,33 @@ void MemoryMapWidget::resizeEvent(QResizeEvent* /*e*/)
     // Paint the bytes as squares into the visible widget area
     quint64 addrSpaceLen = visibleAddrSpaceLength();
 
-    double ratio = width() / (double) height();
-    _cols = (qint64) ceil(sqrt(addrSpaceLen * ratio));
-    _rows = addrSpaceLen / _cols;
-    if (addrSpaceLen % _cols != 0)
-        _rows++;
+//    double ratio = width() / (double) height();
+//    _cols = (qint64) ceil(sqrt(addrSpaceLen * ratio));
+//    _rows = addrSpaceLen / _cols;
+//    if (addrSpaceLen % _cols != 0)
+//        _rows++;
 
-    _bytesPerPixelX = _cols / (double) drawWidth();
-    _bytesPerPixelY = _rows / (double) drawHeight();
+    _cols = drawWidth() / cellSize;
+    _rows = drawHeight() / cellSize;
+
+    // TODO: Fix situations where addrSpaceLen < _cols * _rows
+//    _bytesPerPixelX = _cols / (double) drawWidth();
+//    _bytesPerPixelY = _rows / (double) drawHeight();
+    _bytesPerPixelF = addrSpaceLen / (double)(_cols * _rows);
+    _bytesPerPixelL = ceil(_bytesPerPixelF);
 }
 
 
 void MemoryMapWidget::mouseMoveEvent(QMouseEvent *e)
 {
-    int drawWidth = width() - 2*margin;
-    int drawHeight = height() - 2*margin;
-
     // Find out at which address the mouse pointer is
     int x = e->x() - margin, y = e->y() - margin;
-    if (x < 0 || y < 0 || x >= drawWidth || y >= drawHeight) return;
-    quint64 col = (quint64)(_bytesPerPixelX * x);
-    quint64 row = (quint64)(_bytesPerPixelY * y);
-    quint64 addr = row * _cols + col + visibleAddrSpaceStart();
+    if (x < 0 || y < 0 || x >= drawWidth() || y >= drawHeight())
+        return;
+
+    int c = x / cellSize, r = y / cellSize;
+
+    quint64 addr = (r * _cols + c) * _bytesPerPixelL + visibleAddrSpaceStart();
 
     if (_address != addr && addr < visibleAddrSpaceEnd()) {
         _address = addr;
@@ -317,28 +348,8 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
 
     QColor unusedColor(255, 255, 255);
     QColor usedColor(0, 0, 0);
-    QColor gridColor(255, 255, 255);
+    QColor gridColor(240, 240, 240);
     QColor bgColor(255, 255, 255);
-
-    static const QColor probColor[MAX_PROB+1] = {
-            QColor(255,   0, 0),  //  0
-            QColor(255,  16, 0),  //  1
-            QColor(255,  32, 0),  //  2
-            QColor(255,  48, 0),  //  3
-            QColor(255,  64, 0),  //  4
-            QColor(255,  80, 0),  //  5
-            QColor(255,  96, 0),  //  6
-            QColor(255, 112, 0),  //  7
-            QColor(255, 128, 0),  //  8
-            QColor(224, 128, 0),  //  9
-            QColor(192, 128, 0),  // 10
-            QColor(160, 128, 0),  // 11
-            QColor(128, 128, 0),  // 12
-            QColor( 96, 128, 0),  // 13
-            QColor( 64, 128, 0),  // 14
-            QColor( 32, 128, 0),  // 15
-            QColor(  0, 128, 0)   // 16
-    };
 
     QPainter painter(this);
     if (_antialiasing)
@@ -346,33 +357,38 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
 
     // Draw in "byte"-coordinates, scale bytes to entire widget
     painter.translate(margin, margin);
-    painter.scale(1.0 / _bytesPerPixelX, 1.0 / _bytesPerPixelY);
+//    painter.scale(1.0 / _bytesPerPixelX, 1.0 / _bytesPerPixelY);
     // Clear widget
     painter.setPen(Qt::NoPen);
     painter.setBrush(bgColor);
-    painter.drawRect(0, 0, _cols, _rows);
-    // Draw the whole address space  as "unused"
-    painter.setBrush(unusedColor);
-    quint64 h = totalAddrSpace() / _cols;
-    if (h >= 1)
-        painter.drawRect(0, 0, _cols, h);
-
-    painter.drawRect(0, h, totalAddrSpace() - (_cols * h), 1);
+    painter.drawRect(0, 0, _cols * cellSize, _rows * cellSize);
+//    // Draw the whole address space  as "unused"
+//    painter.setBrush(unusedColor);
+//    quint64 h = totalAddrSpace() / _cols;
+//    if (h >= 1)
+//        painter.drawRect(0, 0, _cols, h);
+//
+//    painter.drawRect(0, h, totalAddrSpace() - (_cols * h), 1);
 
     // Draw all used parts
     painter.setBrush(usedColor);
     int lastColor = -1;
+
+    // State of current memory cell
+    struct {
+        quint64 relStart, nextRelStart, index;
+        int elemCount;
+        VisMapPiece::PropType maxProb, minProb;
+        bool isFirst;
+    } cell;
+
+    cell.isFirst = true;
 
     for (int i = 0; i < _mappings.size(); ++i) {
 
         if (_mappings[i].address + _mappings[i].length < visibleAddrSpaceStart() ||
                 _mappings[i].address > visibleAddrSpaceEnd())
             continue;
-
-        if (_mappings[i].probability != lastColor) {
-            lastColor = _mappings[i].probability;
-            painter.setBrush(probColor[lastColor]);
-        }
 
         quint64 len = _mappings[i].length;
         // Find the row and column of the offset
@@ -385,44 +401,214 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
         }
         else
             relAddr = _mappings[i].address - visibleAddrSpaceStart();
-        quint64 r = relAddr / _cols;
-        quint64 c = relAddr % _cols;
 
-        // The memory region is drawn in three operations: the first line, the
-        // middle (rectangular) block, and finally the list line.
+        while (len > 0) {
+            // In which memory cell does current address lie?
+            quint64 newIndex = relAddr / _bytesPerPixelL;
+            // Does this mapping start in a new cell?
+            if (cell.isFirst || cell.index != newIndex) {
+                if (!cell.isFirst) {
+                    // Draw previous cell
+                    quint64 r = cell.index / _cols;
+                    quint64 c = cell.index % _cols;
 
-        // Draw the first line
-        if (c != 0) {
-            quint64 currLen = (_cols - c > len) ? len : _cols - c;
-            painter.drawRect(c, r, currLen, 1);
-            // Shorten remaining length by no. of bytes drawn
-            len -= currLen;
-            // Next drawing starts in next line
-            r++;
+                    if (cellSize == 1) {
+                        if (cell.maxProb != lastColor) {
+                            lastColor = cell.maxProb;
+                            painter.setPen(probColor[lastColor]);
+                        }
+                        painter.drawPoint(c, r);
+                    }
+                    else {
+                        if (cell.maxProb != lastColor) {
+                            lastColor = cell.maxProb;
+                            painter.setBrush(probColor[lastColor]);
+                        }
+                        painter.drawRect(c * cellSize, r * cellSize,
+                                cellSize - 1, cellSize - 1);
+                    }
+                }
+                // Init cell with new values
+                cell.index = newIndex;
+                cell.relStart = cell.index * _bytesPerPixelL;
+                cell.nextRelStart = (cell.index + 1) * _bytesPerPixelL;
+                cell.elemCount = 1;
+                cell.minProb = cell.maxProb = _mappings[i].probability;
+                cell.isFirst = false;
+            }
+            else {
+                ++cell.elemCount;
+                if (cell.maxProb < _mappings[i].probability)
+                    cell.maxProb = _mappings[i].probability;
+                if (cell.minProb > _mappings[i].probability)
+                    cell.minProb = _mappings[i].probability;
+            }
+
+            // Handle cases where relAddr + len > cell.nextRelStart
+            if (relAddr + len > cell.nextRelStart) {
+                len -= cell.nextRelStart - relAddr;
+                relAddr = cell.nextRelStart;
+            }
+            else
+                break;
         }
-        // Draw the largest possible block
-        h = len / _cols;
-        if (h > 0) {
-            painter.drawRect(0, r, _cols, h);
-            // Shorten length by drawn bytes
-            len %= _cols;
-            // Next drawing starts h lines below
-            r += h;
-        }
-        // Draw the last line
-        if (len > 0) {
-            painter.drawRect(0, r, len, 1);
-        }
+
     }
 
     // Only draw grid lines if we have at least 3 pixel per byte
-    if (_bytesPerPixelX <= 1.0/3 && _bytesPerPixelY <= 1.0/3) {
+    if (cellSize > 1 && gridColor != unusedColor) {
         painter.setPen(gridColor);
-        for (int i = 0; i <= _cols; i++)
-            painter.drawLine(i, 0, i, _rows);
-        for (int i = 0; i <= _rows; i++)
-            painter.drawLine(0, i, _cols, i);
+        for (int i = 1; i < _cols; i++)
+            painter.drawLine(i * cellSize - 1, 0, i * cellSize - 1, _rows * cellSize - 1);
+        for (int i = 1; i < _rows; i++)
+            painter.drawLine(0, i * cellSize - 1, _cols * cellSize - 1, i * cellSize - 1);
     }
+}
+
+
+bool MemoryMapWidget::event(QEvent *event)
+{
+    if (event->type() == QEvent::ToolTip) {
+        QHelpEvent* helpEvent = static_cast<QHelpEvent *>(event);
+
+        // Find out at which address the mouse pointer is
+        int x = helpEvent->x() - margin, y = helpEvent->y() - margin;
+        if (x < 0 || y < 0 || x >= drawWidth() || y >= drawHeight()) {
+            QToolTip::hideText();
+            event->ignore();
+        }
+        else {
+            int c = x / cellSize, r = y / cellSize;
+            quint64 addrStart = (r * _cols + c) * _bytesPerPixelL + visibleAddrSpaceStart();
+            quint64 addrEnd = addrStart + _bytesPerPixelL - 1;
+            int width = _map->vmem()->memSpecs().sizeofUnsignedLong << 1;
+
+            QTextDocument doc;
+            QTextCursor cur(&doc);
+
+            QTextBlockFormat hdrBlkFmt;
+            hdrBlkFmt.setAlignment(Qt::AlignHCenter);
+//            QTextCharFormat hdrChrFmt;
+//            hdrChrFmt.setFontPointSize(doc.defaultFont().pointSizeF());
+//            hdrChrFmt.setFontWeight(QFont::Bold);
+//            hdrChrFmt.setFontFixedPitch(true);
+
+            QFont font; // = doc.defaultFont();
+            font.setPointSizeF(8);
+            doc.setDefaultFont(font);
+
+            const QTextBlockFormat defBlkFmt = cur.blockFormat();
+            const QTextCharFormat defCharFmt = cur.charFormat();
+            QTextBlockFormat cellProbBlkFmt = cur.blockFormat();
+            cellProbBlkFmt.setAlignment(Qt::AlignRight);
+            QTextCharFormat cellAddrCharFmt = cur.charFormat();
+            cellAddrCharFmt.setFontFixedPitch(true);
+            QTextCharFormat cellTypeCharFmt = cur.charFormat();
+            cellTypeCharFmt.setFontWeight(QFont::Bold);
+            QTextCharFormat cellNameCharFmt = cur.charFormat();
+//            cellNameCharFmt.setFontWeight(QFont::Bold);
+            QTextCharFormat cellProbCharFmt = cur.charFormat();
+
+            cur.insertHtml(QString("<h3><tt>0x%1</tt>&nbsp;&ndash;&nbsp;<tt>0x%2</tt></h3>")
+                            .arg(addrStart, width, 16, QChar('0'))
+                            .arg(addrEnd, width, 16, QChar('0')));
+            cur.mergeBlockFormat(hdrBlkFmt);
+//            cur.setCharFormat(hdrChrFmt);
+
+
+            QString elem;
+            PointerNodeMap::const_iterator it = _map->vmemMap().lowerBound(addrStart);
+
+            // Move iterator up to 1kB to the left to care for overlapping
+            // nodes
+            while (it != _map->vmemMap().constEnd() &&
+                   it !=_map->vmemMap().constBegin() &&
+                   it.key() + 1024 > addrStart)
+                --it;
+
+
+            typedef QList<const MemoryMapNode*> NodeList;
+            NodeList nodes;
+
+            while (it != _map->vmemMap().constEnd() && it.key() <= addrEnd) {
+                const MemoryMapNode* node = it.value();
+                // Make sure this element falls into the memory chunk
+                if (node->address() + node->size() >= addrStart)
+                    nodes.append(node);
+                ++it;
+            }
+
+            qSort(nodes.begin(), nodes.end(), NodeProbabilityGreaterThan);
+
+            if (!nodes.isEmpty()) {
+                const int maxTables = 1;
+                const int maxRowsPerTable = 30;
+                int rows = nodes.size() > maxTables * maxRowsPerTable ?
+                        maxTables * maxRowsPerTable : nodes.size();
+
+                QTextTableFormat tabFmt;
+                tabFmt.setCellSpacing(2);
+                tabFmt.setBorderStyle(QTextFrameFormat::BorderStyle_None);
+
+                cur.insertBlock(defBlkFmt, defCharFmt);
+                cur.insertHtml(QString("<b>%1 object(s)</b>").arg(nodes.size()));
+
+                cur.insertBlock(defBlkFmt, defCharFmt);
+
+                int rowCnt = 0;
+                for (NodeList::iterator it = nodes.begin();
+                        it != nodes.end() && rowCnt < rows;
+                        ++it, ++rowCnt)
+                {
+                    if (rowCnt % maxRowsPerTable == 0) {
+                        int r = rows - rowCnt >= maxRowsPerTable ?
+                                maxRowsPerTable : rows - rowCnt;
+                        cur.movePosition(QTextCursor::End);
+                        cur.insertTable(r, 4, tabFmt);
+                    }
+
+                    const MemoryMapNode* node = *it;
+                    int colorIdx = (unsigned char)(MAX_PROB * node->probability());
+                    cellProbCharFmt.setForeground(QBrush(probColor[colorIdx]));
+
+                    cur.setBlockFormat(defBlkFmt);
+                    cur.setCharFormat(cellAddrCharFmt);
+                    cur.insertText(QString("0x%1")
+                            .arg(node->address(), width, 16, QChar('0')));
+                    cur.movePosition(QTextCursor::NextCell);
+
+                    cur.setCharFormat(cellTypeCharFmt);
+                    cur.insertText(node->type()->prettyName());
+                    cur.movePosition(QTextCursor::NextCell);
+
+                    cur.setCharFormat(cellNameCharFmt);
+                    QString name = node->fullName();
+                    if (name.length() > 100)
+                        name.replace(49, name.length() - 97, "...");
+                    cur.insertText(name);
+                    cur.movePosition(QTextCursor::NextCell);
+
+                    cur.setBlockFormat(cellProbBlkFmt);
+                    cur.setCharFormat(cellProbCharFmt);
+                    cur.insertText(QString("%1%")
+                            .arg(node->probability() * 100.0, 0, 'f', 1));
+                    cur.movePosition(QTextCursor::NextCell);
+                }
+
+                if (rows < nodes.size()) {
+                    cur.movePosition(QTextCursor::End);
+                    cur.insertBlock(defBlkFmt, defCharFmt);
+                    cur.insertText(QString("(%1 more)")
+                            .arg(nodes.size() - rows));
+                }
+            }
+
+            QToolTip::showText(helpEvent->globalPos(), doc.toHtml());
+        }
+
+        return true;
+     }
+     return QWidget::event(event);
 }
 
 

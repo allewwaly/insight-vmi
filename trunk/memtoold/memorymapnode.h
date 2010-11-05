@@ -221,4 +221,34 @@ inline float MemoryMapNode::probability() const
 }
 
 
+/**
+ * Comparison function to sort a container for MemoryMapNode pointers in
+ * ascending order of their probability.
+ * @param node1
+ * @param node2
+ * @return \c true if node1->probability() < node2->probability(), \c false
+ * otherwise
+ */
+static inline bool NodeProbabilityLessThan(const MemoryMapNode* node1,
+        const MemoryMapNode* node2)
+{
+    return node1->probability() < node2->probability();
+}
+
+
+/**
+ * Comparison function to sort a container for MemoryMapNode pointers in
+ * descending order of their probability.
+ * @param node1
+ * @param node2
+ * @return \c true if node1->probability() > node2->probability(), \c false
+ * otherwise
+ */
+static inline bool NodeProbabilityGreaterThan(const MemoryMapNode* node1,
+        const MemoryMapNode* node2)
+{
+    return node1->probability() > node2->probability();
+}
+
+
 #endif /* MEMORYMAPNODE_H_ */
