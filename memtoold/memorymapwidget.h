@@ -25,12 +25,13 @@ enum VisMapPieceTypes {
 
 struct VisMapPiece
 {
+    typedef unsigned char PropType;
     VisMapPiece(quint64 start = 0, quint64 length = 0, int type = ptUsed,
             unsigned char probability = 0);
     quint64 address;
     quint64 length;
     int type;
-    unsigned char probability;
+    PropType probability;
 };
 
 typedef QList<VisMapPiece> MapPieceList;
@@ -67,6 +68,7 @@ protected:
     void paintEvent(QPaintEvent* e);
     void mouseMoveEvent(QMouseEvent* e);
     void resizeEvent(QResizeEvent* event);
+    bool event(QEvent *event);
 
 private slots:
     void buildVisMemMap();
@@ -79,8 +81,10 @@ private:
     MapPieceList _mappings;
     bool _visMapValid;
     quint64 _address;
-    double _bytesPerPixelX;
-    double _bytesPerPixelY;
+//    double _bytesPerPixelX;
+//    double _bytesPerPixelY;
+    double _bytesPerPixelF;
+    quint64 _bytesPerPixelL;
     qint64 _cols;
     qint64 _rows;
     int _maxIntensity;
