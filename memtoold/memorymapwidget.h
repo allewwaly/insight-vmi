@@ -47,6 +47,7 @@ public:
     virtual ~MemoryMapWidget();
 
     quint64 totalAddrSpace() const;
+    quint64 totalAddrSpaceEnd() const;
     quint64 visibleAddrSpaceStart() const;
     quint64 visibleAddrSpaceEnd() const;
     quint64 visibleAddrSpaceLength() const;
@@ -83,7 +84,7 @@ private:
     quint64 _address;
 //    double _bytesPerPixelX;
 //    double _bytesPerPixelY;
-    double _bytesPerPixelF;
+//    double _bytesPerPixelF;
     quint64 _bytesPerPixelL;
     qint64 _cols;
     qint64 _rows;
