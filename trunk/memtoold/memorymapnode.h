@@ -18,6 +18,7 @@ class MemoryMapNode;
 
 /// A list of MemoryMapNode's
 typedef QList<MemoryMapNode*> NodeList;
+typedef QList<const MemoryMapNode*> ConstNodeList;
 
 
 /**

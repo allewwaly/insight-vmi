@@ -588,3 +588,28 @@ bool MemoryMap::isBuilding() const
 {
     return _isBuilding;
 }
+
+
+ConstNodeList MemoryMap::vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const
+{
+    PointerNodeMap::const_iterator it = _vmemMap.lowerBound(addrStart);
+
+    // Move iterator up to 1kB to the left to care for overlapping
+    // nodes
+    while (it != _vmemMap.constEnd() &&
+           it != _vmemMap.constBegin() &&
+           it.key() + 1024 > addrStart)
+        --it;
+
+    ConstNodeList nodes;
+
+    while (it != _vmemMap.constEnd() && it.key() <= addrEnd) {
+        const MemoryMapNode* node = it.value();
+        // Make sure this element falls into the memory chunk
+        if (node->address() + node->size() >= addrStart)
+            nodes.append(node);
+        ++it;
+    }
+
+    return nodes;
+}

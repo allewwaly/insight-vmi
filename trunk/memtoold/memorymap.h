@@ -147,6 +147,16 @@ public:
     const PointerNodeMap& vmemMap() const;
 
     /**
+     * Finds all objects in virtual memory that occupy space between
+     * \a addrStart and \a addrEnd. Objects that only partly fall into that
+     * range are included.     *
+     * @param addrStart the virtual start address
+     * @param addrEnd the virtual end address (including)
+     * @return a list of MemoryMapNode objects
+     */
+    ConstNodeList vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const;
+
+    /**
      * This gives access to all allocated objects and the page size of the
      * corresponding page in the physical address space, indexed by their
      * address. Use pmemMap().lowerBound() or pmemMap().upperBound() to find an
