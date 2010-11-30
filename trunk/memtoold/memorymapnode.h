@@ -122,6 +122,11 @@ public:
      */
 	quint64 address() const;
 
+	/**
+	 * @return the virtual address of the last byte of the variable in memory
+	 */
+	quint64 endAddress() const;
+
     /**
      * Convenience function to access type()->size().
      * @return the size of this instance's type
