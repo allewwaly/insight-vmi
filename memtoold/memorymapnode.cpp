@@ -122,3 +122,17 @@ void MemoryMapNode::updateProbability(const Instance* givenInst)
             _children[i]->updateProbability();
     }
 }
+
+
+quint64 MemoryMapNode::endAddress() const
+{
+    if (size() > 0) {
+        if (_belongsTo->vaddrSpaceEnd() - size() <= _address)
+            return _belongsTo->vaddrSpaceEnd();
+        else
+            return _address + size() - 1;
+    }
+    return _address;
+}
+
+
