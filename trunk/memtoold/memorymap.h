@@ -149,6 +149,12 @@ public:
     const PointerNodeMap& vmemMap() const;
 
     /**
+     * @return the address of the last byte in virtual memory, i. e., either
+     * \c 0xFFFFFFFF or \c 0xFFFFFFFFFFFFFFFF.
+     */
+    quint64 vaddrSpaceEnd() const;
+
+    /**
      * Finds all objects in virtual memory that occupy space between
      * \a addrStart and \a addrEnd. Objects that only partly fall into that
      * range are included.     *

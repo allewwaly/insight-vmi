@@ -615,3 +615,10 @@ ConstNodeList MemoryMap::vmemMapsInRange(quint64 addrStart, quint64 addrEnd) con
 
     return nodes;
 }
+
+
+quint64 MemoryMap::vaddrSpaceEnd() const
+{
+    return (_vmem && _vmem->memSpecs().arch == MemSpecs::x86_64) ?
+            0xFFFFFFFFFFFFFFFFUL : 0xFFFFFFFFUL;
+}
