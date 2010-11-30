@@ -65,12 +65,14 @@ struct BuilderSharedState
     {
         queue.clear();
         processed = threadCount = vmemReading = vmemWriting = 0;
+        maxObjSize = 0;
         lastNode = 0;
         for (int i = 0; i < MAX_BUILDER_THREADS; ++i)
             currAddresses[i] = 0;
     }
 
     int threadCount, vmemReading, vmemWriting;
+    unsigned int maxObjSize;
     quint64 currAddresses[MAX_BUILDER_THREADS];
     QMutex perThreadLock[MAX_BUILDER_THREADS];
     QWaitCondition threadDone[MAX_BUILDER_THREADS];

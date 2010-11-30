@@ -48,6 +48,7 @@ MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
 MemoryMap::~MemoryMap()
 {
     clear();
+    delete _shared;
 }
 
 
@@ -227,6 +228,7 @@ void MemoryMap::build()
     debugmsg(_pointersTo.size() << " pointers to "
             << _pointersTo.uniqueKeys().size() << " addresses");
     debugmsg("stack.size() = " << _shared->queue.size());
+    debugmsg("maxObjSize = " << _shared->maxObjSize);
 
     // calculate average type size
     qint64 totalTypeSize = 0;
@@ -594,11 +596,11 @@ ConstNodeList MemoryMap::vmemMapsInRange(quint64 addrStart, quint64 addrEnd) con
 {
     PointerNodeMap::const_iterator it = _vmemMap.lowerBound(addrStart);
 
-    // Move iterator up to 1kB to the left to care for overlapping
+    // Move iterator up to maxObjSize to the left to care for overlapping
     // nodes
     while (it != _vmemMap.constEnd() &&
            it != _vmemMap.constBegin() &&
-           it.key() + 1024 > addrStart)
+           it.key() + _shared->maxObjSize > addrStart)
         --it;
 
     ConstNodeList nodes;
