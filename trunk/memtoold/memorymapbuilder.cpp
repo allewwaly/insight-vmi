@@ -60,6 +60,8 @@ void MemoryMapBuilder::run()
         // Insert in non-critical (non-exception prone) mappings
         shared->typeInstancesLock.lock();
         _map->_typeInstances.insert(node->type()->id(), node);
+        if (shared->maxObjSize < node->size())
+            shared->maxObjSize = node->size();
         shared->typeInstancesLock.unlock();
 
         // try to save the physical mapping
