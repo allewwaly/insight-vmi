@@ -38,8 +38,8 @@ const QString& MemoryMap::insertName(const QString& name)
 
 
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
-    : _factory(factory), _vmem(vmem), _isBuilding(false),
-      _shared(new BuilderSharedState)
+    : _factory(factory), _vmem(vmem), _vmemTree(vaddrSpaceEnd()),
+      _isBuilding(false), _shared(new BuilderSharedState)
 {
 	clear();
 }
@@ -63,6 +63,7 @@ void MemoryMap::clear()
     _typeInstances.clear();
     _pmemMap.clear();
     _vmemMap.clear();
+    _vmemTree.clear();
     _vmemAddresses.clear();
 
 #ifdef DEBUG
@@ -122,6 +123,10 @@ void MemoryMap::build()
 
     debugmsg("Building reverse map with " << _shared->threadCount << " threads.");
 
+//#ifdef DEBUG
+//    int dotcnt = 0;
+//#endif
+
     // Go through the global vars and add their instances to the queue
     for (VariableList::const_iterator it = _factory->vars().constBegin();
             it != _factory->vars().constEnd(); ++it)
@@ -132,8 +137,18 @@ void MemoryMap::build()
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
                 _vmemMap.insertMulti(node->address(), node);
+                _vmemTree.insert(node);
+//#ifdef DEBUG
+//                debugmsg("Added: " << node->name());
+//#endif
                 _vmemAddresses.insert(node->address());
                 _shared->queue.insert(node->probability(), node);
+//#ifdef DEBUG
+//                if (++dotcnt >= 10) {
+//                    shell->interrupt();
+//                    break;
+//                }
+//#endif
             }
         }
         catch (GenericException e) {
@@ -153,6 +168,10 @@ void MemoryMap::build()
         threads[i] = new MemoryMapBuilder(this, i);
         threads[i]->start();
     }
+
+//#ifdef DEBUG
+//    usleep(500*1000);
+//#endif
 
     bool firstLoop = true;
 
@@ -251,6 +270,11 @@ void MemoryMap::build()
     debugmsg("degForUserlandAddrCnt        = " << degForUserlandAddrCnt);
     debugmsg("degPerGenerationCnt          = " << degPerGenerationCnt);
 
+//#ifdef DEBUG
+//    QString dotfile = "vmemTree.dot";
+//    _vmemTree.outputDotFile(dotfile);
+//    debugmsg("Wrote vmemTree to " << dotfile << ".");
+//#endif
 
 /*
     QMap<int, PointerNodeMap::key_type>::iterator it;
@@ -433,6 +457,7 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
 
             _vmemAddresses.insert(child->address());
             _vmemMap.insertMulti(child->address(), child);
+//            _vmemTree.insert(child);
 
             // Release the reading and the writing lock
             _shared->vmemReadingLock.unlock();
