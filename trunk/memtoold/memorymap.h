@@ -18,6 +18,7 @@
 #include <QReadWriteLock>
 #include "memorymapnode.h"
 #include "priorityqueue.h"
+#include "memoryrangetree.h"
 #include "debug.h"
 
 class SymFactory;
@@ -275,6 +276,7 @@ private:
     PointerNodeHash _pointersTo; ///< holds all pointers that point to a certain address
     IntNodeHash _typeInstances;  ///< holds all instances of a given type ID
     PointerNodeMap _vmemMap;     ///< map of all used kernel-space virtual memory
+    MemoryRangeTree _vmemTree;
     PointerIntNodeMap _pmemMap;  ///< map of all used physical memory
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built

@@ -8,7 +8,10 @@
 #ifndef MEMORYRANGETREE_H_
 #define MEMORYRANGETREE_H_
 
+#include <QString>
 #include <QList>
+
+//#define ENABLE_DOT_CODE 1
 
 struct MemoryRangeTreeNode;
 class MemoryMapNode;
@@ -22,6 +25,7 @@ typedef QList<const MemoryMapNode*> ConstNodeList;
  */
 class MemoryRangeTree
 {
+    friend struct MemoryRangeTreeNode;
 public:
     typedef ConstNodeList NodeList;
 
@@ -30,6 +34,7 @@ public:
 
     bool isEmpty() const { return _root != 0; };
     int size() const;
+    int objectCount() const;
     void clear();
 
     void insert(const MemoryMapNode* node);
@@ -44,11 +49,18 @@ public:
      */
     ConstNodeList objInRange(quint64 addrStart, quint64 addrEnd) const;
 
+#ifdef ENABLE_DOT_CODE
+    void outputDotFile(const QString& filename = QString()) const;
+#endif
+
+    quint64 addrSpaceEnd() const;
+
 private:
     MemoryRangeTreeNode* _root;
     MemoryRangeTreeNode* _first;
     MemoryRangeTreeNode* _last;
-    int _size;
+    int _size;                      ///< No. of MemoryRangeTreeNode s
+    int _objectCount;               ///< No. of unique MemoryMapNode objects
     quint64 _addrSpaceEnd;
 };
 

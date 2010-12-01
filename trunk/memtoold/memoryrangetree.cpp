@@ -6,42 +6,47 @@
  */
 
 #include "memoryrangetree.h"
+#include <QFile>
+#include "shell.h"
 #include "memorymapnode.h"
 #include "debug.h"
 
 struct MemoryRangeTreeNode
 {
-    explicit MemoryRangeTreeNode(quint64 addrStart, quint64 addrEnd,
-            MemoryRangeTreeNode* parent = 0, MemoryRangeTreeNode* left = 0
-            , MemoryRangeTreeNode* right = 0)
-        : parent(parent), left(left), right(right), addrStart(addrStart),
-          addrEnd(addrEnd)
+    MemoryRangeTreeNode(MemoryRangeTree* tree, quint64 addrStart,
+            quint64 addrEnd, MemoryRangeTreeNode* parent = 0)
+        : tree(tree), parent(parent), lChild(0), rChild(0), next(0), prev(0),
+          addrStart(addrStart), addrEnd(addrEnd)
     {
+        ++tree->_size;
+#ifdef ENABLE_DOT_CODE
+        id = nodeId++;
+#endif
     }
 
-    explicit MemoryRangeTreeNode(MemoryRangeTreeNode* parent = 0,
-            MemoryRangeTreeNode* left = 0, MemoryRangeTreeNode* right = 0)
-        : parent(parent), left(left), right(right), addrStart(0), addrEnd(0)
+    ~MemoryRangeTreeNode()
     {
+        --tree->_size;
     }
+
 
     void deleteChildren()
     {
-        if (left) {
-            left->deleteChildren();
-            delete left;
-            left = 0;
+        if (lChild) {
+            lChild->deleteChildren();
+            delete lChild;
+            lChild = 0;
         }
-        if (right) {
-            right->deleteChildren();
-            delete right;
-            right = 0;
+        if (rChild) {
+            rChild->deleteChildren();
+            delete rChild;
+            rChild = 0;
         }
     }
 
     bool isLeaf() const
     {
-        return left == 0 && right == 0;
+        return lChild == 0 && rChild == 0;
     }
 
     void insert(const MemoryMapNode* node)
@@ -49,36 +54,76 @@ struct MemoryRangeTreeNode
         nodeProps.update(node);
 
         if (isLeaf()) {
-            // If the node fits in here, then add it here
-            if (node->address() <= addrStart && node->endAddress() == addrEnd) {
-                // TODO Add node here
-            }
-            else if (node->address() == addrStart && node->endAddress() >= addrEnd) {
-                // TODO Add node here
-            }
-            else {
-                // TODO Split up this node
+            nodes.append(node);
+//            if (! ((node->address() == addrStart && node->address() >= addrEnd) ||
+//                   (node->address() <= addrStart && node->endAddress() == addrEnd) ||
+//                   (node->address() < addrStart && node->endAddress() > addrEnd)) )
+//            {
+//                if (addrEnd == addrStart) {
+//                    debugmsg("addrStart       = 0x" << QString("%1").arg(addrStart, 0, 16));
+//                    debugmsg("addrEnd         = 0x" << QString("%1").arg(addrEnd, 0, 16));
+//                    debugmsg("node->address() = 0x" << QString("%1").arg(node->address(), 0, 16));
+//                    debugmsg("node->endAddr() = 0x" << QString("%1").arg(node->endAddress(), 0, 16));
+//                    debugmsg("node->size()    = " << node->size());
+//                    return;
+//                }
+//                split();
+//            }
+
+            // If the MemoryMapNode doesn't stretch over this node's entire
+            // region, then split split up this MemoryRangeTreeNode
+//            if (node->address() > addrStart || node->endAddress() < addrEnd) {
+            quint64 nodeAddress = node->address();
+            quint64 nodeEndAddress = node->endAddress();
+            if (nodeAddress > addrStart || nodeEndAddress < addrEnd) {
+                if (addrEnd == addrStart) {
+                    debugmsg("addrStart       = 0x" << QString("%1").arg(addrStart, 0, 16));
+                    debugmsg("addrEnd         = 0x" << QString("%1").arg(addrEnd, 0, 16));
+                    debugmsg("node->address() = 0x" << QString("%1").arg(node->address(), 0, 16));
+                    debugmsg("node->endAddr() = 0x" << QString("%1").arg(node->endAddress(), 0, 16));
+                    debugmsg("node->size()    = " << node->size());
+                    return;
+                }
+                split();
             }
         }
         else {
-            // TODO Pass this node to one or both of the children.
+            if (node->address() <= lChild->addrEnd)
+                lChild->insert(node);
+            if (node->endAddress() >= rChild->addrStart)
+                rChild->insert(node);
         }
-
-        nodes.append(node);
     }
 
-    void split()
+    inline void split()
     {
-        assert(left == 0 && right == 0);
-        assert(addrEnd - addrStart > 1);
+        assert(lChild == 0 && rChild == 0);
+        assert(addrEnd > addrStart);
 
-        // Find out the spliting address
-        quint64 lAddrEnd = addrStart >> 1;
+        // Find out the splitting address
+        quint64 lAddrEnd = addrStart + ((addrEnd - addrStart) >> 1);
         quint64 rAddrStart = lAddrEnd + 1;
 
-        // Create new left and right nodes
-        left = new MemoryRangeTreeNode(addrStart, lAddrEnd, this);
-        right = new MemoryRangeTreeNode(rAddrStart, addrEnd, this);
+        // Create new lChild and rChild nodes
+        lChild = new MemoryRangeTreeNode(tree, addrStart, lAddrEnd, this);
+        rChild = new MemoryRangeTreeNode(tree, rAddrStart, addrEnd, this);
+
+        // Link the children into the next/prev list
+        if (prev)
+            prev->next = lChild;
+        lChild->next = rChild;
+        rChild->next = next;
+        if (next)
+            next->prev = rChild;
+        rChild->prev = lChild;
+        lChild->prev = prev;
+        prev = next = 0;
+
+        // Correct the tree's first and last pointers, if needed
+        if (this == tree->_first)
+            tree->_first = lChild;
+        if (this == tree->_last)
+            tree->_last = rChild;
 
         // Move all nodes to one or both of the children
         for (ConstNodeList::iterator it = nodes.begin(); it != nodes.end();
@@ -86,13 +131,79 @@ struct MemoryRangeTreeNode
         {
             const MemoryMapNode* node = *it;
             if (node->address() <= lAddrEnd)
-                left->insert(node);
-            if (node->address() + node->size() > rAddrStart)
-                right->insert(node);
+                lChild->insert(node);
+            if (node->endAddress() >= rAddrStart)
+                rChild->insert(node);
         }
 
         nodes.clear();
     }
+
+#ifdef ENABLE_DOT_CODE
+    void outputDotCode(QTextStream& out) const
+    {
+        int width = tree->addrSpaceEnd() > (1UL << 32) ? 16 : 8;
+
+        // Node's own label
+        out << QString("\tnode%1 [label=\"0x%2\\n0x%3\"];")
+                    .arg(id)
+                    .arg(addrStart, width, 16, QChar('0'))
+                    .arg(addrEnd, width, 16, QChar('0'))
+            << endl;
+
+        if (!nodes.isEmpty()) {
+            QString s;
+            // Move all nodes to one or both of the children
+            for (ConstNodeList::const_iterator it = nodes.begin();
+                    it != nodes.end(); ++it)
+            {
+                const MemoryMapNode* node = *it;
+                if (!s.isEmpty())
+                    s += "\\n";
+                s += QString("%1: 0x%2 - 0x%3 (%4 byte)")
+                        .arg(node->name())
+                        .arg(node->address(), width, 16, QChar('0'))
+                        .arg(node->endAddress(), width, 16, QChar('0'))
+                        .arg(node->size());
+            }
+
+            out << QString("\titems%1 [shape=box,style=filled,label=\"%2\"];")
+                    .arg(id)
+                    .arg(s)
+                << endl;
+            out << QString("\tnode%1 -> items%1;")
+                    .arg(id)
+                << endl;
+        }
+
+        if (!isLeaf()) {
+            // Let children write their code, including their label
+            lChild->outputDotCode(out);
+            rChild->outputDotCode(out);
+
+            // Node's connections to the children
+            out << QString("\tnode%1 -> node%2 [label=\"0\"];")
+                    .arg(id)
+                    .arg(lChild->id)
+                << endl;
+            out << QString("\tnode%1 -> node%2 [label=\"1\"];")
+                    .arg(id)
+                    .arg(rChild->id)
+                << endl;
+        }
+
+//        if (next)
+//            out << QString("\tnode%1 -> node%2 [style=dashed];")
+//                    .arg(id)
+//                    .arg(next->id)
+//                << endl;
+//        if (prev)
+//            out << QString("\tnode%1 -> node%2 [style=dashed];")
+//                    .arg(id)
+//                    .arg(prev->id)
+//                << endl;
+    }
+#endif
 
     struct {
         float minProbability;
@@ -114,17 +225,35 @@ struct MemoryRangeTreeNode
     } nodeProps;
 
 
-    MemoryRangeTreeNode *parent, *left, *right;
-    quint64 addrStart, addrEnd;
+    MemoryRangeTree* tree;         ///< Tree holding this node
+    MemoryRangeTreeNode* parent;   ///< Parent node
+    MemoryRangeTreeNode* lChild;   ///< Left child
+    MemoryRangeTreeNode* rChild;   ///< Right child
+    MemoryRangeTreeNode* next;     ///< Next node in sorted order
+    MemoryRangeTreeNode* prev;     ///< Previous node in sorted order
+    quint64 addrStart;             ///< Start address of covered memory region
+    quint64 addrEnd;               ///< End address of covered memory region
+#ifdef ENABLE_DOT_CODE
+    int id;
+#endif
 
     /// If this is a leaf, then this list holds the objects within this leaf
     MemoryRangeTree::NodeList nodes;
+
+#ifdef ENABLE_DOT_CODE
+    static int nodeId;
+#endif
 };
+
+#ifdef ENABLE_DOT_CODE
+int MemoryRangeTreeNode::nodeId = 0;
+#endif
 
 //------------------------------------------------------------------------------
 
 MemoryRangeTree::MemoryRangeTree(quint64 addrSpaceEnd)
-    : _root(0), _first(0), _last(0), _size(0), _addrSpaceEnd(addrSpaceEnd)
+    : _root(0), _first(0), _last(0), _size(0), _objectCount(0),
+      _addrSpaceEnd(addrSpaceEnd)
 {
 }
 
@@ -144,17 +273,56 @@ void MemoryRangeTree::clear()
     delete _root;
 
     _root = _first = _last = 0;
-    _size = 0;
+    _size = _objectCount = 0;
+
+#ifdef ENABLE_DOT_CODE
+    MemoryRangeTreeNode::nodeId = 0;
+#endif
 }
 
 
 void MemoryRangeTree::insert(const MemoryMapNode* node)
 {
     // Insert the first node
-    if (!_root) {
-        _root = new MemoryRangeTreeNode(0, _addrSpaceEnd);
-        _root->insert(node);
+    if (!_root)
+        _root = _first = _last =
+                new MemoryRangeTreeNode(this, 0, _addrSpaceEnd);
+    _root->insert(node);
+    ++_objectCount;
+}
+
+#ifdef ENABLE_DOT_CODE
+void MemoryRangeTree::outputDotFile(const QString& filename) const
+{
+    QFile outFile;
+    QTextStream out;
+
+    // Write to the console, if no file name given
+    if (filename.isEmpty())
+        out.setDevice(shell->out().device());
+    else {
+        outFile.setFileName(filename);
+        assert(outFile.open(QIODevice::WriteOnly));
+        out.setDevice(&outFile);
     }
+
+    // Write header, data and footer
+    out << "/* Generated " << QDateTime::currentDateTime().toString() << " */"
+            << endl
+            << "digraph G {" << endl;
+    if (_root)
+        _root->outputDotCode(out);
+    out << "}" << endl;
+}
+#endif
+
+quint64 MemoryRangeTree::addrSpaceEnd() const
+{
+    return _addrSpaceEnd;
 }
 
 
+int MemoryRangeTree::objectCount() const
+{
+    return _objectCount;
+}
