@@ -10,12 +10,19 @@
 
 #include <QString>
 #include <QList>
+#include <QLinkedList>
 
 #define ENABLE_DOT_CODE 1
 
 #ifdef ENABLE_DOT_CODE
 #include <QTextStream>
 #endif
+
+#ifndef QT_NO_STL
+#include <iterator>
+#include <list>
+#endif
+
 
 // Forward declarations
 class MemoryMapNode;
@@ -52,6 +59,8 @@ struct NodeProperties
  */
 struct MemoryRangeTreeNode
 {
+    typedef ConstNodeList Nodes;
+
     /**
      * Constructor
      * @param tree belonging MemoryRangeTree
@@ -102,7 +111,7 @@ struct MemoryRangeTreeNode
     quint64 addrEnd;               ///< End address of covered memory region
 
     /// If this is a leaf, then this list holds the objects within this leaf
-    ConstNodeList nodes;
+    Nodes nodes;
 
 #ifdef ENABLE_DOT_CODE
     /**
@@ -130,6 +139,130 @@ class MemoryRangeTree
 public:
 //    /// This type is returned by certain functions of this class
 //    typedef ConstNodeList NodeList;
+
+    // definitions to make the iterator's code compatible with this class
+    typedef MemoryRangeTreeNode Node;
+    typedef const MemoryMapNode* T;
+
+    // Forward declaration
+    class const_iterator;
+
+    /**
+     * Iterator class, shamelessly stolen and adapted from QLinkedList
+     */
+    class iterator
+    {
+    public:
+        typedef std::bidirectional_iterator_tag  iterator_category;
+        typedef qptrdiff difference_type;
+        typedef T value_type;
+        typedef T *pointer;
+        typedef T &reference;
+        Node *i;
+        Node::Nodes::iterator it;
+        inline iterator() : i(0) {}
+        inline iterator(Node *n) : i(n) { if (i) it = i->nodes.begin(); }
+        inline iterator(Node *n, Node::Nodes::iterator it) : i(n), it(it) {}
+        inline iterator(const iterator &o) : i(o.i), it(o.it) {}
+        inline iterator &operator=(const iterator &o) { i = o.i; it = o.it; return *this; }
+        inline T &operator*() const { return it.operator*(); }
+        inline T *operator->() const { return it.operator->(); }
+        inline bool operator==(const iterator &o) const { return i == o.i && it == o.it; }
+        inline bool operator!=(const iterator &o) const { return i != o.i || it != o.it; }
+        inline bool operator==(const const_iterator &o) const { return i == o.i && it == o.it; }
+        inline bool operator!=(const const_iterator &o) const { return i != o.i || it != o.it; }
+        inline iterator &operator++()
+        {
+            if (it == i->nodes.end()) {
+                while (i->next && i->nodes.isEmpty())
+                    i = i->next;
+                it = i->nodes.begin();
+            }
+            else
+                ++it;
+            return *this;
+        }
+        inline iterator operator++(int) { iterator it = *this; this->operator++(); return it; }
+        inline iterator &operator--()
+        {
+            if (it == i->nodes.constBegin()) {
+                while (i->prev && i->nodes.isEmpty())
+                    i = i->prev;
+                it = i->nodes.isEmpty() ? i->nodes.end() : i->nodes.end() - 1;
+            }
+            return *this;
+        }
+        inline iterator operator--(int) { iterator it = *this; this->operator--(); return it; }
+        inline iterator operator+(int j) const
+        { iterator it = *this; if (j > 0) while (j--) ++it; else while (j++) --it; return it; }
+        inline iterator operator-(int j) const { return operator+(-j); }
+        inline iterator &operator+=(int j) { return *this = *this + j; }
+        inline iterator &operator-=(int j) { return *this = *this - j; }
+    };
+    friend class iterator;
+
+    /**
+     * Iterator class, shamelessly stolen and adapted from QLinkedList
+     */
+    class const_iterator
+    {
+    public:
+        typedef std::bidirectional_iterator_tag  iterator_category;
+        typedef qptrdiff difference_type;
+        typedef T value_type;
+        typedef const T *pointer;
+        typedef const T &reference;
+        Node *i;
+        Node::Nodes::const_iterator it;
+        inline const_iterator() : i(0) {}
+        inline const_iterator(Node *n) : i(n) { if (i) it = i->nodes.begin(); }
+        inline const_iterator(Node *n, Node::Nodes::const_iterator it) : i(n), it(it) {}
+        inline const_iterator(const const_iterator &o) : i(o.i), it(o.it) {}
+        inline const_iterator(iterator ci) : i(ci.i), it(ci.it) {}
+        inline const_iterator &operator=(const const_iterator &o) { i = o.i; it = o.it; return *this; }
+        inline const T &operator*() const { return it.operator*(); }
+        inline const T *operator->() const { return it.operator->(); }
+        inline bool operator==(const const_iterator &o) const { return i == o.i && it == o.it; }
+        inline bool operator!=(const const_iterator &o) const { return i != o.i || it != o.it; }
+        inline const_iterator &operator++()
+        {
+            if (it == i->nodes.constEnd()) {
+                while (i->next && i->nodes.isEmpty())
+                    i = i->next;
+                it = i->nodes.constBegin();
+            }
+            else
+                ++it;
+            return *this;
+        }
+        inline const_iterator operator++(int) { const_iterator it = *this; this->operator++(); return it; }
+        inline const_iterator &operator--()
+        {
+            if (it == i->nodes.constBegin()) {
+                while (i->prev && i->nodes.isEmpty())
+                    i = i->prev;
+                it = i->nodes.isEmpty() ? i->nodes.constEnd() : i->nodes.constEnd() - 1;
+            }
+            return *this;
+        }
+        inline const_iterator operator--(int) { const_iterator it = *this; this->operator--(); return it; }
+        inline const_iterator operator+(int j) const
+        { const_iterator it = *this; if (j > 0) while (j--) ++it; else while (j++) --it; return it; }
+        inline const_iterator operator-(int j) const { return operator+(-j); }
+        inline const_iterator &operator+=(int j) { return *this = *this + j; }
+        inline const_iterator &operator-=(int j) { return *this = *this - j; }
+    };
+    friend class const_iterator;
+
+    // stl style
+    inline iterator begin() { return _first; }
+    inline const_iterator begin() const { return _first; }
+    inline const_iterator constBegin() const { return _first; }
+    inline iterator end() { return _last ? iterator(_last, _last->nodes.end()) : iterator(); }
+    inline const_iterator end() const
+    { return _last ? const_iterator(_last, _last->nodes.end()) : const_iterator(); }
+    inline const_iterator constEnd() const
+    { return _last ? const_iterator(_last, _last->nodes.end()) : const_iterator(); }
 
     /**
      * Constructor

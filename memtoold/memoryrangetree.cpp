@@ -168,8 +168,7 @@ void MemoryRangeTreeNode::outputDotCode(QTextStream& out) const
     if (!nodes.isEmpty()) {
         QString s;
         // Move all nodes to one or both of the children
-        for (ConstNodeList::const_iterator it = nodes.begin();
-                it != nodes.end(); ++it)
+        for (Nodes::const_iterator it = nodes.begin(); it != nodes.end(); ++it)
         {
             const MemoryMapNode* node = *it;
             if (!s.isEmpty())
