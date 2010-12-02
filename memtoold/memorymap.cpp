@@ -276,6 +276,19 @@ void MemoryMap::build()
 //    debugmsg("Wrote vmemTree to " << dotfile << ".");
 //#endif
 
+#ifdef DEBUG
+    debugmsg("Checking consistency of vmemTree");
+    // See if we can find all objects
+    assert(_vmemMap.size() == _vmemTree.objectCount());
+    for (MemoryRangeTree::iterator it = _vmemTree.begin();
+            it != _vmemTree.end(); ++it)
+    {
+        const MemoryMapNode* node = *it;
+        assert(_vmemMap.contains(node->address()));
+    }
+    debugmsg("Consistency check done");
+#endif
+
 /*
     QMap<int, PointerNodeMap::key_type>::iterator it;
     for (it = keyCnt.begin(); it != keyCnt.end(); ++it) {
@@ -457,7 +470,7 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
 
             _vmemAddresses.insert(child->address());
             _vmemMap.insertMulti(child->address(), child);
-//            _vmemTree.insert(child);
+            _vmemTree.insert(child);
 
             // Release the reading and the writing lock
             _shared->vmemReadingLock.unlock();
