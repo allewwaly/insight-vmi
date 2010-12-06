@@ -198,13 +198,13 @@ void MemoryMap::build()
             prev_queue_size = queue_size;
         }
 
-//#ifdef DEBUG
-//        // emergency stop
-//        if (_shared->processed >= 50000) {
-//            debugmsg(">>> Breaking revmap generation <<<");
-//            break;
-//        }
-//#endif
+#ifdef DEBUG
+        // emergency stop
+        if (_shared->processed >= 5000) {
+            debugmsg(">>> Breaking revmap generation <<<");
+            break;
+        }
+#endif
 
         // Sleep for 100ms
         usleep(100*1000);
@@ -270,22 +270,113 @@ void MemoryMap::build()
     debugmsg("degForUserlandAddrCnt        = " << degForUserlandAddrCnt);
     debugmsg("degPerGenerationCnt          = " << degPerGenerationCnt);
 
-//#ifdef DEBUG
-//    QString dotfile = "vmemTree.dot";
-//    _vmemTree.outputDotFile(dotfile);
-//    debugmsg("Wrote vmemTree to " << dotfile << ".");
-//#endif
+#ifdef DEBUG
+    QString dotfile = "vmemTree.dot";
+    _vmemTree.outputDotFile(dotfile);
+    debugmsg("Wrote vmemTree to " << dotfile << ".");
+#endif
 
 #ifdef DEBUG
     debugmsg("Checking consistency of vmemTree");
     // See if we can find all objects
     assert(_vmemMap.size() == _vmemTree.objectCount());
-    for (MemoryRangeTree::iterator it = _vmemTree.begin();
-            it != _vmemTree.end(); ++it)
-    {
+
+    MemoryRangeTree::iterator it, begin = _vmemTree.begin(),
+            end = _vmemTree.end();
+    MemoryRangeTree::const_iterator ci, cbegin = _vmemTree.constBegin();;
+    QSet<const MemoryMapNode*> set;
+    int count;
+
+//    count = 0;
+//    set.clear();
+//    for (it = _vmemTree.begin(); it != _vmemTree.end(); ++it) {
+//        const MemoryMapNode* node = *it;
+//        assert(_vmemMap.contains(node->address()));
+//        set.insert(node);
+//        ++count;
+//    }
+//    assert(count >= _vmemTree.objectCount());
+//    assert(set.size() == _vmemTree.objectCount());
+//    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
+//            nci != _vmemMap.constEnd(); ++nci)
+//        assert(set.contains(nci.value()));
+
+//    count = 0;
+//    set.clear();
+//    for (ci = _vmemTree.begin(); ci != _vmemTree.end(); ++ci) {
+//        const MemoryMapNode* node = *ci;
+//        assert(_vmemMap.contains(node->address()));
+//        set.insert(node);
+//        ++count;
+//    }
+//    assert(count >= _vmemTree.objectCount());
+//    assert(set.size() == _vmemTree.objectCount());
+//    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
+//            nci != _vmemMap.constEnd(); ++nci)
+//        assert(set.contains(nci.value()));
+//
+//    count = 0;
+//    set.clear();
+//    for (ci = _vmemTree.constBegin(); ci != _vmemTree.constEnd(); ++ci) {
+//        const MemoryMapNode* node = *ci;
+//        assert(_vmemMap.contains(node->address()));
+//        set.insert(node);
+//        ++count;
+//    }
+//    assert(count >= _vmemTree.objectCount());
+//    assert(set.size() == _vmemTree.objectCount());
+//    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
+//            nci != _vmemMap.constEnd(); ++nci)
+//        assert(set.contains(nci.value()));
+//
+    count = 0;
+    set.clear();
+    it = _vmemTree.end();
+    do {
+        --it;
         const MemoryMapNode* node = *it;
         assert(_vmemMap.contains(node->address()));
-    }
+        set.insert(node);
+        ++count;
+    } while (it != begin);
+    assert(count >= _vmemTree.objectCount());
+    assert(set.size() == _vmemTree.objectCount());
+    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
+            nci != _vmemMap.constEnd(); ++nci)
+        assert(set.contains(nci.value()));
+//
+//    count = 0;
+//    set.clear();
+//    ci = _vmemTree.end() - 1;
+//    do {
+//        --ci;
+//        const MemoryMapNode* node = *ci;
+//        assert(_vmemMap.contains(node->address()));
+//        set.insert(node);
+//        ++count;
+//    } while (ci != begin);
+//    assert(count >= _vmemTree.objectCount());
+//    assert(set.size() == _vmemTree.objectCount());
+//    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
+//            nci != _vmemMap.constEnd(); ++nci)
+//        assert(set.contains(nci.value()));
+//
+//    count = 0;
+//    set.clear();
+//    ci = _vmemTree.constEnd() - 1;
+//    do {
+//        --ci;
+//        const MemoryMapNode* node = *ci;
+//        assert(_vmemMap.contains(node->address()));
+//        set.insert(node);
+//        ++count;
+//    } while (ci != cbegin);
+//    assert(count >= _vmemTree.objectCount());
+//    assert(set.size() == _vmemTree.objectCount());
+//    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
+//            nci != _vmemMap.constEnd(); ++nci)
+//        assert(set.contains(nci.value()));
+
     debugmsg("Consistency check done");
 #endif
 

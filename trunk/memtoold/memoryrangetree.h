@@ -23,10 +23,14 @@
 #include <list>
 #endif
 
+#include "debug.h"
+
 
 // Forward declarations
 class MemoryMapNode;
 class MemoryRangeTree;
+
+#include "memorymapnode.h"
 
 /// A QList of constant MemoryMapNode pointers
 typedef QList<const MemoryMapNode*> ConstNodeList;
@@ -160,11 +164,12 @@ public:
         typedef T &reference;
         Node *i;
         Node::Nodes::iterator it;
-        inline iterator() : i(0) {}
-        inline iterator(Node *n) : i(n) { if (i) it = i->nodes.begin(); }
-        inline iterator(Node *n, Node::Nodes::iterator it) : i(n), it(it) {}
-        inline iterator(const iterator &o) : i(o.i), it(o.it) {}
-        inline iterator &operator=(const iterator &o) { i = o.i; it = o.it; return *this; }
+        int index;
+        inline iterator() : i(0), index(-1) {}
+        inline iterator(Node *n) : i(n), index(-1) { if (i) goNext(true); }
+        inline iterator(Node *n, Node::Nodes::iterator it) : i(n), it(it), index(n ? n->nodes.size() - 1 : -1) {}
+        inline iterator(const iterator &o) : i(o.i), it(o.it), index(o.index) {}
+        inline iterator &operator=(const iterator &o) { i = o.i; it = o.it; index = o.index; return *this; }
         inline T &operator*() const { return it.operator*(); }
         inline T *operator->() const { return it.operator->(); }
         inline bool operator==(const iterator &o) const { return i == o.i && it == o.it; }
@@ -173,23 +178,32 @@ public:
         inline bool operator!=(const const_iterator &o) const { return i != o.i || it != o.it; }
         inline iterator &operator++()
         {
-            if (it == i->nodes.end()) {
-                while (i->next && i->nodes.isEmpty())
-                    i = i->next;
-                it = i->nodes.begin();
-            }
+            if (++it == i->nodes.end())
+                goNext(false);
             else
-                ++it;
+                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
+                        .arg((quint64)i, 16, 16, QChar('0'))
+                        .arg(++index)
+                        .arg(i->nodes.size())
+                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+
             return *this;
         }
         inline iterator operator++(int) { iterator it = *this; this->operator++(); return it; }
         inline iterator &operator--()
         {
-            if (it == i->nodes.constBegin()) {
-                while (i->prev && i->nodes.isEmpty())
-                    i = i->prev;
-                it = i->nodes.isEmpty() ? i->nodes.end() : i->nodes.end() - 1;
+            if (it == i->nodes.begin())
+                goPrev(false);
+            else {
+                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
+                        .arg((quint64)i, 16, 16, QChar('0'))
+                        .arg(--index)
+                        .arg(i->nodes.size())
+                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
             }
+            --it;
             return *this;
         }
         inline iterator operator--(int) { iterator it = *this; this->operator--(); return it; }
@@ -198,8 +212,42 @@ public:
         inline iterator operator-(int j) const { return operator+(-j); }
         inline iterator &operator+=(int j) { return *this = *this + j; }
         inline iterator &operator-=(int j) { return *this = *this - j; }
+
+    private:
+        inline void goNext(bool init) {
+            Node* i_old = i;
+            while ( i->next && (i == i_old || i->nodes.isEmpty()) )
+                i = i->next;
+            if (init || i != i_old) {
+                it = i->nodes.begin();
+                index = 0;
+            }
+
+            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
+                    .arg((quint64)i, 16, 16, QChar('0'))
+                    .arg(index)
+                    .arg(i->nodes.size())
+                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+        }
+        inline void goPrev(bool init) {
+            Node* i_old = i;
+            while ( i->prev && (i == i_old || i->nodes.isEmpty()) )
+                i = i->prev;
+            if (init || i != i_old) {
+                it = i->nodes.end();
+                index = i->nodes.size() - 1;
+            }
+
+            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
+                    .arg((quint64)i, 16, 16, QChar('0'))
+                    .arg(index)
+                    .arg(i->nodes.size())
+                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+        }
     };
-    friend class iterator;
+//    friend class iterator;
 
     /**
      * Iterator class, shamelessly stolen and adapted from QLinkedList
@@ -214,35 +262,45 @@ public:
         typedef const T &reference;
         Node *i;
         Node::Nodes::const_iterator it;
-        inline const_iterator() : i(0) {}
-        inline const_iterator(Node *n) : i(n) { if (i) it = i->nodes.begin(); }
-        inline const_iterator(Node *n, Node::Nodes::const_iterator it) : i(n), it(it) {}
-        inline const_iterator(const const_iterator &o) : i(o.i), it(o.it) {}
-        inline const_iterator(iterator ci) : i(ci.i), it(ci.it) {}
-        inline const_iterator &operator=(const const_iterator &o) { i = o.i; it = o.it; return *this; }
+        int index;
+        inline const_iterator() : i(0), index(-1) {}
+        inline const_iterator(Node *n) : i(n), index(-1) { if (i) goNext(true); }
+        inline const_iterator(Node *n, Node::Nodes::const_iterator it) : i(n), it(it), index(-1) {}
+        inline const_iterator(const const_iterator &o) : i(o.i), it(o.it), index(o.index) {}
+        inline const_iterator(iterator ci) : i(ci.i), it(ci.it), index(ci.index) {}
+        inline const_iterator &operator=(const const_iterator &o) { i = o.i; it = o.it; index = o.index; return *this; }
         inline const T &operator*() const { return it.operator*(); }
         inline const T *operator->() const { return it.operator->(); }
         inline bool operator==(const const_iterator &o) const { return i == o.i && it == o.it; }
         inline bool operator!=(const const_iterator &o) const { return i != o.i || it != o.it; }
         inline const_iterator &operator++()
         {
-            if (it == i->nodes.constEnd()) {
-                while (i->next && i->nodes.isEmpty())
-                    i = i->next;
-                it = i->nodes.constBegin();
-            }
+            if (++it == i->nodes.end())
+                goNext(false);
             else
-                ++it;
+                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
+                        .arg((quint64)i, 16, 16, QChar('0'))
+                        .arg(++index)
+                        .arg(i->nodes.size())
+                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+
             return *this;
         }
         inline const_iterator operator++(int) { const_iterator it = *this; this->operator++(); return it; }
         inline const_iterator &operator--()
         {
-            if (it == i->nodes.constBegin()) {
-                while (i->prev && i->nodes.isEmpty())
-                    i = i->prev;
-                it = i->nodes.isEmpty() ? i->nodes.constEnd() : i->nodes.constEnd() - 1;
+            if (it == i->nodes.constBegin())
+                goPrev(false);
+            else {
+                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
+                        .arg((quint64)i, 16, 16, QChar('0'))
+                        .arg(--index)
+                        .arg(i->nodes.size())
+                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
             }
+            --it;
             return *this;
         }
         inline const_iterator operator--(int) { const_iterator it = *this; this->operator--(); return it; }
@@ -251,11 +309,49 @@ public:
         inline const_iterator operator-(int j) const { return operator+(-j); }
         inline const_iterator &operator+=(int j) { return *this = *this + j; }
         inline const_iterator &operator-=(int j) { return *this = *this - j; }
+
+    private:
+        inline void goNext(bool init) {
+            Node* i_old = i;
+            while (i->next) {
+                i = i->next;
+                if (!i->nodes.isEmpty())
+                    break;
+            }
+            if (init || i != i_old) {
+                it = i->nodes.constBegin();
+                index = 0;
+            }
+
+            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
+                    .arg((quint64)i, 16, 16, QChar('0'))
+                    .arg(index)
+                    .arg(i->nodes.size())
+                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+        }
+        inline void goPrev(bool init) {
+            Node* i_old = i;
+            while ( i->prev && (i == i_old || i->nodes.isEmpty()) )
+                i = i->prev;
+            if (init || i != i_old) {
+                it = i->nodes.constEnd();
+                index = i->nodes.size() - 1;
+            }
+
+            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
+                    .arg((quint64)i, 16, 16, QChar('0'))
+                    .arg(index)
+                    .arg(i->nodes.size())
+                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+        }
     };
-    friend class const_iterator;
+//    friend class const_iterator;
 
     // stl style
-    inline iterator begin() { return _first; }
+//    inline
+    iterator begin() { return _first; }
     inline const_iterator begin() const { return _first; }
     inline const_iterator constBegin() const { return _first; }
     inline iterator end() { return _last ? iterator(_last, _last->nodes.end()) : iterator(); }
