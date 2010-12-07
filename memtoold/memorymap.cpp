@@ -224,24 +224,29 @@ void MemoryMap::build()
     _vmem->setThreadSafety(wasThreadSafe);
 
     // Gather some statistics about the memory map
-    int nonAligned = 0;
-    QMap<int, PointerNodeMap::key_type> keyCnt;
-    for (ULongSet::iterator it = _vmemAddresses.begin();
-            it != _vmemAddresses.end(); ++it)
-    {
-        ULongSet::key_type addr = *it;
-        if (addr % 4)
-            ++nonAligned;
-        int cnt = _vmemMap.count(addr);
-        keyCnt.insertMulti(cnt, addr);
-        while (keyCnt.size() > 100)
-            keyCnt.erase(keyCnt.begin());
-    }
+//#define STATS_AVAILABLE 1
+//    int nonAligned = 0;
+//    QMap<int, PointerNodeMap::key_type> keyCnt;
+//    for (ULongSet::iterator it = _vmemAddresses.begin();
+//            it != _vmemAddresses.end(); ++it)
+//    {
+//        ULongSet::key_type addr = *it;
+//        if (addr % 4)
+//            ++nonAligned;
+//        int cnt = _vmemMap.count(addr);
+//        keyCnt.insertMulti(cnt, addr);
+//        while (keyCnt.size() > 100)
+//            keyCnt.erase(keyCnt.begin());
+//    }
 
     debugmsg("Processed " << _shared->processed << " instances");
     debugmsg(_vmemMap.size() << " nodes at "
-            << _vmemAddresses.size() << " virtual addresses (" << nonAligned
-            << " not aligned)");
+            << _vmemAddresses.size() << " virtual addresses"
+#ifdef STATS_AVAILABLE
+            << " (" << nonAligned
+            << " not aligned)"
+#endif
+            );
     debugmsg(_pmemMap.size() << " nodes at " << _pmemMap.uniqueKeys().size()
             << " physical addresses");
     debugmsg(_pointersTo.size() << " pointers to "

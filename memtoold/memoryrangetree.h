@@ -10,7 +10,7 @@
 
 #include <QString>
 #include <QList>
-#include <QLinkedList>
+#include <QSet>
 
 #define ENABLE_DOT_CODE 1
 
@@ -33,14 +33,14 @@ class MemoryRangeTree;
 #include "memorymapnode.h"
 
 /// A QList of constant MemoryMapNode pointers
-typedef QList<const MemoryMapNode*> ConstNodeList;
+typedef QSet<const MemoryMapNode*> NodeSet;
 
 
 /**
  * This struct holds all interesting properties of MemoryMapNode objects under a
  * MemoryRangeTreeNode.
  */
-struct NodeProperties
+struct RangeProperties
 {
     float minProbability;  ///< Minimal probability below this node
     float maxProbability;  ///< Maximal probability below this node
@@ -56,6 +56,12 @@ struct NodeProperties
      * @param node
      */
     void update(const MemoryMapNode* node);
+
+    /**
+     * Unites these properties with the ones found in \a other
+     * @param other the properties to unite with
+     */
+    void unite(const RangeProperties& other);
 };
 
 /**
@@ -63,7 +69,7 @@ struct NodeProperties
  */
 struct MemoryRangeTreeNode
 {
-    typedef ConstNodeList Nodes;
+    typedef NodeSet Nodes;
 
     /**
      * Constructor
@@ -104,7 +110,15 @@ struct MemoryRangeTreeNode
      */
     void split();
 
-    NodeProperties nodeProps;      ///< Properties of MemoryMapNode objects
+    /**
+     * @return the end address of the left child
+     */
+    inline quint64 splitAddr() const
+    {
+        return addrStart + ((addrEnd - addrStart) >> 1);
+    }
+
+    RangeProperties properties;      ///< Properties of MemoryMapNode objects
     MemoryRangeTree* tree;         ///< Tree holding this node
     MemoryRangeTreeNode* parent;   ///< Parent node
     MemoryRangeTreeNode* lChild;   ///< Left child
@@ -142,7 +156,7 @@ class MemoryRangeTree
 
 public:
 //    /// This type is returned by certain functions of this class
-//    typedef ConstNodeList NodeList;
+//    typedef NodeSet NodeList;
 
     // definitions to make the iterator's code compatible with this class
     typedef MemoryRangeTreeNode Node;
@@ -170,8 +184,8 @@ public:
         inline iterator(Node *n, Node::Nodes::iterator it) : i(n), it(it), index(n ? n->nodes.size() - 1 : -1) {}
         inline iterator(const iterator &o) : i(o.i), it(o.it), index(o.index) {}
         inline iterator &operator=(const iterator &o) { i = o.i; it = o.it; index = o.index; return *this; }
-        inline T &operator*() const { return it.operator*(); }
-        inline T *operator->() const { return it.operator->(); }
+        inline const T &operator*() const { return it.operator*(); }
+        inline const T *operator->() const { return it.operator->(); }
         inline bool operator==(const iterator &o) const { return i == o.i && it == o.it; }
         inline bool operator!=(const iterator &o) const { return i != o.i || it != o.it; }
         inline bool operator==(const const_iterator &o) const { return i == o.i && it == o.it; }
@@ -189,7 +203,7 @@ public:
 //                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
 //                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0)
 //                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->name() : QString()));
-        }
+            }
 
             return *this;
         }
@@ -365,8 +379,7 @@ public:
 //    friend class const_iterator;
 
     // stl style
-//    inline
-    iterator begin() { return _first; }
+    inline iterator begin() { return _first; }
     inline const_iterator begin() const { return _first; }
     inline const_iterator constBegin() const { return _first; }
     inline iterator end() { return _last ? iterator(_last, _last->nodes.end()) : iterator(); }
@@ -415,14 +428,37 @@ public:
     void insert(const MemoryMapNode* node);
 
     /**
-     * Finds all objects in virtual memory that occupy space between
+     * Finds all objects at a given memory address.
+     * @param address the memory address to search for
+     * @return a set of MemoryMapNode objects
+     */
+    const NodeSet& objectsAt(quint64 address) const;
+
+    /**
+     * Finds all objects in memory that occupy space between
      * \a addrStart and \a addrEnd. Objects that only partly fall into that
      * range are included.     *
-     * @param addrStart the virtual start address
-     * @param addrEnd the virtual end address (including)
-     * @return a list of MemoryMapNode objects
+     * @param addrStart the memory start address
+     * @param addrEnd the memory end address (including)
+     * @return a set of MemoryMapNode objects
      */
-    ConstNodeList objInRange(quint64 addrStart, quint64 addrEnd) const;
+    NodeSet objectsInRange(quint64 addrStart, quint64 addrEnd) const;
+
+    /**
+     * Returns the properties of a given memory address.
+     * @param address the memory address to search for
+     * @return the properties at that address
+     */
+    const RangeProperties& propertiesAt(quint64 address) const;
+
+    /**
+     * Returns the properties of the memory region between \a addrStart and
+     * \a addrEnd.
+     * @param addrStart the memory start address
+     * @param addrEnd the memory end address (including)
+     * @return the properties of that range
+     */
+    RangeProperties propertiesOfRange(quint64 addrStart, quint64 addrEnd) const;
 
 #ifdef ENABLE_DOT_CODE
     /**
@@ -439,12 +475,16 @@ public:
     quint64 addrSpaceEnd() const;
 
 private:
+    void normalizeInterval(quint64 &addrStart, quint64 &addrEnd) const;
+
     MemoryRangeTreeNode* _root;   ///< Root node
     MemoryRangeTreeNode* _first;  ///< First leaf
     MemoryRangeTreeNode* _last;   ///< Last leaf
     int _size;                    ///< No. of MemoryRangeTreeNode s
     int _objectCount;             ///< No. of unique MemoryMapNode objects
     quint64 _addrSpaceEnd;        ///< Address of the last byte of address space
+    static NodeSet _emptyNodeSet;
+    static RangeProperties _emptyProperties;
 };
 
 #endif /* MEMORYRANGETREE_H_ */
