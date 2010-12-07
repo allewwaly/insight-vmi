@@ -12,19 +12,28 @@
 #include "debug.h"
 
 
-void NodeProperties::reset()
+void RangeProperties::reset()
 {
     minProbability = 1;
     maxProbability = 0;
 }
 
 
-void NodeProperties::update(const MemoryMapNode* node)
+void RangeProperties::update(const MemoryMapNode* node)
 {
     if (node->probability() < minProbability)
         minProbability = node->probability();
     if (node->probability() > maxProbability)
         maxProbability = node->probability();
+}
+
+
+void RangeProperties::unite(const RangeProperties& other)
+{
+    if (other.minProbability < minProbability)
+        minProbability = other.minProbability;
+    if (other.maxProbability > maxProbability)
+        maxProbability = other.maxProbability;
 }
 
 //------------------------------------------------------------------------------
@@ -63,10 +72,10 @@ void MemoryRangeTreeNode::deleteChildren()
 
 void MemoryRangeTreeNode::insert(const MemoryMapNode* node)
 {
-    nodeProps.update(node);
+    properties.update(node);
 
     if (isLeaf()) {
-        nodes.append(node);
+        nodes.insert(node);
 //        if (! ((node->address() == addrStart && node->address() >= addrEnd) ||
 //               (node->address() <= addrStart && node->endAddress() == addrEnd) ||
 //               (node->address() < addrStart && node->endAddress() > addrEnd)) )
@@ -114,7 +123,7 @@ inline void MemoryRangeTreeNode::split()
     assert(addrEnd > addrStart);
 
     // Find out the splitting address
-    quint64 lAddrEnd = addrStart + ((addrEnd - addrStart) >> 1);
+    quint64 lAddrEnd = splitAddr();
     quint64 rAddrStart = lAddrEnd + 1;
 
     // Create new lChild and rChild nodes
@@ -139,7 +148,7 @@ inline void MemoryRangeTreeNode::split()
         tree->_last = rChild;
 
     // Move all nodes to one or both of the children
-    for (ConstNodeList::iterator it = nodes.begin(); it != nodes.end();
+    for (NodeSet::iterator it = nodes.begin(); it != nodes.end();
             ++it)
     {
         const MemoryMapNode* node = *it;
@@ -224,6 +233,10 @@ int MemoryRangeTreeNode::nodeId = 0;
 
 //------------------------------------------------------------------------------
 
+// Instances of static variables
+NodeSet MemoryRangeTree::_emptyNodeSet;
+RangeProperties MemoryRangeTree::_emptyProperties;
+
 MemoryRangeTree::MemoryRangeTree(quint64 addrSpaceEnd)
     : _root(0), _first(0), _last(0), _size(0), _objectCount(0),
       _addrSpaceEnd(addrSpaceEnd)
@@ -298,4 +311,129 @@ quint64 MemoryRangeTree::addrSpaceEnd() const
 int MemoryRangeTree::objectCount() const
 {
     return _objectCount;
+}
+
+
+const NodeSet& MemoryRangeTree::objectsAt(quint64 address) const
+{
+    // Make sure the tree isn't empty and the address is in range
+    if (!_root || address > _addrSpaceEnd)
+        return _emptyNodeSet;
+
+    const MemoryRangeTreeNode* n = _root;
+    // Find the leaf containing the searched address
+    while (!n->isLeaf()) {
+        assert(n->nodes.isEmpty());
+        if (address <= n->splitAddr())
+            n = n->lChild;
+        else
+            n = n->rChild;
+    }
+    return n->nodes;
+}
+
+
+void MemoryRangeTree::normalizeInterval(quint64 &addrStart, quint64 &addrEnd) const
+{
+    if (addrEnd > _addrSpaceEnd)
+        addrEnd = _addrSpaceEnd;
+    // Make sure the interval is valid, swap the addresses, if necessary
+    if (addrStart > addrEnd) {
+        quint64 tmp = addrStart;
+        addrStart = addrEnd;
+        addrEnd = tmp;
+    }
+}
+
+
+NodeSet MemoryRangeTree::objectsInRange(quint64 addrStart, quint64 addrEnd) const
+{
+    normalizeInterval(addrStart, addrEnd);
+    // Make sure the tree isn't empty and the address is in range
+    if (!_root || addrStart > _addrSpaceEnd)
+        return _emptyNodeSet;
+
+    const MemoryRangeTreeNode* n = _root;
+    // Find the leaf containing the start address
+    while (!n->isLeaf()) {
+        assert(n->nodes.isEmpty());
+        if (addrStart <= n->splitAddr())
+            n = n->lChild;
+        else
+            n = n->rChild;
+    }
+
+    // Unite all mappings that are in the requested range
+    NodeSet result;
+    do {
+        result.unite(n->nodes);
+        n = n->next;
+    } while (n && addrEnd <= n->addrStart);
+
+    return result;
+}
+
+
+const RangeProperties& MemoryRangeTree::propertiesAt(quint64 address) const
+{
+    // Make sure the tree isn't empty and the address is in range
+    if (!_root || address > _addrSpaceEnd)
+        return _emptyProperties;
+
+    const MemoryRangeTreeNode* n = _root;
+    // Find the leaf containing the searched address
+    while (!n->isLeaf()) {
+        assert(n->nodes.isEmpty());
+        if (address <= n->splitAddr())
+            n = n->lChild;
+        else
+            n = n->rChild;
+    }
+    return n->properties;
+}
+
+
+RangeProperties MemoryRangeTree::propertiesOfRange(quint64 addrStart,
+        quint64 addrEnd) const
+{
+    normalizeInterval(addrStart, addrEnd);
+   // Make sure the tree isn't empty and the address is in range
+    if (!_root || addrStart > _addrSpaceEnd)
+        return _emptyProperties;
+
+    const MemoryRangeTreeNode* n = _root;
+    // Find the deepest node containing the start address
+    while (n->addrStart < addrStart && !n->isLeaf()) {
+        assert(n->nodes.isEmpty());
+        if (addrStart <= n->splitAddr())
+            n = n->lChild;
+        else
+            n = n->rChild;
+    }
+
+    // Unite all mappings that are in the requested range
+    RangeProperties result = n->properties;
+    // No go upwards in the tree until we have to go down on the right side
+//    do {
+//        result.unite(n->nodes);
+//        n = n->next;
+//    } while (n && addrEnd <= n->addrStart);
+    while (n->addrEnd < addrEnd) {
+//        result.unite(n->properties);
+        n = n->parent;
+    }
+    assert (n != 0);
+
+    // Descent on the right side
+    // Find the deepest node containing the start address
+    while (n->addrEnd > addrEnd && !n->isLeaf()) {
+        assert(n->nodes.isEmpty());
+        if (addrStart <= n->splitAddr())
+            n = n->lChild;
+        else
+            n = n->rChild;
+    }
+    result.unite(n->properties);
+
+    return result;
 }
