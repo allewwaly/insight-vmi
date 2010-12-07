@@ -180,13 +180,16 @@ public:
         {
             if (++it == i->nodes.end())
                 goNext(false);
-            else
-                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
-                        .arg((quint64)i, 16, 16, QChar('0'))
-                        .arg(++index)
-                        .arg(i->nodes.size())
-                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
-                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+            else {
+                ++index;
+//                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte: %6")
+//                        .arg((quint64)i, 16, 16, QChar('0'))
+//                        .arg(index)
+//                        .arg(i->nodes.size())
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0)
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->name() : QString()));
+        }
 
             return *this;
         }
@@ -196,12 +199,14 @@ public:
             if (it == i->nodes.begin())
                 goPrev(false);
             else {
-                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
-                        .arg((quint64)i, 16, 16, QChar('0'))
-                        .arg(--index)
-                        .arg(i->nodes.size())
-                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
-                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+                --index;
+//                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte: %6")
+//                        .arg((quint64)i, 16, 16, QChar('0'))
+//                        .arg(index)
+//                        .arg(i->nodes.size())
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0)
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->name() : QString()));
             }
             --it;
             return *this;
@@ -223,12 +228,13 @@ public:
                 index = 0;
             }
 
-            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
-                    .arg((quint64)i, 16, 16, QChar('0'))
-                    .arg(index)
-                    .arg(i->nodes.size())
-                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
-                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+//            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte: %6")
+//                    .arg((quint64)i, 16, 16, QChar('0'))
+//                    .arg(index)
+//                    .arg(i->nodes.size())
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0)
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->name() : QString()));
         }
         inline void goPrev(bool init) {
             Node* i_old = i;
@@ -239,12 +245,13 @@ public:
                 index = i->nodes.size() - 1;
             }
 
-            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
-                    .arg((quint64)i, 16, 16, QChar('0'))
-                    .arg(index)
-                    .arg(i->nodes.size())
-                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
-                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+//            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte: %6")
+//                    .arg((quint64)i, 16, 16, QChar('0'))
+//                    .arg(index)
+//                    .arg(i->nodes.size())
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0)
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->name() : QString()));
         }
     };
 //    friend class iterator;
@@ -277,13 +284,17 @@ public:
         {
             if (++it == i->nodes.end())
                 goNext(false);
-            else
-                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
-                        .arg((quint64)i, 16, 16, QChar('0'))
-                        .arg(++index)
-                        .arg(i->nodes.size())
-                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
-                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+            else {
+                ++index;
+//                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte: %6")
+//                        .arg((quint64)i, 16, 16, QChar('0'))
+//                        .arg(index)
+//                        .arg(i->nodes.size())
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0)
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->name() : QString()));
+
+            }
 
             return *this;
         }
@@ -293,12 +304,14 @@ public:
             if (it == i->nodes.constBegin())
                 goPrev(false);
             else {
-                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
-                        .arg((quint64)i, 16, 16, QChar('0'))
-                        .arg(--index)
-                        .arg(i->nodes.size())
-                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
-                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+                --index;
+//                debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte: %6")
+//                        .arg((quint64)i, 16, 16, QChar('0'))
+//                        .arg(index)
+//                        .arg(i->nodes.size())
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0)
+//                        .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->name() : QString()));
             }
             --it;
             return *this;
@@ -323,12 +336,13 @@ public:
                 index = 0;
             }
 
-            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
-                    .arg((quint64)i, 16, 16, QChar('0'))
-                    .arg(index)
-                    .arg(i->nodes.size())
-                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
-                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+//            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte: %6")
+//                    .arg((quint64)i, 16, 16, QChar('0'))
+//                    .arg(index)
+//                    .arg(i->nodes.size())
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0)
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->name() : QString()));
         }
         inline void goPrev(bool init) {
             Node* i_old = i;
@@ -339,12 +353,13 @@ public:
                 index = i->nodes.size() - 1;
             }
 
-            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte")
-                    .arg((quint64)i, 16, 16, QChar('0'))
-                    .arg(index)
-                    .arg(i->nodes.size())
-                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
-                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0));
+//            debugmsg(QString("At node 0x%1, index %2 (of %3 mappings): 0x%4, size %5 byte: %6")
+//                    .arg((quint64)i, 16, 16, QChar('0'))
+//                    .arg(index)
+//                    .arg(i->nodes.size())
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->address() : 0, 8, 16, QChar('0'))
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->size() : 0)
+//                    .arg(index >= 0 && index < i->nodes.size() ? i->nodes[index]->name() : QString()));
         }
     };
 //    friend class const_iterator;
