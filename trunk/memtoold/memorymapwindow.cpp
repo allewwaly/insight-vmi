@@ -6,7 +6,7 @@
 #include <QHBoxLayout>
 #include <QCheckBox>
 #include <QLabel>
-#include <QProgressBar>
+//#include <QProgressBar>
 
 MemoryMapWindow* memMapWindow = 0;
 
@@ -52,24 +52,24 @@ MemoryMapWindow::MemoryMapWindow(QWidget *parent)
 //	_sbCursorPosition = new QLabel(this);
 //	statusBar()->addPermanentWidget(_sbCursorPosition);
 
-	_sbBuildingMsg = new QLabel(this);
-	_sbBuildingMsg->setText(LBL_BUILDING);
-	_sbBuildingMsg->hide();
-	statusBar()->addPermanentWidget(_sbBuildingMsg);
+//	_sbBuildingMsg = new QLabel(this);
+//	_sbBuildingMsg->setText(LBL_BUILDING);
+//	_sbBuildingMsg->hide();
+//	statusBar()->addPermanentWidget(_sbBuildingMsg);
 
-	_sbBuildingProgBar = new QProgressBar(this);
-	_sbBuildingProgBar->setMinimum(0);
-	_sbBuildingProgBar->setMaximum(100);
-	_sbBuildingProgBar->setValue(0);
-	_sbBuildingProgBar->hide();
-    connect(_memMapWidget, SIGNAL(buildingProgress(int)),
-            _sbBuildingProgBar, SLOT(setValue(int)));
-    statusBar()->addPermanentWidget(_sbBuildingProgBar);
-
-    connect(_memMapWidget, SIGNAL(buildingStarted()),
-            SLOT(memMapBuildingStarted()));
-    connect(_memMapWidget, SIGNAL(buildingStopped()),
-            SLOT(memMapBuildingStopped()));
+//	_sbBuildingProgBar = new QProgressBar(this);
+//	_sbBuildingProgBar->setMinimum(0);
+//	_sbBuildingProgBar->setMaximum(100);
+//	_sbBuildingProgBar->setValue(0);
+//	_sbBuildingProgBar->hide();
+//    connect(_memMapWidget, SIGNAL(buildingProgress(int)),
+//            _sbBuildingProgBar, SLOT(setValue(int)));
+//    statusBar()->addPermanentWidget(_sbBuildingProgBar);
+//
+//    connect(_memMapWidget, SIGNAL(buildingStarted()),
+//            SLOT(memMapBuildingStarted()));
+//    connect(_memMapWidget, SIGNAL(buildingStopped()),
+//            SLOT(memMapBuildingStopped()));
 }
 
 
@@ -88,19 +88,19 @@ void MemoryMapWindow::virtualAddressChanged(quint64 address)
 }
 
 
-void MemoryMapWindow::memMapBuildingStarted()
-{
-    _sbBuildingMsg->show();
-    _sbBuildingProgBar->show();
-}
+//void MemoryMapWindow::memMapBuildingStarted()
+//{
+//    _sbBuildingMsg->show();
+//    _sbBuildingProgBar->show();
+//}
 
 
-void MemoryMapWindow::memMapBuildingStopped()
-{
-    _sbBuildingProgBar->hide();
-    _sbBuildingMsg->hide();
-    _memMapWidget->update();
-}
+//void MemoryMapWindow::memMapBuildingStopped()
+//{
+//    _sbBuildingProgBar->hide();
+//    _sbBuildingMsg->hide();
+//    _memMapWidget->update();
+//}
 
 
 //void MemoryMapWindow::setMap(const MemoryMap* map)

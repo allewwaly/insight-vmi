@@ -214,8 +214,8 @@ void Shell::prepare()
         }
     }
 
-    connect(&_memMapVisTimer, SIGNAL(timeout()), SLOT(memMapVisTimerTimeout()));
-    _memMapVisTimer.setInterval(500);
+//    connect(&_memMapVisTimer, SIGNAL(timeout()), SLOT(memMapVisTimerTimeout()));
+//    _memMapVisTimer.setInterval(500);
 
     // Open the console devices
     _stdin.open(stdin, QIODevice::ReadOnly);
@@ -1325,8 +1325,6 @@ int Shell::cmdMemoryRevmapBuild(int index)
                 .arg(msec, 3, 10, QChar('0'))
             << endl;
 
-    memMapWindow->mapWidget()->forceMapRecreaction();
-
     return 0;
 }
 
@@ -1351,23 +1349,22 @@ int Shell::cmdMemoryRevmapVisualize(int index)
 }
 
 
-void Shell::memMapVisTimerTimeout()
-{
-    // If memory map is still being built, force an update of the display
-    if (memMapWindow->isVisible() &&
-            memMapWindow->mapWidget()->map()->isBuilding())
-    {
-        if (!memMapWindow->mapWidget()->isPainting() &&
-                !memMapWindow->mapWidget()->isBuilding() &&
-                _memMapLastPaint.elapsed() > 1000)
-        {
-            memMapWindow->mapWidget()->forceMapRecreaction();
-            _memMapLastPaint.restart();
-        }
-    }
-    else
-        _memMapVisTimer.stop();
-}
+//void Shell::memMapVisTimerTimeout()
+//{
+//    // If memory map is still being built, force an update of the display
+//    if (memMapWindow->isVisible() &&
+//            memMapWindow->mapWidget()->map()->isBuilding())
+//    {
+//        if (!memMapWindow->mapWidget()->isPainting() &&
+//                !memMapWindow->mapWidget()->isBuilding() &&
+//                _memMapLastPaint.elapsed() > 1000)
+//        {
+//            _memMapLastPaint.restart();
+//        }
+//    }
+//    else
+//        _memMapVisTimer.stop();
+//}
 
 
 int Shell::cmdScript(QStringList args)

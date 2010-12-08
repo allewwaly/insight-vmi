@@ -25,6 +25,18 @@ inline quint64 Instance::address() const
 }
 
 
+inline quint64 Instance::endAddress() const
+{
+    if (size() > 0) {
+        if (_d->vmem->memSpecs().vaddrSpaceEnd() - size() <= _d->address)
+            return _d->vmem->memSpecs().vaddrSpaceEnd();
+        else
+            return _d->address + size() - 1;
+    }
+    return _d->address;
+}
+
+
 inline void Instance::setAddress(quint64 addr)
 {
     _d->address = addr;

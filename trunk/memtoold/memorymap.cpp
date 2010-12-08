@@ -38,7 +38,7 @@ const QString& MemoryMap::insertName(const QString& name)
 
 
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
-    : _factory(factory), _vmem(vmem), _vmemTree(vaddrSpaceEnd()),
+    : _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
       _isBuilding(false), _shared(new BuilderSharedState)
 {
 	clear();
@@ -63,7 +63,7 @@ void MemoryMap::clear()
     _typeInstances.clear();
     _pmemMap.clear();
     _vmemMap.clear();
-    _vmemTree.clear();
+    _vmemQMap.clear();
     _vmemAddresses.clear();
 
 #ifdef DEBUG
@@ -136,8 +136,8 @@ void MemoryMap::build()
             if (!inst.isNull() && fitsInVmem(inst.address(), inst.size())) {
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
-                _vmemMap.insertMulti(node->address(), node);
-                _vmemTree.insert(node);
+                _vmemMap.insert(node);
+                _vmemQMap.insertMulti(node->address(), node);
 //#ifdef DEBUG
 //                debugmsg("Added: " << node->name());
 //#endif
@@ -191,20 +191,20 @@ void MemoryMap::build()
             MemoryMapNode* node = _shared->lastNode;
             debugmsg("Processed " << _shared->processed << " instances"
                     << ", vmemAddr = " << _vmemAddresses.size()
-                    << ", vmemMap = " << _vmemMap.size()
+                    << ", vmemMap = " << _vmemMap.objectCount()
                     << ", pmemMap = " << _pmemMap.size()
                     << ", queue = " << queue_size << " " << indicator
-                    << ", probability = " << (node ? node->probability() : 1.0));
+                    << ", probability = " << (node ? node->probability() : 0.999));
             prev_queue_size = queue_size;
         }
 
-//#ifdef DEBUG
-//        // emergency stop
-//        if (_shared->processed >= 5000) {
-//            debugmsg(">>> Breaking revmap generation <<<");
-//            break;
-//        }
-//#endif
+#ifdef DEBUG
+        // emergency stop
+        if (_shared->processed >= 5000) {
+            debugmsg(">>> Breaking revmap generation <<<");
+            break;
+        }
+#endif
 
         // Sleep for 100ms
         usleep(100*1000);
@@ -275,19 +275,19 @@ void MemoryMap::build()
     debugmsg("degForUserlandAddrCnt        = " << degForUserlandAddrCnt);
     debugmsg("degPerGenerationCnt          = " << degPerGenerationCnt);
 
-//#ifdef DEBUG
+//#if defined(DEBUG) && defined(ENABLE_DOT_CODE)
 //    QString dotfile = "vmemTree.dot";
-//    _vmemTree.outputDotFile(dotfile);
+//    _vmemMap.outputDotFile(dotfile);
 //    debugmsg("Wrote vmemTree to " << dotfile << ".");
 //#endif
 
 #ifdef DEBUG
     debugmsg("Checking consistency of vmemTree");
     // See if we can find all objects
-    assert(_vmemMap.size() == _vmemTree.objectCount());
+    assert(_vmemQMap.size() == _vmemMap.objectCount());
 
-    MemoryRangeTree::iterator it, begin = _vmemTree.begin(),
-            end = _vmemTree.end();
+    MemoryRangeTree::iterator it, begin = _vmemMap.begin(),
+            end = _vmemMap.end();
     MemoryRangeTree::const_iterator ci, cbegin;
     QSet<const MemoryMapNode*> set;
     int count, prevCount = 0, testNo = 0;
@@ -296,20 +296,20 @@ void MemoryMap::build()
     debugmsg("Consistency check no " << ++testNo); // 1
     count = 0;
     set.clear();
-    for (it = _vmemTree.begin(); it != _vmemTree.end(); ++it) {
+    for (it = _vmemMap.begin(); it != _vmemMap.end(); ++it) {
         const MemoryMapNode* node = *it;
-        assert(_vmemMap.contains(node->address()));
+        assert(_vmemQMap.contains(node->address()));
         set.insert(node);
         ++count;
     }
     if (testNo > 1 && prevCount != count)
         debugmsg("prevCount = " << prevCount << " != " << count << " = count");
     prevCount = count;
-    if (count < _vmemTree.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemTree.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemTree.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
-            nci != _vmemMap.constEnd(); ++nci)
+    if (count < _vmemMap.objectCount())
+        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
+    assert(set.size() == _vmemMap.objectCount());
+    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
+            nci != _vmemQMap.constEnd(); ++nci)
         if (!set.contains(nci.value()))
             debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
 
@@ -317,20 +317,20 @@ void MemoryMap::build()
     debugmsg("Consistency check no " << ++testNo); // 2
     count = 0;
     set.clear();
-    for (ci = _vmemTree.begin(); ci != _vmemTree.end(); ++ci) {
+    for (ci = _vmemMap.begin(); ci != _vmemMap.end(); ++ci) {
         const MemoryMapNode* node = *ci;
-        assert(_vmemMap.contains(node->address()));
+        assert(_vmemQMap.contains(node->address()));
         set.insert(node);
         ++count;
     }
     if (testNo > 1 && prevCount != count)
         debugmsg("prevCount = " << prevCount << " != " << count << " = count");
     prevCount = count;
-    if (count < _vmemTree.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemTree.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemTree.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
-            nci != _vmemMap.constEnd(); ++nci)
+    if (count < _vmemMap.objectCount())
+        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
+    assert(set.size() == _vmemMap.objectCount());
+    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
+            nci != _vmemQMap.constEnd(); ++nci)
         if (!set.contains(nci.value()))
             debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
 
@@ -338,20 +338,20 @@ void MemoryMap::build()
     debugmsg("Consistency check no " << ++testNo); // 3
     count = 0;
     set.clear();
-    for (ci = _vmemTree.constBegin(); ci != _vmemTree.constEnd(); ++ci) {
+    for (ci = _vmemMap.constBegin(); ci != _vmemMap.constEnd(); ++ci) {
         const MemoryMapNode* node = *ci;
-        assert(_vmemMap.contains(node->address()));
+        assert(_vmemQMap.contains(node->address()));
         set.insert(node);
         ++count;
     }
     if (testNo > 1 && prevCount != count)
         debugmsg("prevCount = " << prevCount << " != " << count << " = count");
     prevCount = count;
-    if (count < _vmemTree.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemTree.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemTree.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
-            nci != _vmemMap.constEnd(); ++nci)
+    if (count < _vmemMap.objectCount())
+        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
+    assert(set.size() == _vmemMap.objectCount());
+    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
+            nci != _vmemQMap.constEnd(); ++nci)
         if (!set.contains(nci.value()))
             debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
 
@@ -359,22 +359,22 @@ void MemoryMap::build()
     debugmsg("Consistency check no " << ++testNo); // 4
     count = 0;
     set.clear();
-    it = _vmemTree.end();
+    it = _vmemMap.end();
     do {
         --it;
         const MemoryMapNode* node = *it;
-        assert(_vmemMap.contains(node->address()));
+        assert(_vmemQMap.contains(node->address()));
         set.insert(node);
         ++count;
     } while (it != begin);
     if (testNo > 1 && prevCount != count)
         debugmsg("prevCount = " << prevCount << " != " << count << " = count");
     prevCount = count;
-    if (count < _vmemTree.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemTree.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemTree.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
-            nci != _vmemMap.constEnd(); ++nci)
+    if (count < _vmemMap.objectCount())
+        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
+    assert(set.size() == _vmemMap.objectCount());
+    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
+            nci != _vmemQMap.constEnd(); ++nci)
         if (!set.contains(nci.value()))
             debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
 
@@ -382,23 +382,23 @@ void MemoryMap::build()
     debugmsg("Consistency check no " << ++testNo); // 5
     count = 0;
     set.clear();
-    ci = _vmemTree.end();
-    cbegin = _vmemTree.begin();
+    ci = _vmemMap.end();
+    cbegin = _vmemMap.begin();
     do {
         --ci;
         const MemoryMapNode* node = *ci;
-        assert(_vmemMap.contains(node->address()));
+        assert(_vmemQMap.contains(node->address()));
         set.insert(node);
         ++count;
     } while (ci != begin);
     if (testNo > 1 && prevCount != count)
         debugmsg("prevCount = " << prevCount << " != " << count << " = count");
     prevCount = count;
-    if (count < _vmemTree.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemTree.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemTree.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
-            nci != _vmemMap.constEnd(); ++nci)
+    if (count < _vmemMap.objectCount())
+        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
+    assert(set.size() == _vmemMap.objectCount());
+    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
+            nci != _vmemQMap.constEnd(); ++nci)
         if (!set.contains(nci.value()))
             debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
 
@@ -406,23 +406,23 @@ void MemoryMap::build()
     debugmsg("Consistency check no " << ++testNo); // 6
     count = 0;
     set.clear();
-    ci = _vmemTree.constEnd();
-    cbegin = _vmemTree.constBegin();
+    ci = _vmemMap.constEnd();
+    cbegin = _vmemMap.constBegin();
     do {
         --ci;
         const MemoryMapNode* node = *ci;
-        assert(_vmemMap.contains(node->address()));
+        assert(_vmemQMap.contains(node->address()));
         set.insert(node);
         ++count;
     } while (ci != cbegin);
     if (testNo > 1 && prevCount != count)
         debugmsg("prevCount = " << prevCount << " != " << count << " = count");
     prevCount = count;
-    if (count < _vmemTree.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemTree.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemTree.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemMap.constBegin();
-            nci != _vmemMap.constEnd(); ++nci)
+    if (count < _vmemMap.objectCount())
+        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
+    assert(set.size() == _vmemMap.objectCount());
+    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
+            nci != _vmemQMap.constEnd(); ++nci)
         if (!set.contains(nci.value()))
             debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
 
@@ -488,9 +488,6 @@ bool MemoryMap::addressIsWellFormed(const Instance& inst) const
 bool MemoryMap::objectIsSane(const Instance& inst,
         const MemoryMapNode* parent)
 {
-    // How far "to the left" should we look for overlapping objects?
-    static const quint64 max_obj_size = 4096;
-
     // We consider a difference in probability of 10% or more to be significant
     static const float prob_significance_delta = 0.1;
 
@@ -506,23 +503,14 @@ bool MemoryMap::objectIsSane(const Instance& inst,
     _shared->vmemReading++;
     _shared->vmemReadingLock.unlock();
 
-    // Check if the list contains an object at the same address with a
-    // significantly higher probability
-    PointerNodeMap::const_iterator it = _vmemMap.upperBound(inst.address());
-
     bool isSane = true;
 
-    do {
-        // Decrement iterator by at least one, until we get a valid element
-        while (--it == _vmemMap.constEnd());
+    // Check if the list contains an object within the same memory region with a
+    // significantly higher probability
+    NodeSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
 
-        PointerNodeMap::key_type otherAddr = it.key();
-        MemoryMapNode* otherNode = it.value();
-
-        // Look for overlapping objects "to the left", but not farther then
-        // max_obj_size bytes
-        if (otherAddr + max_obj_size < inst.address())
-            break;
+    for (NodeSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
+        const MemoryMapNode* otherNode = *it;
 
         // Is the the same object already contained?
         if (otherNode->address() == inst.address() &&
@@ -531,14 +519,13 @@ bool MemoryMap::objectIsSane(const Instance& inst,
             isSane = false;
         // Is this an overlapping object with a significantly higher
         // probability?
-        else if (otherNode->address() + otherNode->size() >= inst.address()) {
+        else {
             float instProb =
                     calculateNodeProbability(&inst, parent->probability());
             if (instProb + prob_significance_delta <= otherNode->probability())
                 isSane = false;
         }
-
-    } while (isSane && it != _vmemMap.constBegin());
+    }
 
     // Decrease the reading counter again
     _shared->vmemReadingLock.lock();
@@ -609,8 +596,8 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
             }
 
             _vmemAddresses.insert(child->address());
-            _vmemMap.insertMulti(child->address(), child);
-            _vmemTree.insert(child);
+            _vmemMap.insert(child);
+            _vmemQMap.insertMulti(child->address(), child);
 
             // Release the reading and the writing lock
             _shared->vmemReadingLock.unlock();
@@ -746,7 +733,7 @@ const NodeList& MemoryMap::roots() const
 }
 
 
-const PointerNodeMap& MemoryMap::vmemMap() const
+const MemoryRangeTree& MemoryMap::vmemMap() const
 {
     return _vmemMap;
 }
@@ -770,33 +757,13 @@ bool MemoryMap::isBuilding() const
 }
 
 
-ConstNodeList MemoryMap::vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const
+NodeSet MemoryMap::vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const
 {
-    PointerNodeMap::const_iterator it = _vmemMap.lowerBound(addrStart);
-
-    // Move iterator up to maxObjSize to the left to care for overlapping
-    // nodes
-    while (it != _vmemMap.constEnd() &&
-           it != _vmemMap.constBegin() &&
-           it.key() + _shared->maxObjSize > addrStart)
-        --it;
-
-    ConstNodeList nodes;
-
-    while (it != _vmemMap.constEnd() && it.key() <= addrEnd) {
-        const MemoryMapNode* node = it.value();
-        // Make sure this element falls into the memory chunk
-        if (node->address() + node->size() >= addrStart)
-            nodes.append(node);
-        ++it;
-    }
-
-    return nodes;
+    return _vmemMap.objectsInRange(addrStart, addrEnd);
 }
 
 
 quint64 MemoryMap::vaddrSpaceEnd() const
 {
-    return (_vmem && _vmem->memSpecs().arch == MemSpecs::x86_64) ?
-            0xFFFFFFFFFFFFFFFFUL : 0xFFFFFFFFUL;
+    return _vmem ? _vmem->memSpecs().vaddrSpaceEnd() : 0xFFFFFFFFUL;
 }

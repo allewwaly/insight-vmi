@@ -147,7 +147,7 @@ public:
      * address.
      * @return the map of allocated kernel objects in virtual memory
      */
-    const PointerNodeMap& vmemMap() const;
+    const MemoryRangeTree& vmemMap() const;
 
     /**
      * @return the address of the last byte in virtual memory, i. e., either
@@ -163,7 +163,7 @@ public:
      * @param addrEnd the virtual end address (including)
      * @return a list of MemoryMapNode objects
      */
-    ConstNodeList vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const;
+    NodeSet vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const;
 
     /**
      * This gives access to all allocated objects and the page size of the
@@ -275,8 +275,8 @@ private:
 	NodeList _roots;             ///< the nodes of the global kernel variables
     PointerNodeHash _pointersTo; ///< holds all pointers that point to a certain address
     IntNodeHash _typeInstances;  ///< holds all instances of a given type ID
-    PointerNodeMap _vmemMap;     ///< map of all used kernel-space virtual memory
-    MemoryRangeTree _vmemTree;
+    MemoryRangeTree _vmemMap;    ///< map of all used kernel-space virtual memory
+    PointerNodeMap _vmemQMap;
     PointerIntNodeMap _pmemMap;  ///< map of all used physical memory
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
