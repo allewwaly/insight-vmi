@@ -16,6 +16,7 @@ void RangeProperties::reset()
 {
     minProbability = 1;
     maxProbability = 0;
+    objectCount = 0;
 }
 
 
@@ -25,6 +26,7 @@ void RangeProperties::update(const MemoryMapNode* node)
         minProbability = node->probability();
     if (node->probability() > maxProbability)
         maxProbability = node->probability();
+    ++objectCount;
 }
 
 
@@ -34,6 +36,7 @@ RangeProperties& RangeProperties::unite(const RangeProperties& other)
         minProbability = other.minProbability;
     if (other.maxProbability > maxProbability)
         maxProbability = other.maxProbability;
+    objectCount += other.objectCount;
     return *this;
 }
 
@@ -165,15 +168,17 @@ inline void MemoryRangeTreeNode::split()
 
 
 #ifdef ENABLE_DOT_CODE
-void MemoryRangeTreeNode::outputDotCode(QTextStream& out) const
+void MemoryRangeTreeNode::outputDotCode(quint64 addrRangeStart,
+        quint64 addrRangeEnd, QTextStream& out) const
 {
     int width = tree->addrSpaceEnd() > (1UL << 32) ? 16 : 8;
 
     // Node's own label
-    out << QString("\tnode%1 [label=\"0x%2\\n0x%3\"];")
+    out << QString("\tnode%1 [label=\"0x%2\\n0x%3\\nObjCnt: %4\"];")
                 .arg(id)
                 .arg(addrStart, width, 16, QChar('0'))
                 .arg(addrEnd, width, 16, QChar('0'))
+                .arg(properties.objectCount)
         << endl;
 
     if (!nodes.isEmpty()) {
@@ -201,19 +206,45 @@ void MemoryRangeTreeNode::outputDotCode(QTextStream& out) const
     }
 
     if (!isLeaf()) {
-        // Let children write their code, including their label
-        lChild->outputDotCode(out);
-        rChild->outputDotCode(out);
+        if (addrRangeStart <= lChild->addrEnd) {
+            // Let the left child write its code, including its label
+            lChild->outputDotCode(addrRangeStart, addrRangeEnd, out);
+            // Node's connections to the child
+            out << QString("\tnode%1 -> node%2 [label=\"0\"];")
+                    .arg(id)
+                    .arg(lChild->id)
+                << endl;
+        }
+        else {
+            // Dummy node
+            out << QString("\tnode%2 [shape=plaintext,label=\"\"];")
+                    .arg(lChild->id)
+                << endl;
+            out << QString("\tnode%1 -> node%2 [style=dashed,label=\"0\"];")
+                    .arg(id)
+                    .arg(lChild->id)
+                << endl;
+        }
 
-        // Node's connections to the children
-        out << QString("\tnode%1 -> node%2 [label=\"0\"];")
-                .arg(id)
-                .arg(lChild->id)
-            << endl;
-        out << QString("\tnode%1 -> node%2 [label=\"1\"];")
-                .arg(id)
-                .arg(rChild->id)
-            << endl;
+        if (rChild->addrStart <= addrRangeEnd) {
+            // Let the right child write its code, including its label
+            rChild->outputDotCode(addrRangeStart, addrRangeEnd, out);
+            // Node's connections to the children
+            out << QString("\tnode%1 -> node%2 [label=\"1\"];")
+                    .arg(id)
+                    .arg(rChild->id)
+                << endl;
+        }
+        else {
+            // Dummy node
+            out << QString("\tnode%2 [shape=plaintext,label=\"\"];")
+                    .arg(rChild->id)
+                << endl;
+            out << QString("\tnode%1 -> node%2 [style=dashed,label=\"1\"];")
+                    .arg(id)
+                    .arg(rChild->id)
+                << endl;
+        }
     }
 
 //    if (next)
@@ -240,8 +271,7 @@ NodeSet MemoryRangeTree::_emptyNodeSet;
 RangeProperties MemoryRangeTree::_emptyProperties;
 
 MemoryRangeTree::MemoryRangeTree(quint64 addrSpaceEnd)
-    : _root(0), _first(0), _last(0), _size(0), _objectCount(0),
-      _addrSpaceEnd(addrSpaceEnd)
+    : _root(0), _first(0), _last(0), _size(0), _addrSpaceEnd(addrSpaceEnd)
 {
 }
 
@@ -261,7 +291,7 @@ void MemoryRangeTree::clear()
     delete _root;
 
     _root = _first = _last = 0;
-    _size = _objectCount = 0;
+    _size = 0;
 
 #ifdef ENABLE_DOT_CODE
     MemoryRangeTreeNode::nodeId = 0;
@@ -276,12 +306,20 @@ void MemoryRangeTree::insert(const MemoryMapNode* node)
         _root = _first = _last =
                 new MemoryRangeTreeNode(this, 0, _addrSpaceEnd);
     _root->insert(node);
-    ++_objectCount;
 }
 
 #ifdef ENABLE_DOT_CODE
 void MemoryRangeTree::outputDotFile(const QString& filename) const
 {
+    outputSubtreeDotFile(0, _addrSpaceEnd, filename);
+}
+
+
+void MemoryRangeTree::outputSubtreeDotFile(quint64 addrStart, quint64 addrEnd,
+        const QString& filename) const
+{
+    normalizeInterval(addrStart, addrEnd);
+
     QFile outFile;
     QTextStream out;
 
@@ -298,23 +336,12 @@ void MemoryRangeTree::outputDotFile(const QString& filename) const
     out << "/* Generated " << QDateTime::currentDateTime().toString() << " */"
             << endl
             << "digraph G {" << endl;
-    if (_root)
-        _root->outputDotCode(out);
+    if (_root) {
+        _root->outputDotCode(addrStart, addrEnd, out);
+    }
     out << "}" << endl;
 }
 #endif
-
-quint64 MemoryRangeTree::addrSpaceEnd() const
-{
-    return _addrSpaceEnd;
-}
-
-
-int MemoryRangeTree::objectCount() const
-{
-    return _objectCount;
-}
-
 
 const NodeSet& MemoryRangeTree::objectsAt(quint64 address) const
 {
@@ -370,7 +397,7 @@ NodeSet MemoryRangeTree::objectsInRange(quint64 addrStart, quint64 addrEnd) cons
     do {
         result.unite(n->nodes);
         n = n->next;
-    } while (n && addrEnd <= n->addrStart);
+    } while (n && addrEnd >= n->addrStart);
 
     return result;
 }
@@ -405,8 +432,7 @@ RangeProperties MemoryRangeTree::propertiesOfRange(quint64 addrStart,
 
     const MemoryRangeTreeNode* n = _root;
     // Find the deepest node containing the start address
-    while (n->addrStart < addrStart && !n->isLeaf()) {
-        assert(n->nodes.isEmpty());
+    while ((n->addrStart < addrStart || n->addrEnd > addrEnd) && !n->isLeaf()) {
         if (addrStart <= n->splitAddr())
             n = n->lChild;
         else
@@ -416,18 +442,28 @@ RangeProperties MemoryRangeTree::propertiesOfRange(quint64 addrStart,
     RangeProperties result = n->properties;
 
     // No go upwards in the tree until we have to go down on the right side
-    while (n->addrEnd < addrEnd)
+    bool unite = true;
+    while (n->addrEnd < addrEnd) {
+        // If we go upwards we leave out the right sub-tree which also
+        // belongs to the range, so unite with its properties
+        unite = unite && n->parent->lChild == n;
+        if (!n->isLeaf() && unite)
+            result.unite(n->rChild->properties);
         n = n->parent;
-    assert (n != 0);
+    }
+    const MemoryRangeTreeNode* subTreeRoot = n;
 
-    // Descent on the right side
     // Find the deepest node containing the end address
     while (n->addrEnd > addrEnd && !n->isLeaf()) {
-        assert(n->nodes.isEmpty());
-        if (addrStart <= n->splitAddr())
+        if (addrEnd <= n->splitAddr())
             n = n->lChild;
-        else
+        else {
+            // If we go right, we leave out the left sub-tree which also
+            // belongs to the range, so unite with its properties
+            if (n != subTreeRoot)
+                result.unite(n->lChild->properties);
             n = n->rChild;
+        }
     }
 
     // Unite the properties of the left side with those of the right side

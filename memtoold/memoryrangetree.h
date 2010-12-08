@@ -12,7 +12,7 @@
 #include <QList>
 #include <QSet>
 
-//#define ENABLE_DOT_CODE 1
+#define ENABLE_DOT_CODE 1
 
 #ifdef ENABLE_DOT_CODE
 #include <QTextStream>
@@ -44,11 +44,19 @@ struct RangeProperties
 {
     float minProbability;  ///< Minimal probability below this node
     float maxProbability;  ///< Maximal probability below this node
+    int objectCount;       ///< No. of objects within this range
+
+    RangeProperties() { reset(); }
 
     /**
      * Resets all data to initial state
      */
     void reset();
+
+    /**
+     * @return \c true if this range contains no objects, \c false otherwise
+     */
+    inline bool isEmpty() { return objectCount == 0; }
 
     /**
      * Update the properties with the ones from \a node. This is called whenever
@@ -58,7 +66,9 @@ struct RangeProperties
     void update(const MemoryMapNode* node);
 
     /**
-     * Unites these properties with the ones found in \a other
+     * Unites these properties with the ones found in \a other.
+     * \warning Calling this function for properties of overlapping objects
+     * may result in an inaccurate objectCount.
      * @param other the properties to unite with
      * @return reference to this object
      */
@@ -138,7 +148,7 @@ struct MemoryRangeTreeNode
      * of its children.
      * @param out the stream to output the code to
      */
-    void outputDotCode(QTextStream& out) const;
+    void outputDotCode(quint64 addrStart, quint64 addrEnd, QTextStream& out) const;
 
     int id;              ///< ID of this node (only used for outputDotCode())
     static int nodeId;   ///< Global ID counter (only used for outputDotCode())
@@ -404,18 +414,19 @@ public:
     /**
      * @return \c true if this tree is empty, \c false otherwise
      */
-    bool isEmpty() const { return _root != 0; };
+    inline bool isEmpty() const { return _root == 0; }
 
     /**
      * @return the number of MemoryRangeTreeNode objects within the tree
      */
-    int size() const;
+    inline int size() const { return _size; }
 
     /**
      * @return the number of unique MemoryMapNode objects stored in the leaves
      * of the tree
      */
-    int objectCount() const;
+    inline int objectCount() const
+    { return _root ? _root->properties.objectCount : 0; }
 
     /**
      * Deletes all data and resets the tree.
@@ -468,12 +479,22 @@ public:
      * if left blank
      */
     void outputDotFile(const QString& filename = QString()) const;
+
+    /**
+     * Generates code to plot a graph of the sub-tree covering the address
+     * range from \a addrStart to \a addrEnd with the \c dot utility.
+     * @param addrStart
+     * @param addrEnd
+     * @param filename the filename to write the code to; writes to the console
+     */
+    void outputSubtreeDotFile(quint64 addrStart, quint64 addrEnd,
+            const QString& filename = QString()) const;
 #endif
 
     /**
      * @return the address of the last byte of the covered address space
      */
-    quint64 addrSpaceEnd() const;
+    inline quint64 addrSpaceEnd() const { return _addrSpaceEnd; }
 
 private:
     void normalizeInterval(quint64 &addrStart, quint64 &addrEnd) const;
@@ -482,10 +503,10 @@ private:
     MemoryRangeTreeNode* _first;  ///< First leaf
     MemoryRangeTreeNode* _last;   ///< Last leaf
     int _size;                    ///< No. of MemoryRangeTreeNode s
-    int _objectCount;             ///< No. of unique MemoryMapNode objects
     quint64 _addrSpaceEnd;        ///< Address of the last byte of address space
     static NodeSet _emptyNodeSet;
     static RangeProperties _emptyProperties;
 };
+
 
 #endif /* MEMORYRANGETREE_H_ */

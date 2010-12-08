@@ -6,7 +6,6 @@
  */
 
 #include "memspecs.h"
-#include "debug.h"
 
 KernelMemSpecList MemSpecs::supportedMemSpecs()
 {
@@ -145,17 +144,6 @@ QString MemSpecs::toString() const
     if (vmallocEarlyreserve > 0)
         ret += QString("%1 = 0x%2\n").arg("vmalloc_earlyreserve", key_w).arg(vmallocEarlyreserve, val_w, 16, QChar('0'));
     return ret;
-}
-
-
-quint64 MemSpecs::realVmallocStart() const
-{
-	assert(initialized == true);
-    if (arch & i386)
-        return (vmallocStart + highMemory + vmallocEarlyreserve) &
-                ~(vmallocOffset - 1);
-    else
-        return vmallocStart;
 }
 
 

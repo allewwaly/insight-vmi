@@ -7,7 +7,7 @@
 class MemoryMapWidget;
 class MemoryMap;
 class QLabel;
-class QProgressBar;
+//class QProgressBar;
 
 class MemoryMapWindow : public QMainWindow
 {
@@ -22,15 +22,15 @@ public:
 
 private slots:
     void virtualAddressChanged(quint64 address);
-    void memMapBuildingStarted();
-    void memMapBuildingStopped();
+//    void memMapBuildingStarted();
+//    void memMapBuildingStopped();
 
 private:
     Ui::MemoryMapWindowClass ui;
     MemoryMapWidget* _memMapWidget;
     QLabel* _sbCursorPosition;
-    QLabel* _sbBuildingMsg;
-    QProgressBar* _sbBuildingProgBar;
+//    QLabel* _sbBuildingMsg;
+//    QProgressBar* _sbBuildingProgBar;
 };
 
 extern MemoryMapWindow* memMapWindow;

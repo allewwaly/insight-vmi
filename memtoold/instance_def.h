@@ -83,6 +83,11 @@ public:
     void addToAddress(quint64 offset);
 
     /**
+     * @return the virtual address of the last byte of this instance in memory
+     */
+    quint64 endAddress() const;
+
+    /**
      * This gives you the (short) name of this Instance, i. e., its name its
      * parent's struct, e. g. \c next.
      * @return the name of this instance

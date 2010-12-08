@@ -9,6 +9,7 @@
 #define MEMSPECS_H_
 
 #include <QDataStream>
+#include "debug.h"
 
 /**
  * This struct holds the definition of how a memory specification can be
@@ -139,6 +140,12 @@ struct MemSpecs
      */
     quint64 realVmallocStart() const;
 
+    /**
+     * @return the address of the last byte in virtual memory, i. e., either
+     * \c 0xFFFFFFFF or \c 0xFFFFFFFFFFFFFFFF.
+     */
+    quint64 vaddrSpaceEnd() const;
+
     quint64 pageOffset;
     quint64 vmallocStart;
     quint64 vmallocEnd;
@@ -156,6 +163,23 @@ struct MemSpecs
     qint32 arch;                 ///< An Architecture value
     bool initialized;            ///< \c true after MemoryDump::init() is complete, \c false otherwise
 };
+
+
+inline quint64 MemSpecs::vaddrSpaceEnd() const
+{
+    return (arch & x86_64) ? 0xFFFFFFFFFFFFFFFFUL : 0xFFFFFFFFUL;
+}
+
+
+inline quint64 MemSpecs::realVmallocStart() const
+{
+    assert(initialized == true);
+    if (arch & i386)
+        return (vmallocStart + highMemory + vmallocEarlyreserve) &
+                ~(vmallocOffset - 1);
+    else
+        return vmallocStart;
+}
 
 
 /**

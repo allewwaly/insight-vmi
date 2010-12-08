@@ -27,9 +27,9 @@
 
 static const int margin = 3;
 static const int cellSize = 16;
-static const unsigned char MAX_PROB = 16;
+static const unsigned char PROB_MAX = 16;
 
-static const QColor probColor[MAX_PROB+1] = {
+static const QColor probColor[PROB_MAX+1] = {
         QColor(255,   0, 0),  //  0
         QColor(255,  16, 0),  //  1
         QColor(255,  32, 0),  //  2
@@ -62,7 +62,7 @@ VisMapPiece::VisMapPiece(quint64 start, quint64 length, int type,
 MemoryMapWidget::MemoryMapWidget(const MemoryMap* map, QWidget *parent)
     : QWidget(parent), _map(map), _visMapValid(false), _address(-1),
       /*_bytesPerPixelF(0),*/ _cols(0), _rows(0),
-      _antialiasing(false), _isPainting(false),_isBuilding(false),
+      _antialiasing(false), _isPainting(false), /*_isBuilding(false),*/
       _showOnlyKernelSpace(false), _shownAddrSpaceOffset(0)
 {
 //    setWindowTitle(tr("Difference view"));
@@ -113,9 +113,7 @@ quint64 MemoryMapWidget::totalAddrSpace() const
 
 quint64 MemoryMapWidget::totalAddrSpaceEnd() const
 {
-    return (_map && _map->vmem() &&
-            _map->vmem()->memSpecs().arch == MemSpecs::x86_64) ?
-            0xFFFFFFFFFFFFFFFFUL : 0xFFFFFFFFUL;
+    return _map ? _map->vmem()->memSpecs().vaddrSpaceEnd() : 0xFFFFFFFFUL;
 }
 
 
@@ -132,7 +130,7 @@ void insertSorted(T& list, const typename T::value_type value,
     list.insert(it, value);
 }
 
-
+/*
 void MemoryMapWidget::buildVisMemMap()
 {
     if (_visMapValid || !_buildMutex.tryLock())
@@ -298,7 +296,7 @@ void MemoryMapWidget::buildVisMemMap()
     // Repaint the widget
     update();
 }
-
+*/
 
 void MemoryMapWidget::closeEvent(QCloseEvent* e)
 {
@@ -387,83 +385,77 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
 
     // State of current memory cell
     struct {
-        quint64 relStart, nextRelStart, index;
+        quint64 addrStart, addrEnd, index;
         int elemCount;
         VisMapPiece::PropType maxProb, minProb;
         bool isFirst;
     } cell;
 
     cell.isFirst = true;
+    cell.addrEnd = visibleAddrSpaceStart() - 1;
 
-    for (int i = 0; i < _mappings.size(); ++i) {
+    const int totalCells = _cols * _rows;
 
-        if (_mappings[i].address + _mappings[i].length < visibleAddrSpaceStart() ||
-                _mappings[i].address > visibleAddrSpaceEnd())
+    for (int i = 0; i < totalCells; ++i) {
+
+        cell.index = i;
+        cell.addrStart = cell.addrEnd + 1;
+        cell.addrEnd += _bytesPerPixelL;
+        // Beware of overflows
+        if (cell.addrEnd < cell.addrStart ||
+                cell.addrEnd > totalAddrSpaceEnd())
+            cell.addrEnd = totalAddrSpaceEnd();
+
+        RangeProperties props =
+                _map->vmemMap().propertiesOfRange(cell.addrStart, cell.addrEnd);
+
+        NodeSet nodes =
+                _map->vmemMap().objectsInRange(cell.addrStart, cell.addrEnd);
+
+        if (props.isEmpty() != nodes.isEmpty()) {
+            debugmsg("Cell " << i << " "
+                    << QString("0x%1 - 0x%2")
+                        .arg(cell.addrStart, 8, 16, QChar('0'))
+                        .arg(cell.addrEnd, 8, 16, QChar('0'))
+                    << ": props.objectCount = "
+                    << props.objectCount << ", nodes.size() = " << nodes.size());
+
+#ifdef ENABLE_DOT_CODE
+            QString filename = QString("subtree_0x%1_0x%2.dot")
+                                .arg(cell.addrStart, 8, 16, QChar('0'))
+                                .arg(cell.addrEnd, 8, 16, QChar('0'));
+            _map->vmemMap().outputSubtreeDotFile(cell.addrStart, cell.addrEnd, filename);
+#endif
+
+            props = _map->vmemMap().propertiesOfRange(cell.addrStart, cell.addrEnd);
+            nodes = _map->vmemMap().objectsInRange(cell.addrStart, cell.addrEnd);
+        }
+
+        if (props.isEmpty())
             continue;
 
-        quint64 len = _mappings[i].length;
-        // Find the row and column of the offset
-        quint64 relAddr;
-        // Beware of overflows when calculating the relative address
-        if (visibleAddrSpaceStart() > _mappings[i].address) {
-            relAddr = 0;
-            // shorten length to the visible part
-            len -= visibleAddrSpaceStart() - _mappings[i].address;
+        cell.minProb = (unsigned char)(PROB_MAX * props.minProbability);
+        cell.maxProb = (unsigned char)(PROB_MAX * props.maxProbability);
+
+        // Draw  cell
+        quint64 r = cell.index / _cols;
+        quint64 c = cell.index % _cols;
+
+        if (cellSize == 1) {
+            if (cell.maxProb != lastColor) {
+                lastColor = cell.maxProb;
+                painter.setPen(probColor[lastColor]);
+            }
+            painter.drawPoint(c, r);
         }
-        else
-            relAddr = _mappings[i].address - visibleAddrSpaceStart();
-
-        while (len > 0) {
-            // In which memory cell does current address lie?
-            quint64 newIndex = relAddr / _bytesPerPixelL;
-            // Does this mapping start in a new cell?
-            if (cell.isFirst || cell.index != newIndex) {
-                if (!cell.isFirst) {
-                    // Draw previous cell
-                    quint64 r = cell.index / _cols;
-                    quint64 c = cell.index % _cols;
-
-                    if (cellSize == 1) {
-                        if (cell.maxProb != lastColor) {
-                            lastColor = cell.maxProb;
-                            painter.setPen(probColor[lastColor]);
-                        }
-                        painter.drawPoint(c, r);
-                    }
-                    else {
-//                        if (cell.maxProb != lastColor) {
-                            lastColor = cell.maxProb;
-                            painter.setBrush(probColor[lastColor]);
-//                        }
-                        painter.drawRect(c * cellSize, r * cellSize,
-                                cellSize - 1, cellSize - 1);
-                    }
-                }
-                // Init cell with new values
-                cell.index = newIndex;
-                cell.relStart = cell.index * _bytesPerPixelL;
-                cell.nextRelStart = (cell.index + 1) * _bytesPerPixelL;
-                cell.elemCount = 1;
-                cell.minProb = cell.maxProb = _mappings[i].probability;
-                cell.isFirst = false;
+        else {
+            if (cell.maxProb != lastColor) {
+                lastColor = cell.maxProb;
+                painter.setBrush(probColor[lastColor]);
             }
-            else {
-                ++cell.elemCount;
-                if (cell.maxProb < _mappings[i].probability)
-                    cell.maxProb = _mappings[i].probability;
-                if (cell.minProb > _mappings[i].probability)
-                    cell.minProb = _mappings[i].probability;
-            }
-
-            // Handle cases where relAddr + len > cell.nextRelStart
-            if (relAddr + len > cell.nextRelStart) {
-                len -= cell.nextRelStart - relAddr;
-                relAddr = cell.nextRelStart;
-            }
-            else
-                break;
+            painter.drawRect(c * cellSize, r * cellSize,
+                    cellSize - 1, cellSize - 1);
         }
-
     }
 
     // Only draw grid lines if we have at least 3 pixel per byte
@@ -536,7 +528,8 @@ bool MemoryMapWidget::event(QEvent *event)
 
 
             QString elem;
-            ConstNodeList nodes = _map->vmemMapsInRange(addrStart, addrEnd);
+            ConstNodeList nodes =
+                    _map->vmemMapsInRange(addrStart, addrEnd).toList();
             qSort(nodes.begin(), nodes.end(), NodeProbabilityGreaterThan);
 
             if (!nodes.isEmpty()) {
@@ -567,7 +560,7 @@ bool MemoryMapWidget::event(QEvent *event)
                     }
 
                     const MemoryMapNode* node = *it;
-                    int colorIdx = (unsigned char)(MAX_PROB * node->probability());
+                    int colorIdx = (unsigned char)(PROB_MAX * node->probability());
                     cellProbCharFmt.setForeground(QBrush(probColor[colorIdx]));
 
                     cur.setBlockFormat(defBlkFmt);
@@ -634,7 +627,7 @@ void MemoryMapWidget::setMap(const MemoryMap* map)
     if (_map == map)
         return;
     _map = map;
-    forceMapRecreaction();
+//    forceMapRecreaction();
 }
 
 
@@ -657,18 +650,18 @@ bool MemoryMapWidget::isPainting() const
 }
 
 
-bool MemoryMapWidget::isBuilding() const
-{
-    return _isBuilding;
-}
+//bool MemoryMapWidget::isBuilding() const
+//{
+//    return _isBuilding;
+//}
 
 
-void MemoryMapWidget::forceMapRecreaction()
-{
-    _visMapValid = false;
-    if (!QMetaObject::invokeMethod(this, "buildVisMemMap"))
-        debugerr("Cannot invoke buildVisMemMap() on this widget!");
-}
+//void MemoryMapWidget::forceMapRecreaction()
+//{
+//    _visMapValid = false;
+//    if (!QMetaObject::invokeMethod(this, "buildVisMemMap"))
+//        debugerr("Cannot invoke buildVisMemMap() on this widget!");
+//}
 
 
 void MemoryMapWidget::setShowOnlyKernelSpace(bool value)
