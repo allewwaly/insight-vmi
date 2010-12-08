@@ -12,7 +12,7 @@
 #include <QList>
 #include <QSet>
 
-#define ENABLE_DOT_CODE 1
+//#define ENABLE_DOT_CODE 1
 
 #ifdef ENABLE_DOT_CODE
 #include <QTextStream>
@@ -60,8 +60,9 @@ struct RangeProperties
     /**
      * Unites these properties with the ones found in \a other
      * @param other the properties to unite with
+     * @return reference to this object
      */
-    void unite(const RangeProperties& other);
+    RangeProperties& unite(const RangeProperties& other);
 };
 
 /**

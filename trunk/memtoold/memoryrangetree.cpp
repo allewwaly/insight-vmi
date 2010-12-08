@@ -28,12 +28,13 @@ void RangeProperties::update(const MemoryMapNode* node)
 }
 
 
-void RangeProperties::unite(const RangeProperties& other)
+RangeProperties& RangeProperties::unite(const RangeProperties& other)
 {
     if (other.minProbability < minProbability)
         minProbability = other.minProbability;
     if (other.maxProbability > maxProbability)
         maxProbability = other.maxProbability;
+    return *this;
 }
 
 //------------------------------------------------------------------------------
@@ -48,6 +49,7 @@ MemoryRangeTreeNode::MemoryRangeTreeNode(MemoryRangeTree* tree,
     id = nodeId++;
 #endif
 }
+
 
 MemoryRangeTreeNode::~MemoryRangeTreeNode()
 {
@@ -411,21 +413,15 @@ RangeProperties MemoryRangeTree::propertiesOfRange(quint64 addrStart,
             n = n->rChild;
     }
 
-    // Unite all mappings that are in the requested range
     RangeProperties result = n->properties;
+
     // No go upwards in the tree until we have to go down on the right side
-//    do {
-//        result.unite(n->nodes);
-//        n = n->next;
-//    } while (n && addrEnd <= n->addrStart);
-    while (n->addrEnd < addrEnd) {
-//        result.unite(n->properties);
+    while (n->addrEnd < addrEnd)
         n = n->parent;
-    }
     assert (n != 0);
 
     // Descent on the right side
-    // Find the deepest node containing the start address
+    // Find the deepest node containing the end address
     while (n->addrEnd > addrEnd && !n->isLeaf()) {
         assert(n->nodes.isEmpty());
         if (addrStart <= n->splitAddr())
@@ -433,7 +429,7 @@ RangeProperties MemoryRangeTree::propertiesOfRange(quint64 addrStart,
         else
             n = n->rChild;
     }
-    result.unite(n->properties);
 
-    return result;
+    // Unite the properties of the left side with those of the right side
+    return result.unite(n->properties);
 }
