@@ -59,11 +59,11 @@ struct RangeProperties
     inline bool isEmpty() { return objectCount == 0; }
 
     /**
-     * Update the properties with the ones from \a node. This is called whenever
-     * a MemoryMapNode is added underneath a MemoryRangeTreeNode.
+     * Update the properties with the ones from \a mmnode. This is called
+     * whenever a MemoryMapNode is added underneath a MemoryRangeTreeNode.
      * @param node
      */
-    void update(const MemoryMapNode* node);
+    void update(const MemoryMapNode* mmnode);
 
     /**
      * Unites these properties with the ones found in \a other.
@@ -109,17 +109,23 @@ struct MemoryRangeTreeNode
     inline bool isLeaf() const { return !lChild && !rChild; }
 
     /**
-     * Inserts \a node into this node or its children. This function may call
-     * split() internally to split up this node.
-     * @param node
+     * Inserts \a mmnode into this node or its children into the range
+     * \a mmAddrStart to \a mmAddrEnd. This function may call split() internally
+     * to split up this node.
+     * @param mmnode
+     * @param mmAddrStart start address of mapping
+     * @param mmAddrEnd end address of mapping
      */
-    void insert(const MemoryMapNode* node);
+    void insert(const MemoryMapNode* mmnode, quint64 mmAddrStart,
+            quint64 mmAddrEnd);
 
     /**
      * Splits this node into two children and moves all MemoryMapNode's in
      * nodes to one or both of them
+     * @param mmAddrStart start address of mapping
+     * @param mmAddrEnd end address of mapping
      */
-    void split();
+    void split(quint64 mmAddrStart, quint64 mmAddrEnd);
 
     /**
      * @return the end address of the left child
@@ -331,10 +337,21 @@ public:
     void clear();
 
     /**
-     * Inserts the given MemoryMapNode object into the tree.
-     * @param node the object to insert
+     * Inserts the given MemoryMapNode object at its native address range into
+     * the tree.
+     * @param mmnode
      */
-    void insert(const MemoryMapNode* node);
+    void insert(const MemoryMapNode* mmnode);
+
+    /**
+     * Inserts the given MemoryMapNode object within the range \a mmAddrStart to
+     * \a mmAddrEnd into the tree.
+     * @param mmnode the object to insert
+     * @param mmAddrStart start address of mapping
+     * @param mmAddrEnd end address of mapping
+     */
+    void insert(const MemoryMapNode* mmnode, quint64 mmAddrStart,
+            quint64 mmAddrEnd);
 
     /**
      * Finds all objects at a given memory address.

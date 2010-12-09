@@ -78,7 +78,8 @@ void MemoryRangeTreeNode::deleteChildren()
 }
 
 
-void MemoryRangeTreeNode::insert(const MemoryMapNode* mmnode)
+void MemoryRangeTreeNode::insert(const MemoryMapNode* mmnode,
+        quint64 mmAddrStart, quint64 mmAddrEnd)
 {
     properties.update(mmnode);
 
@@ -86,19 +87,19 @@ void MemoryRangeTreeNode::insert(const MemoryMapNode* mmnode)
         nodes.insert(mmnode);
         // If the MemoryMapNode doesn't stretch over this node's entire
         // region, then split split up this MemoryRangeTreeNode
-        if (mmnode->address() > addrStart || mmnode->endAddress() < addrEnd)
-            split();
+        if (mmAddrStart > addrStart || mmAddrEnd < addrEnd)
+            split(mmAddrStart, mmAddrEnd);
     }
     else {
-        if (mmnode->address() <= lChild->addrEnd)
-            lChild->insert(mmnode);
-        if (mmnode->endAddress() >= rChild->addrStart)
-            rChild->insert(mmnode);
+        if (mmAddrStart <= lChild->addrEnd)
+            lChild->insert(mmnode, mmAddrStart, mmAddrEnd);
+        if (mmAddrEnd >= rChild->addrStart)
+            rChild->insert(mmnode, mmAddrStart, mmAddrEnd);
     }
 }
 
 
-inline void MemoryRangeTreeNode::split()
+inline void MemoryRangeTreeNode::split(quint64 mmAddrStart, quint64 mmAddrEnd)
 {
     assert(lChild == 0 && rChild == 0);
     assert(addrEnd > addrStart);
@@ -133,10 +134,10 @@ inline void MemoryRangeTreeNode::split()
             ++it)
     {
         const MemoryMapNode* mmnode = *it;
-        if (mmnode->address() <= lAddrEnd)
-            lChild->insert(mmnode);
-        if (mmnode->endAddress() >= rAddrStart)
-            rChild->insert(mmnode);
+        if (mmAddrStart <= lAddrEnd)
+            lChild->insert(mmnode, mmAddrStart, mmAddrEnd);
+        if (mmAddrEnd >= rAddrStart)
+            rChild->insert(mmnode, mmAddrStart, mmAddrEnd);
     }
 
     nodes.clear();
@@ -277,11 +278,18 @@ void MemoryRangeTree::clear()
 
 void MemoryRangeTree::insert(const MemoryMapNode* mmnode)
 {
+    insert(mmnode, mmnode->address(), mmnode->endAddress());
+}
+
+
+void MemoryRangeTree::insert(const MemoryMapNode* mmnode, quint64 mmAddrStart,
+        quint64 mmAddrEnd)
+{
     // Insert the first node
     if (!_root)
         _root = _first = _last =
                 new MemoryRangeTreeNode(this, 0, _addrSpaceEnd);
-    _root->insert(mmnode);
+    _root->insert(mmnode, mmAddrStart, mmAddrEnd);
 }
 
 #ifdef ENABLE_DOT_CODE
