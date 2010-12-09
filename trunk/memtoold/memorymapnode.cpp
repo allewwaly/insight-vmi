@@ -33,7 +33,7 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
       _name(MemoryMap::insertName(inst.name())), _address(inst.address()),
       _type(inst.type()), _id(inst.id()), _probability(1.0)
 {
-    if (_belongsTo && _belongsTo->vmem()->memSpecs().vaddrSpaceEnd() > _address)
+    if (_belongsTo && _address > _belongsTo->vmem()->memSpecs().vaddrSpaceEnd())
             genericError(QString("Address 0x%1 exceeds 32 bit address space")
                     .arg(_address, 0, 16));
     updateProbability(&inst);
