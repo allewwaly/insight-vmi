@@ -118,7 +118,7 @@
 
 VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
                              int memDumpIndex)
-    : _tlb(1000), _physMem(physMem), _specs(specs), _pos(-1),
+    : _tlb(10000), _physMem(physMem), _specs(specs), _pos(-1),
       _memDumpIndex(memDumpIndex), _threadSafe(false)
 {
     // Make sure the architecture is set
