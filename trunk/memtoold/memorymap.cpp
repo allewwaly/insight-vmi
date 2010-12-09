@@ -63,7 +63,6 @@ void MemoryMap::clear()
     _typeInstances.clear();
     _pmemMap.clear();
     _vmemMap.clear();
-    _vmemQMap.clear();
     _vmemAddresses.clear();
 
 #ifdef DEBUG
@@ -137,7 +136,6 @@ void MemoryMap::build()
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
                 _vmemMap.insert(node);
-                _vmemQMap.insertMulti(node->address(), node);
 //#ifdef DEBUG
 //                debugmsg("Added: " << node->name());
 //#endif
@@ -194,17 +192,17 @@ void MemoryMap::build()
                     << ", vmemMap = " << _vmemMap.objectCount()
                     << ", pmemMap = " << _pmemMap.size()
                     << ", queue = " << queue_size << " " << indicator
-                    << ", probability = " << (node ? node->probability() : 0.999));
+                    << ", probability = " << (node ? node->probability() : 1.0));
             prev_queue_size = queue_size;
         }
 
-#ifdef DEBUG
-        // emergency stop
-        if (_shared->processed >= 5000) {
-            debugmsg(">>> Breaking revmap generation <<<");
-            break;
-        }
-#endif
+//#ifdef DEBUG
+//        // emergency stop
+//        if (_shared->processed >= 5000) {
+//            debugmsg(">>> Breaking revmap generation <<<");
+//            break;
+//        }
+//#endif
 
         // Sleep for 100ms
         usleep(100*1000);
@@ -281,7 +279,7 @@ void MemoryMap::build()
 //    debugmsg("Wrote vmemTree to " << dotfile << ".");
 //#endif
 
-#ifdef DEBUG
+#if defined(DEBUG) && 0
     debugmsg("Checking consistency of vmemTree");
     // See if we can find all objects
     assert(_vmemQMap.size() == _vmemMap.objectCount());
@@ -597,7 +595,6 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
 
             _vmemAddresses.insert(child->address());
             _vmemMap.insert(child);
-            _vmemQMap.insertMulti(child->address(), child);
 
             // Release the reading and the writing lock
             _shared->vmemReadingLock.unlock();

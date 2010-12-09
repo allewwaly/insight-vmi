@@ -84,37 +84,10 @@ void MemoryRangeTreeNode::insert(const MemoryMapNode* node)
 
     if (isLeaf()) {
         nodes.insert(node);
-//        if (! ((node->address() == addrStart && node->address() >= addrEnd) ||
-//               (node->address() <= addrStart && node->endAddress() == addrEnd) ||
-//               (node->address() < addrStart && node->endAddress() > addrEnd)) )
-//        {
-//            if (addrEnd == addrStart) {
-//                debugmsg("addrStart       = 0x" << QString("%1").arg(addrStart, 0, 16));
-//                debugmsg("addrEnd         = 0x" << QString("%1").arg(addrEnd, 0, 16));
-//                debugmsg("node->address() = 0x" << QString("%1").arg(node->address(), 0, 16));
-//                debugmsg("node->endAddr() = 0x" << QString("%1").arg(node->endAddress(), 0, 16));
-//                debugmsg("node->size()    = " << node->size());
-//                return;
-//            }
-//            split();
-//        }
-
         // If the MemoryMapNode doesn't stretch over this node's entire
         // region, then split split up this MemoryRangeTreeNode
-//        if (node->address() > addrStart || node->endAddress() < addrEnd) {
-        quint64 nodeAddress = node->address();
-        quint64 nodeEndAddress = node->endAddress();
-        if (nodeAddress > addrStart || nodeEndAddress < addrEnd) {
-            if (addrEnd == addrStart) {
-                debugmsg("addrStart       = 0x" << QString("%1").arg(addrStart, 0, 16));
-                debugmsg("addrEnd         = 0x" << QString("%1").arg(addrEnd, 0, 16));
-                debugmsg("node->address() = 0x" << QString("%1").arg(node->address(), 0, 16));
-                debugmsg("node->endAddr() = 0x" << QString("%1").arg(node->endAddress(), 0, 16));
-                debugmsg("node->size()    = " << node->size());
-                return;
-            }
+        if (node->address() > addrStart || node->endAddress() < addrEnd)
             split();
-        }
     }
     else {
         if (node->address() <= lChild->addrEnd)
@@ -355,7 +328,6 @@ const NodeSet& MemoryRangeTree::objectsAt(quint64 address) const
     const MemoryRangeTreeNode* n = _root;
     // Find the leaf containing the searched address
     while (!n->isLeaf()) {
-        assert(n->nodes.isEmpty());
         if (address <= n->splitAddr())
             n = n->lChild;
         else
@@ -388,7 +360,6 @@ NodeSet MemoryRangeTree::objectsInRange(quint64 addrStart, quint64 addrEnd) cons
     const MemoryRangeTreeNode* n = _root;
     // Find the leaf containing the start address
     while (!n->isLeaf()) {
-        assert(n->nodes.isEmpty());
         if (addrStart <= n->splitAddr())
             n = n->lChild;
         else
@@ -415,7 +386,6 @@ const RangeProperties& MemoryRangeTree::propertiesAt(quint64 address) const
     const MemoryRangeTreeNode* n = _root;
     // Find the leaf containing the searched address
     while (!n->isLeaf()) {
-        assert(n->nodes.isEmpty());
         if (address <= n->splitAddr())
             n = n->lChild;
         else
