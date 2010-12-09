@@ -430,37 +430,38 @@ RangeProperties MemoryRangeTree::propertiesOfRange(quint64 addrStart,
     if (!_root || addrStart > _addrSpaceEnd)
         return _emptyProperties;
 
-    const MemoryRangeTreeNode* n = _root;
+    RangeProperties result;
+
+    const MemoryRangeTreeNode *n = _root, *subTreeRoot = _root;
     // Find the deepest node containing the start address
     while ((n->addrStart < addrStart || n->addrEnd > addrEnd) && !n->isLeaf()) {
-        if (addrStart <= n->splitAddr())
+        // Descent to one of the children
+        if (addrStart <= n->splitAddr()) {
+            // If we go to the left AND the right child is completely contained
+            // within the range, we have to unit with its properties
+            if (n->rChild->addrEnd <= addrEnd)
+                result.unite(n->rChild->properties);
             n = n->lChild;
+        }
         else
             n = n->rChild;
+        // Keep reference to the deepest node that still covers the whole range
+        if (n->addrStart <= addrStart && n->addrEnd >= addrEnd)
+            subTreeRoot = n;
     }
 
-    RangeProperties result = n->properties;
+    result.unite(n->properties);
 
-    // No go upwards in the tree until we have to go down on the right side
-    bool unite = true;
-    while (n->addrEnd < addrEnd) {
-        // If we go upwards we leave out the right sub-tree which also
-        // belongs to the range, so unite with its properties
-        unite = unite && n->parent->lChild == n;
-        if (!n->isLeaf() && unite)
-            result.unite(n->rChild->properties);
-        n = n->parent;
-    }
-    const MemoryRangeTreeNode* subTreeRoot = n;
-
-    // Find the deepest node containing the end address
-    while (n->addrEnd > addrEnd && !n->isLeaf()) {
+    // Now descent to addrEnd starting again from subTreeRoot
+    n = subTreeRoot;
+    while ((n->addrStart < addrStart || n->addrEnd > addrEnd) && !n->isLeaf()) {
+        // Descent to one of the children
         if (addrEnd <= n->splitAddr())
             n = n->lChild;
         else {
-            // If we go right, we leave out the left sub-tree which also
-            // belongs to the range, so unite with its properties
-            if (n != subTreeRoot)
+            // If we go to the right AND the left child is completely contained
+            // within the range, we have to unit with its properties
+            if (n->lChild->addrStart >= addrStart)
                 result.unite(n->lChild->properties);
             n = n->rChild;
         }
