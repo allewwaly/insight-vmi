@@ -37,9 +37,6 @@ typedef QMultiHash<quint64, MemoryMapNode*> PointerNodeHash;
 /// An integer-indexed hash of MemoryMapNode pointers
 typedef QMultiHash<int, MemoryMapNode*> IntNodeHash;
 
-/// A address-indexed map of MemoryMapNode pointers
-typedef QMultiMap<quint64, MemoryMapNode*> PointerNodeMap;
-
 /// A pair of an integer and a MemoryMapNode pointer
 typedef QPair<int, MemoryMapNode*> IntNodePair;
 
@@ -276,7 +273,6 @@ private:
     PointerNodeHash _pointersTo; ///< holds all pointers that point to a certain address
     IntNodeHash _typeInstances;  ///< holds all instances of a given type ID
     MemoryRangeTree _vmemMap;    ///< map of all used kernel-space virtual memory
-    PointerNodeMap _vmemQMap;
     PointerIntNodeMap _pmemMap;  ///< map of all used physical memory
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
