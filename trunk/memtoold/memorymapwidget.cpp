@@ -26,7 +26,7 @@
 #include "debug.h"
 
 static const int margin = 3;
-static const int cellSize = 16;
+static const int cellSize = 8;
 static const unsigned char PROB_MAX = 16;
 
 static const QColor probColor[PROB_MAX+1] = {
@@ -51,18 +51,9 @@ static const QColor probColor[PROB_MAX+1] = {
 
 //------------------------------------------------------------------------------
 
-VisMapPiece::VisMapPiece(quint64 start, quint64 length, int type,
-        unsigned char probability)
-    : address(start), length(length), type(type), probability(probability)
-{
-}
-
-//------------------------------------------------------------------------------
-
 MemoryMapWidget::MemoryMapWidget(const MemoryMap* map, QWidget *parent)
     : QWidget(parent), _map(map), _visMapValid(false), _address(-1),
-      /*_bytesPerPixelF(0),*/ _cols(0), _rows(0),
-      _antialiasing(false), _isPainting(false), /*_isBuilding(false),*/
+      _cols(0), _rows(0), _antialiasing(false), _isPainting(false),
       _showOnlyKernelSpace(false), _shownAddrSpaceOffset(0)
 {
 //    setWindowTitle(tr("Difference view"));
@@ -130,173 +121,6 @@ void insertSorted(T& list, const typename T::value_type value,
     list.insert(it, value);
 }
 
-/*
-void MemoryMapWidget::buildVisMemMap()
-{
-    if (_visMapValid || !_buildMutex.tryLock())
-        return;
-
-    VarSetter<bool> building(&_isBuilding, true, false);
-
-    emit buildingStarted();
-
-    _mappings.clear();
-    _maxIntensity = 0;
-
-    if (_map) {
-        int progress = 0;
-        // Holds the currently active nodes, ordered by their end address
-        typedef QMultiMap<quint64, const MemoryMapNode*> NodeMap;
-        NodeMap nodes;
-        // Holds the sorted (!!!) addresses at which we have to stop
-        QLinkedList<quint64> addresses;
-
-        quint64 lastAddr = 0;
-        bool firstRound = true;
-        unsigned char lastProbability = 0;
-        int piecesMerged = 0;
-        qint64 processed = 0, total = _map->vmemMap().size();
-        bool nodesWasEmpty = false;
-
-        for (PointerNodeMap::const_iterator vmap_it = _map->vmemMap().constBegin();
-                vmap_it != _map->vmemMap().constEnd() && processed < total;
-                ++vmap_it)
-        {
-            // The map contains multiple nodes with the same start address,
-            // so curAddr == lastAddr is very likely
-            quint64 curAddr = vmap_it.key();
-            const MemoryMapNode* node = vmap_it.value();
-
-            // Init everything in the first round
-            if (firstRound) {
-                firstRound = false;
-                lastAddr = curAddr;
-                lastProbability = (unsigned char)(MAX_PROB * node->probability());
-                insertSorted(addresses, curAddr);
-            }
-
-            // Add all nodes with the same address into a map ordered by their
-            // end address
-            if (curAddr == lastAddr) {
-                quint64 endAddr = curAddr + node->size();
-                nodes.insert(endAddr, node);
-#ifdef DEBUG
-                if (endAddr < curAddr)
-                    assert(endAddr >= curAddr);
-#endif
-                insertSorted(addresses, endAddr);
-            }
-            // We've moved on to the next address
-            else {
-                insertSorted(addresses, curAddr);
-
-                // Go through all addresses which are <= curAddr
-                do {
-#ifdef DEBUG
-                    // Make sure the list is sorted
-//                    quint64 __prevAddr = addresses.front();
-//                    QLinkedList<quint64>::iterator it = addresses.begin();
-//                    while (++it != addresses.end()) {
-//                        assert(__prevAddr < *it);
-//                        __prevAddr = *it;
-//                    }
-#endif
-                    quint64 addr = addresses.takeFirst();
-#ifdef DEBUG
-//                    if (lastAddr >= addr) {
-//                        debugerr(QString("lastAddr = 0x%1 >= addr = 0x%2")
-//                                .arg(lastAddr, 8, 16, QChar('0'))
-//                                .arg(addr, 8, 16, QChar('0')));
-//                    }
-//                    assert(lastAddr < addr);
-                    assert(addr <= curAddr);
-#endif
-                    // Remove all nodes that are out of scope
-                    NodeMap::iterator nit = nodes.begin();
-                    while (nit != nodes.end() && nit.key() <= addr)
-                        nit = nodes.erase(nit);
-                    // Length of MapPiece object
-                    quint64 length = addr - lastAddr;
-
-                    // Can we merge this with the previous piece?
-                    if (!nodesWasEmpty) {
-                        if (!_mappings.isEmpty() &&
-                                _mappings.last().address + _mappings.last().length == lastAddr &&
-                                _mappings.last().probability == lastProbability)
-                        {
-                            _mappings.last().length += length;
-                            ++piecesMerged;
-                        }
-                        // No, create a new one
-                        else {
-                            _mappings.append(VisMapPiece(lastAddr, length, ptUsed,
-                                    lastProbability));
-//                            if (lastProbability > _maxIntensity)
-//                                _maxIntensity = lastProbability;
-                        }
-#ifdef DEBUG
-                        if (_mappings.last().length > 0xFFFFFF)
-                            debugmsg(QString("[%1] addr = 0x%2, intensity = %3, len = %4")
-                                                    .arg(_mappings.size() - 1)
-                                                    .arg(_mappings.last().address, 8, 16, QChar('0'))
-                                                    .arg(_mappings.last().probability, 3)
-                                                    .arg(_mappings.last().length));
-#endif
-                    }
-
-                    // Update the max. probability
-                    lastProbability = 0;
-                    for (NodeMap::const_iterator it = nodes.constBegin();
-                            it != nodes.constEnd(); ++it)
-                    {
-                        unsigned char p =
-                                (unsigned char)(MAX_PROB * it.value()->probability());
-                        if (lastProbability < p)
-                            lastProbability = p;
-                    }
-                    nodesWasEmpty = nodes.isEmpty(); // any "active" nodes?
-                    lastAddr = addr;
-
-                    // Stop if we've reached the current address
-                } while (!addresses.isEmpty() &&  addresses.front() <= curAddr);
-            }
-
-            // Emit a signal of the building progress
-            int i = (int) (++processed / (float)total * 100.0);
-            if (i != progress) {
-                progress = i;
-                emit buildingProgress(progress);
-            }
-
-            QApplication::processEvents();
-        }
-
-#ifdef DEBUG
-        debugmsg(__PRETTY_FUNCTION__ << ": piecesMerged = " << piecesMerged
-                << ", remaining pieces = " << _mappings.count());
-
-        if (_mappings.count() < 20) {
-            for (int i = 0; i < _mappings.size(); ++i) {
-                debugmsg(QString("[%1] addr = 0x%2, intensity = %3, len = %4")
-                        .arg(i)
-                        .arg(_mappings[i].address, 8, 16, QChar('0'))
-                        .arg(_mappings[i].probability, 3)
-                        .arg(_mappings[i].length));
-            }
-        }
-#endif
-
-    }
-
-    _visMapValid = true;
-    emit buildingStopped();
-
-    _buildMutex.unlock();
-
-    // Repaint the widget
-    update();
-}
-*/
 
 void MemoryMapWidget::closeEvent(QCloseEvent* e)
 {
@@ -306,23 +130,10 @@ void MemoryMapWidget::closeEvent(QCloseEvent* e)
 
 void MemoryMapWidget::resizeEvent(QResizeEvent* /*e*/)
 {
-    // Paint the bytes as squares into the visible widget area
-    quint64 addrSpaceLen = visibleAddrSpaceLength();
-
-//    double ratio = width() / (double) height();
-//    _cols = (qint64) ceil(sqrt(addrSpaceLen * ratio));
-//    _rows = addrSpaceLen / _cols;
-//    if (addrSpaceLen % _cols != 0)
-//        _rows++;
-
     _cols = drawWidth() / cellSize;
     _rows = drawHeight() / cellSize;
 
-    // TODO: Fix situations where addrSpaceLen < _cols * _rows
-//    _bytesPerPixelX = _cols / (double) drawWidth();
-//    _bytesPerPixelY = _rows / (double) drawHeight();
-    double bytesPerPixelF = addrSpaceLen / (double)(_cols * _rows);
-    _bytesPerPixelL = ceil(bytesPerPixelF);
+    _bytesPerPixel = ceil(visibleAddrSpaceLength() / (double)(_cols * _rows));
 }
 
 
@@ -335,7 +146,7 @@ void MemoryMapWidget::mouseMoveEvent(QMouseEvent *e)
 
     int c = x / cellSize, r = y / cellSize;
 
-    quint64 addr = (r * _cols + c) * _bytesPerPixelL + visibleAddrSpaceStart();
+    quint64 addr = (r * _cols + c) * _bytesPerPixel + visibleAddrSpaceStart();
 
     if (_address != addr && addr < visibleAddrSpaceEnd()) {
         _address = addr;
@@ -366,18 +177,10 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
 
     // Draw in "byte"-coordinates, scale bytes to entire widget
     painter.translate(margin, margin);
-//    painter.scale(1.0 / _bytesPerPixelX, 1.0 / _bytesPerPixelY);
     // Clear widget
     painter.setPen(Qt::NoPen);
     painter.setBrush(bgColor);
     painter.drawRect(0, 0, _cols * cellSize, _rows * cellSize);
-//    // Draw the whole address space  as "unused"
-//    painter.setBrush(unusedColor);
-//    quint64 h = totalAddrSpace() / _cols;
-//    if (h >= 1)
-//        painter.drawRect(0, 0, _cols, h);
-//
-//    painter.drawRect(0, h, totalAddrSpace() - (_cols * h), 1);
 
     // Draw all used parts
     painter.setBrush(usedColor);
@@ -387,7 +190,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
     struct {
         quint64 addrStart, addrEnd, index;
         int elemCount;
-        VisMapPiece::PropType maxProb, minProb;
+        unsigned char maxProb, minProb;
         bool isFirst;
     } cell;
 
@@ -400,7 +203,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
 
         cell.index = i;
         cell.addrStart = cell.addrEnd + 1;
-        cell.addrEnd += _bytesPerPixelL;
+        cell.addrEnd += _bytesPerPixel;
         // Beware of overflows
         if (cell.addrEnd < cell.addrStart ||
                 cell.addrEnd > totalAddrSpaceEnd())
@@ -412,6 +215,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
         NodeSet nodes =
                 _map->vmemMap().objectsInRange(cell.addrStart, cell.addrEnd);
 
+#ifdef DEBUG
         if (props.isEmpty() != nodes.isEmpty()) {
             debugmsg("Cell " << i << " "
                     << QString("0x%1 - 0x%2")
@@ -420,16 +224,17 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
                     << ": props.objectCount = "
                     << props.objectCount << ", nodes.size() = " << nodes.size());
 
-#ifdef ENABLE_DOT_CODE
+#   ifdef ENABLE_DOT_CODE
             QString filename = QString("subtree_0x%1_0x%2.dot")
                                 .arg(cell.addrStart, 8, 16, QChar('0'))
                                 .arg(cell.addrEnd, 8, 16, QChar('0'));
             _map->vmemMap().outputSubtreeDotFile(cell.addrStart, cell.addrEnd, filename);
-#endif
+#   endif
 
             props = _map->vmemMap().propertiesOfRange(cell.addrStart, cell.addrEnd);
             nodes = _map->vmemMap().objectsInRange(cell.addrStart, cell.addrEnd);
         }
+#endif
 
         if (props.isEmpty())
             continue;
@@ -482,8 +287,8 @@ bool MemoryMapWidget::event(QEvent *event)
         }
         else {
             int c = x / cellSize, r = y / cellSize;
-            quint64 addrStart = (r * _cols + c) * _bytesPerPixelL + visibleAddrSpaceStart();
-            quint64 addrEnd = addrStart + _bytesPerPixelL - 1;
+            quint64 addrStart = (r * _cols + c) * _bytesPerPixel + visibleAddrSpaceStart();
+            quint64 addrEnd = addrStart + _bytesPerPixel - 1;
             // Limit addrEnd to acutal end of address space. There are two cases:
             // 32-bit: addrEnd is beyond totalAddrSpaceEnd()
             // 64-bit: addrEnd is close to zero, because an overflow occured
@@ -627,7 +432,6 @@ void MemoryMapWidget::setMap(const MemoryMap* map)
     if (_map == map)
         return;
     _map = map;
-//    forceMapRecreaction();
 }
 
 
@@ -648,20 +452,6 @@ bool MemoryMapWidget::isPainting() const
 {
     return _isPainting;
 }
-
-
-//bool MemoryMapWidget::isBuilding() const
-//{
-//    return _isBuilding;
-//}
-
-
-//void MemoryMapWidget::forceMapRecreaction()
-//{
-//    _visMapValid = false;
-//    if (!QMetaObject::invokeMethod(this, "buildVisMemMap"))
-//        debugerr("Cannot invoke buildVisMemMap() on this widget!");
-//}
 
 
 void MemoryMapWidget::setShowOnlyKernelSpace(bool value)

@@ -11,6 +11,9 @@
 #include "memorymapnode.h"
 #include "debug.h"
 
+#ifdef ENABLE_DOT_CODE
+#include <QDateTime>
+#endif
 
 void RangeProperties::reset()
 {

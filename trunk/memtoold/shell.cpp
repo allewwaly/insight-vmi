@@ -214,9 +214,6 @@ void Shell::prepare()
         }
     }
 
-//    connect(&_memMapVisTimer, SIGNAL(timeout()), SLOT(memMapVisTimerTimeout()));
-//    _memMapVisTimer.setInterval(500);
-
     // Open the console devices
     _stdin.open(stdin, QIODevice::ReadOnly);
     _stdout.open(stdout, QIODevice::WriteOnly);
@@ -1302,13 +1299,6 @@ int Shell::cmdMemoryRevmap(QStringList args)
 
 int Shell::cmdMemoryRevmapBuild(int index)
 {
-//    // Show the memory map window so that the user can see the progress
-//    memMapWindow->mapWidget()->setMap(_memDumps[index]->map());
-//    if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
-//        debugerr("Error invoking show() on memMapWindow");
-//    _memMapLastPaint.start();
-//    _memMapVisTimer.start();
-
     QTime timer;
     timer.start();
     _memDumps[index]->setupRevMap();
@@ -1340,31 +1330,12 @@ int Shell::cmdMemoryRevmapVisualize(int index)
     }
 
     memMapWindow->mapWidget()->setMap(_memDumps[index]->map());
-//    memMapWindow->mapWidget()->forceMapRecreaction();
 
     if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
         debugerr("Error invoking show() on memMapWindow");
 
     return 0;
 }
-
-
-//void Shell::memMapVisTimerTimeout()
-//{
-//    // If memory map is still being built, force an update of the display
-//    if (memMapWindow->isVisible() &&
-//            memMapWindow->mapWidget()->map()->isBuilding())
-//    {
-//        if (!memMapWindow->mapWidget()->isPainting() &&
-//                !memMapWindow->mapWidget()->isBuilding() &&
-//                _memMapLastPaint.elapsed() > 1000)
-//        {
-//            _memMapLastPaint.restart();
-//        }
-//    }
-//    else
-//        _memMapVisTimer.stop();
-//}
 
 
 int Shell::cmdScript(QStringList args)
