@@ -106,8 +106,9 @@ void MemoryMap::build()
     clear();
     _shared->reset();
 
-    QTime timer;
+    QTime timer, totalTimer;
     timer.start();
+    totalTimer.start();
     qint64 prev_queue_size = 0;
 
     // NON-PARALLEL PART OF BUILDING PROCESS
@@ -221,6 +222,8 @@ void MemoryMap::build()
     // Restore previous value
     _vmem->setThreadSafety(wasThreadSafe);
 
+    float proc_per_sec = _shared->processed * 1000.0 / totalTimer.elapsed();
+
     // Gather some statistics about the memory map
 //#define STATS_AVAILABLE 1
 //    int nonAligned = 0;
@@ -251,6 +254,7 @@ void MemoryMap::build()
             << _pointersTo.uniqueKeys().size() << " addresses");
     debugmsg("stack.size() = " << _shared->queue.size());
     debugmsg("maxObjSize = " << _shared->maxObjSize);
+    debugmsg("Build speed: " << (int)proc_per_sec << " inst./s");
 
     // calculate average type size
     qint64 totalTypeSize = 0;
