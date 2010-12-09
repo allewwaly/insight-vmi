@@ -18,8 +18,6 @@
 #include <QScriptValue>
 #include <QSemaphore>
 #include <QMutex>
-#include <QTimer>
-#include <QTime>
 #include "kernelsymbols.h"
 
 // Forward declaration
@@ -224,8 +222,6 @@ private:
     int _lastStatus;
     QMutex _engineLock;
     QScriptEngine* _engine;
-//    QTimer _memMapVisTimer;
-//    QTime _memMapLastPaint;
 
     void prepare();
     void cleanupPipedProcs();
