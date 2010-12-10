@@ -99,6 +99,11 @@ public:
      */
     bool setThreadSafety(bool safe);
 
+    /**
+     * Removes all cache entries from the TLB.
+     */
+    void flushTlb();
+
 protected:
     // Pure virtual functions of QIODevice
     virtual qint64 readData (char* data, qint64 maxSize);

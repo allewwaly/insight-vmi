@@ -628,9 +628,17 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
         bool enableExceptions)
 {
-    return (_specs.arch & MemSpecs::i386) ?
+    quint64 physAddr = (_specs.arch & MemSpecs::i386) ?
             virtualToPhysical32(vaddr, pageSize, enableExceptions) :
             virtualToPhysical64(vaddr, pageSize, enableExceptions);
+
+    if (_physMem->size() > 0 && physAddr >= (quint64)_physMem->size())
+        virtualMemoryOtherError(
+                QString("Physical address 0x%1 out of bounds")
+                        .arg(physAddr, 0, 16),
+                        enableExceptions);
+
+    return physAddr;
 }
 
 
@@ -729,3 +737,14 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
 
     return physaddr;
 }
+
+
+void VirtualMemory::flushTlb()
+{
+    bool doLock = _threadSafe;
+
+    if (doLock) _tlbMutex.lock();
+    _tlb.clear();
+    if (doLock) _tlbMutex.unlock();
+}
+

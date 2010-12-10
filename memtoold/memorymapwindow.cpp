@@ -80,7 +80,7 @@ MemoryMapWindow::~MemoryMapWindow()
 
 void MemoryMapWindow::virtualAddressChanged(quint64 address)
 {
-    int width = _memMapWidget->totalAddrSpace() > (1UL << 32) ? 16 : 8;
+    int width = _memMapWidget->totalAddrSpaceEnd() >= (1UL << 32) ? 16 : 8;
     QString s = QString(LBL_MOVE_CURSOR_POS)
                     .arg(address, width, 16, QChar('0'));
 //    _sbCursorPosition->setText(s);

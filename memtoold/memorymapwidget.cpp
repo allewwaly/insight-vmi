@@ -20,7 +20,7 @@
 #include <QTextCursor>
 #include <QTextTable>
 #include <math.h>
-#include "memorymap.h"
+#include "memoryrangetree.h"
 #include "virtualmemory.h"
 #include "varsetter.h"
 #include "debug.h"
@@ -51,7 +51,7 @@ static const QColor probColor[PROB_MAX+1] = {
 
 //------------------------------------------------------------------------------
 
-MemoryMapWidget::MemoryMapWidget(const MemoryMap* map, QWidget *parent)
+MemoryMapWidget::MemoryMapWidget(const MemoryRangeTree* map, QWidget *parent)
     : QWidget(parent), _map(map), _visMapValid(false), _address(-1),
       _cols(0), _rows(0), _antialiasing(false), _isPainting(false),
       _showOnlyKernelSpace(false), _shownAddrSpaceOffset(0)
@@ -70,17 +70,13 @@ MemoryMapWidget::~MemoryMapWidget()
 
 quint64 MemoryMapWidget::visibleAddrSpaceStart() const
 {
-    return _showOnlyKernelSpace ?
-            _map->vmem()->memSpecs().pageOffset :
-            0;
+    return 0;
 }
 
 
 quint64 MemoryMapWidget::visibleAddrSpaceEnd() const
 {
-    return (_map && _map->vmem() &&
-            _map->vmem()->memSpecs().arch == MemSpecs::x86_64) ?
-            0xFFFFFFFFFFFFFFFFUL : 0xFFFFFFFFUL;
+    return _map ? _map->addrSpaceEnd() : 0xFFFFFFFFUL;
 }
 
 
@@ -88,23 +84,15 @@ quint64 MemoryMapWidget::visibleAddrSpaceLength() const
 {
     quint64 length = visibleAddrSpaceEnd() - visibleAddrSpaceStart();
     // Correct the size, if below the 64 bit boundary
-    if (length < 0xFFFFFFFFFFFFFFFF)
+    if (length < 0xFFFFFFFFFFFFFFFFUL)
         ++length;
     return length;
 }
 
 
-quint64 MemoryMapWidget::totalAddrSpace() const
-{
-    return (_map && _map->vmem() &&
-            _map->vmem()->memSpecs().arch == MemSpecs::x86_64) ?
-            0xFFFFFFFFFFFFFFFFUL : (1UL << 32);
-}
-
-
 quint64 MemoryMapWidget::totalAddrSpaceEnd() const
 {
-    return _map ? _map->vmem()->memSpecs().vaddrSpaceEnd() : 0xFFFFFFFFUL;
+    return _map ? _map->addrSpaceEnd(): 0xFFFFFFFFUL;
 }
 
 
@@ -210,10 +198,10 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
             cell.addrEnd = totalAddrSpaceEnd();
 
         RangeProperties props =
-                _map->vmemMap().propertiesOfRange(cell.addrStart, cell.addrEnd);
+                _map->propertiesOfRange(cell.addrStart, cell.addrEnd);
 
         NodeSet nodes =
-                _map->vmemMap().objectsInRange(cell.addrStart, cell.addrEnd);
+                _map->objectsInRange(cell.addrStart, cell.addrEnd);
 
 #ifdef DEBUG
         if (props.isEmpty() != nodes.isEmpty()) {
@@ -231,8 +219,8 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
             _map->vmemMap().outputSubtreeDotFile(cell.addrStart, cell.addrEnd, filename);
 #   endif
 
-            props = _map->vmemMap().propertiesOfRange(cell.addrStart, cell.addrEnd);
-            nodes = _map->vmemMap().objectsInRange(cell.addrStart, cell.addrEnd);
+            props = _map->propertiesOfRange(cell.addrStart, cell.addrEnd);
+            nodes = _map->objectsInRange(cell.addrStart, cell.addrEnd);
         }
 #endif
 
@@ -297,7 +285,7 @@ bool MemoryMapWidget::event(QEvent *event)
             {
                 addrEnd = totalAddrSpaceEnd();
             }
-            int width = _map->vmem()->memSpecs().sizeofUnsignedLong << 1;
+            int width = _map->addrSpaceEnd() >= (1UL << 32) ? 16 : 8;
 
             QTextDocument doc;
             QTextCursor cur(&doc);
@@ -334,7 +322,7 @@ bool MemoryMapWidget::event(QEvent *event)
 
             QString elem;
             ConstNodeList nodes =
-                    _map->vmemMapsInRange(addrStart, addrEnd).toList();
+                    _map->objectsInRange(addrStart, addrEnd).toList();
             qSort(nodes.begin(), nodes.end(), NodeProbabilityGreaterThan);
 
             if (!nodes.isEmpty()) {
@@ -421,17 +409,19 @@ int MemoryMapWidget::drawHeight() const
 }
 
 
-const MemoryMap* MemoryMapWidget::map() const
+const MemoryRangeTree* MemoryMapWidget::map() const
 {
     return _map;
 }
 
 
-void MemoryMapWidget::setMap(const MemoryMap* map)
+void MemoryMapWidget::setMap(const MemoryRangeTree* map)
 {
     if (_map == map)
         return;
     _map = map;
+    resizeEvent(0);
+    update();
 }
 
 

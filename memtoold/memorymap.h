@@ -153,6 +153,11 @@ public:
     quint64 vaddrSpaceEnd() const;
 
     /**
+     * @return the address of the last byte in physical memory
+     */
+    quint64 paddrSpaceEnd() const;
+
+    /**
      * Finds all objects in virtual memory that occupy space between
      * \a addrStart and \a addrEnd. Objects that only partly fall into that
      * range are included.     *
@@ -171,7 +176,7 @@ public:
      * in this mapping.
      * @return the map of allocated kernel objects in physical memory
      */
-    const PointerIntNodeMap& pmemMap() const;
+    const MemoryRangeTree& pmemMap() const;
 
     /**
      * This data structure allows to query which object(s) or pointer(s) point
@@ -273,7 +278,7 @@ private:
     PointerNodeHash _pointersTo; ///< holds all pointers that point to a certain address
     IntNodeHash _typeInstances;  ///< holds all instances of a given type ID
     MemoryRangeTree _vmemMap;    ///< map of all used kernel-space virtual memory
-    PointerIntNodeMap _pmemMap;  ///< map of all used physical memory
+    MemoryRangeTree _pmemMap;    ///< map of all used physical memory
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
     BuilderSharedState* _shared; ///< all variables that are shared amount the builder threads

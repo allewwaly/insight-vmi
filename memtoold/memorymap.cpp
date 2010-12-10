@@ -39,6 +39,7 @@ const QString& MemoryMap::insertName(const QString& name)
 
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
+      _pmemMap(paddrSpaceEnd()),
       _isBuilding(false), _shared(new BuilderSharedState)
 {
 	clear();
@@ -248,8 +249,8 @@ void MemoryMap::build()
             << " not aligned)"
 #endif
             );
-    debugmsg(_pmemMap.size() << " nodes at " << _pmemMap.uniqueKeys().size()
-            << " physical addresses");
+//    debugmsg(_pmemMap.size() << " nodes at " << _pmemMap.uniqueKeys().size()
+//            << " physical addresses");
     debugmsg(_pointersTo.size() << " pointers to "
             << _pointersTo.uniqueKeys().size() << " addresses");
     debugmsg("stack.size() = " << _shared->queue.size());
@@ -740,7 +741,7 @@ const MemoryRangeTree& MemoryMap::vmemMap() const
 }
 
 
-const PointerIntNodeMap& MemoryMap::pmemMap() const
+const MemoryRangeTree& MemoryMap::pmemMap() const
 {
     return _pmemMap;
 }
@@ -768,3 +769,12 @@ quint64 MemoryMap::vaddrSpaceEnd() const
 {
     return _vmem ? _vmem->memSpecs().vaddrSpaceEnd() : 0xFFFFFFFFUL;
 }
+
+
+quint64 MemoryMap::paddrSpaceEnd() const
+{
+    return _vmem && _vmem->physMem() && _vmem->physMem()->size() > 0 ?
+            _vmem->physMem()->size() - 1 : 0xFFFFFFFFL;
+}
+
+
