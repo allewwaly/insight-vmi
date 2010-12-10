@@ -113,7 +113,7 @@ Shell::Shell(bool listenOnSocket)
 				"                              Notice, that a type name or a type id\n"
 				"                              can be followed by a query string in case\n"
 				"                              a member of a struct should be dumped.\n"
-                "  memory revmap [index] build|visualize\n"
+                "  memory revmap [index] build|visualize [pmem|vmem]\n"
                 "                              Build or visualize a reverse mapping for \n"
                 "                              dump <index>"
                 ));
@@ -1285,8 +1285,12 @@ int Shell::cmdMemoryRevmap(QStringList args)
     if (index >= 0) {
         if (QString("build").startsWith(args[0]))
             return cmdMemoryRevmapBuild(index);
-        else if (QString("visualize").startsWith(args[0]))
-            return cmdMemoryRevmapVisualize(index);
+        else if (QString("visualize").startsWith(args[0])) {
+            if (args.size() > 1)
+                return cmdMemoryRevmapVisualize(index, args[1]);
+            else
+                return cmdMemoryRevmapVisualize(index);
+        }
         else {
             _err << "Unknown command: " << args[0] << endl;
             return 2;
@@ -1319,7 +1323,7 @@ int Shell::cmdMemoryRevmapBuild(int index)
 }
 
 
-int Shell::cmdMemoryRevmapVisualize(int index)
+int Shell::cmdMemoryRevmapVisualize(int index, QString type)
 {
     if (!_memDumps[index]->map() || _memDumps[index]->map()->vmemMap().isEmpty())
     {
@@ -1329,12 +1333,22 @@ int Shell::cmdMemoryRevmapVisualize(int index)
         return 1;
     }
 
-    memMapWindow->mapWidget()->setMap(_memDumps[index]->map());
+    int ret = 0;
+    if (type.startsWith("physical") || type.startsWith("pmem"))
+        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->pmemMap());
+    else if (type.startsWith("virtual") || type.startsWith("vmem"))
+        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->vmemMap());
+    else {
+        cmdHelp(QStringList("memory"));
+        ret = 1;
+    }
 
-    if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
-        debugerr("Error invoking show() on memMapWindow");
+    if (!ret) {
+        if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
+            debugerr("Error invoking show() on memMapWindow");
+    }
 
-    return 0;
+    return ret;
 }
 
 

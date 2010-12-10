@@ -75,26 +75,30 @@ void MemoryMapBuilder::run()
             // Linear memory region or paged memory?
             if (pageSize < 0) {
                 shared->pmemMapLock.lock();
-                _map->_pmemMap.insertMulti(physAddr, IntNodePair(pageSize, node));
+                _map->_pmemMap.insert(node, physAddr,
+                        node->size() > 0 ? physAddr + node->size() - 1 : physAddr);
                 shared->pmemMapLock.unlock();
             }
             else {
                 // Add all pages a type belongs to
                 quint32 size = node->size();
-                quint64 addr = node->address();
+                quint64 virtAddr = node->address();
                 quint64 pageMask = ~(pageSize - 1);
 
                 while (size > 0) {
+                    physAddr = _map->_vmem->virtualToPhysical(virtAddr, &pageSize);
+                    // How much space is left on current page?
+                    quint32 sizeOnPage = pageSize - (virtAddr & ~pageMask);
+                    if (sizeOnPage > size)
+                        sizeOnPage = size;
                     // Add a memory mapping
                     shared->pmemMapLock.lock();
-                    _map->_pmemMap.insertMulti(addr, IntNodePair(pageSize, node));
+                    _map->_pmemMap.insert(node, physAddr, physAddr + sizeOnPage - 1);
                     shared->pmemMapLock.unlock();
-                    // How much space is left on current page?
-                    quint32 sizeOnPage = pageSize - (addr & ~pageMask);
                     // Subtract the available space from left-over size
-                    size = (sizeOnPage >= size) ? 0 : size - sizeOnPage;
+                    size -= sizeOnPage;
                     // Advance address
-                    addr += sizeOnPage;
+                    virtAddr += sizeOnPage;
                 }
             }
         }

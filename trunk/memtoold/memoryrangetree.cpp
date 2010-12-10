@@ -103,6 +103,9 @@ inline void MemoryRangeTreeNode::split(quint64 mmAddrStart, quint64 mmAddrEnd)
 {
     assert(lChild == 0 && rChild == 0);
     assert(addrEnd > addrStart);
+    if (addrEnd <= addrStart) {
+        assert(addrEnd > addrStart);
+    }
 
     // Find out the splitting address
     quint64 lAddrEnd = splitAddr();
