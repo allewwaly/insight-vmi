@@ -15,7 +15,8 @@ class QEvent;
 class QPaintEvent;
 class QMouseEvent;
 class QCloseEvent;
-class MemoryRangeTree;
+
+#include "memorymaprangetree.h"
 
 
 class MemoryMapWidget: public QWidget
@@ -24,7 +25,7 @@ class MemoryMapWidget: public QWidget
     Q_DISABLE_COPY(MemoryMapWidget)
 
 public:
-    explicit MemoryMapWidget(const MemoryRangeTree* map = 0, QWidget *parent = 0);
+    explicit MemoryMapWidget(const MemoryMapRangeTree* map = 0, QWidget *parent = 0);
     virtual ~MemoryMapWidget();
 
     quint64 totalAddrSpaceEnd() const;
@@ -32,8 +33,8 @@ public:
     quint64 visibleAddrSpaceEnd() const;
     quint64 visibleAddrSpaceLength() const;
 
-    const MemoryRangeTree* map() const;
-    void setMap(const MemoryRangeTree* map);
+    const MemoryMapRangeTree* map() const;
+    void setMap(const MemoryMapRangeTree* map);
     bool antiAliasing() const;
     bool isPainting() const;
     bool showOnlyKernelSpace() const;
@@ -53,7 +54,7 @@ private:
     int drawWidth() const;
     int drawHeight() const;
 
-    const MemoryRangeTree* _map;
+    const MemoryMapRangeTree* _map;
     bool _visMapValid;
     quint64 _address;
     quint64 _bytesPerPixel;

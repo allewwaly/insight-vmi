@@ -510,9 +510,9 @@ bool MemoryMap::objectIsSane(const Instance& inst,
 
     // Check if the list contains an object within the same memory region with a
     // significantly higher probability
-    NodeSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
+    MemMapSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
 
-    for (NodeSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
+    for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
         const MemoryMapNode* otherNode = *it;
 
         // Is the the same object already contained?
@@ -735,13 +735,13 @@ const NodeList& MemoryMap::roots() const
 }
 
 
-const MemoryRangeTree& MemoryMap::vmemMap() const
+const MemoryMapRangeTree& MemoryMap::vmemMap() const
 {
     return _vmemMap;
 }
 
 
-const MemoryRangeTree& MemoryMap::pmemMap() const
+const MemoryMapRangeTree& MemoryMap::pmemMap() const
 {
     return _pmemMap;
 }
@@ -759,7 +759,7 @@ bool MemoryMap::isBuilding() const
 }
 
 
-NodeSet MemoryMap::vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const
+MemMapSet MemoryMap::vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const
 {
     return _vmemMap.objectsInRange(addrStart, addrEnd);
 }
