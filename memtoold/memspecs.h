@@ -11,6 +11,9 @@
 #include <QDataStream>
 #include "debug.h"
 
+#define VADDR_SPACE_X86    0xFFFFFFFFUL
+#define VADDR_SPACE_X86_64 0xFFFFFFFFFFFFFFFFUL
+
 /**
  * This struct holds the definition of how a memory specification can be
  * extracted from a kernel source tree. It is used in conjunction with the
@@ -167,7 +170,7 @@ struct MemSpecs
 
 inline quint64 MemSpecs::vaddrSpaceEnd() const
 {
-    return (arch & x86_64) ? 0xFFFFFFFFFFFFFFFFUL : 0xFFFFFFFFUL;
+    return (arch & x86_64) ? VADDR_SPACE_X86_64 : VADDR_SPACE_X86;
 }
 
 
