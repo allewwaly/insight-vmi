@@ -76,7 +76,7 @@ quint64 MemoryMapWidget::visibleAddrSpaceStart() const
 
 quint64 MemoryMapWidget::visibleAddrSpaceEnd() const
 {
-    return _map ? _map->addrSpaceEnd() : 0xFFFFFFFFUL;
+    return _map ? _map->addrSpaceEnd() : VADDR_SPACE_X86;
 }
 
 
@@ -84,7 +84,7 @@ quint64 MemoryMapWidget::visibleAddrSpaceLength() const
 {
     quint64 length = visibleAddrSpaceEnd() - visibleAddrSpaceStart();
     // Correct the size, if below the 64 bit boundary
-    if (length < 0xFFFFFFFFFFFFFFFFUL)
+    if (length < VADDR_SPACE_X86_64)
         ++length;
     return length;
 }
@@ -92,7 +92,7 @@ quint64 MemoryMapWidget::visibleAddrSpaceLength() const
 
 quint64 MemoryMapWidget::totalAddrSpaceEnd() const
 {
-    return _map ? _map->addrSpaceEnd(): 0xFFFFFFFFUL;
+    return _map ? _map->addrSpaceEnd(): VADDR_SPACE_X86;
 }
 
 

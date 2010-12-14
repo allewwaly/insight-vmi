@@ -235,9 +235,9 @@ bool VirtualMemory::safeSeek(qint64 pos)
 qint64 VirtualMemory::size() const
 {
     if (_specs.arch & MemSpecs::i386)
-        return 0xFFFFFFFFUL;
+        return VADDR_SPACE_X86;
     else if (_specs.arch & MemSpecs::x86_64)
-        return 0xFFFFFFFFFFFFFFFFUL;
+        return VADDR_SPACE_X86_64;
     // Fallback
     return 0;
 }

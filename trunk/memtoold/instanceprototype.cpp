@@ -424,7 +424,7 @@ quint32 InstancePrototype::toUInt64Low() const
 {
     try {
         Instance* inst;
-        return (inst = thisInstance()) ? quint32(inst->toUInt64() & 0xFFFFFFFFUL) : 0;
+        return (inst = thisInstance()) ? quint32(inst->toUInt64() & INT32MASK) : 0;
     }
     catch (GenericException e) {
         injectScriptError(e);

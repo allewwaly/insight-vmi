@@ -464,7 +464,7 @@ bool MemoryMap::addressIsWellFormed(quint64 address) const
 {
     // Make sure the address is within the virtual address space
     if ((_vmem->memSpecs().arch & MemSpecs::i386) &&
-        address > 0xFFFFFFFFUL)
+        address > VADDR_SPACE_X86)
         return false;
     else {
         // Is the 64 bit address in canonical form?
@@ -767,14 +767,14 @@ NodeSet MemoryMap::vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const
 
 quint64 MemoryMap::vaddrSpaceEnd() const
 {
-    return _vmem ? _vmem->memSpecs().vaddrSpaceEnd() : 0xFFFFFFFFUL;
+    return _vmem ? _vmem->memSpecs().vaddrSpaceEnd() : VADDR_SPACE_X86;
 }
 
 
 quint64 MemoryMap::paddrSpaceEnd() const
 {
     return _vmem && _vmem->physMem() && _vmem->physMem()->size() > 0 ?
-            _vmem->physMem()->size() - 1 : 0xFFFFFFFFL;
+            _vmem->physMem()->size() - 1 : VADDR_SPACE_X86;
 }
 
 
