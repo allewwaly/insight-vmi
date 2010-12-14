@@ -18,7 +18,7 @@
 #include <QReadWriteLock>
 #include "memorymapnode.h"
 #include "priorityqueue.h"
-#include "memoryrangetree.h"
+#include "memorymaprangetree.h"
 #include "debug.h"
 
 class SymFactory;
@@ -45,6 +45,7 @@ typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 
 /// Holds the nodes to be visited, sorted by their probability
 typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
+
 
 #define MAX_BUILDER_THREADS 16
 
@@ -144,7 +145,7 @@ public:
      * address.
      * @return the map of allocated kernel objects in virtual memory
      */
-    const MemoryRangeTree& vmemMap() const;
+    const MemoryMapRangeTree& vmemMap() const;
 
     /**
      * @return the address of the last byte in virtual memory, i. e., either
@@ -165,7 +166,7 @@ public:
      * @param addrEnd the virtual end address (including)
      * @return a list of MemoryMapNode objects
      */
-    NodeSet vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const;
+    MemMapSet vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const;
 
     /**
      * This gives access to all allocated objects and the page size of the
@@ -176,7 +177,7 @@ public:
      * in this mapping.
      * @return the map of allocated kernel objects in physical memory
      */
-    const MemoryRangeTree& pmemMap() const;
+    const MemoryMapRangeTree& pmemMap() const;
 
     /**
      * This data structure allows to query which object(s) or pointer(s) point
@@ -277,8 +278,8 @@ private:
 	NodeList _roots;             ///< the nodes of the global kernel variables
     PointerNodeHash _pointersTo; ///< holds all pointers that point to a certain address
     IntNodeHash _typeInstances;  ///< holds all instances of a given type ID
-    MemoryRangeTree _vmemMap;    ///< map of all used kernel-space virtual memory
-    MemoryRangeTree _pmemMap;    ///< map of all used physical memory
+    MemoryMapRangeTree _vmemMap; ///< map of all used kernel-space virtual memory
+    MemoryMapRangeTree _pmemMap; ///< map of all used physical memory
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
     BuilderSharedState* _shared; ///< all variables that are shared amount the builder threads

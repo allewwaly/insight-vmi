@@ -20,7 +20,7 @@
 #include <QTextCursor>
 #include <QTextTable>
 #include <math.h>
-#include "memoryrangetree.h"
+#include "memorymaprangetree.h"
 #include "virtualmemory.h"
 #include "varsetter.h"
 #include "debug.h"
@@ -51,7 +51,7 @@ static const QColor probColor[PROB_MAX+1] = {
 
 //------------------------------------------------------------------------------
 
-MemoryMapWidget::MemoryMapWidget(const MemoryRangeTree* map, QWidget *parent)
+MemoryMapWidget::MemoryMapWidget(const MemoryMapRangeTree* map, QWidget *parent)
     : QWidget(parent), _map(map), _visMapValid(false), _address(-1),
       _cols(0), _rows(0), _antialiasing(false), _isPainting(false),
       _showOnlyKernelSpace(false), _shownAddrSpaceOffset(0)
@@ -200,7 +200,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
         RangeProperties props =
                 _map->propertiesOfRange(cell.addrStart, cell.addrEnd);
 
-        NodeSet nodes =
+        MemMapSet nodes =
                 _map->objectsInRange(cell.addrStart, cell.addrEnd);
 
 #ifdef DEBUG
@@ -216,7 +216,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
             QString filename = QString("subtree_0x%1_0x%2.dot")
                                 .arg(cell.addrStart, 8, 16, QChar('0'))
                                 .arg(cell.addrEnd, 8, 16, QChar('0'));
-            _map->vmemMap().outputSubtreeDotFile(cell.addrStart, cell.addrEnd, filename);
+            _map->outputSubtreeDotFile(cell.addrStart, cell.addrEnd, filename);
 #   endif
 
             props = _map->propertiesOfRange(cell.addrStart, cell.addrEnd);
@@ -409,13 +409,13 @@ int MemoryMapWidget::drawHeight() const
 }
 
 
-const MemoryRangeTree* MemoryMapWidget::map() const
+const MemoryMapRangeTree* MemoryMapWidget::map() const
 {
     return _map;
 }
 
 
-void MemoryMapWidget::setMap(const MemoryRangeTree* map)
+void MemoryMapWidget::setMap(const MemoryMapRangeTree* map)
 {
     if (_map == map)
         return;
