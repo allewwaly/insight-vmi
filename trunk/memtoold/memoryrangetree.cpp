@@ -20,16 +20,21 @@ void RangeProperties::reset()
     minProbability = 1;
     maxProbability = 0;
     objectCount = 0;
+    baseTypes = 0;
 }
 
 
 void RangeProperties::update(const MemoryMapNode* mmnode)
 {
+    if (!mmnode)
+        return;
     if (mmnode->probability() < minProbability)
         minProbability = mmnode->probability();
     if (mmnode->probability() > maxProbability)
         maxProbability = mmnode->probability();
     ++objectCount;
+    if (mmnode->type())
+        baseTypes |= mmnode->type()->type();
 }
 
 
@@ -40,6 +45,7 @@ RangeProperties& RangeProperties::unite(const RangeProperties& other)
     if (other.maxProbability > maxProbability)
         maxProbability = other.maxProbability;
     objectCount += other.objectCount;
+    baseTypes |= other.baseTypes;
     return *this;
 }
 
@@ -84,7 +90,8 @@ void MemoryRangeTreeNode::insert(const MemoryMapNode* mmnode,
     properties.update(mmnode);
 
     if (isLeaf()) {
-        nodes.insert(mmnode);
+        if (mmnode)
+            nodes.insert(mmnode);
         // If the MemoryMapNode doesn't stretch over this node's entire
         // region, then split split up this MemoryRangeTreeNode
         if (mmAddrStart > addrStart || mmAddrEnd < addrEnd)
@@ -103,9 +110,6 @@ inline void MemoryRangeTreeNode::split(quint64 mmAddrStart, quint64 mmAddrEnd)
 {
     assert(lChild == 0 && rChild == 0);
     assert(addrEnd > addrStart);
-    if (addrEnd <= addrStart) {
-        assert(addrEnd > addrStart);
-    }
 
     // Find out the splitting address
     quint64 lAddrEnd = splitAddr();

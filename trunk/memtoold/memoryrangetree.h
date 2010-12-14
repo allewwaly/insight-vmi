@@ -42,9 +42,10 @@ typedef QSet<const MemoryMapNode*> NodeSet;
  */
 struct RangeProperties
 {
-    float minProbability;  ///< Minimal probability below this node
-    float maxProbability;  ///< Maximal probability below this node
+    float minProbability;  ///< Minimal probability within this range
+    float maxProbability;  ///< Maximal probability within this range
     int objectCount;       ///< No. of objects within this range
+    int baseTypes;         ///< OR'ed BaseType::RealType's within this range
 
     RangeProperties() { reset(); }
 
