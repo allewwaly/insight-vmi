@@ -19,6 +19,7 @@
 #include "memorymapnode.h"
 #include "priorityqueue.h"
 #include "memorymaprangetree.h"
+#include "memorydifftree.h"
 #include "debug.h"
 
 class SymFactory;
@@ -107,9 +108,20 @@ public:
 	virtual ~MemoryMap();
 
 	/**
-	 * Deletes all existing data and prepares this map for a re-built.
+	 * Deletes all existing data.
 	 */
 	void clear();
+
+    /**
+     * Deletes all existing data of the reverse map and prepares it for a
+     * re-built.
+     */
+    void clearRevmap();
+
+    /**
+     * Deletes the data in the difference tree.
+     */
+    void clearDiff();
 
 	/**
 	 * Builds up the memory mapping for the virtual memory object previously
@@ -117,6 +129,13 @@ public:
 	 * \note This might take a while.
 	 */
 	void build();
+
+	/**
+	 * Finds the differences in physical memory between this and another memory
+	 * map
+	 * @param other
+	 */
+	void diffWith(MemoryMap* other);
 
 	/**
 	 * @return the virtual memory object this mapping is built for
@@ -178,6 +197,12 @@ public:
      * @return the map of allocated kernel objects in physical memory
      */
     const MemoryMapRangeTree& pmemMap() const;
+
+    /**
+     * Gives access to the difference map that was built using diffWith()
+     * @return the differnece map
+     */
+    const MemoryDiffTree& pmemDiff() const;
 
     /**
      * This data structure allows to query which object(s) or pointer(s) point
@@ -280,9 +305,79 @@ private:
     IntNodeHash _typeInstances;  ///< holds all instances of a given type ID
     MemoryMapRangeTree _vmemMap; ///< map of all used kernel-space virtual memory
     MemoryMapRangeTree _pmemMap; ///< map of all used physical memory
+    MemoryDiffTree _pmemDiff;    ///< differences between this and another map
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
     BuilderSharedState* _shared; ///< all variables that are shared amount the builder threads
 };
+
+//------------------------------------------------------------------------------
+
+inline VirtualMemory* MemoryMap::vmem()
+{
+    return _vmem;
+}
+
+
+inline const VirtualMemory* MemoryMap::vmem() const
+{
+    return _vmem;
+}
+
+
+inline const NodeList& MemoryMap::roots() const
+{
+    return _roots;
+}
+
+
+inline const MemoryMapRangeTree& MemoryMap::vmemMap() const
+{
+    return _vmemMap;
+}
+
+
+inline const MemoryMapRangeTree& MemoryMap::pmemMap() const
+{
+    return _pmemMap;
+}
+
+
+inline const MemoryDiffTree& MemoryMap::pmemDiff() const
+{
+    return _pmemDiff;
+}
+
+
+inline const PointerNodeHash& MemoryMap::pointersTo() const
+{
+    return _pointersTo;
+}
+
+
+inline bool MemoryMap::isBuilding() const
+{
+    return _isBuilding;
+}
+
+
+inline MemMapSet MemoryMap::vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const
+{
+    return _vmemMap.objectsInRange(addrStart, addrEnd);
+}
+
+
+inline quint64 MemoryMap::vaddrSpaceEnd() const
+{
+    return _vmem ? _vmem->memSpecs().vaddrSpaceEnd() : VADDR_SPACE_X86;
+}
+
+
+inline quint64 MemoryMap::paddrSpaceEnd() const
+{
+    return _vmem && _vmem->physMem() && _vmem->physMem()->size() > 0 ?
+            _vmem->physMem()->size() - 1 : VADDR_SPACE_X86;
+}
+
 
 #endif /* MEMORYMAP_H_ */

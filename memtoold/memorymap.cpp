@@ -19,8 +19,6 @@
 #include "debug.h"
 
 
-
-
 // static variable
 StringSet MemoryMap::_names;
 
@@ -39,7 +37,7 @@ const QString& MemoryMap::insertName(const QString& name)
 
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
-      _pmemMap(paddrSpaceEnd()),
+      _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
       _isBuilding(false), _shared(new BuilderSharedState)
 {
 	clear();
@@ -55,6 +53,13 @@ MemoryMap::~MemoryMap()
 
 void MemoryMap::clear()
 {
+    clearDiff();
+    clearRevmap();
+}
+
+
+void MemoryMap::clearRevmap()
+{
     for (NodeList::iterator it = _roots.begin(); it != _roots.end(); ++it) {
         delete *it;
     }
@@ -67,25 +72,19 @@ void MemoryMap::clear()
     _vmemAddresses.clear();
 
 #ifdef DEBUG
-	degPerGenerationCnt = 0;
-	degForUnalignedAddrCnt = 0;
-	degForUserlandAddrCnt = 0;
-	degForInvalidAddrCnt = 0;
-	degForNonAlignedChildAddrCnt = 0;
-	degForInvalidChildAddrCnt = 0;
+    degPerGenerationCnt = 0;
+    degForUnalignedAddrCnt = 0;
+    degForUserlandAddrCnt = 0;
+    degForInvalidAddrCnt = 0;
+    degForNonAlignedChildAddrCnt = 0;
+    degForInvalidChildAddrCnt = 0;
 #endif
 }
 
 
-VirtualMemory* MemoryMap::vmem()
+void MemoryMap::clearDiff()
 {
-    return _vmem;
-}
-
-
-const VirtualMemory* MemoryMap::vmem() const
-{
-    return _vmem;
+    _pmemDiff.clear();
 }
 
 
@@ -104,7 +103,7 @@ void MemoryMap::build()
     VarSetter<bool> building(&_isBuilding, true, false);
 
     // Clean up everything
-    clear();
+    clearRevmap();
     _shared->reset();
 
     QTime timer, totalTimer;
@@ -729,52 +728,94 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
 }
 
 
-const NodeList& MemoryMap::roots() const
+void MemoryMap::diffWith(MemoryMap* other)
 {
-    return _roots;
+    _pmemDiff.clear();
+
+    QIODevice* dev = _vmem->physMem();
+    QIODevice* otherDev = other->vmem()->physMem();
+    if (!otherDev || !dev)
+        return;
+
+    assert(dev != otherDev);
+
+    // Open devices for reading, if required
+    if (!dev->isReadable()) {
+        if (dev->isOpen())
+            dev->close();
+        assert(dev->open(QIODevice::ReadOnly));
+    }
+    else
+        assert(dev->reset());
+
+    if (!otherDev->isReadable()) {
+        if (otherDev->isOpen())
+            otherDev->close();
+        assert(otherDev->open(QIODevice::ReadOnly));
+    }
+    else
+        assert(otherDev->reset());
+
+    bool wasEqual = true;
+    quint64 addr = 0, startAddr = 0, length = 0;
+    const int bufsize = 1024;
+    char buf1[bufsize], buf2[bufsize];
+    qint64 readSize1, readSize2;
+    qint64 done, prevDone = 0;
+    qint64 totalSize = qMin(dev->size(), otherDev->size());
+    if (totalSize < 0)
+        totalSize = qMax(dev->size(), otherDev->size());
+
+    // Compare the complete physical address space
+    while (!dev->atEnd() && !otherDev->atEnd()) {
+        readSize1 = dev->read(buf1, bufsize);
+        readSize2 = otherDev->read(buf2, bufsize);
+
+        if (readSize1 <= 0 || readSize2 <= 0)
+            break;
+
+        qint64 size = qMin(readSize1, readSize2);
+        for (int i = 0; i < size; ++i) {
+            // Memory is equal
+            if (buf1[i] == buf2[i]) {
+                // Add difference to tree
+                if (!wasEqual)
+                    _pmemDiff.insert(Difference(startAddr, length),
+                                     startAddr,
+                                     startAddr + length - 1);
+            }
+            // Memory differs
+            else {
+                // Start new difference
+                if (wasEqual) {
+                    startAddr = addr;
+                    length = 1;
+                }
+                // Enlarge difference
+                else
+                    ++length;
+            }
+            wasEqual = (buf1[i] == buf2[i]);
+            ++addr;
+        }
+
+        done = (int) (addr / (float) totalSize * 100);
+        if (done != prevDone) {
+            shell->out() << "\rComparing memory dumps: " << done << "%" << flush;
+            prevDone = done;
+        }
+    }
+
+    // Add last difference, if any
+    if (!wasEqual)
+        _pmemDiff.insert(Difference(startAddr, length),
+                         startAddr,
+                         startAddr + length - 1);
+
+    shell->out() << "\rComparing memory dumps finished." << endl;
+
+    debugmsg("No. of differences: " << _pmemDiff.objectCount());
 }
 
-
-const MemoryMapRangeTree& MemoryMap::vmemMap() const
-{
-    return _vmemMap;
-}
-
-
-const MemoryMapRangeTree& MemoryMap::pmemMap() const
-{
-    return _pmemMap;
-}
-
-
-const PointerNodeHash& MemoryMap::pointersTo() const
-{
-    return _pointersTo;
-}
-
-
-bool MemoryMap::isBuilding() const
-{
-    return _isBuilding;
-}
-
-
-MemMapSet MemoryMap::vmemMapsInRange(quint64 addrStart, quint64 addrEnd) const
-{
-    return _vmemMap.objectsInRange(addrStart, addrEnd);
-}
-
-
-quint64 MemoryMap::vaddrSpaceEnd() const
-{
-    return _vmem ? _vmem->memSpecs().vaddrSpaceEnd() : VADDR_SPACE_X86;
-}
-
-
-quint64 MemoryMap::paddrSpaceEnd() const
-{
-    return _vmem && _vmem->physMem() && _vmem->physMem()->size() > 0 ?
-            _vmem->physMem()->size() - 1 : VADDR_SPACE_X86;
-}
 
 

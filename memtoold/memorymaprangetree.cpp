@@ -7,7 +7,7 @@
 
 #include "memorymaprangetree.h"
 
-void RangeProperties::reset()
+void MemMapProperties::reset()
 {
     minProbability = 1;
     maxProbability = 0;
@@ -16,7 +16,7 @@ void RangeProperties::reset()
 }
 
 
-void RangeProperties::update(const MemoryMapNode* mmnode)
+void MemMapProperties::update(const MemoryMapNode* mmnode)
 {
     if (!mmnode)
         return;
@@ -30,7 +30,7 @@ void RangeProperties::update(const MemoryMapNode* mmnode)
 }
 
 
-RangeProperties& RangeProperties::unite(const RangeProperties& other)
+MemMapProperties& MemMapProperties::unite(const MemMapProperties& other)
 {
     if (other.minProbability < minProbability)
         minProbability = other.minProbability;

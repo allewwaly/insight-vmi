@@ -19,14 +19,14 @@ template<class T, class P> class MemoryRangeTree;
  * This struct holds all interesting properties of MemoryMapNode objects under a
  * MemoryRangeTreeNode.
  */
-struct RangeProperties
+struct MemMapProperties
 {
     float minProbability;  ///< Minimal probability within this range
     float maxProbability;  ///< Maximal probability within this range
     int objectCount;       ///< No. of objects within this range
     int baseTypes;         ///< OR'ed BaseType::RealType's within this range
 
-    RangeProperties() { reset(); }
+    MemMapProperties() { reset(); }
 
     /**
      * Resets all data to initial state
@@ -41,7 +41,7 @@ struct RangeProperties
     /**
      * Update the properties with the ones from \a mmnode. This is called
      * whenever a MemoryMapNode is added underneath a MemoryRangeTreeNode.
-     * @param node
+     * @param mmnode
      */
     void update(const MemoryMapNode* mmnode);
 
@@ -52,11 +52,11 @@ struct RangeProperties
      * @param other the properties to unite with
      * @return reference to this object
      */
-    RangeProperties& unite(const RangeProperties& other);
+    MemMapProperties& unite(const MemMapProperties& other);
 };
 
 
-typedef MemoryRangeTree<const MemoryMapNode*, RangeProperties> MemoryMapRangeTree;
+typedef MemoryRangeTree<const MemoryMapNode*, MemMapProperties> MemoryMapRangeTree;
 typedef MemoryMapRangeTree::ItemSet MemMapSet;
 
 #endif /* MEMORYMAPRANGETREE_H_ */
