@@ -115,7 +115,10 @@ Shell::Shell(bool listenOnSocket)
 				"                              a member of a struct should be dumped.\n"
                 "  memory revmap [index] build|visualize [pmem|vmem]\n"
                 "                              Build or visualize a reverse mapping for \n"
-                "                              dump <index>"
+                "                              dump <index>\n"
+                "  memory diff [index1] build <index2>|visualize\n"
+                "                              Compare ore visualize a memory dump with\n"
+                "                              dump <index2>"
                 ));
 
     _commands.insert("script",
@@ -1095,6 +1098,9 @@ int Shell::cmdMemory(QStringList args)
     else if (QString("revmap").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryRevmap(args);
     }
+    else if (QString("diff").startsWith(action) && (action.size() >= 1)) {
+        return cmdMemoryDiff(args);
+    }
     else {
         cmdHelp(QStringList("memory"));
         return 1;
@@ -1102,7 +1108,7 @@ int Shell::cmdMemory(QStringList args)
 }
 
 
-int Shell::parseMemDumpIndex(QStringList &args)
+int Shell::parseMemDumpIndex(QStringList &args, int skip)
 {
     bool ok = false;
     int index = (args.size() > 0) ? args[0].toInt(&ok) : -1;
@@ -1117,7 +1123,7 @@ int Shell::parseMemDumpIndex(QStringList &args)
     // Otherwise use the first valid index
     else {
         for (int i = 0; i < _memDumps.size() && index < 0; ++i)
-            if (_memDumps[i])
+            if (_memDumps[i] && skip-- <= 0)
                 return i;
     }
     // No memory dumps loaded at all?
@@ -1312,12 +1318,12 @@ int Shell::cmdMemoryRevmapBuild(int index)
     int msec = elapsed % 1000;
 
     if (!interrupted())
-    _out << "Built reverse mapping for memory dump [" << index << "] in "
-            << QString("%1:%2.%3 minutes")
-                .arg(min)
-                .arg(sec, 2, 10, QChar('0'))
-                .arg(msec, 3, 10, QChar('0'))
-            << endl;
+        _out << "Built reverse mapping for memory dump [" << index << "] in "
+                << QString("%1:%2.%3 minutes")
+                    .arg(min)
+                    .arg(sec, 2, 10, QChar('0'))
+                    .arg(msec, 3, 10, QChar('0'))
+                << endl;
 
     return 0;
 }
@@ -1334,9 +1340,9 @@ int Shell::cmdMemoryRevmapVisualize(int index, QString type)
     }
 
     int ret = 0;
-    if (type.startsWith("physical") || type.startsWith("pmem"))
+    if (QString("physical").startsWith(type) || QString("pmem").startsWith(type))
         memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->pmemMap());
-    else if (type.startsWith("virtual") || type.startsWith("vmem"))
+    else if (QString("virtual").startsWith(type) || QString("vmem").startsWith(type))
         memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->vmemMap());
     else {
         cmdHelp(QStringList("memory"));
@@ -1349,6 +1355,76 @@ int Shell::cmdMemoryRevmapVisualize(int index, QString type)
     }
 
     return ret;
+}
+
+
+int Shell::cmdMemoryDiff(QStringList args)
+{
+    // Get the memory dump index to use
+    int index = parseMemDumpIndex(args);
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() < 1)
+        return cmdHelp(QStringList("memory"));
+    // Is the index valid?
+    if (index >= 0) {
+        if (QString("build").startsWith(args[0])) {
+            args.pop_front();
+            int index2 = parseMemDumpIndex(args, 1);
+            if (index2 < 0 || index == index2)
+                return cmdHelp(QStringList("memory"));
+            return cmdMemoryDiffBuild(index, index2);
+        }
+        else if (QString("visualize").startsWith(args[0])) {
+            return cmdMemoryDiffVisualize(index);
+        }
+        else {
+            _err << "Unknown command: " << args[0] << endl;
+            return 2;
+        }
+    }
+
+    return 1;
+}
+
+
+int Shell::cmdMemoryDiffBuild(int index1, int index2)
+{
+    QTime timer;
+    timer.start();
+    _memDumps[index1]->setupDiff(_memDumps[index2]);
+    int elapsed = timer.elapsed();
+    int min = (elapsed / 1000) / 60;
+    int sec = (elapsed / 1000) % 60;
+    int msec = elapsed % 1000;
+
+    if (!interrupted())
+        _out << "Compared memory dump [" << index1 << "] to [" << index2 << "] in "
+                << QString("%1:%2.%3 minutes")
+                    .arg(min)
+                    .arg(sec, 2, 10, QChar('0'))
+                    .arg(msec, 3, 10, QChar('0'))
+                << endl;
+
+    return 0;
+}
+
+
+int Shell::cmdMemoryDiffVisualize(int index)
+{
+    if (!_memDumps[index]->map() || _memDumps[index]->map()->pmemDiff().isEmpty())
+    {
+        _err << "The memory dump has not yet been compared to another dump "
+                << index << ". Try \"help memory\" to learn how to compare them."
+                << endl;
+        return 1;
+    }
+
+   memMapWindow->mapWidget()->setDiff(&_memDumps[index]->map()->pmemDiff());
+
+    if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
+        debugerr("Error invoking show() on memMapWindow");
+
+    return 0;
 }
 
 

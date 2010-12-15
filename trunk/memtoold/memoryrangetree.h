@@ -289,7 +289,7 @@ public:
      * of the tree
      */
     inline int objectCount() const
-    { return _root ? _root->properties.objectCount : 0; }
+    { return _objectCount; }
 
     /**
      * Deletes all data and resets the tree.
@@ -377,6 +377,7 @@ private:
     Node* _last;                  ///< Last leaf
     int _size;                    ///< No. of MemoryRangeTreeNode s
     quint64 _addrSpaceEnd;        ///< Address of the last byte of address space
+    quint64 _objectCount;
     static ItemSet _emptyNodeSet;
     static Properties _emptyProperties;
 };
@@ -599,7 +600,8 @@ typename MemoryRangeTree<T, P>::Properties  MemoryRangeTree<T, P>::_emptyPropert
 
 template<class T, class P>
 MemoryRangeTree<T, P>::MemoryRangeTree(quint64 addrSpaceEnd)
-    : _root(0), _first(0), _last(0), _size(0), _addrSpaceEnd(addrSpaceEnd)
+    : _root(0), _first(0), _last(0), _size(0), _addrSpaceEnd(addrSpaceEnd),
+      _objectCount(0)
 {
 }
 
@@ -622,6 +624,7 @@ void MemoryRangeTree<T, P>::clear()
 
     _root = _first = _last = 0;
     _size = 0;
+    _objectCount = 0;
 
 #ifdef ENABLE_DOT_CODE
     Node::nodeId = 0;
@@ -645,6 +648,7 @@ void MemoryRangeTree<T, P>::insert(T item, quint64 mmAddrStart,
         _root = _first = _last =
                 new Node(this, 0, _addrSpaceEnd);
     _root->insert(item, mmAddrStart, mmAddrEnd);
+    ++_objectCount;
 }
 
 #ifdef ENABLE_DOT_CODE

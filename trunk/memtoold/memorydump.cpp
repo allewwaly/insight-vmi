@@ -107,11 +107,6 @@ void MemoryDump::init()
 }
 
 
-const QString& MemoryDump::fileName() const
-{
-    return _fileName;
-}
-
 BaseType* MemoryDump::getType(const QString& type) const
 {
 	BaseType* result;
@@ -447,27 +442,15 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 }
 
 
-const MemSpecs& MemoryDump::memSpecs() const
-{
-    return _specs;
-}
-
-
-int MemoryDump::index() const
-{
-    return _index;
-}
-
-
 void MemoryDump::setupRevMap()
 {
-    // Just to test it for now
     _map->build();
-    // TODO do something useful here
 }
 
 
-const MemoryMap* MemoryDump::map() const
+void MemoryDump::setupDiff(MemoryDump* other)
 {
-    return _map;
+    _map->diffWith(other->map());
 }
+
+

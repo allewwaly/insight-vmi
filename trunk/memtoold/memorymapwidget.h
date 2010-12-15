@@ -17,6 +17,7 @@ class QMouseEvent;
 class QCloseEvent;
 
 #include "memorymaprangetree.h"
+#include "memorydifftree.h"
 
 
 class MemoryMapWidget: public QWidget
@@ -35,6 +36,8 @@ public:
 
     const MemoryMapRangeTree* map() const;
     void setMap(const MemoryMapRangeTree* map);
+    const MemoryDiffTree* diff() const;
+    void setDiff(const MemoryDiffTree* diff);
     bool antiAliasing() const;
     bool isPainting() const;
     bool showOnlyKernelSpace() const;
@@ -55,6 +58,7 @@ private:
     int drawHeight() const;
 
     const MemoryMapRangeTree* _map;
+    const MemoryDiffTree* _diff;
     bool _visMapValid;
     quint64 _address;
     quint64 _bytesPerPixel;

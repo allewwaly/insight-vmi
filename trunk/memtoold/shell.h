@@ -230,7 +230,7 @@ private:
     int eval(QString command);
     int evalLine();
     void hline(int width = 60);
-    int parseMemDumpIndex(QStringList &args);
+    int parseMemDumpIndex(QStringList &args, int skip = 0);
     static QScriptValue scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptListVariableNames(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptListVariableIds(QScriptContext* ctx, QScriptEngine* eng);
@@ -255,6 +255,9 @@ private:
     int cmdMemoryRevmap(QStringList args);
     int cmdMemoryRevmapBuild(int index);
     int cmdMemoryRevmapVisualize(int index, QString type = "v");
+    int cmdMemoryDiff(QStringList args);
+    int cmdMemoryDiffBuild(int index1, int index2);
+    int cmdMemoryDiffVisualize(int index);
     int cmdScript(QStringList args);
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t);

@@ -1,4 +1,5 @@
-SOURCES += memorymaprangetree.cpp \
+SOURCES += memorydifftree.cpp \
+    memorymaprangetree.cpp \
     memorymapbuilder.cpp \
     memorymapwindow.cpp \
     memorymapwidget.cpp \
@@ -41,7 +42,8 @@ SOURCES += memorymaprangetree.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += memorymaprangetree.h \
+HEADERS += memorydifftree.h \
+    memorymaprangetree.h \
     memoryrangetree.h \
     instance_def.h \
     memorymapbuilder.h \

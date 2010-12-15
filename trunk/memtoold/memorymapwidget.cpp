@@ -52,7 +52,7 @@ static const QColor probColor[PROB_MAX+1] = {
 //------------------------------------------------------------------------------
 
 MemoryMapWidget::MemoryMapWidget(const MemoryMapRangeTree* map, QWidget *parent)
-    : QWidget(parent), _map(map), _visMapValid(false), _address(-1),
+    : QWidget(parent), _map(map), _diff(0), _visMapValid(false), _address(-1),
       _cols(0), _rows(0), _antialiasing(false), _isPainting(false),
       _showOnlyKernelSpace(false), _shownAddrSpaceOffset(0)
 {
@@ -76,7 +76,7 @@ quint64 MemoryMapWidget::visibleAddrSpaceStart() const
 
 quint64 MemoryMapWidget::visibleAddrSpaceEnd() const
 {
-    return _map ? _map->addrSpaceEnd() : VADDR_SPACE_X86;
+    return totalAddrSpaceEnd();
 }
 
 
@@ -92,7 +92,13 @@ quint64 MemoryMapWidget::visibleAddrSpaceLength() const
 
 quint64 MemoryMapWidget::totalAddrSpaceEnd() const
 {
-    return _map ? _map->addrSpaceEnd(): VADDR_SPACE_X86;
+    if (_map && _diff)
+        return qMax(_map->addrSpaceEnd(), _diff->addrSpaceEnd());
+    if (_map)
+        return _map->addrSpaceEnd();
+    if (_diff)
+        return _diff->addrSpaceEnd();
+    return VADDR_SPACE_X86;
 }
 
 
@@ -158,6 +164,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
     QColor usedColor(0, 0, 0);
     QColor gridColor(240, 240, 240);
     QColor bgColor(255, 255, 255);
+    QColor diffColor(0, 0, 255);
 
     QPainter painter(this);
     if (_antialiasing)
@@ -170,19 +177,29 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
     painter.setBrush(bgColor);
     painter.drawRect(0, 0, _cols * cellSize, _rows * cellSize);
 
+    // Draw grid lines if we have at least 3 pixel per byte
+    if (cellSize > 1 && gridColor != unusedColor) {
+        painter.setPen(gridColor);
+        for (int i = 1; i < _cols; i++)
+            painter.drawLine(i * cellSize - 1, 0, i * cellSize - 1, _rows * cellSize - 1);
+        for (int i = 1; i < _rows; i++)
+            painter.drawLine(0, i * cellSize - 1, _cols * cellSize - 1, i * cellSize - 1);
+    }
+
     // Draw all used parts
-    painter.setBrush(usedColor);
+    painter.setBrush(Qt::NoBrush);
+    painter.setPen(Qt::NoPen);
     int lastColor = -1;
+    bool diffWasEmpty = true, propsWasEmpty = true;
+    bool sameAddrSpaceSize =
+            !_map || !_diff || _map->addrSpaceEnd() == _diff->addrSpaceEnd();
 
     // State of current memory cell
     struct {
         quint64 addrStart, addrEnd, index;
-        int elemCount;
         unsigned char maxProb, minProb;
-        bool isFirst;
     } cell;
 
-    cell.isFirst = true;
     cell.addrEnd = visibleAddrSpaceStart() - 1;
 
     const int totalCells = _cols * _rows;
@@ -197,11 +214,17 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
                 cell.addrEnd > totalAddrSpaceEnd())
             cell.addrEnd = totalAddrSpaceEnd();
 
-        RangeProperties props =
-                _map->propertiesOfRange(cell.addrStart, cell.addrEnd);
+        MemMapProperties props = _map ?
+                _map->propertiesOfRange(cell.addrStart, cell.addrEnd) :
+                MemMapProperties();
 
-        MemMapSet nodes =
-                _map->objectsInRange(cell.addrStart, cell.addrEnd);
+        MemMapSet nodes = _map ?
+                _map->objectsInRange(cell.addrStart, cell.addrEnd) :
+                MemMapSet();
+
+        DiffProperties diffProps = _diff && sameAddrSpaceSize ?
+                _diff->propertiesOfRange(cell.addrStart, cell.addrEnd) :
+                DiffProperties();
 
 #ifdef DEBUG
         if (props.isEmpty() != nodes.isEmpty()) {
@@ -219,12 +242,12 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
             _map->outputSubtreeDotFile(cell.addrStart, cell.addrEnd, filename);
 #   endif
 
-            props = _map->propertiesOfRange(cell.addrStart, cell.addrEnd);
-            nodes = _map->objectsInRange(cell.addrStart, cell.addrEnd);
+//            props = _map->propertiesOfRange(cell.addrStart, cell.addrEnd);
+//            nodes = _map->objectsInRange(cell.addrStart, cell.addrEnd);
         }
 #endif
 
-        if (props.isEmpty())
+        if (props.isEmpty() && diffProps.isEmpty())
             continue;
 
         cell.minProb = (unsigned char)(PROB_MAX * props.minProbability);
@@ -235,6 +258,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
         quint64 c = cell.index % _cols;
 
         if (cellSize == 1) {
+            // TODO draw diff as well
             if (cell.maxProb != lastColor) {
                 lastColor = cell.maxProb;
                 painter.setPen(probColor[lastColor]);
@@ -242,22 +266,32 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
             painter.drawPoint(c, r);
         }
         else {
-            if (cell.maxProb != lastColor) {
-                lastColor = cell.maxProb;
-                painter.setBrush(probColor[lastColor]);
+            // Do we need to change the brush?
+            if (propsWasEmpty != props.isEmpty() || cell.maxProb != lastColor) {
+                if (props.isEmpty())
+                    painter.setBrush(Qt::NoBrush);
+                else {
+                    lastColor = cell.maxProb;
+                    painter.setBrush(probColor[lastColor]);
+                }
+                propsWasEmpty = props.isEmpty();
             }
-            painter.drawRect(c * cellSize, r * cellSize,
-                    cellSize - 1, cellSize - 1);
+            // Do we need to change the pen?
+            if (diffWasEmpty != diffProps.isEmpty()) {
+                if (diffProps.isEmpty())
+                    painter.setPen(Qt::NoPen);
+                else
+                    painter.setPen(diffColor);
+                diffWasEmpty = diffProps.isEmpty();
+            }
+            // Finally draw the cell
+            if (diffProps.isEmpty())
+                painter.drawRect(c * cellSize, r * cellSize,
+                        cellSize - 1, cellSize - 1);
+            else
+                painter.drawRect(c * cellSize - 1, r * cellSize - 1,
+                        cellSize, cellSize);
         }
-    }
-
-    // Only draw grid lines if we have at least 3 pixel per byte
-    if (cellSize > 1 && gridColor != unusedColor) {
-        painter.setPen(gridColor);
-        for (int i = 1; i < _cols; i++)
-            painter.drawLine(i * cellSize - 1, 0, i * cellSize - 1, _rows * cellSize - 1);
-        for (int i = 1; i < _rows; i++)
-            painter.drawLine(0, i * cellSize - 1, _cols * cellSize - 1, i * cellSize - 1);
     }
 }
 
@@ -285,7 +319,7 @@ bool MemoryMapWidget::event(QEvent *event)
             {
                 addrEnd = totalAddrSpaceEnd();
             }
-            int width = _map->addrSpaceEnd() >= (1UL << 32) ? 16 : 8;
+            int width = _map && _map->addrSpaceEnd() >= (1UL << 32) ? 16 : 8;
 
             QTextDocument doc;
             QTextCursor cur(&doc);
@@ -321,8 +355,9 @@ bool MemoryMapWidget::event(QEvent *event)
 
 
             QString elem;
-            ConstNodeList nodes =
-                    _map->objectsInRange(addrStart, addrEnd).toList();
+            ConstNodeList nodes = _map ?
+                    _map->objectsInRange(addrStart, addrEnd).toList()
+                    : ConstNodeList();
             qSort(nodes.begin(), nodes.end(), NodeProbabilityGreaterThan);
 
             if (!nodes.isEmpty()) {
@@ -412,6 +447,22 @@ int MemoryMapWidget::drawHeight() const
 const MemoryMapRangeTree* MemoryMapWidget::map() const
 {
     return _map;
+}
+
+
+const MemoryDiffTree* MemoryMapWidget::diff() const
+{
+    return _diff;
+}
+
+
+void MemoryMapWidget::setDiff(const MemoryDiffTree* diff)
+{
+    if (_diff == diff)
+        return;
+    _diff = diff;
+    resizeEvent(0);
+    update();
 }
 
 

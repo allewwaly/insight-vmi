@@ -43,9 +43,14 @@ public:
     bool safeSeek(qint64 pos);
 
     /**
-     * @return the device containing the physical memory
+     * @return the device containing the physical memory (const version)
      */
     const QIODevice* physMem() const;
+
+    /**
+     * @return the device containing the physical memory
+     */
+    QIODevice* physMem();
 
     /**
      * Sets the device containing the physical memory
@@ -217,6 +222,12 @@ private:
 inline int VirtualMemory::memDumpIndex() const
 {
     return _memDumpIndex;
+}
+
+
+inline QIODevice* VirtualMemory::physMem()
+{
+    return _physMem;
 }
 
 

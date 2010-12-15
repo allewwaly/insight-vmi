@@ -191,9 +191,20 @@ public:
     const MemoryMap* map() const;
 
     /**
+     * @return the memory map of this dump
+     */
+    MemoryMap* map();
+
+    /**
      * Initializes the reverse mapping of addresses and instances.
      */
     void setupRevMap();
+
+    /**
+     * Calculates the differences with MemoryDump \a other.
+     * @param other
+     */
+    void setupDiff(MemoryDump* other);
 
 private:
     void init();
@@ -206,5 +217,36 @@ private:
     int _index;
     MemoryMap* _map;
 };
+
+//------------------------------------------------------------------------------
+
+inline const QString& MemoryDump::fileName() const
+{
+    return _fileName;
+}
+
+
+inline const MemSpecs& MemoryDump::memSpecs() const
+{
+    return _specs;
+}
+
+
+inline int MemoryDump::index() const
+{
+    return _index;
+}
+
+
+inline const MemoryMap* MemoryDump::map() const
+{
+    return _map;
+}
+
+
+inline MemoryMap* MemoryDump::map()
+{
+    return _map;
+}
 
 #endif /* MEMORYDUMP_H_ */
