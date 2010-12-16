@@ -756,9 +756,10 @@ void MemoryMap::diffWith(MemoryMap* other)
     else
         assert(otherDev->reset());
 
-    bool wasEqual = true;
+    bool wasEqual = true, equal = true;
     quint64 addr = 0, startAddr = 0, length = 0;
     const int bufsize = 1024;
+    const int granularity = 4;
     char buf1[bufsize], buf2[bufsize];
     qint64 readSize1, readSize2;
     qint64 done, prevDone = 0;
@@ -767,7 +768,7 @@ void MemoryMap::diffWith(MemoryMap* other)
         totalSize = qMax(dev->size(), otherDev->size());
 
     // Compare the complete physical address space
-    while (!dev->atEnd() && !otherDev->atEnd()) {
+    while (!shell->interrupted() && !dev->atEnd() && !otherDev->atEnd()) {
         readSize1 = dev->read(buf1, bufsize);
         readSize2 = otherDev->read(buf2, bufsize);
 
@@ -776,27 +777,33 @@ void MemoryMap::diffWith(MemoryMap* other)
 
         qint64 size = qMin(readSize1, readSize2);
         for (int i = 0; i < size; ++i) {
-            // Memory is equal
-            if (buf1[i] == buf2[i]) {
-                // Add difference to tree
-                if (!wasEqual)
-                    _pmemDiff.insert(Difference(startAddr, length),
-                                     startAddr,
-                                     startAddr + length - 1);
-            }
-            // Memory differs
-            else {
-                // Start new difference
-                if (wasEqual) {
-                    startAddr = addr;
-                    length = 1;
+            if (buf1[i] != buf2[i])
+                equal = false;
+            // We only consider memory chunks of size "granularity"
+            if (addr % granularity == granularity - 1) {
+                // Memory is equal
+                if (equal) {
+                    // Add difference to tree
+                    if (!wasEqual)
+                        _pmemDiff.insert(Difference(startAddr, length),
+                                         startAddr,
+                                         startAddr + length - 1);
                 }
-                // Enlarge difference
-                else
-                    ++length;
+                // Memory differs
+                else {
+                    // Start new difference
+                    if (wasEqual) {
+                        startAddr = addr - (addr % granularity);
+                        length = granularity;
+                    }
+                    // Enlarge difference
+                    else
+                        length += granularity;
+                }
+                wasEqual = equal;
             }
-            wasEqual = (buf1[i] == buf2[i]);
             ++addr;
+            equal = true;
         }
 
         done = (int) (addr / (float) totalSize * 100);
