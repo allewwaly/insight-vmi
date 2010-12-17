@@ -97,7 +97,7 @@ bool MemoryMap::fitsInVmem(quint64 addr, quint64 size) const
 }
 
 
-void MemoryMap::build()
+void MemoryMap::build(float minProbability)
 {
     // Set _isBuilding to true now and to false later
     VarSetter<bool> building(&_isBuilding, true, false);
@@ -105,6 +105,7 @@ void MemoryMap::build()
     // Clean up everything
     clearRevmap();
     _shared->reset();
+    _shared->minProbability = minProbability;
 
     QTime timer, totalTimer;
     timer.start();
@@ -114,18 +115,10 @@ void MemoryMap::build()
     // NON-PARALLEL PART OF BUILDING PROCESS
 
     // How many threads to create?
-    if (QThread::idealThreadCount() <= 0)
-        _shared->threadCount = 1;
-    else if (QThread::idealThreadCount() > MAX_BUILDER_THREADS)
-        _shared->threadCount = MAX_BUILDER_THREADS;
-    else
-        _shared->threadCount = QThread::idealThreadCount();
+    _shared->threadCount =
+            qMin(qMax(QThread::idealThreadCount(), 1), MAX_BUILDER_THREADS);
 
-    debugmsg("Building reverse map with " << _shared->threadCount << " threads.");
-
-//#ifdef DEBUG
-//    int dotcnt = 0;
-//#endif
+//    debugmsg("Building reverse map with " << _shared->threadCount << " threads.");
 
     // Go through the global vars and add their instances to the queue
     for (VariableList::const_iterator it = _factory->vars().constBegin();
@@ -137,17 +130,8 @@ void MemoryMap::build()
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
                 _vmemMap.insert(node);
-//#ifdef DEBUG
-//                debugmsg("Added: " << node->name());
-//#endif
                 _vmemAddresses.insert(node->address());
                 _shared->queue.insert(node->probability(), node);
-//#ifdef DEBUG
-//                if (++dotcnt >= 10) {
-//                    shell->interrupt();
-//                    break;
-//                }
-//#endif
             }
         }
         catch (GenericException e) {
@@ -168,14 +152,14 @@ void MemoryMap::build()
         threads[i]->start();
     }
 
-//#ifdef DEBUG
-//    usleep(500*1000);
-//#endif
-
     bool firstLoop = true;
 
     // Let the builders do the work, but regularly output some statistics
-    while (!shell->interrupted() && !_shared->queue.isEmpty()) {
+    while (!shell->interrupted() &&
+           !_shared->queue.isEmpty() &&
+           (!_shared->lastNode ||
+            _shared->lastNode->probability() >= _shared->minProbability) )
+    {
 
         if (firstLoop || timer.elapsed() > 1000) {
             firstLoop = false;
@@ -188,12 +172,21 @@ void MemoryMap::build()
 
             timer.restart();
             MemoryMapNode* node = _shared->lastNode;
-            debugmsg("Processed " << _shared->processed << " instances"
+//            debugmsg("Processed " << _shared->processed << " instances"
+//                    << ", vmemAddr = " << _vmemAddresses.size()
+//                    << ", vmemMap = " << _vmemMap.objectCount()
+//                    << ", pmemMap = " << _pmemMap.size()
+//                    << ", queue = " << queue_size << " " << indicator
+//                    << ", probability = " << (node ? node->probability() : 1.0));
+
+            shell->out()
+                    << "\rProcessed " << _shared->processed << " instances"
                     << ", vmemAddr = " << _vmemAddresses.size()
                     << ", vmemMap = " << _vmemMap.objectCount()
                     << ", pmemMap = " << _pmemMap.size()
                     << ", queue = " << queue_size << " " << indicator
-                    << ", probability = " << (node ? node->probability() : 1.0));
+                    << ", probability = " << (node ? node->probability() : 1.0)
+                    << flush;
             prev_queue_size = queue_size;
         }
 
@@ -208,6 +201,8 @@ void MemoryMap::build()
         // Sleep for 100ms
         usleep(100*1000);
     }
+    shell->out() << endl;
+
 
     // Interrupt all threads, doesn't harm if they are not running anymore
     for (int i = 0; i < _shared->threadCount; ++i)
@@ -222,6 +217,9 @@ void MemoryMap::build()
     // Restore previous value
     _vmem->setThreadSafety(wasThreadSafe);
 
+//#define SHOW_STATISTICS 1
+
+#ifdef SHOW_STATISTICS
     float proc_per_sec = _shared->processed * 1000.0 / totalTimer.elapsed();
 
     // Gather some statistics about the memory map
@@ -431,31 +429,7 @@ void MemoryMap::build()
     debugmsg("Consistency check done");
 #endif
 
-/*
-    QMap<int, PointerNodeMap::key_type>::iterator it;
-    for (it = keyCnt.begin(); it != keyCnt.end(); ++it) {
-        QString s;
-        PointerNodeMap::iterator n;
-        QList<PointerNodeMap::mapped_type> list = _vmemMap.values(*it);
-//        QList<int> idList;
-        for (int i = 0; i < list.size(); ++i) {
-            int id = list[i]->type()->id();
-//            idList += list[i]->type()->id();
-//        }
-//        qSort(idList);
-//        for (int i = 0; i < idList.size(); ++i) {
-//            if (i > 0)
-//                s += ", ";
-            s += QString("\t%1: %2\n")
-                    .arg(id, 8, 16)
-                    .arg(list[i]->fullName());
-        }
-
-        debugmsg(QString("List for address 0x%1 has %2 elements")
-                .arg(it.value(), _vmem->memSpecs().sizeofUnsignedLong << 1, 16, QChar('0'))
-                .arg(it.key(), 4));
-    }
-*/
+#endif // SHOW_STATISTICS
 }
 
 
@@ -821,7 +795,7 @@ void MemoryMap::diffWith(MemoryMap* other)
 
     shell->out() << "\rComparing memory dumps finished." << endl;
 
-    debugmsg("No. of differences: " << _pmemDiff.objectCount());
+//    debugmsg("No. of differences: " << _pmemDiff.objectCount());
 }
 
 

@@ -192,7 +192,7 @@ private slots:
 //    void memMapVisTimerTimeout();
 
 private:
-    typedef QVarLengthArray<MemoryDump*, 16> MemDumpArray;
+    typedef QVarLengthArray<MemoryDump*, 250> MemDumpArray;
 
     static KernelSymbols _sym;
     static QFile _stdin;
@@ -231,12 +231,14 @@ private:
     int evalLine();
     void hline(int width = 60);
     int parseMemDumpIndex(QStringList &args, int skip = 0);
+    int loadMemDump(const QString& fileName);
     static QScriptValue scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptListVariableNames(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptListVariableIds(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptPrint(QScriptContext* ctx, QScriptEngine* eng);
     //---------------------------------
+    int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
     int cmdHelp(QStringList args);
     int cmdList(QStringList args);
@@ -253,7 +255,7 @@ private:
     int cmdMemoryQuery(QStringList args);
     int cmdMemoryDump(QStringList args);
     int cmdMemoryRevmap(QStringList args);
-    int cmdMemoryRevmapBuild(int index);
+    int cmdMemoryRevmapBuild(int index, QStringList args);
     int cmdMemoryRevmapVisualize(int index, QString type = "v");
     int cmdMemoryDiff(QStringList args);
     int cmdMemoryDiffBuild(int index1, int index2);

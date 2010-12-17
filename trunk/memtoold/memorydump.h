@@ -197,8 +197,10 @@ public:
 
     /**
      * Initializes the reverse mapping of addresses and instances.
+     * @param minProbability stop building when the node's probability drops
+     *  below this threshold
      */
-    void setupRevMap();
+    void setupRevMap(float minProbability = 0.0);
 
     /**
      * Calculates the differences with MemoryDump \a other.

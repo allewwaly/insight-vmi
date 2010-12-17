@@ -45,6 +45,20 @@ Q_DECLARE_METATYPE(QAbstractSocket::SocketError);
 
 #define safe_delete(x) do { if ( (x) ) { delete x; x = 0; } } while (0)
 
+#define getElapsedTime(time, h, m, s, ms) \
+    do { \
+        int elapsed = (time).elapsed(); \
+        (ms) = elapsed % 1000; \
+        elapsed /= 1000; \
+        (s) = elapsed % 60; \
+        elapsed /= 60; \
+        (m) = elapsed % 60; \
+        elapsed /= 60; \
+        (h) = elapsed; \
+    } while (0)
+
+
+
 Shell* shell = 0;
 
 Shell::MemDumpArray Shell::_memDumps;
@@ -67,6 +81,15 @@ Shell::Shell(bool listenOnSocket)
 	qRegisterMetaType<QAbstractSocket::SocketError>();
 
     // Register all commands
+    _commands.insert("diff",
+            Command(
+                &Shell::cmdDiffVectors,
+                "Generates a list of vectors corresponding to type IDs",
+                "This command generates a list of vectors corresponding to type IDs that "
+                "have changed in a series of memory dumps. The memory dump files can "
+                "be specified by a shell file glob pattern or by explicit file names.\n"
+                "  diff [min. probability] <file pattern 1> [<file pattern 2> ...]"));
+
     _commands.insert("exit",
             Command(
                 &Shell::cmdExit,
@@ -633,6 +656,9 @@ int Shell::eval(QString command)
     _out << flush;
     _err << flush;
 
+    if (_interrupted)
+        _out << endl << "Operation interrupted by user." << endl;
+
     return ret;
 }
 
@@ -1134,21 +1160,14 @@ int Shell::parseMemDumpIndex(QStringList &args, int skip)
 }
 
 
-
-int Shell::cmdMemoryLoad(QStringList args)
+int Shell::loadMemDump(const QString& fileName)
 {
     // Check argument size
-    if (args.size() != 1) {
-        _err << "No file name given." << endl;
-        return 1;
-    }
-    QString fileName = args[0];
-
     // Check file for existence
     QFile file(fileName);
     if (!file.exists()) {
         _err << "File not found: " << fileName << endl;
-        return 2;
+        return -1;
     }
 
     // Find an unused index and check if the file is already loaded
@@ -1158,7 +1177,7 @@ int Shell::cmdMemoryLoad(QStringList args)
             index = i;
         if (_memDumps[i] && _memDumps[i]->fileName() == fileName) {
             _out << "File already loaded as [" << i << "] " << fileName << endl;
-            return 0;
+            return i;
         }
     }
     // Enlarge array, if necessary
@@ -1172,7 +1191,19 @@ int Shell::cmdMemoryLoad(QStringList args)
             new MemoryDump(_sym.memSpecs(), fileName, &_sym.factory(), index);
     _out << "Loaded [" << index << "] " << fileName << endl;
 
-    return 0;
+    return index;
+}
+
+
+int Shell::cmdMemoryLoad(QStringList args)
+{
+    // Check argument size
+    if (args.size() != 1) {
+        _err << "No file name given." << endl;
+        return 1;
+    }
+
+    return loadMemDump(args[0]) < 0 ? 2 : 0;
 }
 
 
@@ -1290,7 +1321,7 @@ int Shell::cmdMemoryRevmap(QStringList args)
     // Is the index valid?
     if (index >= 0) {
         if (QString("build").startsWith(args[0]))
-            return cmdMemoryRevmapBuild(index);
+            return cmdMemoryRevmapBuild(index, args);
         else if (QString("visualize").startsWith(args[0])) {
             if (args.size() > 1)
                 return cmdMemoryRevmapVisualize(index, args[1]);
@@ -1307,11 +1338,22 @@ int Shell::cmdMemoryRevmap(QStringList args)
 }
 
 
-int Shell::cmdMemoryRevmapBuild(int index)
+int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
 {
     QTime timer;
     timer.start();
-    _memDumps[index]->setupRevMap();
+    float prob = 0.0;
+    // Did the user specify a threshold probability?
+    if (!args.isEmpty()) {
+        bool ok;
+        prob = args[0].toFloat(&ok);
+        if (!ok)
+            cmdHelp(QStringList("memory"));
+        return 1;
+    }
+
+    _memDumps[index]->setupRevMap(prob);
+
     int elapsed = timer.elapsed();
     int min = (elapsed / 1000) / 60;
     int sec = (elapsed / 1000) % 60;
@@ -1966,6 +2008,105 @@ int Shell::cmdBinaryMemDumpList(QStringList /*args*/)
         }
     }
     _bin << files;
+    return 0;
+}
+
+
+int Shell::cmdDiffVectors(QStringList args)
+{
+    if (args.isEmpty())
+        return cmdHelp(QStringList("diff"));
+
+    // Try to parse a probability
+    bool ok;
+    float minProb = args[0].toFloat(&ok);
+    if (ok)
+        args.pop_front();
+    else
+        minProb = 0.1;  // default to 10% probability
+
+    // Get a list of all files
+    QFileInfoList files;
+    for (int i = 0; i < args.size(); ++i) {
+        QFileInfo info(args[i]);
+        if (info.exists())
+            files.append(info);
+        else {
+            QDir dir(info.absolutePath());
+            files.append(dir.entryInfoList(QStringList(info.fileName()),
+                                QDir::Files|QDir::CaseSensitive, QDir::Name));
+        }
+    }
+
+    // Make sure the files exist
+    if (files.isEmpty()) {
+        _err << "The file(s) could not be found." << endl;
+        debugmsg("args = " << args[0]);
+        return 1;
+    }
+    else if (files.size() < 2) {
+        _err << "This operation requires at least two files." << endl;
+        return 2;
+    }
+
+    // Make sure all files have the same size;
+    qint64 size = files[0].size();
+    for (int i = 1; i < files.size(); ++i) {
+        if (size != files[i].size()) {
+            _err << "File size of the following files differ: " << endl
+                 << files[0].fileName() << "(" << files[0].size() << ")" << endl
+                 << files[i].fileName() << "(" << files[i].size() << ")" << endl;
+            return 3;
+        }
+    }
+
+    // Load all memory dumps
+    QList<int> indices;
+    for (int i = 0; i < files.size(); ++i) {
+        int index = loadMemDump(files[i].absoluteFilePath());
+        // A return value less than 0 is an error code
+        if (index < 0)
+            return 4;
+        indices.append(index);
+    }
+
+
+    QTime timer;
+    timer.start();
+    int h, m, s, ms;
+
+//    // Build reverse map of first dump
+//    _memDumps[indices[0]]->setupRevMap(minProb);
+    for (int i = 1; i < indices.size() && !_interrupted; ++i) {
+        int j = indices[i];
+        // Build reverse map
+        if (!_interrupted) {
+            getElapsedTime(timer, h, m, s, ms);
+            _out << QString("%1:%2:%3.%4")
+                            .arg(h)
+                            .arg(m, 2, 10, QChar('0'))
+                            .arg(s, 2, 10, QChar('0'))
+                            .arg(ms, 3, 10, QChar('0'))
+                    << " Building reverse map for dump [" << j << "], "
+                    << "min. probability " << minProb << endl;
+            _memDumps[j]->setupRevMap(minProb);
+        }
+
+        // Compare to previous dump
+        if (!_interrupted) {
+            getElapsedTime(timer, h, m, s, ms);
+            _out << QString("%1:%2:%3.%4")
+                                    .arg(h)
+                                    .arg(m, 2, 10, QChar('0'))
+                                    .arg(s, 2, 10, QChar('0'))
+                                    .arg(ms, 3, 10, QChar('0'))
+                    << " Comparing dump [" << indices[i-1] << "] to [" << j << "]" << endl;
+            _memDumps[j]->setupDiff(_memDumps[indices[i-1]]);
+        }
+
+        // TODO build vector of type IDs that have changed content
+    }
+
     return 0;
 }
 

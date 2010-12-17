@@ -442,9 +442,9 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 }
 
 
-void MemoryDump::setupRevMap()
+void MemoryDump::setupRevMap(float minProbability)
 {
-    _map->build();
+    _map->build(minProbability);
 }
 
 
