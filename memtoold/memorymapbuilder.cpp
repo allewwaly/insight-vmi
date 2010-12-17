@@ -49,16 +49,14 @@ void MemoryMapBuilder::run()
 
     // Now work through the whole stack
     QMutexLocker queueLock(&shared->queueLock);
-    while (!_interrupted && !shared->queue.isEmpty())
+    while ( !_interrupted && !shared->queue.isEmpty() &&
+            (!shared->lastNode ||
+             shared->lastNode->probability() >= shared->minProbability) )
     {
         // Take element with highest probability
         node = shared->queue.takeLargest();
         shared->lastNode = node;
         ++shared->processed;
-//#ifdef DEBUG
-//        if (shared->processed >= 5000)
-//            interrupt();
-//#endif
         queueLock.unlock();
 
         // Insert in non-critical (non-exception prone) mappings

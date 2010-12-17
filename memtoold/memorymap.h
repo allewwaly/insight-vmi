@@ -48,7 +48,7 @@ typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
 
 
-#define MAX_BUILDER_THREADS 16
+#define MAX_BUILDER_THREADS 2
 
 /**
  * Holds all variables that are shared amount the builder threads.
@@ -71,6 +71,7 @@ struct BuilderSharedState
             currAddresses[i] = 0;
     }
 
+    float minProbability;
     int threadCount, vmemReading, vmemWriting;
     unsigned int maxObjSize;
     quint64 currAddresses[MAX_BUILDER_THREADS];
@@ -127,8 +128,10 @@ public:
 	 * Builds up the memory mapping for the virtual memory object previously
 	 * specified in the constructor.
 	 * \note This might take a while.
+	 * @param minProbability stop building when the node's probability drops
+	 *  below this threshold
 	 */
-	void build();
+	void build(float minProbability = 0.0);
 
 	/**
 	 * Finds the differences in physical memory between this and another memory
