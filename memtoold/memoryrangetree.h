@@ -166,9 +166,9 @@ public:
         inline bool operator!=(const iterator &o) const { return i != o.i || it != o.it; }
         inline bool operator==(const const_iterator &o) const { return i == o.i && it == o.it; }
         inline bool operator!=(const const_iterator &o) const { return i != o.i || it != o.it; }
-        inline iterator &operator++() { if (++it == i->nodes.end()) goNext(false); return *this; }
+        inline iterator &operator++() { if (++it == i->items.end()) goNext(false); return *this; }
         inline iterator operator++(int) { iterator it = *this; this->operator++(); return it; }
-        inline iterator &operator--() { if (it == i->nodes.begin()) goPrev(false); --it; return *this; }
+        inline iterator &operator--() { if (it == i->items.begin()) goPrev(false); --it; return *this; }
         inline iterator operator--(int) { iterator it = *this; this->operator--(); return it; }
         inline iterator operator+(int j) const
         { iterator it = *this; if (j > 0) while (j--) ++it; else while (j++) --it; return it; }
@@ -180,7 +180,7 @@ public:
         inline void goNext(bool init)
         {
             Node* i_old = i;
-            while ( i->next && (i == i_old || i->nodes.isEmpty()) )
+            while ( i->next && (i == i_old || i->items.isEmpty()) )
                 i = i->next;
             if (init || i != i_old)
                 it = i->items.begin();
@@ -189,7 +189,7 @@ public:
         inline void goPrev(bool init)
         {
             Node* i_old = i;
-            while ( i->prev && (i == i_old || i->nodes.isEmpty()) )
+            while ( i->prev && (i == i_old || i->items.isEmpty()) )
                 i = i->prev;
             if (init || i != i_old)
                 it = i->items.end();
@@ -233,11 +233,8 @@ public:
         inline void goNext(bool init)
         {
             Node* i_old = i;
-            while (i->next) {
+            while ( i->next && (i == i_old || i->items.isEmpty()) )
                 i = i->next;
-                if (!i->nodes.isEmpty())
-                    break;
-            }
             if (init || i != i_old)
                 it = i->items.constBegin();
         }
@@ -245,7 +242,7 @@ public:
         inline void goPrev(bool init)
         {
             Node* i_old = i;
-            while ( i->prev && (i == i_old || i->nodes.isEmpty()) )
+            while ( i->prev && (i == i_old || i->items.isEmpty()) )
                 i = i->prev;
             if (init || i != i_old)
                 it = i->items.constEnd();
@@ -256,11 +253,11 @@ public:
     inline iterator begin() { return _first; }
     inline const_iterator begin() const { return _first; }
     inline const_iterator constBegin() const { return _first; }
-    inline iterator end() { return _last ? iterator(_last, _last->nodes.end()) : iterator(); }
+    inline iterator end() { return _last ? iterator(_last, _last->items.end()) : iterator(); }
     inline const_iterator end() const
-    { return _last ? const_iterator(_last, _last->nodes.end()) : const_iterator(); }
+    { return _last ? const_iterator(_last, _last->items.end()) : const_iterator(); }
     inline const_iterator constEnd() const
-    { return _last ? const_iterator(_last, _last->nodes.end()) : const_iterator(); }
+    { return _last ? const_iterator(_last, _last->items.end()) : const_iterator(); }
 
     /**
      * Constructor
@@ -375,7 +372,7 @@ private:
     Node* _root;                  ///< Root node
     Node* _first;                 ///< First leaf
     Node* _last;                  ///< Last leaf
-    int _size;                    ///< No. of MemoryRangeTreeNode s
+    int _size;                    ///< No. of MemoryRangeTreeNode's
     quint64 _addrSpaceEnd;        ///< Address of the last byte of address space
     quint64 _objectCount;
     static ItemSet _emptyNodeSet;
