@@ -181,6 +181,11 @@ public:
     const MemSpecs& memSpecs() const;
 
     /**
+     * @return the virtual memory device of this MemDump
+     */
+    VirtualMemory* vmem();
+
+    /**
      * @return the index of this memory dump within the array of dumps
      */
     int index() const;
@@ -249,6 +254,12 @@ inline const MemoryMap* MemoryDump::map() const
 inline MemoryMap* MemoryDump::map()
 {
     return _map;
+}
+
+
+inline VirtualMemory* MemoryDump::vmem()
+{
+    return _vmem;
 }
 
 #endif /* MEMORYDUMP_H_ */
