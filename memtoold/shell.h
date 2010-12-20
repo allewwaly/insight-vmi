@@ -17,6 +17,7 @@
 #include <QVarLengthArray>
 #include <QScriptValue>
 #include <QSemaphore>
+#include <QTime>
 #include <QMutex>
 #include "kernelsymbols.h"
 
@@ -223,6 +224,7 @@ private:
     QMutex _engineLock;
     QScriptEngine* _engine;
 
+    void printTimeStamp(const QTime& time);
     void prepare();
     void cleanupPipedProcs();
     void initScriptEngine();

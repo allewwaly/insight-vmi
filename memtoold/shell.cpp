@@ -23,8 +23,8 @@
 #include <QLocalSocket>
 #include <QLocalServer>
 #include <QMutexLocker>
-#include <QTime>
 #include <QTimer>
+#include <QBitArray>
 #include "compileunit.h"
 #include "variable.h"
 #include "refbasetype.h"
@@ -38,6 +38,7 @@
 #include "memorymap.h"
 #include "memorymapwindow.h"
 #include "memorymapwidget.h"
+#include "basetype.h"
 
 // Register socket enums for the Qt meta type system
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
@@ -45,6 +46,7 @@ Q_DECLARE_METATYPE(QAbstractSocket::SocketError);
 
 #define safe_delete(x) do { if ( (x) ) { delete x; x = 0; } } while (0)
 
+/*
 #define getElapsedTime(time, h, m, s, ms) \
     do { \
         int elapsed = (time).elapsed(); \
@@ -56,7 +58,7 @@ Q_DECLARE_METATYPE(QAbstractSocket::SocketError);
         elapsed /= 60; \
         (h) = elapsed; \
     } while (0)
-
+*/
 
 
 Shell* shell = 0;
@@ -2070,10 +2072,26 @@ int Shell::cmdDiffVectors(QStringList args)
         indices.append(index);
     }
 
-
     QTime timer;
     timer.start();
-    int h, m, s, ms;
+
+    printTimeStamp(timer);
+    _out << "Generating vector of all type IDs" << endl;
+
+    // Get a list of all type IDs
+    QVector<int> typeIds = _sym.factory().typesById().keys().toVector();
+    qSort(typeIds);
+    QBitArray changedTypes[typeIds.size()];
+
+    // Generate the inverse hash: type ID -> vector index
+    QHash<int, int> idIndices;
+    idIndices.reserve(typeIds.size());
+    for (int i = 0; i < typeIds.size(); ++i)
+        idIndices[typeIds[i]] = i;
+
+    int prevj = indices[0];
+    const quint32 bufsize = _sym.factory().maxTypeSize();
+    char cbuf[bufsize], pbuf[bufsize];
 
 //    // Build reverse map of first dump
 //    _memDumps[indices[0]]->setupRevMap(minProb);
@@ -2081,33 +2099,100 @@ int Shell::cmdDiffVectors(QStringList args)
         int j = indices[i];
         // Build reverse map
         if (!_interrupted) {
-            getElapsedTime(timer, h, m, s, ms);
-            _out << QString("%1:%2:%3.%4")
-                            .arg(h)
-                            .arg(m, 2, 10, QChar('0'))
-                            .arg(s, 2, 10, QChar('0'))
-                            .arg(ms, 3, 10, QChar('0'))
-                    << " Building reverse map for dump [" << j << "], "
-                    << "min. probability " << minProb << endl;
+            printTimeStamp(timer);
+            _out << "Building reverse map for dump [" << j << "], "
+                 << "min. probability " << minProb << endl;
             _memDumps[j]->setupRevMap(minProb);
         }
 
         // Compare to previous dump
         if (!_interrupted) {
-            getElapsedTime(timer, h, m, s, ms);
-            _out << QString("%1:%2:%3.%4")
-                                    .arg(h)
-                                    .arg(m, 2, 10, QChar('0'))
-                                    .arg(s, 2, 10, QChar('0'))
-                                    .arg(ms, 3, 10, QChar('0'))
-                    << " Comparing dump [" << indices[i-1] << "] to [" << j << "]" << endl;
-            _memDumps[j]->setupDiff(_memDumps[indices[i-1]]);
+            printTimeStamp(timer);
+            _out << "Comparing dump [" << prevj << "] to [" << j << "]" << endl;
+            _memDumps[j]->setupDiff(_memDumps[prevj]);
         }
 
-        // TODO build vector of type IDs that have changed content
+        if (!_interrupted) {
+            printTimeStamp(timer);
+            _out << "Enumerating changed type IDs for dump [" << j << "]" << endl;
+
+            // Initialize bitmap
+            changedTypes[i].fill(false, typeIds.size());
+
+            // Iterate over all changes
+            const MemoryDiffTree& diff = _memDumps[j]->map()->pmemDiff();
+            const MemoryMapRangeTree& currPMemMap = _memDumps[j]->map()->pmemMap();
+//            const MemoryMapRangeTree& prevPMemMap = _memDumps[prevj]->map()->pmemMap();
+            const MemoryMapRangeTree& prevVMemMap = _memDumps[prevj]->map()->vmemMap();
+            for (MemoryDiffTree::const_iterator it = diff.constBegin();
+                    it != diff.constEnd() && !_interrupted; ++it)
+            {
+                MemoryMapRangeTree::ItemSet curr = currPMemMap.objectsInRange(
+                        it->startAddr, it->startAddr + it->runLength - 1);
+
+                for (MemoryMapRangeTree::ItemSet::const_iterator cit =
+                        curr.constBegin();
+                        cit != curr.constEnd() && !_interrupted;
+                        ++cit)
+                {
+                    const MemoryMapNode* cnode = *cit;
+
+                    // Try to find the object in the previous dump
+                    const MemoryMapRangeTree::ItemSet& prev = prevVMemMap.objectsAt(cnode->address());
+                    for (MemoryMapRangeTree::ItemSet::const_iterator pit =
+                        prev.constBegin(); pit != prev.constEnd(); ++pit)
+                    {
+                        const MemoryMapNode* pnode = *pit;
+
+                        if (cnode->type()->id() == pnode->type()->id()) {
+                            // Read in the data for the current node
+                            _memDumps[j]->vmem()->seek(cnode->address());
+                            int cret = _memDumps[j]->vmem()->read(cbuf, cnode->size());
+                            assert((quint32)cret == cnode->size());
+                            // Read in the data for the previous node
+                            _memDumps[prevj]->vmem()->seek(pnode->address());
+                            int pret = _memDumps[prevj]->vmem()->read(pbuf, pnode->size());
+                            assert((quint32)pret == pnode->size());
+                            // Compare memory
+                            if (memcmp(cbuf, pbuf, cnode->size()) != 0)
+                                changedTypes[i].setBit(idIndices[cnode->type()->id()]);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+//        char* data = ba.data_ptr()->data;
+
+        // TODO do something useful with the data
+
+        // Free unneeded memory
+        _memDumps[prevj]->map()->clear();
+
+        prevj = j;
     }
 
     return 0;
+}
+
+
+void Shell::printTimeStamp(const QTime& time)
+{
+    int elapsed = (time).elapsed();
+    int ms = elapsed % 1000;
+    elapsed /= 1000;
+    int s = elapsed % 60;
+    elapsed /= 60;
+    int m = elapsed % 60;
+    elapsed /= 60;
+    int h = elapsed;
+
+    _out << QString("%1:%2:%3.%4 ")
+                            .arg(h)
+                            .arg(m, 2, 10, QChar('0'))
+                            .arg(s, 2, 10, QChar('0'))
+                            .arg(ms, 3, 10, QChar('0'));
 }
 
 
