@@ -376,6 +376,14 @@ protected:
      */
 	void insert(Variable* var);
 
+	/**
+	 * @return maximum type size of all types (in byte)
+	 */
+	inline quint32 maxTypeSize() const
+	{
+	    return _maxTypeSize;
+	}
+
 private:
 	/**
 	 * Generates a working <tt>struct list_head</tt> from a given, generic one.
@@ -463,6 +471,7 @@ private:
 	int _typeFoundByHash;
 	int _structListHeadCount;
 	int _structHListNodeCount;
+	quint32 _maxTypeSize;
 };
 
 #endif /* TYPEFACTORY_H_ */
