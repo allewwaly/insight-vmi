@@ -30,7 +30,7 @@
 
 SymFactory::SymFactory(const MemSpecs& memSpecs)
 	: _memSpecs(memSpecs), _typeFoundByHash(0), _structListHeadCount(0),
-	  _structHListNodeCount(0)
+	  _structHListNodeCount(0), _maxTypeSize(0)
 {
 }
 
@@ -89,6 +89,7 @@ void SymFactory::clear()
 	_typeFoundByHash = 0;
 	_structListHeadCount = 0;
 	_structHListNodeCount = 0;
+	_maxTypeSize = 0;
 }
 
 
@@ -387,8 +388,11 @@ void SymFactory::insert(const TypeInfo& info, BaseType* type)
 	assert(type != 0);
 
 	// Only add to the list if this is a new type
-	if (isNewType(info, type))
+	if (isNewType(info, type)) {
 	    _types.append(type);
+	    if (type->size() > _maxTypeSize)
+	        _maxTypeSize = type->size();
+	}
 
 	// Insert into the various hashes and check for missing references
 	updateTypeRelations(info, type);
@@ -401,6 +405,8 @@ void SymFactory::insert(BaseType* type)
 
     // Add to the list of types
     _types.append(type);
+    if (type->size() > _maxTypeSize)
+        _maxTypeSize = type->size();
 
     // Insert into the various hashes and check for missing references
     updateTypeRelations(type->id(), type->name(), type);
