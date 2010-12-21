@@ -56,14 +56,15 @@ Instance::Instance(size_t address, const BaseType* type, const QString& name,
 
 
 Instance::Instance(const Instance& other)
-    : _d(other._d)
 {
+    _d = new InstanceData(*other._d);
 	++_objectCount;
 }
 
 
 Instance::~Instance()
 {
+    delete _d;
 	--_objectCount;
 }
 
