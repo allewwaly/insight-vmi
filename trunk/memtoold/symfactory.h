@@ -464,7 +464,6 @@ private:
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
-    BaseTypeList _helperTypes;        ///< Holds all extra types which were created for internal purposes
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
 	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
 

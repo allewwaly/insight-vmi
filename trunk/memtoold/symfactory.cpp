@@ -64,26 +64,18 @@ void SymFactory::clear()
 	_types.clear();
 
     // Delete all custom types
-//    for (BaseTypeList::iterator it = _customTypes.begin();
-//            it != _customTypes.end(); ++it)
-//    {
-//        delete *it;
-//    }
-//	_customTypes.clear();
+    for (BaseTypeList::iterator it = _customTypes.begin();
+            it != _customTypes.end(); ++it)
+    {
+        delete *it;
+    }
+	_customTypes.clear();
 
 	// Clear all further hashes and lists
 	_typesById.clear();
 	_typesByName.clear();
 	_typesByHash.clear();
 	_postponedTypes.clear();
-
-    // Delete all helper types
-    for (BaseTypeList::iterator it = _helperTypes.begin();
-            it != _helperTypes.end(); ++it)
-    {
-        delete *it;
-    }
-    _helperTypes.clear();
 
 	// Reset other vars
 	_typeFoundByHash = 0;
@@ -787,7 +779,7 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     // To dereference this pointer, the member's offset has to be subtracted
     nextPtr->setMacroExtraOffset(extraOffset);
 
-    StructuredMember* next = new StructuredMember();
+    StructuredMember* next = new StructuredMember(); // deleted by ~Structured()
     next->setId(0);
     next->setName("next");
     next->setOffset(0);
@@ -798,17 +790,13 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     //Create "prev" pointer
     Pointer* prevPtr = new Pointer(*nextPtr);
     _customTypes.append(prevPtr);
-    StructuredMember* prev = new StructuredMember();
+    StructuredMember* prev = new StructuredMember(); // deleted by ~Structured()
     prev->setId(0);
     prev->setName("prev");
     prev->setOffset(_memSpecs.sizeofUnsignedLong);
     prev->setRefTypeId(prevPtr->id());
     prev->setRefType(prevPtr);
     ret->addMember(prev);
-
-    _helperTypes.append(nextPtr);
-    _helperTypes.append(prevPtr);
-    _helperTypes.append(ret);
 
     return ret;
 }
@@ -840,7 +828,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     // To dereference this pointer, the member's offset has to be subtracted
     nextPtr->setMacroExtraOffset(extraOffset);
 
-    StructuredMember* next = new StructuredMember();
+    StructuredMember* next = new StructuredMember(); // deleted by ~Structured()
     next->setId(0);
     next->setName("next");
     next->setOffset(0);
@@ -860,17 +848,13 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     pprevPtr->setRefType(prevPtr);
     pprevPtr->setSize(_memSpecs.sizeofUnsignedLong);
 
-    StructuredMember* pprev = new StructuredMember();
+    StructuredMember* pprev = new StructuredMember(); // deleted by ~Structured()
     pprev->setId(0);
     pprev->setName("pprev");
     pprev->setOffset(_memSpecs.sizeofUnsignedLong);
     pprev->setRefTypeId(pprevPtr->id());
     pprev->setRefType(pprevPtr);
     ret->addMember(pprev);
-
-    _helperTypes.append(nextPtr);
-    _helperTypes.append(pprevPtr);
-    _helperTypes.append(ret);
 
     return ret;
 }
