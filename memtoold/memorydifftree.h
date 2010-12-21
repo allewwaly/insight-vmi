@@ -14,8 +14,9 @@ template<class T, class P> class MemoryRangeTree;
 #include "memorymapnode.h"
 #include "memoryrangetree.h"
 
-struct Difference
+class Difference
 {
+public:
     Difference(qint64 startAddr = 0, qint64 runLength = 0)
         : startAddr(startAddr), runLength(runLength) {}
 
@@ -36,8 +37,9 @@ inline uint qHash(const Difference& diff)
  * This struct holds all interesting properties of Difference objects under a
  * MemoryRangeTreeNode.
  */
-struct DiffProperties
+class DiffProperties
 {
+public:
     quint64 minRunLength;  ///< Minimal run-length of all differences
     quint64 maxRunLength;  ///< Maximal run-length of all differences
     int diffCount;         ///< No. of differences within this range
