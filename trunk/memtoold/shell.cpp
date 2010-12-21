@@ -1322,8 +1322,10 @@ int Shell::cmdMemoryRevmap(QStringList args)
         return cmdHelp(QStringList("memory"));
     // Is the index valid?
     if (index >= 0) {
-        if (QString("build").startsWith(args[0]))
+        if (QString("build").startsWith(args[0])) {
+            args.pop_front();
             return cmdMemoryRevmapBuild(index, args);
+        }
         else if (QString("visualize").startsWith(args[0])) {
             if (args.size() > 1)
                 return cmdMemoryRevmapVisualize(index, args[1]);
@@ -1349,9 +1351,10 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
     if (!args.isEmpty()) {
         bool ok;
         prob = args[0].toFloat(&ok);
-        if (!ok)
+        if (!ok) {
             cmdHelp(QStringList("memory"));
-        return 1;
+            return 1;
+        }
     }
 
     _memDumps[index]->setupRevMap(prob);
@@ -2075,19 +2078,41 @@ int Shell::cmdDiffVectors(QStringList args)
     QTime timer;
     timer.start();
 
+    // Prepare output file
+    QString fileName = QDateTime::currentDateTime().toString("yyyyMMdd-hhmmss.vec");
+    QFile outFile(fileName);
+    outFile.open(QIODevice::WriteOnly);
+    QTextStream outStream(&outFile);
+
+    printTimeStamp(timer);
+    _out << "Writing output to file: " << fileName << endl;
+
     printTimeStamp(timer);
     _out << "Generating vector of all type IDs" << endl;
 
     // Get a list of all type IDs
     QVector<int> typeIds = _sym.factory().typesById().keys().toVector();
     qSort(typeIds);
-    QBitArray changedTypes[typeIds.size()];
+    QVector<int> changedTypes[indices.size()];
 
     // Generate the inverse hash: type ID -> vector index
     QHash<int, int> idIndices;
     idIndices.reserve(typeIds.size());
     for (int i = 0; i < typeIds.size(); ++i)
         idIndices[typeIds[i]] = i;
+
+    // Write some header information to the file
+    outStream << "# Kernel symbols:      " << _sym.fileName() << endl;
+    outStream << "# No. of types:        " << typeIds.size() << endl;
+    outStream << "# No. of memory dumps: " << files.size() << endl;
+    for (int i = 0; i < files.size(); ++i)
+        outStream << "#    " << files[i].absoluteFilePath() << endl;
+
+    // Write the space separated list of type IDs
+    outStream << hex;
+    for (int i = 0; i < typeIds.size(); ++i)
+        outStream << typeIds[i] << " ";
+    outStream << endl;
 
     int prevj = indices[0];
     const quint32 bufsize = _sym.factory().maxTypeSize();
@@ -2117,7 +2142,7 @@ int Shell::cmdDiffVectors(QStringList args)
             _out << "Enumerating changed type IDs for dump [" << j << "]" << endl;
 
             // Initialize bitmap
-            changedTypes[i].fill(false, typeIds.size());
+            changedTypes[i].fill(0, typeIds.size());
 
             // Iterate over all changes
             const MemoryDiffTree& diff = _memDumps[j]->map()->pmemDiff();
@@ -2136,6 +2161,7 @@ int Shell::cmdDiffVectors(QStringList args)
                         ++cit)
                 {
                     const MemoryMapNode* cnode = *cit;
+                    assert(cnode != 0);
 
                     // Try to find the object in the previous dump
                     const MemoryMapRangeTree::ItemSet& prev = prevVMemMap.objectsAt(cnode->address());
@@ -2154,8 +2180,10 @@ int Shell::cmdDiffVectors(QStringList args)
                             int pret = _memDumps[prevj]->vmem()->read(pbuf, pnode->size());
                             assert((quint32)pret == pnode->size());
                             // Compare memory
-                            if (memcmp(cbuf, pbuf, cnode->size()) != 0)
-                                changedTypes[i].setBit(idIndices[cnode->type()->id()]);
+                            if (memcmp(cbuf, pbuf, cnode->size()) != 0) {
+                                int typeIndex = idIndices[cnode->type()->id()];
+                                ++changedTypes[i][typeIndex];
+                            }
                             break;
                         }
                     }
@@ -2166,6 +2194,14 @@ int Shell::cmdDiffVectors(QStringList args)
 //        char* data = ba.data_ptr()->data;
 
         // TODO do something useful with the data
+
+        // Write the data to the file
+        if (!_interrupted) {
+            outStream << dec;
+            for (int k = 0; k < changedTypes[i].size(); ++k)
+                outStream << changedTypes[i][k] << " ";
+            outStream << endl;
+        }
 
         // Free unneeded memory
         _memDumps[prevj]->map()->clear();
