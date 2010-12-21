@@ -730,13 +730,15 @@ void MemoryMap::diffWith(MemoryMap* other)
     else
         assert(otherDev->reset());
 
+    QTime timer;
+    timer.start();
     bool wasEqual = true, equal = true;
     quint64 addr = 0, startAddr = 0, length = 0;
     const int bufsize = 1024;
-    const int granularity = 4;
+    const int granularity = 16;
     char buf1[bufsize], buf2[bufsize];
     qint64 readSize1, readSize2;
-    qint64 done, prevDone = 0;
+    qint64 done, prevDone = -1;
     qint64 totalSize = qMin(dev->size(), otherDev->size());
     if (totalSize < 0)
         totalSize = qMax(dev->size(), otherDev->size());
@@ -781,9 +783,10 @@ void MemoryMap::diffWith(MemoryMap* other)
         }
 
         done = (int) (addr / (float) totalSize * 100);
-        if (done != prevDone) {
+        if (prevDone < 0 || (done != prevDone && timer.elapsed() > 500)) {
             shell->out() << "\rComparing memory dumps: " << done << "%" << flush;
             prevDone = done;
+            timer.restart();
         }
     }
 
