@@ -317,7 +317,7 @@ Instance MemoryDump::queryInstance(const QString& queryString) const
     if (components.isEmpty())
         queryError("Empty query string given");
 
-	Instance result = Instance();
+	Instance result;
 	
 	while (!components.isEmpty()) {
 		result = getNextInstance(components.first(), result);
