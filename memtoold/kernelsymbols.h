@@ -95,9 +95,15 @@ public:
      */
     const MemSpecs& memSpecs() const;
 
+    /**
+     * @return file name of the loaded kernel symbols, if any
+     */
+    const QString& fileName() const;
+
 private:
 	MemSpecs _memSpecs;
     SymFactory _factory;
+    QString _fileName;
 };
 
 #endif /* KERNELSYMBOLS_H_ */
