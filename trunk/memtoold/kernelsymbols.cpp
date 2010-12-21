@@ -230,6 +230,7 @@ void KernelSymbols::loadSymbols(const QString& fileName)
     if (!file.open(QIODevice::ReadOnly))
         genericError(QString("Error opening file %1 for reading").arg(fileName));
 
+    _fileName = fileName;
     loadSymbols(&file);
 
     file.close();
@@ -295,3 +296,10 @@ const MemSpecs&  KernelSymbols::memSpecs() const
 {
     return _memSpecs;
 }
+
+
+const QString& KernelSymbols::fileName() const
+{
+    return _fileName;
+}
+
