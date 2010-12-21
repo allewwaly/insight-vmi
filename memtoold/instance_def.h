@@ -10,12 +10,12 @@
 
 #include <QString>
 #include <QStringList>
-//#include <QSharedDataPointer>
+
+#include "instancedata.h"
 
 class BaseType;
 class VirtualMemory;
 class Instance;
-class InstanceData;
 
 /// A list of Instance objects
 typedef QList<Instance> InstanceList;
@@ -43,17 +43,6 @@ public:
      */
     Instance(size_t address, const BaseType* type, const QString& name,
             const QStringList& parentNames, VirtualMemory* vmem, int id = -1);
-
-    /**
-     * Copy constructor
-     * @param other object to copy from
-     */
-    Instance(const Instance& other);
-
-    /**
-     * Destructor
-     */
-    virtual ~Instance();
 
     /**
      * @return the ID of this instance, if it is a variable instance, -1 otherwise
@@ -431,8 +420,6 @@ public:
      */
     int pointerSize() const;
 
-    static qint64 objectCount();
-
 private:
     typedef QSet<quint64> VisitedSet;
 
@@ -440,10 +427,7 @@ private:
             bool includeNestedStructs, QStringList& result,
             VisitedSet& visited) const;
 
-//  QSharedDataPointer<InstanceData> _d;
-    InstanceData* _d;
-
-    static qint64 _objectCount;
+    InstanceData _d;
 };
 
 

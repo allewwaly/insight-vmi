@@ -8,7 +8,6 @@
 #ifndef INSTANCEDATA_H_
 #define INSTANCEDATA_H_
 
-//#include <QSharedData>
 #include <QStringList>
 #include <QSet>
 
@@ -19,16 +18,13 @@ class VirtualMemory;
 typedef QSet<QString> StringSet;
 
 /**
- * This class holds the implicitly shared data between multiple copies of the
- * same Instance object
+ * This class holds the data of an Instance object.
  * \sa Instance
  */
-class InstanceData //: public QSharedData
+class InstanceData
 {
 public:
     InstanceData();
-    InstanceData(const InstanceData& other);
-    ~InstanceData();
 
     int id;
     size_t address;
@@ -40,12 +36,6 @@ public:
     bool isValid;
 
     QStringList fullNames() const;
-
-    static qint64 objectCount();
-
-private:
-    static qint64 _objectCount;
-
 };
 
 #endif /* INSTANCEDATA_H_ */
