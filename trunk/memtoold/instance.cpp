@@ -21,57 +21,31 @@ Q_DECLARE_METATYPE(Instance)
 
 static const QStringList _emtpyStringList;
 
-qint64 Instance::_objectCount = 0;
-
-
-qint64 Instance::objectCount()
-{
-	return _objectCount;
-}
-
-
 //-----------------------------------------------------------------------------
 
 
 Instance::Instance()
 {
-    _d = new InstanceData;
 }
 
 
 Instance::Instance(size_t address, const BaseType* type, const QString& name,
         const QStringList& parentNames, VirtualMemory* vmem, int id)
 {
-    _d = new InstanceData;
-    _d->id = id;
-    _d->address = address;
-    _d->type = type;
-    _d->name = name;
-    _d->parentNames = parentNames;
-    _d->vmem = vmem;
-    _d->isValid = type != 0;
-    _d->isNull = !_d->address || !_d->isValid;
-    ++_objectCount;
-}
-
-
-Instance::Instance(const Instance& other)
-{
-    _d = new InstanceData(*other._d);
-	++_objectCount;
-}
-
-
-Instance::~Instance()
-{
-    delete _d;
-	--_objectCount;
+    _d.id = id;
+    _d.address = address;
+    _d.type = type;
+    _d.name = name;
+    _d.parentNames = parentNames;
+    _d.vmem = vmem;
+    _d.isValid = type != 0;
+    _d.isNull = !_d.address || !_d.isValid;
 }
 
 
 int Instance::memDumpIndex() const
 {
-    return _d->vmem ? _d->vmem->memDumpIndex() : -1;
+    return _d.vmem ? _d.vmem->memDumpIndex() : -1;
 }
 
 
@@ -84,7 +58,7 @@ QString Instance::parentName() const
 
 QStringList Instance::parentNameComponents() const
 {
-    return _d->parentNames;
+    return _d.parentNames;
 }
 
 
@@ -97,42 +71,42 @@ QString Instance::fullName() const
 
 QStringList Instance::fullNameComponents() const
 {
-    return _d->fullNames();
+    return _d.fullNames();
 }
 
 
 int Instance::memberCount() const
 {
-    if (!_d->type || !(_d->type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
         return 0;
-	return dynamic_cast<const Structured*>(_d->type)->members().size();
+	return dynamic_cast<const Structured*>(_d.type)->members().size();
 }
 
 
 const QStringList& Instance::memberNames() const
 {
-    if (!_d->type || !(_d->type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
         return _emtpyStringList;
-	return dynamic_cast<const Structured*>(_d->type)->memberNames();
+	return dynamic_cast<const Structured*>(_d.type)->memberNames();
 }
 
 
 InstanceList Instance::members() const
 {
-    if (!_d->type || !(_d->type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
         return InstanceList();
 
-	const MemberList& list = dynamic_cast<const Structured*>(_d->type)->members();
+	const MemberList& list = dynamic_cast<const Structured*>(_d.type)->members();
 	InstanceList ret;
 	for (int i = 0; i < list.count(); ++i)
-		ret.append(list[i]->toInstance(_d->address, _d->vmem, this, BaseType::trLexical));
+		ret.append(list[i]->toInstance(_d.address, _d.vmem, this, BaseType::trLexical));
 	return ret;
 }
 
 
 bool Instance::equals(const Instance& other) const
 {
-    if (!isValid() || !other.isValid() || _d->type->hash() != other.type()->hash())
+    if (!isValid() || !other.isValid() || _d.type->hash() != other.type()->hash())
         return false;
 
     // If both are null, they are considered to be equal
@@ -141,9 +115,9 @@ bool Instance::equals(const Instance& other) const
 
     // If any of the two is not accessible, compare their addresses
     if (!isAccessible() || !other.isAccessible())
-        return _d->address == other.address();
+        return _d.address == other.address();
 
-    switch (_d->type->type()) {
+    switch (_d.type->type()) {
     case BaseType::rtBool8:
     case BaseType::rtInt8:
     case BaseType::rtUInt8:
@@ -265,15 +239,15 @@ void Instance::differencesRek(const Instance& other,
         const QString& relParent, bool includeNestedStructs,
         QStringList& result, VisitedSet& visited) const
 {
-//    debugmsg("Comparing \"" << dotglue(relParent, _d->name) << "\"");
+//    debugmsg("Comparing \"" << dotglue(relParent, _d.name) << "\"");
 
     // Stop recursion if we have been here before
-    if (visited.contains(_d->address))
+    if (visited.contains(_d.address))
         return;
     else
-        visited.insert(_d->address);
+        visited.insert(_d.address);
 
-    if (!isValid() || !other.isValid() || _d->type->hash() != other.type()->hash()) {
+    if (!isValid() || !other.isValid() || _d.type->hash() != other.type()->hash()) {
         result.append(relParent);
         return;
     }
@@ -282,12 +256,12 @@ void Instance::differencesRek(const Instance& other,
     if (isNull() && other.isNull())
         return;
 
-    switch (_d->type->type()) {
+    switch (_d.type->type()) {
     // For structs or unions we do a member-by-member comparison
     case BaseType::rtStruct:
     case BaseType::rtUnion: {
             // New relative parent name in dotted notation
-            QString newRelParent = dotglue(relParent, _d->name);
+            QString newRelParent = dotglue(relParent, _d.name);
 
             const int cnt = memberCount();
             for (int i = 0; i < cnt; ++i) {
@@ -344,7 +318,7 @@ void Instance::differencesRek(const Instance& other,
         if (cnt1 != cnt2)
             result.append(relParent);
         else
-            inst1.differencesRek(inst2, dotglue(relParent, _d->name),
+            inst1.differencesRek(inst2, dotglue(relParent, _d.name),
                     includeNestedStructs, result, visited);
         return;
     }
@@ -360,19 +334,19 @@ void Instance::differencesRek(const Instance& other,
 
 Instance Instance::arrayElem(int index) const
 {
-    if (!_d->type || !(_d->type->type() & BaseType::rtPointer))
+    if (!_d.type || !(_d.type->type() & BaseType::rtPointer))
         return Instance();
 
-    const Pointer* p = dynamic_cast<const Pointer*>(_d->type);
+    const Pointer* p = dynamic_cast<const Pointer*>(_d.type);
     if (!p->refType())
         return Instance();
 
     return Instance(
-                _d->address + (index * p->refType()->size()),
+                _d.address + (index * p->refType()->size()),
                 p->refType(),
-                _d->name + '[' + QString::number(index) + ']',
-                _d->parentNames,
-                _d->vmem,
+                _d.name + '[' + QString::number(index) + ']',
+                _d.parentNames,
+                _d.vmem,
                 -1);
 }
 
@@ -382,9 +356,9 @@ Instance Instance::dereference(int resolveTypes, int* derefCount) const
     if (isNull())
         return *this;
 
-    if (resolveTypes && _d->type)
-        return _d->type->toInstance(_d->address, _d->vmem, _d->name,
-                _d->parentNames, resolveTypes, derefCount);
+    if (resolveTypes && _d.type)
+        return _d.type->toInstance(_d.address, _d.vmem, _d.name,
+                _d.parentNames, resolveTypes, derefCount);
 
     if (derefCount)
         *derefCount = 0;
@@ -394,9 +368,9 @@ Instance Instance::dereference(int resolveTypes, int* derefCount) const
 
 Instance Instance::member(int index, int resolveTypes) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && index >= 0 && index < s->members().size()) {
-		return s->members().at(index)->toInstance(_d->address, _d->vmem,
+		return s->members().at(index)->toInstance(_d.address, _d.vmem,
 		        this, resolveTypes);
 	}
 	return Instance();
@@ -405,7 +379,7 @@ Instance Instance::member(int index, int resolveTypes) const
 
 const BaseType* Instance::memberType(int index, int resolveTypes) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && index >= 0 && index < s->members().size()) {
 		return s->members().at(index)->refTypeDeep(resolveTypes);
 	}
@@ -415,9 +389,9 @@ const BaseType* Instance::memberType(int index, int resolveTypes) const
 
 quint64 Instance::memberAddress(int index) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && index >= 0 && index < s->members().size()) {
-		return _d->address + s->members().at(index)->offset();
+		return _d.address + s->members().at(index)->offset();
 	}
 	return 0;
 }
@@ -425,34 +399,34 @@ quint64 Instance::memberAddress(int index) const
 
 bool Instance::memberExists(const QString& name) const
 {
-    if (!_d->type || !(_d->type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
         return false;
 
-	return dynamic_cast<const Structured*>(_d->type)->memberExists(name);
+	return dynamic_cast<const Structured*>(_d.type)->memberExists(name);
 }
 
 
 Instance Instance::findMember(const QString& name, int resolveTypes) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	const StructuredMember* m = 0;
 	if ( !s || !(m = s->findMember(name)) )
 		return Instance();
 
-	return m->toInstance(_d->address, _d->vmem, this, resolveTypes);
+	return m->toInstance(_d.address, _d.vmem, this, resolveTypes);
 }
 
 
 int Instance::indexOfMember(const QString& name) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	return s ? s->memberNames().indexOf(name) : -1;
 }
 
 
 int Instance::typeIdOfMember(const QString& name) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	const StructuredMember* m = 0;
 	if ( !s || !(m = s->findMember(name)) )
 		return 0;
