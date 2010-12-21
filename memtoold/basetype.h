@@ -132,6 +132,11 @@ public:
     BaseType(const TypeInfo& info);
 
     /**
+     * Destructor
+     */
+    virtual ~BaseType();
+
+    /**
      * @return the actual type of that polymorphic variable
      */
     virtual RealType type() const = 0;

@@ -67,6 +67,11 @@ BaseType::BaseType(const TypeInfo& info)
 }
 
 
+BaseType::~BaseType()
+{
+}
+
+
 BaseType::RealType BaseType::dereferencedType(int resolveTypes) const
 {
     const BaseType* b = dereferencedBaseType(resolveTypes);
