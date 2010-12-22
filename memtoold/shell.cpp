@@ -2079,7 +2079,10 @@ int Shell::cmdDiffVectors(QStringList args)
     timer.start();
 
     // Prepare output file
-    QString fileName = QDateTime::currentDateTime().toString("yyyyMMdd-hhmmss.vec");
+    QString fileName = QString("%1_%2_%3.vec")
+            .arg(QDateTime::currentDateTime().toString("yyyyMMdd-hhmmss"))
+            .arg(files.first().path().split('/', QString::SkipEmptyParts).last())
+            .arg(minProb);
     QFile outFile(fileName);
     outFile.open(QIODevice::WriteOnly);
     QTextStream outStream(&outFile);
@@ -2161,7 +2164,6 @@ int Shell::cmdDiffVectors(QStringList args)
                         ++cit)
                 {
                     const MemoryMapNode* cnode = *cit;
-                    assert(cnode != 0);
 
                     // Try to find the object in the previous dump
                     const MemoryMapRangeTree::ItemSet& prev = prevVMemMap.objectsAt(cnode->address());
