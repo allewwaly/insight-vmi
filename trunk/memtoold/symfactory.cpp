@@ -549,6 +549,9 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
                     // Did the hash change?
                     if (hash != old_hash)
                         relocateHashEntry(old_hash, hash, (BaseType*)rbt, &_typesByHash);
+                    // Update the maximum type size
+                    if (rbt->size() > _maxTypeSize)
+                        _maxTypeSize = rbt->size();
                 }
             }
 			++it;
