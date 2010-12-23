@@ -2150,7 +2150,6 @@ int Shell::cmdDiffVectors(QStringList args)
             // Iterate over all changes
             const MemoryDiffTree& diff = _memDumps[j]->map()->pmemDiff();
             const MemoryMapRangeTree& currPMemMap = _memDumps[j]->map()->pmemMap();
-//            const MemoryMapRangeTree& prevPMemMap = _memDumps[prevj]->map()->pmemMap();
             const MemoryMapRangeTree& prevVMemMap = _memDumps[prevj]->map()->vmemMap();
             for (MemoryDiffTree::const_iterator it = diff.constBegin();
                     it != diff.constEnd() && !_interrupted; ++it)
@@ -2192,10 +2191,6 @@ int Shell::cmdDiffVectors(QStringList args)
                 }
             }
         }
-
-//        char* data = ba.data_ptr()->data;
-
-        // TODO do something useful with the data
 
         // Write the data to the file
         if (!_interrupted) {
