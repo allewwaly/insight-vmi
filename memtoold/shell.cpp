@@ -2121,8 +2121,8 @@ int Shell::cmdDiffVectors(QStringList args)
     const quint32 bufsize = _sym.factory().maxTypeSize();
     char cbuf[bufsize], pbuf[bufsize];
 
-//    // Build reverse map of first dump
-//    _memDumps[indices[0]]->setupRevMap(minProb);
+    // Build reverse map of first dump
+    _memDumps[indices[0]]->setupRevMap(minProb);
     for (int i = 1; i < indices.size() && !_interrupted; ++i) {
         int j = indices[i];
         // Build reverse map
