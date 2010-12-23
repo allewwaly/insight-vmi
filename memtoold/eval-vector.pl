@@ -68,7 +68,7 @@ foreach my $file(@ARGV) {
 			
 			if ($count > 0) {
 				my $dotp = dot_product(\@vec, \@prev_vec);
-				my $cos = "n/a";
+				my $cos = "-1";
 				
 				if ($len_vec && $len_prev) {
 					$cos = sprintf "%.5f", $dotp / ($len_vec * $len_prev);
