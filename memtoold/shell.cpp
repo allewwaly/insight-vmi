@@ -2097,7 +2097,6 @@ int Shell::cmdDiffVectors(QStringList args)
     QVector<int> typeIds = _sym.factory().typesById().keys().toVector();
     qSort(typeIds);
     QVector<int> changedTypes[indices.size()];
-    QVector<int> equalTypes[indices.size()];
 
     // Generate the inverse hash: type ID -> vector index
     QHash<int, int> idIndices;
@@ -2147,7 +2146,6 @@ int Shell::cmdDiffVectors(QStringList args)
 
             // Initialize bitmap
             changedTypes[i].fill(0, typeIds.size());
-            equalTypes[i].fill(0, typeIds.size());
 
             // Iterate over all changes
             const MemoryDiffTree& diff = _memDumps[j]->map()->pmemDiff();
@@ -2183,11 +2181,10 @@ int Shell::cmdDiffVectors(QStringList args)
                             int pret = _memDumps[prevj]->vmem()->read(pbuf, pnode->size());
                             assert((quint32)pret == pnode->size());
                             // Compare memory
-                            int typeIndex = idIndices[cnode->type()->id()];
-                            if (memcmp(cbuf, pbuf, cnode->size()) != 0)
+                            if (memcmp(cbuf, pbuf, cnode->size()) != 0) {
+                                int typeIndex = idIndices[cnode->type()->id()];
                                 ++changedTypes[i][typeIndex];
-                            else
-                                ++equalTypes[i][typeIndex];
+                            }
                             break;
                         }
                     }
@@ -2198,9 +2195,8 @@ int Shell::cmdDiffVectors(QStringList args)
         // Write the data to the file
         if (!_interrupted) {
             outStream << dec;
-            for (int k = 0; k < typeIds.size(); ++k)
-                outStream << changedTypes[i][k] << " "
-                          << equalTypes[i][k] << " ";
+            for (int k = 0; k < changedTypes[i].size(); ++k)
+                outStream << changedTypes[i][k] << " ";
             outStream << endl;
         }
 
