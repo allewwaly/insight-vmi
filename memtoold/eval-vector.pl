@@ -68,12 +68,12 @@ foreach my $file(@ARGV) {
 			
 			if ($count > 0) {
 				my $dotp = dot_product(\@vec, \@prev_vec);
-				my $cos = "-1";
+				my $cos = "-1     ";
 				
 				if ($len_vec && $len_prev) {
 					$cos = sprintf "%.5f", $dotp / ($len_vec * $len_prev);
 				}
-				printf "%2d -> %2d: dot product = %7d, cosine = %s, length %2d = %7d, length %2d = %7d\n",
+				printf "%2d -> %2d: dot product = %7d, cosine = %s, length %2d = %4.5f, length %2d = %4.5f\n",
 					$count,
 					$count + 1,
 					$dotp,
