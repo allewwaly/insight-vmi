@@ -73,7 +73,15 @@ foreach my $file(@ARGV) {
 				if ($len_vec && $len_prev) {
 					$cos = sprintf "%.5f", $dotp / ($len_vec * $len_prev);
 				}
-				printf "%2d -> %2d: dot product = %7d, cosine = %s\n", $count, $count + 1, $dotp, $cos;
+				printf "%2d -> %2d: dot product = %7d, cosine = %s, length %2d = %7d, length %2d = %7d\n",
+					$count,
+					$count + 1,
+					$dotp,
+					$cos,
+					$count,
+					$len_prev,
+					$count + 1,
+					$len_vec;
 			}
 			
 			@prev_vec = @vec;
@@ -83,6 +91,4 @@ foreach my $file(@ARGV) {
 		}
 	}
 	close(FILE);
-
-	
 }
