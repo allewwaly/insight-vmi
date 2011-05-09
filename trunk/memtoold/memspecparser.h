@@ -136,6 +136,15 @@ private:
      */
     bool rmdirRek(const QString& dir) const;
 
+
+    /**
+     * Writes text \a src to file \a fileName
+     * @param fileName
+     * @param src
+     * @throw MemSpecParserException in case the file cannot be written
+     */
+    void writeSrcFile(const QString& fileName, const QString& src);
+
     bool _autoRemoveBuildDir;
     QString _kernelSrcDir;
     QString _systemMapFile;
