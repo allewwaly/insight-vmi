@@ -15,55 +15,59 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
     list.append(KernelMemSpec(
             "SIZEOF_UNSIGNED_LONG",
             "sizeof(unsigned long)",
-            "%d"));
+            "%lld"));
     // See <linux/include/asm-x86/page_32.h>
     // See <linux/include/asm-x86/page_64.h>
     list.append(KernelMemSpec(
             "PAGE_OFFSET",
             "__PAGE_OFFSET",
-            "%0.16lx"));
+            "%16llx"));
     // See <linux/include/asm-x86/pgtable_32.h>
     // See <linux/include/asm-x86/pgtable_64.h>
     list.append(KernelMemSpec(
             "VMALLOC_START",
             "VMALLOC_START",
-            "%0.16lx"));
+            "%16llx"));
     list.append(KernelMemSpec(
             "VMALLOC_END",
             "VMALLOC_END",
-            "%0.16lx"));
+            "%16llx"));
+
+    // i386 only
+    // See <linux/include/asm-x86/page_32_types.h>
     list.append(KernelMemSpec(
             "VMALLOC_OFFSET",
             "VMALLOC_OFFSET",
-            "%0.16lx"));
+            "%16llx",
+            "defined(VMALLOC_OFFSET)"));
 
     // x86_64 only
     // See <linux/include/asm-x86/page_64.h>
     list.append(KernelMemSpec(
             "START_KERNEL_map",
             "__START_KERNEL_map",
-            "%0.16lx",
+            "%16llx",
             "defined(__START_KERNEL_map)"));
     // See <linux/include/asm-x86/pgtable_64.h>
     list.append(KernelMemSpec(
             "MODULES_VADDR",
             "MODULES_VADDR",
-            "%0.16lx",
+            "%16llx",
             "defined(MODULES_VADDR)"));
     list.append(KernelMemSpec(
             "MODULES_END",
             "MODULES_END",
-            "%0.16lx",
+            "%16llx",
             "defined(MODULES_VADDR) && defined(MODULES_END)"));
     list.append(KernelMemSpec(
             "VMEMMAP_START",
             "VMEMMAP_START",
-            "%0.16lx",
+            "%16llx",
             "defined(VMEMMAP_START)"));
     list.append(KernelMemSpec(
             "VMEMMAP_END",
             "VMEMMAP_END",
-            "%0.16lx",
+            "%16llx",
             "defined(VMEMMAP_START) && defined(VMEMMAP_END)"));
 
     return list;
