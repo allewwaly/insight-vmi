@@ -92,7 +92,11 @@ function printCurrentTask(gs_base)
 	var current_task_hex = ""
 	for(var i = 0; i < 8; ++i){
 		var addrLow = current_task.toUInt8()
-		current_task_hex = parseInt(addrLow).toString(16) + current_task_hex
+		addrLow = parseInt(addrLow).toString(16)
+		current_task_hex = addrLow + current_task_hex
+		if(addrLow.length == 1){
+			current_task_hex = "0" + current_task_hex
+		}
 		current_task.AddToAddress(1)
 	}
 	
@@ -101,6 +105,7 @@ function printCurrentTask(gs_base)
 	
 	current_task.ChangeType("task_struct")
 	current_task.SetAddress(current_task_hex)
+	//print(current_task)
 	
 	var line =
 		ralign(current_task.cred.uid.toString(), uid_size) + 
