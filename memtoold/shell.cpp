@@ -1486,7 +1486,6 @@ static QScriptValue QScript_include(QScriptContext *context, QScriptEngine *engi
         QString fileName = context->argument(0).toString();
 
         QString path =  engine->globalObject().property("SCRIPT_PATH", QScriptValue::ResolveLocal).toString();
-        std::cout << path << std::endl;
 
 		QFile file( path+"/"+fileName );
 		if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) ){
@@ -1549,7 +1548,7 @@ int Shell::cmdScript(QStringList args)
 
     _engine->globalObject().setProperty("HAVE_GLOBAL_PARAMS", hasParameters, QScriptValue::ReadOnly);
     _engine->globalObject().setProperty("PARAMS", scriptParameters, QScriptValue::ReadOnly);
-    /* code example:
+    /* QScript example:
      * assuming the parameters are "{'test':123}" without ", no whitespaces
      * if(HAVE_GLOBAL_PARAMS){
 	 * 		print(PARAMS)			#prints {'test':123}
