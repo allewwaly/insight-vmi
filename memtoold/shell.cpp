@@ -1475,6 +1475,41 @@ int Shell::cmdMemoryDiffVisualize(int index)
 }
 
 
+
+
+//TODO find a good place for this function
+static QScriptValue QScript_include(QScriptContext *context, QScriptEngine *engine)
+{
+    QScriptValue callee = context->callee();
+    if (context->argumentCount() == 1){
+
+        QString fileName = context->argument(0).toString();
+
+        QString path =  engine->globalObject().property("SCRIPT_PATH", QScriptValue::ResolveLocal).toString();
+        std::cout << path << std::endl;
+
+		QFile file( path+"/"+fileName );
+		if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) ){
+			context->throwError(QString("include(): could not open File %1").arg(file.fileName()));
+			return false;
+		}
+		context->setActivationObject(
+				context->parentContext()->activationObject()
+		);
+		engine->evaluate( file.readAll(), fileName );
+
+		file.close();
+    }else{
+    	context->throwError(QString("include(): Wrong argument"));
+    	return false;
+    }
+    return true;
+
+
+}
+
+
+
 int Shell::cmdScript(QStringList args)
 {
     if (args.size() < 1 || args.size() > 2) {
@@ -1511,6 +1546,7 @@ int Shell::cmdScript(QStringList args)
     int ret = 0;
 
 
+
     _engine->globalObject().setProperty("HAVE_GLOBAL_PARAMS", hasParameters, QScriptValue::ReadOnly);
     _engine->globalObject().setProperty("PARAMS", scriptParameters, QScriptValue::ReadOnly);
     /* code example:
@@ -1524,6 +1560,15 @@ int Shell::cmdScript(QStringList args)
 	 * 		print("no parameters specified")
 	 * 	}
      */
+
+    // create the 'include' command
+    _engine->globalObject().setProperty("include", _engine->newFunction(QScript_include, 1 /*#arguments*/),
+    		QScriptValue::KeepExistingFlags);
+
+    //export SCRIPT_PATH to scripting engine
+    QFileInfo fileInfo(file);
+    _engine->globalObject().setProperty("SCRIPT_PATH", fileInfo.absolutePath(), QScriptValue::ReadOnly);
+
 
     try {
         // Execute the script
