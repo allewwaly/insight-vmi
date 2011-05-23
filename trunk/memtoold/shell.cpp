@@ -1477,12 +1477,19 @@ int Shell::cmdMemoryDiffVisualize(int index)
 
 int Shell::cmdScript(QStringList args)
 {
-    if (args.size() != 1) {
+    if (args.size() < 1 || args.size() > 2) {
         cmdHelp(QStringList("script"));
         return 1;
     }
 
     QString fileName = args[0];
+
+    QString scriptParameters = "";
+    bool hasParameters = false;
+    if(args.size() == 2){
+    	scriptParameters = args[1];
+    	hasParameters = true;
+    }
 
     QFile file(fileName);
     if (!file.exists()) {
@@ -1502,6 +1509,21 @@ int Shell::cmdScript(QStringList args)
     // Prepare the script engine
     initScriptEngine();
     int ret = 0;
+
+
+    _engine->globalObject().setProperty("HAVE_GLOBAL_PARAMS", hasParameters, QScriptValue::ReadOnly);
+    _engine->globalObject().setProperty("PARAMS", scriptParameters, QScriptValue::ReadOnly);
+    /* code example:
+     * assuming the parameters are "{'test':123}" without ", no whitespaces
+     * if(HAVE_GLOBAL_PARAMS){
+	 * 		print(PARAMS)			#prints {'test':123}
+	 * 		eval("params="+PARAMS)
+	 * 		print(params) 			#prints [object Object]
+	 * 		print(params["test"])	#prints 123
+	 * 	}else{
+	 * 		print("no parameters specified")
+	 * 	}
+     */
 
     try {
         // Execute the script
