@@ -30,6 +30,7 @@ class QLocalServer;
 class QLocalSocket;
 class DeviceMuxer;
 class MuxerChannel;
+class QFileInfo;
 
 
 /**
@@ -227,7 +228,7 @@ private:
     void printTimeStamp(const QTime& time);
     void prepare();
     void cleanupPipedProcs();
-    void initScriptEngine();
+    void initScriptEngine(bool hasParameters, QString &scriptParameters, QFileInfo &includePathFileInfo);
     void cleanupScriptEngine();
     int eval(QString command);
     int evalLine();
@@ -239,6 +240,7 @@ private:
     static QScriptValue scriptListVariableIds(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptPrint(QScriptContext* ctx, QScriptEngine* eng);
+    static QScriptValue scriptInclude(QScriptContext *context, QScriptEngine *engine);
     //---------------------------------
     int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
