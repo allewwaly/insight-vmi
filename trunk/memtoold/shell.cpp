@@ -1704,14 +1704,19 @@ QScriptValue Shell::scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng)
     }
 
     // Get the instance
-    Instance instance = queryStr.isNull() ?
-            _memDumps[index]->queryInstance(queryId) :
-            _memDumps[index]->queryInstance(queryStr);
+    try{
+		Instance instance = queryStr.isNull() ?
+				_memDumps[index]->queryInstance(queryId) :
+				_memDumps[index]->queryInstance(queryStr);
 
-    if (!instance.isValid())
-        return QScriptValue();
-    else
-        return InstanceClass::toScriptValue(instance, ctx, eng);
+		if (!instance.isValid())
+			return QScriptValue();
+		else
+			return InstanceClass::toScriptValue(instance, ctx, eng);
+    }catch(QueryException &e){
+    	ctx->throwError(e.message);
+    	return QScriptValue();
+    }
 }
 
 
