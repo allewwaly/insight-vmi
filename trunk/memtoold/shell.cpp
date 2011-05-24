@@ -1477,38 +1477,6 @@ int Shell::cmdMemoryDiffVisualize(int index)
 
 
 
-//TODO find a good place for this function
-static QScriptValue QScript_include(QScriptContext *context, QScriptEngine *engine)
-{
-    QScriptValue callee = context->callee();
-    if (context->argumentCount() == 1){
-
-        QString fileName = context->argument(0).toString();
-
-        QString path =  engine->globalObject().property("SCRIPT_PATH", QScriptValue::ResolveLocal).toString();
-
-		QFile file( path+"/"+fileName );
-		if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) ){
-			context->throwError(QString("include(): could not open File %1").arg(file.fileName()));
-			return false;
-		}
-		context->setActivationObject(
-				context->parentContext()->activationObject()
-		);
-		engine->evaluate( file.readAll(), fileName );
-
-		file.close();
-    }else{
-    	context->throwError(QString("include(): Wrong argument"));
-    	return false;
-    }
-    return true;
-
-
-}
-
-
-
 int Shell::cmdScript(QStringList args)
 {
     if (args.size() < 1 || args.size() > 2) {
@@ -1540,33 +1508,12 @@ int Shell::cmdScript(QStringList args)
     QString scriptCode(stream.readAll());
     file.close();
 
+    QFileInfo includePathFileInfo(file);
+
     // Prepare the script engine
-    initScriptEngine();
+    initScriptEngine(hasParameters, scriptParameters, includePathFileInfo);
     int ret = 0;
 
-
-
-    _engine->globalObject().setProperty("HAVE_GLOBAL_PARAMS", hasParameters, QScriptValue::ReadOnly);
-    _engine->globalObject().setProperty("PARAMS", scriptParameters, QScriptValue::ReadOnly);
-    /* QScript example:
-     * assuming the parameters are "{'test':123}" without ", no whitespaces
-     * if(HAVE_GLOBAL_PARAMS){
-	 * 		print(PARAMS)			#prints {'test':123}
-	 * 		eval("params="+PARAMS)
-	 * 		print(params) 			#prints [object Object]
-	 * 		print(params["test"])	#prints 123
-	 * 	}else{
-	 * 		print("no parameters specified")
-	 * 	}
-     */
-
-    // create the 'include' command
-    _engine->globalObject().setProperty("include", _engine->newFunction(QScript_include, 1 /*#arguments*/),
-    		QScriptValue::KeepExistingFlags);
-
-    //export SCRIPT_PATH to scripting engine
-    QFileInfo fileInfo(file);
-    _engine->globalObject().setProperty("SCRIPT_PATH", fileInfo.absolutePath(), QScriptValue::ReadOnly);
 
 
     try {
@@ -1600,7 +1547,7 @@ int Shell::cmdScript(QStringList args)
 }
 
 
-void Shell::initScriptEngine()
+void Shell::initScriptEngine(bool hasParameters, QString &scriptParameters, QFileInfo &includePathFileInfo)
 {
     // Hold the engine lock before testing and using the _engine pointer
     QMutexLocker lock(&_engineLock);
@@ -1627,6 +1574,19 @@ void Shell::initScriptEngine()
 
     InstanceClass* instClass = new InstanceClass(_engine);
     _engine->globalObject().setProperty("Instance", instClass->constructor());
+
+
+
+    _engine->globalObject().setProperty("HAVE_GLOBAL_PARAMS", hasParameters, QScriptValue::ReadOnly);
+    _engine->globalObject().setProperty("PARAMS", scriptParameters, QScriptValue::ReadOnly);
+
+    // create the 'include' command
+    _engine->globalObject().setProperty("include", _engine->newFunction(scriptInclude, 1 /*#arguments*/),
+    		QScriptValue::KeepExistingFlags);
+
+    //export SCRIPT_PATH to scripting engine
+    _engine->globalObject().setProperty("SCRIPT_PATH", includePathFileInfo.absolutePath(), QScriptValue::ReadOnly);
+
 }
 
 
@@ -1765,6 +1725,52 @@ QScriptValue Shell::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
     _out << endl;
 
     return eng->undefinedValue();
+}
+
+
+/*
+ * implements the 'include' function for QTScript
+ *
+ * Depends on SCRIPT_PATH beeing set in engine
+ *
+ * QScript example:
+ * assuming the parameters are "{'test':123}" without ", no whitespaces
+ * if(HAVE_GLOBAL_PARAMS){
+ * 		print(PARAMS)			#prints {'test':123}
+ * 		eval("params="+PARAMS)
+ * 		print(params) 			#prints [object Object]
+ * 		print(params["test"])	#prints 123
+ * 	}else{
+ * 		print("no parameters specified")
+ * 	}
+ */
+QScriptValue Shell::scriptInclude(QScriptContext *context, QScriptEngine *engine)
+{
+    QScriptValue callee = context->callee();
+    if (context->argumentCount() == 1){
+
+        QString fileName = context->argument(0).toString();
+
+        QString path =  engine->globalObject().property("SCRIPT_PATH", QScriptValue::ResolveLocal).toString();
+
+		QFile file( path+"/"+fileName );
+		if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) ){
+			context->throwError(QString("include(): could not open File %1").arg(file.fileName()));
+			return false;
+		}
+		context->setActivationObject(
+				context->parentContext()->activationObject()
+		);
+		engine->evaluate( file.readAll(), fileName );
+
+		file.close();
+    }else{
+    	context->throwError(QString("include(): Wrong argument"));
+    	return false;
+    }
+    return true;
+
+
 }
 
 
