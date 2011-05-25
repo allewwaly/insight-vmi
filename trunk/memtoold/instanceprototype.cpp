@@ -509,3 +509,16 @@ void InstancePrototype::injectScriptError(const QString& msg) const
         genericError(msg);
 }
 
+
+QString InstancePrototype::derefUserLand() const
+{
+    try {
+        Instance* inst;
+        return (inst = thisInstance()) ? inst->derefUserLand() : QString();
+    }
+    catch (GenericException e) {
+        injectScriptError(e);
+        return QString();
+    }
+}
+

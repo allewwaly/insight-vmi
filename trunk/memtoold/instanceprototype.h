@@ -126,6 +126,8 @@ public slots:
     double toDouble() const;
     QString toString() const;
 
+    QString derefUserLand() const;
+
 private:
     inline Instance* thisInstance() const;
     inline void injectScriptError(const GenericException& e) const;

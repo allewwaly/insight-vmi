@@ -416,6 +416,11 @@ public:
     QString toString() const;
 
     /**
+     * @return same as toString but tries to access userland memeory if possible
+     */
+    QString derefUserLand() const;
+
+    /**
      * @return the size of a pointer for this instance in bytes
      */
     int pointerSize() const;

@@ -183,6 +183,15 @@ inline void* Instance::toPointer() const
 }
 
 
+inline QString Instance::derefUserLand() const
+{
+	//TODO
+	//diekmann
+    return _d.isNull ? QString("NULL") :_d.type->toString(_d.vmem, _d.address);
+}
+
+
+
 template<class T>
 inline QVariant Instance::toVariant() const
 {
