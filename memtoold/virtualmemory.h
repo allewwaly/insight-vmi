@@ -241,6 +241,8 @@ private:
     bool _userland; // <! switch to change change from kernelspace reading to userland reading.
     quint64 _userPGD;
 
+    // when someone stes this to userland, we block untill it is set back to kernelMode
+    QMutex _userlandMutex;
 };
 
 

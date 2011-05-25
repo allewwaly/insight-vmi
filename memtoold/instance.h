@@ -197,7 +197,12 @@ inline QString Instance::derefUserLand(const QString &pgd) const
     	if(!ok) throw GenericException("(PDG invalid)");
 
     	_d.vmem->setUserLand(pgd_d);
-    	ret = _d.type->toString(_d.vmem, _d.address);
+    	try{
+    		ret = _d.type->toString(_d.vmem, _d.address);
+    	}catch(...){
+        	_d.vmem->setKernelSpace();
+    		throw;
+    	}
     	_d.vmem->setKernelSpace();
     }
     return ret;
