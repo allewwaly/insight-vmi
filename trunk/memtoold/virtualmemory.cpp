@@ -172,8 +172,8 @@ bool VirtualMemory::reset()
 }
 
 bool VirtualMemory::seek(qint64 pos){
-	_userland = true;
-	_userPGD = 0x1d89f000;
+	//_userland = true;
+	//_userPGD = 0x1d89f000;
 	return MySeek(pos);
 }
 
@@ -758,7 +758,7 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
     	std::cout << "reading userland mem pgd:" << std::hex << _userPGD << std::endl;
     	return pageLookup64(vaddr, pageSize, enableExceptions);
     }else{
-    	std::cout << "reading kernel mem" << std::endl;
+    	//std::cout << "reading kernel mem" << std::endl;
     }
 
     // If we can do the job with a simple linear translation subtract the
