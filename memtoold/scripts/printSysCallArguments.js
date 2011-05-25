@@ -98,7 +98,7 @@ function main(){
 				line += " cannot dereference: "
 				line += e
 			}
-			print(tmpInst)
+			//print(tmpInst)
 			if(!tmpInst.IsAccessible()){
 				line += " cannot dereference: Memory not accessible"
 			}else if(tmpInstValid){
