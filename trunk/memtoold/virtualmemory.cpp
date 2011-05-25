@@ -120,7 +120,7 @@ VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
                              int memDumpIndex)
     : _tlb(10000), _physMem(physMem), _specs(specs), _pos(-1),
       _memDumpIndex(memDumpIndex), _threadSafe(false),
-      _userland(false), _userPGD(0)
+      _userland(false), _userPGD(0), _userlandMutex(QMutex::Recursive)
 {
     // Make sure the architecture is set
     if ( !_specs.arch & (MemSpecs::i386|MemSpecs::x86_64) )
@@ -185,12 +185,18 @@ bool VirtualMemory::seek(qint64 pos)
 
 	int pageSize;
 	qint64 physAddr;
+
+	QMutexLocker locker(&_userlandMutex);
+
 	if(!_userland){
 		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
 	}else{
 		//std::cout << "mySeek virtualToPhysicalUserLand pgd: "<<std::hex<<_userPGD<<std::endl;
 		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
 	}
+
+
+
 	if (physAddr < 0)
 	    return false;
 
@@ -221,8 +227,12 @@ bool VirtualMemory::safeSeek(qint64 pos)
             return true;
 
         int pageSize;
+
+        QMutexLocker locker(&_userlandMutex);
+
         qint64 physAddr =
                 (qint64)virtualToPhysical((quint64) pos, &pageSize, false);
+
 
         if (! (physAddr != (qint64)PADDR_ERROR) && (physAddr >= 0) )
             return false;
@@ -255,6 +265,7 @@ qint64 VirtualMemory::size() const
 //TODO doesn't look very threadsave to me
 void VirtualMemory::setUserLand(qint64 pgd)
 {
+	_userlandMutex.lock();
 	_userland = true;
 	_userPGD = pgd;
 }
@@ -263,6 +274,7 @@ void VirtualMemory::setKernelSpace()
 {
 	_userland = false;
 	_userPGD = 0;
+	_userlandMutex.unlock();
 }
 
 
