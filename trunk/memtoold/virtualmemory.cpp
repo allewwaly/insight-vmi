@@ -171,18 +171,15 @@ bool VirtualMemory::reset()
     return QIODevice::reset();
 }
 
-bool VirtualMemory::seek(qint64 pos){
-	//_userland = true;
-	//_userPGD = 0x1d89f000;
-	return MySeek(pos);
-}
 
-bool VirtualMemory::MySeek(qint64 pos)
+bool VirtualMemory::seek(qint64 pos)
 {
     // Call inherited function
 //    QIODevice::seek(pos);
 
 	//std::cout << "VirtualMemory::seek(qint64 pos, bool userLand, quint64 userPGD)" << std::endl;
+	//_userland = true;
+	//_userPGD = 0x1d89f000;
 
     if ( ((quint64) pos) > ((quint64) size()) || !isOpen() )
         return false;
@@ -195,7 +192,7 @@ bool VirtualMemory::MySeek(qint64 pos)
 	if(!_userland){
 		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
 	}else{
-		std::cout << "mySeek virtualToPhysicalUserLand pgd: "<<std::hex<<_userPGD<<std::endl;
+		//std::cout << "mySeek virtualToPhysicalUserLand pgd: "<<std::hex<<_userPGD<<std::endl;
 		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
 	}
 	if (physAddr < 0)
@@ -218,7 +215,7 @@ bool VirtualMemory::MySeek(qint64 pos)
 
 bool VirtualMemory::safeSeek(qint64 pos)
 {
-	std::cout << "VirtualMemory::safeSeek(qint64 pos)" << std::endl;
+	//std::cout << "VirtualMemory::safeSeek(qint64 pos)" << std::endl;
     // If the address translation works, we consider the seek to succeed.
     try {
         if ( ((quint64) pos) > ((quint64) size()) || !isOpen() )
@@ -256,6 +253,19 @@ qint64 VirtualMemory::size() const
         return VADDR_SPACE_X86_64;
     // Fallback
     return 0;
+}
+
+
+void VirtualMemory::setUserLand(qint64 pgd)
+{
+	_userland = true;
+	_userPGD = pgd;
+}
+
+void VirtualMemory::setKernelSpace()
+{
+	_userland = false;
+	_userPGD = 0;
 }
 
 
@@ -537,7 +547,7 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
 quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
         bool enableExceptions)
 {
-	std::cerr << "modified pageLookup64 " << _userland << " _userPGD:" << std::hex << _userPGD << std::endl;
+	//std::cerr << "modified pageLookup64 " << _userland << " _userPGD:" << std::hex << _userPGD << std::endl;
     bool doLock = _threadSafe;
     quint64 pgd_addr;  // page global directory address
     quint64 pgd;
@@ -570,11 +580,11 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 		}
     }else{
     	if (vaddr >= _specs.pageOffset) {
-    		std::cerr << "not userland " << vaddr << std::endl;
+    		//std::cerr << "not userland " << vaddr << std::endl;
     		virtualMemoryOtherError("vaddr >= PAGE_OFFSET, not a user-land address\n",
     		                enableExceptions);
     	}else{
-    		std::cerr << "userland " << vaddr << std::endl;
+    		//std::cerr << "userland " << vaddr << std::endl;
     	}
     	pgd_addr = _userPGD;
     }
@@ -588,12 +598,12 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 
 
     if (!enableExceptions && !ok){
-    	std::cerr << "not ok pgd " << vaddr << std::endl;
+    	//std::cerr << "not ok pgd " << vaddr << std::endl;
         return PADDR_ERROR;
     }
 
     if (!(pgd & _PAGE_PRESENT)){
-    	std::cerr << "not present pgd " << vaddr << std::endl;
+    	//std::cerr << "not present pgd " << vaddr << std::endl;
         virtualMemoryPageError(vaddr, "pgd", enableExceptions);
     }
 
@@ -605,12 +615,12 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 			enableExceptions, &ok);
 
     if (!enableExceptions && !ok){
-    	std::cerr << "not ok pud " << vaddr << std::endl;
+    	//std::cerr << "not ok pud " << vaddr << std::endl;
         return PADDR_ERROR;
     }
 
     if (!(pud & _PAGE_PRESENT)){
-    	std::cerr << "not present pud " << vaddr << std::endl;
+    	//std::cerr << "not present pud " << vaddr << std::endl;
         virtualMemoryPageError(vaddr, "pud", enableExceptions);
     }
 
@@ -623,12 +633,12 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 			enableExceptions, &ok);
 
     if (!enableExceptions && !ok){
-    	std::cerr << "not ok pmd " << vaddr << std::endl;
+    	//std::cerr << "not ok pmd " << vaddr << std::endl;
         return PADDR_ERROR;
     }
 
     if (!(pmd & _PAGE_PRESENT)){
-    	std::cerr << "not present pgd " << vaddr << std::endl;
+    	//std::cerr << "not present pgd " << vaddr << std::endl;
         virtualMemoryPageError(vaddr, "pmd", enableExceptions);
     }
 
@@ -646,12 +656,12 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
                 enableExceptions, &ok);
 
         if (!enableExceptions && !ok){
-        	std::cerr << "not ok pte " << vaddr << std::endl;
+        	//std::cerr << "not ok pte " << vaddr << std::endl;
             return PADDR_ERROR;
         }
 
         if (!(pte & (_PAGE_PRESENT))){
-        	std::cerr << "not present pte " << vaddr << std::endl;
+        	//std::cerr << "not present pte " << vaddr << std::endl;
             virtualMemoryPageError(vaddr, "pte", enableExceptions);
         }
 
@@ -667,7 +677,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
             new TLBEntry(physaddr & ~((*pageSize) - 1), *pageSize));
     if (doLock) _tlbMutex.unlock();
 
-    std::cerr << "finished: modified pageLookup64 " << std::endl;
+    //std::cerr << "finished: modified pageLookup64 " << std::endl;
     return physaddr;
 }
 
@@ -693,7 +703,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
 quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
         bool enableExceptions)
 {
-	std::cerr << "virtualToPhysical userland for 32bit not implemented" << std::endl;
+	//std::cerr << "virtualToPhysical userland for 32bit not implemented" << std::endl;
     // Make sure the address is within a valid range
     if ((_specs.arch & MemSpecs::i386) && (vaddr >= (1UL << 32)))
         virtualMemoryOtherError(
@@ -755,7 +765,7 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
     }
 
     if(_userland){
-    	std::cout << "reading userland mem pgd:" << std::hex << _userPGD << std::endl;
+    	//std::cout << "reading userland mem pgd:" << std::hex << _userPGD << std::endl;
     	return pageLookup64(vaddr, pageSize, enableExceptions);
     }else{
     	//std::cout << "reading kernel mem" << std::endl;

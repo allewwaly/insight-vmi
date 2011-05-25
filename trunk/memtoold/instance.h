@@ -183,11 +183,24 @@ inline void* Instance::toPointer() const
 }
 
 
-inline QString Instance::derefUserLand() const
+inline QString Instance::derefUserLand(const QString &pgd) const
 {
 	//TODO
 	//diekmann
-    return _d.isNull ? QString("NULL") :_d.type->toString(_d.vmem, _d.address);
+	QString ret;
+    if(_d.isNull){
+    	ret = "NULL";
+    }else{
+    	bool ok;
+
+    	qint64 pgd_d = pgd.toULongLong(&ok, 16);
+    	if(!ok) throw GenericException("(PDG invalid)");
+
+    	_d.vmem->setUserLand(pgd_d);
+    	ret = _d.type->toString(_d.vmem, _d.address);
+    	_d.vmem->setKernelSpace();
+    }
+    return ret;
 }
 
 

@@ -416,9 +416,11 @@ public:
     QString toString() const;
 
     /**
+     * @param pgd Page Global Directory of the current user process
+     * 			most likely this is the cr3 register content
      * @return same as toString but tries to access userland memeory if possible
      */
-    QString derefUserLand() const;
+    QString derefUserLand(const QString &pgd) const;
 
     /**
      * @return the size of a pointer for this instance in bytes
