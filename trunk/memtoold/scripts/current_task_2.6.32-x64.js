@@ -74,6 +74,13 @@ function printHdr()
 }
 
 
-printHdr();
-printCurrentTask("0xffff880001800000"); // %gs register hardcoded as string!
+//printHdr();
+try{
+	printCurrentTask("0xffff880001800000"); // %gs register hardcoded as string!
+}catch(e){
+	print("Exception in printCurrentTask")
+	print(e)
+	// pipe exceptions to caller, as there shouldn't be any
+	throw(e)
+}
 

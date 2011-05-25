@@ -177,10 +177,6 @@ bool VirtualMemory::seek(qint64 pos)
     // Call inherited function
 //    QIODevice::seek(pos);
 
-	//std::cout << "VirtualMemory::seek(qint64 pos, bool userLand, quint64 userPGD)" << std::endl;
-	//_userland = true;
-	//_userPGD = 0x1d89f000;
-
     if ( ((quint64) pos) > ((quint64) size()) || !isOpen() )
         return false;
 
@@ -256,6 +252,7 @@ qint64 VirtualMemory::size() const
 }
 
 
+//TODO doesn't look very threadsave to me
 void VirtualMemory::setUserLand(qint64 pgd)
 {
 	_userland = true;
@@ -547,7 +544,6 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
 quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
         bool enableExceptions)
 {
-	//std::cerr << "modified pageLookup64 " << _userland << " _userPGD:" << std::hex << _userPGD << std::endl;
     bool doLock = _threadSafe;
     quint64 pgd_addr;  // page global directory address
     quint64 pgd;
@@ -580,11 +576,8 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 		}
     }else{
     	if (vaddr >= _specs.pageOffset) {
-    		//std::cerr << "not userland " << vaddr << std::endl;
     		virtualMemoryOtherError("vaddr >= PAGE_OFFSET, not a user-land address\n",
     		                enableExceptions);
-    	}else{
-    		//std::cerr << "userland " << vaddr << std::endl;
     	}
     	pgd_addr = _userPGD;
     }
@@ -598,12 +591,10 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 
 
     if (!enableExceptions && !ok){
-    	//std::cerr << "not ok pgd " << vaddr << std::endl;
         return PADDR_ERROR;
     }
 
     if (!(pgd & _PAGE_PRESENT)){
-    	//std::cerr << "not present pgd " << vaddr << std::endl;
         virtualMemoryPageError(vaddr, "pgd", enableExceptions);
     }
 
@@ -615,12 +606,10 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 			enableExceptions, &ok);
 
     if (!enableExceptions && !ok){
-    	//std::cerr << "not ok pud " << vaddr << std::endl;
         return PADDR_ERROR;
     }
 
     if (!(pud & _PAGE_PRESENT)){
-    	//std::cerr << "not present pud " << vaddr << std::endl;
         virtualMemoryPageError(vaddr, "pud", enableExceptions);
     }
 
@@ -633,12 +622,10 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 			enableExceptions, &ok);
 
     if (!enableExceptions && !ok){
-    	//std::cerr << "not ok pmd " << vaddr << std::endl;
         return PADDR_ERROR;
     }
 
     if (!(pmd & _PAGE_PRESENT)){
-    	//std::cerr << "not present pgd " << vaddr << std::endl;
         virtualMemoryPageError(vaddr, "pmd", enableExceptions);
     }
 
@@ -656,12 +643,10 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
                 enableExceptions, &ok);
 
         if (!enableExceptions && !ok){
-        	//std::cerr << "not ok pte " << vaddr << std::endl;
             return PADDR_ERROR;
         }
 
         if (!(pte & (_PAGE_PRESENT))){
-        	//std::cerr << "not present pte " << vaddr << std::endl;
             virtualMemoryPageError(vaddr, "pte", enableExceptions);
         }
 
@@ -670,14 +655,21 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
                 + (((quint64) (vaddr)) & KERNEL_PAGE_OFFSET_FOR_MASK);
     }
 
-    // Create TLB entry. Always use small page size (4k) as key into cache.
-    if (doLock) _tlbMutex.lock();
-    _tlb.insert(
-            vaddr & PAGEMASK,
-            new TLBEntry(physaddr & ~((*pageSize) - 1), *pageSize));
-    if (doLock) _tlbMutex.unlock();
 
-    //std::cerr << "finished: modified pageLookup64 " << std::endl;
+
+    if(!_userland){
+    	// Create TLB entry. Always use small page size (4k) as key into cache.
+    	if (doLock) _tlbMutex.lock();
+		_tlb.insert(
+				vaddr & PAGEMASK,
+				new TLBEntry(physaddr & ~((*pageSize) - 1), *pageSize));
+		if (doLock) _tlbMutex.unlock();
+    }
+    // never create a TLB entry outside kernelspace as memtool will never now about a contextswitch
+    // if we connect it to a real machine
+    // performance improvement: save last known _userPGD and flushTLB() on an new value
+
+
     return physaddr;
 }
 
