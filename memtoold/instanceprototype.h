@@ -126,7 +126,7 @@ public slots:
     double toDouble() const;
     QString toString() const;
 
-    QString derefUserLand() const;
+    QString derefUserLand(const QString &pgd) const;
 
 private:
     inline Instance* thisInstance() const;

@@ -32,12 +32,25 @@ public:
     virtual qint64 pos() const;
     virtual bool reset();
     virtual bool seek (qint64 pos);
-private:
-    bool MySeek (qint64 pos);
-    bool _userland; // <! switch to change change from kernelspace reading to userland reading.
-    quint64 _userPGD;
-public:
     virtual qint64 size() const;
+
+    /**
+     * Configures this instance to work on the user-land part of the memory only.
+     * Reset with setKernelSpace
+     *
+     * Note: to prevent logical error, VirtualMemory either works on
+     * user-land or kernel space.
+     *
+     * @param pgd the Page-Global-Directory of the current user process, most likely
+     * the cr3 register content. This value cannot be provided by memtool.
+     */
+    void setUserLand(qint64 pgd);
+
+    /**
+     * Configures this instance to work on the kernel memory space only.
+     * This is the default behavior.
+     */
+    void setKernelSpace();
 
     /**
      * Seeks to the virtual memory position \a pos without throwing an exception
@@ -224,6 +237,10 @@ private:
     bool _threadSafe;
     QMutex _tlbMutex;
     QMutex _physMemMutex;
+
+    bool _userland; // <! switch to change change from kernelspace reading to userland reading.
+    quint64 _userPGD;
+
 };
 
 
