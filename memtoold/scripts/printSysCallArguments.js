@@ -1,12 +1,21 @@
 if(HAVE_GLOBAL_PARAMS){
 	eval("params="+PARAMS)
-	sys_call_nr = params["sys_call_nr"] //int
-	arg0 = params["rdi"] //hex string
-	arg1 = params["rsi"] //hex string
-	arg2 = params["rdx"] //hex string
-	arg3 = params["r10"] //hex string
-	arg4 = params["r8"] //hex string
-	arg5 = params["r9"] //hex string
+	var sys_call_nr = params["sys_call_nr"] //int
+	var arg0 = params["rdi"] //hex string
+	var arg1 = params["rsi"] //hex string
+	var arg2 = params["rdx"] //hex string
+	var arg3 = params["r10"] //hex string
+	var arg4 = params["r8"] //hex string
+	var arg5 = params["r9"] //hex string
+	var userPGD = params["cr3"] // hex string
+	
+	if(typeof(arg0) == "undefined") print("rdi undefined")
+	if(typeof(arg1) == "undefined") print("r2i undefined")
+	if(typeof(arg2) == "undefined") print("rdx undefined")
+	if(typeof(arg3) == "undefined") print("r10 undefined")
+	if(typeof(arg4) == "undefined") print("r8 undefined")
+	if(typeof(arg5) == "undefined") print("r9 undefined")
+	if(typeof(userPGD) == "undefined") print("cr3 undefined")
 }else{
 	print("no parameters specified")
 }
@@ -72,9 +81,10 @@ function main(){
 			// treat argument as value in register, try to cast to specific type
 			// and print it
 			line += arg["type"]+": "
+			
+			tmpInst.SetAddress("0") // ignore addr
 			try{
 				tmpInst.ChangeType(arg["type"])
-				tmpInst.SetAddress("0") // ignore addr
 				tmpInstValid = true;
 			}catch(e){
 				line += "exception: "
@@ -90,25 +100,38 @@ function main(){
 			
 			//try to deref the value
 			try{
-				//tmpInst.ChangeType(arg["type"])
-				tmpInst.ChangeType("char")
+				tmpInst.ChangeType(arg["type"])
 				tmpInst.SetAddress(sys_call_arg)
 				tmpInstValid = true;
 			}catch(e){
-				line += " cannot dereference: "
-				line += e
-			}
-			//print(tmpInst)
-			if(!tmpInst.IsAccessible()){
-				line += " cannot dereference: Memory not accessible"
-			}else if(tmpInstValid){
-				try{
-					print(tmpInst)
+				tmpInstValid = false;
+				try{// give it another try with only the last part of the type
+					type = arg["type"].split(" ")[1]
+					tmpInst.ChangeType(type)
+					tmpInstValid = true;
 				}catch(e){
+					//print(e)
+				}
+				if(!tmpInstValid){
 					line += " cannot dereference: "
 					line += e
 				}
 			}
+			
+			// this always returns false as we set the address to userSpace!
+			// if this returns true, we try to access kernel memory!
+			if(tmpInst.IsAccessible()){
+				line += " cannot dereference: Memory address points to kernel space!"
+			}else if(tmpInstValid){
+				try{
+					line += " -> "+tmpInst.derefUserLand(userPGD)
+				}catch(e){
+					line += " cannot dereference: "
+					line += e
+				}
+			}//else{
+			//	line += "unknown type "+arg["type"]
+			//}
 		}
 		print(line)
 		
