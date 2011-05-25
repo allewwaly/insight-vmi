@@ -87,10 +87,37 @@ function main(){
 		}else{
 			// treat argument as pointer, just print value
 			line += arg["type"]+" "+arg["user_ptr"]+": 0x"+sys_call_arg
+			
+			//try to deref the value
+			try{
+				//tmpInst.ChangeType(arg["type"])
+				tmpInst.ChangeType("char")
+				tmpInst.SetAddress(sys_call_arg)
+				tmpInstValid = true;
+			}catch(e){
+				line += " cannot dereference: "
+				line += e
+			}
+			print(tmpInst)
+			if(!tmpInst.IsAccessible()){
+				line += " cannot dereference: Memory not accessible"
+			}else if(tmpInstValid){
+				try{
+					print(tmpInst)
+				}catch(e){
+					line += " cannot dereference: "
+					line += e
+				}
+			}
 		}
 		print(line)
 		
 	}
 }
 
-main()
+try{
+	main()
+}catch(e){
+	print("Exception in main():")
+	print(e)
+}

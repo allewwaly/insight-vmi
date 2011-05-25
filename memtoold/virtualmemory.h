@@ -32,6 +32,11 @@ public:
     virtual qint64 pos() const;
     virtual bool reset();
     virtual bool seek (qint64 pos);
+private:
+    bool MySeek (qint64 pos);
+    bool _userland; // <! switch to change change from kernelspace reading to userland reading.
+    quint64 _userPGD;
+public:
     virtual qint64 size() const;
 
     /**
@@ -86,6 +91,9 @@ public:
      */
     quint64 virtualToPhysical(quint64 vaddr, int* pageSize,
             bool enableExceptions = true);
+
+    quint64 virtualToPhysicalUserLand(quint64 vaddr, int* pageSize, quint64 pgd,
+                bool enableExceptions = true);
 
     /**
      * @return \c true if thread safety is turned on, \c false otherwise

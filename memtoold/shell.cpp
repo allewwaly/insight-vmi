@@ -1576,6 +1576,9 @@ void Shell::initScriptEngine(bool hasParameters, QString &scriptParameters, QFil
     _engine->globalObject().setProperty("Instance", instClass->constructor());
 
 
+//InstanceUserLandClass* instUserLandClass = new InstanceUserLandClass(_engine);
+//_engine->globalObject().setProperty("InstanceUserLand", instUserLandClass->constructor());
+
 
     _engine->globalObject().setProperty("HAVE_GLOBAL_PARAMS", hasParameters, QScriptValue::ReadOnly);
     _engine->globalObject().setProperty("PARAMS", scriptParameters, QScriptValue::ReadOnly);
