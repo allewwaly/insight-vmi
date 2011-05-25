@@ -707,8 +707,14 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
 quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
         bool enableExceptions)
 {
-	//std::cerr << "virtualToPhysical userland for 32bit not implemented" << std::endl;
-    // Make sure the address is within a valid range
+
+	if (_userland){
+	        virtualMemoryOtherError(
+	                QString("virtualToPhysical userland for 32bit not implemented!"),
+	                        enableExceptions);
+	}
+
+	// Make sure the address is within a valid range
     if ((_specs.arch & MemSpecs::i386) && (vaddr >= (1UL << 32)))
         virtualMemoryOtherError(
                 QString("Virtual address 0x%1 exceeds 32 bit address space")

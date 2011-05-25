@@ -125,6 +125,18 @@ function main(){
 			}else if(tmpInstValid){
 				try{
 					line += " -> "+tmpInst.derefUserLand(userPGD)
+					if(arg["name"] == "filename"){
+						line += " string: "
+						str_filename = ""
+						for(var k = 0; k < 16; k++){
+							var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10)
+							if(thisChar == 0) break
+							line += thisChar+" "
+							str_filename += String.fromCharCode(thisChar)
+							tmpInst.AddToAddress(1)
+						}
+						line += str_filename
+					}
 				}catch(e){
 					line += " cannot dereference: "
 					line += e

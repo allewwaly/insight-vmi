@@ -69,6 +69,11 @@ function printHdr()
 
 var init = new Instance("init_task");
 
-printHdr();
-printList(init);
+try{
+	printHdr();
+	printList(init);
+}catch(e){
+	print(e)
+	//throw(e)
+}
 
