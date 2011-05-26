@@ -39,7 +39,14 @@ public:
      * Reset with setKernelSpace
      *
      * Note: to prevent logical error, VirtualMemory either works on
-     * user-land or kernel space.
+     * user-land or kernel space, it is up to the programmer to
+     * switch manually.
+     *
+     * setUserLand() locks this instance for the calling Thread. After calling
+     * setUserLand(), the caller MUST IN ANY CASE call setKernelSpace()
+     * to unlock this VirtualMemory for other Threads. A not executed
+     * setKernelSpace() is the first place to search for, if you look for
+     * deadlocks.
      *
      * @param pgd the Page-Global-Directory of the current user process, most likely
      * the cr3 register content. This value cannot be provided by memtool.
