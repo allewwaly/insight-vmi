@@ -186,6 +186,7 @@ bool VirtualMemory::seek(qint64 pos)
 	int pageSize;
 	qint64 physAddr;
 
+	//prevent any seek while we might be in userLand mode
 	QMutexLocker locker(&_userlandMutex);
 
 	if(!_userland){
@@ -195,6 +196,7 @@ bool VirtualMemory::seek(qint64 pos)
 		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
 	}
 
+	locker.unlock();
 
 
 	if (physAddr < 0)
@@ -233,6 +235,7 @@ bool VirtualMemory::safeSeek(qint64 pos)
         qint64 physAddr =
                 (qint64)virtualToPhysical((quint64) pos, &pageSize, false);
 
+        locker.unlock();
 
         if (! (physAddr != (qint64)PADDR_ERROR) && (physAddr >= 0) )
             return false;
@@ -262,7 +265,6 @@ qint64 VirtualMemory::size() const
 }
 
 
-//TODO doesn't look very threadsave to me
 void VirtualMemory::setUserLand(qint64 pgd)
 {
 	_userlandMutex.lock();
@@ -288,6 +290,8 @@ qint64 VirtualMemory::readData(char* data, qint64 maxSize)
 
     while (maxSize > 0) {
         bool doLock = _threadSafe;
+
+        //userland mode might block in next command
         // Obtain physical address and page size
         quint64 physAddr = virtualToPhysical(_pos, &pageSize);
 
