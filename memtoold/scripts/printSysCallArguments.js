@@ -108,6 +108,7 @@ function main(){
 				try{// give it another try with only the last part of the type
 					type = arg["type"].split(" ")[1]
 					tmpInst.ChangeType(type)
+					tmpInst.SetAddress(sys_call_arg)
 					tmpInstValid = true;
 				}catch(e){
 					//print(e)
@@ -124,6 +125,7 @@ function main(){
 				line += " cannot dereference: Memory address points to kernel space!"
 			}else if(tmpInstValid){
 				try{
+					line += " (" + tmpInst.derefUserLand(userPGD) + " @ " + tmpInst.Address() + ") "
 					line += " -> "+tmpInst.derefUserLand(userPGD)
 					if(arg["name"] == "filename"){
 						line += " string: "
