@@ -52,6 +52,8 @@ include("lib_syscalls_2.6.32-x64.js")
 
 include("lib_getCurrent_2.6.32-x64.js")
 
+include("lib_typecasting.js")
+
 //workaround to create an instance
 //EMPTY_INSTANCE should signal that we do not care about the symbol
 EMPTY_INSTANCE="init_task"
@@ -100,30 +102,17 @@ function main(){
 			
 			//try to deref the value
 			try{
-				tmpInst.ChangeType(arg["type"])
+				__tryChangeType(tmpInst, arg["type"])
 				tmpInst.SetAddress(sys_call_arg)
 				tmpInstValid = true;
 			}catch(e){
-				tmpInstValid = false;
-				try{// give it another try with only the last part of the type
-					type = arg["type"].split(" ")[1]
-					tmpInst.ChangeType(type)
-					tmpInst.SetAddress(sys_call_arg)
-					tmpInstValid = true;
-				}catch(e){
-					//print(e)
-				}
-				if(!tmpInstValid){
-					line += " cannot dereference: "
-					line += e
-				}
+				line += " cannot dereference: "
+				line += e
 			}
 			
 			// this always returns false as we set the address to userSpace!
 			// if this returns true, we try to access kernel memory!
-			if(tmpInst.IsAccessible()){
-				line += " cannot dereference: Memory address points to kernel space!"
-			}else if(tmpInstValid){
+			if(tmpInstValid){
 				try{
 					line += " (" + tmpInst.derefUserLand(userPGD) + " @ " + tmpInst.Address() + ") "
 					line += " -> "+tmpInst.derefUserLand(userPGD)
