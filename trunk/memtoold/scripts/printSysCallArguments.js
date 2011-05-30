@@ -70,6 +70,7 @@ function main(){
 	var i
 	for(i=0; i < SysCalls[sys_call_nr]["argc"]; i++){
 		var arg = SysCalls[sys_call_nr]["arg"+i]
+		var next_arg = SysCalls[sys_call_nr]["arg"+(i+1)]
 		
 		// global parameter sys_call_arg is now the conetent of the register which contains the syscall parameter
 		var sys_call_arg = eval("arg"+i) 
@@ -116,10 +117,25 @@ function main(){
 				try{
 					line += " (" + tmpInst.derefUserLand(userPGD) + " @ " + tmpInst.Address() + ") "
 					line += " -> "+tmpInst.derefUserLand(userPGD)
+					// now we try to output some nice humean readable representation if some arguments
+					// are obvious
 					if(arg["name"] == "filename"){
 						line += " string: "
 						str_filename = ""
 						for(var k = 0; k < 16; k++){
+							var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10)
+							if(thisChar == 0) break
+							line += thisChar+" "
+							str_filename += String.fromCharCode(thisChar)
+							tmpInst.AddToAddress(1)
+						}
+						line += str_filename
+					}else if(arg["name"] == "buf" && next_arg["name"] == "count"){
+						//TODO
+						//need size here
+						line += "buffer content:\n"
+						str_filename = ""
+						for(var k = 0; k < next_arg.derefUserLand(userPGD); k++){
 							var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10)
 							if(thisChar == 0) break
 							line += thisChar+" "
