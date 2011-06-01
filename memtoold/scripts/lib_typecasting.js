@@ -30,6 +30,11 @@ function __tryChangeType(inst, type){
 		inst.ChangeType(type) ;
 		return;
 	}catch(e){
+		//print("-->"+type);
+		if(type=="unsigned long"){
+			if(__changeType(inst, "uint64_t")) return;
+		}
+		
 		var foundMatchingType = false;
 		var typeList = type.split(" ");
 		for(i=0; i<typeList.length; i++){

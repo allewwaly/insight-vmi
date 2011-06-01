@@ -87,7 +87,7 @@ function main(){
 			
 			tmpInst.SetAddress("0") // ignore addr
 			try{
-				tmpInst.ChangeType(arg["type"])
+				__tryChangeType(tmpInst, arg["type"])
 				tmpInstValid = true;
 			}catch(e){
 				line += "exception: "
@@ -120,29 +120,27 @@ function main(){
 					// now we try to output some nice humean readable representation if some arguments
 					// are obvious
 					if(arg["name"] == "filename"){
-						line += " string: "
-						str_filename = ""
-						for(var k = 0; k < 16; k++){
+						line += " hex: ";
+						var str_filename = "";
+						for(var k = 0; k < 256; k++){
 							var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10)
 							if(thisChar == 0) break
-							line += thisChar+" "
+							line += thisChar.toString(16)+" "
 							str_filename += String.fromCharCode(thisChar)
 							tmpInst.AddToAddress(1)
 						}
-						line += str_filename
+						line += "string: "+str_filename
 					}else if(arg["name"] == "buf" && next_arg["name"] == "count"){
-						//TODO
-						//need size here
-						line += "buffer content:\n"
-						str_filename = ""
-						for(var k = 0; k < next_arg.derefUserLand(userPGD); k++){
+						var buffSize = parseInt(eval("arg"+(i+1)), 16) 
+						line += "\nbuffer content hex (of size "+buffSize+"):\n";
+						var str_buffer = "";
+						for(var k = 0; k < buffSize; k++){
 							var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10)
-							if(thisChar == 0) break
-							line += thisChar+" "
-							str_filename += String.fromCharCode(thisChar)
+							line += thisChar.toString(16)+" "
+							str_buffer += String.fromCharCode(thisChar)
 							tmpInst.AddToAddress(1)
 						}
-						line += str_filename
+						line += "\nbuffer content string: " + str_buffer
 					}
 				}catch(e){
 					line += " cannot dereference: "
