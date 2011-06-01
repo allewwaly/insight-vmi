@@ -66,25 +66,37 @@ function main(){
 	
 	print(SysCalls[sys_call_nr]["sys_name"]+": "+SysCalls[sys_call_nr]["signature"])
 	
+	var line = ""
+	
+	if(SysCalls[sys_call_nr]["signature"] == None){
+		line += "unknown signature, dumping registers\n"
+		for(i=0; i < 6; i++){
+			var value = eval("arg"+i)
+			line += "arg"+i+": 0x"+value+"\n";
+		}
+		print(line)
+	}
 	
 	var i
+
 	for(i=0; i < SysCalls[sys_call_nr]["argc"]; i++){
 		var arg = SysCalls[sys_call_nr]["arg"+i]
 		var next_arg = SysCalls[sys_call_nr]["arg"+(i+1)]
-		
+	
 		// global parameter sys_call_arg is now the conetent of the register which contains the syscall parameter
 		var sys_call_arg = eval("arg"+i) 
-		
+	
 		line = "\t"
-		
+	
 		var arg_name = arg["name"] == "" ? "?unknown?" : arg["name"]
 		line += arg_name+": "
+		
 		tmpInstValid = false;
 		if(!arg["isPtr"]){
 			// treat argument as value in register, try to cast to specific type
 			// and print it
 			line += arg["type"]+": "
-			
+	
 			tmpInst.SetAddress("0") // ignore addr
 			try{
 				__tryChangeType(tmpInst, arg["type"])
@@ -93,14 +105,14 @@ function main(){
 				line += "exception: "
 				line += e
 			}
-		
+
 			if(tmpInstValid){
 				line += "0x"+sys_call_arg
 			}
 		}else{
 			// treat argument as pointer, just print value
 			line += arg["type"]+" "+arg["user_ptr"]+": 0x"+sys_call_arg
-			
+	
 			//try to deref the value
 			try{
 				__tryChangeType(tmpInst, arg["type"])
@@ -110,7 +122,7 @@ function main(){
 				line += " cannot dereference: "
 				line += e
 			}
-			
+	
 			// this always returns false as we set the address to userSpace!
 			// if this returns true, we try to access kernel memory!
 			if(tmpInstValid){
@@ -151,7 +163,7 @@ function main(){
 			//}
 		}
 		print(line)
-		
+	
 	}
 }
 
