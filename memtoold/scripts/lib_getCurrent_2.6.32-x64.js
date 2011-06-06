@@ -84,6 +84,8 @@ function getCurrentTask(gs_base)
 	return current_task
 }
 
+GS_BASE_2632x64 = "0xffff880001800000";
+
 /* 
  * usage:
  * getCurrentTask("0xffff880001800000"); // %gs register hardcoded as string!
