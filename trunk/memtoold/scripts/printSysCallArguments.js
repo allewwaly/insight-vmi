@@ -122,9 +122,7 @@ function main(){
 				line += " cannot dereference: "
 				line += e
 			}
-	
-			// this always returns false as we set the address to userSpace!
-			// if this returns true, we try to access kernel memory!
+
 			if(tmpInstValid){
 				try{
 					line += " (" + tmpInst.derefUserLand(userPGD) + " @ " + tmpInst.Address() + ") "
@@ -142,7 +140,7 @@ function main(){
 							tmpInst.AddToAddress(1)
 						}
 						line += "string: "+str_filename
-					}else if(arg["name"] == "buf" && next_arg["name"] == "count"){
+					}else if(arg["name"] == "buf" && next_arg["name"] == "count" && SysCalls[sys_call_nr]["sys_name"] != "sys_read"){
 						var buffSize = parseInt(eval("arg"+(i+1)), 16) 
 						line += "\nbuffer content hex (of size "+buffSize+"):\n";
 						var str_buffer = "";
