@@ -26,6 +26,8 @@
  * 	the kernel macro for current is equal to asm("mov %%gs:0xcbc0, %0": "=r" (current));
  * 
  */
+ 
+include("lib_hexStringArith.js")
 
 //always work with numbers as strings!!!
 function getCurrentTask(gs_base)
@@ -48,9 +50,7 @@ function getCurrentTask(gs_base)
 	var offset = new Instance("per_cpu__current_task")
 	//print(offset.Address())
 	
-	var addrLow = parseInt(offset.Address(), 16)
-	
-	current_task.AddToAddress(addrLow)
+	current_task.SetAddress(__hex_add(gs_base, offset.Address()));
 	
 	// current_task.Address() now contains the Adress of the memory are where gs:per_cpu__current_task points
 	//print(current_task.Address())
@@ -76,7 +76,10 @@ function getCurrentTask(gs_base)
 	
 	current_task.ChangeType("task_struct")
 	current_task.SetAddress(current_task_hex)
-	//print(current_task)
+	//print("->"+current_task.Address())
+	//print("->"+__hex_add(gs_base, offset.Address()))
+	//print("->"+gs_base+" + "+offset.Address())
+	
 	
 	return current_task
 }
