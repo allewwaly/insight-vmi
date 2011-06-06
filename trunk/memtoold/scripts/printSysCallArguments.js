@@ -156,9 +156,13 @@ function main(){
 					line += " cannot dereference: "
 					line += e
 				}
-			}//else{
-			//	line += "unknown type "+arg["type"]
-			//}
+				
+			}
+			
+			var mmap = getMemoryMap(getCurrentTask(GS_BASE_2632x64), sys_call_arg)
+			if(mmap != ""){
+				line += "memory mapped to: "+mmap;
+			}
 		}
 		print(line)
 	
