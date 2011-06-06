@@ -9,22 +9,27 @@
  */
  
 include("lib_getCurrent_2.6.32-x64.js")
- 
 
 //always work with numbers as strings!!!
 function printCurrentTask(gs_base)
 {
 	current_task = getCurrentTask(gs_base)
 	
-	var line = current_task.cred.uid.toString() + " " +
-		current_task.pid.toString() + " " +
-		current_task.cred.gid.toString() + " " +
-		current_task.state.toString() + " " +
-		current_task.comm.toString() + " " +
-		"0x" + current_task.Address();
+	try{
+		print(current_task.cred.uid.toString());
+	}catch(e){
+		print("unknown");
+	}
+	print(current_task.pid.toString());
+	try{
+		print(current_task.cred.gid.toString());
+	}catch(e){
+		print("unknown");
+	}
+	print(current_task.state.toString());
+	print(current_task.comm.toString());
+	print("0x" + current_task.Address());
 	
-
-	print(line);
 	
 }
 
