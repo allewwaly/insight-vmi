@@ -55,3 +55,22 @@ function __hex_add(a, b){
 
 //print(__hex_add("ffff","1234f"));
 //print(__hex_add("f", "f"));
+
+
+/**
+ * unsigned integer to hex String
+ * Instance is modified
+ */
+function __uintToHex(instance){
+	var res_hex = "";
+	for(var i = 0; i < instance.Size(); ++i){
+		var addrLow = instance.toUInt8()
+		addrLow = parseInt(addrLow).toString(16)
+		res_hex = addrLow + res_hex
+		if(addrLow.length == 1){
+			res_hex = "0" + res_hex
+		}
+		instance.AddToAddress(1)
+	}
+	return res_hex;
+}

@@ -5,18 +5,30 @@ function __dumpStringKernel(instance, limit){
 	var i;
 	for(i=0; i<limit; ++i){
 		var thisChar = parseInt(instance.toString(), 10)
+		if(thisChar == 0) break;
 		ret += String.fromCharCode(thisChar)
-		instance.AddToAddress(1)	
+		instance.AddToAddress(1)
 	}
 	return ret;
 }
 
 
 /**
- * returns string with the name of the file which is mapped in task_struct's address space at address
- * returns empty string if no mapping exists for address
+ * returns string representation of flags
  */
-function getMemoryMap(task_struct, address, userPGD){
+function __getVMAreaFlags(flags){
+	var ret = "";
+	if(flags & 0x00000001) ret += "VM_READ ";
+	if(flags & 0x00000002) ret += "VM_WRITE ";
+	if(flags & 0x00000004) ret += "VM_EXEC ";
+	if(flags & 0x00000008) ret += "VM_SHARED ";
+	return ret;	
+}
+
+/**
+ * returns the mmapped areas for task_struct
+ */
+function getMemoryMap(task_struct){
 	var ret = "";
 	try{
 		//active_mm
@@ -43,9 +55,14 @@ function getMemoryMap(task_struct, address, userPGD){
 				//TODO address of d_iname calculated by hand!!
 				tmp.SetAddress(__hex_add(dentry.Address(), "a0"));
 				
+				var mmappedFile = __dumpStringKernel(tmp, 32);
+				//ret += it.vm_start + " " + it.vm_end + " ";
+				//ret += mmappedFile;
+				//ret += "\n"
 				
-				ret += it.vm_start + " " + it.vm_end + " ";
-				ret += __dumpStringKernel(tmp, 32);
+				ret += __uintToHex(it.vm_start) + " " + __uintToHex(it.vm_end) + " ";
+				ret += __getVMAreaFlags(it.vm_flags) + " ";
+				ret += mmappedFile;
 				ret += "\n"
 				
 			}
@@ -60,6 +77,6 @@ function getMemoryMap(task_struct, address, userPGD){
 }
 
 
-include("lib_getCurrent_2.6.32-x64.js")
-var mmap = getMemoryMap(getCurrentTask(GS_BASE_2632x64), 123)
-print(mmap)
+//include("lib_getCurrent_2.6.32-x64.js")
+//var mmap = getMemoryMap(getCurrentTask(GS_BASE_2632x64), 123)
+//print(mmap)
