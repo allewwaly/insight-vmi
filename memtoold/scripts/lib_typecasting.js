@@ -31,7 +31,8 @@ function __tryChangeType(inst, type){
 		return;
 	}catch(e){
 		//print("-->"+type);
-		if(type=="unsigned long"){
+		
+		if(type=="unsigned long" || type=="unsigned" || type=="long"){
 			if(__changeType(inst, "uint64_t")) return;
 		}
 		
