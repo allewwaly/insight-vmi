@@ -109,7 +109,8 @@ function main(){
 			// treat argument as value in register, try to cast to specific type
 			// and print it
 			line += arg["type"]+": ";
-	
+			line += "0x"+sys_call_arg+" ";
+				
 			tmpInst.SetAddress("0"); // ignore addr
 			try{
 				__tryChangeType(tmpInst, arg["type"]);
@@ -120,7 +121,6 @@ function main(){
 			}
 
 			if(tmpInstValid){
-				line += "0x"+sys_call_arg;
 				
 				//try to provide some human readable representation
 				if(SysCalls[sys_call_nr]["sys_name"] == "sys_mmap"){
@@ -167,27 +167,50 @@ function main(){
 						var str_filename = "";
 						for(var k = 0; k < 256; k++){
 							var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10)
-							if(thisChar == 0) break
-							line += thisChar.toString(16)+" "
-							str_filename += String.fromCharCode(thisChar)
-							tmpInst.AddToAddress(1)
+							if(thisChar == 0) break;
+							line += thisChar.toString(16)+" ";
+							str_filename += String.fromCharCode(thisChar);
+							tmpInst.AddToAddress(1);
 						}
 						line += "string: "+str_filename
 					}else if(arg["name"] == "buf" && next_arg["name"] == "count" && SysCalls[sys_call_nr]["sys_name"] != "sys_read"){
 						// dereference buffers
-						var buffSize = parseInt(eval("arg"+(i+1)), 16) 
+						var buffSize = parseInt(eval("arg"+(i+1)), 16);
 						line += "\nbuffer content hex (of size "+buffSize+"):\n";
 						var str_buffer = "";
 						for(var k = 0; k < buffSize; k++){
-							var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10)
-							line += thisChar.toString(16)+" "
-							str_buffer += String.fromCharCode(thisChar)
-							tmpInst.AddToAddress(1)
+							var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10);
+							line += thisChar.toString(16)+" ";
+							str_buffer += String.fromCharCode(thisChar);
+							tmpInst.AddToAddress(1);
 						}
 						line += "\nbuffer content string: " + str_buffer
 					}else if(arg["name"] == "argv" || arg["name"] == "envp"){
 						//dereference command line
 						//array, nullterminated of pointers to strings
+						
+						if(tmpInst.Size() != 1) throw("char not of size 1!!");
+						
+						var strInst = new Instance("init_task").comm; // type char array to automatically print string
+						strInst.SetAddress("42"); // something not NULL
+						
+						for(var j=0; !strInst.IsNull(); ++j){
+							//TODO assuming pointer is 8 byte long
+							var addr = ""; // address of next char *
+							for(var k = 0; k < 8; ++k){
+								var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10);
+								if(thisChar < 0) thisChar = 256 + thisChar;
+								thisChar = thisChar.toString(16);
+								if(thisChar.length == 1) thisChar = "0"+thisChar;
+								addr = thisChar + addr; //little endian
+								tmpInst.AddToAddress(1);
+							}
+							line += "\n\t\t\t" + arg["name"] + "["+ j +"]" + " @ " + "0x"+addr;
+						
+							strInst.SetAddress(addr);
+							line += " -> "+strInst.derefUserLand(userPGD);
+						}
+						
 					}
 				}catch(e){
 					line += " cannot dereference: ";
