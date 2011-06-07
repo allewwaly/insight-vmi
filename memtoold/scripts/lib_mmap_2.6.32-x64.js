@@ -25,6 +25,7 @@ function __getVMAreaFlags(flags){
 	return ret;	
 }
 
+
 /**
  * returns the mmapped areas for task_struct
  */
@@ -32,7 +33,7 @@ function getMemoryMap(task_struct){
 	var ret = "";
 	try{
 		//active_mm
-		var it = task_struct.mm.mmap;
+		var it = task_struct.active_mm.mmap;
 		
 		//TODO memtool IsNull Bug
 		//while(!it.IsNull()){
@@ -42,7 +43,8 @@ function getMemoryMap(task_struct){
 			//TODO
 			if(typeof(file) == "undefined") break;
 			
-			
+			ret += __uintToHex(it.vm_start) + " " + __uintToHex(it.vm_end) + " ";
+			ret += __getVMAreaFlags(it.vm_flags) + " ";
 			if(file.toString() != "NULL"){
 				file.ChangeType("file");
 				var dentry = file.f_path.dentry;
@@ -60,12 +62,15 @@ function getMemoryMap(task_struct){
 				//ret += mmappedFile;
 				//ret += "\n"
 				
-				ret += __uintToHex(it.vm_start) + " " + __uintToHex(it.vm_end) + " ";
-				ret += __getVMAreaFlags(it.vm_flags) + " ";
-				ret += mmappedFile;
-				ret += "\n"
 				
+				
+				ret += mmappedFile;
+				
+				
+			}else{
+				ret += "?";
 			}
+			ret += "\n"
 			it = it.vm_next;
 		};
 		
@@ -80,3 +85,19 @@ function getMemoryMap(task_struct){
 //include("lib_getCurrent_2.6.32-x64.js")
 //var mmap = getMemoryMap(getCurrentTask(GS_BASE_2632x64), 123)
 //print(mmap)
+
+
+/* returns the human readable flags of a mmap syscall of signature 
+ * void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset);
+ * @param: flags from mmap
+ */
+function getMMAPsyscall_flags(flags){
+	var ret = "";
+	if(flags & 0x01) ret += "MAP_SHARED ";
+	if(flags & 0x02) ret += "MAP_PRIVATE ";
+	if(flags & 0x0f) ret += "MAP_TYPE ";
+	if(flags & 0x10) ret += "MAP_FIXED ";
+	if(flags & 0x20) ret += "MAP_ANONYMOUS ";
+	if(flags & 0x4000000) ret += "MAP_UNINITIALIZED ";
+	return ret;
+}
