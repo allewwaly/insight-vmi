@@ -91,53 +91,56 @@ function main(){
 	var i
 
 	for(i=0; i < SysCalls[sys_call_nr]["argc"]; i++){
-		var arg = SysCalls[sys_call_nr]["arg"+i]
-		var next_arg = SysCalls[sys_call_nr]["arg"+(i+1)]
+		var arg = SysCalls[sys_call_nr]["arg"+i];
+		var next_arg = SysCalls[sys_call_nr]["arg"+(i+1)];
 	
 		// global parameter sys_call_arg is now the conetent of the register which contains the syscall parameter
-		var sys_call_arg = eval("arg"+i) 
+		var sys_call_arg = eval("arg"+i) ;
 	
-		line = "\t"
+		line = "\t";
 	
-		var arg_name = arg["name"] == "" ? "?unknown?" : arg["name"]
-		line += arg_name+": "
+		var arg_name = arg["name"] == "" ? "?unknown?" : arg["name"];
+		line += arg_name+": ";
 		
 		tmpInstValid = false;
 		if(!arg["isPtr"]){
 			// treat argument as value in register, try to cast to specific type
 			// and print it
-			line += arg["type"]+": "
+			line += arg["type"]+": ";
 	
-			tmpInst.SetAddress("0") // ignore addr
+			tmpInst.SetAddress("0"); // ignore addr
 			try{
-				__tryChangeType(tmpInst, arg["type"])
+				__tryChangeType(tmpInst, arg["type"]);
 				tmpInstValid = true;
 			}catch(e){
-				line += "exception: "
-				line += e
+				line += "exception: ";
+				line += e;
 			}
 
 			if(tmpInstValid){
-				line += "0x"+sys_call_arg
+				line += "0x"+sys_call_arg;
 			}
 		}else{
 			// treat argument as pointer, just print value
-			line += arg["type"]+" "+arg["user_ptr"]+": 0x"+sys_call_arg
-	
+			line += arg["type"]+" "+arg["user_ptr"]+": 0x"+sys_call_arg;
+			
 			//try to deref the value
 			try{
-				__tryChangeType(tmpInst, arg["type"])
-				tmpInst.SetAddress(sys_call_arg)
+				__tryChangeType(tmpInst, arg["type"]);
+				tmpInst.SetAddress(sys_call_arg);
 				tmpInstValid = true;
 			}catch(e){
-				line += " cannot dereference: "
-				line += e
+				line += " cannot dereference: ";
+				line += e;
 			}
 
 			if(tmpInstValid){
 				try{
-					line += " (" + tmpInst.derefUserLand(userPGD) + " @ " + tmpInst.Address() + ") "
-					line += " -> "+tmpInst.derefUserLand(userPGD)
+				
+					var dereferenced = tmpInst.derefUserLand(userPGD);
+					
+					line += " -> \n\t\t"+dereferenced.replace(/\n/g, "\n\t\t");
+					
 					// now we try to output some nice humean readable representation if some arguments
 					// are obvious
 					if(arg["name"] == "filename"){
@@ -162,6 +165,8 @@ function main(){
 							tmpInst.AddToAddress(1)
 						}
 						line += "\nbuffer content string: " + str_buffer
+					}else if(arg["name"] == "argv" || arg["name"] == "envp"){
+						//array, nullterminated of pointers to strings
 					}
 				}catch(e){
 					line += " cannot dereference: ";
