@@ -25,8 +25,13 @@ KERNEL_SRC_DIR="/local_diekmann/build/victim_kernel/kernel/linux-2.6-2.6.32/"
 # the file where Macros like __SYS_read are specified
 SYS_xxx_DIR="arch/x86/include/asm/unistd_64.h"
 
-# thef ile where the syscall signatures are specified
+# the file where the syscall signatures are specified
 SYS_SIGNATURE_DIR="include/linux/syscalls.h"
+
+# more syscall signatures
+SYS_OTHER_SIGNATURE_DIR="include/asm-generic/syscalls.h"
+# maybe /arch/x86/include/asm/syscalls.h might be also interesting
+
 
 # search #define __NR_read                               0
 sys_line_regex = re.compile(r"""^#define\s+__NR_([a-z_0-9]+)[ \t]+(\d{1,3})\s*$""")
@@ -112,40 +117,42 @@ if __name__ == "__main__":
 			sysCalls["sys_"+sys_name] = {"sys_real_name": sys_real_name, "nr": sys_nr, "signature": None}
 	sys_nr_f.close()
 	
+	
 	#read sysCall signature
-	sys_sig_f = open(KERNEL_SRC_DIR+SYS_SIGNATURE_DIR, "r")
-	try:
-		for line in sys_sig_f:
-			while not re.match(r""".*;.*""", line, re.DOTALL):
-				line += sys_sig_f.next()
-			#print "parsing\"%s\" with %s" % (line, sys_signature_regex)
+	for subDir in [SYS_SIGNATURE_DIR, SYS_OTHER_SIGNATURE_DIR]:
+		sys_sig_f = open(KERNEL_SRC_DIR+subDir, "r")
+		try:
+			for line in sys_sig_f:
+				while not re.match(r""".*;.*""", line, re.DOTALL):
+					line += sys_sig_f.next()
+				#print "parsing\"%s\" with %s" % (line, sys_signature_regex)
 		
-			# changed from match to search
-			m = re.search(sys_signature_regex, line)
-			#print(".")
-			if m :
-				#print m
-				#print m.group(0)
-				#print m.group(1)
-				signature = re.sub(r"\s+", " ", m.group(2)) # remove annoying \n\t
-				#print m.group(2)
-				#print m.group(3)
-				#print m.group(4)
-				#print m.group(5)
-				sys_real_name = m.group(1)
-				if sys_real_name not in sysCalls:
-					#print "%s has no number!" % sys_real_name
-					pass
-				else:
-					sysCalls[sys_real_name]["signature"] = signature
+				# changed from match to search
+				m = re.search(sys_signature_regex, line)
+				#print(".")
+				if m :
+					#print m
+					#print m.group(0)
+					#print m.group(1)
+					signature = re.sub(r"\s+", " ", m.group(2)) # remove annoying \n\t
+					#print m.group(2)
+					#print m.group(3)
+					#print m.group(4)
+					#print m.group(5)
+					sys_real_name = m.group(1)
+					if sys_real_name not in sysCalls:
+						#print "%s has no number!" % sys_real_name
+						pass
+					else:
+						sysCalls[sys_real_name]["signature"] = signature
 				
-				__allSysCalls[sys_real_name] = {"sig": signature, "matched_name": sys_real_name}
-	except(StopIteration):
-		print "last line (should not contain a syscall definition): \"%s\"" % line
-		print("done parsing, checking ...")
+					__allSysCalls[sys_real_name] = {"sig": signature, "matched_name": sys_real_name}
+		except(StopIteration):
+			print "last line (should not contain a syscall definition): \"%s\"" % line
+			print("done parsing, checking ...")
 	
 	
-	sys_sig_f.close()
+		sys_sig_f.close()
 	
 	
 	#pprint(sysCalls)
@@ -207,15 +214,19 @@ if __name__ == "__main__":
 	for (k,v) in sysCallsByNR.iteritems():
 		if v["signature"] != None:
 			
-			if v["arg0"]["isPtr"] and not v["arg0"]["isUser"]:
-				print("pointer to not user: %s" % v)
-			
-			argc = 1
-			for arg in ["arg1", "arg2", "arg3", "arg4", "arg5", "arg6"]:
+			argc = 0
+			for arg in ["arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6"]:
 				if arg in v:
 					argc += 1
 					if v[arg]["isPtr"] and not v[arg]["isUser"]:
-						print("pointer to not user: %s" % v)
+						if(v[arg]["type"] == "struct pt_regs"):
+							# struct pt_regs is a kernel internal data structure
+							del(v[arg])
+							v["argc"] -= 1
+							argc -= 1
+						else:
+							print("pointer to not user:")
+							pprint(v)
 					if arg == "arg6":
 						print("%s has 6 arguments" % v)
 			
