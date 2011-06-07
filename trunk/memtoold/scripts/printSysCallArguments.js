@@ -88,7 +88,9 @@ function main(){
 		print(line)
 	}
 	
-	var i
+	var i;
+	
+	var privateData; // variable used by human readable representation function to store data which could be userfull for the next argument to print
 
 	for(i=0; i < SysCalls[sys_call_nr]["argc"]; i++){
 		var arg = SysCalls[sys_call_nr]["arg"+i];
@@ -119,6 +121,22 @@ function main(){
 
 			if(tmpInstValid){
 				line += "0x"+sys_call_arg;
+				
+				//try to provide some human readable representation
+				if(SysCalls[sys_call_nr]["sys_name"] == "sys_mmap"){
+					if(arg["name"] == "flags"){
+						// dereference mmap flags
+						var flags = getMMAPsyscall_flags(parseInt(sys_call_arg, 16));
+						line += " -> "+flags;
+						if(flags.indexOf("MAP_ANONYMOUS") != -1){
+							privateData = "MAP_ANONYMOUS";
+						}else{
+							privateDATA = "";
+						}
+					}else if(privateData == "MAP_ANONYMOUS" && (arg["name"] == "fd" || arg["name"] == "pgoff")){
+						line += " (ignored due to MAP_ANONYMOUS)";
+					}
+				}
 			}
 		}else{
 			// treat argument as pointer, just print value
@@ -144,6 +162,7 @@ function main(){
 					// now we try to output some nice humean readable representation if some arguments
 					// are obvious
 					if(arg["name"] == "filename"){
+						// derefernece filenames
 						line += " hex: ";
 						var str_filename = "";
 						for(var k = 0; k < 256; k++){
@@ -155,6 +174,7 @@ function main(){
 						}
 						line += "string: "+str_filename
 					}else if(arg["name"] == "buf" && next_arg["name"] == "count" && SysCalls[sys_call_nr]["sys_name"] != "sys_read"){
+						// dereference buffers
 						var buffSize = parseInt(eval("arg"+(i+1)), 16) 
 						line += "\nbuffer content hex (of size "+buffSize+"):\n";
 						var str_buffer = "";
@@ -166,6 +186,7 @@ function main(){
 						}
 						line += "\nbuffer content string: " + str_buffer
 					}else if(arg["name"] == "argv" || arg["name"] == "envp"){
+						//dereference command line
 						//array, nullterminated of pointers to strings
 					}
 				}catch(e){
