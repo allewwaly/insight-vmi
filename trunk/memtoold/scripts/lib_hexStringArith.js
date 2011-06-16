@@ -53,6 +53,8 @@ function __hex_add(a, b){
 	
 }
 
+POINTER_SIZE=8
+
 //print(__hex_add("ffff","1234f"));
 //print(__hex_add("f", "f"));
 

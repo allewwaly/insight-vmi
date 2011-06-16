@@ -36,6 +36,11 @@ function __tryChangeType(inst, type){
 			if(__changeType(inst, "uint64_t")) return;
 		}
 		
+		// guess that we got into a buffer
+		if(type=="void"){
+			if(__changeType(inst, "char")) return;
+		}
+		
 		var foundMatchingType = false;
 		var typeList = type.split(" ");
 		for(i=0; i<typeList.length; i++){
