@@ -148,12 +148,11 @@ function main(){
 					line += __getSocketParams(arg["name"], parseInt(sys_call_arg, 16));
 				}
 				
-				if(arg["name"] == "fd"){
+				if(arg["name"] == "fd" || arg["name"] == "sockfd"){
 					// print fd
 					var fd = parseInt(sys_call_arg, 16);
-					line += " -> " + "----------------------> fd" + fd
+					line += " -> ";
 					
-					line += "FD <---------------";
 					var files_struct = current.files;
 					
 					try{
@@ -168,37 +167,36 @@ function main(){
 						
 						
 						if(true){
-						print(fdtable.Address())
-						print("fdtable:"+fdtable)
+						//print(fdtable.Address())
+						//print("fdtable:"+fdtable)
 						fdtable.ChangeType("uint64_t");
-						print(fdtable.Address())
+						//print(fdtable.Address())
 						fdtable.AddToAddress(8);
-						//TODO uncomment
-						//fdtable.AddToAddress(fd*POINTER_SIZE);
-						print("file ptr for given fd at: " + fdtable.Address().toString())
+						//print("file ptr for given fd at: " + fdtable.Address().toString());
 						
 						
 						var file_ptr = fdtable;
 						//file_ptr.ChangeType("uint64_t");
 						file_ptr.SetAddress(__uintToHex(fdtable));
+						file_ptr.AddToAddress(fd*POINTER_SIZE);
 						
 						file_ptr = __uintToHex(file_ptr);
-						print("file for given fd at "+file_ptr);
+						//print("file for given fd at "+file_ptr);
 						
 						file.SetAddress(file_ptr);
 						}
 						
 						
 						//print(fdtable.fd.Address());
-						print(file.Address());
-						print(file)
+						//print(file.Address());
+						//print(file)
 					
 						//file.ChangeType("file");
 						var dentry = file.f_path.dentry;
-						print(dentry.toString());
+						//print(dentry.toString());
 						if(dentry.toString() != "NULL"){
-							print(file.f_path.Address())
-							print(file.f_path);
+							//print(file.f_path.Address())
+							//print(file.f_path);
 						
 							var tmp = dentry.d_iname
 							tmp.ChangeType("char");
