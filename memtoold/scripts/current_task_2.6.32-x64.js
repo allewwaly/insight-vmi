@@ -20,9 +20,19 @@ function printCurrentTask(gs_base)
 	}catch(e){
 		print("unknown");
 	}
+	try{
+		print(current_task.cred.euid.toString());
+	}catch(e){
+		print("unknown");
+	}
 	print(current_task.pid.toString());
 	try{
 		print(current_task.cred.gid.toString());
+	}catch(e){
+		print("unknown");
+	}
+	try{
+		print(current_task.cred.egid.toString());
 	}catch(e){
 		print("unknown");
 	}
