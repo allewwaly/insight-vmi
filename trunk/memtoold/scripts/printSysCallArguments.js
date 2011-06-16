@@ -166,7 +166,6 @@ function main(){
 						var file = fdtable.fd;
 						
 						
-						if(true){
 						//print(fdtable.Address())
 						//print("fdtable:"+fdtable)
 						fdtable.ChangeType("uint64_t");
@@ -184,8 +183,17 @@ function main(){
 						//print("file for given fd at "+file_ptr);
 						
 						file.SetAddress(file_ptr);
-						}
 						
+						//howto deetermine wether it is a socket:
+						// static struct socket *sock_from_file(struct file *file, int *err)
+// 418{
+// 419        if (file->f_op == &socket_file_ops)
+// 420                return file->private_data;      /* set in sock_map_fd */
+// 421
+// 422        *err = -ENOTSOCK;
+// 423        return NULL;
+// 424}
+
 						
 						//print(fdtable.fd.Address());
 						//print(file.Address());
