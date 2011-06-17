@@ -52,6 +52,27 @@ function __getSocketParams(argument, value){
 	return ret;
 }
 
+
+/* 32bit ip as int (big endian) to string */
+function __num2dot(num) {
+	var d = num%256;
+	for (var i = 3; i > 0; i--) {
+	num = Math.floor(num/256);
+	d = num%256 + '.' + d;
+	}
+	return d;
+}
+
+/* 32bit ip as int (little endian) to string */
+function __num2dotNetworkByteOrdering(num) {
+	var d = num%256;
+	for (var i = 3; i > 0; i--) {
+	num = Math.floor(num/256);
+	d = d + "." + num%256;
+	}
+	return d;
+}
+
 function __getSockaddr(inst, len, userPGD){
 	if(typeof(len) != typeof(0)) throw("len must be number");
 	
@@ -60,9 +81,14 @@ function __getSockaddr(inst, len, userPGD){
 	inst.ChangeType("sockaddr_in")
 	var dereferenced = inst.derefUserLand(userPGD);
 	ret += "\t\t"+dereferenced.replace(/\n/g, "\n\t\t") //indent
+	
+	var sin_addr = inst.sin_addr.s_addr;
+	ret += "\n\t\t\tfurther dereferencing: sin_addr " + sin_addr.derefUserLand(userPGD) + " -> ";
+	var ip_int = parseInt(sin_addr.derefUserLand(userPGD), 10);
+	ret += __num2dotNetworkByteOrdering(ip_int);
+	
 	return ret;
 }
-
 
 function __printSocketMsgHdr(inst, userPGD){
 	//TODO
@@ -86,4 +112,19 @@ function __printSocketMsgHdr(inst, userPGD){
 	ret += "\t\t buffer @ 0x" + data.Address() + " length: "+len+"\n";
 	
 	return ret;
+}
+
+
+/* @param instance of type file
+ * @return true if file is a socket, false otherwise
+ */
+function __fileIsSocket(file){
+	if(file.TypeName() == "file") thorw("file not a file Instance");
+	
+	try{
+		var socket_ops = new Instance("socket_file_ops");
+		return (socket_ops.Address() == file.f_op.Address());
+	}catch(e){
+		return false;
+	}
 }

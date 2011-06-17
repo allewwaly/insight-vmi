@@ -46,6 +46,8 @@ function getMemoryMap(task_struct){
 			ret += __uintToHex(it.vm_start) + " " + __uintToHex(it.vm_end) + " ";
 			ret += __getVMAreaFlags(it.vm_flags) + " ";
 			if(file.toString() != "NULL"){
+				//TODO memtool bug:
+				// change type to file although it is already file
 				file.ChangeType("file");
 				var dentry = file.f_path.dentry;
 				

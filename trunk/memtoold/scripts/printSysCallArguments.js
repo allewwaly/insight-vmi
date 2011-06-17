@@ -186,35 +186,74 @@ function main(){
 						
 						//howto deetermine wether it is a socket:
 						// static struct socket *sock_from_file(struct file *file, int *err)
-// 418{
-// 419        if (file->f_op == &socket_file_ops)
-// 420                return file->private_data;      /* set in sock_map_fd */
-// 421
-// 422        *err = -ENOTSOCK;
-// 423        return NULL;
-// 424}
+						// 418{
+						// 419        if (file->f_op == &socket_file_ops)
+						// 420                return file->private_data;      /* set in sock_map_fd */
+						// 421
+						// 422        *err = -ENOTSOCK;
+						// 423        return NULL;
+						// 424}
+						// --socket
+						
+						if(__fileIsSocket(file)){
+						print("############################################################################################################################################################################################################################################################################################################")
+							line += "(socket) -> ";
+							var private_data = file.private_data;
+							var socket = new Instance(EMPTY_INSTANCE);
+							
+							private_data.ChangeType("uint64_t");
+							socket.SetAddress(__uintToHex(private_data));
+							
+							socket.ChangeType("socket");
+							//print(socket.Address())
+							if(socket.Size() == 0){
+								line += "type "+socket.TypeName()+" currently unknown to memorytool; "
+							}
+							print(socket.Address());
+							
+							socket.AddToAddress(4);
+							line += "type: " + __getSocketParams("type", socket.toUInt16());
+							socket.AddToAddress(2);
+							line += " flags: " + __getSocketParams("flags", socket.toUInt64());
+							//socket.AddToAddress(32);
+							//socket.ChangeType("uint64_t")
+							//
+							//var sock = new Instance(EMPTY_INSTANCE);
+							//var addr = __uintToHex(socket);
+							//print(addr);
+							//sock.SetAddress(addr);
+							//sock.ChangeType("sock");
+							//print(sock)
+							
+						}else{
+						
+							// -- end socket
 
 						
-						//print(fdtable.fd.Address());
-						//print(file.Address());
-						//print(file)
+							//print(fdtable.fd.Address());
+							//print(file.Address());
+							//print(file)
 					
-						//file.ChangeType("file");
-						var dentry = file.f_path.dentry;
-						//print(dentry.toString());
-						if(dentry.toString() != "NULL"){
-							//print(file.f_path.Address())
-							//print(file.f_path);
+							//TODO memtool bug
+							//without ChangeType (type is already file" an error occurs
+							//file.ChangeType("file");
+							var dentry = file.f_path.dentry;
+							//print(dentry.toString());
+							if(dentry.toString() != "NULL"){
+								//print(file.f_path.Address())
+								//print(file.f_path);
 						
-							var tmp = dentry.d_iname
-							tmp.ChangeType("char");
-							//TODO address of d_iname calculated by hand!!
-							tmp.SetAddress(__hex_add(dentry.Address(), "a0"));
+								var tmp = dentry.d_iname
+								tmp.ChangeType("char");
+								//TODO address of d_iname calculated by hand!!
+								var addr = __hex_add(dentry.Address(), "a0");
+								tmp.SetAddress(addr);
 				
-							var filePath = __dumpStringKernel(tmp, 32);
-							line += "\"" + filePath + "\"";
-						}else{
-							line += "no filename";
+								var filePath = __dumpStringKernel(tmp, 32);
+								line += "\"" + filePath + "\"";
+							}else{
+								line += "no filename";
+						}
 						}
 					}catch(e){
 						line += e;
