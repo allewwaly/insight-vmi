@@ -154,11 +154,12 @@ function main(){
 					line += " -> ";
 					
 					var files_struct = current.files;
+					//print(current)
 					
 					try{
 						//TODO memtool bug, must change type here
 						files_struct.ChangeType("files_struct");
-						//print(files_struct);
+						//print(files_struct + " \n@ " + files_struct.Address());
 						//print(files_struct.TypeName()) // struct files_struct
 					
 						var fdtable = files_struct.fdt;
@@ -173,6 +174,7 @@ function main(){
 						fdtable.AddToAddress(8);
 						//print("file ptr for given fd at: " + fdtable.Address().toString());
 						
+						//print("1##########################################################################################################################################")
 						
 						var file_ptr = fdtable;
 						//file_ptr.ChangeType("uint64_t");
@@ -183,6 +185,7 @@ function main(){
 						//print("file for given fd at "+file_ptr);
 						
 						file.SetAddress(file_ptr);
+						//print("2##########################################################################################################################################")
 						
 						//howto deetermine wether it is a socket:
 						// static struct socket *sock_from_file(struct file *file, int *err)
@@ -194,9 +197,8 @@ function main(){
 						// 423        return NULL;
 						// 424}
 						// --socket
-						
 						if(__fileIsSocket(file)){
-						print("############################################################################################################################################################################################################################################################################################################")
+						
 							line += "(socket) -> ";
 							var private_data = file.private_data;
 							var socket = new Instance(EMPTY_INSTANCE);
@@ -209,7 +211,7 @@ function main(){
 							if(socket.Size() == 0){
 								line += "type "+socket.TypeName()+" currently unknown to memorytool; "
 							}
-							print(socket.Address());
+							//print(socket.Address());
 							
 							socket.AddToAddress(4);
 							line += "type: " + __getSocketParams("type", socket.toUInt16());

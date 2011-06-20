@@ -44,7 +44,7 @@ function printCurrentTask(gs_base)
 }
 
 try{
-	printCurrentTask("0xffff880001800000"); // %gs register hardcoded as string!
+	printCurrentTask(GS_BASE_2632x64); // %gs register hardcoded as string!
 }catch(e){
 	print("Exception in printCurrentTask")
 	print(e)
