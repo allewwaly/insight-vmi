@@ -293,6 +293,15 @@ public:
     quint64 memberAddress(int index) const;
 
     /**
+     * Calculates the offset of a member into the struct, if this is a struct
+     * or union.
+     * @param name the name of the member
+     * @return the virtual address of member \a index, or 0 if this is no struct
+     * or union
+     */
+    quint64 memberOffset(const QString& name) const;
+
+    /**
      * Checks if a member with the given name \a name exists in this instance.
      * @param name the name of the member to find
      * @return \c true if that member exists, \c false otherwise

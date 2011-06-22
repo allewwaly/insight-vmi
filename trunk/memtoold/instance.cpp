@@ -397,6 +397,17 @@ quint64 Instance::memberAddress(int index) const
 }
 
 
+quint64 Instance::memberOffset(const QString& name) const
+{
+    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
+        return false;
+
+    const StructuredMember* m =
+            dynamic_cast<const Structured*>(_d.type)->findMember(name);
+    return m ? m->offset() : 0;
+}
+
+
 bool Instance::memberExists(const QString& name) const
 {
     if (!_d.type || !(_d.type->type() & BaseType::trStructured))
