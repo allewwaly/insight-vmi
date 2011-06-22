@@ -398,6 +398,9 @@ T VirtualMemory::extractFromPhysMem(quint64 physaddr, bool enableExceptions,
 
 inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 {
+    // Disable TLB for now
+    return 0;
+
     bool doLock = _threadSafe;
     quint64 result = 0;
     // For the key, the small page size (4k) is always assumed.
