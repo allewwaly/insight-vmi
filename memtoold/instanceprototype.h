@@ -98,6 +98,7 @@ public slots:
     QString TypeName() const;
     quint32 Size() const;
     bool MemberExists(const QString& name) const;
+    int MemberOffset(const QString& name) const;
     Instance FindMember(const QString& name) const;
     int TypeIdOfMember(const QString& name) const;
     int PointerSize() const;

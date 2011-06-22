@@ -253,6 +253,13 @@ bool InstancePrototype::MemberExists(const QString& name) const
 }
 
 
+int InstancePrototype::MemberOffset(const QString& name) const
+{
+	Instance* inst;
+    return (inst = thisInstance()) ? inst->memberOffset(name) : 0;
+}
+
+
 Instance InstancePrototype::FindMember(const QString& name) const
 {
 	Instance* inst;
