@@ -140,7 +140,7 @@ QString MemSpecs::toString() const
     if (startKernelMap > 0)
         ret += QString("%1 = 0x%2\n").arg("START_KERNEL_map", key_w).arg(startKernelMap, val_w, 16, QChar('0'));
     if (initLevel4Pgt > 0)
-        ret += QString("%1 = 0x%2\n").arg("init_level5_pgt", key_w).arg(initLevel4Pgt, val_w, 16, QChar('0'));
+        ret += QString("%1 = 0x%2\n").arg("init_level4_pgt", key_w).arg(initLevel4Pgt, val_w, 16, QChar('0'));
     if (swapperPgDir > 0)
         ret += QString("%1 = 0x%2\n").arg("swapper_pg_dir", key_w).arg(swapperPgDir, val_w, 16, QChar('0'));
     if (highMemory > 0)
