@@ -19,7 +19,7 @@ MemoryMapWindow::MemoryMapWindow(QWidget *parent)
 {
 	ui.setupUi(this);
 
-	setWindowTitle(tr("MemoryTool - Differences View"));
+	setWindowTitle(tr("InSight - Differences View"));
 
 	// Setup main window area
 	_memMapWidget = new MemoryMapWidget(0, this);

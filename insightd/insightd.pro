@@ -96,7 +96,7 @@ HEADERS += memorydifftree.h \
     basetype.h \
     enum.h
 CONFIG += console \
-    debug
+    debug_and_release
 QT += script \
     network \
     gui

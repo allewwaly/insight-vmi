@@ -238,7 +238,7 @@ if __name__ == "__main__":
 	#pprint(__allSysCalls)
 	out = open("./tmp", "w")
 	
-	out.write("// created by gen_syscall_memtool_script.py\n")
+	out.write("// created by gen_syscall_insight_script.py\n")
 	out.write("// can be found in diekmann's git\n")
 	out.write("// "+str(datetime.date.today())+"\n\n")
 	

@@ -1,7 +1,7 @@
 /*
  * created by diekmann on Fri 27 May 2011
  *
- * functions for memorytool typecasting
+ * functions for InSight typecasting
  *
  *
  */

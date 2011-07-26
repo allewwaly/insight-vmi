@@ -1,7 +1,7 @@
 TEMPLATE = app
 TARGET = insight
 QT += core network
-CONFIG += debug
+CONFIG += debug_and_release
 HEADERS += debug.h \
     shell.h \
     programoptions.h

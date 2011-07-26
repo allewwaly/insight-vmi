@@ -2,7 +2,7 @@ TEMPLATE = lib
 TARGET = insight
 VERSION = 1.0.0
 DEFINES += LIBINSIGHT_LIBRARY
-CONFIG += debug
+CONFIG += debug_and_release
 QT += core \
     network
 QT -= gui

@@ -11,13 +11,17 @@ SHARE   = $(DESTDIR)/usr/share
 
 all: build
 
-distclean: 
+clean:
 	@echo clean
-	@for dir in $(SUBDIRS) ; do cd $$dir ; make clean ; rm -rf Makefile ; cd $(PWD) ;done
+	@for dir in $(SUBDIRS) ; do cd $$dir ; make clean ; cd $(PWD) ; done
+	
+distclean:
+	@echo distclean
+	@for dir in $(SUBDIRS) ; do cd $$dir ; make distclean ; rm -rf Makefile ; cd $(PWD) ; done
 	
 
 build:
-	@for dir in $(SUBDIRS) ; do cd $$dir ; qmake -makefile ; make ; cd $(PWD) ;done
+	@for dir in $(SUBDIRS) ; do cd $$dir ; qmake -makefile && make release ; cd $(PWD) ; done
 
 
 install:
@@ -37,7 +41,7 @@ install:
 	@##insight
 	@install -Dp insight/insight    $(BIN)/insight
 
-%:
-	@echo $@
-	@echo "$@ Todo create this target"
-	@#for i in `ls -d mem*/ -1` ; do cd $i ; make clean && make ; cd - ; done
+#%:
+#	@echo $@
+#	@echo "$@ Todo create this target"
+#	@#for i in `ls -d mem*/ -1` ; do cd $i ; make clean && make ; cd - ; done
