@@ -1,10 +1,10 @@
 #!/bin/bash
 
-LIB="libmemtool.so.1"
+LIB="libinsight.so.1"
 BASE="$(dirname $0)"
 
-if [ -r "$BASE/../libmemtool/$LIB" ]; then
-	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+LD_LIBRARY_PATH:}$BASE/../libmemtool"
+if [ -r "$BASE/../libinsight/$LIB" ]; then
+	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+LD_LIBRARY_PATH:}$BASE/../libinsight"
 elif [ -r "$BASE/$LIB" ]; then
 	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+LD_LIBRARY_PATH:}$BASE"
 else
@@ -12,4 +12,4 @@ else
 	exit 1
 fi
 
-exec "$BASE/memtoold" "$@"
+exec "$BASE/insightd" "$@"

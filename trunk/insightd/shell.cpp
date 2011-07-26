@@ -12,9 +12,9 @@
 #include <unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
-#include <memtool/constdefs.h>
-#include <memtool/devicemuxer.h>
-#include <memtool/memtool.h>
+#include <insight/constdefs.h>
+#include <insight/devicemuxer.h>
+#include <insight/insight.h>
 #include <QtAlgorithms>
 #include <QProcess>
 #include <QCoreApplication>
@@ -184,7 +184,7 @@ Shell::Shell(bool listenOnSocket)
                 &Shell::cmdBinary,
                 "Allows to retrieve binary data through a socket connection",
                 "This command is only meant for communication between the "
-                "memtool daemon and the frontend application."));
+                "InSight daemon and the frontend application."));
 
     prepare();
 }

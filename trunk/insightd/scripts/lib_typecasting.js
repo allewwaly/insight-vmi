@@ -20,7 +20,7 @@ function __changeType(inst, type){
 
 // try to change the type of _inst_ to _type_
 // heuristically tries to make the typeChange succeed,
-// e.g: if memtool doesn't know "const char", this function
+// e.g: if InSight doesn't know "const char", this function
 // will also try "char" before giving up
 // throws exception
 function __tryChangeType(inst, type){

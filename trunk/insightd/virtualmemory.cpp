@@ -684,7 +684,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 				new TLBEntry(physaddr & ~((*pageSize) - 1), *pageSize));
 		if (doLock) _tlbMutex.unlock();
     }
-    // never create a TLB entry outside kernelspace as memtool will never now about a contextswitch
+    // never create a TLB entry outside kernelspace as InSight will never now about a contextswitch
     // if we connect it to a real machine
     // performance improvement: save last known _userPGD and flushTLB() on an new value
 

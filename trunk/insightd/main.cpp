@@ -9,7 +9,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <stdlib.h>
-#include <memtool/constdefs.h>
+#include <insight/constdefs.h>
 
 #include "debug.h"
 #include "kernelsymbols.h"
@@ -215,7 +215,7 @@ int main(int argc, char* argv[])
 		if (daemonize) {
 			init_daemon();
 		    // Start a new logging session
-			log_message(QString("Memtool started with PID %1.").arg(getpid()));
+			log_message(QString("InSight started with PID %1.").arg(getpid()));
 		}
 
 	    shell = new Shell(daemonize);
@@ -242,7 +242,7 @@ int main(int argc, char* argv[])
 		ret = app.exec();
 
 		if (daemonize)
-            log_message(QString("Memtool exited with return code %1.").arg(ret));
+            log_message(QString("InSight exited with return code %1.").arg(ret));
 		if (shell->interactive())
 		    shell->out() << "Done, exiting." << endl;
 	}
