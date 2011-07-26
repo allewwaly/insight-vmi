@@ -1,10 +1,10 @@
 #!/bin/bash
 
-LIB="libmemtool.so.1"
-DAEMON="memtoold"
+LIB="libinsight.so.1"
+DAEMON="insightd"
 
-if [ -r ../libmemtool/$LIB ]; then
-	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+LD_LIBRARY_PATH:}../libmemtool"
+if [ -r ../libinsight/$LIB ]; then
+	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+LD_LIBRARY_PATH:}../libinsight"
 elif [ -r ./$LIB ]; then
 	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+LD_LIBRARY_PATH:}."
 else
@@ -12,8 +12,8 @@ else
 	exit 1
 fi
 
-if [ -x ../memtoold/$DAEMON ]; then
-	export PATH="../memtoold:$PATH"
+if [ -x ../insightd/$DAEMON ]; then
+	export PATH="../insightd:$PATH"
 fi
 
-exec ./memtool "$@"
+exec ./insight "$@"

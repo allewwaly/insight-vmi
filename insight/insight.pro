@@ -1,5 +1,5 @@
 TEMPLATE = app
-TARGET = memtool
+TARGET = insight
 QT += core network
 CONFIG += debug
 HEADERS += debug.h \
@@ -11,6 +11,6 @@ SOURCES += debug.cpp \
     main.cpp
 LIBS += -lreadline \
     -L \
-    ../libmemtool \
-    -lmemtool
-INCLUDEPATH += ../libmemtool/include
+    ../libinsight \
+    -linsight
+INCLUDEPATH += ../libinsight/include

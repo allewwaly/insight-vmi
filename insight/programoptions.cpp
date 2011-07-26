@@ -46,7 +46,7 @@ const struct Option options[OPTION_COUNT] = {
         {
                 "-ds",
                 "--start",
-                "Start the memtool daemon, if not already running",
+                "Start the InSight daemon, if not already running",
                 acDaemonStart,
                 opNone,
                 ntOption,
@@ -55,7 +55,7 @@ const struct Option options[OPTION_COUNT] = {
         {
                 "-dk",
                 "--stop",
-                "Stop the memtool daemon, if it is running",
+                "Stop the InSight daemon, if it is running",
                 acDaemonStop,
                 opNone,
                 ntOption,
@@ -64,7 +64,7 @@ const struct Option options[OPTION_COUNT] = {
         {
                 "-dr",
                 "--status",
-                "Show the status of the memtool daemon",
+                "Show the status of the InSight daemon",
                 acDaemonStatus,
                 opNone,
                 ntOption,
@@ -100,7 +100,7 @@ const struct Option options[OPTION_COUNT] = {
         {
                 "-c",
                 "--eval",
-                "Evaluates a command line in memtool's shell syntax",
+                "Evaluates a command line in InSight's shell syntax",
                 acEval,
                 opNone,
                 ntCommand,

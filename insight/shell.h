@@ -13,7 +13,7 @@
 #include <QTextStream>
 #include <QThread>
 
-class Memtool;
+class Insight;
 
 
 class Shell: public QThread
@@ -100,7 +100,7 @@ private:
     QTextStream _out;
     QTextStream _err;
     bool _interactive;
-    Memtool* _memtool;
+    Insight* _insight;
     bool _finished;
     int _lastStatus;
 
