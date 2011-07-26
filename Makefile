@@ -1,7 +1,7 @@
 SOURCEDIR ?= .
 DESTDIR ?= .
 
-SUBDIRS = libmemtool memtoold memtool
+SUBDIRS = libinsight insightd insight
 
 # Where to put binary on 'make install'?
 BIN     = $(DESTDIR)/usr/bin
@@ -23,19 +23,19 @@ build:
 install:
 	@##create install directory
 	@install -d $(DESTDIR)
-	@## libmemtool
-	@install -Dp libmemtool/libmemtool.so.1.0.0 $(LIB)/libmemtool.so.1.0.0
-	@ln -s ./libmemtool.so.1.0.0   $(LIB)/libmemtool.so
-	@ln -s ./libmemtool.so.1.0.0   $(LIB)/libmemtool.so.1
-	@ln -s ./libmemtool.so.1.0.0   $(LIB)/libmemtool.so.1.0
+	@## libinsight
+	@install -Dp libinsight/libinsight.so.1.0.0 $(LIB)/libinsight.so.1.0.0
+	@ln -s ./libinsight.so.1.0.0   $(LIB)/libinsight.so
+	@ln -s ./libinsight.so.1.0.0   $(LIB)/libinsight.so.1
+	@ln -s ./libinsight.so.1.0.0   $(LIB)/libinsight.so.1.0
 	@install -d $(INCLUDE)/
-	@svn export --force libmemtool/include/memtool     $(INCLUDE)/memtool > /dev/null
-	@##memtoold
-	@install -Dp memtoold/memtoold  $(BIN)/memtoold
-	@install -d $(SHARE)/memtool
-	@svn export --force memtoold/scripts   $(SHARE)/memtool/scripts > /dev/null
-	@##memtool
-	@install -Dp memtool/memtool    $(BIN)/memtool
+	@svn export --force libinsight/include/insight     $(INCLUDE)/insight > /dev/null
+	@##insightd
+	@install -Dp insightd/insightd  $(BIN)/insightd
+	@install -d $(SHARE)/insight
+	@svn export --force insightd/scripts   $(SHARE)/insight/scripts > /dev/null
+	@##insight
+	@install -Dp insight/insight    $(BIN)/insight
 
 %:
 	@echo $@
