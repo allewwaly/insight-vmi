@@ -204,7 +204,7 @@ void MemSpecParser::writeSrcFile(const QString& fileName, const QString& src)
 
 void MemSpecParser::setupBuildDir()
 {
-    char buf[] = "/tmp/memtool.XXXXXX";
+    char buf[] = "/tmp/insight.XXXXXX";
     if (!mkdtemp(buf)) {
         int e = errno;
         memSpecParserError(QString("Error creating temporary directory: %1").arg(strerror(e)));

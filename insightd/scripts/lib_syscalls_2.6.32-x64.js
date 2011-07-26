@@ -1,4 +1,4 @@
-// created by gen_syscall_memtool_script.py
+// created by gen_syscall_insight_script.py
 // can be found in diekmann's git
 // 2011-06-07
 

@@ -102,7 +102,7 @@ QT += script \
     gui
 LIBS += -lreadline \
     -L \
-    ../libmemtool \
-    -lmemtool
-INCLUDEPATH += ../libmemtool/include
+    ../libinsight \
+    -linsight
+INCLUDEPATH += ../libinsight/include
 FORMS = memorymapwindow.ui

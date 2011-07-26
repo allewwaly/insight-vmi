@@ -1,10 +1,10 @@
 #!/bin/bash
 
-LIB="libmemtool.so.1"
+LIB="libinsight.so.1"
 
 
-if [ -r ../libmemtool/$LIB ]; then
-	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+LD_LIBRARY_PATH:}../libmemtool"
+if [ -r ../libinsight/$LIB ]; then
+	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+LD_LIBRARY_PATH:}../libinsight"
 elif [ -r ./$LIB ]; then
 	export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+LD_LIBRARY_PATH:}."
 else
@@ -12,4 +12,4 @@ else
 	exit 1
 fi
 
-exec valgrind --tool=callgrind ./memtoold "$@"
+exec valgrind --tool=callgrind ./insightd "$@"

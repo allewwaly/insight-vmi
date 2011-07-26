@@ -49,7 +49,7 @@ public:
      * deadlocks.
      *
      * @param pgd the Page-Global-Directory of the current user process, most likely
-     * the cr3 register content. This value cannot be provided by memtool.
+     * the cr3 register content. This value cannot be provided by InSight.
      */
     void setUserLand(qint64 pgd);
 
