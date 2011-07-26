@@ -209,7 +209,7 @@ function main(){
 							socket.ChangeType("socket");
 							//print(socket.Address())
 							if(socket.Size() == 0){
-								line += "type "+socket.TypeName()+" currently unknown to memorytool; "
+								line += "type "+socket.TypeName()+" currently unknown to InSight; "
 							}
 							//print(socket.Address());
 							

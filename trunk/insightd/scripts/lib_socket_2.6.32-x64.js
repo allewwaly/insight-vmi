@@ -92,7 +92,7 @@ function __getSockaddr(inst, len, userPGD){
 
 function __printSocketMsgHdr(inst, userPGD){
 	//TODO
-	// memorytool doesn't know struct msghdr for some reason
+	// InSight doesn't know struct msghdr for some reason
 	ret = "";
 	inst.AddToAddress(28);
 	var data = inst;

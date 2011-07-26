@@ -10,8 +10,8 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <insight/constdefs.h>
-#include <insight/memtool.h>
-#include <insight/memtoolexception.h>
+#include <insight/insight.h>
+#include <insight/insightexception.h>
 #include <QCoreApplication>
 #include <QDir>
 #include "programoptions.h"
