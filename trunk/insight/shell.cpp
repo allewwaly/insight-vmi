@@ -9,9 +9,9 @@
 #include <stdlib.h>
 #include <readline/readline.h>
 #include <readline/history.h>
-#include <memtool/constdefs.h>
-#include <memtool/memtool.h>
-#include <memtool/memtoolexception.h>
+#include <insight/constdefs.h>
+#include <insight/memtool.h>
+#include <insight/memtoolexception.h>
 #include <QCoreApplication>
 #include <QDir>
 #include "programoptions.h"
@@ -21,7 +21,7 @@ Shell* shell = 0;
 
 
 Shell::Shell(bool interactive, QObject* parent)
-    : QThread(parent), _interactive(interactive), _memtool(0), _lastStatus(0)
+    : QThread(parent), _interactive(interactive), _insight(0), _lastStatus(0)
 {
     // Open the console devices
     _stdin.open(stdin, QIODevice::ReadOnly);
@@ -32,17 +32,17 @@ Shell::Shell(bool interactive, QObject* parent)
     _err.setDevice(&_stderr);
 
     // Create the object in this thread
-    _memtool = new Memtool();
-    _memtool->setOutToStdOut(true);
-    _memtool->setErrToStdErr(true);
+    _insight = new Insight();
+    _insight->setOutToStdOut(true);
+    _insight->setErrToStdErr(true);
 }
 
 
 Shell::~Shell()
 {
 	saveHistory();
-    if (_memtool)
-    	delete _memtool;
+    if (_insight)
+    	delete _insight;
 }
 
 
@@ -174,9 +174,9 @@ void Shell::shellLoop()
 			try {
 				if (line.toLower() == "exit")
 					break;
-				_lastStatus = _memtool->eval(line);
+				_lastStatus = _insight->eval(line);
 			}
-		    catch (MemtoolException e) {
+		    catch (InsightException e) {
 		        _err << "Caught exception at " << e.file << ":" << e.line << ":"
 		        	<< endl
 		            << e.message << endl;
@@ -195,14 +195,14 @@ void Shell::printConnectionError(int error)
 	case crOk:
 		break;
 	case crDaemonNotRunning:
-		_err << "Memtool daemon is not running." << endl;
+		_err << "Insight daemon is not running." << endl;
 		break;
 	case crTooManyConnections:
 		_err << "Too many connections, currently only one connection is "
 				"supported at a time." << endl;
 		break;
 	default:
-		_err << "An unknown error occurred while connecting to the memtool "
+		_err << "An unknown error occurred while connecting to the insight "
 			"daemon, error code is " << error << "." << endl;
 	}
 }
@@ -214,7 +214,7 @@ void Shell::run()
     _lastStatus = 0;
 
     // Try to connect to daemon
-    int connRes = _memtool->connectToDaemon();
+    int connRes = _insight->connectToDaemon();
 
     try {
         switch (programOptions.action()) {
@@ -230,35 +230,35 @@ void Shell::run()
             break;
 
         case acDaemonStart:
-            if (_memtool->isDaemonRunning())
-                _out << "Memtool daemon already running." << endl;
-            else if (_memtool->daemonStart())
-                _out << "Memtool daemon successfully started." << endl;
+            if (_insight->isDaemonRunning())
+                _out << "Insight daemon already running." << endl;
+            else if (_insight->daemonStart())
+                _out << "Insight daemon successfully started." << endl;
             else {
-                _err << "Error starting memtool daemon." << endl;
+                _err << "Error starting insight daemon." << endl;
                 _lastStatus = 1;
             }
             break;
 
         case acDaemonStop:
             if (connRes == crDaemonNotRunning)
-                _out << "Memtool daemon is not running." << endl;
+                _out << "Insight daemon is not running." << endl;
             else if (connRes != crOk)
             	printConnectionError(connRes);
-            else if (_memtool->daemonStop())
-                _out << "Memtool daemon successfully stopped." << endl;
+            else if (_insight->daemonStop())
+                _out << "Insight daemon successfully stopped." << endl;
             else {
-                _err << "Error stopping memtool daemon." << endl;
+                _err << "Error stopping insight daemon." << endl;
                 _lastStatus = 2;
             }
             break;
 
         case acDaemonStatus:
-        	_memtool->setErrToStdErr(false);
-            if (_memtool->isDaemonRunning())
-                _out << "Memtool daemon is running." << endl;
+        	_insight->setErrToStdErr(false);
+            if (_insight->isDaemonRunning())
+                _out << "Insight daemon is running." << endl;
             else
-                _out << "Memtool daemon not running." << endl;
+                _out << "Insight daemon not running." << endl;
             break;
 
         case acSymbolsLoad: {
@@ -270,7 +270,7 @@ void Shell::run()
             else if (connRes != crOk)
         		printConnectionError(connRes);
             else
-            	_lastStatus = _memtool->eval("symbols load " + fileName);
+            	_lastStatus = _insight->eval("symbols load " + fileName);
             break;
         }
 
@@ -282,7 +282,7 @@ void Shell::run()
 				if (!QFile::exists(fileName) ||
 						questionYesNo(QString("Overwrite file \"%1\"?")
 								.arg(programOptions.fileName())))
-					_lastStatus = _memtool->eval("symbols store " + fileName);
+					_lastStatus = _insight->eval("symbols store " + fileName);
         	}
             break;
         }
@@ -301,7 +301,7 @@ void Shell::run()
             else if (connRes != crOk)
             	printConnectionError(connRes);
             else
-            	_lastStatus = _memtool->eval("symbols parse " + dirName);
+            	_lastStatus = _insight->eval("symbols parse " + dirName);
             break;
         }
 
@@ -309,14 +309,14 @@ void Shell::run()
         	if (connRes != crOk)
         		printConnectionError(connRes);
         	else
-        		_lastStatus = _memtool->eval(programOptions.command());
+        		_lastStatus = _insight->eval(programOptions.command());
             break;
 
         case acMemDumpList:
         	if (connRes != crOk)
         		printConnectionError(connRes);
         	else {
-				QStringList list = _memtool->memDumpList();
+				QStringList list = _insight->memDumpList();
 				if (list.isEmpty())
 					output = "No memory dumps loaded.";
 				for (int i = 0; i < list.size(); ++i)
@@ -333,7 +333,7 @@ void Shell::run()
             }
             else if (connRes != crOk)
         		printConnectionError(connRes);
-            else if (_memtool->memDumpLoad(programOptions.fileName()))
+            else if (_insight->memDumpLoad(programOptions.fileName()))
 				output = QString("Successfully loaded \"%1\"")
 							.arg(programOptions.fileName());
 			else {
@@ -346,7 +346,7 @@ void Shell::run()
         case acMemDumpUnload:
             if (connRes != crOk)
         		printConnectionError(connRes);
-            else if (_memtool->memDumpUnload(programOptions.fileName()))
+            else if (_insight->memDumpUnload(programOptions.fileName()))
                 output = QString("Successfully unloaded \"%1\"")
                             .arg(programOptions.fileName());
             else {
@@ -357,7 +357,7 @@ void Shell::run()
         } // end of switch()
 
     }
-    catch (MemtoolException e) {
+    catch (InsightException e) {
         _err << "Caught exception at " << e.file << ":" << e.line << ":" << endl
             << e.message << endl;
         _lastStatus = 6;
