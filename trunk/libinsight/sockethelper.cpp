@@ -9,8 +9,8 @@
 #include <iostream>
 #include <QLocalSocket>
 #include <QThread>
-#include <memtool/constdefs.h>
-#include <memtool/devicemuxer.h>
+#include <insight/constdefs.h>
+#include <insight/devicemuxer.h>
 #include "eventloopthread.h"
 #include "debug.h"
 

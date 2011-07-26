@@ -1,23 +1,23 @@
 TEMPLATE = lib
-TARGET = memtool
+TARGET = insight
 VERSION = 1.0.0
-DEFINES += LIBMEMTOOL_LIBRARY
+DEFINES += LIBINSIGHT_LIBRARY
 CONFIG += debug
 QT += core \
     network
 QT -= gui
 HEADERS += eventloopthread.h \
-    include/memtool/devicemuxer.h \
-    include/memtool/memtool.h \
+    include/insight/devicemuxer.h \
+    include/insight/insight.h \
     sockethelper.h \
-    include/memtool/memtoolexception.h \
-    include/memtool/constdefs.h \
+    include/insight/insightexception.h \
+    include/insight/constdefs.h \
     debug.h
 SOURCES += eventloopthread.cpp \
     devicemuxer.cpp \
     sockethelper.cpp \
-    memtoolexception.cpp \
-    memtool.cpp \
+    insightexception.cpp \
+    insight.cpp \
     constdefs.cpp \
     debug.cpp
 INCLUDEPATH += ./include

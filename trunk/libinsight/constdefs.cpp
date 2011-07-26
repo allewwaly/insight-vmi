@@ -5,9 +5,9 @@
  *      Author: chrschn
  */
 
-#include <memtool/constdefs.h>
+#include <insight/constdefs.h>
 
-const char* mt_history_file = ".memtool/history";
-const char* mt_lock_file = ".memtool/memtool.lock";
-const char* mt_log_file = ".memtool/memtool.log";
-const char* mt_sock_file = ".memtool/memtool.sock";
+const char* mt_history_file = ".insight/history";
+const char* mt_lock_file = ".insight/insight.lock";
+const char* mt_log_file = ".insight/insight.log";
+const char* mt_sock_file = ".insight/insight.sock";

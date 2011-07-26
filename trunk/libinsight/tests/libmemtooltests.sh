@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LIB="libmemtool.so.1"
+LIB="libinsight.so.1"
 
 
 if [ -r ../$LIB ]; then
@@ -12,4 +12,4 @@ else
 	exit 1
 fi
 
-exec ./libmemtooltests "$@"
+exec ./libinsighttests "$@"

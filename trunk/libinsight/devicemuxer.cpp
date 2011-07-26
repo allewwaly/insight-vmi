@@ -5,7 +5,7 @@
  *      Author: chrschn
  */
 
-#include <memtool/devicemuxer.h>
+#include <insight/devicemuxer.h>
 #include <string.h>
 #include <QMutex>
 #include <QMutexLocker>

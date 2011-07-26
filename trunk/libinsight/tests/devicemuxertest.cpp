@@ -6,7 +6,7 @@
  */
 
 #include "devicemuxertest.h"
-#include <memtool/devicemuxer.h>
+#include <insight/devicemuxer.h>
 #include <QTest>
 #include <QByteArray>
 #include <QBuffer>
