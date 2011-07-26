@@ -1,6 +1,6 @@
 TEMPLATE = app
 QMAKE_CXXFLAGS += -g -O0
-TARGET = libmemtooltests
+TARGET = libinsighttests
 QT += core \
     network \
     testlib
@@ -11,4 +11,4 @@ SOURCES += main.cpp \
 INCLUDEPATH += ../include
 LIBS += -L \
     ../ \
-    -lmemtool
+    -linsight

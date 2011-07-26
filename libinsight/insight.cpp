@@ -1,5 +1,5 @@
 /*
- * memtool.cpp
+ * insight.cpp
  *
  *  Created on: 02.08.2010
  *      Author: chrschn
@@ -11,10 +11,10 @@
 #include <QDataStream>
 #include <QCoreApplication>
 #include <QMetaType>
-#include <memtool/constdefs.h>
-#include <memtool/memtool.h>
-#include <memtool/devicemuxer.h>
-#include <memtool/memtoolexception.h>
+#include <insight/constdefs.h>
+#include <insight/insight.h>
+#include <insight/devicemuxer.h>
+#include <insight/insightexception.h>
 #include "sockethelper.h"
 #include "debug.h"
 
@@ -28,23 +28,23 @@ void socket_state_id_foo() { Q_UNUSED(socket_state_id); }
 #define connectOrFail() \
     do { \
         if (connectToDaemon() != crOk) \
-            memtoolError("Could not connect to memtool daemon");\
+            insightError("Could not connect to InSight daemon");\
     } while (0)
 
 
-Memtool::Memtool()
+Insight::Insight()
     : _helper(new SocketHelper())
 {
 }
 
 
-Memtool::~Memtool()
+Insight::~Insight()
 {
     delete _helper;
 }
 
 
-int Memtool::connectToDaemon()
+int Insight::connectToDaemon()
 {
     QString sockFileName = QDir::home().absoluteFilePath(mt_sock_file);
     if (!QFile::exists(sockFileName))
@@ -72,7 +72,7 @@ int Memtool::connectToDaemon()
 }
 
 
-void Memtool::disconnectFromDaemon()
+void Insight::disconnectFromDaemon()
 {
     // Are we already connected?
     if (_helper->state() == QLocalSocket::ConnectingState &&
@@ -82,7 +82,7 @@ void Memtool::disconnectFromDaemon()
 }
 
 
-int Memtool::eval(const QString& cmd)
+int Insight::eval(const QString& cmd)
 {
     connectOrFail();
 
@@ -101,63 +101,63 @@ int Memtool::eval(const QString& cmd)
 }
 
 
-bool Memtool::outToStdOut() const
+bool Insight::outToStdOut() const
 {
 	return _helper->outToStdOut();
 }
 
 
-QString Memtool::readAllStdOut()
+QString Insight::readAllStdOut()
 {
 	QByteArray buf = _helper->out()->readAll();
 	return QString::fromLocal8Bit(buf.constData(), buf.size());
 }
 
 
-QString Memtool::readAllStdErr()
+QString Insight::readAllStdErr()
 {
 	QByteArray buf = _helper->err()->readAll();
 	return QString::fromLocal8Bit(buf.constData(), buf.size());
 }
 
 
-QByteArray Memtool::readAllBinary()
+QByteArray Insight::readAllBinary()
 {
 	return _helper->bin()->readAll();
 }
 
 
-void Memtool::setOutToStdOut(bool value)
+void Insight::setOutToStdOut(bool value)
 {
 	_helper->setOutToStdOut(value);
 }
 
 
-bool Memtool::errToStdErr() const
+bool Insight::errToStdErr() const
 {
 	return _helper->errToStdErr();
 }
 
 
-void Memtool::setErrToStdErr(bool value)
+void Insight::setErrToStdErr(bool value)
 {
 	_helper->setErrToStdErr(value);
 }
 
 
-bool Memtool::isDaemonRunning()
+bool Insight::isDaemonRunning()
 {
 	int ret = connectToDaemon();
     return ret == crOk || ret == crTooManyConnections;
 }
 
 
-bool Memtool::daemonStart()
+bool Insight::daemonStart()
 {
     if (isDaemonRunning())
         return true;
 
-    QString cmd = "memtoold";
+    QString cmd = "insightd";
     QStringList args("--daemon");
 
     QProcess proc;
@@ -168,7 +168,7 @@ bool Memtool::daemonStart()
 }
 
 
-bool Memtool::daemonStop()
+bool Insight::daemonStop()
 {
 	int ret = 0;
     if (isDaemonRunning())
@@ -177,12 +177,12 @@ bool Memtool::daemonStop()
 }
 
 
-QStringList Memtool::memDumpList()
+QStringList Insight::memDumpList()
 {
 	QString cmd = QString("binary %1").arg((int) bdMemDumpList);
     int ret = eval(cmd);
     if (ret)
-    	memtoolError(QString("Error executing command \"%1\", error code #%2")
+    	insightError(QString("Error executing command \"%1\", error code #%2")
     			.arg(cmd)
     			.arg(ret));
 
@@ -194,21 +194,21 @@ QStringList Memtool::memDumpList()
 }
 
 
-bool Memtool::memDumpLoad(const QString& fileName)
+bool Insight::memDumpLoad(const QString& fileName)
 {
     int ret = eval(QString("memory load %1").arg(fileName));
     return ret == 0;
 }
 
 
-bool Memtool::memDumpUnload(const QString& fileName)
+bool Insight::memDumpUnload(const QString& fileName)
 {
     int ret = eval(QString("memory unload %1").arg(fileName));
     return ret == 0;
 }
 
 
-bool Memtool::memDumpUnload(int index)
+bool Insight::memDumpUnload(int index)
 {
     return memDumpUnload(QString::number(index));
 }
