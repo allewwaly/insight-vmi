@@ -1,4 +1,0 @@
-file: /home/domi/kvm/rootkits/ported_rootkits/lyceum-2.46.tar.bz2
-command: tar xjf lyceum-2.46.tar.bz2
-command: lyceum-2.46/lyceum_host 
-
