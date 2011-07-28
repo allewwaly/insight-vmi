@@ -1,7 +1,7 @@
 #summary Sidebar navigation
 
   * [About]
-    * [About#What_is_InSight What is InSight?]
+    * [About#What_is_InSight_? What is InSight?]
     * [About#Background Background]
     * [About#Features Features]
     * [About#How_it_works How it works]
