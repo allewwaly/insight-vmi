@@ -15,9 +15,11 @@ Operating systems organize their state in specific data structures within the *k
   * a pointer to a primitive or composite type,
   * a pointer to a function.
 
-The values of the members with primitive types and function pointers actually represent the system state and steer the behavior of the kernel while the pointers and nested compositions link objects together and logically group the state information. The goal of !InSight is to make this information available to applications that analyze the state of an operating system.
+The values of the members with primitive types and function pointers actually represent the system state and steer the behavior of the kernel while the pointers and nested compositions link objects together and logically group the state information. This results in a *graph* of kernel objects as illustrated in the following figure:
 
-The layout and organization of the kernel memory within the physical memory varies among different operating systems and their particular versions. Without detailed knowledge about the operating system that is being analyzed, the physical memory of a machine only consists of zeros and ones, but has no meaning to an application. This problem has become well-known as the *semantic gap* in the field of virtual machine introspection.
+[https://insight-vmi.googlecode.com/svn/wiki/images/kernel_graph.png]
+
+The goal of !InSight is to make this information available to applications that analyze the state of an operating system. The challenge of this task is that the layout and organization of the kernel memory within the physical memory varies among different operating systems and their particular versions. Without detailed knowledge about the operating system that is being analyzed, the physical memory of a machine only consists of zeros and ones, but has no meaning to an application. This problem has become well-known as the *semantic gap* in the field of virtual machine introspection.
 
 !InSight brings back the semantics into the zeros and ones by applying knowledge about the operating system to the raw physical memory. In doing so, !InSight is able to re-create the kernel objects from the memory as the kernel would see them, including their values and their pointer linkage.
 
