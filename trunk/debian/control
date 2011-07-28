@@ -22,7 +22,7 @@ Description: Front-end to interact with the InSight daemon
 
 Package: insight-daemon
 Architecture: i386 amd64
-Depends: ${shlibs:Depends}, ${misc:Depends}, libreadline6, libqt4-script, libqt4-network, libqt4-gui, libinsight
+Depends: ${shlibs:Depends}, ${misc:Depends}, libreadline6, libqt4-script, libqt4-network, libinsight
 Recommends: insight-scripts
 Description: InSight daemon for memory analysis and forensic applications
  InSight is a tool for bridging the semantic gap in the field of virtual machine
