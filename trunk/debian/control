@@ -17,7 +17,7 @@ Description: Front-end to interact with the InSight daemon
  physical memory of a guest VM. InSight is written in C++ based on the Qt
  libraries and features interactive analysis of kernel objects as well as a
  JavaScript engine for automation of repeating inspection tasks.
-
+ .
  This package contains the front-end part of InSight.
 
 Package: insight-daemon
@@ -31,7 +31,7 @@ Description: InSight daemon for memory analysis and forensic applications
  physical memory of a guest VM. InSight is written in C++ based on the Qt
  libraries and features interactive analysis of kernel objects as well as a
  JavaScript engine for automation of repeating inspection tasks. 
-
+ .
  This package contains the InSight daemon which can handle memory analysis
  requests from the command line or from the InSight front-end.
 
@@ -45,7 +45,7 @@ Description: Sample JavaScript files for memory analysis with InSight
  physical memory of a guest VM. InSight is written in C++ based on the Qt
  libraries and features interactive analysis of kernel objects as well as a
  JavaScript engine for automation of repeating inspection tasks. 
-
+ .
  This package contains sample JavaScript files for various analysis tasks.
 
 Package: libinsight
@@ -58,7 +58,7 @@ Description: Shared functionality for InSight daemon and front-end
  physical memory of a guest VM. InSight is written in C++ based on the Qt
  libraries and features interactive analysis of kernel objects as well as a
  JavaScript engine for automation of repeating inspection tasks. 
-
+ .
  This packages contains the library with functions shared among the daemon and
  the front-end.
 
@@ -73,7 +73,7 @@ Description: Developer package for InSight
  physical memory of a guest VM. InSight is written in C++ based on the Qt
  libraries and features interactive analysis of kernel objects as well as a
  JavaScript engine for automation of repeating inspection tasks. 
-
+ .
  This package contains the development files.
 
 Package: insight-doc
@@ -85,5 +85,5 @@ Description: A semantic bridge for virtual machine introspection and forensic ap
  physical memory of a guest VM. InSight is written in C++ based on the Qt
  libraries and features interactive analysis of kernel objects as well as a
  JavaScript engine for automation of repeating inspection tasks.
-
+ .
  This package contains the documentation.
