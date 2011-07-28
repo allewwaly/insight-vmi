@@ -37,7 +37,7 @@ The goal of !InSight is to make this information available to applications that 
 
 = How it works =
 
-In order to extract kernel objects out of a machine's pyhsical memory, !LinSight requires and applies the following information to it:
+In order to extract kernel objects out of a machine's pyhsical memory, !InSight requires and applies the following information to it:
 
   # layout of the kernel's virtual memory
   # layout and size of kernel data structures
