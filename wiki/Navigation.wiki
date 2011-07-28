@@ -1,0 +1,12 @@
+#summary Sidebar navigation
+
+  * [About]
+    * [About#What_is_InSight What is InSight?]
+    * [About#Background Background]
+    * [About#Features Features]
+    * [About#How_it_works How it works]
+  * [GettingStarted Getting started]
+    * [Installation]
+    * [LinuxDebugSymbols Debugging symbols]
+    * [CommandLineInterface Command Line Interface]
+    * [ScriptingEngine Scripting Engine]
