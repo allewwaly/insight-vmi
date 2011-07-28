@@ -1,5 +1,9 @@
 #summary What is InSight?
 
+= About =
+
+<wiki:toc max_depth="1" />
+
 = What is !InSight? =
 
 !InSight is a memory analysis tool for the IA-32 (x86) and AMD64 platform that makes all kernel objects of an operating system available for further analysis. It operates on physical memory dumps stored on disk or on the guest physical memory of a running virtual machine that a hypervisor makes available. Therefore !InSight lends itself to applications of virtual machine introspection (VMI), digital forensic analysis, malware analysis, as well as kernel debugging.
