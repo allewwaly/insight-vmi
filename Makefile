@@ -1,13 +1,14 @@
 SOURCEDIR ?= .
 DESTDIR ?= .
+PREFIX ?= /usr
 
 SUBDIRS = libinsight insightd insight
 
 # Where to put binary on 'make install'?
-BIN     = $(DESTDIR)/usr/bin
-LIB     = $(DESTDIR)/usr/lib
-INCLUDE = $(DESTDIR)/usr/include
-SHARE   = $(DESTDIR)/usr/share
+BIN     = $(DESTDIR)$(PREFIX)/bin
+LIB     = $(DESTDIR)$(PREFIX)/lib
+INCLUDE = $(DESTDIR)$(PREFIX)/include
+SHARE   = $(DESTDIR)$(PREFIX)/share
 
 all: build
 
@@ -26,20 +27,20 @@ build:
 
 install:
 	@##create install directory
-	@install -d $(DESTDIR)
+	@install -v -d $(DESTDIR)
 	@## libinsight
-	@install -Dp libinsight/libinsight.so.1.0.0 $(LIB)/libinsight.so.1.0.0
-	@ln -s ./libinsight.so.1.0.0   $(LIB)/libinsight.so
-	@ln -s ./libinsight.so.1.0.0   $(LIB)/libinsight.so.1
-	@ln -s ./libinsight.so.1.0.0   $(LIB)/libinsight.so.1.0
-	@install -d $(INCLUDE)/
+	@install -v -Dp libinsight/libinsight.so.1.0.0 $(LIB)/libinsight.so.1.0.0
+	@ln -sv ./libinsight.so.1.0.0   $(LIB)/libinsight.so
+	@ln -sv ./libinsight.so.1.0.0   $(LIB)/libinsight.so.1
+	@ln -sv ./libinsight.so.1.0.0   $(LIB)/libinsight.so.1.0
+	@install -v -d $(INCLUDE)/
 	@svn export --force libinsight/include/insight     $(INCLUDE)/insight > /dev/null
 	@##insightd
-	@install -Dp insightd/insightd  $(BIN)/insightd
-	@install -d $(SHARE)/insight
+	@install -v -Dp insightd/insightd  $(BIN)/insightd
+	@install -v -d $(SHARE)/insight
 	@svn export --force insightd/scripts   $(SHARE)/insight/scripts > /dev/null
 	@##insight
-	@install -Dp insight/insight    $(BIN)/insight
+	@install -v -Dp insight/insight    $(BIN)/insight
 
 #%:
 #	@echo $@
