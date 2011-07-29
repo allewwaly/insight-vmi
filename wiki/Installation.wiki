@@ -1,5 +1,5 @@
 #summary Installation of InSight
-#sidebar Navigation
+#labels Phase-Deploy,Featured
 
 = Installation =
 
