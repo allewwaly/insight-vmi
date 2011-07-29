@@ -77,8 +77,8 @@ Install the generated packages using `dpkg` (the exact package names might diffe
 
 {{{
 sudo dpkg -i \
-    ./linux-image-$(uname -r)-dbg*.deb \
-    ./linux-headers-$(uname -r)-dbg*.deb
+    ./linux-image-*-dbg*.deb \
+    ./linux-headers-*-dbg*.deb
 }}}
 
 You are now ready to reboot your machine into the new kernel.
