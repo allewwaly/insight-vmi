@@ -10,13 +10,15 @@ The foundation of !InSight's ability to extract kernel objects out of physical m
 
 = Generating Debugging Symbols =
 
-In order to create the debugging symbols for a Linux kernel, the kernel image of the system _begin analzed_ must be compiled with symbol generation switched on. If you intend to inspect a system running inside of a virtual machine, follow the instructions below from _within_ the virtual machine.
+In order to create the debugging symbols for a Linux kernel, the kernel image of the system _begin analzed_ must be compiled with symbol generation switched on. If you intend to inspect a system running inside of a virtual machine, follow the instructions below from _within_ the virtual machine. 
 
-*Note:* This process does neither influence the semantics nor the performance of the resulting kernel image!
+In addition, this process requires a lot of disk space, typically more than 10GB. For a virtual machine environment, you might consider to dedicate a separate virtual disk to the machine that is used exclusively for this purpose. This keeps the primary disk image of the guest much smaller and easier to handle.
+
+*Note:* The creation of debugging symbols does neither influence the semantics nor the performance of the resulting kernel image!
 
 == Compiling the Kernel from Source ==
 
-Unpack the source code of the running and change to its directory. Most Linux distributions provide means to obtain the source code of the distribution's kernel including all patches and additions. Consult the handbook of your package manager on how to do this. For a Debian and derived distributions such as Ubuntu, skip this section and [#Creating_Debian_Kernel_Packages continue below].
+Unpack the source code of the running and change to its directory. Most Linux distributions provide means to obtain the source code of the distribution's kernel including all patches and additions. Consult the handbook of your package manager on how to do this. For Debian and derived distributions such as Ubuntu, skip this section and [#Creating_Debian_Kernel_Packages continue below].
 
 Start by creating a backup copy of the original `Makefile`:
 
@@ -61,3 +63,21 @@ Now edit your bootloader's configuration files (most likely `/boot/grub/menu.lst
 
 == Creating Debian Kernel Packages ==
 
+Debian and derived distributions such as Ubuntu come with a handy tool called `make-kpkg` that creates custom kernel packages. These packages integrate the new kernel seamlessly into all dependent mechanisms such as creation of `initrd` files, compilation of binary modules and the configuration of the bootloader.
+
+In the directory [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/ trunk/tools] of the !InSight source, we provide an additional helper script
+[https://code.google.com/p/insight-vmi/source/browse/trunk/tools/make-debug-kpkg make-debug-kpkg] that fetches the source of the running kernel, prepares it for debugging symbol generation, compiles it, and creates the kernel packages utilizing `make-kpkg`. Execute this script from within the directory you want the packages to be built, for example:
+
+{{{
+cd /usr/src && sudo /path/to/insight-vmi/tools/make-debug-kpkg
+}}}
+
+Install the generated packages using `dpkg` (the exact package names might differ for your distribution):
+
+{{{
+sudo dpkg -i \
+    ./linux-image-$(uname -r)-dbg*.deb \
+    ./linux-headers-$(uname -r)-dbg*.deb
+}}}
+
+You are now ready to reboot your machine into the new kernel.
