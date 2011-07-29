@@ -40,11 +40,11 @@ libinsight/
 Makefile
 </pre>
 
-If your system fulfills the prerequisites, the source should compile by changing into the source code directory containing the above listed files and executing:
+If your system fulfills the prerequisites, the source can be compiled by changing into the source code directory containing the above listed files and executing:
 
 <code language="sh">make</code>
 
-In case compilation succeeded, the following files do exist:
+You can verify that the compilation succeeded by assuring that the following files exist:
 
 <pre>
 insight/insight
@@ -52,9 +52,11 @@ insightd/insightd
 libinsight/libinsight.so
 </pre>
 
-To install InSight in the `/usr/local` tree, use the following command:
+To install !InSight in the `/usr/local` tree, use the following command:
 
 <code language="sh">sudo make DESTDIR=/ PREFIX=/usr/local install</code>
+
+You can also run !InSight without installation, see [RunningInsight Running Insight].
 
 == Creating Debian Packages ==
 
