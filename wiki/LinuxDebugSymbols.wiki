@@ -1,5 +1,5 @@
 #summary Generating and parsing debugging symbols for Linux
-#sidebar Navigation
+#labels Phase-Deploy
 
 = Linux Debugging Symbols =
 
