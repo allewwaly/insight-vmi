@@ -31,7 +31,7 @@ The following instructions have been tested on a system with Ubuntu Linux (64-bi
 
 == Compilation and Installation ==
 
-The source directory you just checked out before should contain at least the following directories and files:
+The source directory `insight-vmi` you just checked out before should contain at least the following directories and files:
 
 <pre>
 insight/
@@ -40,7 +40,7 @@ libinsight/
 Makefile
 </pre>
 
-If your system fulfills the prerequisites, the source can be compiled by changing into the source code directory containing the above listed files and executing:
+If your system fulfills the prerequisites, the source can be compiled by changing into the `insight-vmi` directory containing the above listed files and executing:
 
 <code language="sh">make</code>
 
