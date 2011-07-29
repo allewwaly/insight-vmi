@@ -58,7 +58,7 @@ To install InSight in the `/usr/local` tree, use the following command:
 
 == Creating Debian Packages ==
 
-The source code comes with all required control files to create packages for Debian-based distributions such as Ubuntu. This requires one additional package to be installed:
+The source code comes with all required control files to create packages for Debian-based distributions such as Ubuntu. This requires an additional package to be installed:
 
   * dpkg-dev
 
