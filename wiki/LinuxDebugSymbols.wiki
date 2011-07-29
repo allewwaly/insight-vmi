@@ -100,38 +100,101 @@ There are two ways how these files can be passed to !InSight:
     * using the module build system to extract version specific constants
   # If a more user controllable way is desired, the path to the *`System.map` file*, the *object dump file*, and the *configured kernel headers* can be specified. Here, !InSight will use the following data:
     * `System.map` file as specified
-    * object dump file as specified (created by the user with `objdump -W vmlinux > file`)
+    * _uncompressed_ object dump file as specified (created by the user with `objdump -W vmlinux > file`)
     * `.config` file from the specified kernel headers directory
     * using the module build system to extract version specific constants from the specified kernel headers
 
-If the inspected kernel runs inside of a virtual machine, both of these steps can be performed either inside of the virtual machine, in which case !InSight needs to be compiled for that machine, or from the host system. In the latter case, the required files need to be copied over to the host system, or the disk image of the virtual machine needs to be mounted on the host system.
+If the inspected kernel runs inside of a virtual machine, both of these steps can be performed either inside of the virtual machine, in which case !InSight needs to be compiled for that machine, or from the host system. In the latter case, the required files need to be [#Copying_the_Kernel_Headers copied over to the host system], or the disk image of the virtual machine needs to be [#Mounting_a_Virtual_Disk_Image mounted on the host system].
 
 == Copying the Kernel Headers ==
 
-If an SSH server is running inside of the virtual machine, the easiest way to copy the required files is to utilize `tar` over the SSH connection. This ensures that all symbolic links in the kernel source or headers directory are correctly restored. The following command does this trick (replace `vmhost, `VER`, and all directories accordingly):
+If an SSH server is running inside of the virtual machine, the easiest way to copy the required files is to utilize `tar` over the SSH connection. This ensures that all symbolic links in the kernel source or headers directory are correctly restored. The following command does this trick (replace `vmhost, `OVER`, `KVER`, and all directories accordingly):
 
 {{{
 mkdir /tmp/vmfiles
-VER=2.6.38-10-generic-dbg
+OVER=2.6.38-10-generic-dbg
+KVER=2.6.38.7-10-generic-dbg
 ssh vmhost tar -C / -cf - \
-    /boot/System.map-$VER \
-    /usr/src/objdump-$VER.lzma \
-    /usr/src/linux-headers-$VER \
-    | tar -C /tmp/vmfiles -xf -
+    /usr/src/objdump-$OVER.lzma \
+    /boot/System.map-$KVER \
+    /usr/src/linux-headers-$KVER \
+    | tar -C /tmp/vmfiles -xvf -
 }}}
+
+Now you have all required files and directories available on the host for [#Parsing_Symbols_with_InSight processing by InSight].
 
 == Mounting a Virtual Disk Image ==
 
-If the inspected kernel runs inside of a virtual machine, both of these steps can be performed either inside of the virtual machine, in which case !InSight needs to be compiled for that machine, or from the host system. In the latter case, the disk image of the virtual machine
+When using KVM or QEMU as the hypervisor, the disks in raw format can be directly mounted into the host's file system. To check if a file, for example `image-file.bin`, is in raw format, the `qemu-img` utility can be used:
 
 {{{
->>> symbols parse /usr/src/linux-2.6.39-gentoo-r3
-Successfully parsed the memory specifications in 1 sec
-Parsing line 1089141, 0:15 elapsed
+qemu-img info image-file.bin
 }}}
 
+This tool is also able to convert an existing image into raw format. Details can be found in the corresponding man page.
+
+*Warning: Power down the virtual machine before mounting the disk image!*
+
+Mounting a raw disk image works in conjunction with the kernels loop block devices. Therefore the module `loop` must be loaded first, if it is not directly built into the kernel:
+
 {{{
->>> symbols store /tmp/insight-vmi/linux-2.6.39-gentoo-r3.ksym
+sudo modprobe loop
+}}}
+
+Now find an unused loop device and link it with the image file, but with an offset of 63*512 bytes. The offset will skip the hold virtual hard disk's management sectors:
+
+{{{
+sudo su -                   # become root
+DEV=$(losetup --find) &&
+losetup -o $((63 * 512)) $DEV image-file.bin &&
+mount -o ro $DEV /mnt
+}}}
+
+You should now be able to browse the guest's file system when entering the `/mnt` directory. When !InSight is done with [#Parsing_Symbols_with_InSight parsing the debugging symbols], unmount the disk image again:
+
+{{{
+umount $DEV && losetup -d $DEV
+}}}
+
+== Parsing Symbols with !InSight ==
+
+When either the build directory of the kernel source tree or the `System.map`, object dump, and kernel headers directory have been made available, !InSight is ready to parse the debugging symbols. The best way to do so is starting `insightd` and using its shell. The syntax is either
+<pre>  symbols parse <kernel_src></pre>
+or
+<pre>  symbols parse <objdump> <System.map> <kernel_headers></pre>
+depending on the available data. While the symbols are being processed, the progress is being displayed. At the end of the operation, you will see a short statistic about the resulting type database:
+
+{{{
+>>> symbols parse /mnt/usr/src/linux-2.6.38
+Successfully parsed the memory specifications in 4 sec
+Parsing 41294701 lines (2218604348 bytes) finished.
+Statistics:
+  | No. of types:                  171654         
+  | No. of types by name:           35166         
+  | No. of types by ID:           2082826         
+  | No. of types by hash:          171654         
+  | No of "struct list_head":         781         
+  | No of "struct hlist_node":         63         
+  | No. of variables:               31761         
+  | No. of variables by ID:         31761         
+  | No. of variables by name:       31761         
+  | There are 175 referencing types still waiting for 131 missing types.
+  `-------------------------------------------
+Parsing finish in 11 min 55 sec (57746 lines per second).
+}}}
+
+== Storing Symbols Database ==
+
+!InSight needs to parse the debugging symbols only once, they can then be stored in a custom data format for future use. The corresponding command is:
+
+<pre>  symbols store <dest_file></pre>
+
+For example:
+
+{{{
+>>> symbols store insight-2.6.38-10-generic-dbg.ksym
 Writing symbols finished (18948166 bytes written).
 Writing of 18948166 bytes finished in 4 sec (3982380 byte/s).
 }}}
+
+With this final step, !InSight is prepared to be used for memory analysis for this kernel version. To learn more about how !InSight can be used, you might be interested in reading about the [InSightShell InSight shell] and the [ScriptingEngine JavaScript engine].
