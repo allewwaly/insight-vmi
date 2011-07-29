@@ -54,7 +54,8 @@ libinsight/libinsight.so
 
 To install !InSight in the `/usr/local` tree, use the following command:
 
-<code language="sh">sudo make DESTDIR=/ PREFIX=/usr/local install</code>
+<code language="sh">sudo make DESTDIR=/ PREFIX=/usr/local install &&
+sudo ldconfig</code>
 
 You can also run !InSight without installation, see [RunningInsight Running Insight].
 
