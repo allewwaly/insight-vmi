@@ -1,4 +1,5 @@
 #summary Generating and parsing debugging symbols for Linux
+#sidebar Navigation
 
 = Linux Debugging Symbols =
 
