@@ -91,11 +91,11 @@ Type "exit" to leave this shell.
 || `-sp` _file_, `--parse-symbols` _srcdir_ || Parse the [LinuxDebugSymbols debugging symbols] from the given kernel source directory _srcdir_ ||
 || `-sl` _file_, `--load-symbols` _file_    || Read in previously saved debugging symbols from _file_ ||
 || `-ss` _file_, `--store` _file_           || Store the currently loaded debugging symbols as _file_ ||
-|| `-ds`, `--start`                         || Start the InSight daemon, if not already running ||
-|| `-dk`, `--stop`                          || Stop the InSight daemon, if it is running ||
-|| `-dr`, `--status`                        || Show the status of the InSight daemon ||
+|| `-ds`, `--start`                         || Start the !InSight daemon, if not already running ||
+|| `-dk`, `--stop`                          || Stop the !InSight daemon, if it is running ||
+|| `-dr`, `--status`                        || Show the status of the !InSight daemon ||
 || `-md`, `--list-memdumps`                 || List the currently loaded memory dumps ||
 || `-ml` _file_, `--load-memdump` _file_    || Load a memory dump from _file_ ||
 || `-mu`, `--unload-memdump` _file_|_index_ || Unload a previously memory dump loaded from _file_ or being listed in the list at index _index_ ||
-|| `-c` _command_, `--eval` _command_       || Evaluates _command_ in InSight's [InSightShell shell syntax] ||
+|| `-c` _command_, `--eval` _command_       || Evaluates _command_ in !InSight's [InSightShell shell syntax] ||
 || `-h`, `--help`                           || Display list of command line parameters ||
