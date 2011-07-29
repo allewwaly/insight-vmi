@@ -82,3 +82,56 @@ sudo dpkg -i \
 }}}
 
 You are now ready to reboot your machine into the new kernel.
+
+= Parsing Debugging Symbols =
+
+Once the debugging symbols are available, !InSight needs to parse them to build its internal type database. This step is only necessary once and takes several minutes to complete. !InSight requires the following information to parse the debugging symbols:
+
+  * path to the object dump file of the kernel
+  * path to the `System.map` file of the kernel
+  * path to the configured header files of the kernel
+
+There are two ways how these files can be passed to !InSight:
+
+  # The easiest way is to make the path to the *kernel source directory* available that was previously used to compile the kernel. In that case, !InSight will use the following data from this directory:
+    * `System.map` file
+    * extracting debugging symbols from the `vmlinux` file on the fly using the `objdump` utility
+    * `.config` file
+    * using the module build system to extract version specific constants
+  # If a more user controllable way is desired, the path to the *`System.map` file*, the *object dump file*, and the *configured kernel headers* can be specified. Here, !InSight will use the following data:
+    * `System.map` file as specified
+    * object dump file as specified (created by the user with `objdump -W vmlinux > file`)
+    * `.config` file from the specified kernel headers directory
+    * using the module build system to extract version specific constants from the specified kernel headers
+
+If the inspected kernel runs inside of a virtual machine, both of these steps can be performed either inside of the virtual machine, in which case !InSight needs to be compiled for that machine, or from the host system. In the latter case, the required files need to be copied over to the host system, or the disk image of the virtual machine needs to be mounted on the host system.
+
+== Copying the Kernel Headers ==
+
+If an SSH server is running inside of the virtual machine, the easiest way to copy the required files is to utilize `tar` over the SSH connection. This ensures that all symbolic links in the kernel source or headers directory are correctly restored. The following command does this trick (replace `vmhost, `VER`, and all directories accordingly):
+
+{{{
+mkdir /tmp/vmfiles
+VER=2.6.38-10-generic-dbg
+ssh vmhost tar -C / -cf - \
+    /boot/System.map-$VER \
+    /usr/src/objdump-$VER.lzma \
+    /usr/src/linux-headers-$VER \
+    | tar -C /tmp/vmfiles -xf -
+}}}
+
+== Mounting a Virtual Disk Image ==
+
+If the inspected kernel runs inside of a virtual machine, both of these steps can be performed either inside of the virtual machine, in which case !InSight needs to be compiled for that machine, or from the host system. In the latter case, the disk image of the virtual machine
+
+{{{
+>>> symbols parse /usr/src/linux-2.6.39-gentoo-r3
+Successfully parsed the memory specifications in 1 sec
+Parsing line 1089141, 0:15 elapsed
+}}}
+
+{{{
+>>> symbols store /tmp/insight-vmi/linux-2.6.39-gentoo-r3.ksym
+Writing symbols finished (18948166 bytes written).
+Writing of 18948166 bytes finished in 4 sec (3982380 byte/s).
+}}}
