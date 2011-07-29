@@ -8,6 +8,6 @@
   * [GettingStarted Getting Started]
     * [Installation]
     * [RunningInSight Running InSight]
-    * [LinuxDebugSymbols Parsing Debugging Symbols]
+    * [LinuxDebugSymbols Debugging Symbols]
     * [InSightShell Using the InSight Shell]
     * [ScriptingEngine Using the Scripting Engine]
