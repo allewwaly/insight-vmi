@@ -91,7 +91,7 @@ namespace str {
     static const char* locAddr   = "DW_OP_" LOC_ADDR;
     static const char* locOffset = "DW_OP_" LOC_OFFSET;
 
-    static const char* regexErrorMsg = "Regex \"%1\" did not match the following string: %2";
+    static const char* regexErrorMsg = "Regex \"%1\" did not match the following string: \"%2\"";
 };
 
 
@@ -272,8 +272,11 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
         break;
     }
     case psUpperBound: {
+    	// Ignore bound references to other types
+        if (rxId.exactMatch(value))
+        	break;
         // This can be decimal or integer encoded
-        if (!rxBound.exactMatch(value))
+        else if (!rxBound.exactMatch(value))
             parserError(QString(str::regexErrorMsg).arg(rxBound.pattern()).arg(value));
         parseInt(i, rxBound.cap(1), &ok);
         _pInfo->setUpperBound(i);
