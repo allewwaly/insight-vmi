@@ -9,5 +9,5 @@
     * [Installation]
     * [RunningInSight Running InSight]
     * [LinuxDebugSymbols Debugging Symbols]
-    * [InSightShell Using the InSight Shell]
-    * [ScriptingEngine Using the Scripting Engine]
+    * [InSightShell The InSight Shell]
+    * [ScriptingEngine The Scripting Engine]
