@@ -1,0 +1,7 @@
+#summary Getting started with InSight
+
+  * [Installation]
+  * [RunningInSight Running InSight]
+  * [LinuxDebugSymbols Debugging Symbols]
+  * [InSightShell The InSight Shell]
+  * [ScriptingEngine The Scripting Engine]
