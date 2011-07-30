@@ -12,5 +12,5 @@
     * [LinuxDebugSymbols Debugging Symbols]
     * [InSightShell The InSight Shell]
     * [ScriptingEngine The Scripting Engine]
-  * [https://code.google.com/p/insight-vmi/w/list All Pages]
-  *
+----
+  [https://code.google.com/p/insight-vmi/w/list All Pages]
