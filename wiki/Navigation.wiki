@@ -1,5 +1,6 @@
 #summary Sidebar navigation
 
+  * [Home]
   * [About]
     * [About#What_is_InSight_? What is InSight?]
     * [About#Background Background]
