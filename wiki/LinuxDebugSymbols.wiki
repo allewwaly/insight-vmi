@@ -162,7 +162,11 @@ When either the build directory of the kernel source tree or the `System.map`, o
 <pre>  symbols parse <kernel_src></pre>
 or
 <pre>  symbols parse <objdump> <System.map> <kernel_headers></pre>
-depending on the available data. While the symbols are being processed, the progress is being displayed. At the end of the operation, you will see a short statistic about the resulting type database:
+depending on the available data. 
+
+*Note:* The `<objdump>` file mentioned above must _not_ be compressed!
+
+While the symbols are being processed, the progress is being displayed. At the end of the operation, you will see a short statistic about the resulting type database:
 
 {{{
 >>> symbols parse /mnt/usr/src/linux-2.6.38
