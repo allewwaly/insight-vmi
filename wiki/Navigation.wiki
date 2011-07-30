@@ -1,6 +1,6 @@
 #summary Sidebar navigation
 
-  * [Home]
+  * [https://code.google.com/p/insight-vmi/ Home]
   * [About]
     * [About#What_is_InSight_? What is InSight?]
     * [About#Background Background]
