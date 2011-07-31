@@ -1,5 +1,5 @@
 #summary Describes usage of the InSight shell for management and analysis
-#labels Phase-Usage
+#labels Phase-Usage,Featured
 
 = The !InSight Shell =
 
