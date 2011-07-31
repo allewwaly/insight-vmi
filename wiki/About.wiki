@@ -37,8 +37,8 @@ The goal of !InSight is to make this information available to applications that 
   * support for 32-bit and 64-bit addressing schemes with and without PAE
   * re-creation of kernel objects for the Linux kernel
   * automatic de-referencing of pointers to futher objects
-  * an interactive shell for manual analysis of kernel objects
-  * a !JavaScript engine for automated analysis of repeating or complex tasks
+  * an [InSightShell interactive shell] for manual analysis of kernel objects
+  * a [ScriptingEngine JavaScript engine] for automated analysis of repeating or complex tasks
 
 = How it works =
 
