@@ -5,28 +5,28 @@
 
 The first part describes how to compile !InSight from sources, optionally create Debian packages, install it. and set it up.
 
-See: [Installation]
+Visit: [Installation]
 
 = Running !InSight =
 
 After !InSight has been installed, it has to be started. The second part explains how !InSight is run from command line, how the `insight` front-end and the `insightd` daemon work together and which command line parameters they offer.
 
-See: RunningInSight
+Visit: RunningInSight
 
 = Debugging Symbols =
 
 Before any analysis can be performed, !InSight needs to parse the debugging symbols of the inspected operating system. This part shows how the debugging symbols can be obtained and how to process them with !InSight.
 
-See: DebugSymbols
+Visit: DebugSymbols
 
 = The !InSight Shell =
 
 The !InSight shell is a powerful interface to process debugging symbols, load memory files, inspect data types and variables, execute scripts, amongst other things. This part describes the basic usage of the shell and how to perform first analysis tasks.
 
-See: InSightShell
+Visit: InSightShell
 
 = The Scripting Engine =
 
 !InSight comes with a !JavaScript engine that allows to interact with kernel objects by means of !JavaScript objects. This provides a very flexible and intuitive way to write analysis script for automation of complex analysis tasks.
 
-See: ScriptingEngine
+Visit: ScriptingEngine
