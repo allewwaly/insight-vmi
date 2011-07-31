@@ -1,5 +1,5 @@
 #summary Mailing lists for the InSight project
-#labels Featured,Phase-Support
+#labels Phase-Support
 
 = Mailing Lists =
 http://groups.google.com/intl/en/images/logos/groups_logo_sm.gif
