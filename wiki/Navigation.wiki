@@ -14,4 +14,4 @@
     * [InSightShell The InSight Shell]
     * [ScriptingEngine The Scripting Engine]
   * [RoadMap Road Map]
-  * [MailingLists Contact]
+  * [MailingLists Get in Contact]
