@@ -15,3 +15,5 @@
     * [ScriptingEngine The Scripting Engine]
   * [RoadMap Road Map]
   * [MailingLists Get in Contact]
+
+  * [http://code.google.com/p/insight-vmi/w/list Search Wiki]
