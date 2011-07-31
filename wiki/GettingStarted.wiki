@@ -3,7 +3,7 @@
 
 = Installation =
 
-The first part describes how to compile !InSight from sources, optionally create Debian packages, install it. and set it up.
+The first part describes how to compile !InSight from sources, optionally create Debian packages, install it, and set it up.
 
 Visit: [Installation]
 
@@ -27,6 +27,6 @@ Visit: InSightShell
 
 = The Scripting Engine =
 
-!InSight comes with a !JavaScript engine that allows to interact with kernel objects by means of !JavaScript objects. This provides a very flexible and intuitive way to write analysis script for automation of complex analysis tasks.
+!InSight comes with a !JavaScript engine that allows to interact with kernel objects by means of !JavaScript objects. This provides a very flexible and intuitive way to write analysis scripts for automation of complex analysis tasks.
 
 Visit: ScriptingEngine
