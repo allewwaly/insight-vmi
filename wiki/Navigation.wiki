@@ -16,4 +16,4 @@
   * [RoadMap Road Map]
   * [MailingLists Get in Contact]
 
-  * [/p/insight-vmi/w/list Search Wiki]
+  * [https://code.google.com/p/insight-vmi/w/list Search Wiki]
