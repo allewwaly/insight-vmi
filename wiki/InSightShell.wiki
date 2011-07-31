@@ -1,4 +1,5 @@
 #summary Describes usage of the InSight shell for management and analysis
+#labels Phase-Usage
 
 = The !InSight Shell =
 
@@ -6,7 +7,7 @@
 
 = Introduction =
 
-!InSight provides a shell-like interface for [LinuxDebugSymbols processing debugging symbols], loading and comparing memory files, interactive analysis, [ScriptEngine script execution], etc.
+!InSight provides a shell-like interface for [DebugSymbols processing debugging symbols], loading and comparing memory files, interactive analysis, [ScriptEngine script execution], etc.
 
 The shell can be invoked either by connecting with the `insight` program to a running `insightd` daemon, or by running `insightd` interactively (i. e., without the `--daemon` parameter, see RunningInSight).
 
@@ -53,3 +54,97 @@ Description: This command allows to load, store or parse the kernel debugging sy
   symbols save <ksym_file>       Alias for "store"
   symbols load <ksym_file>       Loads previously stored symbols for usage
 }}}
+
+= Required Data for Analysis =
+
+== Debugging Symbols ==
+
+Before any memory dump can be loaded, the corresponding debugging symbols have to be loaded first. More information on how !InSight can be used to parse the debugging symbols for each supported operating system is described on the DebugSymbols page.
+
+The debugging symbols to be loaded can be specified from [RunningInSight#Command_Line_Parameters_for_insightd command line] or within the shell using the `symbols load` command. The given file can have an absolute path or a path relative to the current working directory. After successfully loading the symbols, some statistics about the types is displayed:
+
+{{{
+>>> symbols load /path/to/insight-2.6.38-10-generic-dbg.ksym
+Reading symbols finished (16476592 bytes read).
+Statistics:
+  | No. of types:                  171654         
+  | No. of types by name:           35166         
+  | No. of types by ID:           2082826         
+  | No. of types by hash:          171654         
+  | No of "struct list_head":         781         
+  | No of "struct hlist_node":         63         
+  | No. of variables:               31761         
+  | No. of variables by ID:         31761         
+  | No. of variables by name:       31761         
+  | There are 175 referencing types still waiting for 131 missing types.
+  `-------------------------------------------
+Reading of 16476592 bytes finished in 3 sec (4125336 byte/s).
+}}}
+
+*Note:* Only one set of debugging symbols can be loaded at a time.
+
+== Memory Files ==
+
+!InSight reads kernel objects from the physical memory of the machine being analyzed. The physical memory must be provided as a file. This can be a regular file, for example, a memory snapshot taken with KVM or QEMU using the `pmemsave` command, or it can be a special device or memory mapped file provided by the hypervisor to allow direct access to the guest physical memory. One or more memory files to be loaded can be specified at the [RunningInSight#Command_Line_Parameters_for_insightd command line]. In addition, they can be loaded and unloaded using the `memory load` and `memory unload` commands of the shell.
+
+{{{
+>>> memory load 20110713-170436.bin
+Loaded [0] 20110713-170436.bin
+>>> memory load 20110713-170601.bin
+Loaded [1] 20110713-170601.bin
+>>> memory unload 0
+Unloaded [0] 20110713-170436.bin
+}}}
+
+The `memory list` command prints a list of currently loaded memory files:
+
+{{{
+>>> memory list
+Loaded memory dumps:
+  [1] 20110713-170601.bin
+}}}
+
+= Analyzing the Data =
+
+Once all required data has been loaded, it can be analyzed interactively in various ways.
+
+== Kernel Memory Specifications ==
+
+As described in [About#How_it_works How It Works], !InSight requires several constants for virtual-to-physical address translation that it collects when parsing the debugging symbols. The command `memory specs` lists these values:
+
+{{{
+>>> memory specs
+ARCHITECTURE          = x86_64
+sizeof(unsigned long) = 8
+PAGE_OFFSET           = 0xffff880000000000
+VMALLOC_START         = 0xffffc90000000000
+VMALLOC_END           = 0xffffe8ffffffffff
+VMEMMAP_START         = 0xffffea0000000000
+VMEMMAP_END           = 0xffffeaffffffffff
+MODULES_VADDR         = 0xffffffffa0000000
+MODULES_END           = 0xffffffffff000000
+START_KERNEL_map      = 0xffffffff80000000
+init_level4_pgt       = 0xffffffff81001000
+}}}
+
+This information is mostly interesting to developers.
+
+== Type Information ==
+
+The type database !InSight has loaded can be inspected with the `list` command:
+
+{{{
+>>> list help
+Command: list
+Description: This command lists various types of read symbols.
+  list sources          List the source files
+  list types            List the types
+  list types-by-id      List the types-by-ID hash
+  list types-by-name    List the types-by-name hash
+  list variables        List the variables
+}}}
+
+The commands `list variables` and `list types` are self-explaining and will be the most interesting for users. Note that these commands will produce very long lists, it may be advisable to [#Shell_Basics pipe the output through filters] such as `grep`.
+
+== Memory Analysis ==
+
