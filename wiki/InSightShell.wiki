@@ -146,5 +146,407 @@ Description: This command lists various types of read symbols.
 
 The commands `list variables` and `list types` are self-explaining and will be the most interesting for users. Note that these commands will produce very long lists, it may be advisable to [#Shell_Basics pipe the output through filters] such as `grep`.
 
+In addition, the `show` command can be used to display details about a type or variable, either by using their hexadecimal ID or their name. For example, it can be used to output information about the global variable "`modules`":
+
+{{{
+>>> show modules
+Found variable with name modules:
+  ID:             0x8a14ef
+  Name:           modules
+  Location:       0xffffffff814575a0
+  Source file:    kernel/module.c:81
+Corresponding type information:
+  ID:             0x2b5a
+  Name:           struct list_head
+  Type:           Struct
+  Size:           16
+  Source file:    arch/x86/kernel/head64.c:19
+  Members:        2
+    0x0000  next:               struct list_head *
+    0x0008  prev:               struct list_head *
+}}}
+
+The following example shows how to resolve chained type definitions to the built-in base type:
+
+{{{
+>>> show pid_t
+Found type with name pid_t:
+  ID:             0x23a
+  Name:           pid_t
+  Type:           Typedef
+  Size:           4
+  Ref. type ID:   0x1b6
+  Ref. type:      __kernel_pid_t
+  Source file:    arch/x86/kernel/head64.c:26
+>>> show 0x1b6
+Found type with ID 0x1b6:
+  ID:             0x1b6
+  Name:           __kernel_pid_t
+  Type:           Typedef
+  Size:           4
+  Ref. type ID:   0xd1
+  Ref. type:      int
+  Source file:    arch/x86/kernel/head64.c:14
+>>> show 0xd1
+Found type with ID 0xd1:
+  ID:             0xd1
+  Name:           int
+  Type:           Int32
+  Size:           4
+}}}
+
 == Memory Analysis ==
 
+The original purpose of !InSight is to make kernel objects available for analysis. The !InSight shell can be used to inspect the kernel objects interactively. This is very helpful to identify object relations and important information for a particular application. The command to access `memory query`, optionally followed by the index of the memory file to read the object from. If the index is omitted, the first memory file will be used.
+
+=== Retrieving Kernel Objects from Global Variables ===
+
+The following example displays the variable `init_tasks` from the first memory file (because no index is given). This variable represents the head to the list of processes on a Linux system. The first first line shows that variable `init_task` is of type *`struct task_struct`* which has the *ID `0x11ba`*. The variable is located at *virtual address `0xffffffff8144b1f0`*. The following lines list all members of `init_task, their *index*, *offsets*, *names*, *types*, and *values*.
+
+{{{
+>>> memory query init_task
+init_task: struct task_struct (ID 0x11ba) @ 0xffffffff8144b1f0
+  0.  0x000  state                       : volatile long int                = 0
+  1.  0x008  stack                       : void *                           = 0xffffffff81416000
+  2.  0x010  usage                       : atomic_t                         = ...
+  3.  0x014  flags                       : unsigned int                     = 2097408
+  4.  0x018  ptrace                      : unsigned int                     = 0
+  5.  0x01c  lock_depth                  : int                              = -1
+  6.  0x020  prio                        : int                              = 140
+  7.  0x024  static_prio                 : int                              = 120
+  8.  0x028  normal_prio                 : int                              = 140
+  9.  0x02c  rt_priority                 : unsigned int                     = 0
+ 10.  0x030  sched_class                 : const struct sched_class *       = ... @ 0xffffffff81305db0
+ 11.  0x038  se                          : struct sched_entity              = ...
+ 12.  0x0c8  rt                          : struct sched_rt_entity           = ...
+ 13.  0x0f0  preempt_notifiers           : struct hlist_head                = ...
+ 14.  0x0f8  fpu_counter                 : unsigned char                    = 0
+ 15.  0x0fc  btrace_seq                  : unsigned int                     = 0
+ 16.  0x100  policy                      : unsigned int                     = 0
+ 17.  0x108  cpus_allowed                : cpumask_t                        = ...
+ 18.  0x148  sched_info                  : struct sched_info                = ...
+ 19.  0x168  tasks                       : struct list_head                 = ...
+ 20.  0x178  pushable_tasks              : struct plist_node                = ...
+ 21.  0x1a0  mm                          : struct mm_struct *               = NULL
+ 22.  0x1a8  active_mm                   : struct mm_struct *               = ... @ 0xffff880017cbbc00
+ 23.  0x1b0  exit_state                  : int                              = 0
+ 24.  0x1b4  exit_code                   : int                              = 0
+ 25.  0x1b8  exit_signal                 : int                              = 0
+ 26.  0x1bc  pdeath_signal               : int                              = 0
+ 27.  0x1c0  personality                 : unsigned int                     = 0
+ 28.  0x1c4  did_exec                    : unsigned int                     = 0
+ 29.  0x1c4  in_execve                   : unsigned int                     = 0
+ 30.  0x1c4  in_iowait                   : unsigned int                     = 0
+ 31.  0x1c4  sched_reset_on_fork         : unsigned int                     = 0
+ 32.  0x1c8  pid                         : pid_t                            = 0
+ 33.  0x1cc  tgid                        : pid_t                            = 0
+ 34.  0x1d0  stack_canary                : long unsigned int                = 13485186408009435704
+ 35.  0x1d8  real_parent                 : struct task_struct *             = ... @ 0xffffffff8144b1f0 (self)
+ 36.  0x1e0  parent                      : struct task_struct *             = ... @ 0xffffffff8144b1f0 (self)
+ 37.  0x1e8  children                    : struct list_head                 = ...
+ 38.  0x1f8  sibling                     : struct list_head                 = ...
+ 39.  0x208  group_leader                : struct task_struct *             = ... @ 0xffffffff8144b1f0 (self)
+ 40.  0x210  ptraced                     : struct list_head                 = ...
+ 41.  0x220  ptrace_entry                : struct list_head                 = ...
+ 42.  0x230  bts                         : struct bts_context *             = NULL
+ 43.  0x238  pids                        : struct pid_link[3]               = ...
+ 44.  0x280  thread_group                : struct list_head                 = ...
+ 45.  0x290  vfork_done                  : struct completion *              = NULL
+ 46.  0x298  set_child_tid               : int *                            = NULL
+ 47.  0x2a0  clear_child_tid             : int *                            = NULL
+ 48.  0x2a8  utime                       : cputime_t                        = 0
+ 49.  0x2b0  stime                       : cputime_t                        = 6
+ 50.  0x2b8  utimescaled                 : cputime_t                        = 0
+ 51.  0x2c0  stimescaled                 : cputime_t                        = 6
+ 52.  0x2c8  gtime                       : cputime_t                        = 0
+ 53.  0x2d0  prev_utime                  : cputime_t                        = 0
+ 54.  0x2d8  prev_stime                  : cputime_t                        = 0
+ 55.  0x2e0  nvcsw                       : long unsigned int                = 0
+ 56.  0x2e8  nivcsw                      : long unsigned int                = 1394
+ 57.  0x2f0  start_time                  : struct timespec                  = ...
+ 58.  0x300  real_start_time             : struct timespec                  = ...
+ 59.  0x310  min_flt                     : long unsigned int                = 0
+ 60.  0x318  maj_flt                     : long unsigned int                = 0
+ 61.  0x320  cputime_expires             : struct task_cputime              = ...
+ 62.  0x338  cpu_timers                  : struct list_head[3]              = ...
+ 63.  0x368  real_cred                   : const struct cred *              = ... @ 0xffffffff81456c90
+ 64.  0x370  cred                        : const struct cred *              = ... @ 0xffffffff81456c90
+ 65.  0x378  cred_guard_mutex            : struct mutex                     = ...
+ 66.  0x398  replacement_session_keyring : struct cred *                    = NULL
+ 67.  0x3a0  comm                        : char[16]                         = "swapper"
+ 68.  0x3b0  link_count                  : int                              = 0
+ 69.  0x3b4  total_link_count            : int                              = 0
+ 70.  0x3b8  sysvsem                     : struct sysv_sem                  = ...
+ 71.  0x3c0  last_switch_count           : long unsigned int                = 0
+ 72.  0x3c8  thread                      : struct thread_struct             = ...
+ 73.  0x488  fs                          : struct fs_struct *               = ... @ 0xffffffff8145f440
+ 74.  0x490  files                       : struct files_struct *            = ... @ 0xffffffff8145f140
+ 75.  0x498  nsproxy                     : struct nsproxy *                 = ... @ 0xffffffff81456870
+ 76.  0x4a0  signal                      : struct signal_struct *           = ... @ 0xffffffff8144b8e0
+ 77.  0x4a8  sighand                     : struct sighand_struct *          = ... @ 0xffffffff8144bca0
+ 78.  0x4b0  blocked                     : sigset_t                         = ...
+ 79.  0x4b8  real_blocked                : sigset_t                         = ...
+ 80.  0x4c0  saved_sigmask               : sigset_t                         = ...
+ 81.  0x4c8  pending                     : struct sigpending                = ...
+ 82.  0x4e0  sas_ss_sp                   : long unsigned int                = 0
+ 83.  0x4e8  sas_ss_size                 : size_t                           = 0
+ 84.  0x4f0  notifier                    : void (*)() *                     = NULL
+ 85.  0x4f8  notifier_data               : void *                           = NULL
+ 86.  0x500  notifier_mask               : sigset_t *                       = NULL
+ 87.  0x508  audit_context               : struct audit_context *           = NULL
+ 88.  0x510  loginuid                    : uid_t                            = 4294967295
+ 89.  0x514  sessionid                   : unsigned int                     = 4294967295
+ 90.  0x518  seccomp                     : seccomp_t                        = ...
+ 91.  0x51c  parent_exec_id              : u32                              = 0
+ 92.  0x520  self_exec_id                : u32                              = 0
+ 93.  0x524  alloc_lock                  : spinlock_t                       = ...
+ 94.  0x528  irqaction                   : struct irqaction *               = NULL
+ 95.  0x530  pi_lock                     : spinlock_t                       = ...
+ 96.  0x538  pi_waiters                  : struct plist_head                = ...
+ 97.  0x558  pi_blocked_on               : struct rt_mutex_waiter *         = NULL
+ 98.  0x560  journal_info                : void *                           = NULL
+ 99.  0x568  bio_list                    : struct bio *                     = NULL
+100.  0x570  bio_tail                    : struct bio * *                   = NULL
+101.  0x578  reclaim_state               : struct reclaim_state *           = NULL
+102.  0x580  backing_dev_info            : struct backing_dev_info *        = NULL
+103.  0x588  io_context                  : struct io_context *              = NULL
+104.  0x590  ptrace_message              : long unsigned int                = 0
+105.  0x598  last_siginfo                : siginfo_t *                      = NULL
+106.  0x5a0  ioac                        : struct task_io_accounting        = ...
+107.  0x5d8  acct_rss_mem1               : u64                              = 0
+108.  0x5e0  acct_vm_mem1                : u64                              = 0
+109.  0x5e8  acct_timexpd                : cputime_t                        = 0
+110.  0x5f0  mems_allowed                : nodemask_t                       = ...
+111.  0x5f8  cpuset_mem_spread_rotor     : int                              = 0
+112.  0x600  cgroups                     : struct css_set *                 = ... @ 0xffffffff81605280
+113.  0x608  cg_list                     : struct list_head                 = ...
+114.  0x618  robust_list                 : struct robust_list_head *        = NULL
+115.  0x620  compat_robust_list          : struct compat_robust_list_head * = NULL
+116.  0x628  pi_state_list               : struct list_head                 = ...
+117.  0x638  pi_state_cache              : struct futex_pi_state *          = NULL
+118.  0x640  perf_event_ctxp             : struct perf_event_context *      = NULL
+119.  0x648  perf_event_mutex            : struct mutex                     = ...
+120.  0x668  perf_event_list             : struct list_head                 = ...
+121.  0x678  mempolicy                   : struct mempolicy *               = NULL
+122.  0x680  il_next                     : short int                        = 0
+123.  0x684  fs_excl                     : atomic_t                         = ...
+124.  0x688  rcu                         : struct rcu_head                  = ...
+125.  0x698  splice_pipe                 : struct pipe_inode_info *         = NULL
+126.  0x6a0  delays                      : struct task_delay_info *         = ... @ 0xffff88001f8de000
+127.  0x6a8  dirties                     : struct prop_local_single         = ...
+128.  0x6c0  timer_slack_ns              : long unsigned int                = 50000
+129.  0x6c8  default_timer_slack_ns      : long unsigned int                = 0
+130.  0x6d0  scm_work_list               : struct list_head *               = NULL
+131.  0x6d8  trace                       : long unsigned int                = 0
+132.  0x6e0  trace_recursion             : long unsigned int                = 0
+133.  0x6e8  stack_start                 : long unsigned int                = 0
+}}}
+
+The values of members are dipslayed as follows:
+  * Values of members representing built-in types are displayed inline (e. g., 128. `timer_slack_ns`).
+  * Values of nested `struct` or `union` members are hinted with three dots (e. g., 127. `dirties`).
+  * Values of `char` pointers or arrays are shown as strings (e. g., 67. `comm`).
+  * Values of other pointers or function pointers show the virtual address they point to (e. g., 1. `stack`).
+  * Values of pointers to `struct` or `union` types are hinted with three dots followed by the vitual address they point to (e. g., 126. `delays`).
+
+For any kernel object that represents a struct or union, their members can be followed by using the common notation `object.member`. From the `init_task` object, for example, we are able to follow member `cred` (no. 64) which holds the credentials of the owner of the process:
+
+{{{
+>>> memory query init_task.cred
+init_task.cred: struct cred (ID 0x628a) @ 0xffffffff81456c90
+ 0.  0x00  usage            : atomic_t                   = ...
+ 1.  0x04  uid              : uid_t                      = 0
+ 2.  0x08  gid              : gid_t                      = 0
+ 3.  0x0c  suid             : uid_t                      = 0
+ 4.  0x10  sgid             : gid_t                      = 0
+ 5.  0x14  euid             : uid_t                      = 0
+ 6.  0x18  egid             : gid_t                      = 0
+ 7.  0x1c  fsuid            : uid_t                      = 0
+ 8.  0x20  fsgid            : gid_t                      = 0
+ 9.  0x24  securebits       : unsigned int               = 0
+10.  0x28  cap_inheritable  : kernel_cap_t               = ...
+11.  0x30  cap_permitted    : kernel_cap_t               = ...
+12.  0x38  cap_effective    : kernel_cap_t               = ...
+13.  0x40  cap_bset         : kernel_cap_t               = ...
+14.  0x48  jit_keyring      : unsigned char              = 0
+15.  0x50  thread_keyring   : struct key *               = NULL
+16.  0x58  request_key_auth : struct key *               = NULL
+17.  0x60  tgcred           : struct thread_group_cred * = ... @ 0xffffffff81456d20
+18.  0x68  security         : void *                     = NULL
+19.  0x70  user             : struct user_struct *       = ... @ 0xffffffff81455ac0
+20.  0x78  group_info       : struct group_info *        = ... @ 0xffffffff81456dc0
+21.  0x80  rcu              : struct rcu_head            = ...
+}}}
+
+From here we can further follow the member `user` (no. 19):
+
+{{{
+>>> memory query init_task.cred.user
+init_task.cred.user: struct user_struct (ID 0x5add) @ 0xffffffff81455ac0
+ 0.  0x00  __count         : atomic_t                = ...
+ 1.  0x04  processes       : atomic_t                = ...
+ 2.  0x08  files           : atomic_t                = ...
+ 3.  0x0c  sigpending      : atomic_t                = ...
+ 4.  0x10  inotify_watches : atomic_t                = ...
+ 5.  0x14  inotify_devs    : atomic_t                = ...
+ 6.  0x18  epoll_watches   : atomic_t                = ...
+ 7.  0x20  mq_bytes        : long unsigned int       = 0
+ 8.  0x28  locked_shm      : long unsigned int       = 0
+ 9.  0x30  uid_keyring     : struct key *            = NULL
+10.  0x38  session_keyring : struct key *            = NULL
+11.  0x40  uidhash_node    : struct hlist_node       = ...
+12.  0x50  uid             : uid_t                   = 0
+13.  0x58  user_ns         : struct user_namespace * = ... @ 0xffffffff81455290
+14.  0x60  locked_vm       : atomic_long_t           = ...
+}}}
+
+This chain can be extended to follow arbitrary paths as long as the memory at the referenced addresses is readable (i. e., not swapped out to disk or in user-land address space).
+
+=== Imitation of Kernel Pointer Magic ===
+
+The kernel organizes objects in efficient data structures by embedding a member of type `struct list_head` for linked lists or of type `struct hlist_node` for hash tables. These lists work by setting the `next` and `prev` pointers to the `list_head` or `hlist_node` _within_ the next and previous object rather to the embedding object itself. This is illustrated in the following figure:
+
+https://insight-vmi.googlecode.com/svn/wiki/images/linked_list.png
+
+These data structures are then are operated by special functions and C macros that "automagically" retrieve the embedding kernel object at runtime by sophisticated address calculations and type casts. As these data structures are prevalent in the kernel code, !InSight tries to imitate this behavior. When !InSight encounters an embedded `list_head` in a data structure `foo`, it assumes that the `next` and `prev` pointers of that `list_head` member do in fact point to the address of the same member embedded in another object of the type `struct foo`. It manipulates the type of the pointers as well as the addresses accordingly. In doing so, the user can easily iterate over all processes starting from `init_task` and following member `tasks` which is of type `list_head`:
+
+{{{
+>>> memory query init_task.comm
+init_task.comm: char[16] (ID 0x2500) @ 0xffffffff8144b590
+"swapper"
+>>> memory query init_task.tasks.next.comm
+init_task.tasks.next.comm: char[16] (ID 0x2500) @ 0xffff88001f8fc3a0
+"init"
+>>> memory query init_task.tasks.next.tasks.next.comm
+init_task.tasks.next.tasks.next.comm: char[16] (ID 0x2500) @ 0xffff88001f8fca90
+"kthreadd"
+}}}
+
+However, this automatic correction of pointers and types might not always produce the correct result for the following reasons:
+  * Some structures embed members of type `list_head` that represent the head of a list to different objects. For example, the member `bus_list` of `struct pci_dev` does in fact point to an object of type `struct pci_bus` rather than to another `pci_dev` object.
+  * The `list_head` type is sometimes used to implement trees in which case the pointing can become quite confusing. For example, the structure `task_struct` has two members of type `struct list_head`, namely `children` and `sibling`. The pointers of `children`, however, point to the member `sibling` of the first or next child, respectively.
+  * The head to some lists are of plain type `struct list_head` and do not give away the type of objects the lists holds. This is shown in the following figure:
+  
+https://insight-vmi.googlecode.com/svn/wiki/images/linked_list_head.png
+
+In all of these cases, the user has to specify the types and offsets manually. We are currently working on a new solution to automatically handle these cases in the future, see RoadMap for further details.
+
+=== Retrieving Kernel Objects from User-Defined Locations ===
+
+In special cases as [Imitation_of_Kernel_Pointer_Magic explained before] or for general debugging, the user can request objects of arbitrary types and at any readable location. This is achieved with the command `memory dump` which adheres to the following general syntax:
+
+`memory dump [index] <char|int|long|type-name|type-id>(.<member>)* @ <address>`
+
+This can be used as follows. For example, we know that the global variable `modules` of type `list_head` is in fact the head to a list of `struct module` objects. This is one of the cases !InSight cannot automatically handle [RoadMap yet]. We can still access the modules by calculating the correct address and requesting an object of type `struct module` at this address
+
+First, we inspect `struct module` with the command: 
+
+{{{
+>>> show module | grep list_head
+    0x0008  list:               struct list_head
+    0x0178  bug_list:           struct list_head
+    0x0208  modules_which_use_me: struct list_head
+}}}
+
+This reveals that the `list` member at offset `0x8` most likely is the member that links to the next object. Next, we need to find the address of the first `module` object. We therefore query the global variable `modules`:
+
+{{{
+>>> memory query modules
+modules: struct list_head (ID 0x2b5a) @ 0xffffffff814575a0
+0.  0x00  next : struct list_head * = ... @ 0xffffffffa02261e8
+1.  0x08  prev : struct list_head * = ... @ 0xffffffffa0000918
+}}}
+
+We see that the `next` pointer points to address `0xffffffffa02261e8`, however we assume that this is the address of member `list` _within_ the `module` object. Consequently, the first object is located at address `0xffffffffa02261e8 - 0x8 = 0xffffffffa02261e0`. So we request an object of type `module` at this address:
+
+{{{
+>>> memory dump module @ 0xffffffffa02261e0
+Caught exception at memorydump.cpp:132
+Message: Found multiple types for module:
+        -> 0x1c519ec - module
+        -> 0xbef3 - module
+        -> 0x2348 - module
+        -> 0x899e4a - module
+}}}
+
+We receive an error message because !InSight knows several types with name `module`. To disambiguate the type, we inspect all suggested types with the `show` command and find the first one to be the correct one. So we re-try our query:
+
+{{{
+>>> mem dump 0x1c519ec @ 0xffffffffa02261e0
+struct module (ID 0x1c519ec) @ ffffffffa02261e0
+ 0.  0x000  state                   : module_state                   = MODULE_STATE_LIVE (0)
+ 1.  0x008  list                    : struct list_head               = ...
+ 2.  0x018  name                    : char[56]                       = "fuse"
+ 3.  0x050  mkobj                   : struct module_kobject          = ...
+ 4.  0x0a8  modinfo_attrs           : struct module_attribute *      = ... @ 0xffff880017ca0400
+ 5.  0x0b0  version                 : const char *                   = NULL
+ 6.  0x0b8  srcversion              : const char *                   = NULL
+ 7.  0x0c0  holders_dir             : struct kobject *               = ... @ 0xffff88001f2bbc40
+ 8.  0x0c8  syms                    : const struct kernel_symbol *   = NULL
+ 9.  0x0d0  crcs                    : const long unsigned int *      = NULL
+10.  0x0d8  num_syms                : unsigned int                   = 0
+11.  0x0e0  kp                      : struct kernel_param *          = ... @ 0xffffffffa0226058
+12.  0x0e8  num_kp                  : unsigned int                   = 2
+13.  0x0ec  num_gpl_syms            : unsigned int                   = 17
+14.  0x0f0  gpl_syms                : const struct kernel_symbol *   = ... @ 0xffffffffa0225d40
+15.  0x0f8  gpl_crcs                : const long unsigned int *      = 0xffffffffa0225e50
+16.  0x100  unused_syms             : const struct kernel_symbol *   = NULL
+17.  0x108  unused_crcs             : const long unsigned int *      = NULL
+18.  0x110  num_unused_syms         : unsigned int                   = 0
+19.  0x114  num_unused_gpl_syms     : unsigned int                   = 0
+20.  0x118  unused_gpl_syms         : const struct kernel_symbol *   = NULL
+21.  0x120  unused_gpl_crcs         : const long unsigned int *      = NULL
+22.  0x128  gpl_future_syms         : const struct kernel_symbol *   = NULL
+23.  0x130  gpl_future_crcs         : const long unsigned int *      = NULL
+24.  0x138  num_gpl_future_syms     : unsigned int                   = 0
+25.  0x13c  num_exentries           : unsigned int                   = 0
+26.  0x140  extable                 : struct exception_table_entry * = NULL
+27.  0x148  init                    : void (*)() *                   = 0xffffffffa022b059
+28.  0x150  module_init             : void *                         = NULL
+29.  0x158  module_core             : void *                         = 0xffffffffa021c000
+30.  0x160  init_size               : unsigned int                   = 0
+31.  0x164  core_size               : unsigned int                   = 49861
+32.  0x168  init_text_size          : unsigned int                   = 0
+33.  0x16c  core_text_size          : unsigned int                   = 36308
+34.  0x170  arch                    : struct mod_arch_specific       = ...
+35.  0x170  taints                  : unsigned int                   = 0
+36.  0x174  num_bugs                : unsigned int                   = 18
+37.  0x178  bug_list                : struct list_head               = ...
+38.  0x188  bug_table               : struct bug_entry *             = ... @ 0xffffffffa0225c67
+39.  0x190  symtab                  : Elf64_Sym *                    = ... @ 0xffffffffa0226468
+40.  0x198  core_symtab             : Elf64_Sym *                    = ... @ 0xffffffffa0226468
+41.  0x1a0  num_symtab              : unsigned int                   = 187
+42.  0x1a4  core_num_syms           : unsigned int                   = 187
+43.  0x1a8  strtab                  : char *                         = ""
+44.  0x1b0  core_strtab             : char *                         = ""
+45.  0x1b8  sect_attrs              : struct module_sect_attrs *     = ... @ 0xffff88001f296800
+46.  0x1c0  notes_attrs             : struct module_notes_attrs *    = ... @ 0xffff88001fbf1a20
+47.  0x1c8  percpu                  : void *                         = NULL
+48.  0x1d0  args                    : char *                         = ""
+49.  0x1d8  tracepoints             : struct tracepoint *            = NULL
+50.  0x1e0  num_tracepoints         : unsigned int                   = 0
+51.  0x1e8  trace_bprintk_fmt_start : const char * *                 = NULL
+52.  0x1f0  num_trace_bprintk_fmt   : unsigned int                   = 0
+53.  0x1f8  trace_events            : struct ftrace_event_call *     = NULL
+54.  0x200  num_trace_events        : unsigned int                   = 0
+55.  0x208  modules_which_use_me    : struct list_head               = ...
+56.  0x218  waiter                  : struct task_struct *           = ... @ 0xffff88001e7222b0
+57.  0x220  exit                    : void (*)() *                   = 0xffffffffa0224dac
+58.  0x228  refptr                  : char *                         = 0x00000000000161c0 (Error reading from virtual address 0x00000000000161c0: address below linear offsets, seems to be user-land memory)
+59.  0x230  ctors                   : ctor_fn_t *                    = NULL
+60.  0x238  num_ctors               : unsigned int                   = 0
+}}}
+
+This time the command succeeded. As the resulting object links to further objects through its `list` member of type `struct list_head`, we can now request further members using the syntax `object.member` as we already did before. No further user intervention is required:
+
+{{{
+>>> mem dump 0x1c519ec.name @ 0xffffffffa02261e0
+char[56] (ID 0xf7f5) @ ffffffffa02261f8
+"fuse"
+>>> mem dump 0x1c519ec.list.next.name @ 0xffffffffa02261e0
+char[56] (ID 0xf7f5) @ ffffffffa0215748
+"loop"
+>>> mem dump 0x1c519ec.list.next.list.next.name @ 0xffffffffa02261e0
+char[56] (ID 0xf7f5) @ ffffffffa01fc408
+"snd_pcm"
+}}}
