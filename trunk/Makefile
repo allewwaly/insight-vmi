@@ -1,6 +1,6 @@
 SOURCEDIR ?= .
 DESTDIR ?= .
-PREFIX ?= /usr
+PREFIX ?= /usr 
 
 SUBDIRS = libinsight insightd insight
 
