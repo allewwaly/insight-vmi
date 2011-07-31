@@ -1,0 +1,55 @@
+#summary Describes usage of the InSight shell for management and analysis
+
+= The !InSight Shell =
+
+<wiki:toc max_depth="2" />
+
+= Introduction =
+
+!InSight provides a shell-like interface for [LinuxDebugSymbols processing debugging symbols], loading and comparing memory files, interactive analysis, [ScriptEngine script execution], etc.
+
+The shell can be invoked either by connecting with the `insight` program to a running `insightd` daemon, or by running `insightd` interactively (i. e., without the `--daemon` parameter, see RunningInSight).
+
+= Shell Basics =
+
+The shell comes with readline support and further convenience functions you might be familiar with from your favorite shell. The following list summarizes these features:
+  * *command history*: Use up and down arrows to browse through previous commands.
+  * *history search*: Use CTRL+R to search the command histroy.
+  * *command abbreviation*: Only the prefix of a command is required, as long as the prefix is not ambiguous, for example "`memory query`" may be abbreviated to "`m q`".
+  * *interrupt support*: Long operations such as script executions may be aborted with CTRL+C, the shell can be closed with CTRL+D.
+  * *pipe support* (_experimental_): The output of one command can be piped to other shell utilities such as `grep`, `sort`, `head`, `tail`, etc. _Note: Pipe support currently *only* works for `insightd`, not for `insight` connected to the daemon._
+
+= Built-in Help =
+
+The shell provides a built-in help for the available commands. If at any point you don't remember the syntax of a command, just try `help` to get a list of available commands:
+
+{{{
+>>> help
+The following represents a complete list of valid commands:
+  binary      Allows to retrieve binary data through a socket connection
+  diff        Generates a list of vectors corresponding to type IDs
+  exit        Exits the program
+  help        Displays some help for a command
+  list        Lists various types of read symbols
+  memory      Load or unload a memory dump
+  script      Executes a QtScript script file
+  show        Shows information about a symbol given by name or ID
+  symbols     Allows to load, store or parse the kernel symbols
+}}}
+
+To get further help for a particular command, enter `<command> help`, for example:
+
+{{{
+>>> symbols help
+Command: symbols
+Description: This command allows to load, store or parse the kernel debugging symbols that are to be used.
+  symbols parse <kernel_src>     Parse the symbols from a kernel source
+                                 tree. Uses "vmlinux" and "System.map"
+                                 from that directory.
+  symbols parse <objdump> <System.map> <kernel_headers>
+                                 Parse the symbols from an objdump output, a
+                                 System.map file and a kernel headers dir.
+  symbols store <ksym_file>      Saves the parsed symbols to a file
+  symbols save <ksym_file>       Alias for "store"
+  symbols load <ksym_file>       Loads previously stored symbols for usage
+}}}
