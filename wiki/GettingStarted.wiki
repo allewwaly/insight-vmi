@@ -1,6 +1,6 @@
 #summary Getting started with InSight
 
-= [Installation] =
+= Installation =
 
 The first part describes how to compile !InSight from sources, optionally create Debian packages, install it. and set it up.
 
