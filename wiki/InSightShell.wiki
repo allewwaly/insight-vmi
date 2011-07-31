@@ -7,7 +7,7 @@
 
 = Introduction =
 
-!InSight provides a shell-like interface for [DebugSymbols processing debugging symbols], loading and comparing memory files, interactive analysis, [ScriptEngine script execution], etc.
+!InSight provides a shell-like interface for [DebugSymbols processing debugging symbols], loading and comparing memory files, interactive analysis, [ScriptingEngine script execution], etc.
 
 The shell can be invoked either by connecting with the `insight` program to a running `insightd` daemon, or by running `insightd` interactively (i. e., without the `--daemon` parameter, see RunningInSight).
 
@@ -550,3 +550,5 @@ char[56] (ID 0xf7f5) @ ffffffffa0215748
 char[56] (ID 0xf7f5) @ ffffffffa01fc408
 "snd_pcm"
 }}}
+
+While this type of analysis is very helpful for getting an overview of the information that can be retrieved and how it can be accessed, it provides little degree of automation. For a more powerful analysis without user interaction, !InSight provides a [ScriptingEngine JavaScript engine] to automate the inspection and share repetitive tasks in functions and libraries.
