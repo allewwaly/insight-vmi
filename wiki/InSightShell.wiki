@@ -469,7 +469,7 @@ Message: Found multiple types for module:
         -> 0x899e4a - module
 }}}
 
-We receive an error message because !InSight knows several types with name `module`. To disambiguate the type, we inspect all suggested types with the `show` command and find the first one to be the correct one. So we re-try our query:
+We receive an error message because !InSight knows several types with name `module`. To disambiguate the type, we inspect all suggested types using their ID with the `show` command and find the first one to be the correct one. So we re-try our query:
 
 {{{
 >>> mem dump 0x1c519ec @ 0xffffffffa02261e0
