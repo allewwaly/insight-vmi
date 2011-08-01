@@ -1,7 +1,13 @@
 #summary Mailing lists for the InSight project
 #labels Phase-Support
 
+= Introduction =
+
+https://insight-vmi.googlecode.com/svn/wiki/images/report-bug.png
+We are grateful for any user feedback we receive concerning our project. If you experience any problems using !InSight or have suggestions how to further improve it, feel free to [https://code.google.com/p/insight-vmi/issues/list file an issue] for our project.
+
 = Mailing Lists =
+
 http://groups.google.com/intl/en/images/logos/groups_logo_sm.gif
 
 The project provides the following mailing lists to support user discussions and coordinate development:
