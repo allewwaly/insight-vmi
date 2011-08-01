@@ -3,7 +3,7 @@
 
 = Road Map =
 
-We plan to add new features to !InSight in future versions. If you would like to see further enhancements to !InSight, feel free to [https://code.google.com/p/insight-vmi/issues/list add a suggestion] to the issues list.
+We plan to add new features to !InSight in future versions. If you would like to see further enhancements to !InSight, feel free to [https://code.google.com/p/insight-vmi/issues/entry?template=Enhancement add a suggestion] to the issues list.
 
 The following list contains the planned enhancements in the order of their priority:
 
