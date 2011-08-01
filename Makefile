@@ -42,6 +42,10 @@ install:
 	@##insight
 	@install -v -Dp insight/insight    $(BIN)/insight
 
+documentation:
+	@for dir in $(SUBDIRS) ; do cd $$dir ; test -f Doxyfile && doxygen ; cd $(PWD) ; done
+	
+
 #%:
 #	@echo $@
 #	@echo "$@ Todo create this target"
