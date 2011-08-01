@@ -517,7 +517,7 @@ void InstancePrototype::injectScriptError(const QString& msg) const
 }
 
 
-QString InstancePrototype::derefUserLand(const QString &pgd) const
+QString InstancePrototype::toStringUserLand(const QString &pgd) const
 {
     try {
         Instance* inst;

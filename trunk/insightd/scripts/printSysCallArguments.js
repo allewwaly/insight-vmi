@@ -281,7 +281,7 @@ function main(){
 			if(tmpInstValid){
 				try{
 				
-					var dereferenced = tmpInst.derefUserLand(userPGD);
+					var dereferenced = tmpInst.toStringUserLand(userPGD);
 					
 					line += " -> \n\t\t"+dereferenced.replace(/\n/g, "\n\t\t");
 					
@@ -292,7 +292,7 @@ function main(){
 						line += " hex: ";
 						var str_filename = "";
 						for(var k = 0; k < 256; k++){
-							var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10)
+							var thisChar = parseInt(tmpInst.toStringUserLand(userPGD), 10)
 							if(thisChar == 0) break;
 							line += thisChar.toString(16)+" ";
 							str_filename += String.fromCharCode(thisChar);
@@ -305,7 +305,7 @@ function main(){
 						line += "\nbuffer content hex (of size "+buffSize+"):\n";
 						var str_buffer = "";
 						for(var k = 0; k < buffSize; k++){
-							var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10);
+							var thisChar = parseInt(tmpInst.toStringUserLand(userPGD), 10);
 							line += thisChar.toString(16)+" ";
 							str_buffer += String.fromCharCode(thisChar);
 							tmpInst.AddToAddress(1);
@@ -324,7 +324,7 @@ function main(){
 							//TODO assuming pointer is 8 byte long
 							var addr = ""; // address of next char *
 							for(var k = 0; k < 8; ++k){
-								var thisChar = parseInt(tmpInst.derefUserLand(userPGD), 10);
+								var thisChar = parseInt(tmpInst.toStringUserLand(userPGD), 10);
 								if(thisChar < 0) thisChar = 256 + thisChar;
 								thisChar = thisChar.toString(16);
 								if(thisChar.length == 1) thisChar = "0"+thisChar;
@@ -334,7 +334,7 @@ function main(){
 							line += "\n\t\t\t" + arg["name"] + "["+ j +"]" + " @ " + "0x"+addr;
 						
 							strInst.SetAddress(addr);
-							line += " -> "+strInst.derefUserLand(userPGD);
+							line += " -> "+strInst.toStringUserLand(userPGD);
 						}
 						
 					}else if(arg["type"] == "struct sockaddr"){

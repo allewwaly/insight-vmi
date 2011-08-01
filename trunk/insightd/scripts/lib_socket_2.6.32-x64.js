@@ -79,12 +79,12 @@ function __getSockaddr(inst, len, userPGD){
 	var ret = "";
 	ret += "(assuming sockaddr_in)\n";
 	inst.ChangeType("sockaddr_in")
-	var dereferenced = inst.derefUserLand(userPGD);
+	var dereferenced = inst.toStringUserLand(userPGD);
 	ret += "\t\t"+dereferenced.replace(/\n/g, "\n\t\t") //indent
 	
 	var sin_addr = inst.sin_addr.s_addr;
-	ret += "\n\t\t\tfurther dereferencing: sin_addr " + sin_addr.derefUserLand(userPGD) + " -> ";
-	var ip_int = parseInt(sin_addr.derefUserLand(userPGD), 10);
+	ret += "\n\t\t\tfurther dereferencing: sin_addr " + sin_addr.toStringUserLand(userPGD) + " -> ";
+	var ip_int = parseInt(sin_addr.toStringUserLand(userPGD), 10);
 	ret += __num2dotNetworkByteOrdering(ip_int);
 	
 	return ret;
@@ -98,11 +98,11 @@ function __printSocketMsgHdr(inst, userPGD){
 	var data = inst;
 	data.ChangeType("char");
 	
-	//print(data.derefUserLand(userPGD));
+	//print(data.toStringUserLand(userPGD));
 	
 	inst.AddToAddress(4);
 	inst.ChangeType("__kernel_size_t");
-	var len = inst.derefUserLand(userPGD);
+	var len = inst.toStringUserLand(userPGD);
 	//print(len)
 	
 	len = parseInt(len, 10);

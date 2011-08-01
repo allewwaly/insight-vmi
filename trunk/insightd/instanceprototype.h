@@ -563,7 +563,7 @@ public slots:
      * @return the same as toString() but tries to access user-land memory,
      * if possible, using the page table specified as \a pgd
      */
-    QString derefUserLand(const QString &pgd) const;
+    QString toStringUserLand(const QString &pgd) const;
 
 private:
     inline Instance* thisInstance() const;
