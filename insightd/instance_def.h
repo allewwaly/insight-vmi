@@ -45,7 +45,8 @@ public:
             const QStringList& parentNames, VirtualMemory* vmem, int id = -1);
 
     /**
-     * @return the ID of this instance, if it is a variable instance, -1 otherwise
+     * @return the ID of this instance, if it is a variable instance, -1
+     * otherwise
      */
     int id() const;
 
@@ -56,12 +57,14 @@ public:
 
     /**
      * @return the virtual address of the variable in memory
+     * \sa setAddress()
      */
     quint64 address() const;
 
     /**
      * Sets the virtual addres of the variable in memory
      * @param addr the new virtual address
+     * \sa address()
      */
     void setAddress(quint64 addr);
 
@@ -77,22 +80,27 @@ public:
     quint64 endAddress() const;
 
     /**
-     * This gives you the (short) name of this Instance, i. e., its name its
-     * parent's struct, e. g. \c next.
+     * This gives the (short) name of this Instance, i. e., its name its
+     * parent's struct. For example, if you have accessed this Instance via
+     * \c init_task.children.next, this will return \c next.
      * @return the name of this instance
+     * \sa setName()
      */
     QString name() const;
 
     /**
-     * Sets the name of this instance
+     * Sets the name of this instance.
      * @param name new name for this instance
+     * \sa name()
      */
     void setName(const QString& name);
 
     /**
      * This function returns the full name of the parent's struct, as it was
-     * found, e. g. \c init_task.children
+     * found. For example, if you have accessed this Instance via
+     * \c init_task.children.next, this will return \c init_task.children .
      * @return the full name of the parent's struct
+     * \sa parentNameComponents(), name(), fullName()
      */
     QString parentName() const;
 
@@ -106,7 +114,7 @@ public:
     /**
      * Use this function to retrieve the full name of this instance as it was
      * found following the names and members of structs in dotted notation,
-     * i.e., \c init_task.children.next.
+     * for example, \c init_task.children.next.
      * @return the full name of this instance
      */
     QString fullName() const;
@@ -121,6 +129,7 @@ public:
     /**
      * Gives access to the names of all members if this instance.
      * @return the names of all direct members of this instance
+     * \sa members(), memberExists()
      */
     const QStringList& memberNames() const;
 
@@ -131,7 +140,7 @@ public:
 
     /**
      * Gives access to the concrete BaseType of this instance.
-     * @return
+     * @return the BaseType of this instance
      */
     const BaseType* type() const;
 
@@ -142,7 +151,7 @@ public:
     void setType(const BaseType* type);
 
     /**
-     * Convenience function to access type()->name()
+     * Convenience function to access type()->prettyName()
      * @return the name of this instance's type
      */
     QString typeName() const;
@@ -169,7 +178,7 @@ public:
     bool isValid() const;
 
     /**
-     * Checks if this instance is accessible, i. e., that its value can be read
+     * Checks if this instance is accessible, meaning that its value can be read
      * from the memory dump through its virtual address.
      * @return \c true if the instance is accessible, \c false otherwise
      */
@@ -177,9 +186,9 @@ public:
 
     /**
      * Compares this Instance with \a other on a value basis. Two instances
-     * must have the same BaseType as returned by type() to possibly be equal.
-     * In addition, their following contents is compared to determine their
-     * equality:
+     * must have the same BaseType as returned by type() to potentially be
+     * equal. In addition, their following contents is compared to determine
+     * their equality:
      *
      * \li NumericBaseType: the numeric value
      * \li Enum: the enumeration value
@@ -193,7 +202,7 @@ public:
      *      but nested structs are ignored
      *
      * @param other the Instance object to compare this instance to
-     * @return \c true if the two instances are considered equal, \c false
+     * @return \c true if the two instances are considered to be equal, \c false
      * otherwise
      */
     bool equals(const Instance& other) const;
@@ -212,8 +221,9 @@ public:
      * @param other the Instance object to compare this instance to
      * @param recursive if \c true, this function recurses into nested structs
      *      or unions
-     * @return \c true if the two instannces are considered equal, \c false
-     * otherwise
+     * @return If this Instance and \a other are structs or unions and
+     * comparable, a list of member names that are different is returned.
+     * Otherwise a list containing only one empty string is returned.
      */
     QStringList differences(const Instance& other, bool recursive) const;
 
@@ -293,11 +303,12 @@ public:
     quint64 memberAddress(int index) const;
 
     /**
-     * Calculates the offset of a member into the struct, if this is a struct
+     * Calculates the offset of a member within a struct, if this is a struct
      * or union.
      * @param name the name of the member
-     * @return the virtual address of member \a index, or 0 if this is no struct
-     * or union
+     * @return offset of member \a name within the struct, or 0 if no such
+     * member exists or if this instance is no struct or union
+     * \sa memberAddress()
      */
     quint64 memberOffset(const QString& name) const;
 
@@ -425,9 +436,15 @@ public:
     QString toString() const;
 
     /**
-     * @param pgd Page Global Directory of the current user process
-     * 			most likely this is the cr3 register content
-     * @return same as toString but tries to access userland memeory if possible
+     * Returns a toString() representation of this instance using the page
+     * global directory (i. e., page table) specified as \a pgd for
+     * virtual-to-physical address translation. This allows to read an instance
+     * that is located in user-land address space.
+     *
+     * @param pgd the page global directory of the process this instance belongs
+     * to, most likely the content of the \CR3 register, as a hex-encoded string
+     * @return the same as toString() but tries to access user-land memory,
+     * if possible, using the page table specified as \a pgd
      */
     QString derefUserLand(const QString &pgd) const;
 
