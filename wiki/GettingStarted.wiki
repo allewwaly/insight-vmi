@@ -9,7 +9,7 @@ Visit: [Installation]
 
 = Running !InSight =
 
-After !InSight has been installed, it has to be started. The second part explains how !InSight is run from command line, how the `insight` front-end and the `insightd` daemon work together and which command line parameters they offer.
+After !InSight has been installed, it needs to be started. The second part explains how !InSight is run from command line, how the `insight` front-end and the `insightd` daemon work together and which command line parameters they offer.
 
 Visit: RunningInSight
 
