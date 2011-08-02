@@ -1,4 +1,5 @@
 #summary Using the JavaScript engine for memory analysis
+#labels Phase-Usage,Featured
 
 = The Scripting Engine =
 
@@ -6,9 +7,4 @@
 
 = Introduction =
 
-Add your content here.
-
-
-= Details =
-
-Tbd.
+Please refer to the [http://www.sec.in.tum.de/~chrschn/insightd-doc/classInstancePrototype.html InstancePrototype class documentation] for an introduction to the scripting engine and a list of all functions and properties that the `Instance` objects provide within a script.
