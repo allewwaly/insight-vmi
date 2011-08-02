@@ -9,7 +9,9 @@
 
 !InSight is a memory analysis tool for the IA-32 (x86) and AMD64 platform that makes all kernel objects of an operating system available for further analysis. It operates on physical memory dumps stored on disk or on the guest physical memory of a running virtual machine that a hypervisor makes available. Therefore !InSight lends itself to applications of virtual machine introspection (VMI), digital forensic analysis, malware analysis, as well as kernel debugging.
 
-!InSight is written in C++ using the [http://qt.nokia.com/ Qt libraries] and runs on Linux. It supports memory analysis of Linux kernels and will be extended for Windows kernels in the future (see RoadMap).
+!InSight is written in C++ using the [http://qt.nokia.com/ Qt libraries] and runs on Linux. It supports memory analysis of Linux kernels and will be extended for Windows kernels in the future (see RoadMap). The source code is licensed under the terms and conditions of the <a href="http://www.gnu.org/licenses/old-licenses/gpl-2.0.html">GNU GPL v2</a>.
+
+This tool is developed by <a href="http://www.sec.in.tum.de/christian-schneider/">Christian Schneider</a> and other contributors as part of <a href="http://www.sec.in.tum.de/leveraging-virtualization-techniques-for-system-security/">their research</a> at the <a href="http://portal.mytum.de/welcome/?set_language=en">Technische Universität München</a>, Munich, Germany. Together with his colleges at the <a href="http://www.sec.in.tum.de/">Chair for IT Security</a>, his interest lies in the field of virtual machine introspection and how this can be used in novel ways to improve current intrusion detection methods.
 
 = Background =
 
