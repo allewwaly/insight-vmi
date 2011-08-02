@@ -3,13 +3,12 @@
 
 = Introduction =
 
-https://insight-vmi.googlecode.com/svn/wiki/images/report-bug.png
+<img src="https://insight-vmi.googlecode.com/svn/wiki/images/report-bug.png" align="right" />
 We are grateful for any user feedback we receive concerning our project. If you experience any problems using !InSight or have suggestions how to further improve it, feel free to [https://code.google.com/p/insight-vmi/issues/list file an issue] for our project.
 
 = Mailing Lists =
 
-http://groups.google.com/intl/en/images/logos/groups_logo_sm.gif
-
+<img src="http://groups.google.com/intl/en/images/logos/groups_logo_sm.gif" align="right" />
 The project provides the following mailing lists to support user discussions and coordinate development:
 
 == !InSight VMI User Group ==
