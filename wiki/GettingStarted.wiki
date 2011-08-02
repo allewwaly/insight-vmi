@@ -1,32 +1,62 @@
 #summary Getting started with InSight
 #labels Featured
 
-= Installation =
+= Getting Started =
+
+The following pages cover the first steps that need to be performed in order to install !InSight, obtain the debugging symbols, start it up, and perform you first analysis.
+
+<table>
+<tr>
+<td><img src="https://insight-vmi.googlecode.com/svn/wiki/images/pg_installation.png" /></td>
+<td width="8"></td>
+<td>
+== [Installation] ==
 
 The first part describes how to compile !InSight from sources, optionally create Debian packages, install it, and set it up.
-
-Visit: [Installation]
-
-= Running !InSight =
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<td><img src="https://insight-vmi.googlecode.com/svn/wiki/images/pg_running_insight.png" /></td>
+<td width="8"></td>
+<td>
+== [RunningInSight Running InSight] ==
 
 After !InSight has been installed, it needs to be started. The second part explains how !InSight is run from command line, how the `insight` front-end and the `insightd` daemon work together and which command line parameters they offer.
-
-Visit: RunningInSight
-
-= Debugging Symbols =
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<td><img src="https://insight-vmi.googlecode.com/svn/wiki/images/pg_debug_symbols.png" /></td>
+<td width="8"></td>
+<td>
+== [DebugSymbols Debugging Symbols] ==
 
 Before any analysis can be performed, !InSight needs to parse the debugging symbols of the inspected operating system. This part shows how the debugging symbols can be obtained and how to process them with !InSight.
-
-Visit: DebugSymbols
-
-= The !InSight Shell =
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<td><img src="https://insight-vmi.googlecode.com/svn/wiki/images/pg_shell.png" /></td>
+<td width="8"></td>
+<td>
+== [InSightShell The InSight Shell] ==
 
 The !InSight shell is a powerful interface to process debugging symbols, load memory files, inspect data types and variables, execute scripts, amongst other things. This part describes the basic usage of the shell and how to perform first analysis tasks.
-
-Visit: InSightShell
-
-= The Scripting Engine =
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<td><img src="https://insight-vmi.googlecode.com/svn/wiki/images/pg_script.png" /></td>
+<td width="8"></td>
+<td>
+== [ScriptingEngine The Scripting Engine] ==
 
 !InSight comes with a !JavaScript engine that allows to interact with kernel objects by means of !JavaScript objects. This provides a very flexible and intuitive way to write analysis scripts for automation of complex analysis tasks.
-
-Visit: ScriptingEngine
+</td>
+</tr>
+</table>
