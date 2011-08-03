@@ -70,7 +70,7 @@
 
  \subsection Acknowledgments
 
- The <a href="http://www.sec.in.tum.de/christian-schneider/" title="Christian Schneider">author</a> would like to thank the following people for their contribution to this project in form of code, in testing and tracking down bugs, or in sharing ideas and inspirations (names in alphabetic orders):
+ The <a href="http://www.sec.in.tum.de/christian-schneider/" title="Christian Schneider">author</a> would like to thank the following people for their contribution to this project in form of code, in testing and tracking down bugs, or in sharing ideas and inspirations (names in alphabetic order):
 
  \li Cornelius Diekmann (diekmann <at> in . tum . de)
  \li Dominik Meyer (meyerd <at> in . tum . de)
