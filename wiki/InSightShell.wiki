@@ -555,7 +555,7 @@ char[56] (ID 0xf7f5) @ ffffffffa01fc408
 
 While the analysis within the shell is very helpful for getting an overview of the information that can be retrieved and how it can be accessed, it provides little degree of automation. For a more powerful analysis without user interaction, !InSight provides a !JavaScript engine to automate the inspection and share repetitive tasks in functions and libraries. 
 
-How to write these scripts is covered on the ScriptingEngine page. Use the command `script` to execute a script with a path relative to the current working directory. The output of the script is written to the shell:
+How to write these scripts is covered on the ScriptingEngine page. Use the command `script` to execute a script with a path relative to the current working directory. Any arguments that follow the script name are passed as [ScriptingEngine#Arguments_to_Scripts arguments to the script]. The output of the script is written to the shell:
 
 {{{
 >>> script scripts/tasklist.js
