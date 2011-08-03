@@ -7,4 +7,165 @@
 
 = Introduction =
 
-Please refer to the [http://www.sec.in.tum.de/~chrschn/insightd-doc/classInstancePrototype.html InstancePrototype class documentation] for an introduction to the scripting engine and a list of all functions and properties that the `Instance` objects provide within a script.
+The scripting engine provides a powerful and intuitive way to inspect kernel objects and follow structure members to further objects. It is implemented using the [http://developer.qt.nokia.com/doc/qt-4.7/qtscript.html QtScript module] of the Qt libraries. Both !JavaScript and !QtScript are based on the !ECMAScript scripting language, so anybody familiar with !JavaScript will instantly feel at home with !QtScript.
+
+= Scripting Basics =
+
+The scripts that can be written in !InSight support all common language features also found in JavaScript. In addition to that, some new functions and objects have been added to allow analysis of kernel objects. A complete list of these additions is available in the [#Function_Reference function reference].
+
+== The `Instance` Object ==
+
+All kernel objects in the scripting environment are represented as `Instance` objects. To obtain a kernel object based on a global variable, just pass the name or the ID of that variable to the constructor of the `Instance` object (the ID might be less portable, though):
+
+<code language="js">
+var swapper = new Instance("init_task");</code>
+
+The constructor also takes queries in the form of `object.member` in the same way [InSightShell#Memory_Analysis as the shell does]:
+
+<code language="js">
+var init = new Instance("init_task.tasks.next");</code>
+
+The `Instance` objects provide various functions to inspect the properties of the kernel object, such as its type, its virtual address, its size, etc. Again, refer to the [#Function_Reference function reference] for a complete list of methods that an `Instance` object provides.
+
+<code language="js">
+// Retrieve information about the kernel object
+print("init.Address() = 0x" + init.Address());
+print("init.!FullName() = " + init.!FullName());
+print("init.!Type() = " + init.Type());
+print("init.!TypeName() = " + init.!TypeName());
+print("init.Size() = " + init.Size());</code>
+
+== Accessing Members ==
+
+If an `Instance` represents a structure or a union, its members can be accessed using the `Members()` method. This method returns an array of `Instance` objects of all members of the callee: 
+
+<code language="js">
+// Iterate over all members using an array of Instance objects
+var members = init.Members();
+for (var i = 0; i < members.length; ++i) {
+    var offset = init.!MemberOffset(members`[`i`]`.Name());
+    print ((i+1) +
+            ". 0x" + offset.toString(16) + " " +
+            members`[`i`]`.Name() + ": " +
+            members`[`i`]`.!TypeName() +
+            " @ 0x" + members`[`i`]`.Address());
+}</code>
+
+The members can also be accessed using a !JavaScript-style iterator:
+
+<code language="js">
+ // Iterate over all members using an iterator
+var i = 1;
+for (m in init) {
+    var offset = init.!MemberOffset(init`[`m`]`.Name());
+    print ((i++) +
+            ". 0x" + offset.toString(16) + " " +
+            init`[`m`]`.Name() + ": " +
+            init`[`m`]`.!TypeName() +
+            " @ 0x" + init`[`m`]`.Address());
+}</code>
+
+If the name of a member is known, it can be directly accessed as a property of that `Instance` object:
+
+<code language="js">
+// Print a list of running processes
+var proc = swapper;
+do {
+    print(proc.pid + "  " + proc.comm);
+    proc = proc.tasks.next;
+} while (proc.Address() != swapper.Address());</code>
+
+*Note:* In order to prevent name collisions between member names of a kernel objects and the methods provided by the `Instance` object itself, all `Instance` methods start with an upper-case letter, as the previous examples showed for `Address()`, `Size()`, or `Members()`. The only exception to this rule are the explicit casting methods, such as `toString()`, `toInt32()`, `toFloat()` etc.
+
+== Running a Script ==
+
+Scripts are executed using the `script` command within the !InSight shell, as explained in detail on the [InSightShell#Executing_Scripts InSightShell] page. Save the following example as `hello.js`:
+
+<code language="js">
+// contents of file "hello.js"
+print("Hello, world!");</code>
+
+The output of the script is written to the shell:
+
+{{{
+>>> script scripts/hello.js
+Hello, world!
+}}}
+
+== Arguments to Scripts ==
+
+The script file name can optionally be followed by one argument that is passed to the script. You can check the variable `HAVE_GLOBAL_PARAMS` within a script to see if a parameter is available. Access the parameter through the variable `PARAMS`:
+
+<code language="js">
+// contents of file "hello.js"
+if (HAVE_GLOBAL_PARAMS)
+    print("Hello, " + PARAMS + "!");
+else
+    print("Hello, world!");</code>
+
+Now the script provides a personalized greeting:
+
+{{{
+>>> script scripts/hello.js Bob
+Hello, Bob!
+}}}
+
+*Note:* Due to current limitations, no arguments with spaces can be passed to a script (see issue 4).
+
+== Using Multiple Memory Files ==
+
+The list of loaded memory files can be accessed within a script using the `getMemDumps()` command. The following example prints out the list:
+
+<code language="js">
+// Obtain the list of loaded memory files
+var dumps = getMemDumps();
+ 
+if (dumps.length <= 0)
+    print("No memory dumps loaded.");
+else {
+    for (var i in dumps)
+        print("[" + i + "] " + dumps`[`i`]`);
+}</code>
+
+To request a kernel object from a specific memory dump, the constructor of an `Instance` objects accepts the index of the memory file as an optional second parameter. If this parameter is omitted, the first memory file in the list will be used:
+
+<code language="js">
+// Explicitly request kernel object from first file
+var swapper1 = new Instance("init_task", 0);
+ 
+// Explicitly request kernel object from second file
+var swapper2 = new Instance("init_task", 1);
+ 
+// Implicitly request kernel object from first file
+var swapper3 = new Instance("init_task");</code>
+
+All members of an `Instance` object will be read from the same memory file.
+
+== Including Other Scripts ==
+
+It is advisable to split scripts up into several files and encapsulate pieces of logic into functions. Using the `include()` function within a script, other files can be included. That way it is easy to build up a library of analysis functions that can be re-used in multiple scripts:
+
+<code language="js">
+// Include custom library file
+include("my_library.js");
+ 
+// Now use functions or objects from that library
+// ...</code>
+
+= Function Reference =
+
+The ECMA-262 specification that !QtScript implements already defines various classes, methods and functions. A complete list of these can be found in the [http://developer.qt.nokia.com/doc/qt-4.7/ecmascript.html QtScript documentation].
+
+For all the methods that an `Instance` object provides to interact with a kernel object, refer to the [http://www.sec.in.tum.de/~chrschn/insightd-doc/classInstancePrototype.html InstancePrototype class documentation].
+
+In addition to that, the following global functions, properties and constructors are available:
+
+|| *Name*               || *Type*   || *Description* ||
+|| `Instance([`_name_`|`_id_` [, `_index_`]]` || constructor || Creates an `Instance` object for variable _name_ or _id_, reading its values from memory file _index_. If _index_ is omitted, the first memory file is used. If neither _name_ nor _id_ is specified, an empty `Instance` object is created. ||
+|| `getMemDumps()`      || function || Returns an array of all loaded memory files. ||
+|| `getVariableIds()`   || function || Returns an array containing the IDs of all global variables. ||
+|| `getVariableNames()` || function || Returns an array containing the names of all global variables. ||
+|| `include(`_file_`)`  || function || Executes _file_ in the current context of the script. ||
+|| `HAVE_GLOBAL_PARAMS` || property || Is `true` if an argument has been supplied to the script, `false` otherwise. ||
+|| `PARAMS`             || property || Holds the argument supplied to the script ||
+|| `SCRIPT_PATH`        || property || Holds the path of the script that is being executed. ||
