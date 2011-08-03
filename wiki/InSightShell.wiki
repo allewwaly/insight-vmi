@@ -551,4 +551,62 @@ char[56] (ID 0xf7f5) @ ffffffffa01fc408
 "snd_pcm"
 }}}
 
-While this type of analysis is very helpful for getting an overview of the information that can be retrieved and how it can be accessed, it provides little degree of automation. For a more powerful analysis without user interaction, !InSight provides a [ScriptingEngine JavaScript engine] to automate the inspection and share repetitive tasks in functions and libraries.
+= Executing Scripts =
+
+While the analysis within the shell is very helpful for getting an overview of the information that can be retrieved and how it can be accessed, it provides little degree of automation. For a more powerful analysis without user interaction, !InSight provides a !JavaScript engine to automate the inspection and share repetitive tasks in functions and libraries. 
+
+How to write these scripts is covered on the ScriptingEngine page. Use the command `script` to execute a script with a path relative to the current working directory. The output of the script is written to the shell:
+
+{{{
+>>> script scripts/tasklist.js
+===================================================
+USER     PID     GID   STATE  COMMAND           ADDRESS           
+   0       0       0       0  "swapper"         0xc0340b20        
+   0       1       0       1  "init"            0xce182a90        
+   0       2       0       1  "migration/0"     0xce182560        
+   0       3       0       1  "ksoftirqd/0"     0xce182030        
+   0       4       0       1  "watchdog/0"      0xce186a90        
+   0       5       0       1  "events/0"        0xce186560        
+   0       6       0       1  "khelper"         0xce186030        
+   0       7       0       1  "kthread"         0xcffd3a90        
+   0       9       0       1  "kblockd/0"       0xcffd3560        
+   0      10       0       1  "kacpid"          0xcffd3030        
+   0     119       0       1  "pdflush"         0xcfe8aa90        
+   0     120       0       1  "pdflush"         0xcfe8a560        
+   0     122       0       1  "aio/0"           0xcfed8a90        
+   0     121       0       1  "kswapd0"         0xcfe8a030        
+   0     708       0       1  "kseriod"         0xcfed8560        
+   0    1828       0       1  "kjournald"       0xcfdaa560        
+   0    1985       0       1  "udevd"           0xcfdc9030        
+   0    3277       0       1  "dhclient3"       0xcc7c0030        
+ 102    3423     102       2  "syslogd"         0xc9b41030        
+   0    3440       0       1  "dd"              0xcfdaa030        
+ 103    3442     103      65  "klogd"           0xcfdc9560        
+   0    3482       0       1  "mysqld_safe"     0xc96b6030        
+ 100    3546     104       1  "mysqld"          0xc96b6a90        
+   0    3547       0      65  "logger"          0xcbe61560        
+   0    3639       0       1  "sshd"            0xcc860a90        
+   0    3671       0       1  "mdadm"           0xc9b41a90        
+   0    3684       0       1  "atd"             0xcc860560        
+   0    3694       0       1  "cron"            0xc96b6560        
+   0    3721       0       1  "apache2"         0xc1322030        
+   0    3739       0       1  "getty"           0xcfdaaa90        
+   0    3740       0       1  "getty"           0xce3a1560        
+   0    3741       0       1  "getty"           0xc1322a90        
+   0    3742       0       1  "getty"           0xcbe61030        
+   0    3743       0       1  "getty"           0xc9b41560        
+   0    3744       0       1  "getty"           0xcfdc9a90        
+  33    3755      33       1  "apache2"         0xcbae4560        
+  33    3756      33       1  "apache2"         0xcbae4030        
+  33    3757      33       1  "apache2"         0xcc04aa90        
+  33    3758      33       1  "apache2"         0xcc04a560        
+  33    3759      33       1  "apache2"         0xcc04a030        
+}}}
+
+Remember that you can use the `--eval` [RunningInSight#Command_Line_Parameters_for_insight parameter] to the `insight` front-end to execute scripts from the command line, for example:
+
+{{{
+insight --eval "script /path/to/scripts/tasklist.js"
+}}}
+
+This will print the output of the script to the console where it can be piped to another program or redirected to a file.
