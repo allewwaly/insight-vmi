@@ -67,6 +67,18 @@
  
  \li Insight is the main interface class between front-end and daemon.
  \li DeviceMuxer is a helper class that multiplexes the \stdout and \stderr channel over a single socket.
+
+ \subsection Acknowledgments
+
+ The <a href="http://www.sec.in.tum.de/christian-schneider/" title="Christian Schneider">author</a> would like to thank the following people for their contribution to this project in form of code, in testing and tracking down bugs, or in sharing ideas and inspirations (names in alphabetic orders):
+
+ \li Cornelius Diekmann (diekmann <at> in . tum . de)
+ \li Dominik Meyer (meyerd <at> in . tum . de)
+ \li Hagen Fritsch (fritsch <at> in . tum . de)
+ \li Jonas Pfoh (pfoh <at> in . tum . de)
+ \li Sebastian Vogl (vogls <at> in . tum . de)
+ \li Thomas Kittel (kittel <at> in . tum . de)
+
  */ 
 
 #include <QApplication>
