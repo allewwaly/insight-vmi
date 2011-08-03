@@ -161,7 +161,7 @@ For all the methods that an `Instance` object provides to interact with a kernel
 In addition to that, the following global functions, properties and constructors are available:
 
 || *Name*               || *Type*   || *Description* ||
-|| `Instance([`_name_`|`_id_` [, `_index_`]]` || constructor || Creates an `Instance` object for variable _name_ or _id_, reading its values from memory file _index_. If _index_ is omitted, the first memory file is used. If neither _name_ nor _id_ is specified, an empty `Instance` object is created. ||
+|| `Instance([`_name_`|`_id_` [, `_index_`]])` || constructor || Creates an `Instance` object for variable _name_ or _id_, reading its values from memory file _index_. If _index_ is omitted, the first memory file is used. If neither _name_ nor _id_ is specified, an empty `Instance` object is created. ||
 || `getMemDumps()`      || function || Returns an array of all loaded memory files. ||
 || `getVariableIds()`   || function || Returns an array containing the IDs of all global variables. ||
 || `getVariableNames()` || function || Returns an array containing the names of all global variables. ||
