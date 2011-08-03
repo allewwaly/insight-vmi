@@ -38,10 +38,10 @@ The following represents a complete list of valid commands:
   symbols     Allows to load, store or parse the kernel symbols
 }}}
 
-To get further help for a particular command, enter `<command> help`, for example:
+To get further help for a particular command, enter `help <command>`, for example:
 
 {{{
->>> symbols help
+>>> help symbols
 Command: symbols
 Description: This command allows to load, store or parse the kernel debugging symbols that are to be used.
   symbols parse <kernel_src>     Parse the symbols from a kernel source
