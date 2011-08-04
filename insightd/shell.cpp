@@ -566,64 +566,109 @@ bool Shell::executing() const
     return _executing;
 }
 
+QStringList Shell::splitIntoPipes(QString command) const
+{
+    // For parsing commands between pipes
+#   define SINGLE_QUOTED "(?:'(?:[^']|\\\\')*')"
+#   define DOUBLE_QUOTED "(?:\"(?:[^\"]|\\\\\")*\")"
+#   define NO_PIPE "[^\\|\\s\"']+"
+#   define PIPE_SINGLE_RE "(?:" NO_PIPE "|" SINGLE_QUOTED "|" DOUBLE_QUOTED ")"
+#   define RX_PIPE "^(" PIPE_SINGLE_RE "(?:\\s+" PIPE_SINGLE_RE ")*)\\s*(\\|\\s*)?"
+
+    command = command.trimmed();
+    if (command.isEmpty())
+        return QStringList();
+
+    QRegExp rxPipe(RX_PIPE);
+    QStringList pipeCmds;
+    int pos = 0, lastPos = 0;
+    bool endedInPipe = true;
+    
+    while (endedInPipe &&
+            (pos = rxPipe.indexIn(command, pos, QRegExp::CaretAtOffset)) != -1)
+    {
+        pipeCmds << rxPipe.cap(1);
+        pos += rxPipe.matchedLength();
+        lastPos = pos;
+        endedInPipe = !rxPipe.cap(2).isEmpty();
+    }
+
+    if (endedInPipe || lastPos != command.length()) {
+        _err << "Error parsing command line at position " << lastPos << ":" << endl
+            << command << endl;
+        for (int i = 0; i < lastPos; i++)
+            _err << " ";
+        _err << "^ error occurred here" << endl;
+        pipeCmds.clear();
+    }
+
+    return pipeCmds;
+}
+
+
+QStringList Shell::splitIntoWords(QString command) const
+{
+    // For parsing a command with arguments
+#   define SINGLE_QUOTED_CAP "'((?:[^']|\\\\')*)'"
+#   define DOUBLE_QUOTED_CAP "\"((?:[^\"]|\\\\\")*)\""
+#   define NO_SPACE_CAP "([^\\s\\\"']+)"
+#   define RX_WORD "^(?:" SINGLE_QUOTED_CAP "|" DOUBLE_QUOTED_CAP "|" NO_SPACE_CAP ")\\s*"
+
+    command = command.trimmed();
+
+    QRegExp rxWord(RX_WORD);
+    QStringList words;
+    int pos = 0, lastPos = 0;
+    
+    while ((pos = rxWord.indexIn(command, pos, QRegExp::CaretAtOffset)) != -1) {
+        if (!rxWord.cap(3).isEmpty())
+            words << rxWord.cap(3);
+        else if (!rxWord.cap(2).isEmpty())
+            // Replace escaped double quotes
+            words << rxWord.cap(2).replace("\\\"", "\"");
+        else
+            // Replace escaped single quotes
+            words << rxWord.cap(1).replace("\\'", "'");
+        pos += rxWord.matchedLength();
+        lastPos = pos;
+    }
+
+    if (lastPos != command.length())
+    {
+        _err << "Error parsing command at position " << lastPos << ":" << endl
+            << command << endl;
+        for (int i = 0; i < lastPos; i++)
+            _err << " ";
+        _err << "^ error occurred here" << endl;
+        words.clear();
+    }
+
+    return words;
+}
+
 
 int Shell::eval(QString command)
 {
     int ret = 1;
     VarSetter<bool> setter1(&_executing, true, false);
     _interrupted = false;
+    ShellCallback c = 0;
+    QStringList pipeCmds, words;
 
-	QStringList pipeCmds = command.split(QRegExp("\\s*\\|\\s*"), QString::KeepEmptyParts);
+    pipeCmds = splitIntoPipes(command);
+    if (!pipeCmds.isEmpty())
+        words = splitIntoWords(pipeCmds.first());
 
-	// Setup piped processes if no socket connection
-	if (pipeCmds.size() > 1) {
-        // First, create piped processes in reverse order, i.e., right to left
-        for (int i = 1; i < pipeCmds.size(); ++i) {
-            QProcess* proc = new QProcess();
-            proc->moveToThread(QThread::currentThread());
-            // Connect with previously created process
-            if (!_pipedProcs.isEmpty())
-                proc->setStandardOutputProcess(_pipedProcs.first());
-            // Add to the list and connect signal
-            _pipedProcs.push_front(proc);
-            connect(proc, SIGNAL(readyReadStandardError()), SLOT(pipeEndReadyReadStdErr()));
-        }
-        // Next, connect the stdout to the pipe
-        _out.setDevice(_pipedProcs.first());
-        _bin.setDevice(_pipedProcs.first());
-        connect(_pipedProcs.last(),
-                SIGNAL(readyReadStandardOutput()),
-                SLOT(pipeEndReadyReadStdOut()));
-        // Finally, start the piped processes in regular order, i.e., left to right
-        for (int i = 0; i < _pipedProcs.size(); ++i) {
-            QStringList args = pipeCmds[i+1].split(QRegExp("\\s+"), QString::SkipEmptyParts);
-            // Prepare program name and arguments
-            QString prog = args.first();
-            args.pop_front();
-
-            // Start and wait for process
-            _pipedProcs[i]->start(prog, args);
-            _pipedProcs[i]->waitForStarted(-1);
-            if (_pipedProcs[i]->state() != QProcess::Running) {
-                _err << "Error executing " << pipeCmds[i+1] << endl << flush;
-                cleanupPipedProcs();
-                return 0;
-            }
-        }
-	}
-
-    QStringList words = pipeCmds.first().split(QRegExp("\\s+"), QString::SkipEmptyParts);
     if (!words.isEmpty()) {
 
         QString cmd = words[0].toLower();
         words.pop_front();
 
         if (_commands.contains(cmd)) {
-            ShellCallback c =_commands[cmd].callback;
-            ret = (this->*c)(words);
+            c =_commands[cmd].callback;
         }
         else {
-            // Try to match the run of a command
+            // Try to match the prefix of a command
             QList<QString> cmds = _commands.keys();
             int match, match_count = 0;
             for (int i = 0; i < cmds.size(); i++) {
@@ -633,17 +678,8 @@ int Shell::eval(QString command)
                 }
             }
 
-            if (match_count == 1) {
-                ShellCallback c =_commands[cmds[match]].callback;
-                try {
-                    ret = (this->*c)(words);
-                }
-                catch (...) {
-                    // Exceptional cleanup
-                    cleanupPipedProcs();
-                    throw;
-                }
-            }
+            if (match_count == 1)
+                c =_commands[cmds[match]].callback;
             else if (match_count > 1)
                 _err << "Command prefix \"" << cmd << "\" is ambiguous." << endl;
             else
@@ -651,8 +687,56 @@ int Shell::eval(QString command)
         }
     }
 
-    // Regular cleanup
-    cleanupPipedProcs();
+    // Did we find a valid command?
+    if (c) {
+        // Setup piped processes if no socket connection
+        if (pipeCmds.size() > 1) {
+            // First, create piped processes in reverse order, i.e., right to left
+            for (int i = 1; i < pipeCmds.size(); ++i) {
+                QProcess* proc = new QProcess();
+                proc->moveToThread(QThread::currentThread());
+                // Connect with previously created process
+                if (!_pipedProcs.isEmpty())
+                    proc->setStandardOutputProcess(_pipedProcs.first());
+                // Add to the list and connect signal
+                _pipedProcs.push_front(proc);
+                connect(proc, SIGNAL(readyReadStandardError()), SLOT(pipeEndReadyReadStdErr()));
+            }
+            // Next, connect the stdout to the pipe
+            _out.setDevice(_pipedProcs.first());
+            _bin.setDevice(_pipedProcs.first());
+            connect(_pipedProcs.last(),
+                    SIGNAL(readyReadStandardOutput()),
+                    SLOT(pipeEndReadyReadStdOut()));
+            // Finally, start the piped processes in regular order, i.e., left to right
+            for (int i = 0; i < _pipedProcs.size(); ++i) {
+                QStringList args = splitIntoWords(pipeCmds[i+1]);
+                // Prepare program name and arguments
+                QString prog = args.first();
+                args.pop_front();
+
+                // Start and wait for process
+                _pipedProcs[i]->start(prog, args);
+                _pipedProcs[i]->waitForStarted(-1);
+                if (_pipedProcs[i]->state() != QProcess::Running) {
+                    _err << "Error executing " << pipeCmds[i+1] << endl << flush;
+                    cleanupPipedProcs();
+                    return 0;
+                }
+            }
+        }
+
+        try {
+            ret = (this->*c)(words);
+        }
+        catch (...) {
+            // Exceptional cleanup
+            cleanupPipedProcs();
+            throw;
+        }
+        // Regular cleanup
+        cleanupPipedProcs();
+    }
 
     // Flush the streams
     _out << flush;
@@ -1739,7 +1823,7 @@ QScriptValue Shell::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
 /*
  * implements the 'include' function for QTScript
  *
- * Depends on SCRIPT_PATH beeing set in engine
+ * Depends on SCRIPT_PATH being set in engine
  *
  * QScript example:
  * assuming the parameters are "{'test':123}" without ", no whitespaces

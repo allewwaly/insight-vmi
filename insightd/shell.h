@@ -230,6 +230,8 @@ private:
     void cleanupPipedProcs();
     void initScriptEngine(bool hasParameters, QString &scriptParameters, QFileInfo &includePathFileInfo);
     void cleanupScriptEngine();
+    QStringList splitIntoPipes(QString command) const;
+    QStringList splitIntoWords(QString command) const;
     int eval(QString command);
     int evalLine();
     void hline(int width = 60);
