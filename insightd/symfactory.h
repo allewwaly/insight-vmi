@@ -241,6 +241,14 @@ public:
 	}
 
 	/**
+	 * @return the hash of all variables by there name
+	 */
+	inline const VariableStringHash& varsByName() const
+	{
+		return _varsByName;
+	}
+
+	/**
 	 * This function should be called after the last symbol has been added to
 	 * the factory, either after parsing or reading a custom symbol file is
 	 * complete.

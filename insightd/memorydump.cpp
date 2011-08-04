@@ -15,7 +15,13 @@
 #include "memorymap.h"
 
 
-#define queryError(x) do { throw QueryException((x), __FILE__, __LINE__); } while (0)
+#define queryError(msg) do { throw QueryException((msg), __FILE__, __LINE__); } while (0)
+#define queryError2(msg, err) do { \
+		throw QueryException((msg), (err), QVariant(), __FILE__, __LINE__); \
+	} while (0)
+#define queryError3(msg, err, param) do { \
+		throw QueryException((msg), (err), (param), __FILE__, __LINE__); \
+	} while (0)
 
 
 MemoryDump::MemoryDump(const MemSpecs& specs, QIODevice* mem,
@@ -121,15 +127,8 @@ BaseType* MemoryDump::getType(const QString& type) const
 	if(results.size() > 0) {
 		// Check if type is ambiguous
 		if (results.size() > 1) {
-			error = QString("Found multiple types for %1:\n").arg(type);
-			
-			for(int i = 0; i < results.size(); i ++) {
-				error += QString("\t-> 0x%1 - %2\n")
-				        .arg(results.at(i)->id(), 0, 16)
-				        .arg(results.at(i)->name());
-			}
-
-			queryError(error);
+			error = QString("Found multiple types for \"%1\".").arg(type);
+			queryError3(error, QueryException::ecAmbiguousType, type);
 		}
 		else {
 			result = results.at(0);
@@ -144,7 +143,8 @@ BaseType* MemoryDump::getType(const QString& type) const
 		result = _factory->findBaseTypeById(typeCopy.toUInt(&okay, 16));
 
 		if(result == 0 || !okay) {
-			queryError(QString("Could not resolve type %1.").arg(type));
+			queryError3(QString("Could not resolve type %1.").arg(type),
+					QueryException::ecUnresolvedType, type);
 		}
 	}
 	
@@ -436,7 +436,8 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 				result.toString();
 	}
 
-    queryError("Unknown type: " + type);
+    queryError3("Unknown type: " + type,
+    		QueryException::ecUnresolvedType, type);
 
     return QString();
 }

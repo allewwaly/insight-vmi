@@ -1434,6 +1434,16 @@ int Shell::cmdMemoryQuery(QStringList args)
     	}
     	catch (QueryException e) {
     		_err << e.message << endl;
+    		// Show a list of ambiguous types
+    		if (e.errorCode == QueryException::ecAmbiguousType) {
+    			_err << "Select a type by its ID from the following list:"
+    					<< endl << endl;
+    			
+    			QIODevice* outDev = _out.device();
+    			_out.setDevice(_err.device());
+    			cmdListTypes(QStringList(e.errorParam.toString()));
+    			_out.setDevice(outDev);
+    		}
     	}
     }
     return 1;
@@ -1969,14 +1979,28 @@ int Shell::cmdShow(QStringList args)
 
     // If we did not find a type by that ID, try the names
     if (!var && !bt) {
-    	// Try to find this ID in types and variables
-    	if ( (bt = _sym.factory().findBaseTypeByName(s)) ) {
-    		_out << "Found type with name " << s << ":" << endl;
-    		return cmdShowBaseType(bt);
+    	QList<BaseType*> types = _sym.factory().typesByName().values(s);
+    	QList<Variable*> vars = _sym.factory().varsByName().values(s);
+    	if (types.size() + vars.size() > 1) {
+    		_out << "The name \"" << s << "\" is ambiguous:" << endl << endl;
+
+    		if (!types.isEmpty()) {
+    			cmdListTypes(QStringList(s));
+    			if (!vars.isEmpty())
+    				_out << endl;
+    		}
+    		if (vars.size() > 0)
+    			cmdListVars(QStringList(s));
+    		return 1;
     	}
-    	else if ( (var = _sym.factory().findVarByName(s)) ) {
+
+    	if (!types.isEmpty()) {
+    		_out << "Found type with name " << s << ":" << endl;
+    		return cmdShowBaseType(types.first());
+    	}
+    	if (!vars.isEmpty()) {
     		_out << "Found variable with name " << s << ":" << endl;
-    		return cmdShowVariable(var);
+    		return cmdShowVariable(vars.first());
 		}
     }
 
