@@ -25,6 +25,15 @@ class MemoryMap;
 class QueryException: public GenericException
 {
 public:
+	enum ErrorCodes {
+		ecNotSpecified = 0,
+		ecAmbiguousType,
+		ecUnresolvedType
+	};
+
+	int errorCode;        ///< Holds an error code for error handling ambiguous
+	QVariant errorParam;  ///< Holds an additional parameter for the error
+
     /**
       Constructor
       @param msg error message
@@ -32,8 +41,25 @@ public:
       @param line line number at which message was originally thrown
       @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
      */
-    QueryException(QString msg = QString(), const char* file = 0, int line = -1)
-        : GenericException(msg, file, line)
+    explicit QueryException(QString msg = QString(), const char* file = 0, int line = -1)
+        : GenericException(msg, file, line), errorCode(ecNotSpecified)
+    {
+    }
+
+    /**
+      Constructor
+      @param msg error message
+      @param errorCode error code for error handling
+      @param errorParam additional parameter for the \a errorCode
+      @param file file name in which message was originally thrown
+      @param line line number at which message was originally thrown
+      @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
+     */
+    QueryException(QString msg, int errorCode,
+    		QVariant errorParam = QVariant(), const char* file = 0,
+    		int line = -1)
+        : GenericException(msg, file, line), errorCode(errorCode),
+          errorParam(errorParam)
     {
     }
 
