@@ -111,11 +111,13 @@ Shell::Shell(bool listenOnSocket)
                 &Shell::cmdList,
                 "Lists various types of read symbols",
                 "This command lists various types of read symbols.\n"
-                "  list sources          List the source files\n"
-                "  list types            List the types\n"
-                "  list types-by-id      List the types-by-ID hash\n"
-                "  list types-by-name    List the types-by-name hash\n"
-                "  list variables        List the variables"));
+                "  list sources              List all source files\n"
+                "  list types [<glob>]       List all types, optionally filtered by a\n"
+                "                            wildcard expression <glob>\n"
+                "  list types-by-id          List the types-by-ID hash\n"
+                "  list types-by-name        List the types-by-name hash\n"
+                "  list variables [<glob>]   List all variables, optionally filtered by\n"
+                "                            a wildcard expression <glob>\n"));
 
     _commands.insert("memory",
             Command(
@@ -126,11 +128,12 @@ Shell::Shell(bool listenOnSocket)
                 "the debugging symbols loaded with the \"symbols\" command.\n"
                 "  memory load   <file_name>   Load a memory dump\n"
                 "  memory unload <file_name>   Unload a memory dump by file name\n"
-                "  memory unload <file_index>  Unload a memory dump by its index\n"
+                "  memory unload <index>       Unload a memory dump by its index\n"
                 "  memory list                 Show loaded memory dumps\n"
-                "  memory specs [index]        Show memory specifications for dump <index>\n"
-                "  memory query [index] <expr> Output a symbol from memory dump <index>\n"
-                "  memory dump [index] <type> @ <address>\n"
+                "  memory specs [<index>]      Show memory specifications for dump <index>\n"
+                "  memory query [<index>] <expr>\n"
+                "                              Output a symbol from memory dump <index>\n"
+                "  memory dump [<index>] <type> @ <address>\n"
                 "                              Output a value from memory dump <index> at\n"
                 "                              <address> as <type>, where <type>\n"
                 "                              must be one of \"char\", \"int\", \"long\",\n"
@@ -906,11 +909,17 @@ int Shell::cmdListSources(QStringList /*args*/)
 }
 
 
-int Shell::cmdListTypes(QStringList /*args*/)
+int Shell::cmdListTypes(QStringList args)
 {
     static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
     const BaseTypeList& types = _sym.factory().types();
     CompileUnit* unit = 0;
+
+    // Expect at most one parameter
+    if (args.size() > 1) {
+        cmdHelp(QStringList("list"));
+        return 1;
+    }
 
     if (types.isEmpty()) {
         _out << "There are no type references.\n";
@@ -920,28 +929,43 @@ int Shell::cmdListTypes(QStringList /*args*/)
     // Find out required field width (the types are sorted by ascending ID)
     const int w_id = getFieldWidth(types.last()->id());
     const int w_type = 12;
-    const int w_name = 24;
+    const int w_name = 30;
     const int w_size = 5;
-    const int w_src = 15;
+    const int w_src = 20;
     const int w_line = 5;
     const int w_colsep = 2;
     const int w_total = w_id + w_type + w_name + w_size + w_src + w_line + 2*w_colsep;
 
-    _out << qSetFieldWidth(w_id)  << right << "ID"
-         << qSetFieldWidth(w_colsep) << " "
-         << qSetFieldWidth(w_type) << left << "Type"
-         << qSetFieldWidth(w_name) << "Name"
-         << qSetFieldWidth(w_size)  << right << "Size"
-         << qSetFieldWidth(w_colsep) << " "
-         << qSetFieldWidth(w_src) << left << "Source"
-         << qSetFieldWidth(w_line) << right << "Line"
-         << qSetFieldWidth(0)  << endl;
-
-    hline(w_total);
+    bool headerPrinted = false;
+    int typeCount = 0;
+    bool applyFilter = !args.isEmpty();
+    QRegExp rxFilter(args.isEmpty() ? QString() : args.first(),
+    		Qt::CaseSensitive, QRegExp::WildcardUnix);
 
     QString src, srcLine;
     for (int i = 0; i < types.size(); i++) {
         BaseType* type = types[i];
+
+        // Apply name filter, if requested
+        if (applyFilter && !rxFilter.exactMatch(type->name()))
+        	continue;
+
+        // Print header if not yet done
+        if (!headerPrinted) {
+    	    _out << qSetFieldWidth(w_id)  << right << "ID"
+    	         << qSetFieldWidth(w_colsep) << " "
+    	         << qSetFieldWidth(w_type) << left << "Type"
+    	         << qSetFieldWidth(w_name) << "Name"
+    	         << qSetFieldWidth(w_size)  << right << "Size"
+    	         << qSetFieldWidth(w_colsep) << " "
+    	         << qSetFieldWidth(w_src) << left << "Source"
+    	         << qSetFieldWidth(w_line) << right << "Line"
+    	         << qSetFieldWidth(0)  << endl;
+
+    	    hline(w_total);
+    	    headerPrinted = true;
+       }
+
         // Construct name and line of the source file
         if (type->srcFile() >= 0) {
             if (!unit || unit->id() != type->srcFile())
@@ -950,6 +974,8 @@ int Shell::cmdListTypes(QStringList /*args*/)
                 src = QString("(unknown id: %1)").arg(type->srcFile());
             else
                 src = QString("%1").arg(unit->name());
+            if (src.size() > w_src)
+            	src = "..." + src.right(w_src - 3);
         }
         else
             src = "--";
@@ -963,15 +989,21 @@ int Shell::cmdListTypes(QStringList /*args*/)
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << tRevMap[type->type()]
              << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
-             << qSetFieldWidth(w_size) << right << type->size()
+             << qSetFieldWidth(w_size) << right << dec << type->size()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_src) << left << src
              << qSetFieldWidth(w_line) << right << srcLine
              << qSetFieldWidth(0) << endl;
+
+        ++typeCount;
     }
 
-    hline(w_total);
-    _out << "Total types: " << dec << types.size() << endl;
+    if (headerPrinted) {
+		hline(w_total);
+		_out << "Total types: " << dec << typeCount << endl;
+    }
+    else if (applyFilter)
+    	_out << "No types matching that name." << endl;
 
     return 0;
 }
@@ -1080,11 +1112,17 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
 }
 
 
-int Shell::cmdListVars(QStringList /*args*/)
+int Shell::cmdListVars(QStringList args)
 {
     static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
     const VariableList& vars = _sym.factory().vars();
     CompileUnit* unit = 0;
+
+    // Expect at most one parameter
+    if (args.size() > 1) {
+        cmdHelp(QStringList("list"));
+        return 1;
+    }
 
     if (vars.isEmpty()) {
         _out << "There were no variable references.\n";
@@ -1097,31 +1135,47 @@ int Shell::cmdListVars(QStringList /*args*/)
     const int w_typename = 24;
     const int w_name = 24;
     const int w_size = 5;
-    const int w_src = 15;
+    const int w_src = 20;
     const int w_line = 5;
     const int w_colsep = 2;
     const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + w_line + 6*w_colsep;
 
-    _out
-        << qSetFieldWidth(w_id)  << right << "ID"
-        << qSetFieldWidth(w_colsep) << " "
-        << qSetFieldWidth(w_datatype) << left << "Base"
-        << qSetFieldWidth(w_colsep) << " "
-        << qSetFieldWidth(w_typename) << left << "Type name"
-        << qSetFieldWidth(w_colsep) << " "
-        << qSetFieldWidth(w_name) << "Name"
-        << qSetFieldWidth(w_colsep) << " "
-        << qSetFieldWidth(w_size)  << right << "Size"
-        << qSetFieldWidth(w_colsep) << " "
-        << qSetFieldWidth(w_src) << left << "Source"
-        << qSetFieldWidth(w_colsep) << " "
-        << qSetFieldWidth(w_line) << right << "Line"
-        << qSetFieldWidth(0) << endl;
+    bool headerPrinted = false;
+    int varCount = 0;
+    bool applyFilter = !args.isEmpty();
+    QRegExp rxFilter(args.isEmpty() ? QString() : args.first(),
+    		Qt::CaseSensitive, QRegExp::WildcardUnix);
 
-    hline(w_total);
 
     for (int i = 0; i < vars.size(); i++) {
         Variable* var = vars[i];
+
+        // Apply name filter, if requested
+        if (applyFilter && !rxFilter.exactMatch(var->name()))
+        	continue;
+
+        // Print header if not yet done
+        if (!headerPrinted) {
+            _out
+                << qSetFieldWidth(w_id)  << right << "ID"
+                << qSetFieldWidth(w_colsep) << " "
+                << qSetFieldWidth(w_datatype) << left << "Base"
+                << qSetFieldWidth(w_colsep) << " "
+                << qSetFieldWidth(w_typename) << left << "Type name"
+                << qSetFieldWidth(w_colsep) << " "
+                << qSetFieldWidth(w_name) << "Name"
+                << qSetFieldWidth(w_colsep) << " "
+                << qSetFieldWidth(w_size)  << right << "Size"
+                << qSetFieldWidth(w_colsep) << " "
+                << qSetFieldWidth(w_src) << left << "Source"
+                << qSetFieldWidth(w_colsep) << " "
+                << qSetFieldWidth(w_line) << right << "Line"
+                << qSetFieldWidth(0) << endl;
+
+            hline(w_total);
+            headerPrinted = true;
+        }
+
         // Construct name and line of the source file
         QString s_src;
         if (var->srcFile() >= 0) {
@@ -1131,12 +1185,12 @@ int Shell::cmdListVars(QStringList /*args*/)
                 s_src = QString("(unknown id: %1)").arg(var->srcFile());
             else
                 s_src = QString("%1").arg(unit->name());
+			// Shorten, if neccessary
+			if (s_src.length() > w_src)
+				s_src = "..." + s_src.right(w_src - 3);
         }
         else
             s_src = "--";
-        // Shorten, if neccessary
-        if (s_src.length() > w_src)
-            s_src = "..." + s_src.right(w_src - 3);
 
         assert(var->refType() != 0);
 
@@ -1170,10 +1224,16 @@ int Shell::cmdListVars(QStringList /*args*/)
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(w_line) << right << dec << var->srcLine()
             << qSetFieldWidth(0) << endl;
+
+        ++varCount;
     }
 
-    hline(w_total);
-    _out << "Total variables: " << dec << vars.size() << endl;
+    if (headerPrinted) {
+    	hline(w_total);
+    	_out << "Total variables: " << dec << varCount << endl;
+    }
+    else if (applyFilter)
+    	_out << "No variables matching that name." << endl;
 
     return 0;
 }
@@ -1367,8 +1427,14 @@ int Shell::cmdMemoryQuery(QStringList args)
     int index = parseMemDumpIndex(args);
     // Perform the query
     if (index >= 0) {
-        _out << _memDumps[index]->query(args.join(" ")) << endl;
-        return 0;
+    	// Expect QueryExceptions here, just print their message
+    	try {
+    		_out << _memDumps[index]->query(args.join(" ")) << endl;
+    		return 0;
+    	}
+    	catch (QueryException e) {
+    		_err << e.message << endl;
+    	}
     }
     return 1;
 }
