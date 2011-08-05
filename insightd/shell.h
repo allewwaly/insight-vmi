@@ -67,6 +67,7 @@ class Shell: public QThread
          * @param call-back function to be called when the command is invoked
          * @param helpShort short help text
          * @param helpLong long help text
+         * @param exclude exclude from listing in the help view
          */
         Command(ShellCallback callback = 0,
                 const QString& helpShort = QString(),

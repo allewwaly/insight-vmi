@@ -187,7 +187,8 @@ Shell::Shell(bool listenOnSocket)
                 &Shell::cmdBinary,
                 "Allows to retrieve binary data through a socket connection",
                 "This command is only meant for communication between the "
-                "InSight daemon and the frontend application."));
+                "InSight daemon and the frontend application.",
+                true));
 
     prepare();
 }
@@ -732,6 +733,19 @@ int Shell::eval(QString command)
         try {
             ret = (this->*c)(words);
         }
+    	catch (QueryException e) {
+    		_err << e.message << endl;
+    		// Show a list of ambiguous types
+    		if (e.errorCode == QueryException::ecAmbiguousType) {
+    			_err << "Select a type by its ID from the following list:"
+    					<< endl << endl;
+
+    			QIODevice* outDev = _out.device();
+    			_out.setDevice(_err.device());
+    			cmdListTypes(QStringList(e.errorParam.toString()));
+    			_out.setDevice(outDev);
+    		}
+    	}
         catch (...) {
             // Exceptional cleanup
             cleanupPipedProcs();
@@ -805,6 +819,8 @@ int Shell::cmdHelp(QStringList args)
         cmds.sort();
 
         for (int i = 0; i < cmds.size(); i++) {
+        	if (_commands[cmds[i]].exclude)
+        		continue;
             _out << "  " << qSetFieldWidth(12) << left << cmds[i]
                  << qSetFieldWidth(0) << _commands[cmds[i]].helpShort << endl;
         }
@@ -1294,6 +1310,7 @@ int Shell::parseMemDumpIndex(QStringList &args, int skip)
     }
     // Otherwise use the first valid index
     else {
+    	index = -1;
         for (int i = 0; i < _memDumps.size() && index < 0; ++i)
             if (_memDumps[i] && skip-- <= 0)
                 return i;
@@ -1433,24 +1450,8 @@ int Shell::cmdMemoryQuery(QStringList args)
     int index = parseMemDumpIndex(args);
     // Perform the query
     if (index >= 0) {
-    	// Expect QueryExceptions here, just print their message
-    	try {
-    		_out << _memDumps[index]->query(args.join(" ")) << endl;
-    		return 0;
-    	}
-    	catch (QueryException e) {
-    		_err << e.message << endl;
-    		// Show a list of ambiguous types
-    		if (e.errorCode == QueryException::ecAmbiguousType) {
-    			_err << "Select a type by its ID from the following list:"
-    					<< endl << endl;
-    			
-    			QIODevice* outDev = _out.device();
-    			_out.setDevice(_err.device());
-    			cmdListTypes(QStringList(e.errorParam.toString()));
-    			_out.setDevice(outDev);
-    		}
-    	}
+		_out << _memDumps[index]->query(args.join(" ")) << endl;
+		return 0;
     }
     return 1;
 }
