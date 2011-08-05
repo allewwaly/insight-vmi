@@ -277,15 +277,11 @@ void init_daemon()
  */
 int main(int argc, char* argv[])
 {
-	QApplication app(argc, argv);
-	memMapWindow = new MemoryMapWindow();
-	memMapWindow->resize(800, 600);
-	memMapWindow->setAttribute(Qt::WA_QuitOnClose, false);
+	memMapWindow = 0;
+	shell = 0;
 
 	// Parse the command line options
-	QStringList args = app.arguments();
-    args.pop_front();
-    if (!programOptions.parseCmdOptions(args))
+    if (!programOptions.parseCmdOptions(argc, argv))
         return 1;
 
 	int ret = 0;
@@ -298,6 +294,15 @@ int main(int argc, char* argv[])
 			init_daemon();
 		    // Start a new logging session
 			log_message(QString("InSight started with PID %1.").arg(getpid()));
+		}
+
+		// Delay creation of QApplication until AFTER possible fork()!
+		QApplication app(argc, argv);
+
+		if (!daemonize) {
+			memMapWindow = new MemoryMapWindow();
+			memMapWindow->resize(800, 600);
+			memMapWindow->setAttribute(Qt::WA_QuitOnClose, false);
 		}
 
 	    shell = new Shell(daemonize);
@@ -342,10 +347,8 @@ int main(int argc, char* argv[])
 
 	// Wait for the shell to exit
 	if (shell) {
-		while (!shell->isFinished()) {
-		 	shell->quit();
-		 	QCoreApplication::processEvents();
-		}
+		shell->quit();
+		shell->wait();
 		delete shell;
 	}
 
