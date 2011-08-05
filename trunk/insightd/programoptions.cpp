@@ -111,6 +111,15 @@ void ProgramOptions::cmdOptionsUsage()
 }
 
 
+bool ProgramOptions::parseCmdOptions(int argc, char* argv[])
+{
+	QStringList args;
+	for (int i = 1; i < argc; i++)
+		args << QString(argv[i]);
+	return parseCmdOptions(args);
+}
+
+
 bool ProgramOptions::parseCmdOptions(QStringList args)
 {
     _activeOptions = 0;

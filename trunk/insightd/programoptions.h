@@ -69,6 +69,14 @@ public:
     bool parseCmdOptions(QStringList args);
 
     /**
+     * Parses command line options
+     * @param argc number of command line arguments
+     * @param argv array of command line arguments
+     * @return \c true if parsing succeeded, \c false in case of errors
+     */
+    bool parseCmdOptions(int argc, char* argv[]);
+
+    /**
      * Prints command line options help
      */
     static void cmdOptionsUsage();
