@@ -207,7 +207,7 @@ The original purpose of !InSight is to make kernel objects available for analysi
 
 === Retrieving Kernel Objects from Global Variables ===
 
-The following example displays the variable `init_tasks` from the first memory file (because no index is given). This variable represents the head to the list of processes on a Linux system. The first first line shows that variable `init_task` is of type *`struct task_struct`* which has the *ID `0x11ba`*. The variable is located at *virtual address `0xffffffff8144b1f0`*. The following lines list all members of `init_task, their *index*, *offsets*, *names*, *types*, and *values*.
+The following example displays the variable `init_tasks` from the first memory file (because no index is given). This variable represents the head to the list of processes on a Linux system. The first first line shows that variable `init_task` is of type *`struct task_struct`* which has the *ID `0x11ba`*. The variable is located at *virtual address `0xffffffff8144b1f0`*. The following lines list all members of `init_task`, their *index*, *offsets*, *names*, *types*, and *values*.
 
 {{{
 >>> memory query init_task
