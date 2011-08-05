@@ -1646,20 +1646,12 @@ int Shell::cmdMemoryDiffVisualize(int index)
 
 int Shell::cmdScript(QStringList args)
 {
-    if (args.size() < 1 || args.size() > 2) {
+    if (args.size() < 1) {
         cmdHelp(QStringList("script"));
         return 1;
     }
 
     QString fileName = args[0];
-
-    QString scriptParameters = "";
-    bool hasParameters = false;
-    if(args.size() == 2){
-    	scriptParameters = args[1];
-    	hasParameters = true;
-    }
-
     QFile file(fileName);
     if (!file.exists()) {
         _err << "File not found: " << fileName << endl;
@@ -1678,7 +1670,7 @@ int Shell::cmdScript(QStringList args)
     QFileInfo includePathFileInfo(file);
 
     // Prepare the script engine
-    initScriptEngine(hasParameters, scriptParameters, includePathFileInfo);
+    initScriptEngine(args, includePathFileInfo);
     int ret = 0;
 
 
@@ -1714,7 +1706,8 @@ int Shell::cmdScript(QStringList args)
 }
 
 
-void Shell::initScriptEngine(bool hasParameters, QString &scriptParameters, QFileInfo &includePathFileInfo)
+void Shell::initScriptEngine(const QStringList& args,
+		const QFileInfo &includePathFileInfo)
 {
     // Hold the engine lock before testing and using the _engine pointer
     QMutexLocker lock(&_engineLock);
@@ -1746,17 +1739,18 @@ void Shell::initScriptEngine(bool hasParameters, QString &scriptParameters, QFil
 //InstanceUserLandClass* instUserLandClass = new InstanceUserLandClass(_engine);
 //_engine->globalObject().setProperty("InstanceUserLand", instUserLandClass->constructor());
 
-
-    _engine->globalObject().setProperty("HAVE_GLOBAL_PARAMS", hasParameters, QScriptValue::ReadOnly);
-    _engine->globalObject().setProperty("PARAMS", scriptParameters, QScriptValue::ReadOnly);
+    // Export parameters to the script
+    _engine->globalObject().setProperty("ARGV", _engine->toScriptValue(args),
+    		QScriptValue::ReadOnly);
 
     // create the 'include' command
-    _engine->globalObject().setProperty("include", _engine->newFunction(scriptInclude, 1 /*#arguments*/),
+    _engine->globalObject().setProperty("include",
+    		_engine->newFunction(scriptInclude, 1),
     		QScriptValue::KeepExistingFlags);
 
     //export SCRIPT_PATH to scripting engine
-    _engine->globalObject().setProperty("SCRIPT_PATH", includePathFileInfo.absolutePath(), QScriptValue::ReadOnly);
-
+    _engine->globalObject().setProperty("SCRIPT_PATH",
+    		includePathFileInfo.absolutePath(), QScriptValue::ReadOnly);
 }
 
 
@@ -1907,17 +1901,6 @@ QScriptValue Shell::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
  * implements the 'include' function for QTScript
  *
  * Depends on SCRIPT_PATH being set in engine
- *
- * QScript example:
- * assuming the parameters are "{'test':123}" without ", no whitespaces
- * if(HAVE_GLOBAL_PARAMS){
- * 		print(PARAMS)			#prints {'test':123}
- * 		eval("params="+PARAMS)
- * 		print(params) 			#prints [object Object]
- * 		print(params["test"])	#prints 123
- * 	}else{
- * 		print("no parameters specified")
- * 	}
  */
 QScriptValue Shell::scriptInclude(QScriptContext *context, QScriptEngine *engine)
 {

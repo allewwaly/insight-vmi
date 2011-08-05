@@ -229,7 +229,8 @@ private:
     void printTimeStamp(const QTime& time);
     void prepare();
     void cleanupPipedProcs();
-    void initScriptEngine(bool hasParameters, QString &scriptParameters, QFileInfo &includePathFileInfo);
+    void initScriptEngine(const QStringList& args,
+    		const QFileInfo &includePathFileInfo);
     void cleanupScriptEngine();
     QStringList splitIntoPipes(QString command) const;
     QStringList splitIntoWords(QString command) const;
