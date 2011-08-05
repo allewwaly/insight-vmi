@@ -303,3 +303,9 @@ const QString& KernelSymbols::fileName() const
     return _fileName;
 }
 
+
+bool KernelSymbols::symbolsAvailable() const
+{
+	return !_factory.types().isEmpty();
+}
+

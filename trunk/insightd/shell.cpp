@@ -1308,7 +1308,13 @@ int Shell::parseMemDumpIndex(QStringList &args, int skip)
 
 int Shell::loadMemDump(const QString& fileName)
 {
-    // Check argument size
+	// Check if any symbols are loaded yet
+	if (!_sym.symbolsAvailable()) {
+        _err << "Cannot load memory dump file before symbols have been loaded."
+        		<< endl;
+        return -1;
+	}
+
     // Check file for existence
     QFile file(fileName);
     if (!file.exists()) {

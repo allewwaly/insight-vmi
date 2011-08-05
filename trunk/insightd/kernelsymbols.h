@@ -100,6 +100,12 @@ public:
      */
     const QString& fileName() const;
 
+    /**
+     * @return \c true if kernel symbols have been loaded or parsed, \c false
+     * otherwise
+     */
+    bool symbolsAvailable() const;
+
 private:
 	MemSpecs _memSpecs;
     SymFactory _factory;
