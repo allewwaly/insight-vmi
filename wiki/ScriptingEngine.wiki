@@ -94,23 +94,24 @@ Hello, world!
 
 == Arguments to Scripts ==
 
-The script file name can optionally be followed by one argument that is passed to the script. You can check the variable `HAVE_GLOBAL_PARAMS` within a script to see if a parameter is available. Access the parameter through the variable `PARAMS`:
+The script file name can optionally be followed by one argument that is passed to the script. Access the parameter through the array `ARGV`:
 
 <code language="js">
 // contents of file "hello.js"
-if (HAVE_GLOBAL_PARAMS)
-    print("Hello, " + PARAMS + "!");
-else
-    print("Hello, world!");</code>
+print("Hello, my arguments are:");
+for (var i = 0; i < ARGV.length; i++)
+	print ("[" + i + "] " + ARGV`[`i`]`);</code>
 
-Now the script provides a personalized greeting:
+Note that the value at array index 0 holds the name of the script being executed. The first user-supplied argument is found at array index 1:
 
 {{{
->>> script scripts/hello.js Bob
-Hello, Bob!
+>>> sc scripts/hello.js foo bar "with spaces"
+Hello, my arguments are:
+[0] scripts/hello.js
+[1] foo
+[2] bar
+[3] with spaces
 }}}
-
-*Note:* Due to current limitations, no arguments with spaces can be passed to a script (see issue 4).
 
 == Using Multiple Memory Files ==
 
@@ -166,6 +167,5 @@ In addition to that, the following global functions, properties and constructors
 || `getVariableIds()`   || function || Returns an array containing the IDs of all global variables. ||
 || `getVariableNames()` || function || Returns an array containing the names of all global variables. ||
 || `include(`_file_`)`  || function || Executes _file_ in the current context of the script. ||
-|| `HAVE_GLOBAL_PARAMS` || property || Is `true` if an argument has been supplied to the script, `false` otherwise. ||
-|| `PARAMS`             || property || Holds the argument supplied to the script ||
-|| `SCRIPT_PATH`        || property || Holds the path of the script that is being executed. ||
+|| `ARGV`               || property || Array holding the script's file name as well as the arguments supplied to the script ||
+|| `SCRIPT_PATH`        || property || Holds the path to the script that is being executed. ||
