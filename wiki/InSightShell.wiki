@@ -7,9 +7,7 @@
 
 = Introduction =
 
-!InSight provides a shell-like interface for [DebugSymbols processing debugging symbols], loading and comparing memory files, interactive analysis, [ScriptingEngine script execution], etc.
-
-The shell can be invoked either by connecting with the `insight` program to a running `insightd` daemon, or by running `insightd` interactively (i. e., without the `--daemon` parameter, see RunningInSight).
+!InSight provides a shell-like interface for [DebugSymbols processing debugging symbols], loading and comparing memory files, interactive analysis, [ScriptingEngine script execution], etc. The shell can be invoked either by connecting with the `insight` program to a running `insightd` daemon, or by running `insightd` interactively (i. e., without the `--daemon` parameter, see RunningInSight).
 
 = Shell Basics =
 
@@ -18,7 +16,7 @@ The shell comes with readline support and further convenience functions you migh
   * *history search*: Use CTRL+R to search the command histroy.
   * *command abbreviation*: Only the prefix of a command is required, as long as the prefix is not ambiguous, for example "`memory query`" may be abbreviated to "`m q`".
   * *interrupt support*: Long operations such as script executions may be aborted with CTRL+C, the shell can be closed with CTRL+D.
-  * *pipe support* (_experimental_): The output of one command can be piped to other shell utilities such as `grep`, `sort`, `head`, `tail`, etc. _Note: Pipe support currently *only* works for `insightd`, not for `insight` connected to the daemon._
+  * *pipe support* (_experimental_): The output of one command can be piped to other shell utilities such as `grep`, `sort`, `head`, `tail`, etc.
 
 = Built-in Help =
 
@@ -27,7 +25,6 @@ The shell provides a built-in help for the available commands. If at any point y
 {{{
 >>> help
 The following represents a complete list of valid commands:
-  binary      Allows to retrieve binary data through a socket connection
   diff        Generates a list of vectors corresponding to type IDs
   exit        Exits the program
   help        Displays some help for a command
@@ -134,17 +131,26 @@ This information is mostly interesting to developers.
 The type database !InSight has loaded can be inspected with the `list` command:
 
 {{{
->>> list help
+>>> help list
 Command: list
 Description: This command lists various types of read symbols.
-  list sources          List the source files
-  list types            List the types
-  list types-by-id      List the types-by-ID hash
-  list types-by-name    List the types-by-name hash
-  list variables        List the variables
+  list sources              List all source files
+  list types [<glob>]       List all types, optionally filtered by a
+                            wildcard expression <glob>
+  list types-by-id          List the types-by-ID hash
+  list types-by-name        List the types-by-name hash
+  list variables [<glob>]   List all variables, optionally filtered by
+                            a wildcard expression <glob>
 }}}
 
-The commands `list variables` and `list types` are self-explaining and will be the most interesting for users. Note that these commands will produce very long lists, it may be advisable to [#Shell_Basics pipe the output through filters] such as `grep`.
+The commands `list variables` and `list types` are self-explaining and will be the most interesting for users. They both accept an optional wildcard expression as argument to show only those variables or types with matching names. The wildcard expressions follows the usual rules of file wildcards:
+
+  * a `?` matches exactly one arbitrary character
+  * a `*` matches zero or more characters
+  * character ranges like `[a-f]` match exactly one character within that range
+  * all other characters are matched literally
+
+Note that these commands might produce very long lists, it may be advisable [#Shell_Basics pipe the output through filters] such as `grep` in addition to the wildcards.
 
 In addition, the `show` command can be used to display details about a type or variable, either by using their hexadecimal ID or their name. For example, it can be used to output information about the global variable "`modules`":
 
@@ -461,12 +467,17 @@ We see that the `next` pointer points to address `0xffffffffa02261e8`, however w
 
 {{{
 >>> memory dump module @ 0xffffffffa02261e0
-Caught exception at memorydump.cpp:132
-Message: Found multiple types for module:
-        -> 0x1c519ec - module
-        -> 0xbef3 - module
-        -> 0x2348 - module
-        -> 0x899e4a - module
+Found multiple types for "module".
+Select a type by its ID from the following list:
+
+     ID  Type        Name                           Size  Source               Line
+-----------------------------------------------------------------------------------
+ 899e4a  Const       const struct module             576  --                     --
+   2348  Struct      struct module                     0  --                     --
+   bef3  Struct      struct module                   576  ...ernel/init_task.c   60
+1c519ec  Struct      struct module                   576  ...onsole/dummycon.c   22
+-----------------------------------------------------------------------------------
+Total types: 4
 }}}
 
 We receive an error message because !InSight knows several types with name `module`. To disambiguate the type, we inspect all suggested types using their ID with the `show` command and find the first one to be the correct one. So we re-try our query:
