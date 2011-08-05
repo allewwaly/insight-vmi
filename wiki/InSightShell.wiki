@@ -439,7 +439,7 @@ In all of these cases, the user has to specify the types and offsets manually. W
 
 === Retrieving Kernel Objects from User-Defined Locations ===
 
-In special cases as [Imitation_of_Kernel_Pointer_Magic explained before] or for general debugging, the user can request objects of arbitrary types and at any readable location. This is achieved with the command `memory dump` which adheres to the following general syntax:
+In special cases as [#Imitation_of_Kernel_Pointer_Magic explained before] or for general debugging, the user can request objects of arbitrary types and at any readable location. This is achieved with the command `memory dump` which adheres to the following general syntax:
 
 `memory dump [index] <char|int|long|type-name|type-id>(.<member>)* @ <address>`
 
