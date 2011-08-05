@@ -1,5 +1,5 @@
-if(HAVE_GLOBAL_PARAMS){
-	eval("params="+PARAMS)
+if(ARGV.length > 1){
+	eval("params="+ARGV[1])
 	var sys_call_nr = params["sys_call_nr"] //int
 	var arg0 = params["rdi"] //hex string
 	var arg1 = params["rsi"] //hex string
