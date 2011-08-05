@@ -1,5 +1,5 @@
 #summary Running InSight from the command line
-#labels Featured,Phase-Usage
+#labels Phase-Usage
 
 = Running !InSight =
 
