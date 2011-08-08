@@ -1692,8 +1692,6 @@ int Shell::cmdScript(QStringList args)
                 _err << result.toString() << endl;
             ret = 4;
         }
-        else if (!result.isUndefined())
-            _out << result.toString() << endl;
 
         cleanupScriptEngine();
     }
