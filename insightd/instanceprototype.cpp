@@ -131,17 +131,17 @@ QStringList InstancePrototype::Differences(const Instance& other, bool recursive
 }
 
 
-bool InstancePrototype::IsNull() const
+bool InstancePrototype::IsValid() const
 {
 	Instance* inst;
-    return (inst = thisInstance()) ? inst->isNull() : true;
+    return (inst = thisInstance()) ? inst->isValid() : false;
 }
 
 
-bool InstancePrototype::IsAddressNull() const
+bool InstancePrototype::IsNull() const
 {
     Instance* inst;
-    return (inst = thisInstance()) ? (inst->address() == 0) : true;
+    return (inst = thisInstance()) ? inst->isNull() : true;
 }
 
 
