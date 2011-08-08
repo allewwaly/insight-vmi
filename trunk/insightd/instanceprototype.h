@@ -316,13 +316,13 @@ public slots:
      * existence with MemberExists() or by iterating over the names returned by
      * MemberNames().
      *
-     * \note Make sure to check IsNull() on the returned object to see if it is
+     * \note Make sure to check IsValid() on the returned object to see if it is
      * valid or not.
      *
      * @param name the name of the member to find
      * @return a new Instance object if the member was found, or an empty
      * object otherwise
-     * \sa MemberExists(), MemberNames(), IsNull()
+     * \sa MemberExists(), MemberNames(), IsValid()
      */
     Instance FindMember(const QString& name) const;
 
@@ -384,28 +384,28 @@ public slots:
     QStringList Differences(const Instance& other, bool recursive) const;
 
     /**
-     * Use this method to check if an Instance object has a null address. As
-     * JavaScript does not support 64-bit integers natively, one would otherwise
-     * have to compare:
-     * \code
-     * !AddressHigh() && !AddressLow()
-     * \endcode
+     * Use this method to check if an Instance object has a valid type.
      *
-     * \warning This method only tests the address of this instance. If you
-     * additionally want to check whether this instance has a valid type, use
+     * \warning This method does not tests the address of this instance. If you
+     * additionally want to check whether this instance has a non-null address,
      * IsNull() instead.
      *
-     * @return \c true if the instance's address is \c 0, \c false otherwise
+     * @return \c true if the instance has a valid type, \c false otherwise
      * \sa IsNull()
      */
-    bool IsAddressNull() const;
+    bool IsValid() const;
 
     /**
      * Checks if this instance has a non-null address \e and references a valid
-     * type.
+     * type.  As JavaScript does not support 64-bit integers natively, one
+     * would otherwise have to compare both the high and low values to test for
+     * a null address:
+     * \code
+     * !AddressHigh() && !AddressLow()
+     * \endcode
      * @return \c true if this instance has a non-null address as well as a
      * valid type, \c false otherwise
-     * \sa IsAddressNull()
+     * \sa IsValid()
      */
     bool IsNull() const;
 
