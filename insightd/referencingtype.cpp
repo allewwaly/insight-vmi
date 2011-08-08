@@ -108,10 +108,8 @@ inline Instance ReferencingType::createRefInstance(size_t address,
     if (p) {
         if (vmem->safeSeek(addr)) {
             size_t derefAddr = (size_t)p->toPointer(vmem, addr);
-            if (derefAddr && derefAddr >= (size_t) -p->macroExtraOffset())
-                addr = derefAddr + p->macroExtraOffset();
-            else
-                done = true;
+           	// Don't taint NULL pointers by adding some artificial offsets!
+            addr = derefAddr ? derefAddr + p->macroExtraOffset() : derefAddr;
         }
         else
             done = true;
@@ -142,10 +140,8 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 			    // If we cannot dereference the pointer, we have to stop here
 			    if (vmem->safeSeek(addr)) {
 		            size_t derefAddr = (size_t)p->toPointer(vmem, addr);
-		            if (derefAddr && derefAddr >= (size_t) -p->macroExtraOffset())
-		                addr = derefAddr + p->macroExtraOffset();
-		            else
-		                break;
+	            	// Don't taint NULL pointers by adding some artificial offsets!
+	                addr = derefAddr ? derefAddr + p->macroExtraOffset() : derefAddr;
 			    }
 			    else
 			        break;
