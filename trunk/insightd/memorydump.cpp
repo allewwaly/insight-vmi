@@ -197,7 +197,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 
 	// If the given instance is Null, we interpret this as the first component
 	// in the query string and will therefore try to resolve the variable.
-	if (instance.isNull()) {
+	if (!instance.isValid()) {
 		 Variable* v = _factory->findVarByName(symbol);
 
 		if (!v)
@@ -228,11 +228,6 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
                             .arg(instance.fullName())
                             .arg(symbol));
         }
-        else if (result.isNull())
-            queryError(QString("The member \"%1.%2\" is a null pointer and "
-                        "cannot be further resolved")
-                        .arg(instance.fullName())
-                        .arg(symbol));
 	}
 	
 	// Cast the instance if necessary
@@ -349,7 +344,7 @@ QString MemoryDump::query(const int queryId) const
     Instance instance = queryInstance(queryId);
 
     QString s = QString("0x%1: ").arg(queryId, 0, 16);
-    if (!instance.isNull()) {
+    if (instance.isValid()) {
         s += QString("%1 (ID 0x%2)").arg(instance.typeName()).arg(instance.type()->id(), 0, 16);
         ret = instance.toString();
     }
@@ -380,7 +375,7 @@ QString MemoryDump::query(const QString& queryString) const
         Instance instance = queryInstance(queryString);
 
         QString s = QString("%1: ").arg(queryString);
-        if (!instance.isNull()) {
+        if (instance.isValid()) {
             s += QString("%1 (ID 0x%2)").arg(instance.typeName()).arg(instance.type()->id(), 0, 16);
             ret = instance.toString();
         }

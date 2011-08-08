@@ -112,7 +112,6 @@ QScriptValue InstanceClass::property(const QScriptValue& object,
     assert(id < (uint)inst->memberCount());
 
     Instance member = inst->member(id, BaseType::trAny);
-    assert(!member.isNull());
 
     return newInstance(member);
 }
