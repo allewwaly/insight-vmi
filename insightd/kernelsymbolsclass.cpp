@@ -128,7 +128,9 @@ QStringList KernelSymbolsClass::typeNames() const
 
 QList<int> KernelSymbolsClass::typeIds() const
 {
-    return shell->symbols().factory().typesById().keys();
+    QList<int> ret = shell->symbols().factory().typesById().keys();
+    qSort(ret);
+    return ret;
 }
 
 
@@ -140,6 +142,8 @@ QStringList KernelSymbolsClass::variableNames() const
 
 QList<int> KernelSymbolsClass::variableIds() const
 {
-    return shell->symbols().factory().varsById().keys();
+    QList<int> ret = shell->symbols().factory().varsById().keys();
+    qSort(ret);
+    return ret;
 }
 
