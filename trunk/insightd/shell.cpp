@@ -61,6 +61,17 @@ Q_DECLARE_METATYPE(QAbstractSocket::SocketError);
 */
 
 
+enum ShellErrorCodes {
+    ecOk                  = 0,
+    ecNoSymbolsLoaded     = -1,
+    ecFileNotFound        = -2,
+    ecNoFileNameGiven     = -3,
+    ecFileNotLoaded       = -4,
+    ecInvalidIndex        = -5,
+    ecNoMemoryDumpsLoaded = -6
+};
+
+
 Shell* shell = 0;
 
 MemDumpArray Shell::_memDumps;
@@ -736,7 +747,7 @@ int Shell::eval(QString command)
         try {
             ret = (this->*c)(words);
         }
-    	catch (QueryException e) {
+    	catch (QueryException& e) {
     		_err << e.message << endl;
     		// Show a list of ambiguous types
     		if (e.errorCode == QueryException::ecAmbiguousType) {
@@ -787,7 +798,7 @@ int Shell::evalLine()
             _clSocket->waitForBytesWritten(-1);
         }
     }
-    catch (GenericException e) {
+    catch (GenericException& e) {
             _err
                 << "Caught exception at " << e.file << ":" << e.line << endl
                 << "Message: " << e.message << endl;
@@ -1299,16 +1310,18 @@ int Shell::cmdMemory(QStringList args)
 }
 
 
-int Shell::parseMemDumpIndex(QStringList &args, int skip)
+int Shell::parseMemDumpIndex(QStringList &args, int skip, bool quiet)
 {
     bool ok = false;
-    int index = (args.size() > 0) ? args[0].toInt(&ok) : -1;
+    int index = (args.size() > 0) ? args[0].toInt(&ok) : ecNoMemoryDumpsLoaded;
     if (ok) {
         args.pop_front();
         // Check the bounds
         if (index < 0 || index >= _memDumps.size() || !_memDumps[index]) {
-            _err << "Memory dump index " << index + 1 << " does not exist." << endl;
-            return -1;
+            if (!quiet)
+                _err << "Memory dump index " << index << " does not exist."
+                    << endl;
+            return ecInvalidIndex;
         }
     }
     // Otherwise use the first valid index
@@ -1319,7 +1332,7 @@ int Shell::parseMemDumpIndex(QStringList &args, int skip)
                 return i;
     }
     // No memory dumps loaded at all?
-    if (index < 0)
+    if (index < 0 && !quiet)
         _err << "No memory dumps loaded." << endl;
 
     return index;
@@ -1329,28 +1342,21 @@ int Shell::parseMemDumpIndex(QStringList &args, int skip)
 int Shell::loadMemDump(const QString& fileName)
 {
 	// Check if any symbols are loaded yet
-	if (!_sym.symbolsAvailable()) {
-        _err << "Cannot load memory dump file before symbols have been loaded."
-        		<< endl;
-        return -1;
-	}
+	if (!_sym.symbolsAvailable())
+        return ecNoSymbolsLoaded;
 
     // Check file for existence
     QFile file(fileName);
-    if (!file.exists()) {
-        _err << "File not found: " << fileName << endl;
-        return -1;
-    }
+    if (!file.exists())
+        return ecFileNotFound;
 
     // Find an unused index and check if the file is already loaded
     int index = -1;
     for (int i = 0; i < _memDumps.size(); ++i) {
         if (!_memDumps[i] && index < 0)
             index = i;
-        if (_memDumps[i] && _memDumps[i]->fileName() == fileName) {
-            _out << "File already loaded as [" << i << "] " << fileName << endl;
+        if (_memDumps[i] && _memDumps[i]->fileName() == fileName)
             return i;
-        }
     }
     // Enlarge array, if necessary
     if (index < 0) {
@@ -1361,7 +1367,6 @@ int Shell::loadMemDump(const QString& fileName)
     // Load memory dump
     _memDumps[index] =
             new MemoryDump(_sym.memSpecs(), fileName, &_sym.factory(), index);
-    _out << "Loaded [" << index << "] " << fileName << endl;
 
     return index;
 }
@@ -1372,10 +1377,66 @@ int Shell::cmdMemoryLoad(QStringList args)
     // Check argument size
     if (args.size() != 1) {
         _err << "No file name given." << endl;
-        return 1;
+        return ecNoFileNameGiven;
     }
 
-    return loadMemDump(args[0]) < 0 ? 2 : 0;
+    int ret = loadMemDump(args[0]);
+
+    switch(ret) {
+    case ecNoSymbolsLoaded:
+        _err << "Cannot load memory dump file before symbols have been loaded."
+                << endl;
+        break;
+
+    case ecFileNotFound:
+        _err << "File not found: " << args[0] << endl;
+        break;
+
+    default:
+        if (ret < 0)
+            _err << "An unknown error occurred (error code " << ret << ")"
+                << endl;
+        else
+            _out << "Loaded [" << ret << "] " << _memDumps[ret]->fileName()
+                << endl;
+        break;
+    }
+
+    return ret < 0 ? ret : ecOk;
+}
+
+
+int Shell::unloadMemDump(const QString& indexOrFileName, QString* unloadedFile)
+{
+    // Did the user specify an index or a file name?
+    bool isNumeric = false;
+    indexOrFileName.toInt(&isNumeric);
+    // Initialize error codes according to parameter type
+    int index = isNumeric ? ecInvalidIndex : ecFileNotFound;
+
+    if (isNumeric) {
+        QStringList list(indexOrFileName);
+        index = parseMemDumpIndex(list, 0, true);
+    }
+    else {
+        // Not numeric, must have been a file name
+        for (int i = 0; i < _memDumps.size(); ++i) {
+            if (_memDumps[i] && _memDumps[i]->fileName() == indexOrFileName) {
+                index = i;
+                break;
+            }
+        }
+    }
+
+    if (index >= 0) {
+        // Finally, delete the memory dump
+        if (unloadedFile)
+            *unloadedFile = _memDumps[index]->fileName();
+        delete _memDumps[index];
+        _memDumps[index] = 0;
+    }
+
+    return index;
 }
 
 
@@ -1383,37 +1444,41 @@ int Shell::cmdMemoryUnload(QStringList args)
 {
     // Check argument size
     if (args.size() != 1) {
-        _err << "No file name or index given." << endl;
-        return 1;
+        _err << "No file name given." << endl;
+        return ecNoFileNameGiven;
     }
 
     QString fileName;
+    int ret = unloadMemDump(args.front(), &fileName);
 
-    // Did the user specify a file index?
-    int index = parseMemDumpIndex(args);
+    switch (ret) {
+    case ecFileNotFound:
+        _err << "File not loaded: " << args.front() << endl;
+        break;
 
-    if (index >= 0)
-        fileName = _memDumps[index]->fileName();
-    // Not numeric, must have been a file name
-    else {
-        index = -1;
-        for (int i = 0; i < _memDumps.size(); ++i) {
-            if (_memDumps[i] && _memDumps[i]->fileName() == fileName)
-                index = i;
-        }
-        if (index < 0)
-            _err << "No memory dump with file name \"" << fileName << "\" loaded." << endl;
+    case ecInvalidIndex:
+        _err << "Memory dump index does not exist." << endl;
+        break;
+
+    case ecNoMemoryDumpsLoaded:
+        _err << "No memory dumps loaded." << endl;
+        break;
+
+    case ecFileNotLoaded:
+        _err << "No memory dump with file name \"" << fileName << "\" loaded."
+            << endl;
+        break;
+
+    default:
+        if (ret < 0)
+            _err << "An unknown error occurred (error code " << ret << ")"
+                << endl;
+        else
+            _out << "Unloaded [" << ret << "] " << fileName << endl;
+        break;
     }
 
-    // Finally, delete the memory dump
-    if (index >= 0) {
-        delete _memDumps[index];
-        _memDumps[index] = 0;
-        _out << "Unloaded [" << index << "] " << fileName << endl;
-        return 0;
-    }
-
-    return 2;
+    return ret < 0 ? ret : ecOk;
 }
 
 

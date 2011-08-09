@@ -1,4 +1,5 @@
-SOURCES += scriptengine.cpp \
+SOURCES += memorydumpsclass.cpp \
+    scriptengine.cpp \
     kernelsymbolsclass.cpp \
     memorydifftree.cpp \
     memorymaprangetree.cpp \
@@ -44,7 +45,8 @@ SOURCES += scriptengine.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += scriptengine.h \
+HEADERS += memorydumpsclass.h \
+    scriptengine.h \
     kernelsymbolsclass.h \
     memorydifftree.h \
     memorymaprangetree.h \

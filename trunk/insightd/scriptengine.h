@@ -17,6 +17,7 @@ class QScriptContext;
 class Shell;
 class InstanceClass;
 class KernelSymbolsClass;
+class MemoryDumpsClass;
 
 /**
  * This class manages and executes the QtScript scripting engine.
@@ -99,6 +100,7 @@ private:
 	QScriptEngine* _engine;
 	InstanceClass* _instClass;
 	KernelSymbolsClass* _symClass;
+	MemoryDumpsClass* _memClass;
 
 	void initScriptEngine();
 

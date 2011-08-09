@@ -161,6 +161,28 @@ public:
      */
     static const MemDumpArray& memDumps();
 
+    /**
+     * Loads a memory file.
+     * @param fileName the file to load
+     * @return in case of success, the index of the loaded file into the
+     * memDumps() array is returned, i.e., a value >= 0, otherwise an error
+     * code < 0
+     */
+    int loadMemDump(const QString& fileName);
+
+    /**
+     * Unloads a memory file, either based on the file name or an the index into
+     * the memDumps() array.
+     * @param indexOrfileName either the name or the list index of the file to
+     * unload
+     * @param unloadedFile if given, the name of the unloaded file will be
+     * returned here
+     * @return in case of success, the index of the loaded file into the
+     * memDumps() array is returned, i.e., a value >= 0, otherwise an error
+     * code < 0
+     */
+    int unloadMemDump(const QString& indexOrFileName, QString* unloadedFile = 0);
+
 protected:
     /**
      * Starts the interactive shell and does not return until the user invokes
@@ -227,8 +249,7 @@ private:
     int eval(QString command);
     int evalLine();
     void hline(int width = 60);
-    int parseMemDumpIndex(QStringList &args, int skip = 0);
-    int loadMemDump(const QString& fileName);
+    int parseMemDumpIndex(QStringList &args, int skip = 0, bool quiet = false);
     //---------------------------------
     int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
