@@ -39,8 +39,10 @@ QString Pointer::prettyName() const
 {
     if (_refType)
         return _refType->prettyName() + " *";
-    else
+    else if (_refTypeId < 0)
         return "void *";
+    else
+    	return "(unresolved) *";
 }
 
 
