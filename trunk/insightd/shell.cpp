@@ -18,7 +18,6 @@
 #include <QtAlgorithms>
 #include <QProcess>
 #include <QCoreApplication>
-#include <QScriptEngine>
 #include <QDir>
 #include <QLocalSocket>
 #include <QLocalServer>
@@ -39,6 +38,7 @@
 #include "memorymapwindow.h"
 #include "memorymapwidget.h"
 #include "basetype.h"
+#include "scriptengine.h"
 
 // Register socket enums for the Qt meta type system
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
@@ -63,7 +63,7 @@ Q_DECLARE_METATYPE(QAbstractSocket::SocketError);
 
 Shell* shell = 0;
 
-Shell::MemDumpArray Shell::_memDumps;
+MemDumpArray Shell::_memDumps;
 KernelSymbols Shell::_sym;
 QFile Shell::_stdin;
 QFile Shell::_stdout;
@@ -255,6 +255,8 @@ void Shell::prepare()
     // connects in daemon mode, the device for stdout will become the socket.
     _out.setDevice(&_stdout);
     _err.setDevice(&_stderr);
+
+    _engine = new ScriptEngine();
 }
 
 
@@ -287,6 +289,7 @@ Shell::~Shell()
     if (_srvSocket) _srvSocket->close();
     safe_delete(_srvSocket);
 
+    safe_delete(_engine);
     safe_delete(_outChan);
     safe_delete(_errChan);
     safe_delete(_binChan);
@@ -554,7 +557,7 @@ void Shell::interrupt()
 {
     if (executing()) {
         _interrupted = true;
-        terminateScript();
+        _engine->terminateScript();
     }
 }
 
@@ -1653,280 +1656,54 @@ int Shell::cmdScript(QStringList args)
 
     QString fileName = args[0];
     QFile file(fileName);
-    if (!file.exists()) {
-        _err << "File not found: " << fileName << endl;
-        return 2;
-    }
-
-    // Try to read in the whole file
-    if (!file.open(QIODevice::ReadOnly)) {
-        _err << "Cannot open file \"" << fileName << "\" for reading." << endl;
-        return 3;
-    }
-    QTextStream stream(&file);
-    QString scriptCode(stream.readAll());
-    file.close();
-
     QFileInfo includePathFileInfo(file);
 
-    // Prepare the script engine
-    initScriptEngine(args, includePathFileInfo);
-    int ret = 0;
-
-
-
-    try {
-        // Execute the script
-        QScriptValue result = _engine->evaluate(scriptCode, fileName);
-
-        if (result.isError()) {
-            if (_engine->hasUncaughtException()) {
-                _err << "Exception occured on " << fileName << ":"
-                        << _engine->uncaughtExceptionLineNumber() << ": " << endl
-                        << _engine->uncaughtException().toString() << endl;
-                QStringList bt = _engine->uncaughtExceptionBacktrace();
-                for (int i = 0; i < bt.size(); ++i)
-                    _err << "    " << bt[i] << endl;
-            }
-            else
-                _err << result.toString() << endl;
-            ret = 4;
-        }
-
-        cleanupScriptEngine();
+    // Read script code from file or from args[1] if the file name is "eval"
+    QString scriptCode;
+    if (fileName == "eval") {
+    	if (args.size() < 2) {
+			_err << "Using the \"eval\" function expects script code as "
+					<< "additional argument." << endl;
+			return 4;
+    	}
+    	scriptCode = args[1];
+    	args.removeAt(1);
     }
-    catch(...) {
-        cleanupScriptEngine();
-        throw;
-    }
-
-    return ret;
-}
-
-
-void Shell::initScriptEngine(const QStringList& args,
-		const QFileInfo &includePathFileInfo)
-{
-    // Hold the engine lock before testing and using the _engine pointer
-    QMutexLocker lock(&_engineLock);
-    if (_engine)
-        delete _engine;
-    // Prepare the script engine
-    _engine = new QScriptEngine();
-    _engine->setProcessEventsInterval(200);
-
-    QScriptValue printFunc = _engine->newFunction(scriptPrint);
-    _engine->globalObject().setProperty("print", printFunc);
-
-    QScriptValue memDumpFunc = _engine->newFunction(scriptListMemDumps);
-    _engine->globalObject().setProperty("getMemDumps", memDumpFunc);
-
-    QScriptValue getVarNamesFunc = _engine->newFunction(scriptListVariableNames);
-    _engine->globalObject().setProperty("getVariableNames", getVarNamesFunc);
-
-    QScriptValue getVarIdsFunc = _engine->newFunction(scriptListVariableIds);
-    _engine->globalObject().setProperty("getVariableIds", getVarIdsFunc);
-
-    QScriptValue getInstanceFunc = _engine->newFunction(scriptGetInstance, 2);
-    _engine->globalObject().setProperty("getInstance", getInstanceFunc);
-
-    InstanceClass* instClass = new InstanceClass(_engine);
-    _engine->globalObject().setProperty("Instance", instClass->constructor());
-
-
-//InstanceUserLandClass* instUserLandClass = new InstanceUserLandClass(_engine);
-//_engine->globalObject().setProperty("InstanceUserLand", instUserLandClass->constructor());
-
-    // Export parameters to the script
-    _engine->globalObject().setProperty("ARGV", _engine->toScriptValue(args),
-    		QScriptValue::ReadOnly);
-
-    // create the 'include' command
-    _engine->globalObject().setProperty("include",
-    		_engine->newFunction(scriptInclude, 1),
-    		QScriptValue::KeepExistingFlags);
-
-    //export SCRIPT_PATH to scripting engine
-    _engine->globalObject().setProperty("SCRIPT_PATH",
-    		includePathFileInfo.absolutePath(), QScriptValue::ReadOnly);
-}
-
-
-void Shell::cleanupScriptEngine()
-{
-    // Hold the engine lock before testing and using the _engine pointer
-    QMutexLocker lock(&_engineLock);
-    if (_engine) {
-        delete _engine;
-        _engine = 0;
-    }
-}
-
-
-bool Shell::terminateScript()
-{
-    // Hold the engine lock before testing and using the _engine pointer
-    QMutexLocker lock(&_engineLock);
-    if (_engine && _engine->isEvaluating()) {
-        _engine->abortEvaluation();
-        return true;
-    }
-    return false;
-}
-
-
-QScriptValue Shell::scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng)
-{
-    if (ctx->argumentCount() > 0) {
-        ctx->throwError("Expected one or two arguments");
-        return QScriptValue();
-    }
-
-    // Create a new script array with all members of _memDumps
-    QScriptValue arr = eng->newArray(_memDumps.size());
-    for (int i = 0; i < _memDumps.size(); ++i) {
-        if (_memDumps[i])
-            arr.setProperty(i, _memDumps[i]->fileName());
-    }
-
-    return arr;
-}
-
-
-QScriptValue Shell::scriptListVariableNames(QScriptContext* ctx, QScriptEngine* eng)
-{
-    if (ctx->argumentCount() != 0) {
-        ctx->throwError("No arguments expected");
-        return QScriptValue();
-    }
-
-    // Create a new script array with all variable names
-    const VariableList& vars = _sym.factory().vars();
-    QScriptValue arr = eng->newArray(vars.size());
-    for (int i = 0; i < vars.size(); ++i)
-        arr.setProperty(i, vars[i]->name());
-
-    return arr;
-}
-
-
-QScriptValue Shell::scriptListVariableIds(QScriptContext* ctx, QScriptEngine* eng)
-{
-    if (ctx->argumentCount() != 0) {
-        ctx->throwError("No arguments expected");
-        return QScriptValue();
-    }
-
-    // Create a new script array with all variable names
-    const VariableList& vars = _sym.factory().vars();
-    QScriptValue arr = eng->newArray(vars.size());
-    for (int i = 0; i < vars.size(); ++i)
-        arr.setProperty(i, vars[i]->id());
-
-    return arr;
-}
-
-
-QScriptValue Shell::scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng)
-{
-    if (ctx->argumentCount() < 1 || ctx->argumentCount() > 2) {
-        ctx->throwError("Expected one or two arguments");
-        return QScriptValue();
-    }
-
-    // First argument must be a query string or an ID
-    QString queryStr;
-    int queryId = -1;
-    if (ctx->argument(0).isString())
-        queryStr = ctx->argument(0).toString();
-    else if (ctx->argument(0).isNumber())
-        queryId = ctx->argument(0).toInt32();
     else {
-        ctx->throwError("First argument must be a string or an integer value");
-        return QScriptValue();
-    }
-    QString query = ctx->argument(0).toString();
-
-    // Default memDump index is the first one
-    int index = 0;
-    while (index < _memDumps.size() && !_memDumps[index])
-        index++;
-    if (index >= _memDumps.size() || !_memDumps[index]) {
-        ctx->throwError("No memory dumps loaded");
-        return QScriptValue();
-    }
-
-    // Second argument is optional and defines the memDump index
-    if (ctx->argumentCount() == 2) {
-        index = ctx->argument(1).isNumber() ? ctx->argument(1).toInt32() : -1;
-        if (index < 0 || index >= _memDumps.size() || !_memDumps[index]) {
-            ctx->throwError(QString("Invalid memory dump index: %1").arg(index));
-            return QScriptValue();
-        }
-    }
-
-    // Get the instance
-    try{
-		Instance instance = queryStr.isNull() ?
-				_memDumps[index]->queryInstance(queryId) :
-				_memDumps[index]->queryInstance(queryStr);
-
-		if (!instance.isValid())
-			return QScriptValue();
-		else
-			return InstanceClass::toScriptValue(instance, ctx, eng);
-    }catch(QueryException &e){
-    	ctx->throwError(e.message);
-    	return QScriptValue();
-    }
-}
-
-
-QScriptValue Shell::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
-{
-    for (int i = 0; i < ctx->argumentCount(); ++i) {
-        if (i > 0)
-            _out << " ";
-        _out << ctx->argument(i).toString();
-    }
-    _out << endl;
-
-    return eng->undefinedValue();
-}
-
-
-/*
- * implements the 'include' function for QTScript
- *
- * Depends on SCRIPT_PATH being set in engine
- */
-QScriptValue Shell::scriptInclude(QScriptContext *context, QScriptEngine *engine)
-{
-    QScriptValue callee = context->callee();
-    if (context->argumentCount() == 1){
-
-        QString fileName = context->argument(0).toString();
-
-        QString path =  engine->globalObject().property("SCRIPT_PATH", QScriptValue::ResolveLocal).toString();
-
-		QFile file( path+"/"+fileName );
-		if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) ){
-			context->throwError(QString("include(): could not open File %1").arg(file.fileName()));
-			return false;
+		if (!file.exists()) {
+			_err << "File not found: " << fileName << endl;
+			return 2;
 		}
-		context->setActivationObject(
-				context->parentContext()->activationObject()
-		);
-		engine->evaluate( file.readAll(), fileName );
 
+		// Try to read in the whole file
+		if (!file.open(QIODevice::ReadOnly)) {
+			_err << "Cannot open file \"" << fileName << "\" for reading." << endl;
+			return 3;
+		}
+		QTextStream stream(&file);
+		scriptCode = stream.readAll();
 		file.close();
-    }else{
-    	context->throwError(QString("include(): Wrong argument"));
-    	return false;
-    }
-    return true;
+	}
 
+	// Execute the script
+	QScriptValue result = _engine->evaluate(scriptCode, args,
+			includePathFileInfo.absolutePath());
 
+	if (result.isError()) {
+		if (_engine->hasUncaughtException()) {
+			_err << "Exception occured on " << fileName << ":"
+					<< _engine->uncaughtExceptionLineNumber() << ": " << endl
+					<< _engine->uncaughtException().toString() << endl;
+			QStringList bt = _engine->uncaughtExceptionBacktrace();
+			for (int i = 0; i < bt.size(); ++i)
+				_err << "    " << bt[i] << endl;
+		}
+		else
+			_err << result.toString() << endl;
+		return 4;
+	}
+
+    return 0;
 }
 
 

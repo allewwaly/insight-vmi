@@ -8,6 +8,7 @@
 #ifndef MEMORYDUMP_H_
 #define MEMORYDUMP_H_
 
+#include <QVarLengthArray>
 #include "filenotfoundexception.h"
 #include "virtualmemory.h"
 #include "instance.h"
@@ -250,6 +251,10 @@ private:
     int _index;
     MemoryMap* _map;
 };
+
+/// An array of MemoryDump files
+typedef QVarLengthArray<MemoryDump*, 250> MemDumpArray;
+
 
 //------------------------------------------------------------------------------
 
