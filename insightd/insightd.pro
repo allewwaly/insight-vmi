@@ -1,4 +1,6 @@
-SOURCES += memorydifftree.cpp \
+SOURCES += scriptengine.cpp \
+    kernelsymbolsclass.cpp \
+    memorydifftree.cpp \
     memorymaprangetree.cpp \
     memorymapbuilder.cpp \
     memorymapwindow.cpp \
@@ -42,7 +44,9 @@ SOURCES += memorydifftree.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += memorydifftree.h \
+HEADERS += scriptengine.h \
+    kernelsymbolsclass.h \
+    memorydifftree.h \
     memorymaprangetree.h \
     memoryrangetree.h \
     instance_def.h \

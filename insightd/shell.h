@@ -14,24 +14,21 @@
 #include <QDataStream>
 #include <QTextStream>
 #include <QThread>
-#include <QVarLengthArray>
 #include <QScriptValue>
 #include <QSemaphore>
 #include <QTime>
 #include <QMutex>
 #include "kernelsymbols.h"
+#include "memorydump.h"
 
 // Forward declaration
-class MemoryDump;
 class QProcess;
-class QScriptContext;
-class QScriptEngine;
+class ScriptEngine;
 class QLocalServer;
 class QLocalSocket;
 class DeviceMuxer;
 class MuxerChannel;
 class QFileInfo;
-
 
 /**
  * This class represents the interactive shell, which is the primary interface
@@ -137,13 +134,6 @@ public:
     void shutdown();
 
     /**
-     * Terminates any script that is currently executed, if any
-     * @return \c true if a script was executed and has been terminated,
-     * \c false otherwise
-     */
-    bool terminateScript();
-
-    /**
      * @return \c true if the user has exited the shell or if shutdown() has
      * been called, \c false otherwise
      */
@@ -165,6 +155,11 @@ public:
      * still in progress, \c false otherwise
      */
     bool executing() const;
+
+    /**
+     * @return the array of memory dump files
+     */
+    static const MemDumpArray& memDumps();
 
 protected:
     /**
@@ -195,8 +190,6 @@ private slots:
 //    void memMapVisTimerTimeout();
 
 private:
-    typedef QVarLengthArray<MemoryDump*, 250> MemDumpArray;
-
     static KernelSymbols _sym;
     static QFile _stdin;
     static QFile _stdout;
@@ -224,14 +217,11 @@ private:
     bool _interrupted;
     int _lastStatus;
     QMutex _engineLock;
-    QScriptEngine* _engine;
+    ScriptEngine* _engine;
 
     void printTimeStamp(const QTime& time);
     void prepare();
     void cleanupPipedProcs();
-    void initScriptEngine(const QStringList& args,
-    		const QFileInfo &includePathFileInfo);
-    void cleanupScriptEngine();
     QStringList splitIntoPipes(QString command) const;
     QStringList splitIntoWords(QString command) const;
     int eval(QString command);
@@ -239,12 +229,6 @@ private:
     void hline(int width = 60);
     int parseMemDumpIndex(QStringList &args, int skip = 0);
     int loadMemDump(const QString& fileName);
-    static QScriptValue scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng);
-    static QScriptValue scriptListVariableNames(QScriptContext* ctx, QScriptEngine* eng);
-    static QScriptValue scriptListVariableIds(QScriptContext* ctx, QScriptEngine* eng);
-    static QScriptValue scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng);
-    static QScriptValue scriptPrint(QScriptContext* ctx, QScriptEngine* eng);
-    static QScriptValue scriptInclude(QScriptContext *context, QScriptEngine *engine);
     //---------------------------------
     int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
@@ -283,5 +267,10 @@ private:
 
 /// Globally accessible shell object
 extern Shell* shell;
+
+inline const MemDumpArray& Shell::memDumps()
+{
+	return _memDumps;
+}
 
 #endif /* SHELL_H_ */
