@@ -132,8 +132,8 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 			      rbtRef->type() == BaseType::rtInt8)))
 				// Stop here, so that toString() later on will print this as string
 				break;
-			// If this is a type "void*", don't resolve it anymore
-			else if (rbt->refTypeId() < 0)
+			// If this is an unresolved type, don't resolve it anymore
+			else if (!rbt->refType())
 			    break;
 			// Otherwise resolve pointer reference, if this is a pointer
 			if ( (p = dynamic_cast<const Pointer*>(rbt)) ) {
