@@ -36,6 +36,16 @@ public:
      * Constructor
      * @param address the address of that instance
      * @param type the underlying BaseType of this instance
+     * @param vmem the virtual memory device to read data from
+     * @param id the ID of the variable this instance represents, if any
+     */
+    Instance(size_t address, const BaseType* type, VirtualMemory* vmem,
+    		int id = -1);
+
+    /**
+     * Constructor
+     * @param address the address of that instance
+     * @param type the underlying BaseType of this instance
      * @param name the name of this instance
      * @param parentNames the full name of the parent
      * @param vmem the virtual memory device to read data from

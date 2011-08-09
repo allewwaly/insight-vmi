@@ -29,6 +29,18 @@ Instance::Instance()
 }
 
 
+Instance::Instance(size_t address, const BaseType* type, VirtualMemory* vmem,
+		int id)
+{
+    _d.id = id;
+    _d.address = address;
+    _d.type = type;
+    _d.vmem = vmem;
+    _d.isValid = type != 0;
+    _d.isNull = !_d.address || !_d.isValid;
+}
+
+
 Instance::Instance(size_t address, const BaseType* type, const QString& name,
         const QStringList& parentNames, VirtualMemory* vmem, int id)
 {
