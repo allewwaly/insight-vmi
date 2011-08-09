@@ -48,13 +48,13 @@ private:
 //------------------------------------------------------------------------------
 
 InstanceClass::InstanceClass(QScriptEngine *eng)
-    : QObject(eng), QScriptClass(eng), _proto(0)
+    : QScriptClass(eng), _proto(0)
 {
     qScriptRegisterMetaType<Instance>(eng, instToScriptValue, instFromScriptValue);
     qScriptRegisterMetaType<InstanceList>(eng, membersToScriptValue, membersFromScriptValue);
     qScriptRegisterMetaType<QStringList>(eng, stringListToScriptValue, stringListFromScriptValue);
 
-    _proto = new InstancePrototype(this);
+    _proto = new InstancePrototype();
     _protoScriptVal = eng->newQObject(_proto,
                                QScriptEngine::QtOwnership,
                                QScriptEngine::SkipMethodsInEnumeration
@@ -70,6 +70,8 @@ InstanceClass::InstanceClass(QScriptEngine *eng)
 
 InstanceClass::~InstanceClass()
 {
+	if (_proto)
+		delete _proto;
 }
 
 
@@ -117,16 +119,11 @@ QScriptValue InstanceClass::property(const QScriptValue& object,
 }
 
 
-//void InstanceClass::setProperty(QScriptValue &object,
-//                                 const QScriptString &name,
-//                                 uint id, const QScriptValue &value)
-//{
-//}
-
-
 QScriptValue::PropertyFlags InstanceClass::propertyFlags(
 		const QScriptValue& /*object*/, const QScriptString& /*name*/, uint /*id*/)
 {
+	// Only gets called for our "member" properties, so no need to differentiate
+	// here depending on id
 	return QScriptValue::Undeletable | QScriptValue::ReadOnly;
 }
 
@@ -152,14 +149,6 @@ QScriptValue InstanceClass::prototype() const
 QScriptValue InstanceClass::constructor()
 {
     return _ctor;
-}
-
-
-QScriptValue InstanceClass::toScriptValue(const Instance& inst,
-		QScriptContext* /*ctx*/, QScriptEngine* eng)
-{
-	InstanceClass* cls = new InstanceClass(eng);
-    return cls->newInstance(inst);
 }
 
 
@@ -259,31 +248,6 @@ void InstanceClass::stringListFromScriptValue(const QScriptValue& obj, QStringLi
     }
 }
 
-
-//QVariant InstanceClass::extension(Extension extension, const QVariant& argument)
-//{
-//    if (extension != HasInstance)
-//        return QVariant();
-//
-//    QScriptValueList args = argument.value<QScriptValueList>();
-//    if (args.size() != 2)
-//        return false;
-//
-//    Instance inst;
-//    instFromScriptValue(args[0], inst);
-//    if (inst.isNull())
-//        return QScriptClass::extension(extension, argument);
-//
-//    debugmsg(args[1].toString());
-//
-//    return QVariant();
-//}
-//
-//
-//bool InstanceClass::supportsExtension(Extension extension) const
-//{
-//    return extension == HasInstance;
-//}
 
 //------------------------------------------------------------------------------
 
