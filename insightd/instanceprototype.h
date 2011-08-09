@@ -116,6 +116,7 @@
 class InstancePrototype : public QObject, public QScriptable
 {
     Q_OBJECT
+
 public:
     /**
      * Constructor
@@ -280,6 +281,12 @@ public slots:
     QString Type() const;
 
     /**
+     * Retrieves the ID of the type of this instance.
+     * @return the ID of this instance's type
+     */
+    int TypeId() const;
+
+    /**
      * Retrieves the pretty-printed name of the type of this instance, for
      * example, <tt>unsigned int</tt>, <tt>struct list_head *</tt>, or
      * <tt>const int[16]</tt>.
@@ -292,7 +299,6 @@ public slots:
      * @return the size of this instance's type
      */
     quint32 Size() const;
-
 
     /**
      * Checks if a member with the given name \a name exists in this instance.
@@ -338,7 +344,6 @@ public slots:
      * @return the size of pointers for this architecture, in bytes
      */
     int PointerSize() const;
-
 
     /**
      * Compares this Instance with \a other on a value basis. Two instances

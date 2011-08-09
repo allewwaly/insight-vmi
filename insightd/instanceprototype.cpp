@@ -96,7 +96,6 @@ void InstancePrototype::SetAddressLow(quint32 addrLow)
 }
 
 
-
 void InstancePrototype::AddToAddress(int offset)
 {
     Instance* inst = thisInstance();
@@ -218,6 +217,13 @@ InstanceList InstancePrototype::Members() const
 //	Instance* inst;
 //    return (inst = thisInstance()) ? inst->type() : 0;
 //}
+
+
+int InstancePrototype::TypeId() const
+{
+	Instance* inst;
+    return (inst = thisInstance()) && inst->type() ? inst->type()->id() : -1;
+}
 
 
 QString InstancePrototype::TypeName() const
