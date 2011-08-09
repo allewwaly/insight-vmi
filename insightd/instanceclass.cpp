@@ -25,7 +25,7 @@ class InstanceClassPropertyIterator : public QScriptClassPropertyIterator
 {
 public:
     InstanceClassPropertyIterator(const QScriptValue &object);
-    ~InstanceClassPropertyIterator();
+    virtual ~InstanceClassPropertyIterator();
 
     bool hasNext() const;
     void next();
