@@ -65,6 +65,20 @@ public slots:
 	QScriptValue listTypes(QString filter = QString(), int index = -1);
 
 	/**
+	 * Lists the names of all available types. Does not include anonymous types
+	 * such as anonymous nested structs or unions.
+	 * @return array of names of all named types, as <tt>QString</tt>s
+	 */
+    QStringList typeNames() const;
+
+    /**
+     * Lists the IDs of all available types. This list might be very long
+     * because of the high degree of redundancy in the debugging symbols.
+     * @return array of all type IDs, as <tt>int</tt>s
+     */
+    QList<int> typeIds() const;
+
+	/**
 	 * Lists all available global variables, maybe limited to those matching
 	 * \a filter. The variables are returned as an array of Instance objects.
 	 * @param filter wildcard expression to filter variables by their name,
@@ -84,6 +98,18 @@ public slots:
      * \endcode
 	 */
 	QScriptValue listVariables(QString filter = QString(), int index = -1);
+
+    /**
+     * Lists the names of all global variables.
+     * @return array of names of all global variables, as <tt>QString</tt>s
+     */
+	QStringList variableNames() const;
+
+    /**
+     * Lists the IDs of all global variables.
+     * @return array of all variable IDs, as <tt>int</tt>s
+     */
+	QList<int> variableIds() const;
 
 private:
 	InstanceClass* _instClass;
