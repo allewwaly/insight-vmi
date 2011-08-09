@@ -118,3 +118,28 @@ QScriptValue KernelSymbolsClass::listVariables(QString filter, int index)
 			shell->symbols().factory().varsByName(),
 			varToInst);
 }
+
+
+QStringList KernelSymbolsClass::typeNames() const
+{
+    return shell->symbols().factory().typesByName().uniqueKeys();
+}
+
+
+QList<int> KernelSymbolsClass::typeIds() const
+{
+    return shell->symbols().factory().typesById().keys();
+}
+
+
+QStringList KernelSymbolsClass::variableNames() const
+{
+    return shell->symbols().factory().varsByName().uniqueKeys();
+}
+
+
+QList<int> KernelSymbolsClass::variableIds() const
+{
+    return shell->symbols().factory().varsById().keys();
+}
+

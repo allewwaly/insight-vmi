@@ -248,6 +248,14 @@ public:
 		return _varsByName;
 	}
 
+    /**
+     * @return the hash of all variables by there ID
+     */
+    inline const VariableIntHash& varsById() const
+    {
+        return _varsById;
+    }
+
 	/**
 	 * This function should be called after the last symbol has been added to
 	 * the factory, either after parsing or reading a custom symbol file is
