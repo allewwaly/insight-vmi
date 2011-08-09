@@ -104,9 +104,6 @@ private:
 
 	void initScriptEngine();
 
-    static QScriptValue scriptListMemDumps(QScriptContext* ctx, QScriptEngine* eng);
-    static QScriptValue scriptListVariableNames(QScriptContext* ctx, QScriptEngine* eng);
-    static QScriptValue scriptListVariableIds(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng, void* arg);
     static QScriptValue scriptPrint(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptInclude(QScriptContext *context, QScriptEngine *engine);
