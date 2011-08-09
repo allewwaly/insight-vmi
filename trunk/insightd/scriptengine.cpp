@@ -91,18 +91,6 @@ void ScriptEngine::initScriptEngine()
     		_engine->newFunction(scriptPrint),
     		roFlags|QScriptValue::SkipInEnumeration);
 
-    _engine->globalObject().setProperty("getMemDumps",
-    		_engine->newFunction(scriptListMemDumps),
-			roFlags);
-
-    _engine->globalObject().setProperty("getVariableNames",
-    		_engine->newFunction(scriptListVariableNames),
-    		roFlags);
-
-    _engine->globalObject().setProperty("getVariableIds",
-    		_engine->newFunction(scriptListVariableIds),
-    		roFlags);
-
     _engine->globalObject().setProperty("getInstance",
     		_engine->newFunction(scriptGetInstance, this),
     		roFlags);
@@ -170,61 +158,6 @@ QScriptValue ScriptEngine::evaluate(const QString& program,
 	_engine->collectGarbage();
 
 	return ret;
-}
-
-
-QScriptValue ScriptEngine::scriptListMemDumps(QScriptContext* ctx,
-		QScriptEngine* eng)
-{
-    if (ctx->argumentCount() != 0) {
-        ctx->throwError("No arguments expected");
-        return QScriptValue();
-    }
-
-    // Create a new script array with all members of memDumps()
-    QScriptValue arr = eng->newArray(shell->memDumps().size());
-    for (int i = 0; i < shell->memDumps().size(); ++i) {
-        if (shell->memDumps()[i])
-            arr.setProperty(i, shell->memDumps()[i]->fileName());
-    }
-
-    return arr;
-}
-
-
-QScriptValue ScriptEngine::scriptListVariableNames(QScriptContext* ctx,
-		QScriptEngine* eng)
-{
-    if (ctx->argumentCount() != 0) {
-        ctx->throwError("No arguments expected");
-        return QScriptValue();
-    }
-
-    // Create a new script array with all variable names
-    const VariableList& vars = shell->symbols().factory().vars();
-    QScriptValue arr = eng->newArray(vars.size());
-    for (int i = 0; i < vars.size(); ++i)
-        arr.setProperty(i, vars[i]->name());
-
-    return arr;
-}
-
-
-QScriptValue ScriptEngine::scriptListVariableIds(QScriptContext* ctx,
-		QScriptEngine* eng)
-{
-    if (ctx->argumentCount() != 0) {
-        ctx->throwError("No arguments expected");
-        return QScriptValue();
-    }
-
-    // Create a new script array with all variable names
-    const VariableList& vars = shell->symbols().factory().vars();
-    QScriptValue arr = eng->newArray(vars.size());
-    for (int i = 0; i < vars.size(); ++i)
-        arr.setProperty(i, vars[i]->id());
-
-    return arr;
 }
 
 
