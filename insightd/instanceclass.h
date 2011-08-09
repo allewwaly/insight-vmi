@@ -21,7 +21,7 @@ class InstancePrototype;
 /**
  * This class wraps an Instance object for a QtScript environment.
  */
-class InstanceClass : public QObject, public QScriptClass
+class InstanceClass : public QScriptClass
 {
 public:
     InstanceClass(QScriptEngine *eng);
@@ -38,9 +38,6 @@ public:
     QScriptValue property(const QScriptValue& object,
                           const QScriptString& name, uint id);
 
-//    void setProperty(QScriptValue &object, const QScriptString &name,
-//                     uint id, const QScriptValue &value);
-
     QScriptValue::PropertyFlags propertyFlags(
         const QScriptValue& object, const QScriptString& name, uint id);
 
@@ -49,12 +46,6 @@ public:
     QString name() const;
 
     QScriptValue prototype() const;
-
-    static QScriptValue toScriptValue(const Instance& inst, QScriptContext* ctx,
-    		QScriptEngine* eng);
-
-//    QVariant extension(Extension extension, const QVariant& argument = QVariant());
-//    bool supportsExtension(Extension extension) const;
 
 private:
     static QScriptValue construct(QScriptContext* ctx, QScriptEngine* eng);
