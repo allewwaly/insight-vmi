@@ -9,13 +9,14 @@
 #include <QScriptEngine>
 #include "instanceclass.h"
 #include "kernelsymbolsclass.h"
+#include "memorydumpsclass.h"
 #include "shell.h"
 #include "symfactory.h"
 #include "variable.h"
 
 
 ScriptEngine::ScriptEngine()
-	: _engine(0), _instClass(0), _symClass(0)
+	: _engine(0), _instClass(0), _symClass(0), _memClass(0)
 {
 }
 
@@ -36,6 +37,8 @@ void ScriptEngine::reset()
 		delete _instClass;
 	if (_symClass)
 		delete _symClass;
+	if (_memClass)
+	    delete _memClass;
 }
 
 
@@ -119,6 +122,13 @@ void ScriptEngine::initScriptEngine()
     				QScriptEngine::QtOwnership,
     				QScriptEngine::ExcludeSuperClassContents),
     		roFlags);
+
+    _memClass = new MemoryDumpsClass();
+    _engine->globalObject().setProperty("Memory",
+            _engine->newQObject(_memClass,
+                    QScriptEngine::QtOwnership,
+                    QScriptEngine::ExcludeSuperClassContents),
+            roFlags);
 }
 
 
@@ -275,8 +285,8 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
     }
     catch (QueryException &e) {
     	ctx->throwError(e.message);
-    	return QScriptValue();
     }
+    return QScriptValue();
 }
 
 
