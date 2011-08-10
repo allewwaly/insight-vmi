@@ -50,7 +50,6 @@ public:
 
     /**
      * @param mem the memory device to read the data from
-     * @param offset the offset at which to read the value from memory
      * @return the value of this type as a variant
      */
     template<class T>

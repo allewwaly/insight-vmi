@@ -173,7 +173,7 @@ public:
     /**
      * Unloads a memory file, either based on the file name or an the index into
      * the memDumps() array.
-     * @param indexOrfileName either the name or the list index of the file to
+     * @param indexOrFileName either the name or the list index of the file to
      * unload
      * @param unloadedFile if given, the name of the unloaded file will be
      * returned here

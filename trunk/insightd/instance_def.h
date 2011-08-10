@@ -452,7 +452,7 @@ public:
      * that is located in user-land address space.
      *
      * @param pgd the page global directory of the process this instance belongs
-     * to, most likely the content of the \CR3 register, as a hex-encoded string
+     * to, most likely the content of the \c CR3 register, as a hex-encoded string
      * @return the same as toString() but tries to access user-land memory,
      * if possible, using the page table specified as \a pgd
      */

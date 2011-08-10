@@ -294,16 +294,16 @@ public:
     void clear();
 
     /**
-     * Inserts the given MemoryMapNode object at its native address range into
-     * the tree.
-     * @param mmnode
+     * Inserts the given MemoryMapNode object \a item at its native address
+     * range into the tree.
+     * @param item the object to insert
      */
     void insert(T item);
 
     /**
      * Inserts the given MemoryMapNode object within the range \a mmAddrStart to
      * \a mmAddrEnd into the tree.
-     * @param mmnode the object to insert
+     * @param item the object to insert
      * @param mmAddrStart start address of mapping
      * @param mmAddrEnd end address of mapping
      */

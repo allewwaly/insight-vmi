@@ -24,7 +24,7 @@ class KernelSymbolWriter: public LongOperation
 public:
     /**
      * Constructor
-     * @param from destination to write the debugging symbols to
+     * @param to destination to write the debugging symbols to
      * @param factory the SymFactory whose symbols shall be written
      * @param specs the MemSpecs whose data shall be written
      */
