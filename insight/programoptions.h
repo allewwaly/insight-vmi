@@ -94,7 +94,7 @@ public:
 
     /**
      * Sets the input file name
-     * @param fileName new file name
+     * @param inFileName new file name
      */
     void setFileName(QString inFileName);
 
