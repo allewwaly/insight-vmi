@@ -50,7 +50,7 @@
  
  The shell is the main interface for the user:
  
- \li Shell is the main class that executes the read-command-and-execute loop. In addition, it is responsible for setting up the scripting environment to run QtScript files.
+ \li Shell is the main class that executes the read-command-and-execute loop.
  \li ProgramOptions holds runtime settings and parses the command line arguments.
  \li Instance objects represent an instance of a kernel object in memory. An instance must have a non-null address and reference an existing type in order to be valid.
  
@@ -58,26 +58,29 @@
  
  The scripting engine is set up by the Shell.
  
+ \li ScriptEngine is responsible for setting up the scripting environment to run QtScript files.
  \li InstancePrototype provides all default properties and methods of an Instance object in a scripting environment. This is the probably the most interesting class if you are interested in what you can do with an Instance object within a script.
  \li InstanceClass wraps an Instance object within the scripting environment.
+ \li KernelSymbolsClass provides access to all kernel data structures and global variables within the scripting environment.
+ \li MemoryDumpsClass is the management interface for memory files within the scripting environment.
  
  \subsection frontend Connection between Daemon and Front-End
  
  The InSight front-end connects to the InSight daemon over a socket connection.
  
  \li Insight is the main interface class between front-end and daemon.
- \li DeviceMuxer is a helper class that multiplexes the \stdout and \stderr channel over a single socket.
+ \li DeviceMuxer is a helper class that multiplexes the \c stdout and \c stderr channel over a single socket.
 
- \subsection Acknowledgments
+ \subsection acks Acknowledgments
 
  The <a href="http://www.sec.in.tum.de/christian-schneider/" title="Christian Schneider">author</a> would like to thank the following people for their contribution to this project in form of code, in testing and tracking down bugs, or in sharing ideas and inspirations (names in alphabetic order):
 
- \li Cornelius Diekmann (diekmann <at> in . tum . de)
- \li Dominik Meyer (meyerd <at> in . tum . de)
- \li Hagen Fritsch (fritsch <at> in . tum . de)
- \li Jonas Pfoh (pfoh <at> in . tum . de)
- \li Sebastian Vogl (vogls <at> in . tum . de)
- \li Thomas Kittel (kittel <at> in . tum . de)
+ \li Cornelius Diekmann (diekmann [at] in . tum . de)
+ \li Dominik Meyer (meyerd [at] in . tum . de)
+ \li Hagen Fritsch (fritsch [at] in . tum . de)
+ \li Jonas Pfoh (pfoh [at] in . tum . de)
+ \li Sebastian Vogl (vogls [at] in . tum . de)
+ \li Thomas Kittel (kittel [at] in . tum . de)
 
  */ 
 
