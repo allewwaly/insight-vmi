@@ -131,6 +131,7 @@ void KernelSymbolParser::finishLastSymbol()
             break;
         default:
             parserError(QString("Unhandled sub-type: %1").arg(_subInfo.symType()));
+            // no break
         }
         // Reset all data for a new sub-symbol
         _subInfo.clear();
