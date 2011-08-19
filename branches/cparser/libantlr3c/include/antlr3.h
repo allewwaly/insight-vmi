@@ -1,6 +1,10 @@
 #ifndef	_ANTLR3_H
 #define	_ANTLR3_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include    <antlr3defs.h>
 
 #include    <antlr3errors.h>
@@ -21,5 +25,9 @@
 #include    <antlr3basetreeadaptor.h>
 #include    <antlr3commontreeadaptor.h>
 #include    <antlr3rewritestreams.h>
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
