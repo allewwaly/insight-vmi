@@ -82,7 +82,7 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
 //        } while (reply != "y" && reply != "n");
 //        specParser.setAutoRemoveBuildDir(reply == "n");
 	}
-    catch (GenericException e) {
+    catch (GenericException& e) {
         shell->err()
             << endl
             << "Caught exception at " << e.file << ":" << e.line << endl
@@ -126,7 +126,7 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
             shell->out() << " (" << (int)((symParser.line() / (float)duration * 1000)) << " lines per second)";
         shell->out() << "." << endl;
 	}
-    catch (GenericException e) {
+    catch (GenericException& e) {
         shell->err()
             << endl
             << "Caught exception at " << e.file << ":" << e.line
@@ -215,7 +215,7 @@ void KernelSymbols::loadSymbols(QIODevice* from)
             shell->out() << " (" << (int)((from->pos() / (float)duration * 1000)) << " byte/s)";
         shell->out() << "." << endl;
     }
-    catch (GenericException e) {
+    catch (GenericException& e) {
         shell->err()
             << "Caught exception at " << e.file << ":" << e.line << endl
             << "Message: " << e.message << endl;
@@ -265,7 +265,7 @@ void KernelSymbols::saveSymbols(QIODevice* to)
             shell->out() << " (" << (int)((to->pos() / (float)duration * 1000)) << " byte/s)";
         shell->out() << "." << endl;
     }
-    catch (GenericException e) {
+    catch (GenericException& e) {
         shell->err()
             << "Caught exception at " << e.file << ":" << e.line << endl
             << "Message: " << e.message << endl;
