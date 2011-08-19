@@ -1,0 +1,310 @@
+/*
+ * myscopemanager.cpp
+ *
+ *  Created on: 06.04.2011
+ *      Author: chrschn
+ */
+
+#include <ast_interface.h>
+#include <astscopemanager.h>
+#include <debug.h>
+
+void ASTScope::add(const QString& name, ASTSymbolType type, struct ASTNode* node)
+{
+	switch (type) {
+	case stNull:
+		debugerr("Trying to add symbol \"" << name << "\" with empty type!");
+		break;
+	case stEnumerator:
+	case stFunctionDecl:
+	case stFunctionDef:
+	case stFunctionParam:
+	case stStructMember:
+	case stVariableDecl:
+	case stVariableDef:
+		addSymbol(name, type, node);
+		break;
+	case stEnumDecl:
+	case stEnumDef:
+	case stStructOrUnionDecl:
+	case stStructOrUnionDef:
+		addCompoundType(name, type, node);
+		break;
+	case stTypedef:
+		addTypedef(name, type, node);
+		break;
+	}
+}
+
+
+void ASTScope::addSymbol(const QString& name, ASTSymbolType type,
+		struct ASTNode* node)
+{
+	if (_symbols.contains(name)) {
+		bool warn = true;
+		// See if we found a definition for a declaration
+		switch (_symbols[name].type()) {
+		case stFunctionDecl:
+			// No warning if definition follows declaration
+			warn = (type != stFunctionDef);
+			// no break
+		case stFunctionDef:
+			// Ignore declarations following prev. definition or declaration
+			if (type == stFunctionDecl)
+				return;
+			// Special case: Ignore declarations like the following:
+			// void foo() { /*...*/ }; typeof(foo) foo;
+			if (type == stVariableDecl)
+				return;
+			break;
+
+		case stVariableDecl:
+			// No warning if definition follows declaration
+			warn = (type != stVariableDef);
+			// no break
+		case stVariableDef:
+			// Ignore declarations following prev. definition or declaration
+			if (type == stVariableDecl)
+				return;
+			break;
+
+		default:
+			break;
+		}
+
+		if (warn)
+			debugerr("Line " << (node ? node->start->line : 0) << ": scope already "
+					 << "contains symbol \"" << name << "\" as "
+					 << ASTSymbol::typeToString(_symbols[name].type())
+					 << ", defined at line "
+					 << (_symbols[name].astNode() ? _symbols[name].astNode()->start->line : 0)
+					 << ", new type is " << ASTSymbol::typeToString(type)
+					 );
+	}
+
+	_symbols[name] = ASTSymbol(name, type, node);
+}
+
+
+void ASTScope::addCompoundType(const QString& name, ASTSymbolType type,
+		struct ASTNode* node)
+{
+	if (_compoundTypes.contains(name)) {
+		bool warn = true;
+		// See if we found a definition for a declaration
+		switch (_compoundTypes[name].type()){
+		case stEnumDecl:
+			// No warning if definition follows declaration
+			warn = (type != stEnumDef);
+			// no break
+		case stEnumDef:
+			// Ignore declarations following prev. definition or declaration
+			if (type == stEnumDecl)
+				return;
+			break;
+
+		case stStructOrUnionDecl:
+			// No warning if definition follows declaration
+			warn = (type != stStructOrUnionDef);
+			// no break
+		case stStructOrUnionDef:
+			// Ignore declarations following prev. definition or declaration
+			if (type == stStructOrUnionDecl)
+				return;
+			break;
+
+		default:
+			break;
+		}
+
+		if (warn)
+			debugerr("Line " << (node ? node->start->line : 0) << ": scope already "
+					 << "contains tagged type \"" << qPrintable(name) << "\" as "
+					 << ASTSymbol::typeToString(_compoundTypes[name].type()) << ", defined at line "
+					 << (_compoundTypes[name].astNode() ? _compoundTypes[name].astNode()->start->line : 0)
+					 << ", new type is " << ASTSymbol::typeToString(type)
+					 );
+	}
+
+	_compoundTypes[name] = ASTSymbol(name, type, node);
+}
+
+
+void ASTScope::addTypedef(const QString& name, ASTSymbolType type,
+		struct ASTNode* node)
+{
+	if (_typedefs.contains(name)) {
+        debugerr("Line " << (node ? node->start->line : 0) << ": scope already "
+                 << "contains tagged type \"" << qPrintable(name) << "\" as "
+                 << qPrintable(ASTSymbol::typeToString(_typedefs[name].type())) << ", defined at line "
+                 << (_typedefs[name].astNode() ? _typedefs[name].astNode()->start->line : 0)
+                 << ", new type is " << qPrintable(ASTSymbol::typeToString(type))
+                 );
+	}
+
+	_typedefs[name] = ASTSymbol(name, type, node);
+}
+
+
+ASTSymbol ASTScope::find(const QString& name, int searchSymbols) const
+{
+#   undef DEBUG_SCOPE_FIND
+//#   define DEBUG_SCOPE_FIND 1
+
+	if (searchSymbols & ssSymbols)
+		for (const ASTScope* p = this; p; p = p->_parent) {
+#           ifdef DEBUG_SCOPE_FIND
+            debugmsg(
+                    QString("Searching for symbol \"%1\" in %2 within scope %3 opened at %4:%5")
+                    .arg(name)
+                    .arg("symbols")
+                    .arg((quint64)p, 0, 16)
+                    .arg(p->astNode() ? p->astNode()->start->line : 0)
+                    .arg(p->astNode() ? p->astNode()->start->charPosition : 0));
+#           endif
+
+            if (p->_symbols.contains(name)) {
+#               ifdef DEBUG_SCOPE_FIND
+                debugmsg(
+                        QString("Found symbol \"%1\" in %2 within scope %3 opened at %4:%5")
+                            .arg(name)
+                            .arg("symbols")
+                            .arg((quint64)p, 0, 16)
+                            .arg(p->astNode() ? p->astNode()->start->line : 0)
+                            .arg(p->astNode() ? p->astNode()->start->charPosition : 0));
+#               endif
+
+				return p->_symbols[name];
+            }
+		}
+	if (searchSymbols & ssTypedefs)
+		for (const ASTScope* p = this; p; p = p->_parent) {
+#           ifdef DEBUG_SCOPE_FIND
+            debugmsg(
+                    QString("Searching for symbol \"%1\" in %2 within scope %3 opened at %4:%5")
+                    .arg(name)
+                    .arg("typedefs")
+                    .arg((quint64)p, 0, 16)
+                    .arg(p->astNode() ? p->astNode()->start->line : 0)
+                    .arg(p->astNode() ? p->astNode()->start->charPosition : 0));
+#           endif
+
+            if (p->_typedefs.contains(name)) {
+#               ifdef DEBUG_SCOPE_FIND
+                debugmsg(
+                        QString("Found symbol \"%1\" in %2 within scope %3 opened at %4:%5")
+                            .arg(name)
+                            .arg("typedefs")
+                            .arg((quint64)p, 0, 16)
+                            .arg(p->astNode() ? p->astNode()->start->line : 0)
+                            .arg(p->astNode() ? p->astNode()->start->charPosition : 0));
+#               endif
+
+				return p->_typedefs[name];
+            }
+		}
+	if (searchSymbols & ssCompoundTypes)
+		for (const ASTScope* p = this; p; p = p->_parent) {
+#           ifdef DEBUG_SCOPE_FIND
+            debugmsg(
+                    QString("Searching for symbol \"%1\" in %2 within scope %3 opened at %4:%5")
+                    .arg(name)
+                    .arg("compound types")
+                    .arg((quint64)p, 0, 16)
+                    .arg(p->astNode() ? p->astNode()->start->line : 0)
+                    .arg(p->astNode() ? p->astNode()->start->charPosition : 0));
+#           endif
+
+			if (p->_compoundTypes.contains(name)) {
+#               ifdef DEBUG_SCOPE_FIND
+                debugmsg(
+                        QString("Found symbol \"%1\" in %2 within scope %3 opened at %4:%5")
+                            .arg(name)
+                            .arg("compound types")
+                            .arg((quint64)p, 0, 16)
+                            .arg(p->astNode() ? p->astNode()->start->line : 0)
+                            .arg(p->astNode() ? p->astNode()->start->charPosition : 0));
+#               endif
+
+				return p->_compoundTypes[name];
+			}
+		}
+
+	return ASTSymbol();
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+ASTScopeManager::ASTScopeManager()
+	: _currentScope(0)
+{
+}
+
+
+ASTScopeManager::~ASTScopeManager()
+{
+	clear();
+}
+
+
+void ASTScopeManager::clear()
+{
+	// Delete all scopes
+	for (int i = 0; i < _scopes.size(); ++i)
+		delete _scopes[i];
+	_scopes.clear();
+	_currentScope = 0;
+}
+
+
+void ASTScopeManager::pushScope(struct ASTNode* astNode)
+{
+	// Create new scope object
+	_currentScope = new ASTScope(astNode, _currentScope);
+	_scopes.append(_currentScope);
+	if (astNode)
+	    astNode->childrenScope = _currentScope;
+}
+
+
+void ASTScopeManager::popScope()
+{
+	if (_currentScope)
+		_currentScope = _currentScope->parent();
+	else
+		debugerr("Called " << __PRETTY_FUNCTION__ << " on an empty scope stack");
+}
+
+
+void ASTScopeManager::addSymbol(const QString& name, ASTSymbolType type,
+		struct ASTNode* node)
+{
+	addSymbol(name, type, node, _currentScope);
+}
+
+
+void ASTScopeManager::addSymbol(const QString& name, ASTSymbolType type,
+		struct ASTNode* node, ASTScope* scope)
+{
+	if (!scope) {
+		QString msg = (scope == _currentScope) ?
+				"No scope has been initialized yet" :
+				"Gone beyond last scope";
+	    if (node)
+	        debugerr(msg << ", ignoring symbol \"" << name << "\" in line "
+	        		<< node->start->line);
+	    else
+            debugerr(msg << ", ignoring symbol \"" << name << "\"");
+		return;
+	}
+
+	// If this is a struct/union definition, add it to the top-most scope that
+	// does not belong to a struct or union
+	if (type == stStructOrUnionDef || type == stEnumDef || type == stEnumerator) {
+        while (scope->parent() && scope->astNode() &&
+                scope->astNode()->type == nt_struct_or_union_specifier)
+            scope = scope->parent();
+	}
+
+	scope->add(name, type, node);
+}
