@@ -1,4 +1,5 @@
-SOURCES += memorydumpsclass.cpp \
+SOURCES += kernelsourceparser.cpp \
+    memorydumpsclass.cpp \
     scriptengine.cpp \
     kernelsymbolsclass.cpp \
     memorydifftree.cpp \
@@ -45,7 +46,8 @@ SOURCES += memorydumpsclass.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += memorydumpsclass.h \
+HEADERS += kernelsourceparser.h \
+    memorydumpsclass.h \
     scriptengine.h \
     kernelsymbolsclass.h \
     memorydifftree.h \
@@ -107,8 +109,13 @@ QT += script \
     network \
     gui
 LIBS += -lreadline \
-    -L \
-    ../libinsight \
-    -linsight
-INCLUDEPATH += ../libinsight/include
+    -L../libinsight \
+    -linsight \
+    -L../libantlr3c \
+    -lantlr3c \
+    -L../libcparser \
+    -lcparser
+INCLUDEPATH += ../libinsight/include \
+    ../libantlr3c/include \
+    ../libcparser/include
 FORMS = memorymapwindow.ui
