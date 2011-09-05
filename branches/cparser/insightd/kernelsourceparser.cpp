@@ -10,16 +10,45 @@
 #include <astbuilder.h>
 #include <abstractsyntaxtree.h>
 #include <astdotgraph.h>
-#include <asttypeevaluator.h>
+#include "kernelsourcetypeevaluator.h"
 #include <typeevaluatorexception.h>
 #include <cassert>
 #include "debug.h"
 #include "shell.h"
+#include "compileunit.h"
+#include "filenotfoundexception.h"
+
+
+#define sourceParserError(x) do { throw SourceParserException((x), __FILE__, __LINE__); } while (0)
+
+/**
+ * Exception class for I/O operations
+ */
+class SourceParserException: public GenericException
+{
+public:
+    /**
+      Constructor
+      @param msg error message
+      @param file file name in which message was originally thrown
+      @param line line number at which message was originally thrown
+      @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
+     */
+    SourceParserException(QString msg = QString(), const char* file = 0, int line = -1)
+        : GenericException(msg, file, line)
+    {
+    }
+
+    virtual ~SourceParserException() throw()
+    {
+    }
+};
+
 
 
 KernelSourceParser::KernelSourceParser(SymFactory* factory,
         const QString& srcPath)
-    : _factory(factory), _filesDone(0)
+    : _factory(factory), _srcPath(srcPath), _srcDir(srcPath), _filesDone(0)
 {
     assert(_factory);
 }
@@ -41,13 +70,41 @@ void KernelSourceParser::operationProgress()
 
 void KernelSourceParser::parse()
 {
+    // Make sure the source directoy exists
+    if (!_srcDir.exists()) {
+        shell->err() << "Source directory \"" << _srcDir.absolutePath()
+                << "\" does not exist."
+            << endl;
+        return;
+    }
+
     operationStarted();
 
      try {
-         while ( !shell->interrupted()) {
-             // TODO implement me
+         CompileUnitIntHash::const_iterator it = _factory->sources().begin();
+         while (it != _factory->sources().end() && !shell->interrupted()) {
+             const CompileUnit* unit = it.value();
+             ++_filesDone;
+
+             try {
+                 parseFile(unit->name() + ".i");
+             }
+             catch (SourceParserException& e) {
+                 shell->out() << endl << flush;
+                 shell->err() << "WARNING: " << e.message << endl << flush;
+             }
+             catch (FileNotFoundException& e) {
+                 shell->out() << endl << flush;
+                 shell->err() << "WARNING: " << e.message << endl << flush;
+             }
+             catch (TypeEvaluatorException& e) {
+                 shell->out() << endl << flush;
+                 shell->err() << "WARNING: At " << e.file << ":" << e.line
+                         << ": " << e.message << endl << flush;
+             }
 
              checkOperationProgress();
+             ++it;
          }
      }
      catch (...) {
@@ -63,4 +120,24 @@ void KernelSourceParser::parse()
              << endl;
 }
 
+
+void KernelSourceParser::parseFile(const QString& fileName)
+{
+    QString file = _srcDir.absoluteFilePath(fileName);
+
+    if (!_srcDir.exists(fileName))
+        fileNotFoundError(QString("File not found: %1").arg(file));
+
+    AbstractSyntaxTree ast;
+    ASTBuilder builder(&ast);
+
+    // Parse the file
+    if (builder.buildFrom(file) != 0)
+        sourceParserError(QString("Error parsing file %1").arg(file));
+
+    // Evaluate types
+    KernelSourceTypeEvaluator eval(&ast, _factory);
+    if (!eval.evaluateTypes())
+        sourceParserError(QString("Error evaluating types in %1").arg(file));
+}
 
