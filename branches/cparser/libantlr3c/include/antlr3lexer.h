@@ -155,7 +155,7 @@ typedef	struct ANTLR3_LEXER_struct
 
     /** Pointer to a function that constructs a new token from the lexer stored information 
      */
-    pANTLR3_COMMON_TOKEN	(*emit)		    (struct ANTLR3_LEXER_struct * lexer);
+    pANTLR3_COMMON_TOKEN	(*emitToken)		    (struct ANTLR3_LEXER_struct * lexer);
 
     /** Pointer to the user provided (either manually or through code generation
      *  function that causes the lexer rules to run the lexing rules and produce 

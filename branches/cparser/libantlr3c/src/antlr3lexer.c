@@ -96,7 +96,7 @@ antlr3LexerNew(ANTLR3_UINT32 sizeHint)
     lexer->setCharStream			=  setCharStream;
     lexer->pushCharStream			=  pushCharStream;
     lexer->popCharStream			=  popCharStream;
-    lexer->emit						=  emit;
+    lexer->emitToken						=  emit;
     lexer->emitNew					=  emitNew;
     lexer->matchs					=  matchs;
     lexer->matchc					=  matchc;
