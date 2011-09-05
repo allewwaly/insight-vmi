@@ -8,6 +8,8 @@
 #ifndef VIRTUALMEMORYEXCEPTION_H_
 #define VIRTUALMEMORYEXCEPTION_H_
 
+#include <genericexception.h>
+
 #define virtualMemoryError(x) do { throw VirtualMemoryException((x), __FILE__, __LINE__); } while (0)
 
 /**
