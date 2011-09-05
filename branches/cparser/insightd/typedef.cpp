@@ -18,7 +18,7 @@ Typedef::Typedef(const TypeInfo& info)
 }
 
 
-BaseType::RealType Typedef::type() const
+RealType Typedef::type() const
 {
 	return rtTypedef;
 }

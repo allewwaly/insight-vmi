@@ -50,9 +50,9 @@ void KernelSymbolWriter::write()
     // 2.c  (CompileUnit) data of 2nd compile unit
     // 2.d  ...
     // 3.a  (qint32) number of types
-    // 3.b  (qint32) type (BaseType::RealType casted to qint32)
+    // 3.b  (qint32) type (RealType casted to qint32)
     // 3.c  (subclass of BaseType) data of type
-    // 3.d  (qint32) type (BaseType::RealType casted to qint32)
+    // 3.d  (qint32) type (RealType casted to qint32)
     // 3.e  (subclass of BaseType) data of type
     // 3.f  ...
     // 4.a  (qint32) number of id-mappings for types
@@ -90,8 +90,8 @@ void KernelSymbolWriter::write()
         for (int round = 0; round < 3; ++round) {
             int mask = ElementaryTypes;
             switch (round) {
-            case 1: mask = ReferencingTypes & ~(BaseType::rtStruct|BaseType::rtUnion); break;
-            case 2: mask = (BaseType::rtStruct|BaseType::rtUnion); break;
+            case 1: mask = ReferencingTypes & ~(rtStruct|rtUnion); break;
+            case 2: mask = (rtStruct|rtUnion); break;
             }
 
             for (int i = 0; i < _factory->types().size(); i++) {

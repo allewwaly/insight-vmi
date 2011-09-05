@@ -18,7 +18,7 @@ ConstType::ConstType(const TypeInfo& info)
 }
 
 
-BaseType::RealType ConstType::type() const
+RealType ConstType::type() const
 {
 	return rtConst;
 }

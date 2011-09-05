@@ -127,7 +127,7 @@ void Structured::writeTo(QDataStream& out) const
 
 QString Structured::toString(QIODevice* mem, size_t offset) const
 {
-//    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
+//    static RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
 
     QString s;
     int index_len = 0, offset_len = 1, name_len = 1, type_len = 1;
@@ -240,7 +240,7 @@ Struct::Struct(const TypeInfo& info)
 }
 
 
-BaseType::RealType Struct::type() const
+RealType Struct::type() const
 {
 	return rtStruct;
 }
@@ -264,7 +264,7 @@ Union::Union(const TypeInfo& info)
 }
 
 
-BaseType::RealType Union::type() const
+RealType Union::type() const
 {
 	return rtUnion;
 }

@@ -19,7 +19,7 @@ VolatileType::VolatileType(const TypeInfo& info)
 }
 
 
-BaseType::RealType VolatileType::type() const
+RealType VolatileType::type() const
 {
 	return rtVolatile;
 }

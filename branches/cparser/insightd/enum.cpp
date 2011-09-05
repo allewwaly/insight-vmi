@@ -19,7 +19,7 @@ Enum::Enum(const TypeInfo& info)
 }
 
 
-BaseType::RealType Enum::type() const
+RealType Enum::type() const
 {
 	return rtEnum;
 }
