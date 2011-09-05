@@ -134,7 +134,7 @@ void MemoryMap::build(float minProbability)
                 _shared->queue.insert(node->probability(), node);
             }
         }
-        catch (GenericException e) {
+        catch (GenericException& e) {
             debugerr("Caught exception for variable " << (*it)->name()
                     << " at " << e.file << ":" << e.line << ":" << e.message);
         }
@@ -519,11 +519,11 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
 {
     static const int interestingTypes =
             BaseType::trLexical |
-            BaseType::rtArray |
-            BaseType::rtFuncPointer |
-            BaseType::rtPointer |
-            BaseType::rtStruct |
-            BaseType::rtUnion;
+            rtArray |
+            rtFuncPointer |
+            rtPointer |
+            rtStruct |
+            rtUnion;
 
     // Dereference, if required
     const Instance i = (inst.type()->type() & BaseType::trLexical) ?
@@ -661,7 +661,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
             const BaseType* m_type =
                     structured->members().at(i)->refTypeDeep(BaseType::trLexical);
 
-            if (m_type && m_type->type() & BaseType::rtPointer) {
+            if (m_type && (m_type->type() & rtPointer)) {
                 try {
                     quint64 m_addr = inst->address() + structured->members().at(i)->offset();
 //                    quint64 m_addr = inst->memberAddress(i);
@@ -685,12 +685,12 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
                         degForInvalidChildAddrCnt++;
                     }
                 }
-                catch (MemAccessException) {
+                catch (MemAccessException&) {
                     // Address was invalid
                     prob *= degForInvalidChildAddr;
                     degForInvalidChildAddrCnt++;
                 }
-                catch (VirtualMemoryException) {
+                catch (VirtualMemoryException&) {
                     // Address was invalid
                     prob *= degForInvalidChildAddr;
                     degForInvalidChildAddrCnt++;

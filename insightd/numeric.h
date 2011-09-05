@@ -14,7 +14,7 @@
 /**
  * Generic template class for all numeric types
  */
-template<class T, const BaseType::RealType realType>
+template<class T, const RealType realType>
 class NumericBaseType: public BaseType
 {
 public:
@@ -54,7 +54,7 @@ protected:
 /**
  * Generic template class for all integer types
  */
-template<class T, const BaseType::RealType realType>
+template<class T, const RealType realType>
 class IntegerBaseType: public NumericBaseType<T, realType>
 {
 public:
@@ -174,7 +174,7 @@ protected:
 /**
  * Generic template class for all floating-point types
  */
-template<class T, const BaseType::RealType realType>
+template<class T, const RealType realType>
 class FloatingBaseType: public NumericBaseType<T, realType>
 {
 public:
@@ -209,46 +209,46 @@ public:
 
 
 /// Represents a signed 8-bit integer
-typedef IntegerBaseType<qint8, BaseType::rtInt8> Int8;
+typedef IntegerBaseType<qint8, rtInt8> Int8;
 
 /// Represents an unsigned 8-bit integer
-typedef IntegerBaseType<quint8, BaseType::rtUInt8> UInt8;
+typedef IntegerBaseType<quint8, rtUInt8> UInt8;
 
 /// Represents a boolean 8-bit integer
-typedef IntegerBaseType<quint8, BaseType::rtBool8> Bool8;
+typedef IntegerBaseType<quint8, rtBool8> Bool8;
 
 /// Represents a signed 16-bit integer
-typedef IntegerBaseType<qint16, BaseType::rtInt16> Int16;
+typedef IntegerBaseType<qint16, rtInt16> Int16;
 
 /// Represents an unsigned 16-bit integer
-typedef IntegerBaseType<quint16, BaseType::rtUInt16> UInt16;
+typedef IntegerBaseType<quint16, rtUInt16> UInt16;
 
 /// Represents a boolean 16-bit integer
-typedef IntegerBaseType<quint16, BaseType::rtBool16> Bool16;
+typedef IntegerBaseType<quint16, rtBool16> Bool16;
 
 /// Represents a signed 32-bit integer
-typedef IntegerBaseType<qint32, BaseType::rtInt32> Int32;
+typedef IntegerBaseType<qint32, rtInt32> Int32;
 
 /// Represents an unsigned 32-bit integer
-typedef IntegerBaseType<quint32, BaseType::rtUInt32> UInt32;
+typedef IntegerBaseType<quint32, rtUInt32> UInt32;
 
 /// Represents an unsigned 32-bit integer
-typedef IntegerBaseType<quint32, BaseType::rtBool32> Bool32;
+typedef IntegerBaseType<quint32, rtBool32> Bool32;
 
 /// Represents a signed 64-bit integer
-typedef IntegerBaseType<qint64, BaseType::rtInt64> Int64;
+typedef IntegerBaseType<qint64, rtInt64> Int64;
 
 /// Represents an unsigned 64-bit integer
-typedef IntegerBaseType<quint64, BaseType::rtUInt64> UInt64;
+typedef IntegerBaseType<quint64, rtUInt64> UInt64;
 
 /// Represents a boolean 64-bit integer
-typedef IntegerBaseType<quint64, BaseType::rtBool64> Bool64;
+typedef IntegerBaseType<quint64, rtBool64> Bool64;
 
 /// Represents a single precision float (32 bit)
-typedef FloatingBaseType<float, BaseType::rtFloat> Float;
+typedef FloatingBaseType<float, rtFloat> Float;
 
 /// Represents a double precision float (64 bit)
-typedef FloatingBaseType<double, BaseType::rtDouble> Double;
+typedef FloatingBaseType<double, rtDouble> Double;
 
 
 #endif /* NUMERICTYPE_H_ */

@@ -5,23 +5,12 @@
 #include <QVariant>
 #include <QSet>
 #include <QIODevice>
+#include <realtypes.h>
 #include "symbol.h"
 #include "genericexception.h"
 #include "sourceref.h"
 #include "typeinfo.h"
 #include "instance_def.h"
-
-/// Bitmask with all integer-based BaseType::RealType's
-extern const qint32 IntegerTypes;
-
-/// Bitmask with all floating-point BaseType::RealType's
-extern const qint32 FloatingTypes;
-
-/// Bitmask with all BaseType::RealType's that need further resolution
-extern const qint32 ReferencingTypes;
-
-/// Bitmask with all BaseType::RealType's that cannot be further resolved
-extern const qint32 ElementaryTypes;
 
 /**
   Basic exception class for all type-related exceptions
@@ -72,34 +61,6 @@ public:
 class BaseType: public Symbol, public SourceRef
 {
 public:
-    /// The actual type that a BaseType object represents
-    enum RealType {
-        rtInt8        = (1 <<  0),
-        rtUInt8       = (1 <<  1),
-        rtBool8       = (1 <<  2),
-        rtInt16       = (1 <<  3),
-        rtUInt16      = (1 <<  4),
-        rtBool16      = (1 <<  5),
-        rtInt32       = (1 <<  6),
-        rtUInt32      = (1 <<  7),
-        rtBool32      = (1 <<  8),
-        rtInt64       = (1 <<  9),
-        rtUInt64      = (1 << 10),
-        rtBool64      = (1 << 11),
-        rtFloat       = (1 << 12),
-        rtDouble      = (1 << 13),
-        rtPointer     = (1 << 14),
-        rtArray       = (1 << 15),
-        rtEnum        = (1 << 16),
-        rtStruct      = (1 << 17),
-        rtUnion       = (1 << 18),
-        rtConst       = (1 << 19),
-        rtVolatile    = (1 << 20),
-        rtTypedef     = (1 << 21),
-        rtFuncPointer = (1 << 22),
-        // Don't forget to add new types to getRealTypeRevMap()
-    };
-
     /// Specifies how referencing types should be resolved
     enum TypeResolution {
         trNone = 0,                                 ///< no resolution is performed
@@ -110,15 +71,6 @@ public:
         trStructured = rtStruct|rtUnion,            ///< structs or unions
         trAny = 0xFFFFFFFF                          ///< resolve all types
     };
-
-    /// A QHash that maps RealType's to strings
-    typedef QHash<BaseType::RealType, QString> RealTypeRevMap;
-
-    /**
-     * @return a QHash that maps all RealType's to their corresponding string
-     * representation
-     */
-    static RealTypeRevMap getRealTypeRevMap();
 
     /**
      * Constructor

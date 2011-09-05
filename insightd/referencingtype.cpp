@@ -126,10 +126,10 @@ inline Instance ReferencingType::createRefInstance(size_t address,
                     0;
 			// If this is a type "char*" or "const char*", treat it as a string
 			if (rbt->refType() &&
-			    (rbt->refType()->type() == BaseType::rtInt8 ||
-			     (rbt->refType()->type() == BaseType::rtConst &&
+			    (rbt->refType()->type() == rtInt8 ||
+			     (rbt->refType()->type() == rtConst &&
 			      rbtRef &&
-			      rbtRef->type() == BaseType::rtInt8)))
+			      rbtRef->type() == rtInt8)))
 				// Stop here, so that toString() later on will print this as string
 				break;
 			// If this is an unresolved type, don't resolve it anymore

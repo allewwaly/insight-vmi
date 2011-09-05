@@ -160,7 +160,7 @@ public:
 	 * @param type the type of BaseType to create
 	 * @return pointer to the new BaseType object of type \a type
 	 */
-	static BaseType* createEmptyType(BaseType::RealType type);
+	static BaseType* createEmptyType(RealType type);
 
 	/**
 	 * Checks if the given combination of type information is a legal for a symbol

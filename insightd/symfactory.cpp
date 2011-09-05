@@ -109,100 +109,100 @@ Variable* SymFactory::findVarByName(const QString & name) const
 }
 
 
-BaseType* SymFactory::createEmptyType(BaseType::RealType type)
+BaseType* SymFactory::createEmptyType(RealType type)
 {
     BaseType* t = 0;
 
     switch (type) {
-    case BaseType::rtInt8:
+    case rtInt8:
         t = new Int8();
         break;
 
-    case BaseType::rtUInt8:
+    case rtUInt8:
         t = new UInt8();
         break;
 
-    case BaseType::rtBool8:
+    case rtBool8:
         t = new Bool8();
         break;
 
-    case BaseType::rtInt16:
+    case rtInt16:
         t = new Int16();
         break;
 
-    case BaseType::rtUInt16:
+    case rtUInt16:
         t = new UInt16();
         break;
 
-    case BaseType::rtBool16:
+    case rtBool16:
         t = new Bool16();
         break;
 
-    case BaseType::rtInt32:
+    case rtInt32:
         t = new Int32();
         break;
 
-    case BaseType::rtUInt32:
+    case rtUInt32:
         t = new UInt32();
         break;
 
-    case BaseType::rtBool32:
+    case rtBool32:
         t = new Bool32();
         break;
 
-    case BaseType::rtInt64:
+    case rtInt64:
         t = new Int64();
         break;
 
-    case BaseType::rtUInt64:
+    case rtUInt64:
         t = new UInt64();
         break;
 
-    case BaseType::rtBool64:
+    case rtBool64:
         t = new Bool64();
         break;
 
-    case BaseType::rtFloat:
+    case rtFloat:
         t = new Float();
         break;
 
-    case BaseType::rtDouble:
+    case rtDouble:
         t = new Double();
         break;
 
-    case BaseType::rtPointer:
+    case rtPointer:
         t = new Pointer();
         break;
 
-    case BaseType::rtArray:
+    case rtArray:
         t = new Array();
         break;
 
-    case BaseType::rtEnum:
+    case rtEnum:
         t = new Enum();
         break;
 
-    case BaseType::rtStruct:
+    case rtStruct:
         t = new Struct();
         break;
 
-    case BaseType::rtUnion:
+    case rtUnion:
         t = new Union();
         break;
 
-    case BaseType::rtConst:
+    case rtConst:
         t = new ConstType();
         break;
 
-    case BaseType::rtVolatile:
+    case rtVolatile:
         t = new VolatileType();
         break;
 
-    case BaseType::rtTypedef:
+    case rtTypedef:
         t = new Typedef();
         break;
 
-    case BaseType::rtFuncPointer:
+    case rtFuncPointer:
         t = new FuncPointer();
         break;
 
@@ -437,10 +437,10 @@ bool SymFactory::isStructListHead(const BaseType* type) const
            (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
             next->name() == "next" &&
             (!next->refType() ||
-             next->refType()->type() == BaseType::rtPointer) &&
+             next->refType()->type() == rtPointer) &&
             prev->name() == "prev" &&
             (!prev->refType() ||
-             prev->refType()->type() == BaseType::rtPointer));
+             prev->refType()->type() == rtPointer));
 }
 
 
@@ -462,10 +462,10 @@ bool SymFactory::isStructHListNode(const BaseType* type) const
            (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
             next->name() == "next" &&
             (!next->refType() ||
-             next->refType()->type() == BaseType::rtPointer) &&
+             next->refType()->type() == rtPointer) &&
             prev->name() == "pprev" &&
             (!prev->refType() ||
-             prev->refType()->type() == BaseType::rtPointer));
+             prev->refType()->type() == rtPointer));
 }
 
 

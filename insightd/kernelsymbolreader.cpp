@@ -67,9 +67,9 @@ void KernelSymbolReader::read()
     // 2.c  (CompileUnit) data of 2nd compile unit
     // 2.d  ...
     // 3.a  (qint32) number of types
-    // 3.b  (qint32) type (BaseType::RealType casted to qint32)
+    // 3.b  (qint32) type (RealType casted to qint32)
     // 3.c  (subclass of BaseType) data of type
-    // 3.d  (qint32) type (BaseType::RealType casted to qint32)
+    // 3.d  (qint32) type (RealType casted to qint32)
     // 3.e  (subclass of BaseType) data of type
     // 3.f  ...
     // 4.a  (qint32) number of id-mappings for types
@@ -105,15 +105,15 @@ void KernelSymbolReader::read()
         in >> size;
         for (int i = 0; i < size; i++) {
             in >> type;
-            BaseType* t = SymFactory::createEmptyType((BaseType::RealType) type);
+            BaseType* t = SymFactory::createEmptyType((RealType) type);
             if (!t)
                 genericError("Out of memory.");
             in >> *t;
             _factory->addSymbol(t);
 
-            if (t->type() & (ReferencingTypes & ~(BaseType::rtStruct|BaseType::rtUnion)))
+            if (t->type() & (ReferencingTypes & ~(rtStruct|rtUnion)))
                 _phase = phReferencingTypes;
-            else if (t->type() & (BaseType::rtStruct|BaseType::rtUnion)) {
+            else if (t->type() & (rtStruct|rtUnion)) {
                 _phase = phStructuredTypes;
             }
 

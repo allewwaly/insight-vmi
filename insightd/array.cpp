@@ -21,7 +21,7 @@ Array::Array(const TypeInfo& info)
 }
 
 
-BaseType::RealType Array::type() const
+RealType Array::type() const
 {
 	return rtArray;
 }

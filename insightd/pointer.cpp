@@ -29,7 +29,7 @@ Pointer::Pointer(const TypeInfo& info)
 }
 
 
-BaseType::RealType Pointer::type() const
+RealType Pointer::type() const
 {
 	return rtPointer;
 }
@@ -64,7 +64,7 @@ QString Pointer::toString(QIODevice* mem, size_t offset) const
         (_refType->type() == rtInt8 ||
          (_refType->type() == rtConst &&
           refRefType &&
-          refRefType->type() == BaseType::rtInt8)))
+          refRefType->type() == rtInt8)))
     {
         QString s = readString(mem, p, 255, &errMsg);
         if (errMsg.isEmpty())
@@ -101,10 +101,10 @@ QString Pointer::readString(QIODevice* mem, size_t offset, const int len, QStrin
         }
         return QString(buf);
     }
-    catch (VirtualMemoryException e) {
+    catch (VirtualMemoryException& e) {
         *errMsg = e.message;
     }
-    catch (MemAccessException e) {
+    catch (MemAccessException& e) {
         *errMsg = e.message;
     }
 

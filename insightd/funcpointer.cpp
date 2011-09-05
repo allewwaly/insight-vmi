@@ -18,7 +18,7 @@ FuncPointer::FuncPointer(const TypeInfo& info)
 }
 
 
-BaseType::RealType FuncPointer::type() const
+RealType FuncPointer::type() const
 {
 	return rtFuncPointer;
 }

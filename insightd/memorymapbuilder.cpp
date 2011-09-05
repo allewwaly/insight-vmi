@@ -100,7 +100,7 @@ void MemoryMapBuilder::run()
                 }
             }
         }
-        catch (VirtualMemoryException) {
+        catch (VirtualMemoryException&) {
             // Lock the mutex again before we jump to the loop condition checking
             queueLock.relock();
             // Don't proceed any further in case of an exception
@@ -111,7 +111,7 @@ void MemoryMapBuilder::run()
         Instance inst = node->toInstance(false);
 
         // If this is a pointer, add where it's pointing to
-        if (node->type()->type() & BaseType::rtPointer) {
+        if (node->type()->type() & rtPointer) {
             try {
                 quint64 addr = (quint64) inst.toPointer();
                 shared->pointersToLock.lock();
@@ -124,12 +124,12 @@ void MemoryMapBuilder::run()
                 if (cnt && _map->addressIsWellFormed(inst))
                     _map->addChildIfNotExistend(inst, node, _index);
             }
-            catch (GenericException e) {
+            catch (GenericException& e) {
                 // Do nothing
             }
         }
         // If this is an array, add all elements
-        else if (node->type()->type() & BaseType::rtArray) {
+        else if (node->type()->type() & rtArray) {
             const Array* a = dynamic_cast<const Array*>(node->type());
             if (a->length() > 0) {
                 // Add all elements to the stack that haven't been visited
@@ -139,7 +139,7 @@ void MemoryMapBuilder::run()
                         if (_map->addressIsWellFormed(e))
                             _map->addChildIfNotExistend(e, node, _index);
                     }
-                    catch (GenericException e) {
+                    catch (GenericException& e) {
                         // Do nothing
                     }
                 }
@@ -154,7 +154,7 @@ void MemoryMapBuilder::run()
                     if (_map->addressIsWellFormed(m))
                         _map->addChildIfNotExistend(m, node, _index);
                 }
-                catch (GenericException e) {
+                catch (GenericException& e) {
                     // Do nothing
                 }
             }

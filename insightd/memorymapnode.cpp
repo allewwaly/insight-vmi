@@ -71,7 +71,7 @@ QStringList MemoryMapNode::fullNameComponents() const
     // If this is the child of an array or pointer, then suppress the father's
 	// name
     if (_parent && _parent->type() &&
-            (_parent->type()->type() & (BaseType::rtArray|BaseType::rtPointer)))
+            (_parent->type()->type() & (rtArray|rtPointer)))
         ret.removeLast();
 	ret += name();
 	return ret;

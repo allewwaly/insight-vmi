@@ -941,7 +941,6 @@ int Shell::cmdListSources(QStringList /*args*/)
 
 int Shell::cmdListTypes(QStringList args)
 {
-    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
     const BaseTypeList& types = _sym.factory().types();
     CompileUnit* unit = 0;
 
@@ -1017,7 +1016,7 @@ int Shell::cmdListTypes(QStringList args)
 
         _out << qSetFieldWidth(w_id)  << right << hex << type->id()
              << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_type) << left << tRevMap[type->type()]
+             << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
              << qSetFieldWidth(w_size) << right << dec << type->size()
              << qSetFieldWidth(w_colsep) << " "
@@ -1041,7 +1040,6 @@ int Shell::cmdListTypes(QStringList args)
 
 int Shell::cmdListTypesById(QStringList /*args*/)
 {
-    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
     QList<int> ids = _sym.factory()._typesById.keys();
 
     if (ids.isEmpty()) {
@@ -1079,7 +1077,7 @@ int Shell::cmdListTypesById(QStringList /*args*/)
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_realId) << type->id()
              << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_type) << left << tRevMap[type->type()]
+             << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_size) << right << type->size() << qSetFieldWidth(0)
@@ -1095,7 +1093,6 @@ int Shell::cmdListTypesById(QStringList /*args*/)
 
 int Shell::cmdListTypesByName(QStringList /*args*/)
 {
-    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
     QList<QString> names = _sym.factory()._typesByName.keys();
 
     if (names.isEmpty()) {
@@ -1128,7 +1125,7 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
         // Construct name and line of the source file
         _out << qSetFieldWidth(w_id)  << right << hex << type->id()
              << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_type) << left << tRevMap[type->type()]
+             << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(w_name) << names[i]
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_size) << right << type->size()
@@ -1144,7 +1141,6 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
 
 int Shell::cmdListVars(QStringList args)
 {
-    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
     const VariableList& vars = _sym.factory().vars();
     CompileUnit* unit = 0;
 
@@ -1228,10 +1224,11 @@ int Shell::cmdListVars(QStringList args)
         const BaseType* base = var->refType();
         while ( dynamic_cast<const RefBaseType*>(base) )
             base = dynamic_cast<const RefBaseType*>(base)->refType();
-        QString s_datatype = base ? tRevMap[base->type()] : "(undef)";
+        QString s_datatype = base ? realTypeToStr(base->type()) : "(undef)";
 
         // Shorten the type name, if required
-        QString s_typename = var->refType()->name().isEmpty() ? "(anonymous type)" : var->refType()->name();
+        QString s_typename = var->refType()->name().isEmpty() ?
+                "(anonymous type)" : var->refType()->name();
         if (s_typename.length() > w_typename)
             s_typename = s_typename.left(w_typename - 3) + "...";
 
@@ -1843,11 +1840,9 @@ int Shell::cmdShow(QStringList args)
 
 int Shell::cmdShowBaseType(const BaseType* t)
 {
-	static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
-
 	_out << "  ID:             " << "0x" << hex << t->id() << dec << endl;
 	_out << "  Name:           " << (t->prettyName().isEmpty() ? QString("(unnamed)") : t->prettyName()) << endl;
-	_out << "  Type:           " << tRevMap[t->type()] << endl;
+	_out << "  Type:           " << realTypeToStr(t->type()) << endl;
 	_out << "  Size:           " << t->size() << endl;
 
     const RefBaseType* r = dynamic_cast<const RefBaseType*>(t);
@@ -1909,8 +1904,6 @@ int Shell::cmdShowBaseType(const BaseType* t)
 int Shell::cmdShowVariable(const Variable* v)
 {
 	assert(v != 0);
-
-	static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
 
 	_out << "  ID:             " << "0x" << hex << v->id() << dec << endl;
 	_out << "  Name:           " << v->name() << endl;
