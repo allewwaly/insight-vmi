@@ -10,6 +10,7 @@
 
 #include "longoperation.h"
 #include <QString>
+#include <QDir>
 
 // forward declaration
 class SymFactory;
@@ -44,9 +45,13 @@ protected:
      */
     virtual void operationProgress();
 
+
 private:
+    void parseFile(const QString& fileName);
+
     SymFactory* _factory;
     QString _srcPath;
+    QDir _srcDir;
     QString _currentFile;
     int _filesDone;
 };

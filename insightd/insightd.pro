@@ -1,4 +1,5 @@
-SOURCES += kernelsourceparser.cpp \
+SOURCES += kernelsourcetypeevaluator.cpp \
+    kernelsourceparser.cpp \
     memorydumpsclass.cpp \
     scriptengine.cpp \
     kernelsymbolsclass.cpp \
@@ -45,7 +46,8 @@ SOURCES += kernelsourceparser.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += kernelsourceparser.h \
+HEADERS += kernelsourcetypeevaluator.h \
+    kernelsourceparser.h \
     memorydumpsclass.h \
     scriptengine.h \
     kernelsymbolsclass.h \
