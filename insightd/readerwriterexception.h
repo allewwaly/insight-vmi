@@ -8,7 +8,7 @@
 #ifndef READERWRITEREXCEPTION_H_
 #define READERWRITEREXCEPTION_H_
 
-#include "genericexception.h"
+#include <genericexception.h>
 
 #define readerWriterError(x) do { throw ReaderWriterException((x), __FILE__, __LINE__); } while (0)
 

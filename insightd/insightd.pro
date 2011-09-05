@@ -33,7 +33,6 @@ SOURCES += kernelsourceparser.cpp \
     sourceref.cpp \
     shell.cpp \
     referencingtype.cpp \
-    genericexception.cpp \
     debug.cpp \
     structuredmember.cpp \
     structured.cpp \
@@ -91,7 +90,6 @@ HEADERS += kernelsourceparser.h \
     sourceref.h \
     shell.h \
     referencingtype.h \
-    genericexception.h \
     debug.h \
     structuredmember.h \
     structured.h \
