@@ -18,7 +18,7 @@ class ASTTypeEvaluatorTester: public ASTTypeEvaluator
 {
 public:
 	ASTTypeEvaluatorTester(AbstractSyntaxTree* ast)
-		: ASTTypeEvaluator(ast) { reset(); }
+		: ASTTypeEvaluator(ast, 4) { reset(); }
 
 	void reset()
 	{
@@ -116,11 +116,9 @@ void ASTTypeEvaluatorTest::cleanup()
 		"{\n" \
 		"    struct list_head* h;\n" \
 		"    struct module* m;\n" \
-		"\n" \
-		"    "
+		"\n"
 
 #define DEF_MAIN_END \
-		"\n" \
 		"}\n" \
 		"\n"
 
@@ -296,6 +294,15 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "h" << "Struct(list_head)" << "prev" << "Pointer->Struct(module)";
     QTest::newRow("arrayInitChange7") << "" << "struct module* a[2] = { [0] = h->prev };" << true
         << "h" << "Struct(list_head)" << "prev" << "Pointer->Struct(module)";
+
+    // Return values
+    QTest::newRow("returnNoValue") << "struct module* foo() { return; }" << "" << false;
+    QTest::newRow("returnNullValue") << "struct module* foo() { return 0; }" << "" << false;
+    QTest::newRow("returnSameValue") << "struct module* foo(struct module* p) { return p; }" << "" << false;
+    QTest::newRow("returnDifferentValue") << "struct module* foo(void* p) { return p; }" << "" << true
+        << "p" << "Pointer->Void" << "" << "Pointer->Struct(module)";
+    QTest::newRow("returnDifferentValue") << "struct module* foo(long i) { return i; }" << "" << true
+        << "i" << "Int32" << "" << "Pointer->Struct(module)";
 }
 
 
@@ -305,9 +312,16 @@ void ASTTypeEvaluatorTest::allTests()
 	QFETCH(QString, localCode);
 
 	_ascii += DEF_HEADER;
-	_ascii += globalCode.toAscii();
+	if (!globalCode.isEmpty()) {
+	    _ascii += globalCode.toAscii();
+	    _ascii += "\n\n";
+	}
 	_ascii += DEF_MAIN_BEGIN;
-	_ascii += localCode.toAscii();
+	if (!localCode.isEmpty()) {
+        _ascii += "    ";
+	    _ascii += localCode.toAscii();
+	    _ascii += "\n";
+	}
 	_ascii += DEF_MAIN_END;
 
 	try {

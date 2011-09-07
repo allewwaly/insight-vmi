@@ -62,8 +62,8 @@ bool ASTType::equalTo(const ASTType* other) const
 }
 
 
-ASTTypeEvaluator::ASTTypeEvaluator(AbstractSyntaxTree* ast)
-    : ASTWalker(ast)
+ASTTypeEvaluator::ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong)
+    : ASTWalker(ast), _sizeofLong(sizeofLong)
 {
 }
 
@@ -677,10 +677,11 @@ ASTType* ASTTypeEvaluator::typeofNode(pASTNode node)
 //      debugerr(_ast->fileName() << ":" << node->start->line << ": "
 //              << "Failed to resolve type for node "
 //              << ast_node_type_to_str(node));
-        typeEvaluatorError(QString("Failed to resolve type for node %1 at %2:%3")
+        typeEvaluatorError(QString("Failed to resolve type for node %1 at %2:%3:%4")
                 .arg(ast_node_type_to_str(node))
                 .arg(_ast->fileName())
-                .arg(node->start->line));
+                .arg(node->start->line)
+                .arg(node->start->charPosition));
     }
 
     _nodeStack.pop();
@@ -816,6 +817,24 @@ ASTType* ASTTypeEvaluator::typeofDesignatedInitializer(pASTNode node)
     }
 
     return _types[node];
+}
+
+/**
+ * Returns the return type of the inner-most function \a node is contained in.
+ * @param node the node contained in a function
+ * @return
+ */
+ASTType* ASTTypeEvaluator::embeddingFuncReturnType(pASTNode node)
+{
+    while (node && node->type != nt_function_definition)
+        node = node->parent;
+
+    assert(node != 0);
+    ASTType* ret = typeofNode(node);
+    assert(ret != 0);
+    assert(ret->type() == rtFuncPointer);
+
+    return ret->next();
 }
 
 /**
@@ -2056,13 +2075,14 @@ ASTType* ASTTypeEvaluator::preprendPointers(pASTNode d_ad, ASTType* type)
     else /*if (d_ad->type == nt_abstract_declarator)*/
         ptr = d_ad->u.abstract_declarator.pointer;
 
-    // Distinguish between function pointer and regular pointer
-    RealType realType = rtPointer;
+    // Distinguish between function pointer and regular pointer: The declarator
+    // of a function pointer is always child of a direct_declarator node.
+    RealType ptrType = rtPointer;
     bool skipFirst = false;
     if (d_ad->parent->type == nt_direct_declarator ||
 		d_ad->parent->type == nt_direct_abstract_declarator)
     {
-    	realType = rtFuncPointer;
+    	ptrType = rtFuncPointer;
     	// If there is at least one declarator_suffix_parens in the suffix list,
     	// then we need to skip the first pointer, because it is added when we
     	// encounter the declarator_suffix_parens anyways
@@ -2089,21 +2109,30 @@ ASTType* ASTTypeEvaluator::preprendPointers(pASTNode d_ad, ASTType* type)
     }
 
     // Add one pointer type node for every asterisk in the declaration
+    int count = 0;
     while (ptr) {
     	// For function pointers, the first asterisk is ignored, because GCC
     	// treats "void (foo)()" and "void (*foo)()" equally.
-    	if (skipFirst) {
+    	if (skipFirst)
     		skipFirst = false;
-    		if (type) {
-    		    // We must not change the original type information, so copy it
-    		    // before any modification
-    		    type = copyDeep(type);
-    		    type->setPointerSkipped(true);
-    		}
-    	}
     	else
-    		type = createASTType(realType, ptr, type);
+    		type = createASTType(ptrType, ptr, type);
+
+    	// Set the pointerSkipped flag in any case
+    	if (type) {
+            if (count == 0 && !type->pointerSkipped()) {
+                // We must not change the original type information, so copy it
+                // before any modification
+                type = copyDeep(type);
+                // Also set the flag for the return type of the function
+                if (type->next())
+                    type->next()->setPointerSkipped(true);
+            }
+            type->setPointerSkipped(true);
+    	}
+
         ptr = ptr->u.pointer.pointer;
+        ++count;
     }
     return type;
 }
@@ -2247,6 +2276,20 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
     while (root) {
         // Skip if we are used in some built-in function
         switch (root->type) {
+        case nt_assignment_expression:
+            // Is this in the right-hand of an assignment expression?
+            if ((lNode = root->u.assignment_expression.lvalue) &&
+               rNode == root->u.assignment_expression.assignment_expression)
+            {
+                lType = typeofNode(lNode);
+                goto while_exit;
+            }
+            break;
+
+        case nt_assembler_parameter:
+        case nt_assembler_statement:
+            return erNoAssignmentUse;
+
         case nt_builtin_function_alignof:
 //        case nt_builtin_function_choose_expr:
         case nt_builtin_function_constant_p:
@@ -2264,15 +2307,10 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
         case nt_builtin_function_va_start:
             return erUseInBuiltinFunction;
 
-        case nt_assignment_expression:
-            // Is this in the right-hand of an assignment expression?
-            if ((lNode = root->u.assignment_expression.lvalue) &&
-               rNode == root->u.assignment_expression.assignment_expression)
-            {
-                lType = typeofNode(lNode);
-                goto while_exit;
-            }
-            break;
+        case nt_compound_braces_statement:
+        case nt_compound_statement:
+        case nt_expression_statement:
+            return erNoAssignmentUse;
 
         case nt_init_declarator:
             // Is this in the right-hand of an init declarator?
@@ -2293,6 +2331,28 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
                 goto while_exit;
             }
             break;
+
+        case nt_iteration_statement_do:
+        case nt_iteration_statement_for:
+        case nt_iteration_statement_while:
+            return erNoAssignmentUse;
+
+        case nt_jump_statement_goto:
+            return erNoAssignmentUse;
+
+        case nt_jump_statement_return:
+            // An identifier underneath a return should be the initializer
+            assert(root->u.jump_statement.initializer != 0);
+            lType = embeddingFuncReturnType(root);
+            lNode = lType ? lType->node() : 0;
+            goto while_exit;
+
+        case nt_selection_statement_if:
+        case nt_selection_statement_switch:
+            return erNoAssignmentUse;
+
+        case nt_typeof_specification:
+            return erNoAssignmentUse;
 
         default:
             break;
@@ -2355,9 +2415,9 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
     if ((forcedChanges == 0 && lType->equalTo(typeChain.last())) ||
             lType->equalTo(typeChain.first()))
     {
-        debugmsg(QString("Line %1: Skipping because types are equal (%1:%2)")
-                        .arg(node->start->line)
-                        .arg(node->start->charPosition));
+//        debugmsg(QString("Line %1: Skipping because types are equal (%1:%2)")
+//                        .arg(node->start->line)
+//                        .arg(node->start->charPosition));
         return erTypesAreEqual;
     }
 
@@ -2368,10 +2428,10 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
 
     // Skip if neither the left nor the right side involves pointers
     if (!rHasPointer && !lType->isPointer()) {
-        debugmsg(QString("Line %1: Skipping because no pointer "
-                "assignment (%1:%2)")
-                .arg(node->start->line)
-                .arg(node->start->charPosition));
+//        debugmsg(QString("Line %1: Skipping because no pointer "
+//                "assignment (%1:%2)")
+//                .arg(node->start->line)
+//                .arg(node->start->charPosition));
         return erNoPointerAssignment;
     }
 
@@ -2569,7 +2629,7 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
             << "\"" << var << "\""
             << std::endl;
 
-    std::cout << std::endl;
+//    std::cout << std::endl;
 }
 
 
@@ -2610,8 +2670,7 @@ ASTType* ASTTypeEvaluator::typeofTypeId(pASTNode node)
 
 int ASTTypeEvaluator::sizeofLong() const
 {
-	// TODO find out if we have a i386 or AMD64 system
-	return 4;
+	return _sizeofLong;
 }
 
 
