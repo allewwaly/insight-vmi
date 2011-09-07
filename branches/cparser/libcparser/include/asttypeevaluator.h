@@ -61,7 +61,7 @@ typedef QStack<pASTNode> ASTNodeStack;
 class ASTTypeEvaluator: protected ASTWalker
 {
 public:
-    ASTTypeEvaluator(AbstractSyntaxTree* ast);
+    ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong);
     virtual ~ASTTypeEvaluator();
 
     bool evaluateTypes();
@@ -149,6 +149,7 @@ private:
     ASTType* typeofPostfixExpression(pASTNode node);
     ASTType* typeofPostfixExpressionSuffix(pASTNode node);
 
+    ASTType* embeddingFuncReturnType(pASTNode node);
     ASTType* expectedTypeAtInitializerPosition(pASTNode node);
     ASTType* preprendPointers(pASTNode d_ad, ASTType* type);
     ASTType* preprendArrays(pASTNode dd_dad, ASTType* type);
@@ -160,6 +161,7 @@ private:
     ASTNodeTypeHash _types;
     ASTTypeList _allTypes;
     ASTNodeStack _nodeStack;
+    int _sizeofLong;
 };
 
 #endif /* ASTTYPEEVALUATOR_H_ */
