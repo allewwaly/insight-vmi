@@ -59,11 +59,18 @@ void ASTScope::addSymbol(const QString& name, ASTSymbolType type,
 			break;
 
 		case stVariableDecl:
+            // Ignore declarations following prev. declaration
+            if (type == stVariableDecl)
+                return;
 			// No warning if definition follows declaration
 			warn = (type != stVariableDef);
-			// no break
+			// No warning if function typedef'ed variable is followed by a
+			// function definition
+			warn = warn && (type != stFunctionDef);
+			break;
+
 		case stVariableDef:
-			// Ignore declarations following prev. definition or declaration
+			// Ignore declarations following prev. definition
 			if (type == stVariableDecl)
 				return;
 			break;
