@@ -48,7 +48,8 @@ public:
 
 KernelSourceParser::KernelSourceParser(SymFactory* factory,
         const QString& srcPath)
-    : _factory(factory), _srcPath(srcPath), _srcDir(srcPath), _filesDone(0)
+    : _factory(factory), _srcPath(srcPath), _srcDir(srcPath), _filesDone(0),
+      _lastFileNameLen(0)
 {
     assert(_factory);
 }
@@ -62,9 +63,18 @@ KernelSourceParser::~KernelSourceParser()
 void KernelSourceParser::operationProgress()
 {
     int percent = (_filesDone / (float) _factory->sources().size()) * 100;
-    shell->out() << "\rParsing file " << _filesDone << " (" << percent  << "%)"
-            << ", " << elapsedTime() << " elapsed: " << qPrintable(_currentFile)
-            << flush;
+//    shell->out() << "Parsing file " << _filesDone << "/"
+//            <<  _factory->sources().size()
+//            << " (" << percent  << "%)"
+//            << ", " << elapsedTime() << " elapsed: "
+//            << qPrintable(_currentFile)
+//            << endl;
+    shell->out() << "\rParsing file " << _filesDone << "/"
+            <<  _factory->sources().size() << " (" << percent  << "%)"
+            << ", " << elapsedTime() << " elapsed: "
+            << qSetFieldWidth(_lastFileNameLen) << qPrintable(_currentFile)
+            << qSetFieldWidth(0) << flush;
+    _lastFileNameLen = _currentFile.length();
 }
 
 
@@ -78,6 +88,8 @@ void KernelSourceParser::parse()
         return;
     }
 
+    _filesDone = _lastFileNameLen = 0;
+
     operationStarted();
 
      try {
@@ -86,24 +98,29 @@ void KernelSourceParser::parse()
              const CompileUnit* unit = it.value();
              ++_filesDone;
 
-             try {
-                 parseFile(unit->name() + ".i");
-             }
-             catch (SourceParserException& e) {
-                 shell->out() << endl << flush;
-                 shell->err() << "WARNING: " << e.message << endl << flush;
-             }
-             catch (FileNotFoundException& e) {
-                 shell->out() << endl << flush;
-                 shell->err() << "WARNING: " << e.message << endl << flush;
-             }
-             catch (TypeEvaluatorException& e) {
-                 shell->out() << endl << flush;
-                 shell->err() << "WARNING: At " << e.file << ":" << e.line
-                         << ": " << e.message << endl << flush;
-             }
+             // Skip assembly files
+             if (!unit->name().endsWith(".S")) {
+                 _currentFile = unit->name() + ".i";
 
-             checkOperationProgress();
+                 checkOperationProgress();
+
+                 try {
+                     parseFile(_currentFile);
+                 }
+//                 catch (SourceParserException& e) {
+//                     shell->out() << "\r" << flush;
+//                     shell->err() << "WARNING: " << e.message << endl << flush;
+//                 }
+                 catch (FileNotFoundException& e) {
+                     shell->out() << "\r" << flush;
+                     shell->err() << "WARNING: " << e.message << endl << flush;
+                 }
+                 catch (TypeEvaluatorException& e) {
+                     shell->out() << "\r" << flush;
+                     shell->err() << "WARNING: At " << e.file << ":" << e.line
+                             << ": " << e.message << endl << flush;
+                 }
+             }
              ++it;
          }
      }

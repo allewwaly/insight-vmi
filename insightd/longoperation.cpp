@@ -35,11 +35,16 @@ void LongOperation::operationStopped()
 
 void LongOperation::checkOperationProgress()
 {
-    if (_timer.elapsed() >= _progressInterval) {
-        _duration = _elapsedTime.elapsed();
-        operationProgress();
-        _timer.restart();
-    }
+    if (_timer.elapsed() >= _progressInterval)
+        forceOperationProgress();
+}
+
+
+void LongOperation::forceOperationProgress()
+{
+    _duration = _elapsedTime.elapsed();
+    operationProgress();
+    _timer.restart();
 }
 
 

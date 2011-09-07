@@ -39,6 +39,7 @@
 #include "memorymapwidget.h"
 #include "basetype.h"
 #include "scriptengine.h"
+#include "kernelsourceparser.h"
 
 // Register socket enums for the Qt meta type system
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
@@ -68,7 +69,9 @@ enum ShellErrorCodes {
     ecNoFileNameGiven     = -3,
     ecFileNotLoaded       = -4,
     ecInvalidIndex        = -5,
-    ecNoMemoryDumpsLoaded = -6
+    ecNoMemoryDumpsLoaded = -6,
+    ecInvalidArguments    = -7,
+    ecCaughtException     = -8
 };
 
 
@@ -819,7 +822,7 @@ int Shell::cmdExit(QStringList)
     _finished = true;
     // End event loop
     this->exit(0);
-    return 0;
+    return ecOk;
 }
 
 
@@ -848,7 +851,7 @@ int Shell::cmdHelp(QStringList args)
         }
     }
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -915,7 +918,7 @@ int Shell::cmdListSources(QStringList /*args*/)
 
     if (keys.isEmpty()) {
         _out << "There were no source references.\n";
-        return 0;
+        return ecOk;
     }
 
     // Find out required field width (keys needs to be sorted for that)
@@ -935,7 +938,7 @@ int Shell::cmdListSources(QStringList /*args*/)
     hline();
     _out << "Total source files: " << keys.size() << endl;
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -952,7 +955,7 @@ int Shell::cmdListTypes(QStringList args)
 
     if (types.isEmpty()) {
         _out << "There are no type references.\n";
-        return 0;
+        return ecOk;
     }
 
     // Find out required field width (the types are sorted by ascending ID)
@@ -1034,7 +1037,7 @@ int Shell::cmdListTypes(QStringList args)
     else if (applyFilter)
     	_out << "No types matching that name." << endl;
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -1044,7 +1047,7 @@ int Shell::cmdListTypesById(QStringList /*args*/)
 
     if (ids.isEmpty()) {
         _out << "There are no type references.\n";
-        return 0;
+        return ecOk;
     }
 
     qSort(ids);
@@ -1087,7 +1090,7 @@ int Shell::cmdListTypesById(QStringList /*args*/)
     hline(w_total);
     _out << "Total types by ID: " << dec << _sym.factory()._typesById.size() << endl;
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -1097,7 +1100,7 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
 
     if (names.isEmpty()) {
         _out << "There are no type references.\n";
-        return 0;
+        return ecOk;
     }
 
     qSort(names);
@@ -1135,7 +1138,7 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
     hline(w_total);
     _out << "Total types by name: " << dec << _sym.factory()._typesByName.size() << endl;
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -1152,7 +1155,7 @@ int Shell::cmdListVars(QStringList args)
 
     if (vars.isEmpty()) {
         _out << "There were no variable references.\n";
-        return 0;
+        return ecOk;
     }
 
     // Find out required field width (the types are sorted by ascending ID)
@@ -1262,7 +1265,7 @@ int Shell::cmdListVars(QStringList args)
     else if (applyFilter)
     	_out << "No variables matching that name." << endl;
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -1491,7 +1494,7 @@ int Shell::cmdMemoryList(QStringList /*args*/)
         _out << "No memory dumps loaded." << endl;
     else
         _out << "Loaded memory dumps:" << endl << out;
-    return 0;
+    return ecOk;
 }
 
 
@@ -1502,7 +1505,7 @@ int Shell::cmdMemorySpecs(QStringList args)
     // Output the specs
     if (index >= 0) {
         _out << _memDumps[index]->memSpecs().toString() << endl;
-        return 0;
+        return ecOk;
     }
 
     return 1;
@@ -1516,7 +1519,7 @@ int Shell::cmdMemoryQuery(QStringList args)
     // Perform the query
     if (index >= 0) {
 		_out << _memDumps[index]->query(args.join(" ")) << endl;
-		return 0;
+		return ecOk;
     }
     return 1;
 }
@@ -1538,7 +1541,7 @@ int Shell::cmdMemoryDump(QStringList args)
         bool ok;
         quint64 addr = re.cap(2).toULong(&ok, 16);
         _out << _memDumps[index]->dump(re.cap(1).trimmed(), addr) << endl;
-        return 0;
+        return ecOk;
     }
 
     return 2;
@@ -1604,7 +1607,7 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
                     .arg(msec, 3, 10, QChar('0'))
                 << endl;
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -1684,7 +1687,7 @@ int Shell::cmdMemoryDiffBuild(int index1, int index2)
                     .arg(msec, 3, 10, QChar('0'))
                 << endl;
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -1703,7 +1706,7 @@ int Shell::cmdMemoryDiffVisualize(int index)
     if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
         debugerr("Error invoking show() on memMapWindow");
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -1765,7 +1768,7 @@ int Shell::cmdScript(QStringList args)
 		return 4;
 	}
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -1897,7 +1900,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
         }
 	}
 
-	return 0;
+	return ecOk;
 }
 
 
@@ -1921,7 +1924,7 @@ int Shell::cmdShowVariable(const Variable* v)
 		_out << "  Type:           " << QString("(unresolved)") << endl;
 	}
 
-	return 0;
+	return ecOk;
 }
 
 
@@ -1930,7 +1933,7 @@ int Shell::cmdSymbols(QStringList args)
     // Show cmdHelp, of an invalid number of arguments is given
     if (args.size() < 2) {
         cmdHelp(QStringList("symbols"));
-        return 1;
+        return ecInvalidArguments;
     }
 
     QString action = args[0].toLower();
@@ -1943,10 +1946,33 @@ int Shell::cmdSymbols(QStringList args)
         return cmdSymbolsStore(args);
     else if (QString("load").startsWith(action))
         return cmdSymbolsLoad(args);
+    else if (QString("source").startsWith(action))
+        return cmdSymbolsSource(args);
     else {
         cmdHelp(QStringList("symbols"));
         return 2;
     }
+}
+
+
+int Shell::cmdSymbolsSource(QStringList args)
+{
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() != 1) {
+        cmdHelp(QStringList("symbols"));
+        return ecInvalidArguments;
+    }
+
+    // Check files for existence
+    if (!QFile::exists(args[0])) {
+        _err << "Directory not found: " << args[0] << endl;
+        return ecFileNotFound;
+    }
+
+    KernelSourceParser srcParser(&_sym.factory(), args[0]);
+    srcParser.parse();
+
+   return ecOk;
 }
 
 
@@ -1975,7 +2001,7 @@ int Shell::cmdSymbolsParse(QStringList args)
     else {
         // Show cmdHelp, of an invalid number of arguments is given
     	cmdHelp(QStringList("symbols"));
-    	return 1;
+    	return ecInvalidArguments;
     }
 
     // Check files for existence
@@ -1998,7 +2024,7 @@ int Shell::cmdSymbolsParse(QStringList args)
     else
     	_sym.parseSymbols(objdump, kernelSrc, sysmap);
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -2007,7 +2033,7 @@ int Shell::cmdSymbolsLoad(QStringList args)
     // Show cmdHelp, of an invalid number of arguments is given
     if (args.size() != 1) {
         cmdHelp(QStringList("symbols"));
-        return 1;
+        return ecInvalidArguments;
     }
 
     QString fileName = args[0];
@@ -2020,7 +2046,7 @@ int Shell::cmdSymbolsLoad(QStringList args)
 
     _sym.loadSymbols(fileName);
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -2029,7 +2055,7 @@ int Shell::cmdSymbolsStore(QStringList args)
     // Show cmdHelp, of an invalid number of arguments is given
     if (args.size() != 1) {
         cmdHelp(QStringList("symbols"));
-        return 1;
+        return ecInvalidArguments;
     }
 
     QString fileName = args[0];
@@ -2042,13 +2068,13 @@ int Shell::cmdSymbolsStore(QStringList args)
             if (reply.isEmpty())
                 reply = "y";
             else if (reply == "n")
-                return 0;
+                return ecOk;
         } while (reply != "y");
     }
 
     _sym.saveSymbols(fileName);
 
-    return 0;
+    return ecOk;
 }
 
 
@@ -2057,7 +2083,7 @@ int Shell::cmdBinary(QStringList args)
     // Show cmdHelp, of an invalid number of arguments is given
     if (args.size() < 1) {
         cmdHelp(QStringList("binary"));
-        return 1;
+        return ecInvalidArguments;
     }
 
     bool ok = false;
@@ -2090,14 +2116,16 @@ int Shell::cmdBinaryMemDumpList(QStringList /*args*/)
         }
     }
     _bin << files;
-    return 0;
+    return ecOk;
 }
 
 
 int Shell::cmdDiffVectors(QStringList args)
 {
-    if (args.isEmpty())
-        return cmdHelp(QStringList("diff"));
+    if (args.isEmpty()) {
+        cmdHelp(QStringList("diff"));
+        return ecInvalidArguments;
+    }
 
     // Try to parse a probability
     bool ok;
@@ -2283,7 +2311,7 @@ int Shell::cmdDiffVectors(QStringList args)
         prevj = j;
     }
 
-    return 0;
+    return ecOk;
 }
 
 

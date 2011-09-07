@@ -284,28 +284,3 @@ void KernelSymbols::saveSymbols(const QString& fileName)
 
     file.close();
 }
-
-
-const SymFactory& KernelSymbols::factory() const
-{
-    return _factory;
-}
-
-
-const MemSpecs&  KernelSymbols::memSpecs() const
-{
-    return _memSpecs;
-}
-
-
-const QString& KernelSymbols::fileName() const
-{
-    return _fileName;
-}
-
-
-bool KernelSymbols::symbolsAvailable() const
-{
-	return !_factory.types().isEmpty();
-}
-
