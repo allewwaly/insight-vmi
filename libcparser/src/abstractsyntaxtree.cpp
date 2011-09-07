@@ -153,13 +153,6 @@ int AbstractSyntaxTree::parsePhase2(ASTBuilder* builder)
                     << _tstream->tokens->count << ")");
     }
 
-    if (errorCount() == 0) {
-//        debugmsg("AST successfully built");
-    }
-    else {
-        debugerr("Encountered " << errorCount() << " errors while building AST");
-    }
-
     return errorCount();
 }
 
