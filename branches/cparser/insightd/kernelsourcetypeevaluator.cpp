@@ -11,7 +11,8 @@
 
 KernelSourceTypeEvaluator::KernelSourceTypeEvaluator(AbstractSyntaxTree* ast,
         SymFactory* factory)
-    : ASTTypeEvaluator(ast), _factory(factory)
+    : ASTTypeEvaluator(ast, factory->memSpecs().sizeofUnsignedLong),
+      _factory(factory)
 {
 }
 
@@ -26,8 +27,8 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNo
         const QStringList& ctxMembers, const ASTNode* targetNode,
         const ASTType* targetType)
 {
-    ASTTypeEvaluator::primaryExpressionTypeChange(
-            srcNode, symbol, ctxType, ctxNode, ctxMembers, targetNode, targetType);
+//    ASTTypeEvaluator::primaryExpressionTypeChange(
+//            srcNode, symbol, ctxType, ctxNode, ctxMembers, targetNode, targetType);
 
     // TODO implement me
 }

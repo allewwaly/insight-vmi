@@ -276,6 +276,14 @@ public:
 	 */
 	QString typesByHashStats() const;
 
+	/**
+	 * @return the memory specifications of the symbols
+	 */
+	const MemSpecs& memSpecs() const
+	{
+	    return _memSpecs;
+	}
+
 protected:
 	/**
 	 * Creates or retrieves a BaseType based on the information provided in

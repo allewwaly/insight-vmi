@@ -54,6 +54,7 @@ private:
     QDir _srcDir;
     QString _currentFile;
     int _filesDone;
+    int _lastFileNameLen;
 };
 
 #endif /* KERNELSOURCEPARSER_H_ */

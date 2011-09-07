@@ -278,6 +278,7 @@ private:
     int cmdShowBaseType(const BaseType* t);
     int cmdShowVariable(const Variable* v);
     int cmdSymbols(QStringList args);
+    int cmdSymbolsSource(QStringList args);
     int cmdSymbolsParse(QStringList args);
     int cmdSymbolsLoad(QStringList args);
     int cmdSymbolsStore(QStringList args);
