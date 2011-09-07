@@ -2102,37 +2102,29 @@ ASTType* ASTTypeEvaluator::preprendPointers(pASTNode d_ad, ASTType* type)
     // If the type is FuncPointer and there was no pointer to be skipped at its
     // definition (e.g., as in "typedef void (foo)()"), than we have yet to skip
     // the first pointer
-    else if (type && type->type() == rtFuncPointer &&
-            type->next() && !type->next()->pointerSkipped())
+    else if (type && type->type() == rtFuncPointer && !type->pointerSkipped())
     {
         skipFirst = true;
     }
 
     // Add one pointer type node for every asterisk in the declaration
-    int count = 0;
     while (ptr) {
     	// For function pointers, the first asterisk is ignored, because GCC
     	// treats "void (foo)()" and "void (*foo)()" equally.
-    	if (skipFirst)
+    	if (skipFirst) {
     		skipFirst = false;
-    	else
-    		type = createASTType(ptrType, ptr, type);
-
-    	// Set the pointerSkipped flag in any case
-    	if (type) {
-            if (count == 0 && !type->pointerSkipped()) {
-                // We must not change the original type information, so copy it
-                // before any modification
-                type = copyDeep(type);
-                // Also set the flag for the return type of the function
-                if (type->next())
-                    type->next()->setPointerSkipped(true);
-            }
+            // We must not change the original type information, so copy it
+            // before any modification
+            type = copyDeep(type);
             type->setPointerSkipped(true);
+    	}
+    	else {
+    		type = createASTType(ptrType, ptr, type);
+    		if (ptrType == rtFuncPointer)
+    		    type->setPointerSkipped(true);
     	}
 
         ptr = ptr->u.pointer.pointer;
-        ++count;
     }
     return type;
 }

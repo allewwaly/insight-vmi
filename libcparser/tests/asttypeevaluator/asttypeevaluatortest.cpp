@@ -10,6 +10,7 @@
 #include <abstractsyntaxtree.h>
 #include <astbuilder.h>
 #include <debug.h>
+#include <genericexception.h>
 #include <QtTest>
 #include <iostream>
 
@@ -134,6 +135,7 @@ void ASTTypeEvaluatorTest::allTests_data()
 	QTest::addColumn<QString>("ctxType");
 	QTest::addColumn<QString>("ctxMembers");
 	QTest::addColumn<QString>("targetType");
+	QTest::addColumn<QString>("exceptionMsg");
 
 	// Very basic type equality and changes
 	QTest::newRow("basicInitiEqual") << "" << "void* q; void *p = q;" << false;
@@ -303,6 +305,169 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "p" << "Pointer->Void" << "" << "Pointer->Struct(module)";
     QTest::newRow("returnDifferentValue") << "struct module* foo(long i) { return i; }" << "" << true
         << "i" << "Int32" << "" << "Pointer->Struct(module)";
+
+    // Function definitions
+    QTest::newRow("funcPtr1") << "int foo() { return 0; }" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr2") << "int* foo() { return 0; }" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr3") << "int** foo() { return 0; }" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+
+    // Function declarations
+    QTest::newRow("funcPtr4") << "int foo();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr5") << "int* foo();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr6") << "int** foo();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+
+    // Function pointers
+    QTest::newRow("funcPtr7") << "int   (  foo)();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr8") << "int*  (  foo)();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr9") << "int** (  foo)();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr10") << "int   (* foo)();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr11") << "int*  (* foo)();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr12") << "int** (* foo)();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr13") << "int   (**foo)();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr14") << "int*  (**foo)();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr15") << "int** (**foo)();" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+
+    // Function pointer typedefs
+    QTest::newRow("funcPtr16") << "typedef int   (  foodef)(); foodef foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr17") << "typedef int*  (  foodef)(); foodef foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr18") << "typedef int** (  foodef)(); foodef foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr19") << "typedef int   (* foodef)(); foodef foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr20") << "typedef int*  (* foodef)(); foodef foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr21") << "typedef int** (* foodef)(); foodef foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr22") << "typedef int   (**foodef)(); foodef foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr23") << "typedef int*  (**foodef)(); foodef foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr24") << "typedef int** (**foodef)(); foodef foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+
+    // Function pointer parameters
+    QTest::newRow("funcPtr25") << "void func(int   (  foo)()) { void* p = foo; }" << "" << true
+        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr26") << "void func(int*  (  foo)()) { void* p = foo; }" << "" << true
+        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr27") << "void func(int** (  foo)()) { void* p = foo; }" << "" << true
+        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr28") << "void func(int   (* foo)()) { void* p = foo; }" << "" << true
+        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr29") << "void func(int*  (* foo)()) { void* p = foo; }" << "" << true
+        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr30") << "void func(int** (* foo)()) { void* p = foo; }" << "" << true
+        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr31") << "void func(int   (**foo)()) { void* p = foo; }" << "" << true
+        << "foo" << "FuncPointer->FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr32") << "void func(int*  (**foo)()) { void* p = foo; }" << "" << true
+        << "foo" << "FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr33") << "void func(int** (**foo)()) { void* p = foo; }" << "" << true
+        << "foo" << "FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+
+    // Function pointer invocations
+    QTest::newRow("funcPtr34") << "int   (  foo)();" << "void* p = foo();" << true
+        << "foo" << "Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr35") << "int*  (  foo)();" << "void* p = foo();" << true
+        << "foo" << "Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr36") << "int** (  foo)();" << "void* p = foo();" << true
+        << "foo" << "Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr37") << "int   (* foo)();" << "void* p = foo();" << true
+        << "foo" << "Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr38") << "int*  (* foo)();" << "void* p = foo();" << true
+        << "foo" << "Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr39") << "int** (* foo)();" << "void* p = foo();" << true
+        << "foo" << "Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr40") << "int   (**foo)();" << "void* p = foo();" << true
+        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr41") << "int*  (**foo)();" << "void* p = foo();" << true
+        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr42") << "int** (**foo)();" << "void* p = foo();" << true
+        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+
+    // Pointers of function pointer typedefs
+    QTest::newRow("funcPtr43") << "typedef int   (  foodef)(); foodef *foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr44") << "typedef int*  (  foodef)(); foodef *foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr45") << "typedef int** (  foodef)(); foodef *foo;" << "void* p = foo;" << true
+        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr46") << "typedef int   (* foodef)(); foodef *foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr47") << "typedef int*  (* foodef)(); foodef *foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr48") << "typedef int** (* foodef)(); foodef *foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr49") << "typedef int   (**foodef)(); foodef *foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->FuncPointer->FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr50") << "typedef int*  (**foodef)(); foodef *foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr51") << "typedef int** (**foodef)(); foodef *foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+
+    QTest::newRow("funcPtr52") << "typedef int   (  foodef)(); foodef **foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr53") << "typedef int*  (  foodef)(); foodef **foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr54") << "typedef int** (  foodef)(); foodef **foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr55") << "typedef int   (* foodef)(); foodef **foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->Pointer->FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr56") << "typedef int*  (* foodef)(); foodef **foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->Pointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr57") << "typedef int** (* foodef)(); foodef **foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr58") << "typedef int   (**foodef)(); foodef **foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->Pointer->FuncPointer->FuncPointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr59") << "typedef int*  (**foodef)(); foodef **foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->Pointer->FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr60") << "typedef int** (**foodef)(); foodef **foo;" << "void* p = foo;" << true
+        << "foo" << "Pointer->Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+
+    // Invocation of pointers of function pointer typedefs
+    QTest::newRow("funcPtr61") << "typedef int   (  foodef)(); foodef *foo;" << "void* p = foo();" << true
+        << "foo" << "Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr62") << "typedef int*  (  foodef)(); foodef *foo;" << "void* p = foo();" << true
+        << "foo" << "Pointer->Int32" << "" << "Pointer->Void";
+    QTest::newRow("funcPtr63") << "typedef int** (  foodef)(); foodef *foo;" << "void* p = foo();" << true
+        << "foo" << "Pointer->Pointer->Int32" << "" << "Pointer->Void";
+
+    // Illegal invocation of pointers of function pointer typedefs
+    QTest::newRow("funcPtr64") << "typedef int   (* foodef)(); foodef *foo;" << "void* p = foo();" << true
+        << "" << "" << "" << ""
+        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->Int32\" at :25:17";
+    QTest::newRow("funcPtr65") << "typedef int*  (* foodef)(); foodef *foo;" << "void* p = foo();" << true
+        << "" << "" << "" << ""
+        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->Pointer->Int32\" at :25:17";
+    QTest::newRow("funcPtr66") << "typedef int** (* foodef)(); foodef *foo;" << "void* p = foo();" << true
+        << "" << "" << "" << ""
+        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17";
+    QTest::newRow("funcPtr67") << "typedef int   (**foodef)(); foodef *foo;" << "void* p = foo();" << true
+        << "" << "" << "" << ""
+        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Int32\" at :25:17";
+    QTest::newRow("funcPtr68") << "typedef int*  (**foodef)(); foodef *foo;" << "void* p = foo();" << true
+        << "" << "" << "" << ""
+        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Pointer->Int32\" at :25:17";
+    QTest::newRow("funcPtr69") << "typedef int** (**foodef)(); foodef *foo;" << "void* p = foo();" << true
+        << "" << "" << "" << ""
+        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17";
 }
 
 
@@ -336,6 +501,18 @@ void ASTTypeEvaluatorTest::allTests()
             QTEST(_tester->ctxMembers, "ctxMembers");
             QTEST(_tester->targetType, "targetType");
         }
+	}
+	catch (GenericException& e) {
+	    QFETCH(QString, exceptionMsg);
+	    // Re-throw unexpected exceptions
+	    if (exceptionMsg.isEmpty()) {
+	        std::cerr << "Caught exception at " << qPrintable(e.file) << ":"
+	                << e.line << ": " << qPrintable(e.message) << std::endl;
+	        throw;
+	    }
+	    else {
+	        QCOMPARE(e.message, exceptionMsg);
+	    }
 	}
 	catch (...) {
 	    cleanup();
