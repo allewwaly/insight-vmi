@@ -85,7 +85,7 @@ bool BaseType::operator==(const BaseType& other) const
     return
         type() == other.type() &&
         size() == other.size() &&
-        srcLine() == other.srcLine() &&
+        (srcLine() < 0 || other.srcLine() < 0 || srcLine() == other.srcLine()) &&
         name() == other.name();
 }
 

@@ -2455,7 +2455,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
     }
 
     // Embedding struct in whose context we see the type change
-    ASTType* ctxType = typeofNode(node);
+    ASTType *ctxType = typeofNode(node), *srcType = typeofNode(pe);
     // Member chain of embedding struct in whose context we see the type change
     QStringList ctxMembers;
     // True as long as we see member.sub.subsub expressions
@@ -2589,14 +2589,16 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
 
     ASTSymbol sym = findSymbolOfPrimaryExpression(node);
 
-    primaryExpressionTypeChange(node, sym, ctxType, ctxNode, ctxMembers, lNode, lType);
+    primaryExpressionTypeChange(node, srcType, sym, ctxType, ctxNode,
+                                ctxMembers, lNode, lType);
 
     return erTypesAreDifferent;
 }
 
 
 void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
-    		const ASTSymbol& symbol, const ASTType* ctxType, const ASTNode* ctxNode,
+            const ASTType* srcType, const ASTSymbol& srcSymbol,
+            const ASTType* ctxType, const ASTNode* ctxNode,
     		const QStringList& ctxMembers, const ASTNode* targetNode,
     		const ASTType* targetType)
 {
@@ -2604,8 +2606,8 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
 	checkNodeType(srcNode, nt_primary_expression);
 	checkNodeType(srcNode->parent, nt_postfix_expression);
 
-    QString symScope = symbol.astNode()->scope->parent() ? "local" : "global";
-    QStringList symType = symbol.typeToString().split(' ');
+    QString symScope = srcSymbol.astNode()->scope->parent() ? "local" : "global";
+    QStringList symType = srcSymbol.typeToString().split(' ');
     if (symType.last().startsWith('('))
     	symType.pop_back();
 
@@ -2615,7 +2617,10 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
 
     std::cout << "Line " << srcNode->start->line << ": "
             << ctxType->toString()
-            << (ctxMembers.isEmpty() ? QString() : "." + ctxMembers.join("."))
+            << (ctxMembers.isEmpty() ?
+                    QString() :
+                    "." + ctxMembers.join(".") + " of type " +
+                        srcType->toString())
             << " is used as " << targetType->toString()
             << " via " << symScope  << " " << symType.join(" ") << " "
             << "\"" << var << "\""

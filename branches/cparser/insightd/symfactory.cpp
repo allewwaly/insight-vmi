@@ -724,6 +724,84 @@ void SymFactory::addSymbol(BaseType* type)
 }
 
 
+BaseType* SymFactory::getNumericInstance(RealType type)
+{
+    if (! (type & ((~rtEnum) & IntegerTypes)) ) {
+        factoryError("Expected a numeric type, but given type is " +
+                     realTypeToStr(type));
+    }
+
+    TypeInfo info;
+    info.setSymType(hsBaseType);
+
+    // Type size
+    switch (type) {
+    case rtBool8:
+    case rtInt8:
+    case rtUInt8:
+        info.setByteSize(1);
+        break;
+
+    case rtBool16:
+    case rtInt16:
+    case rtUInt16:
+        info.setByteSize(2);
+        break;
+
+    case rtBool32:
+    case rtInt32:
+    case rtUInt32:
+    case rtFloat:
+        info.setByteSize(4);
+        break;
+
+    case rtBool64:
+    case rtInt64:
+    case rtUInt64:
+    case rtDouble:
+        info.setByteSize(8);
+        break;
+
+    default:
+        break;
+    }
+
+    // Encoding
+    switch (type) {
+    case rtBool8:
+    case rtBool16:
+    case rtBool32:
+    case rtBool64:
+        info.setEnc(eBoolean);
+        break;
+
+    case rtInt8:
+    case rtInt16:
+    case rtInt32:
+    case rtInt64:
+        info.setEnc(eSigned);
+        break;
+
+    case rtUInt8:
+    case rtUInt16:
+    case rtUInt32:
+    case rtUInt64:
+        info.setEnc(eUnsigned);
+        break;
+
+    case rtFloat:
+    case rtDouble:
+        info.setEnc(eFloat);
+        break;
+
+    default:
+        break;
+    }
+
+    return getNumericInstance(info);
+}
+
+
 bool SymFactory::resolveReference(ReferencingType* ref)
 {
     assert(ref != 0);
