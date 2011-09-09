@@ -86,8 +86,9 @@ protected:
      * This function is called during the execution of evaluateTypes() each
      * time a noticeable type change is detected. Override this function in
      * descendant classes to handle these type changes.
-     * @param node the nt_primary_expression node of the source type
-     * @param symbol the symbol corresponding to the primary expression of the
+     * @param srcNode the nt_primary_expression node of the source type
+     * @param srcType the type of the nt_primary_expression node
+     * @param srcSymbol the symbol corresponding to the primary expression of the
      * source type
      * @param ctxType the context type where the source type originates from
      * @param ctxNode the last nt_postfix_expression_XXX suffix node that
@@ -98,9 +99,10 @@ protected:
      * @param targetType the type that the source type is changed to
      */
     virtual void primaryExpressionTypeChange(const ASTNode* srcNode,
-    		const ASTSymbol& symbol, const ASTType* ctxType, const ASTNode* ctxNode,
-    		const QStringList& ctxMembers, const ASTNode* targetNode,
-    		const ASTType* targetType);
+            const ASTType* srcType, const ASTSymbol& srcSymbol,
+            const ASTType* ctxType, const ASTNode* ctxNode,
+            const QStringList& ctxMembers, const ASTNode* targetNode,
+            const ASTType* targetType);
 
 private:
     ASTType* copyASTType(const ASTType* src);

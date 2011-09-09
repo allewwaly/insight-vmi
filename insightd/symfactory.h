@@ -201,6 +201,13 @@ public:
     void addSymbol(BaseType* type);
 
     /**
+     * Retrieves an instance of a numeric type
+     * @param type the type to retrieve, must be a numeric type
+     * @return an instance of the requested type, if it exists, 0 otherwise
+     */
+    BaseType* getNumericInstance(RealType type);
+
+    /**
      * @return the list of all types owned by this factory
      */
 	inline const BaseTypeList& types() const
