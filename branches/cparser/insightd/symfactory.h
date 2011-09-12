@@ -90,6 +90,17 @@ typedef QMultiHash<int, ReferencingType*> RefTypeMultiHash;
 /// Has table to find equivalent types based on a per-type hash function
 typedef QMultiHash<const BaseType*, BaseType*> BaseTypeMultiHash;
 
+/// Hash table to find all RefBaseType's that use a particular type
+typedef QMultiHash<int, RefBaseType*> RefBaseTypeMultiHash;
+
+/// Hash table to find all Variable's that use a particular type
+typedef QMultiHash<int, Variable*> VarMultiHash;
+
+/// Hash table to find all StructuredMember's that use a particular type
+typedef QMultiHash<int, StructuredMember*> StructMemberMultiHash;
+
+
+
 // /// This function is required to use pointer to BaseType as a key in a QHash
 // uint qHash(const BaseType* key);
 
@@ -486,6 +497,11 @@ private:
     void relocateHashEntry(const T_key& old_key, const T_key& new_key,
             T_val* value, QMultiHash<T_key, T_val*>* hash);
 
+    void insertUsedBy(ReferencingType* ref);
+    void insertUsedBy(RefBaseType* rbt);
+    void insertUsedBy(Variable* var);
+    void insertUsedBy(StructuredMember* m);
+
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
 	VariableStringHash _varsByName;   ///< Holds all Variable objects, indexed by name
@@ -496,6 +512,9 @@ private:
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
+	RefBaseTypeMultiHash _usedByRefTypes;///< Holds all RefBaseType objects that hold a reference to another type
+	VarMultiHash _usedByVars;         ///< Holds all Variable objects that hold a reference to another type
+	StructMemberMultiHash _usedByStructMembers;///< Holds all StructuredMember objects that hold a reference to another type
 	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
 
 	int _typeFoundByHash;

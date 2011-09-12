@@ -76,6 +76,9 @@ void SymFactory::clear()
 	_typesByName.clear();
 	_typesByHash.clear();
 	_postponedTypes.clear();
+	_usedByRefTypes.clear();
+	_usedByVars.clear();
+	_usedByStructMembers.clear();
 
 	// Reset other vars
 	_typeFoundByHash = 0;
@@ -509,9 +512,16 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
 	assert(_typesById.contains(new_id) == false);
 	_typesById.insert(new_id, target);
 
-    // Only add this type into the name relation table if it is new
-	if (isNewType(new_id, target) && !new_name.isEmpty())
-	    _typesByName.insert(new_name, target);
+    // Perform certain actions for new types
+    if (isNewType(new_id, target)) {
+        // Add this type into the name relation table
+        if (!new_name.isEmpty())
+            _typesByName.insert(new_name, target);
+        // Add referencing types into the used-by hash tables
+        RefBaseType* rbt = dynamic_cast<RefBaseType*>(target);
+        if (rbt)
+            insertUsedBy(rbt);
+    }
 
 	// See if we have types with missing references to the given type
 	if (_postponedTypes.contains(new_id)) {
@@ -820,7 +830,19 @@ bool SymFactory::resolveReference(ReferencingType* ref)
         return false;
     }
     else {
+        RefBaseType* rbt = 0;
+        Variable* var = 0;
+        StructuredMember* s = 0;
+
         ref->setRefType(base);
+        // Add type into the used-by hash tables
+        if ( (rbt = dynamic_cast<RefBaseType*>(ref)) )
+            _usedByRefTypes.insertMulti(ref->refTypeId(), rbt);
+        else if ( (var = dynamic_cast<Variable*>(ref)) )
+            _usedByVars.insertMulti(ref->refTypeId(), var);
+        else if ( (s = dynamic_cast<StructuredMember*>(ref)) )
+            _usedByStructMembers.insertMulti(ref->refTypeId(), s);
+
         return true;
     }
 }
@@ -906,6 +928,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     nextPtr->setRefTypeId(parent->id());
     nextPtr->setRefType(parent);
     nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
+    _usedByRefTypes.insertMulti(nextPtr->refTypeId(), nextPtr);
     // To dereference this pointer, the member's offset has to be subtracted
     nextPtr->setMacroExtraOffset(extraOffset);
 
@@ -915,6 +938,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     next->setOffset(0);
     next->setRefTypeId(nextPtr->id());
     next->setRefType(nextPtr);
+    _usedByStructMembers.insertMulti(next->refTypeId(), next);
     ret->addMember(next);
 
     // Create "prev" pointer from the next pointer
@@ -928,6 +952,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     pprevPtr->setRefTypeId(prevPtr->id());
     pprevPtr->setRefType(prevPtr);
     pprevPtr->setSize(_memSpecs.sizeofUnsignedLong);
+    _usedByRefTypes.insertMulti(pprevPtr->refTypeId(), pprevPtr);
 
     StructuredMember* pprev = new StructuredMember(); // deleted by ~Structured()
     pprev->setId(0);
@@ -935,6 +960,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     pprev->setOffset(_memSpecs.sizeofUnsignedLong);
     pprev->setRefTypeId(pprevPtr->id());
     pprev->setRefType(pprevPtr);
+    _usedByStructMembers.insertMulti(pprev->refTypeId(), pprev);
     ret->addMember(pprev);
 
     return ret;
@@ -958,6 +984,7 @@ bool SymFactory::resolveReference(StructuredMember* member)
         Struct* list_head = makeStructListHead(member);
         member->setRefType(list_head);
         member->setRefTypeId(list_head->id());
+        _usedByStructMembers.insertMulti(member->refTypeId(), member);
         _structListHeadCount++;
         return true;
     }
@@ -965,6 +992,7 @@ bool SymFactory::resolveReference(StructuredMember* member)
         Struct* hlist_node = makeStructHListNode(member);
         member->setRefType(hlist_node);
         member->setRefTypeId(hlist_node->id());
+        _usedByStructMembers.insertMulti(member->refTypeId(), member);
         _structHListNodeCount++;
         return true;
     }
@@ -1131,3 +1159,44 @@ QString SymFactory::typesByHashStats() const
 
     return ret;
 }
+
+
+void SymFactory::insertUsedBy(ReferencingType* ref)
+{
+    if (!ref) return;
+
+    RefBaseType* rbt = 0;
+    Variable* var = 0;
+    StructuredMember* m = 0;
+
+    // Add type into the used-by hash tables
+    if ( (rbt = dynamic_cast<RefBaseType*>(ref)) )
+        insertUsedBy(rbt);
+    else if ( (var = dynamic_cast<Variable*>(ref)) )
+        insertUsedBy(var);
+    else if ( (m = dynamic_cast<StructuredMember*>(ref)) )
+        insertUsedBy(m);
+}
+
+
+void SymFactory::insertUsedBy(RefBaseType* rbt)
+{
+    if (!rbt) return;
+    _usedByRefTypes.insertMulti(rbt->refTypeId(), rbt);
+}
+
+
+void SymFactory::insertUsedBy(Variable* var)
+{
+    if (!var) return;
+    _usedByVars.insertMulti(var->refTypeId(), var);
+}
+
+
+void SymFactory::insertUsedBy(StructuredMember* m)
+{
+    if (!m) return;
+    _usedByStructMembers.insertMulti(m->refTypeId(), m);
+}
+
+

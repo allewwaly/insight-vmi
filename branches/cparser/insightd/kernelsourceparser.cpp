@@ -22,7 +22,7 @@
 #define sourceParserError(x) do { throw SourceParserException((x), __FILE__, __LINE__); } while (0)
 
 /**
- * Exception class for I/O operations
+ * Exception class for KernelSourceParser operations
  */
 class SourceParserException: public GenericException
 {
