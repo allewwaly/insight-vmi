@@ -22,6 +22,9 @@
 #include "shell.h"
 #include "debug.h"
 #include <string.h>
+#include <asttypeevaluator.h>
+#include <astnode.h>
+#include <astscopemanager.h>
 
 #define factoryError(x) do { throw FactoryException((x), __FILE__, __LINE__); } while (0)
 
@@ -508,6 +511,9 @@ void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 
 void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, BaseType* target)
 {
+    if (new_id < 0)
+        return;
+
     // Insert new ID/type relation into lookup tables
 	assert(_typesById.contains(new_id) == false);
 	_typesById.insert(new_id, target);
@@ -830,19 +836,8 @@ bool SymFactory::resolveReference(ReferencingType* ref)
         return false;
     }
     else {
-        RefBaseType* rbt = 0;
-        Variable* var = 0;
-        StructuredMember* s = 0;
-
         ref->setRefType(base);
-        // Add type into the used-by hash tables
-        if ( (rbt = dynamic_cast<RefBaseType*>(ref)) )
-            _usedByRefTypes.insertMulti(ref->refTypeId(), rbt);
-        else if ( (var = dynamic_cast<Variable*>(ref)) )
-            _usedByVars.insertMulti(ref->refTypeId(), var);
-        else if ( (s = dynamic_cast<StructuredMember*>(ref)) )
-            _usedByStructMembers.insertMulti(ref->refTypeId(), s);
-
+        insertUsedBy(ref);
         return true;
     }
 }
@@ -928,7 +923,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     nextPtr->setRefTypeId(parent->id());
     nextPtr->setRefType(parent);
     nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
-    _usedByRefTypes.insertMulti(nextPtr->refTypeId(), nextPtr);
+    insertUsedBy(nextPtr);
     // To dereference this pointer, the member's offset has to be subtracted
     nextPtr->setMacroExtraOffset(extraOffset);
 
@@ -938,7 +933,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     next->setOffset(0);
     next->setRefTypeId(nextPtr->id());
     next->setRefType(nextPtr);
-    _usedByStructMembers.insertMulti(next->refTypeId(), next);
+    insertUsedBy(next);
     ret->addMember(next);
 
     // Create "prev" pointer from the next pointer
@@ -952,7 +947,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     pprevPtr->setRefTypeId(prevPtr->id());
     pprevPtr->setRefType(prevPtr);
     pprevPtr->setSize(_memSpecs.sizeofUnsignedLong);
-    _usedByRefTypes.insertMulti(pprevPtr->refTypeId(), pprevPtr);
+    insertUsedBy(pprevPtr);
 
     StructuredMember* pprev = new StructuredMember(); // deleted by ~Structured()
     pprev->setId(0);
@@ -960,7 +955,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     pprev->setOffset(_memSpecs.sizeofUnsignedLong);
     pprev->setRefTypeId(pprevPtr->id());
     pprev->setRefType(pprevPtr);
-    _usedByStructMembers.insertMulti(pprev->refTypeId(), pprev);
+    insertUsedBy(pprev);
     ret->addMember(pprev);
 
     return ret;
@@ -984,7 +979,7 @@ bool SymFactory::resolveReference(StructuredMember* member)
         Struct* list_head = makeStructListHead(member);
         member->setRefType(list_head);
         member->setRefTypeId(list_head->id());
-        _usedByStructMembers.insertMulti(member->refTypeId(), member);
+        insertUsedBy(member);
         _structListHeadCount++;
         return true;
     }
@@ -992,7 +987,7 @@ bool SymFactory::resolveReference(StructuredMember* member)
         Struct* hlist_node = makeStructHListNode(member);
         member->setRefType(hlist_node);
         member->setRefTypeId(hlist_node->id());
-        _usedByStructMembers.insertMulti(member->refTypeId(), member);
+        insertUsedBy(member);
         _structHListNodeCount++;
         return true;
     }
@@ -1182,21 +1177,200 @@ void SymFactory::insertUsedBy(ReferencingType* ref)
 void SymFactory::insertUsedBy(RefBaseType* rbt)
 {
     if (!rbt) return;
-    _usedByRefTypes.insertMulti(rbt->refTypeId(), rbt);
+    _usedByRefTypes.insertMulti(rbt->origRefTypeId(), rbt);
 }
 
 
 void SymFactory::insertUsedBy(Variable* var)
 {
     if (!var) return;
-    _usedByVars.insertMulti(var->refTypeId(), var);
+    _usedByVars.insertMulti(var->origRefTypeId(), var);
 }
 
 
 void SymFactory::insertUsedBy(StructuredMember* m)
 {
     if (!m) return;
-    _usedByStructMembers.insertMulti(m->refTypeId(), m);
+    _usedByStructMembers.insertMulti(m->origRefTypeId(), m);
 }
+
+
+AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
+{
+    // Find the first non-pointer ASTType
+    const ASTType* astTypeNonPtr = astType;
+    while (astTypeNonPtr && (astTypeNonPtr->type() & (rtPointer|rtArray)))
+        astTypeNonPtr = astTypeNonPtr->next();
+
+    if (!astTypeNonPtr)
+        factoryError("The context type has no type besides pointers.");
+
+    QList<BaseType*> baseTypes;
+
+    // Is the context type a struct or union?
+    if (astTypeNonPtr->type() & (rtStruct|rtUnion|rtEnum)) {
+        if (astTypeNonPtr->identifier().isEmpty()) {
+            debugmsg("The context type has no identifier.");
+        }
+        else {
+            baseTypes = _typesByName.values(astTypeNonPtr->identifier());
+        }
+    }
+    // Is the source a numeric type?
+    else if (astTypeNonPtr->type() & (~rtEnum & NumericTypes)) {
+        baseTypes += getNumericInstance(astTypeNonPtr->type());
+    }
+    else {
+        factoryError(
+                    QString("We do not consider astTypeNonPtr->type() == %1")
+                        .arg(realTypeToStr(astTypeNonPtr->type())));
+    }
+
+    return AstBaseTypeList(astTypeNonPtr, baseTypes);
+}
+
+
+void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
+                                      const ASTType* ctxType,
+                                      const QStringList& ctxMembers,
+                                      const ASTType* targetType)
+{
+    // Find the target base types
+    AstBaseTypeList targetTypeRet = findBaseTypesForAstType(targetType);
+    const ASTType* targetTypeNonPtr = targetTypeRet.first;
+    BaseTypeList targetBaseTypes = targetTypeRet.second;
+
+    // Create a list of pointer/array types preceeding targetTypeNonPtr
+    QList<const ASTType*> targetPointers;
+    for (const ASTType* t = targetType; t != targetTypeNonPtr; t = t->next())
+        targetPointers.append(t);
+
+    // Now go through the targetBaseTypes and find its usages as pointers or
+    // arrays as in targetType
+    BaseTypeList candidates;
+    for (int i = 0; i < targetBaseTypes.size(); ++i) {
+        candidates += targetBaseTypes[i];
+        // Try to match all pointer/array usages
+        for (int j = targetPointers.size() - 1; j >= 0; --j) {
+            BaseTypeList nextCandidates;
+            // Try it on all candidates
+            for (int k = 0; k < candidates.size(); ++k) {
+                // Get all types that use the current candidate
+                QList<RefBaseType*> typesUsingSrc =
+                        _usedByRefTypes.values(candidates[k]->id());
+
+                // Next candidates are all that use the type in the way
+                // defined by targetPointers[j]
+                for (int l = 0; l < typesUsingSrc.size(); ++l) {
+                    if (typesUsingSrc[l]->type() == targetPointers[j]->type())
+                        nextCandidates.append(typesUsingSrc[l]);
+                }
+            }
+
+            candidates = nextCandidates;
+        }
+    }
+
+    if (candidates.isEmpty())
+        factoryError("Could not find target BaseType.");
+
+    // Just use the first
+    BaseType* targetBaseType = candidates.first();
+
+    switch (srcSymbol.type()) {
+    case stVariableDecl:
+    case stVariableDef:
+        // Only change global variables
+        if (!srcSymbol.astNode()->scope->parent())
+            typeAlternateUsageVar(ctxType, srcSymbol, targetBaseType);
+        break;
+
+    case stStructMember:
+        typeAlternateUsageStructMember(ctxType, ctxMembers, targetBaseType);
+        break;
+
+    default:
+        factoryError("Symbol " + srcSymbol.name() + " is of type " +
+                     srcSymbol.typeToString());
+    }
+}
+
+
+void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
+												const QStringList& ctxMembers,
+												BaseType* targetBaseType)
+{
+    // Find context base types
+    AstBaseTypeList ctxTypeRet = findBaseTypesForAstType(ctxType);
+    BaseTypeList ctxBaseTypes = ctxTypeRet.second;
+
+    int membersFound = 0;
+    StructuredMember* member = 0;
+
+    for (int i = 0; i < ctxBaseTypes.size(); ++i) {
+        BaseType* t = ctxBaseTypes[i];
+
+        // Find the correct member of the struct or union
+        for (int j = 0; j < ctxMembers.size(); ++j) {
+            Structured* s = dynamic_cast<Structured*>(t);
+            if ( s && (member = s->findMember(ctxMembers[j])) ) {
+                t = member->refType();
+            }
+            else {
+                member = 0;
+                break;
+            }
+        }
+
+        // If we have a member here, it is the one whose reference is to be replaced
+        if (member) {
+            ++membersFound;
+            // Was the member already manipulated?
+            if (member->refTypeId() != member->origRefTypeId()) {
+                // Do we have conflicting target types?
+                if (member->refTypeId() != targetBaseType->id())
+                    factoryError(QString("Conflicting target types: 0x%1 vs. 0x%2")
+                                 .arg(member->refTypeId(), 0, 16)
+                                 .arg(targetBaseType->id(), 0, 16));
+                // No conflicts, just ignore it
+            }
+            else {
+                // Apply new type
+                /// @todo may need to adjust member->memberOffset() somehow
+                member->setRefType(targetBaseType);
+                member->setRefTypeId(targetBaseType->id());
+            }
+        }
+    }
+
+    if (!membersFound)
+        factoryError("Did not find any members to adjust!");
+}
+
+
+void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
+                                       const ASTSymbol& srcSymbol,
+                                       BaseType* targetBaseType)
+{
+    VariableList vars = _varsByName.values(srcSymbol.name());
+    int varsFound = 0;
+
+    // Find the variable(s) using the targetBaseType
+    for (int i = 0; i < vars.size(); ++i) {
+        Variable* v = vars[i];
+        if (v->refType() && v->refType()->hash() == targetBaseType->hash()) {
+            ++varsFound;
+            v->setRefType(targetBaseType);
+            v->setRefTypeId(targetBaseType->id());
+        }
+    }
+
+    if (!varsFound)
+        factoryError("Did not find any variables to adjust!");
+}
+
+
+
+
 
 

@@ -14,11 +14,14 @@
 #include <QMultiHash>
 #include <exception>
 
+// forward declaration
+class KernelSymbolReader;
 class BaseType;
 class Structured;
 class ReferencingType;
 class CompileUnit;
 class Variable;
+class ASTType;
 
 #include "numeric.h"
 #include "typeinfo.h"
@@ -26,9 +29,8 @@ class Variable;
 #include "structured.h"
 #include "memspecs.h"
 #include "pointer.h"
+#include <astsymbol.h>
 
-// forward declaration
-class KernelSymbolReader;
 
 /**
   Basic exception class for all factory-related exceptions
@@ -99,6 +101,7 @@ typedef QMultiHash<int, Variable*> VarMultiHash;
 /// Hash table to find all StructuredMember's that use a particular type
 typedef QMultiHash<int, StructuredMember*> StructMemberMultiHash;
 
+typedef QPair<const ASTType*, BaseTypeList> AstBaseTypeList;
 
 
 // /// This function is required to use pointer to BaseType as a key in a QHash
@@ -302,7 +305,21 @@ public:
 	    return _memSpecs;
 	}
 
+	void typeAlternateUsage(const ASTSymbol& srcSymbol,
+							const ASTType* ctxType,
+							const QStringList& ctxMembers,
+							const ASTType* targetType);
+
 protected:
+	void typeAlternateUsageStructMember(const ASTType* ctxType,
+										const QStringList& ctxMembers,
+										BaseType* targetBaseType);
+
+	void typeAlternateUsageVar(const ASTType* ctxType,
+							   const ASTSymbol& srcSymbol,
+							   BaseType* targetBaseType);
+
+
 	/**
 	 * Creates or retrieves a BaseType based on the information provided in
 	 * \a info and returns it. If that type has already been created, it is
@@ -501,6 +518,8 @@ private:
     void insertUsedBy(RefBaseType* rbt);
     void insertUsedBy(Variable* var);
     void insertUsedBy(StructuredMember* m);
+    AstBaseTypeList findBaseTypesForAstType(const ASTType* astType);
+
 
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
