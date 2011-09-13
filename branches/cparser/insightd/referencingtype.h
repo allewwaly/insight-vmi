@@ -33,10 +33,16 @@ public:
     virtual ~ReferencingType();
 
     /**
-     * Getter for the directly referenced type
+     * Getter for the directly referenced type, const version
      * @return the type this referencing type directly points to
      */
     const BaseType* refType() const;
+
+    /**
+     * Getter for the directly referenced type
+     * @return the type this referencing type directly points to
+     */
+    BaseType* refType();
 
     /**
      * Follows all referencing types' references until a non-referencing
@@ -51,7 +57,7 @@ public:
      * Set the base type this pointer points to
      * @param type new pointed type
      */
-    void setRefType(const BaseType* type);
+    void setRefType(BaseType* type);
 
     /**
      * @return ID of the type this object is referencing
@@ -63,6 +69,14 @@ public:
      * @param id new ID
      */
     void setRefTypeId(int id);
+
+    /**
+     * When the refTypeId() of this object gets initially set, this ID will be
+     * saved as origRefTypeId() so that further type adjustments can be
+     * detected.
+     * @return ID of the type this object was originally referencing
+     */
+    int origRefTypeId() const;
 
     /**
      * Reads a serialized version of this object from \a in.
@@ -112,8 +126,9 @@ protected:
             const QString& name, int id, int resolveTypes,
             int* derefCount = 0) const;
 
-	const BaseType *_refType;  ///< holds the type this object is referencing
-    int _refTypeId;            ///< holds ID of the type this object is referencing
+    BaseType *_refType;        ///< holds the type this object is referencing
+    int _refTypeId;            ///< holds ID of the type this object is referencing    
+    int _origRefTypeId;        ///< holds ID of the type this object was originally referencing
 
 private:
     /**
@@ -143,11 +158,17 @@ inline const BaseType* ReferencingType::refType() const
 }
 
 
-inline void ReferencingType::setRefType(const BaseType* type)
+inline BaseType* ReferencingType::refType()
+{
+    return _refType;
+}
+
+
+inline void ReferencingType::setRefType(BaseType* type)
 {
     _refType = type;
     if (_refType && _refTypeId < 0)
-        _refTypeId = _refType->id();
+        setRefTypeId(_refType->id());
 }
 
 
@@ -157,8 +178,16 @@ inline int ReferencingType::refTypeId() const
 }
 
 
+inline int ReferencingType::origRefTypeId() const
+{
+    return _origRefTypeId;
+}
+
+
 inline void ReferencingType::setRefTypeId(int id)
 {
+    if (_origRefTypeId < 0)
+        _origRefTypeId = _refTypeId;
     _refTypeId = id;
 }
 
