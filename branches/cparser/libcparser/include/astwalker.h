@@ -35,6 +35,8 @@ protected:
     int walkTree(pASTNode node, int flags = 0);
 
     virtual void beforeChildren(pASTNode node, int flags);
+    virtual void beforeChild(pASTNode node, pASTNode childNode);
+    virtual void afterChild(pASTNode node, pASTNode childNode);
     virtual void afterChildren(pASTNode node, int flags);
 
     AbstractSyntaxTree* _ast;
@@ -42,7 +44,9 @@ protected:
 };
 
 
-inline void ASTWalker::beforeChildren(pASTNode /*node*/, int /*flags*/) {};
-inline void ASTWalker::afterChildren(pASTNode /*node*/, int /*flags*/) {};
+inline void ASTWalker::beforeChildren(pASTNode /*node*/, int /*flags*/) {}
+inline void ASTWalker::beforeChild(pASTNode /*node*/, pASTNode /*childNode*/) {}
+inline void ASTWalker::afterChild(pASTNode /*node*/, pASTNode /*childNode*/) {}
+inline void ASTWalker::afterChildren(pASTNode /*node*/, int /*flags*/) {}
 
 #endif /* ASTWALKER_H_ */
