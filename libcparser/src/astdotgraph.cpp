@@ -871,6 +871,7 @@ int ASTDotGraph::writeDotGraph(pASTNode node, const QString& fileName)
                 .arg(getNodeId(child))
             << endl;
 
+        _stopWalking = false;
         visits += walkTree(node);
     }
 
