@@ -64,7 +64,7 @@ inline void ASTSourcePrinter::newlineIndent()
 {
     _out += "\n";
     for (int i = 0; i < _indent; ++i)
-        _out += "\t";
+        _out += "    ";
 }
 
 
@@ -79,23 +79,25 @@ void ASTSourcePrinter::beforeChildren(pASTNode node, int flags)
     case nt_abstract_declarator_suffix_parens:
         _out += "(";
         break;
-//    case nt_assembler_parameter:
-//        if (node->u.assembler_parameter.alias) {
-//            _out += " [";
-//            _out += tokenToString(node->u.assembler_parameter.alias);
-//            _out += "]";
-//        }
-//        if (node->u.assembler_parameter.constraint_list)
-//            _out += " " +tokenListToString(node->u.assembler_parameter.constraint_list, " ");
-//        _out += " (";
-//        break;
-//    case nt_assembler_statement:
-//        _out += "asm";
-//        if (node->u.assembler_statement.type_qualifier_list)
-//            _out += " " + tokenListToString(node->u.assembler_statement.type_qualifier_list, " ");
-//        _out += " (";
-//        _out += tokenListToString(node->u.assembler_statement.instructions, " ");
-//        break;
+    case nt_assembler_parameter:
+        if ((flags & wfIsList) && !(flags & wfFirstInList))
+            _out += ", ";
+        if (node->u.assembler_parameter.alias) {
+            _out += " [";
+            _out += tokenToString(node->u.assembler_parameter.alias);
+            _out += "] ";
+        }
+        if (node->u.assembler_parameter.constraint_list)
+            _out += tokenListToString(node->u.assembler_parameter.constraint_list, " ") + " ";
+        _out += "(";
+        break;
+    case nt_assembler_statement:
+        _out += "asm ";
+        if (node->u.assembler_statement.type_qualifier_list)
+            _out += " " + tokenListToString(node->u.assembler_statement.type_qualifier_list, " ") + " ";
+        _out += " (";
+        _out += tokenListToString(node->u.assembler_statement.instructions, " ");
+        break;
     case nt_assignment_expression:
         if ((flags & wfIsList) && !(flags & wfFirstInList))
             _out += ", ";
@@ -124,7 +126,7 @@ void ASTSourcePrinter::beforeChildren(pASTNode node, int flags)
         _out += "__builtin_offsetof(";
         break;
     case nt_builtin_function_prefetch:
-        _out += "__builtin_prefetch("
+        _out += "__builtin_prefetch(";
         break;
     case nt_builtin_function_return_address:
         _out += "__builtin_return_address(";
@@ -187,9 +189,9 @@ void ASTSourcePrinter::beforeChildren(pASTNode node, int flags)
         _out += tokenToString(node->u.direct_declarator.identifier);
         break;
     case nt_enum_specifier:
-        _out += "enum ";
+        _out += "enum";
         if (node->u.enum_specifier.identifier)
-            _out += tokenToString(node->u.enum_specifier.identifier) + " ";
+            _out += " " + tokenToString(node->u.enum_specifier.identifier);
         break;
     case nt_enumerator:
         if ((flags & wfIsList) && !(flags & wfFirstInList)) {
@@ -202,8 +204,14 @@ void ASTSourcePrinter::beforeChildren(pASTNode node, int flags)
         if ((flags & wfIsList) && !(flags & wfFirstInList))
             _out += ", ";
         break;
+    case nt_initializer:
+        if ((flags & wfIsList) && !(flags & wfFirstInList)) {
+            _out += ",";
+            newlineIndent();
+        }
+        break;
     case nt_iteration_statement_do:
-        _out += "do ";
+        _out += "do";
         break;
     case nt_iteration_statement_for:
         _out += "for (";
@@ -211,20 +219,20 @@ void ASTSourcePrinter::beforeChildren(pASTNode node, int flags)
     case nt_iteration_statement_while:
         _out += "while (";
         break;
-//    case nt_jump_statement_break:
-//        _out += "break";  /*, nodeId*/
-//        _out += ";";  /*, nodeId*/
-//        break;
-//    case nt_jump_statement_continue:
-//        _out += "continue";  /*, nodeId*/
-//        _out += ";";  /*, nodeId*/
-//        break;
-//    case nt_jump_statement_goto:
-//        _out += "goto";  /*, nodeId*/
-//        break;
-//    case nt_jump_statement_return:
-//        _out += "return";  /*, nodeId*/
-//        break;
+    case nt_jump_statement_break:
+        _out += "break;";
+        newlineIndent();
+        break;
+    case nt_jump_statement_continue:
+        _out += "continue;";
+        newlineIndent();
+        break;
+    case nt_jump_statement_goto:
+        _out += "goto ";
+        break;
+    case nt_jump_statement_return:
+        _out += "return";
+        break;
     case nt_labeled_statement:
         _out += tokenToString(node->u.labeled_statement.identifier);
         _out += ":";
@@ -242,9 +250,9 @@ void ASTSourcePrinter::beforeChildren(pASTNode node, int flags)
             _out += ", ";
         break;
     case nt_pointer:
-        _out += " *";
+        _out += "*";
         if (node->u.pointer.type_qualifier_list)
-            _out += tokenListToString(node->u.pointer.type_qualifier_list, " ") + " ";
+            _out += " " + tokenListToString(node->u.pointer.type_qualifier_list, " ");
         break;
     case nt_postfix_expression_brackets:
         _out += "[";
@@ -282,7 +290,7 @@ void ASTSourcePrinter::beforeChildren(pASTNode node, int flags)
         break;
     case nt_storage_class_specifier:
         if ((flags & wfIsList) && !(flags & wfFirstInList))
-            _out += ", ";
+            _out += " ";
         _out += tokenToString(node->u.storage_class_specifier.token);
         break;
     case nt_struct_declarator:
@@ -290,10 +298,10 @@ void ASTSourcePrinter::beforeChildren(pASTNode node, int flags)
             _out += ", ";
         break;
     case nt_struct_or_union_struct:
-        _out += "struct ";
+        _out += "struct";
         break;
     case nt_struct_or_union_union:
-        _out += "union ";
+        _out += "union";
         break;
     case nt_type_id:
         _out += tokenToString(node->u.type_id.identifier);
@@ -304,44 +312,49 @@ void ASTSourcePrinter::beforeChildren(pASTNode node, int flags)
         _out += tokenToString(node->u.type_qualifier.token);
         break;
     case nt_type_specifier:
-        if (node->u.type_specifier.builtin_type_list)
-            _out += tokenListToString(node->u.type_specifier.builtin_type_list, " ") + " ";
-        else if ((flags & wfIsList) && !(flags & wfFirstInList))
+        if ((flags & wfIsList) && !(flags & wfFirstInList))
             _out += " ";
+        if (node->u.type_specifier.builtin_type_list)
+            _out += tokenListToString(node->u.type_specifier.builtin_type_list, " ");
         break;
     case nt_typeof_specification:
         _out += "typeof(";
         break;
-    case nt_unary_expression_inc:
-        _out += "++";
-        break;
     case nt_unary_expression_dec:
         _out += "--";
         break;
+    case nt_unary_expression_inc:
+        _out += "++";
+        break;
+    case nt_unary_expression_op:
+        _out += tokenToString(node->u.unary_expression.unary_operator);
     default:
         break;
-
     }
 }
 
 
 void ASTSourcePrinter::beforeChild(pASTNode node, pASTNode childNode)
 {
-    // Do we have a terminal token?
     switch (node->type) {
     case nt_abstract_declarator:
         if (childNode->type == nt_direct_abstract_declarator &&
             node->u.abstract_declarator.pointer)
             _out +=  " ";
+        break;
     case nt_additive_expression:
     case nt_and_expression:
         if (node->u.binary_expression.right == childNode)
             _out += " " + tokenToString(node->u.binary_expression.op) + " ";
         break;
+    case nt_assembler_statement:
+        if (childNode->type == nt_assembler_parameter)
+            _out += " : ";
+        break;
     case nt_assignment_expression:
         if (childNode->type == nt_assignment_expression ||
             childNode->type == nt_initializer)
-            _out += " " + tokenToString(node->parent->u.assignment_expression.assignment_operator) + " ";
+            _out += " " + tokenToString(node->u.assignment_expression.assignment_operator) + " ";
         break;
     case nt_builtin_function_choose_expr:
         if (childNode->type == nt_assignment_expression)
@@ -356,7 +369,7 @@ void ASTSourcePrinter::beforeChild(pASTNode node, pASTNode childNode)
             _out += ", ";
         break;
     case nt_builtin_function_types_compatible_p:
-        if (node-u.builtin_function_types_compatible_p.type_name2 == childNode)
+        if (node->u.builtin_function_types_compatible_p.type_name2 == childNode)
             _out += ", ";
         break;
     case nt_builtin_function_va_arg:
@@ -368,8 +381,6 @@ void ASTSourcePrinter::beforeChild(pASTNode node, pASTNode childNode)
         if (node->u.builtin_function_va_xxx.assignment_expression2 == childNode)
             _out += ", ";
         break;
-        break;
-
     case nt_cast_expression:
         if (childNode->type == nt_type_name)
             _out += "(";
@@ -392,7 +403,7 @@ void ASTSourcePrinter::beforeChild(pASTNode node, pASTNode childNode)
         break;
     case nt_enum_specifier:
         if (childNode->type == nt_enumerator) {
-            _out += "{";
+            _out += " {";
             newlineIncIndent();
         }
         break;
@@ -402,6 +413,15 @@ void ASTSourcePrinter::beforeChild(pASTNode node, pASTNode childNode)
         break;
     case nt_equality_expression:
     case nt_exclusive_or_expression:
+        if (node->u.binary_expression.right == childNode)
+            _out += " " + tokenToString(node->u.binary_expression.op) + " ";
+        break;
+    case nt_function_definition:
+        if (childNode->type == nt_declarator)
+            _out += " ";
+        else if (childNode->type == nt_compound_statement)
+            newlineIndent();
+        break;
     case nt_inclusive_or_expression:
         if (node->u.binary_expression.right == childNode)
             _out += " " + tokenToString(node->u.binary_expression.op) + " ";
@@ -411,24 +431,40 @@ void ASTSourcePrinter::beforeChild(pASTNode node, pASTNode childNode)
             _out += " = ";
         break;
     case nt_initializer:
-        if ((flags & wfIsList) && !(flags & wfFirstInList))
-            _out += ", ";
         if (childNode->type == nt_initializer) {
             _out += "{";
             newlineIncIndent();
         }
         break;
     case nt_iteration_statement_do:
-        if (node->u.iteration_statement.expression == childNode) {
-            _out += ");";
-            newlineIndent();
+        if (node->u.iteration_statement.statement == childNode) {
+            if (node->u.iteration_statement.statement->type == nt_compound_statement)
+                _out += " ";
+            else
+                newlineIncIndent();
+        }
+        else {
+            if (node->u.iteration_statement.statement->type == nt_compound_statement)
+                newlineIndent();
+            else
+                newlineDecIndent();
+            _out += "while (";
         }
         break;
     case nt_iteration_statement_for:
-        _out += "for (";
-        break;
     case nt_iteration_statement_while:
-        _out += "while (";
+        if (node->u.iteration_statement.statement == childNode) {
+            _out += ")";
+            if (childNode->type == nt_compound_statement)
+                _out += " ";
+            else
+                newlineIncIndent();
+        }
+        break;
+    case nt_jump_statement_return:
+        if (childNode->type == nt_initializer)
+            _out += " ";
+        break;
     case nt_logical_and_expression:
     case nt_logical_or_expression:
         if (node->u.binary_expression.right == childNode)
@@ -445,6 +481,11 @@ void ASTSourcePrinter::beforeChild(pASTNode node, pASTNode childNode)
     case nt_parameter_declaration:
         if (childNode->type == nt_declarator || childNode->type == nt_abstract_declarator)
             _out += " ";
+        break;
+    case nt_pointer:
+        if (childNode->type == nt_pointer)
+            _out += " ";
+        break;
     case nt_relational_expression:
     case nt_shift_expression:
         if (node->u.binary_expression.right == childNode)
@@ -455,10 +496,12 @@ void ASTSourcePrinter::beforeChild(pASTNode node, pASTNode childNode)
             _out += ")";
         if (childNode == node->u.selection_statement.statement_else)
             _out += "else";
-        if (childNode->type == nt_compound_statement)
-            _out += " ";
-        else
-            newlineIncIndent();
+        if (childNode->type != nt_assignment_expression) {
+            if (childNode->type == nt_compound_statement)
+                _out += " ";
+            else
+                newlineIncIndent();
+        }
         break;
     case nt_struct_declaration:
         if (childNode->type == nt_struct_declarator)
@@ -466,7 +509,7 @@ void ASTSourcePrinter::beforeChild(pASTNode node, pASTNode childNode)
         break;
     case nt_struct_declarator:
         if (childNode->type == nt_constant_expression)
-            _out += ": "
+            _out += ": ";
         break;
     case nt_type_name:
         if (childNode->type == nt_abstract_declarator)
@@ -502,14 +545,10 @@ void ASTSourcePrinter::afterChild(pASTNode node, pASTNode childNode)
     case nt_declarator:
         if (childNode->type == nt_pointer)
             _out += " ";
+        break;
     case nt_direct_abstract_declarator:
         if (childNode->type == nt_abstract_declarator)
             _out += ")";
-        break;
-    case nt_enumerator:
-        if (flags & wfFirstInList)
-            _out += "{";  /*, getNodeId(node->parent)*/
-        _out += tokenToString(node->u.enumerator.identifier /*, nodeId*/);
         break;
     case nt_enum_specifier:
         if (childNode->type == nt_enumerator) {
@@ -521,6 +560,21 @@ void ASTSourcePrinter::afterChild(pASTNode node, pASTNode childNode)
         if (childNode->type == nt_initializer) {
             newlineDecIndent();
             _out += "}";
+        }
+        break;
+    case nt_iteration_statement_do:
+        if (node->u.iteration_statement.statement != childNode) {
+            _out += ");";
+            newlineIndent();
+        }
+        break;
+    case nt_iteration_statement_for:
+    case nt_iteration_statement_while:
+        if (node->u.iteration_statement.statement == childNode) {
+            if (childNode->type != nt_compound_statement)
+                newlineDecIndent();
+            else
+                newlineIndent();
         }
         break;
     case nt_labeled_statement_case:
@@ -539,7 +593,8 @@ void ASTSourcePrinter::afterChild(pASTNode node, pASTNode childNode)
             _out += ") ";
         break;
     case nt_selection_statement_if:
-        if (childNode->type != nt_compound_statement)
+        if (childNode->type != nt_assignment_expression &&
+            childNode->type != nt_compound_statement)
             newlineDecIndent();
         break;
     case nt_selection_statement_switch:
@@ -549,9 +604,9 @@ void ASTSourcePrinter::afterChild(pASTNode node, pASTNode childNode)
     case nt_struct_or_union_specifier:
         if (childNode == node->u.struct_or_union_specifier.struct_or_union) {
             if (node->u.struct_or_union_specifier.identifier)
-                _out += tokenToString(node->u.struct_or_union_specifier.identifier) + " ";
+                _out += " " + tokenToString(node->u.struct_or_union_specifier.identifier);
             if (node->u.struct_or_union_specifier.isDefinition) {
-                _out += "{";
+                _out += " {";
                 newlineIncIndent();
             }
         }
@@ -561,6 +616,7 @@ void ASTSourcePrinter::afterChild(pASTNode node, pASTNode childNode)
 
     }
 }
+
 
 void ASTSourcePrinter::afterChildren(pASTNode node, int flags)
 {
@@ -575,15 +631,13 @@ void ASTSourcePrinter::afterChildren(pASTNode node, int flags)
     case nt_abstract_declarator_suffix_parens:
         _out += ")";
         break;
-//    case nt_assembler_parameter:
-//        _out += ")";  /*, nodeId*/
-//        if ((flags & wfIsList) && !(flags & wfLastInList))
-//            _out += ",";  /*, getNodeId(node->parent)*/
-//        break;
-//    case nt_assembler_statement:
-//        _out += ")";  /*, nodeId*/
-//        _out += ";";  /*, nodeId*/
-//        break;
+    case nt_assembler_parameter:
+        _out += ")";
+        break;
+    case nt_assembler_statement:
+        _out += ");";
+        newlineIndent();
+        break;
     case nt_builtin_function_alignof:
         if (node->u.builtin_function_sizeof.type_name)
             _out += ")";
@@ -636,33 +690,19 @@ void ASTSourcePrinter::afterChildren(pASTNode node, int flags)
         break;
     case nt_expression_statement:
         _out += ";";
+        if (node->parent && node->parent->type == nt_iteration_statement_for)
+            _out += " ";
+        else
+            newlineIndent();
+        break;
+    case nt_jump_statement_goto:
+    case nt_jump_statement_return:
+        _out += ";";
         newlineIndent();
         break;
-//    case nt_external_declaration:
-//        if (node->u.external_declaration.assembler_statement)
-//            _out += ";";  /*, nodeId*/
-//        break;
-//    case nt_init_declarator:
-//        if ((flags & wfIsList) && !(flags & wfLastInList))
-//            _out += ",";  /*, getNodeId(node->parent)*/
-//        break;
-//    case nt_initializer:
-//        if (node->u.initializer.initializer_list)
-//            _out += "}";  /*, nodeId*/
-//        if ((flags & wfIsList) && !(flags & wfLastInList))
-//            _out += ",";  /*, getNodeId(node->parent)*/
-//        break;
-//    case nt_iteration_statement_do:
-//        _out += ")";  /*, nodeId*/
-//        _out += ";";  /*, nodeId*/
-//        break;
-//    case nt_jump_statement_goto:
-//    case nt_jump_statement_return:
-//        _out += ";";  /*, nodeId*/
-//        break;
     case nt_labeled_statement_case:
     case nt_labeled_statement_default:
-        --_indent;
+        newlineDecIndent();
         break;
     case nt_parameter_type_list:
         if (node->u.parameter_type_list.openArgs)
@@ -687,6 +727,7 @@ void ASTSourcePrinter::afterChildren(pASTNode node, int flags)
             newlineDecIndent();
             _out += "}";
         }
+        break;
     case nt_typeof_specification:
         _out += ")";
         break;
@@ -709,6 +750,7 @@ QString ASTSourcePrinter::toString()
 
 QString ASTSourcePrinter::toString(pASTNode node)
 {
+    _stopWalking = false;
     _out.clear();
     _indent = 0;
     if (_ast && node)
