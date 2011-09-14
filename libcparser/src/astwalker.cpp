@@ -55,7 +55,9 @@ int ASTWalker::walkTree(pASTNode node, int flags)
 //				.arg(node->start->line)
 //				.arg(node->start->charPosition));
 
-    // Invoke the virtual handler function
+    // Invoke the virtual handler functions
+    if (node->parent && (!(flags & wfIsList) || (flags & wfFirstInList)))
+        beforeChild(node->parent, node);
     beforeChildren(node, flags);
 
     int visits = 1;
@@ -413,8 +415,10 @@ int ASTWalker::walkTree(pASTNode node, int flags)
     }
     }
 
-    // Invoke the virtual handler function
+    // Invoke the virtual handler functions
     afterChildren(node, flags);
+    if (node->parent && (!(flags & wfIsList) || (flags & wfLastInList)))
+        afterChild(node->parent, node);
 
     return visits;
 }
