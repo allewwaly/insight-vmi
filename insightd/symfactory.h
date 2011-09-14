@@ -77,6 +77,9 @@ typedef QMultiHash<QString, BaseType*> BaseTypeStringHash;
 /// Hash table for Variable pointers
 typedef QMultiHash<QString, Variable*> VariableStringHash;
 
+/// Hash table to find all equivalent types
+typedef QMultiHash<int, int> IntIntMultiHash;
+
 /// Hash table to find all types by ID
 typedef QHash<int, BaseType*> BaseTypeIntHash;
 
@@ -384,6 +387,14 @@ protected:
     bool isStructHListNode(const BaseType* type) const;
 
     /**
+     * Returns a list of all type IDs that are equivalent to the type with
+     * the given id.
+     * @param id the ID of the type to search equivalent types for
+     * @return a list of equivalent type IDs
+     */
+    QList<int> equivalentTypes(int id) const;
+
+    /**
      * This is an overloaded convenience function.
      * Updates the different relations that exist for the types (e.g. typesById).
      * During this progress postponed types will be updated as well.
@@ -529,6 +540,7 @@ private:
     BaseTypeList _customTypes;        ///< Holds all BaseType objects which were internally created
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
+	IntIntMultiHash _equivalentTypes; ///< Holds all type IDs of equivalent types
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
 	RefBaseTypeMultiHash _usedByRefTypes;///< Holds all RefBaseType objects that hold a reference to another type
