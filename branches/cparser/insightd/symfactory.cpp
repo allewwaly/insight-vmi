@@ -76,6 +76,7 @@ void SymFactory::clear()
 
 	// Clear all further hashes and lists
 	_typesById.clear();
+	_equivalentTypes.clear();
 	_typesByName.clear();
 	_typesByHash.clear();
 	_postponedTypes.clear();
@@ -503,6 +504,13 @@ void SymFactory::relocateHashEntry(const T_key& old_key, const T_key& new_key,
 }
 
 
+QList<int> SymFactory::equivalentTypes(int id) const
+{
+    const BaseType* t = findBaseTypeById(id);
+    return t ? _equivalentTypes.values(t->id()) : QList<int>();
+}
+
+
 void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 {
     updateTypeRelations(info.id(), info.name(), target);
@@ -517,6 +525,7 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
     // Insert new ID/type relation into lookup tables
 	assert(_typesById.contains(new_id) == false);
 	_typesById.insert(new_id, target);
+	_equivalentTypes.insertMulti(target->id(), new_id);
 
     // Perform certain actions for new types
     if (isNewType(new_id, target)) {
@@ -1176,21 +1185,24 @@ void SymFactory::insertUsedBy(ReferencingType* ref)
 
 void SymFactory::insertUsedBy(RefBaseType* rbt)
 {
-    if (!rbt) return;
+    if (!rbt || _usedByRefTypes.contains(rbt->origRefTypeId(), rbt))
+        return;
     _usedByRefTypes.insertMulti(rbt->origRefTypeId(), rbt);
 }
 
 
 void SymFactory::insertUsedBy(Variable* var)
 {
-    if (!var) return;
+    if (!var || _usedByVars.contains(var->origRefTypeId(), var))
+        return;
     _usedByVars.insertMulti(var->origRefTypeId(), var);
 }
 
 
 void SymFactory::insertUsedBy(StructuredMember* m)
 {
-    if (!m) return;
+    if (!m || _usedByStructMembers.contains(m->origRefTypeId(), m))
+        return;
     _usedByStructMembers.insertMulti(m->origRefTypeId(), m);
 }
 
@@ -1245,10 +1257,12 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
     for (const ASTType* t = targetType; t != targetTypeNonPtr; t = t->next())
         targetPointers.append(t);
 
+    BaseType* targetBaseType = 0;
+
     // Now go through the targetBaseTypes and find its usages as pointers or
-    // arrays as in targetType
-    BaseTypeList candidates;
+    // arrays as in targetType    
     for (int i = 0; i < targetBaseTypes.size(); ++i) {
+        BaseTypeList candidates;
         candidates += targetBaseTypes[i];
         // Try to match all pointer/array usages
         for (int j = targetPointers.size() - 1; j >= 0; --j) {
@@ -1256,8 +1270,10 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
             // Try it on all candidates
             for (int k = 0; k < candidates.size(); ++k) {
                 // Get all types that use the current candidate
-                QList<RefBaseType*> typesUsingSrc =
-                        _usedByRefTypes.values(candidates[k]->id());
+                QList<RefBaseType*> typesUsingSrc;
+                QList<int> equivTypeIds = equivalentTypes(candidates[k]->id());
+                for (int l = 0; l < equivTypeIds.size(); ++l)
+                    typesUsingSrc += _usedByRefTypes.values(equivTypeIds[l]);
 
                 // Next candidates are all that use the type in the way
                 // defined by targetPointers[j]
@@ -1269,13 +1285,17 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
 
             candidates = nextCandidates;
         }
+
+        // Did we find a candidate?
+        if (!candidates.isEmpty()) {
+            // Just use the first
+            targetBaseType = candidates.first();
+            break;
+        }
     }
 
-    if (candidates.isEmpty())
+    if (!targetBaseType)
         factoryError("Could not find target BaseType.");
-
-    // Just use the first
-    BaseType* targetBaseType = candidates.first();
 
     switch (srcSymbol.type()) {
     case stVariableDecl:
@@ -1345,6 +1365,8 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 
     if (!membersFound)
         factoryError("Did not find any members to adjust!");
+    else
+        debugmsg("Adjusted " << membersFound << " members.");
 }
 
 
@@ -1367,6 +1389,8 @@ void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
 
     if (!varsFound)
         factoryError("Did not find any variables to adjust!");
+    else
+        debugmsg("Adjusted " << varsFound << " variables.");
 }
 
 
