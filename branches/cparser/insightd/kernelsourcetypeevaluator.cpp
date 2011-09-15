@@ -33,7 +33,6 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         const ASTNode* ctxNode, const QStringList& ctxMembers,
         const ASTNode* targetNode, const ASTType* targetType)
 {
-    /// @todo implement me
     const ASTType* ctxTypeNonPtr = 0;
     QList<BaseType*> srcBaseTypes;
 
@@ -46,6 +45,8 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
 //                    targetNode, targetType);
         return;
     }
+
+    /// @todo Ignore casts from arrays to pointers of the same base type
 
     try {
         _factory->typeAlternateUsage(srcSymbol, ctxType, ctxMembers, targetType);
