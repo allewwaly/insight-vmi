@@ -508,7 +508,7 @@ void SymFactory::relocateHashEntry(const T_key& old_key, const T_key& new_key,
 QList<int> SymFactory::equivalentTypes(int id) const
 {
     const BaseType* t = findBaseTypeById(id);
-    return t ? _equivalentTypes.values(t->id()) : QList<int>();
+    return _equivalentTypes.values(t ? t->id() : id);
 }
 
 
@@ -517,9 +517,12 @@ QList<RefBaseType*> SymFactory::typesUsingId(int id) const
     QList<int> typeIds = equivalentTypes(id);
     QList<RefBaseType*> ret;
 
-    for (int i = 0; i < typeIds.size(); ++i)
-        ret += _usedByRefTypes.values(typeIds[i]);
-
+    if (typeIds.isEmpty())
+        ret = _usedByRefTypes.values(id);
+    else {
+        for (int i = 0; i < typeIds.size(); ++i)
+            ret += _usedByRefTypes.values(typeIds[i]);
+    }
     return ret;
 }
 
@@ -1249,6 +1252,10 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
     else if (astTypeNonPtr->type() & (~rtEnum & NumericTypes)) {
         baseTypes += getNumericInstance(astTypeNonPtr);
     }
+    // We don't have any type for "void", this is just null.
+    else if (astTypeNonPtr->type() == rtVoid) {
+        baseTypes += 0;
+    }
     else {
         factoryError(
                     QString("We do not consider astTypeNonPtr->type() == %1")
@@ -1286,9 +1293,10 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
             BaseTypeList nextCandidates;
             // Try it on all candidates
             for (int k = 0; k < candidates.size(); ++k) {
+                BaseType* candidate = candidates[k];
                 // Get all types that use the current candidate
                 QList<RefBaseType*> typesUsingSrc =
-                        typesUsingId(candidates[k]->id());
+                        typesUsingId(candidate ? candidate->id() : -1);
 
                 // Next candidates are all that use the type in the way
                 // defined by targetPointers[j]
@@ -1389,6 +1397,7 @@ void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
                                        const ASTSymbol& srcSymbol,
                                        BaseType* targetBaseType)
 {
+    Q_UNUSED(ctxType);
     VariableList vars = _varsByName.values(srcSymbol.name());
     int varsFound = 0;
 
