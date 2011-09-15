@@ -97,12 +97,14 @@ protected:
      * actual source type
      * @param targetNode the root node of the target type, may be null
      * @param targetType the type that the source type is changed to
+     * @param rootNode the root note embedding source and target, e.g., an
+     * nt_assignment_expression or an nt_init_declarator node.
      */
     virtual void primaryExpressionTypeChange(const ASTNode* srcNode,
             const ASTType* srcType, const ASTSymbol& srcSymbol,
             const ASTType* ctxType, const ASTNode* ctxNode,
             const QStringList& ctxMembers, const ASTNode* targetNode,
-            const ASTType* targetType);
+            const ASTType* targetType, const ASTNode* rootNode);
 
 private:
     ASTType* copyASTType(const ASTType* src);
@@ -144,7 +146,7 @@ private:
     ASTType* typeofUnaryExpressionOp(pASTNode node);
     ASTType* typeofCompoundBracesStatement(pASTNode node);
     ASTType* typeofBuiltinFunction(pASTNode node);
-    ASTType* typeofBuiltinType(const pASTTokenList list);
+    ASTType* typeofBuiltinType(const pASTTokenList list, pASTNode node);
     ASTType* typeofPrimaryExpression(pASTNode node);
     ASTType* typeofDirectDeclarator(pASTNode node);
     ASTType* typeofDeclarationSpecifier(pASTNode node);
