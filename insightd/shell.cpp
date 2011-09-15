@@ -71,7 +71,8 @@ enum ShellErrorCodes {
     ecInvalidIndex        = -5,
     ecNoMemoryDumpsLoaded = -6,
     ecInvalidArguments    = -7,
-    ecCaughtException     = -8
+    ecCaughtException     = -8,
+    ecInvalidId           = -9
 };
 
 
@@ -128,6 +129,7 @@ Shell::Shell(bool listenOnSocket)
                 "  list sources              List all source files\n"
                 "  list types [<glob>]       List all types, optionally filtered by a\n"
                 "                            wildcard expression <glob>\n"
+                "  list types-using <id>     List the types using type <id>\n"
                 "  list types-by-id          List the types-by-ID hash\n"
                 "  list types-by-name        List the types-by-name hash\n"
                 "  list variables [<glob>]   List all variables, optionally filtered by\n"
@@ -895,6 +897,9 @@ int Shell::cmdList(QStringList args)
         else if (s.length() <= 5 && QString("types").startsWith(s)) {
             return cmdListTypes(args);
         }
+        else if (s.length() >= 7 && QString("types-using").startsWith(s)) {
+            return cmdListTypesUsing(args);
+        }
         else if (s.length() > 9 && QString("types-by-id").startsWith(s)) {
             return cmdListTypesById(args);
         }
@@ -1036,6 +1041,89 @@ int Shell::cmdListTypes(QStringList args)
     }
     else if (applyFilter)
     	_out << "No types matching that name." << endl;
+
+    return ecOk;
+}
+
+
+bool cmpIdLessThan(const RefBaseType* t1, const RefBaseType* t2)
+{
+    return t1->id() < t2->id();
+}
+
+
+int Shell::cmdListTypesUsing(QStringList args)
+{
+    // Expect one parameter
+    if (args.size() != 1) {
+        cmdHelp(QStringList("list"));
+        return ecInvalidArguments;
+    }
+
+    QString s = args.front();
+    if (s.startsWith("0x"))
+        s = s.right(s.size() - 2);
+    bool ok = false;
+    int id = s.toInt(&ok, 16);
+
+    if (!ok) {
+        _err << "Invalid type ID given." << endl;
+        return ecInvalidId;
+    }
+
+    if (_sym.factory().equivalentTypes(id).isEmpty()) {
+        _err << "No type with id " << args.front() << " found." << endl;
+        return ecInvalidId;
+    }
+
+
+
+    QList<RefBaseType*> types = _sym.factory().typesUsingId(id);
+
+    if (types.isEmpty()) {
+        _out << "There are no types using type " << args.front() << "." << endl;
+        return ecOk;
+    }
+
+    qSort(types.begin(), types.end(), cmpIdLessThan);
+
+    // Find out required field width (the types are sorted by ascending ID)
+    const int w_id = getFieldWidth(types.last()->id());
+    const int w_refTypeId = w_id <= 7 ? 7 : w_id;
+    const int w_type = 12;
+    const int w_name = 24;
+    const int w_size = 5;
+    const int w_colsep = 2;
+    const int w_total = w_id + w_refTypeId + w_type + w_name + w_size + 3*w_colsep;
+
+    _out << qSetFieldWidth(w_id)  << right << "ID"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_refTypeId) << "RefType"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_type) << left << "Type"
+         << qSetFieldWidth(w_name) << "Name"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_size)  << right << "Size"
+         << qSetFieldWidth(0)  << endl;
+
+    hline(w_total);
+
+    for (int i = 0; i < types.size(); i++) {
+        RefBaseType* type = types[i];
+        _out << qSetFieldWidth(w_id)  << right << hex << type->id()
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_refTypeId) << type->refTypeId()
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
+             << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_size) << right << type->size() << qSetFieldWidth(0)
+             << qSetFieldWidth(0) << endl;
+    }
+
+    hline(w_total);
+    _out << "Total types using type " << args.front() << ": "
+         << dec << _sym.factory()._typesById.size() << endl;
 
     return ecOk;
 }

@@ -222,7 +222,7 @@ public:
      * @param type the type to retrieve, must be a numeric type
      * @return an instance of the requested type, if it exists, 0 otherwise
      */
-    BaseType* getNumericInstance(RealType type);
+    BaseType* getNumericInstance(const ASTType* astType);
 
     /**
      * @return the list of all types owned by this factory
@@ -308,6 +308,17 @@ public:
 	    return _memSpecs;
 	}
 
+    /**
+     * Returns a list of all type IDs that are equivalent to the type with
+     * the given id.
+     * @param id the ID of the type to search equivalent types for
+     * @return a list of equivalent type IDs
+     */
+    QList<int> equivalentTypes(int id) const;
+
+    QList<RefBaseType*> typesUsingId(int id) const;
+
+
 	void typeAlternateUsage(const ASTSymbol& srcSymbol,
 							const ASTType* ctxType,
 							const QStringList& ctxMembers,
@@ -385,14 +396,6 @@ protected:
      * otherwise
      */
     bool isStructHListNode(const BaseType* type) const;
-
-    /**
-     * Returns a list of all type IDs that are equivalent to the type with
-     * the given id.
-     * @param id the ID of the type to search equivalent types for
-     * @return a list of equivalent type IDs
-     */
-    QList<int> equivalentTypes(int id) const;
 
     /**
      * This is an overloaded convenience function.

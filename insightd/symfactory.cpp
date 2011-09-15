@@ -25,6 +25,7 @@
 #include <asttypeevaluator.h>
 #include <astnode.h>
 #include <astscopemanager.h>
+//#include <astsourceprinter.h>
 
 #define factoryError(x) do { throw FactoryException((x), __FILE__, __LINE__); } while (0)
 
@@ -511,6 +512,18 @@ QList<int> SymFactory::equivalentTypes(int id) const
 }
 
 
+QList<RefBaseType*> SymFactory::typesUsingId(int id) const
+{
+    QList<int> typeIds = equivalentTypes(id);
+    QList<RefBaseType*> ret;
+
+    for (int i = 0; i < typeIds.size(); ++i)
+        ret += _usedByRefTypes.values(typeIds[i]);
+
+    return ret;
+}
+
+
 void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 {
     updateTypeRelations(info.id(), info.name(), target);
@@ -749,18 +762,18 @@ void SymFactory::addSymbol(BaseType* type)
 }
 
 
-BaseType* SymFactory::getNumericInstance(RealType type)
+BaseType* SymFactory::getNumericInstance(const ASTType* astType)
 {
-    if (! (type & ((~rtEnum) & IntegerTypes)) ) {
+    if (! (astType->type() & ((~rtEnum) & IntegerTypes)) ) {
         factoryError("Expected a numeric type, but given type is " +
-                     realTypeToStr(type));
+                     realTypeToStr(astType->type()));
     }
 
     TypeInfo info;
     info.setSymType(hsBaseType);
 
     // Type size
-    switch (type) {
+    switch (astType->type()) {
     case rtBool8:
     case rtInt8:
     case rtUInt8:
@@ -792,7 +805,7 @@ BaseType* SymFactory::getNumericInstance(RealType type)
     }
 
     // Encoding
-    switch (type) {
+    switch (astType->type()) {
     case rtBool8:
     case rtBool16:
     case rtBool32:
@@ -822,6 +835,10 @@ BaseType* SymFactory::getNumericInstance(RealType type)
     default:
         break;
     }
+
+//    ASTSourcePrinter printer;
+//    QString s = printer.toString(astType->node());
+//    info.setName(s);
 
     return getNumericInstance(info);
 }
@@ -1230,7 +1247,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
     }
     // Is the source a numeric type?
     else if (astTypeNonPtr->type() & (~rtEnum & NumericTypes)) {
-        baseTypes += getNumericInstance(astTypeNonPtr->type());
+        baseTypes += getNumericInstance(astTypeNonPtr);
     }
     else {
         factoryError(
@@ -1270,10 +1287,8 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
             // Try it on all candidates
             for (int k = 0; k < candidates.size(); ++k) {
                 // Get all types that use the current candidate
-                QList<RefBaseType*> typesUsingSrc;
-                QList<int> equivTypeIds = equivalentTypes(candidates[k]->id());
-                for (int l = 0; l < equivTypeIds.size(); ++l)
-                    typesUsingSrc += _usedByRefTypes.values(equivTypeIds[l]);
+                QList<RefBaseType*> typesUsingSrc =
+                        typesUsingId(candidates[k]->id());
 
                 // Next candidates are all that use the type in the way
                 // defined by targetPointers[j]
