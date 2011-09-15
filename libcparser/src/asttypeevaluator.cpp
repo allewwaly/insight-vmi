@@ -647,7 +647,7 @@ ASTType* ASTTypeEvaluator::typeofNode(pASTNode node)
         else if (node->u.type_specifier.enum_specifier)
             _types[node] = typeofNode(node->u.type_specifier.enum_specifier);
         else if (node->u.type_specifier.builtin_type_list)
-            _types[node] = typeofBuiltinType (node->u.type_specifier.builtin_type_list);
+            _types[node] = typeofBuiltinType(node->u.type_specifier.builtin_type_list, node);
         else if (node->u.type_specifier.type_id)
             _types[node] = typeofNode(node->u.type_specifier.type_id);
         break;
@@ -1452,10 +1452,11 @@ ASTType* ASTTypeEvaluator::typeofSymbol(const ASTSymbol& sym)
 }
 
 
-ASTType* ASTTypeEvaluator::typeofBuiltinType(const pASTTokenList list)
+ASTType* ASTTypeEvaluator::typeofBuiltinType(const pASTTokenList list,
+											 pASTNode node)
 {
 	RealType type = evaluateBuiltinType(list);
-	return type ? createASTType(type) : 0;
+	return type ? createASTType(type, node) : 0;
 }
 
 
@@ -2345,8 +2346,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
 
         case nt_postfix_expression_brackets:
         case nt_postfix_expression_parens:
-            // Use as an array index, not interesting.
-            /// @todo Use as a function parameter might be interesting!
+            /// @todo Use as a function parameter in nt_postfix_expression_parens might be interesting!
             return erNoAssignmentUse;
 
         case nt_selection_statement_if:
@@ -2355,6 +2355,23 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
 
         case nt_typeof_specification:
             return erNoAssignmentUse;
+
+        // Unary logical expression
+        case nt_unary_expression_op:
+            // The negation operator results in a boolean expression
+            if ("!" == antlrTokenToStr(root->u.unary_expression.unary_operator))
+                return erNoAssignmentUse;
+            break;
+
+        // Binary logical expressions
+        case nt_equality_expression:
+        case nt_logical_and_expression:
+        case nt_logical_or_expression:
+        case nt_relational_expression:
+            // A binary expression with a right-hand side returns a boolean
+            if (root->u.binary_expression.right)
+                return erNoAssignmentUse;
+            break;
 
         default:
             break;
@@ -2634,7 +2651,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
     ASTSymbol sym = findSymbolOfPrimaryExpression(node);
 
     primaryExpressionTypeChange(node, srcType, sym, ctxType, ctxNode,
-                                ctxMembers, lNode, lType);
+                                ctxMembers, lNode, lType, root);
 
     return erTypesAreDifferent;
 }
@@ -2644,9 +2661,11 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
             const ASTType* srcType, const ASTSymbol& srcSymbol,
             const ASTType* ctxType, const ASTNode* ctxNode,
     		const QStringList& ctxMembers, const ASTNode* targetNode,
-    		const ASTType* targetType)
+            const ASTType* targetType, const ASTNode* rootNode)
 {
 	Q_UNUSED(targetNode);
+	Q_UNUSED(rootNode);
+
 	checkNodeType(srcNode, nt_primary_expression);
 	checkNodeType(srcNode->parent, nt_postfix_expression);
 
