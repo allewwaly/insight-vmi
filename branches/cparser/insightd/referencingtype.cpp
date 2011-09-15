@@ -49,7 +49,6 @@ const BaseType* ReferencingType::refTypeDeep(int resolveTypes) const
 void ReferencingType::readFrom(QDataStream& in)
 {
     _refType = 0;
-    in >> _refTypeId;
     in >> _refTypeId >> _origRefTypeId;
 }
 
