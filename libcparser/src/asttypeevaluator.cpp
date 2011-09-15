@@ -2388,6 +2388,10 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
     if (!root)
         return erNoAssignmentUse;
 
+    // Skip if source and target types are equal
+    if (lType->equalTo(typeofNode(node->parent)))
+        return erTypesAreEqual;
+
     // Find the chain of changing types up to ae on the right-hand
     TypeChain typeChain;
     assert(node->parent->type == nt_postfix_expression);
