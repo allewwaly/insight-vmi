@@ -46,14 +46,18 @@ bool ASTType::equalTo(const ASTType* other) const
 {
     const ASTType *a = this, *b = other;
     int ptrMask = rtPointer|rtArray;
+    int intTypes = IntegerTypes & ~rtEnum;
+    bool isPointer = false;
     while (a && b) {
-        // Consider an rtPointer and rtArray as well as all numeric types
-    	// to be equal
-        if (a->type() != b->type() && ((a->type()|b->type()) != ptrMask) &&
-        		(!((a->type() & IntegerTypes) && (b->type() & IntegerTypes))))
-            return false;
+        // Consider rtPointer and rtArray to be equal
+        if (a->type() != b->type() && ((a->type()|b->type()) != ptrMask)) {
+            // For non-pointer types, consider all integer types to be equal
+            if (isPointer || (!((a->type() & intTypes) && (b->type() & intTypes))))
+                return false;
+        }
         if (a->identifier() != b->identifier())
             return false;
+        isPointer = isPointer || ((a->type()|b->type()) & ptrMask);
         a = a->next();
         b = b->next();
     }
@@ -2339,6 +2343,12 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
             lNode = lType ? lType->node() : 0;
             goto while_exit;
 
+        case nt_postfix_expression_brackets:
+        case nt_postfix_expression_parens:
+            // Use as an array index, not interesting.
+            /// @todo Use as a function parameter might be interesting!
+            return erNoAssignmentUse;
+
         case nt_selection_statement_if:
         case nt_selection_statement_switch:
             return erNoAssignmentUse;
@@ -2373,7 +2383,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
         if (!t->equalTo(typeChain.last())) {
             // Is this an expected change of types?
             bool forced = true;
-            switch(p->type) {
+            switch(p->type) {                
             case nt_unary_expression_op:
                 // Pointer dereferencing?
                 if (antlrTokenToStr(p->u.unary_expression.unary_operator) == "*" &&
@@ -2404,13 +2414,47 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
     }
 
     // Skip if both sides have the same, single type
-    if ((forcedChanges == 0 && lType->equalTo(typeChain.last())) ||
+    if (forcedChanges == 0) {
+        if (lType->equalTo(typeChain.last()) ||
             lType->equalTo(typeChain.first()))
-    {
+        {
 //        debugmsg(QString("Line %1: Skipping because types are equal (%1:%2)")
 //                        .arg(node->start->line)
 //                        .arg(node->start->charPosition));
-        return erTypesAreEqual;
+            return erTypesAreEqual;
+        }
+        // Check for pointer arithmetics with += or -= operator
+        else if (root->type == nt_assignment_expression) {
+            QString op = antlrTokenToStr(
+                        root->u.assignment_expression.assignment_operator);
+
+            // Treat "+="/"-=" as lvalue = lvalue +/- assignment_expression
+            if (op != "=") {
+                ASTType *rType = typeofNode(
+                            root->u.assignment_expression.assignment_expression);
+                ASTType *resType =  (op == "+=" || op == "-=") ?
+                            typeofAdditiveExpression(lType, rType, op) :
+                            typeofIntegerExpression(lType, rType, op);
+
+                if (lType->equalTo(resType)) {
+//                    debugmsg(QString("Line %1: Skipping because types are equal (%1:%2)")
+//                             .arg(node->start->line)
+//                             .arg(node->start->charPosition));
+                    return erTypesAreEqual;
+                }
+                else {
+                    typeChain.append(resType);
+                    ++forcedChanges;
+//                    debugmsg(QString("Added type %1 (%2)")
+//                             .arg(lType->toString())
+//                             .arg(lNode ?
+//                                      QString("%1:%2")
+//                                      .arg(lNode->start->line)
+//                                      .arg(lNode->start->charPosition) :
+//                                      QString("builtin")));
+                }
+            }
+        }
     }
 
     // See if the right side involves pointers
@@ -2615,7 +2659,12 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
             antlrTokenToStr(srcNode->u.primary_expression.identifier) :
             postfixExpressionToStr(srcNode->parent, ctxNode);
 
-    std::cout << "Line " << srcNode->start->line << ": "
+    std::cout
+            << (_ast && !_ast->fileName().isEmpty() ?
+                    _ast->fileName() + ":%1:%2: " :
+                    QString("Line %1:%2: "))
+                .arg(srcNode->start->line)
+                .arg(srcNode->start->charPosition)
             << ctxType->toString()
             << (ctxMembers.isEmpty() ?
                     QString() :
