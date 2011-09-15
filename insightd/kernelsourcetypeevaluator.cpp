@@ -10,6 +10,7 @@
 #include <debug.h>
 #include <astnode.h>
 #include <astscopemanager.h>
+#include <astsourceprinter.h>
 
 #define typeEvaluatorError(x) do { throw SourceTypeEvaluatorException((x), __FILE__, __LINE__); } while (0)
 
@@ -52,6 +53,16 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         _factory->typeAlternateUsage(srcSymbol, ctxType, ctxMembers, targetType);
     }
     catch (FactoryException& e) {
+        // Print the source of the embedding external declaration
+        const ASTNode* n = srcNode;
+        while (n && n->parent) // && n->type != nt_external_declaration)
+            n = n->parent;
+        ASTSourcePrinter printer(_ast);
+        std::cout
+                << "------------------[Source]------------------" << std::endl
+                << printer.toString(const_cast<ASTNode*>(n), true)
+                << "------------------[/Source]-----------------" << std::endl;
+
         ASTTypeEvaluator::primaryExpressionTypeChange(
                     srcNode, srcType, srcSymbol, ctxType, ctxNode, ctxMembers,
                     targetNode, targetType);
