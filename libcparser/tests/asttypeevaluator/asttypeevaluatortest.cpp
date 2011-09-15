@@ -38,12 +38,17 @@ public:
 
 protected:
     virtual void primaryExpressionTypeChange(const ASTNode* srcNode,
-    		const ASTSymbol& symbol, const ASTType* ctxType, const ASTNode* ctxNode,
-    		const QStringList& ctxMembers, const ASTNode* targetNode,
-    		const ASTType* targetType)
+            const ASTType* srcType, const ASTSymbol& srcSymbol,
+            const ASTType* ctxType, const ASTNode* ctxNode,
+            const QStringList& ctxMembers, const ASTNode* targetNode,
+            const ASTType* targetType)
     {
+        Q_UNUSED(srcNode);
+        Q_UNUSED(srcType);
+        Q_UNUSED(ctxNode);
+        Q_UNUSED(targetNode);
     	this->typeChanged = true;
-    	this->symbolName = symbol.name();
+        this->symbolName = srcSymbol.name();
     	this->ctxType = ctxType->toString();
     	this->ctxMembers = ctxMembers.join(".");
     	this->targetType = targetType->toString();
@@ -137,18 +142,50 @@ void ASTTypeEvaluatorTest::allTests_data()
 	QTest::addColumn<QString>("targetType");
 	QTest::addColumn<QString>("exceptionMsg");
 
-	// Very basic type equality and changes
-	QTest::newRow("basicInitiEqual") << "" << "void* q; void *p = q;" << false;
-	QTest::newRow("basicAssignmentEqual") << "" << "void* q, *p; p = q;" << false;
+	// Very basic type equalities and changes
+	QTest::newRow("basicInitiEqual1") << "" << "void* q; void *p = q;" << false;
+	QTest::newRow("basicInitiEqual2") << "" << "int i; int j = i;" << false;
+	QTest::newRow("basicInitiEqual3") << "" << "int i; char j = i;" << false;
+	QTest::newRow("basicAssignmentEqual1") << "" << "void* q, *p; p = q;" << false;
+	QTest::newRow("basicAssignmentEqual2") << "" << "int i, j; i = j;" << false;
+	QTest::newRow("basicAssignmentEqual3") << "" << "int i; char j; i = j;" << false;
+	QTest::newRow("basicAssignmentEqual4") << "" << "int i; char j; j = i;" << false;
+	QTest::newRow("basicAssignmentEqual5") << "" << "int i; char j; i += j;" << false;
+	QTest::newRow("basicAssignmentEqual6") << "" << "int i; char j; i -= j;" << false;
+	QTest::newRow("basicAssignmentEqual7") << "" << "int i; char j; i *= j;" << false;
+	QTest::newRow("basicAssignmentEqual8") << "" << "int i; char j; i /= j;" << false;
+	QTest::newRow("basicAssignmentEqual9") << "" << "int i; char j; i %= j;" << false;
+	QTest::newRow("basicAssignmentEqual10") << "" << "int i; char j; i <<= j;" << false;
+	QTest::newRow("basicAssignmentEqual11") << "" << "int i; char j; i >>= j;" << false;
 	QTest::newRow("basicInitNoIdentifier") << "" << "void* q = (1+2)*3;" << false;
 	QTest::newRow("basicInitChange1") << "" << "int i; void *p = i;" << true
 		<< "i" << "Int32" << "" << "Pointer->Void";
 	QTest::newRow("basicInitChange2") << "" << "void *p; int i = p;" << true
 		<< "p" << "Pointer->Void" << "" << "Int32";
+	QTest::newRow("basicInitChange3") << "" << "int *i; char *j = i;" << true
+		<< "i" << "Pointer->Int32" << "" << "Pointer->Int8";
 	QTest::newRow("basicAssignmentChange1") << "" << "int i; void *p; p = i;" << true
 		<< "i" << "Int32" << "" << "Pointer->Void";
 	QTest::newRow("basicAssignmentChange2") << "" << "void *p; int i; i = p;" << true
 		<< "p" << "Pointer->Void" << "" << "Int32";
+	QTest::newRow("basicAssignmentChange3") << "" << "int *i; char *j; i = j;" << true
+		<< "j" << "Pointer->Int8" << "" << "Pointer->Int32";
+	QTest::newRow("basicAssignmentChange4") << "" << "int *i; char *j; j = i;" << true
+		<< "i" << "Pointer->Int32" << "" << "Pointer->Int8";
+	QTest::newRow("basicAssignmentPlusEqual") << "" << "int i; char* p; p += i;" << false;
+	QTest::newRow("basicAssignmentMinusEqual") << "" << "int i; char* p; p -= i;" << false;
+	QTest::newRow("basicAssignmentPlusEqualEx") << "" << "int *i; char* p; p += i;" << false
+		<< "" << "" << "" << ""
+		<< "Cannot determine resulting type of \"Pointer += Pointer\" at lines 23 and 23";
+	QTest::newRow("basicAssignmentMinusEqualEx") << "" << "int *i; char* p; p -= i;" << false
+		<< "" << "" << "" << ""
+		<< "Cannot determine resulting type of \"Pointer -= Pointer\" at lines 23 and 23";
+	QTest::newRow("basicAssignmentTimesEqualEx") << "" << "int *i; char* p; p *= i;" << false
+		<< "" << "" << "" << ""
+		<< "Cannot determine resulting type of \"Pointer *= Pointer\" at lines 23 and 23";
+	QTest::newRow("basicAssignmentShiftEqualEx") << "" << "int *i; char* p; p >>= i;" << false
+		<< "" << "" << "" << ""
+		<< "Cannot determine resulting type of \"Pointer >>= Pointer\" at lines 23 and 23";
 
 	// Various equality checks for list_head
     QTest::newRow("listHeadEqual1") << "" << "h = heads[0];" << false;
