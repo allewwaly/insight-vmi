@@ -50,8 +50,9 @@ uint BaseType::hash() const
         // Create a hash value based on name, size and type. Always do this,
         // don't cache the hash, because it might change for chained referencing
         // types unnoticed
-            _hash = type();
-        if (!_name.isEmpty())
+        _hash = type();
+        // Ignore the name for numeric types
+        if (!_name.isEmpty() && !(type() & (IntegerTypes & ~rtEnum)))
             _hash ^= qHash(_name);
         if (_size > 0)
             _hash ^= qHash(_size);
@@ -82,11 +83,16 @@ Instance BaseType::toInstance(size_t address, VirtualMemory* vmem,
 
 bool BaseType::operator==(const BaseType& other) const
 {
-    return
+    bool ret =
         type() == other.type() &&
-        size() == other.size() &&
-        (srcLine() < 0 || other.srcLine() < 0 || srcLine() == other.srcLine()) &&
-        name() == other.name();
+        size() == other.size();
+
+    if (ret && !(type() & (IntegerTypes & ~rtEnum))) {
+        ret = (srcLine() < 0 || other.srcLine() < 0 || srcLine() == other.srcLine()) &&
+                name() == other.name();
+    }
+
+    return ret;
 }
 
 
