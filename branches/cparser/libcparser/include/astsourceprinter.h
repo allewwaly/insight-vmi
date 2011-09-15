@@ -19,8 +19,8 @@ public:
     ASTSourcePrinter(AbstractSyntaxTree* ast = 0);
     virtual ~ASTSourcePrinter();
 
-    QString toString();
-    QString toString(pASTNode node);
+    QString toString(bool lineNo = false);
+    QString toString(pASTNode node, bool lineNo = false);
 
 protected:
     virtual void beforeChildren(pASTNode node, int flags);
@@ -29,14 +29,19 @@ protected:
     virtual void afterChildren(pASTNode node, int flags);
 
 private:
-    void newlineIndent();
+    QString lineIndent() const;
+    void newlineIndent(bool forceIfEmpty = false);
     void newlineIncIndent();
     void newlineDecIndent();
     QString tokenToString(pANTLR3_COMMON_TOKEN token);
     QString tokenListToString(pASTTokenList list, const QString& delim);
 
+    QString _line;
     QString _out;
     int _indent;
+    int _lineIndent;
+    pASTNode _currNode;
+    bool _prefixLineNo;
 };
 
 #endif /* ASTSOURCEPRINTER_H_ */
