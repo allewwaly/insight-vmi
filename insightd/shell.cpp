@@ -1071,18 +1071,20 @@ int Shell::cmdListTypesUsing(QStringList args)
         return ecInvalidId;
     }
 
-    if (_sym.factory().equivalentTypes(id).isEmpty()) {
-        _err << "No type with id " << args.front() << " found." << endl;
-        return ecInvalidId;
-    }
 
 
 
     QList<RefBaseType*> types = _sym.factory().typesUsingId(id);
 
     if (types.isEmpty()) {
-        _out << "There are no types using type " << args.front() << "." << endl;
-        return ecOk;
+        if (_sym.factory().equivalentTypes(id).isEmpty()) {
+            _err << "No type with id " << args.front() << " found." << endl;
+            return ecInvalidId;
+        }
+        else {
+            _out << "There are no types using type " << args.front() << "." << endl;
+            return ecOk;
+        }
     }
 
     qSort(types.begin(), types.end(), cmpIdLessThan);
