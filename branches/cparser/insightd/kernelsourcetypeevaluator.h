@@ -48,7 +48,7 @@ protected:
             const ASTType* srcType, const ASTSymbol& srcSymbol,
             const ASTType* ctxType, const ASTNode* ctxNode,
             const QStringList& ctxMembers, const ASTNode* targetNode,
-            const ASTType* targetType);
+            const ASTType* targetType, const ASTNode* rootNode);
 
 private:
     SymFactory* _factory;
