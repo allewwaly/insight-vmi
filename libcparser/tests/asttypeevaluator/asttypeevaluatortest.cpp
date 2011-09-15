@@ -41,12 +41,13 @@ protected:
             const ASTType* srcType, const ASTSymbol& srcSymbol,
             const ASTType* ctxType, const ASTNode* ctxNode,
             const QStringList& ctxMembers, const ASTNode* targetNode,
-            const ASTType* targetType)
+            const ASTType* targetType, const ASTNode* rootNode)
     {
         Q_UNUSED(srcNode);
         Q_UNUSED(srcType);
         Q_UNUSED(ctxNode);
         Q_UNUSED(targetNode);
+        Q_UNUSED(rootNode);
     	this->typeChanged = true;
         this->symbolName = srcSymbol.name();
     	this->ctxType = ctxType->toString();
@@ -505,6 +506,25 @@ void ASTTypeEvaluatorTest::allTests_data()
     QTest::newRow("funcPtr69") << "typedef int** (**foodef)(); foodef *foo;" << "void* p = foo();" << true
         << "" << "" << "" << ""
         << "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17";
+
+    // Usage in logical expressions
+    QTest::newRow("equalityExpr1") << "" << "char *p, *q; int i; i = p == q;" << false;
+    QTest::newRow("equalityExpr2") << "" << "char *p, *q; int i; i = p == i;" << false;
+    QTest::newRow("equalityExpr3") << "" << "char *p, *q; int i = p == q;" << false;
+    QTest::newRow("equalityExpr4") << "" << "char *p, *q; int i = p == i;" << false;
+    QTest::newRow("equalityExpr5") << "" << "char *p, *q; int i; i = p != q;" << false;
+    QTest::newRow("equalityExpr6") << "" << "char *p, *q; int i; i = p != i;" << false;
+    QTest::newRow("equalityExpr7") << "" << "char *p, *q; int i = p != q;" << false;
+    QTest::newRow("equalityExpr8") << "" << "char *p, *q; int i = p != i;" << false;
+
+    QTest::newRow("relationalExpr1") << "" << "char *p, *q; int i; i = p < q;" << false;
+    QTest::newRow("relationalExpr2") << "" << "char *p, *q; int i; i = p <= q;" << false;
+    QTest::newRow("relationalExpr3") << "" << "char *p, *q; int i; i = p > q;" << false;
+    QTest::newRow("relationalExpr4") << "" << "char *p, *q; int i; i = p >= q;" << false;
+
+    QTest::newRow("logicalAndExpr") << "" << "char *p, *q; int i; i = p && q;" << false;
+    QTest::newRow("logicalOrExpr") << "" << "char *p, *q; int i; i = p || q;" << false;
+    QTest::newRow("unaryNotExpr") << "" << "char *p; int i; i = !q;" << false;
 }
 
 
