@@ -41,7 +41,7 @@ QString KernelSourceTypeEvaluator::typeChangeInfo(
                    INDENT "Line %7")
             .arg(srcSymbol.name(), -30)
             .arg(srcSymbol.typeToString())
-            .arg(printer.toString(srcNode, false).trimmed() + ",", -30)
+            .arg(printer.toString(srcNode->parent, false).trimmed() + ",", -30)
             .arg(srcType->toString())
             .arg(printer.toString(targetNode, false).trimmed() + ",", -30)
             .arg(targetType->toString())
@@ -67,7 +67,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
     }
     // Ignore parameters of non-struct types as source
     if (srcSymbol.type() == stFunctionParam && ctxMembers.isEmpty()) {
-        debugmsg("Source is non-struct paramter:\n" +
+        debugmsg("Source is a paramter without struct member reference:\n" +
                  typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
                                 targetType, rootNode));
         return;
@@ -99,7 +99,8 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
                 << "------------------[/Source]-----------------" << std::endl;
 
         std::cout << typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
-                                    targetType, rootNode);
+                                    targetType, rootNode)
+                     << std::endl;
         throw e;
     }
 }
