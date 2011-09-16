@@ -147,6 +147,8 @@ void ASTTypeEvaluatorTest::allTests_data()
 	QTest::newRow("basicInitiEqual1") << "" << "void* q; void *p = q;" << false;
 	QTest::newRow("basicInitiEqual2") << "" << "int i; int j = i;" << false;
 	QTest::newRow("basicInitiEqual3") << "" << "int i; char j = i;" << false;
+	QTest::newRow("basicInitiEqual4") << "" << "int i; char* p; p = p + i;" << false;
+	QTest::newRow("basicInitiEqual5") << "" << "int i; char* p; p = p - i;" << false;
 	QTest::newRow("basicAssignmentEqual1") << "" << "void* q, *p; p = q;" << false;
 	QTest::newRow("basicAssignmentEqual2") << "" << "int i, j; i = j;" << false;
 	QTest::newRow("basicAssignmentEqual3") << "" << "int i; char j; i = j;" << false;

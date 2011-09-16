@@ -2235,15 +2235,7 @@ QString ASTTypeEvaluator::postfixExpressionToStr(const ASTNode* postfix_exp,
     return var;
 }
 
-//struct TypeBool
-//{
-//    TypeBool() : type(0), forced(false) {}
-//    TypeBool(ASTType* type, bool forced) : type(type), forced(forced) {}
-//    ASTType* type;
-//    bool forced;
-//};
-//
-//typedef QList<TypeBool> TypeChain;
+
 typedef QList<ASTType*> TypeChain;
 
 
@@ -2405,6 +2397,17 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
             // Is this an expected change of types?
             bool forced = true;
             switch(p->type) {                
+            case nt_additive_expression:
+                // Type changes through additive expressions are never forced.
+                forced = false;
+                break;
+
+            case nt_postfix_expression:
+                // Member access or array operator?
+                if (p->u.postfix_expression.postfix_expression_suffix_list)
+                    forced = false;
+                break;
+
             case nt_unary_expression_op:
                 // Pointer dereferencing?
                 if (antlrTokenToStr(p->u.unary_expression.unary_operator) == "*" &&
@@ -2415,12 +2418,6 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
                 if (antlrTokenToStr(p->u.unary_expression.unary_operator) == "&" &&
                         (t->type() & rtPointer) &&
                         typeChain.last()->equalTo(t->next()))
-                    forced = false;
-                break;
-
-            case nt_postfix_expression:
-                // Member access or array operator?
-                if (p->u.postfix_expression.postfix_expression_suffix_list)
                     forced = false;
                 break;
 
