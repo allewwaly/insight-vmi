@@ -7,6 +7,8 @@
 
 #include <astsymboltypes.h>
 #include <astsymbol.h>
+#include <astnode.h>
+#include <astscopemanager.h>
 
 ASTSymbol::ASTSymbol()
 	: _type(stNull), _astNode(0)
@@ -20,28 +22,12 @@ ASTSymbol::ASTSymbol(const QString& name, ASTSymbolType type, struct ASTNode* as
 }
 
 
-bool ASTSymbol::isNull() const
+bool ASTSymbol::isLocal() const
 {
-	return _type == stNull;
+	// built-in types lack an ASTNode and are considered to be global
+	return _astNode && _astNode->scope->parent() != 0;
 }
 
-
-ASTSymbolType ASTSymbol::type() const
-{
-	return _type;
-}
-
-
-struct ASTNode* ASTSymbol::astNode() const
-{
-	return _astNode;
-}
-
-
-const QString& ASTSymbol::name() const
-{
-	return _name;
-}
 
 
 QString ASTSymbol::typeToString() const
