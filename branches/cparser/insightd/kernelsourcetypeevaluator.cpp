@@ -11,6 +11,7 @@
 #include <astnode.h>
 #include <astscopemanager.h>
 #include <astsourceprinter.h>
+#include <shell.h>
 
 #define typeEvaluatorError(x) do { throw SourceTypeEvaluatorException((x), __FILE__, __LINE__); } while (0)
 
@@ -65,9 +66,19 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
                                 targetType, rootNode));
         return;
     }
-    // Ignore parameters of non-struct types as source
+    // Ignore function parameters of non-struct source types as source
     if (srcSymbol.type() == stFunctionParam && ctxMembers.isEmpty()) {
         debugmsg("Source is a paramter without struct member reference:\n" +
+                 typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
+                                targetType, rootNode));
+        return;
+    }
+    // Ignore local variables of non-struct source types as source
+    if ((srcSymbol.type() == stVariableDecl ||
+         srcSymbol.type() == stVariableDef)
+            && srcSymbol.isLocal() && ctxMembers.isEmpty())
+    {
+        debugmsg("Source is a local variable without struct member reference:\n" +
                  typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
                                 targetType, rootNode));
         return;
@@ -82,9 +93,14 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         return;
     }
 
+
+
     /// @todo Ignore casts from arrays to pointers of the same base type
 
     try {
+        debugmsg("Passing the following type change to SymFactory:\n" +
+                 typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
+                                targetType, rootNode));
         _factory->typeAlternateUsage(srcSymbol, ctxType, ctxMembers, targetType);
     }
     catch (FactoryException& e) {
@@ -93,14 +109,15 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         while (n && n->parent) // && n->type != nt_external_declaration)
             n = n->parent;
         ASTSourcePrinter printer(_ast);
-        std::cout
-                << "------------------[Source]------------------" << std::endl
+        shell->out()
+                << "------------------[Source]------------------" << endl
                 << printer.toString(n, true)
-                << "------------------[/Source]-----------------" << std::endl;
+                << "------------------[/Source]-----------------" << endl;
 
-        std::cout << typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
+        shell->out()
+                << typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
                                     targetType, rootNode)
-                     << std::endl;
+                << endl;
         throw e;
     }
 }
