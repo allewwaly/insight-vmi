@@ -15,6 +15,7 @@
  * Special IDs for special symbol types
  */
 enum SpecialIds {
+    siCopy           = 0x7FFFFFFD,  ///< a copy of another type
     siHListNode      = 0x7FFFFFFE,  ///< kernel hash chain list (<tt>struct hlist_node</tt>)
     siListHead       = 0x7FFFFFFF   ///< kernel linked list (<tt>struct list_head</tt>)
 };

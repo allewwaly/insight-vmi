@@ -468,6 +468,7 @@ private:
 	 * @param member the StructuredMember to create a <tt>struct list_head</tt>
 	 * from
 	 * @return the resulting Struct type
+	 * \sa SpecialIds
 	 */
 	Struct* makeStructListHead(StructuredMember* member);
 
@@ -481,8 +482,18 @@ private:
      * @param member the StructuredMember to create a <tt>struct hlist_node</tt>
      * from
      * @return the resulting Struct type
+     * \sa SpecialIds
      */
     Struct* makeStructHListNode(StructuredMember* member);
+
+    /**
+     * Creates a shallow copy of the given type \a source and returns it. The
+     * copy will have an ID of siCopy to be distinguishable from the original.
+     * @param source the source type
+     * @return a shallow copy of \a source with an ID of siCopy.
+     * \sa SpecialIds
+     */
+    Structured* makeStructCopy(Structured* source);
 
 	/**
      * Tries to resolve the type reference of a ReferencingType object \a ref.
