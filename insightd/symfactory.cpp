@@ -991,6 +991,30 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
 }
 
 
+Structured* SymFactory::makeStructCopy(Structured* source)
+{
+    if (!source)
+        return 0;
+
+    Structured* dest = (source->type() == rtStruct) ?
+                (Structured*)new Struct() :
+                (Structured*)new Union();
+    _customTypes.append(dest);
+
+    // Use the symbol r/w mechanism to create the copy
+    QByteArray ba;
+    QDataStream data(&ba, QIODevice::ReadWrite);
+
+    source->writeTo(data);
+    data.device()->reset();
+    dest->readFrom(data);
+
+    // Set the special ID
+    dest->setId(siCopy);
+    return dest;
+}
+
+
 bool SymFactory::resolveReference(StructuredMember* member)
 {
     assert(member != 0);
@@ -1324,10 +1348,13 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
     case stVariableDecl:
     case stVariableDef:
         // Only change global variables
-        if (!srcSymbol.astNode()->scope->parent())
+        if (srcSymbol.isGlobal())
             typeAlternateUsageVar(ctxType, srcSymbol, targetBaseType);
+        else
+            debugmsg("Ignoring local variable " << srcSymbol.name());
         break;
 
+    case stFunctionParam:
     case stStructMember:
         typeAlternateUsageStructMember(ctxType, ctxMembers, targetBaseType);
         break;
@@ -1348,7 +1375,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
     BaseTypeList ctxBaseTypes = ctxTypeRet.second;
 
     int membersFound = 0;
-    StructuredMember* member = 0;
+    StructuredMember *member = 0, *embeddingMember = 0;
 
     for (int i = 0; i < ctxBaseTypes.size(); ++i) {
         BaseType* t = ctxBaseTypes[i];
@@ -1356,6 +1383,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
         // Find the correct member of the struct or union
         for (int j = 0; j < ctxMembers.size(); ++j) {
             Structured* s = dynamic_cast<Structured*>(t);
+            embeddingMember = member;
             if ( s && (member = s->findMember(ctxMembers[j])) ) {
                 t = member->refType();
             }
@@ -1365,6 +1393,28 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
             }
         }
 
+        // Is the source type a member of a struct embedded in the context type?
+        if (embeddingMember) {
+            // Was the embedding member already manipulated?
+            if (embeddingMember->refTypeId() == siCopy) {
+                debugmsg(QString("Member %1 %2 is already a type copy.")
+                         .arg(embeddingMember->prettyName())
+                         .arg(embeddingMember->name()));
+            }
+            else {
+                // Create a copy of the embedding struct before manipulation
+                Structured* s = dynamic_cast<Structured*>(embeddingMember->refType());
+                assert(s != 0);
+                Structured* refTypeCopy = makeStructCopy(s);
+                embeddingMember->setRefType(refTypeCopy);
+                embeddingMember->setRefTypeId(refTypeCopy->id());
+                member = refTypeCopy->findMember(ctxMembers.last());
+                assert(member != 0);
+                debugmsg(QString("Created copy of embedding member %1 %2.")
+                         .arg(embeddingMember->prettyName())
+                         .arg(embeddingMember->name()));
+            }
+        }
         // If we have a member here, it is the one whose reference is to be replaced
         if (member) {
             ++membersFound;
@@ -1389,7 +1439,11 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
     if (!membersFound)
         factoryError("Did not find any members to adjust!");
     else
-        debugmsg("Adjusted " << membersFound << " members.");
+        debugmsg(QString("Adjusted %1 member%2 with target type 0x%3: %4")
+                 .arg(membersFound)
+                 .arg(membersFound == 1 ? "" : "s")
+                 .arg(targetBaseType->id(), 0, 16)
+                 .arg(targetBaseType->prettyName()));
 }
 
 
