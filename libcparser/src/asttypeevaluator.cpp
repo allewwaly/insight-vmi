@@ -2670,7 +2670,7 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
 	checkNodeType(srcNode, nt_primary_expression);
 	checkNodeType(srcNode->parent, nt_postfix_expression);
 
-    QString symScope = srcSymbol.astNode()->scope->parent() ? "local" : "global";
+    QString symScope = srcSymbol.isLocal() ? "local" : "global";
     QStringList symType = srcSymbol.typeToString().split(' ');
     if (symType.last().startsWith('('))
     	symType.pop_back();
