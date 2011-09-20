@@ -74,8 +74,9 @@ protected:
     	erUseInBuiltinFunction,
     	erNoAssignmentUse,
     	erNoPointerAssignment,
+        erIntegerArithmetics,
     	erTypesAreEqual,
-    	erTypesAreDifferent
+        erTypesAreDifferent
     };
 
 //    virtual void beforeChildren(pASTNode node, int flags);
