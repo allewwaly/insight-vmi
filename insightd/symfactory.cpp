@@ -1438,12 +1438,19 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 
     if (!membersFound)
         factoryError("Did not find any members to adjust!");
-    else
-        debugmsg(QString("Adjusted %1 member%2 with target type 0x%3: %4")
+    else {
+        QStringList ctxTypes;
+        for (int i = 0; i < ctxBaseTypes.size(); ++i)
+            if (ctxBaseTypes[i])
+                ctxTypes += QString("0x%1").arg(ctxBaseTypes[i]->id());
+        debugmsg(QString("Adjusted %1 member%2 of type%3 %4 with target type 0x%5: %6")
                  .arg(membersFound)
                  .arg(membersFound == 1 ? "" : "s")
+                 .arg(ctxBaseTypes.size() > 1 ? "s" : "")
+                 .arg(ctxTypes.join((", ")))
                  .arg(targetBaseType->id(), 0, 16)
                  .arg(targetBaseType->prettyName()));
+    }
 }
 
 
