@@ -2355,10 +2355,17 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
             goto while_exit;
 
         case nt_postfix_expression:
-            // Make a postfix expression with suffixes the new primary expr.
             if (root->u.postfix_expression.postfix_expression_suffix_list) {
-                postExNode = root;
-                primExNode = root->u.postfix_expression.primary_expression;
+                // Postfix expression suffixes represent a type usage, so if the
+                // type has already been casted, this esd the first effective
+                // type change
+                if (castExNode)
+                    goto cast_expression_type_change;
+                else {
+                    // Make a postfix expression with suffixes the new primary expr.
+                    postExNode = root;
+                    primExNode = root->u.postfix_expression.primary_expression;
+                }
             }
             break;
 
@@ -2380,13 +2387,10 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
             // The negation operator results in a boolean expression
             if ("!" == op)
                 return erNoAssignmentUse;
-            if (("*" == op || "&" == op) && castExNode) {
-                root = castExNode;
-                lNode = castExNode->u.cast_expression.type_name;
-                rNode = castExNode->u.cast_expression.cast_expression;
-                lType = typeofNode(lNode);
-                goto while_exit;
-            }
+            // Dereferencing is a type usage, so if the type has already been
+            // casted, this is the first effective type change
+            if (("*" == op || "&" == op) && castExNode)
+                goto cast_expression_type_change;
             }
             break;
 
@@ -2408,6 +2412,14 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
         rNode = root;
         root = root->parent;
     }
+
+    goto while_exit;
+
+    cast_expression_type_change:
+    root = castExNode;
+    lNode = castExNode->u.cast_expression.type_name;
+    rNode = castExNode->u.cast_expression.cast_expression;
+    lType = typeofNode(lNode);
 
     while_exit:
 
