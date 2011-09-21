@@ -131,17 +131,73 @@ void ASTTypeEvaluatorTest::cleanup()
 
 #define DEF_HEADER DEF_LIST_HEAD DEF_MODULES DEF_FUNCS DEF_HEADS
 
+#define	TEST_FUNCTION(methodName) \
+	void ASTTypeEvaluatorTest::test_##methodName##_func() \
+	{ \
+		QFETCH(QString, globalCode); \
+		QFETCH(QString, localCode); \
+	\
+		_ascii += DEF_HEADER; \
+		if (!globalCode.isEmpty()){ \
+			_ascii += globalCode.toAscii(); \
+			_ascii += "\n\n"; \
+		} \
+		_ascii += DEF_MAIN_BEGIN; \
+		if (!localCode.isEmpty()){ \
+			_ascii += "    "; \
+			_ascii += localCode.toAscii(); \
+			_ascii += "\n"; \
+		} \
+		_ascii += DEF_MAIN_END; \
+	\
+		try{ \
+			QCOMPARE(_builder->buildFrom(_ascii), 0); \
+			QCOMPARE(_tester->evaluateTypes(), true); \
+	\
+			QTEST(_tester->typeChanged, "typeChanged"); \
+	\
+			if (_tester->typeChanged){ \
+				QTEST(_tester->symbolName, "symbolName"); \
+				QTEST(_tester->ctxType, "ctxType"); \
+				QTEST(_tester->ctxMembers, "ctxMembers"); \
+				QTEST(_tester->targetType, "targetType"); \
+			} \
+		} \
+		catch (GenericException& e) { \
+			QFETCH(QString, exceptionMsg); \
+			/* Re-throw unexpected exceptions */ \
+			if (exceptionMsg.isEmpty()){ \
+				std::cerr << "Caught exception at " << qPrintable(e.file) << ":" \
+						<< e.line << ": " << qPrintable(e.message) << std::endl; \
+				throw; \
+			} \
+			else{ \
+				QCOMPARE(e.message, exceptionMsg); \
+			} \
+		} \
+		catch (...){ \
+			cleanup(); \
+			throw; \
+		} \
+	\
+		_ascii.clear(); \
+	} \
+	\
+   void ASTTypeEvaluatorTest::test_##methodName##_func_data()
 
-void ASTTypeEvaluatorTest::allTests_data()
+#define TEST_DATA_COLUMNS \
+   QTest::addColumn<QString>("globalCode"); \
+   QTest::addColumn<QString>("localCode"); \
+   QTest::addColumn<bool>("typeChanged"); \
+   QTest::addColumn<QString>("symbolName"); \
+   QTest::addColumn<QString>("ctxType"); \
+   QTest::addColumn<QString>("ctxMembers"); \
+   QTest::addColumn<QString>("targetType"); \
+   QTest::addColumn<QString>("exceptionMsg");
+
+TEST_FUNCTION(basic)
 {
-	QTest::addColumn<QString>("globalCode");
-	QTest::addColumn<QString>("localCode");
-	QTest::addColumn<bool>("typeChanged");
-	QTest::addColumn<QString>("symbolName");
-	QTest::addColumn<QString>("ctxType");
-	QTest::addColumn<QString>("ctxMembers");
-	QTest::addColumn<QString>("targetType");
-	QTest::addColumn<QString>("exceptionMsg");
+	TEST_DATA_COLUMNS;
 
 	// Very basic type equalities and changes
 	QTest::newRow("basicInitiEqual1") << "" << "void* q; void *p = q;" << false;
@@ -189,6 +245,12 @@ void ASTTypeEvaluatorTest::allTests_data()
 	QTest::newRow("basicAssignmentShiftEqualEx") << "" << "int *i; char* p; p >>= i;" << false
 		<< "" << "" << "" << ""
 		<< "Cannot determine resulting type of \"Pointer >>= Pointer\" at lines 23 and 23";
+}
+
+
+TEST_FUNCTION(listHeadEqual)
+{
+	TEST_DATA_COLUMNS;
 
 	// Various equality checks for list_head
     QTest::newRow("listHeadEqual1") << "" << "h = heads[0];" << false;
@@ -198,6 +260,12 @@ void ASTTypeEvaluatorTest::allTests_data()
     QTest::newRow("listHeadEqual5") << "" << "heads = &h;" << false;
     QTest::newRow("listHeadEqual6") << "" << "m->list.next = h;" << false;
     QTest::newRow("listHeadEqual7") << "" << "h = m->list.next;" << false;
+}
+
+
+TEST_FUNCTION(postfixOperators)
+{
+	TEST_DATA_COLUMNS;
 
     // Array, arrow and star operator, all in the mix
     QTest::newRow("arrayArrowStar1") << "" << "h = m->plist->next;" << false;
@@ -226,17 +294,35 @@ void ASTTypeEvaluatorTest::allTests_data()
     QTest::newRow("arrayArrowStar22") << "" << "*h = (*m->plist).next[0];" << false;
     QTest::newRow("arrayArrowStar23") << "" << "*h = (*m).plist[0].next[0];" << false;
     QTest::newRow("arrayArrowStar24") << "" << "*h = (*m[0].plist).next[0];" << false;
+}
+
+
+TEST_FUNCTION(basicTypeCasts)
+{
+    TEST_DATA_COLUMNS;
 
     // Type casts that lead to equal types
     QTest::newRow("castingEqual1") << "" << "h = (struct list_head*)m->list.next;" << false;
     QTest::newRow("castingEqual2") << "" << "h = (struct list_head*)((struct module*)m)->list.next;" << false;
     QTest::newRow("castingEqual3") << "" << "h = (struct list_head*)(*((struct module*)m)).list.next;" << false;
+}
+
+
+TEST_FUNCTION(functionCalls)
+{
+    TEST_DATA_COLUMNS;
 
     // Function calls
     QTest::newRow("funcCalls1") << "" << "h = func();" << false;
     QTest::newRow("funcCalls2") << "" << "*h = *func();" << false;
     QTest::newRow("funcCalls3") << "" << "h = func_ptr();" << false;
     QTest::newRow("funcCalls4") << "" << "*h = *func_ptr();" << false;
+}
+
+
+TEST_FUNCTION(basicTypeChanges)
+{
+    TEST_DATA_COLUMNS;
 
     // Basic type changes
     QTest::newRow("basicChanges1") << "" << "h = m;" << true
@@ -247,6 +333,12 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "h" << "Struct(list_head)" << "next" << "Pointer->Struct(module)";
     QTest::newRow("basicChanges3") << "" << "m = h->next->prev;" << true
         << "h" << "Struct(list_head)" << "prev" << "Pointer->Struct(module)";
+}
+
+
+TEST_FUNCTION(basicCastingChanges)
+{
+    TEST_DATA_COLUMNS;
 
     // Casting changes
     QTest::newRow("castingChanges1") << "" << "m = (struct module*)h->next;" << true
@@ -259,12 +351,23 @@ void ASTTypeEvaluatorTest::allTests_data()
     // list_head-like casting changes
     QTest::newRow("listHeadCasts1") << "" << "m = (struct module*)(((char*)modules.next) - __builtin_offsetof(struct module, list));" << true
         << "modules" << "Struct(list_head)" << "next" << "Pointer->Struct(module)";
+}
+
+
+TEST_FUNCTION(ignoredTypeChanges)
+{
+	TEST_DATA_COLUMNS;
 
     // Ignore type changes in certain cases
     QTest::newRow("ignoreCastInBuiltin") << "" << "int i = sizeof((void*)m);" << false;
     QTest::newRow("ignoreNoAssignment") << "" << "(void*)m;" << false;
     QTest::newRow("ignoreNoIdentifier") << "" << "h = (void*)(1+2);" << false;
+}
 
+
+TEST_FUNCTION(structInitializers)
+{
+    TEST_DATA_COLUMNS;
     // Struct initializers
     QTest::newRow("structInitEqual1") << "" << "struct list_head foo = { h->next, h->prev };" << false;
     QTest::newRow("structInitEqual2") << "" << "struct list_head foo = { m->list.next, m->list.prev };" << false;
@@ -287,8 +390,13 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "m" << "Pointer->Struct(module)" << "" << "Int32";
     QTest::newRow("structInitChanges7") << "" << "struct module foo = { .foo = 0, .list = { m, h } };" << true
         << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
+}
 
-    // Designated struct initializers
+
+TEST_FUNCTION(designatedInitializers)
+{
+	TEST_DATA_COLUMNS;
+	// Designated struct initializers
     QTest::newRow("designatedInitEqual1") << "struct list_head foo;\n" << "foo = (struct list_head){ h->next, h->prev };" << false;
     QTest::newRow("designatedInitEqual2") << "struct list_head foo;\n" << "foo = (struct list_head){ m->list.next, m->list.prev };" << false;
     QTest::newRow("designatedInitEqual3") << "struct list_head foo;\n" << "foo = (struct list_head){ .prev = h, .next = h };" << false;
@@ -314,7 +422,12 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
     QTest::newRow("designatedInitChanges9") << "struct module foo;\n" << "foo = (struct module){ .foo = h, .list = { 0, 0 } };" << true
         << "h" << "Pointer->Struct(list_head)" << "" << "Int32";
+}
 
+
+TEST_FUNCTION(arrayInitializers)
+{
+    TEST_DATA_COLUMNS;
     // Array initializers
     QTest::newRow("arrayInitEqual1") << "" << "struct list_head a[2] = { {h, h}, {h, h} };" << false;
     QTest::newRow("arrayInitEqual2") << "" << "struct list_head a[2] = { [0] = {h, h} };" << false;
@@ -336,7 +449,12 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "h" << "Struct(list_head)" << "prev" << "Pointer->Struct(module)";
     QTest::newRow("arrayInitChange7") << "" << "struct module* a[2] = { [0] = h->prev };" << true
         << "h" << "Struct(list_head)" << "prev" << "Pointer->Struct(module)";
+}
 
+
+TEST_FUNCTION(returnValues)
+{
+    TEST_DATA_COLUMNS;
     // Return values
     QTest::newRow("returnNoValue") << "struct module* foo() { return; }" << "" << false;
     QTest::newRow("returnNullValue") << "struct module* foo() { return 0; }" << "" << false;
@@ -345,7 +463,12 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "p" << "Pointer->Void" << "" << "Pointer->Struct(module)";
     QTest::newRow("returnDifferentValue") << "struct module* foo(long i) { return i; }" << "" << true
         << "i" << "Int32" << "" << "Pointer->Struct(module)";
+}
 
+
+TEST_FUNCTION(functionDefsDecls)
+{
+    TEST_DATA_COLUMNS;
     // Function definitions
     QTest::newRow("funcPtr1") << "int foo() { return 0; }" << "void* p = foo;" << true
         << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
@@ -361,7 +484,12 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
     QTest::newRow("funcPtr6") << "int** foo();" << "void* p = foo;" << true
         << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+}
 
+
+TEST_FUNCTION(functionPointers)
+{
+    TEST_DATA_COLUMNS;
     // Function pointers
     QTest::newRow("funcPtr7") << "int   (  foo)();" << "void* p = foo;" << true
         << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
@@ -381,7 +509,12 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "foo" << "FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
     QTest::newRow("funcPtr15") << "int** (**foo)();" << "void* p = foo;" << true
         << "foo" << "FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+}
 
+
+TEST_FUNCTION(functionPointerTypedefs)
+{
+    TEST_DATA_COLUMNS;
     // Function pointer typedefs
     QTest::newRow("funcPtr16") << "typedef int   (  foodef)(); foodef foo;" << "void* p = foo;" << true
         << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
@@ -401,7 +534,12 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "foo" << "FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
     QTest::newRow("funcPtr24") << "typedef int** (**foodef)(); foodef foo;" << "void* p = foo;" << true
         << "foo" << "FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+}
 
+
+TEST_FUNCTION(functionPointerParams)
+{
+    TEST_DATA_COLUMNS;
     // Function pointer parameters
     QTest::newRow("funcPtr25") << "void func(int   (  foo)()) { void* p = foo; }" << "" << true
         << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
@@ -421,7 +559,12 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "foo" << "FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
     QTest::newRow("funcPtr33") << "void func(int** (**foo)()) { void* p = foo; }" << "" << true
         << "foo" << "FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+}
 
+
+TEST_FUNCTION(functionPointerInvocations)
+{
+    TEST_DATA_COLUMNS;
     // Function pointer invocations
     QTest::newRow("funcPtr34") << "int   (  foo)();" << "void* p = foo();" << true
         << "foo" << "Int32" << "" << "Pointer->Void";
@@ -441,7 +584,12 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
     QTest::newRow("funcPtr42") << "int** (**foo)();" << "void* p = foo();" << true
         << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+}
 
+
+TEST_FUNCTION(funcPtrTypdefPtrs)
+{
+    TEST_DATA_COLUMNS;
     // Pointers of function pointer typedefs
     QTest::newRow("funcPtr43") << "typedef int   (  foodef)(); foodef *foo;" << "void* p = foo;" << true
         << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
@@ -480,7 +628,12 @@ void ASTTypeEvaluatorTest::allTests_data()
         << "foo" << "Pointer->Pointer->FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
     QTest::newRow("funcPtr60") << "typedef int** (**foodef)(); foodef **foo;" << "void* p = foo;" << true
         << "foo" << "Pointer->Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+}
 
+
+TEST_FUNCTION(funcPtrTypdefPtrInvocations)
+{
+    TEST_DATA_COLUMNS;
     // Invocation of pointers of function pointer typedefs
     QTest::newRow("funcPtr61") << "typedef int   (  foodef)(); foodef *foo;" << "void* p = foo();" << true
         << "foo" << "Int32" << "" << "Pointer->Void";
@@ -508,7 +661,12 @@ void ASTTypeEvaluatorTest::allTests_data()
     QTest::newRow("funcPtr69") << "typedef int** (**foodef)(); foodef *foo;" << "void* p = foo();" << true
         << "" << "" << "" << ""
         << "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17";
+}
 
+
+TEST_FUNCTION(logicalExpressions)
+{
+    TEST_DATA_COLUMNS;
     // Usage in logical expressions
     QTest::newRow("equalityExpr1") << "" << "char *p, *q; int i; i = p == q;" << false;
     QTest::newRow("equalityExpr2") << "" << "char *p, *q; int i; i = p == i;" << false;
@@ -530,55 +688,46 @@ void ASTTypeEvaluatorTest::allTests_data()
 }
 
 
-void ASTTypeEvaluatorTest::allTests()
+TEST_FUNCTION(castExpressions)
 {
-	QFETCH(QString, globalCode);
-	QFETCH(QString, localCode);
+    TEST_DATA_COLUMNS;
+    // Cast expressions
+    QTest::newRow("castExpr1") << "" << "char *p, *q; p = (char*)q;" << false;
+    QTest::newRow("castExpr2") << "" << "char *p; int i; p = (char*)i;" << true
+        << "i" << "Int32" << "" << "Pointer->Int8";
+    QTest::newRow("castExpr3") << "" << "char *p ,*q; int i; p = (char*)(q + i);" << false;
+    QTest::newRow("castExpr4") << "" << "void *p; int i; p = (void*)((char*)p + i);" << false;
+    QTest::newRow("castExpr5") << "" << "char *p; int i; p = (void*)((char*)p + i);" << false;
+    QTest::newRow("castExpr6") << "" << "void *p; char* q; int i; p = (void*)((char*)q + i);" << true
+        << "q" << "Pointer->Int8" << "" << "Pointer->Void";
+    QTest::newRow("castExpr7") << "" << "void *p; char* q; int i; p = (void*)(q + i);" << true
+        << "q" << "Pointer->Int8" << "" << "Pointer->Void";
+    QTest::newRow("castExpr8") << "" << "void *p; char* q; int i; q = (void*)((char*)p + i);" << true
+        << "p" << "Pointer->Void" << "" << "Pointer->Int8";
+    QTest::newRow("castExpr9") << "" << "void *p; char* q; int i; q = ((char*)p + i);" << true
+        << "p" << "Pointer->Void" << "" << "Pointer->Int8";
+    QTest::newRow("castExpr10") << "" << "int *p; int i; i = *p;" << false;
+    QTest::newRow("castExpr11") << "" << "void *p; int i; i = *((char*)p);" << true
+        << "p" << "Pointer->Void" << "" << "Pointer->Int8";
+    QTest::newRow("castExpr12") << "" << "void *p; int i; i = ((char*)p);" << true
+        << "p" << "Pointer->Void" << "" << "Int32";
+    QTest::newRow("castExpr13") << "" << "struct list_head *p; modules.next = (p)->next;" << false;
+    QTest::newRow("castExpr14") << "" << "struct list_head *p; modules.next = ((struct list_head *)p)->next;" << false;
+    QTest::newRow("castExpr15") << "" << "struct list_head *p; modules.next = ((p))->next;" << false;
+    QTest::newRow("castExpr16") << "" << "struct list_head *p; modules.next = (((struct list_head *)p))->next;" << false;
+    QTest::newRow("castExpr17") << "" << "struct list_head *p; modules.next = ((struct list_head *)(p))->next;" << false;
+    QTest::newRow("castExpr18") << "" << "struct list_head *p; modules.next = (struct list_head *)(p)->next;" << false;
+    QTest::newRow("castExpr19") << "" << "struct list_head *p; modules.next = (struct list_head *)p->next;" << false;
+    QTest::newRow("castExpr20") << "" << "void *p; modules.next = ((struct list_head *)p)->next;" << true
+                                << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
+    QTest::newRow("castExpr21") << "" << "void *p; modules.next = (((struct list_head *)p))->next;" << true
+                                << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
+    QTest::newRow("castExpr22") << "" << "void *p; modules.next = ((struct list_head *)(p))->next;" << true
+                                << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
 
-	_ascii += DEF_HEADER;
-	if (!globalCode.isEmpty()) {
-	    _ascii += globalCode.toAscii();
-	    _ascii += "\n\n";
-	}
-	_ascii += DEF_MAIN_BEGIN;
-	if (!localCode.isEmpty()) {
-        _ascii += "    ";
-	    _ascii += localCode.toAscii();
-	    _ascii += "\n";
-	}
-	_ascii += DEF_MAIN_END;
-
-	try {
-        QCOMPARE(_builder->buildFrom(_ascii), 0);
-        QCOMPARE(_tester->evaluateTypes(), true);
-
-        QTEST(_tester->typeChanged, "typeChanged");
-
-        if (_tester->typeChanged) {
-            QTEST(_tester->symbolName, "symbolName");
-            QTEST(_tester->ctxType, "ctxType");
-            QTEST(_tester->ctxMembers, "ctxMembers");
-            QTEST(_tester->targetType, "targetType");
-        }
-	}
-	catch (GenericException& e) {
-	    QFETCH(QString, exceptionMsg);
-	    // Re-throw unexpected exceptions
-	    if (exceptionMsg.isEmpty()) {
-	        std::cerr << "Caught exception at " << qPrintable(e.file) << ":"
-	                << e.line << ": " << qPrintable(e.message) << std::endl;
-	        throw;
-	    }
-	    else {
-	        QCOMPARE(e.message, exceptionMsg);
-	    }
-	}
-	catch (...) {
-	    cleanup();
-	    throw;
-	}
-
-	_ascii.clear();
+    QTest::newRow("castExpr23") << "" << "void *p; struct module* m; m = (struct module*)((struct list_head*)p)->next;" << true
+                               << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
 }
+
 
 QTEST_MAIN(ASTTypeEvaluatorTest)
