@@ -545,6 +545,16 @@ private:
     void insertUsedBy(StructuredMember* m);
     AstBaseTypeList findBaseTypesForAstType(const ASTType* astType);
 
+    enum TypeConflicts {
+        tcNoConflict,
+        tcIgnore,
+        tcReplace,
+        tcConflict
+    };
+
+    TypeConflicts compareConflictingTypes(const BaseType* oldType,
+                                          const BaseType* newType);
+
 
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
