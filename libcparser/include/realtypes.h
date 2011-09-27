@@ -98,6 +98,11 @@ static const int ElementaryTypes =
     NumericTypes |
     rtFuncPointer;
 
+/// Structured types
+static const int StructOrUnion =
+    rtStruct |
+    rtUnion;
+
 QString realTypeToStr(RealType type);
 
 #endif /* REALTYPES_H_ */
