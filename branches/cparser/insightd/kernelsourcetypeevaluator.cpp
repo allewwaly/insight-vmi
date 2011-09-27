@@ -11,6 +11,7 @@
 #include <astnode.h>
 #include <astscopemanager.h>
 #include <astsourceprinter.h>
+#include <abstractsyntaxtree.h>
 #include <shell.h>
 
 #define typeEvaluatorError(x) do { throw SourceTypeEvaluatorException((x), __FILE__, __LINE__); } while (0)
@@ -65,10 +66,11 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
     Q_UNUSED(ctxNode);
     // Ignore all usages of a pointer as an integer, we cannot learn anything
     // from that
-    if (targetType->type() != rtPointer) {
+    if (!(targetType->type() & (rtArray|rtPointer))) {
         debugmsg("Target is no pointer:\n" +
                  typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
                                 targetType, rootNode));
+        /// @todo Consider function pointers as target type
         return;
     }
     // Ignore function parameters of non-struct source types as source
@@ -98,8 +100,6 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         return;
     }
 
-
-
     /// @todo Ignore casts from arrays to pointers of the same base type
 
     try {
@@ -115,6 +115,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
             n = n->parent;
         ASTSourcePrinter printer(_ast);
         shell->out()
+                << "File: " << _ast->fileName()
                 << "------------------[Source]------------------" << endl
                 << printer.toString(n, true)
                 << "------------------[/Source]-----------------" << endl;
