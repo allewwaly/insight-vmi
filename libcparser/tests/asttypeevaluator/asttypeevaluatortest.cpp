@@ -711,13 +711,13 @@ TEST_FUNCTION(castExpressions)
         << "p" << "Pointer->Void" << "" << "Pointer->Int8";
     QTest::newRow("castExpr12") << "" << "void *p; int i; i = ((char*)p);" << true
         << "p" << "Pointer->Void" << "" << "Int32";
-    QTest::newRow("castExpr13") << "" << "struct list_head *p; modules.next = (p)->next;" << false;
-    QTest::newRow("castExpr14") << "" << "struct list_head *p; modules.next = ((struct list_head *)p)->next;" << false;
-    QTest::newRow("castExpr15") << "" << "struct list_head *p; modules.next = ((p))->next;" << false;
-    QTest::newRow("castExpr16") << "" << "struct list_head *p; modules.next = (((struct list_head *)p))->next;" << false;
-    QTest::newRow("castExpr17") << "" << "struct list_head *p; modules.next = ((struct list_head *)(p))->next;" << false;
-    QTest::newRow("castExpr18") << "" << "struct list_head *p; modules.next = (struct list_head *)(p)->next;" << false;
-    QTest::newRow("castExpr19") << "" << "struct list_head *p; modules.next = (struct list_head *)p->next;" << false;
+    QTest::newRow("castExpr13") << "" << "modules.next = (h)->next;" << false;
+    QTest::newRow("castExpr14") << "" << "modules.next = ((struct list_head *)h)->next;" << false;
+    QTest::newRow("castExpr15") << "" << "modules.next = ((h))->next;" << false;
+    QTest::newRow("castExpr16") << "" << "modules.next = (((struct list_head *)h))->next;" << false;
+    QTest::newRow("castExpr17") << "" << "modules.next = ((struct list_head *)(h))->next;" << false;
+    QTest::newRow("castExpr18") << "" << "modules.next = (struct list_head *)(h)->next;" << false;
+    QTest::newRow("castExpr19") << "" << "modules.next = (struct list_head *)h->next;" << false;
     QTest::newRow("castExpr20") << "" << "void *p; modules.next = ((struct list_head *)p)->next;" << true
                                 << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
     QTest::newRow("castExpr21") << "" << "void *p; modules.next = (((struct list_head *)p))->next;" << true
@@ -725,8 +725,10 @@ TEST_FUNCTION(castExpressions)
     QTest::newRow("castExpr22") << "" << "void *p; modules.next = ((struct list_head *)(p))->next;" << true
                                 << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
 
-    QTest::newRow("castExpr23") << "" << "void *p; struct module* m; m = (struct module*)((struct list_head*)p)->next;" << true
+    QTest::newRow("castExpr23") << "" << "void *p; m = (struct module*)((struct list_head*)p)->next;" << true
                                << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
+    QTest::newRow("castExpr24") << "" << "m = (struct module*)(h)->next;" << true
+                                << "h" << "Struct(list_head)" << "next" << "Pointer->Struct(module)";
 }
 
 
