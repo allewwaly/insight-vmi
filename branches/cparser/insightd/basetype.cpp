@@ -22,15 +22,17 @@ BaseType::~BaseType()
 }
 
 
-RealType BaseType::dereferencedType(int resolveTypes) const
+RealType BaseType::dereferencedType(int resolveTypes, int *depth) const
 {
-    const BaseType* b = dereferencedBaseType(resolveTypes);
+    const BaseType* b = dereferencedBaseType(resolveTypes, depth);
     return b ? b->type() : type();
 }
 
 
-const BaseType* BaseType::dereferencedBaseType(int resolveTypes) const
+const BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth) const
 {
+    if (depth)
+        *depth = 0;
     if (! (type() & resolveTypes) )
         return this;
 
@@ -39,6 +41,8 @@ const BaseType* BaseType::dereferencedBaseType(int resolveTypes) const
     while (curr && curr->refType() && (curr->type() & resolveTypes) ) {
         prev = curr->refType();
         curr = dynamic_cast<const RefBaseType*>(prev);
+        if (depth)
+            *depth += 1;
     }
     return prev;
 }
