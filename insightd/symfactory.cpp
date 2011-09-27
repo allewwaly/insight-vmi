@@ -1374,62 +1374,100 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
     AstBaseTypeList ctxTypeRet = findBaseTypesForAstType(ctxType);
     BaseTypeList ctxBaseTypes = ctxTypeRet.second;
 
-    int membersFound = 0;
-    StructuredMember *member = 0, *embeddingMember = 0;
+    int membersFound = 0, membersChanged = 0;
 
     for (int i = 0; i < ctxBaseTypes.size(); ++i) {
         BaseType* t = ctxBaseTypes[i];
+        StructuredMember *member = 0, *nestingMember = 0;
 
         // Find the correct member of the struct or union
         for (int j = 0; j < ctxMembers.size(); ++j) {
             Structured* s = dynamic_cast<Structured*>(t);
-            embeddingMember = member;
+            nestingMember = member; // previous struct for nested structs
             if ( s && (member = s->findMember(ctxMembers[j])) ) {
                 t = member->refType();
             }
             else {
-                member = 0;
+                nestingMember = member = 0;
                 break;
             }
         }
 
         // Is the source type a member of a struct embedded in the context type?
-        if (embeddingMember) {
+        if (nestingMember) {
             // Was the embedding member already manipulated?
-            if (embeddingMember->refTypeId() == siCopy) {
+            if (nestingMember->refTypeId() == siCopy) {
                 debugmsg(QString("Member %1 %2 is already a type copy.")
-                         .arg(embeddingMember->prettyName())
-                         .arg(embeddingMember->name()));
+                         .arg(nestingMember->prettyName())
+                         .arg(nestingMember->name()));
             }
             else {
                 // Create a copy of the embedding struct before manipulation
-                Structured* s = dynamic_cast<Structured*>(embeddingMember->refType());
+                Structured* s = dynamic_cast<Structured*>(nestingMember->refType());
                 assert(s != 0);
                 Structured* refTypeCopy = makeStructCopy(s);
-                embeddingMember->setRefType(refTypeCopy);
-                embeddingMember->setRefTypeId(refTypeCopy->id());
+                nestingMember->setRefType(refTypeCopy);
+                nestingMember->setRefTypeId(refTypeCopy->id());
                 member = refTypeCopy->findMember(ctxMembers.last());
                 assert(member != 0);
                 debugmsg(QString("Created copy of embedding member %1 %2.")
-                         .arg(embeddingMember->prettyName())
-                         .arg(embeddingMember->name()));
+                         .arg(nestingMember->prettyName())
+                         .arg(nestingMember->name()));
             }
         }
         // If we have a member here, it is the one whose reference is to be replaced
         if (member) {
             ++membersFound;
+            bool changeType = true;
             // Was the member already manipulated?
             if (member->refTypeId() != member->origRefTypeId()) {
                 // Do we have conflicting target types?
-                if (member->refTypeId() != targetBaseType->id())
-                    factoryError(QString("Conflicting target types: 0x%1 vs. 0x%2")
+                switch (compareConflictingTypes(member->refType(), targetBaseType)) {
+                case tcNoConflict:
+                    changeType = false;
+                    t = findBaseTypeById(member->origRefTypeId());
+                    debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\"")
+                             .arg(member->name())
+                             .arg(member->belongsTo()->prettyName())
+                             .arg(member->belongsTo()->id(), 0, 16)
+                             .arg(t ? t->prettyName() : QString("???"))
+                             .arg(member->refType() ?
+                                      member->refType()->prettyName() :
+                                      QString("???")));
+                    break;
+
+                case tcIgnore:
+                    debugmsg(QString("Not changing \"%0\" of %1 (0x%2) from \"%3\" to \"%4\"")
+                             .arg(member->name())
+                             .arg(member->belongsTo()->prettyName())
+                             .arg(member->belongsTo()->id(), 0, 16)
+                             .arg(member->refType() ?
+                                      member->refType()->prettyName() :
+                                      QString("???"))
+                             .arg(targetBaseType->prettyName()));
+                    changeType = false;
+                    break;
+
+                case tcConflict:
+                    factoryError(QString("Conflicting target types: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
+                                 .arg(member->refType() ?
+                                          member->refType()->prettyName() :
+                                          QString("???"))
                                  .arg(member->refTypeId(), 0, 16)
+                                 .arg(targetBaseType->prettyName())
                                  .arg(targetBaseType->id(), 0, 16));
-                // No conflicts, just ignore it
+                    break;
+
+                case tcReplace:
+                    changeType = true;
+                    break;
+                }
             }
-            else {
-                // Apply new type
+
+            // Apply new type, if applicable
+            if (changeType) {
                 /// @todo may need to adjust member->memberOffset() somehow
+                ++membersChanged;
                 member->setRefType(targetBaseType);
                 member->setRefTypeId(targetBaseType->id());
             }
@@ -1438,12 +1476,12 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 
     if (!membersFound)
         factoryError("Did not find any members to adjust!");
-    else {
+    else if (membersChanged) {
         QStringList ctxTypes;
         for (int i = 0; i < ctxBaseTypes.size(); ++i)
             if (ctxBaseTypes[i])
-                ctxTypes += QString("0x%1").arg(ctxBaseTypes[i]->id());
-        debugmsg(QString("Adjusted %1 member%2 of type%3 %4 with target type 0x%5: %6")
+                ctxTypes += QString("0x%1").arg(ctxBaseTypes[i]->id(), 0, 16);
+        debugmsg(QString("Changed %1 member%2 of type%3 %4 to target type 0x%5: %6")
                  .arg(membersFound)
                  .arg(membersFound == 1 ? "" : "s")
                  .arg(ctxBaseTypes.size() > 1 ? "s" : "")
@@ -1479,6 +1517,66 @@ void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
 }
 
 
+SymFactory::TypeConflicts SymFactory::compareConflictingTypes(
+        const BaseType* oldType, const BaseType* newType)
+{
+    if (!oldType || !newType)
+        factoryError("At least one of the given BaseTypes is null!");
+
+    // Do we have conflicting target types?
+    if (oldType->id() == newType->id())
+        return tcNoConflict;
+
+    // Compare the conflicting types
+    int ctr_old = 0, ctr_new = 0;
+    oldType = oldType->dereferencedBaseType(
+                BaseType::trLexicalPointersArrays,
+                &ctr_old);
+    newType = newType->dereferencedBaseType(
+                BaseType::trLexicalPointersArrays,
+                &ctr_new);
+
+    RealType old_rt = oldType->type();
+    RealType new_rt = newType->type();
+    // A void pointer has no referencing type and is thus not dereferenced
+    if (old_rt == rtPointer) {
+        old_rt = rtVoid;
+        ++ctr_old;
+    }
+    if (new_rt == rtPointer) {
+        new_rt = rtVoid;
+        ++ctr_new;
+    }
+
+    // The number of dereferences must match
+    if (ctr_old != ctr_new) {
+        return tcConflict;
+    }
+    // Ignore all casts to void
+    else if (new_rt == rtVoid) {
+        return tcIgnore;
+    }
+    // Ignore casts from structs to non-struct types
+    else if ((old_rt & StructOrUnion) &&
+             (new_rt & IntegerTypes))
+    {
+        return tcIgnore;
+    }
+    // Ignore casts between different integer types
+    else if ((old_rt & IntegerTypes) &&
+             (new_rt & IntegerTypes))
+    {
+        return tcIgnore;
+    }
+    // Always replace non-struct types with struct types
+    else if ((old_rt & (IntegerTypes|rtVoid)) &&
+             (new_rt & StructOrUnion))
+    {
+        return tcReplace;
+    }
+    // This is a conflict
+    return tcConflict;
+}
 
 
 
