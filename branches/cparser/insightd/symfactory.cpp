@@ -90,6 +90,10 @@ void SymFactory::clear()
 	_structListHeadCount = 0;
 	_structHListNodeCount = 0;
 	_maxTypeSize = 0;
+	_uniqeTypesChanged = 0;
+	_totalTypesChanged = 0;
+	_typesReplaced = 0;
+	_conflictingTypeChanges = 0;
 }
 
 
@@ -1117,6 +1121,19 @@ void SymFactory::symbolsFinished(RestoreType rt)
 }
 
 
+void SymFactory::sourceParcingFinished()
+{
+    shell->out() << "Statistics:" << endl;
+    shell->out() << qSetFieldWidth(10) << right;
+    shell->out() << "  | Unique type changes:   " << _uniqeTypesChanged << endl;
+    shell->out() << "  | Replaced type changes: " << _typesReplaced << endl;
+    shell->out() << "  | Total type changes:    " << _totalTypesChanged << endl;
+    shell->out() << "  | Type conflicts:        " << _conflictingTypeChanges << endl;
+    shell->out() << "  `-------------------------------------------" << endl;
+    shell->out() << qSetFieldWidth(0) << left;
+}
+
+
 QString SymFactory::postponedTypesStats() const
 {
     if (_postponedTypes.isEmpty())
@@ -1251,6 +1268,28 @@ void SymFactory::insertUsedBy(StructuredMember* m)
 }
 
 
+BaseTypeList SymFactory::typedefsOfType(BaseType* type)
+{
+    BaseTypeList ret, temp;
+
+    if (!type)
+        return ret;
+    QList<RefBaseType*> rbtList = _usedByRefTypes.values(type->id());
+    for (int i = rbtList.size() - 1; i >= 0; --i) {
+        // Remove all non-typedefs
+        if (rbtList[i]->type() != rtTypedef)
+            rbtList.removeAt(i);
+        // Recursively add all futher typedefs
+        else {
+            ret += rbtList[i];
+            temp += typedefsOfType(rbtList[i]);
+        }
+    }
+
+    return ret + temp;
+}
+
+
 AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
 {
     // Find the first non-pointer ASTType
@@ -1266,7 +1305,42 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
     // Is the context type a struct or union?
     if (astTypeNonPtr->type() & (rtStruct|rtUnion|rtEnum)) {
         if (astTypeNonPtr->identifier().isEmpty()) {
-            debugmsg("The context type has no identifier.");
+            assert(astTypeNonPtr->node() != 0);
+            // See if this struct appears in a typedef
+            pASTNode dec_spec = astTypeNonPtr->node()->parent->parent;
+            pASTNode dec = dec_spec->parent;
+            // Did we find the typedef declaration?
+            if (dec_spec->type == nt_declaration_specifier &&
+                dec->type == nt_declaration &&
+                dec->u.declaration.isTypedef &&
+                dec->u.declaration.declaration_specifier == dec_spec)
+            {
+                // Take the first declarator from thie list and resolve it
+                pANTLR3_COMMON_TOKEN tok = dec
+                        ->u.declaration.init_declarator_list
+                        ->item
+                        ->u.init_declarator.declarator
+                        ->u.declarator.direct_declarator
+                        ->u.direct_declarator.identifier;
+                QString id = antlrTokenToStr(tok);
+                BaseTypeList temp;
+                baseTypes = _typesByName.values(id);
+                for (int i = baseTypes.size() - 1; i >= 0; --i) {
+                    // Dereference any pointers or typedefs
+                    baseTypes[i] = baseTypes[i]->dereferencedBaseType();
+                    // See if the type matches
+                    if (baseTypes[i]->type() == astTypeNonPtr->type())
+                        // Add all typedefs of that type to a separate list
+                        temp += typedefsOfType(baseTypes[i]);
+                    // Remove non-matching types
+                    else
+                        baseTypes.removeAt(i);
+                }
+                // Join the lists
+                baseTypes += temp;
+            }
+            else
+                debugmsg("The context type has no identifier.");
         }
         else {
             baseTypes = _typesByName.values(astTypeNonPtr->identifier());
@@ -1284,6 +1358,27 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
         factoryError(
                     QString("We do not consider astTypeNonPtr->type() == %1")
                         .arg(realTypeToStr(astTypeNonPtr->type())));
+    }
+
+    // Count the number of types with zero and non-zero size
+    int non_zero = 0, zero = 0;
+    for (int i = 0; i < baseTypes.size(); ++i) {
+        if (baseTypes[i] && baseTypes[i]->type() != rtTypedef) {
+            if (baseTypes[i]->size() > 0)
+                non_zero++;
+            else
+                zero++;
+        }
+    }
+    // If we non-zero-sized types, then remove all zero-sized types
+    if (non_zero && zero) {
+        for (int i = baseTypes.size() - 1; i >= 0; --i) {
+            if (baseTypes[i] && baseTypes[i]->type() != rtTypedef &&
+                baseTypes[i]->size() == 0)
+            {
+                baseTypes.removeAt(i);;
+            }
+        }
     }
 
     return AstBaseTypeList(astTypeNonPtr, baseTypes);
@@ -1325,8 +1420,11 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
                 // Next candidates are all that use the type in the way
                 // defined by targetPointers[j]
                 for (int l = 0; l < typesUsingSrc.size(); ++l) {
-                    if (typesUsingSrc[l]->type() == targetPointers[j]->type())
+                    if (typesUsingSrc[l]->type() == targetPointers[j]->type()) {
                         nextCandidates.append(typesUsingSrc[l]);
+                        // Additonally add all typedefs for that type
+                        nextCandidates.append(typedefsOfType(typesUsingSrc[l]));
+                    }
                 }
             }
 
@@ -1341,8 +1439,32 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
         }
     }
 
-    if (!targetBaseType)
-        factoryError("Could not find target BaseType.");
+    if (!targetBaseType) {
+        // If possible, we create the type ourself
+        if (targetBaseTypes.size() > 0) {
+            targetBaseType = targetBaseTypes.first();
+            for (int j = targetPointers.size() - 1; j >= 0; --j) {
+                // Create "next" pointer
+                Pointer* ptr = 0;
+                switch (targetPointers[j]->type()) {
+                case rtArray: ptr = new Array(); break;
+                case rtPointer: ptr = new Pointer(); break;
+                default: factoryError("Unexpected type: " +
+                                      realTypeToStr(targetPointers[j]->type()));
+                }
+                _customTypes.append(ptr);
+                ptr->setId(siCreatred);
+                ptr->setRefTypeId(targetBaseType->id());
+                ptr->setRefType(targetBaseType);
+                ptr->setSize(_memSpecs.sizeofUnsignedLong);
+                if (targetBaseType->id() > 0 && targetBaseType->id() != siCreatred)
+                    insertUsedBy(ptr);
+                targetBaseType = ptr;
+            }
+        }
+        else
+            factoryError("Could not find target BaseType.");
+    }
 
     switch (srcSymbol.type()) {
     case stVariableDecl:
@@ -1438,6 +1560,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
                     break;
 
                 case tcIgnore:
+                    changeType = false;
                     debugmsg(QString("Not changing \"%0\" of %1 (0x%2) from \"%3\" to \"%4\"")
                              .arg(member->name())
                              .arg(member->belongsTo()->prettyName())
@@ -1446,11 +1569,12 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
                                       member->refType()->prettyName() :
                                       QString("???"))
                              .arg(targetBaseType->prettyName()));
-                    changeType = false;
                     break;
 
                 case tcConflict:
-                    factoryError(QString("Conflicting target types: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
+                    changeType = false;
+                    ++_conflictingTypeChanges;
+                    debugerr(QString("Conflicting target types: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
                                  .arg(member->refType() ?
                                           member->refType()->prettyName() :
                                           QString("???"))
@@ -1461,6 +1585,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 
                 case tcReplace:
                     changeType = true;
+                    ++_typesReplaced;
                     break;
                 }
             }
@@ -1469,6 +1594,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
             if (changeType) {
                 /// @todo may need to adjust member->memberOffset() somehow
                 ++membersChanged;
+                ++_totalTypesChanged;
                 member->setRefType(targetBaseType);
                 member->setRefTypeId(targetBaseType->id());
             }
@@ -1478,6 +1604,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
     if (!membersFound)
         factoryError("Did not find any members to adjust!");
     else if (membersChanged) {
+        ++_uniqeTypesChanged;
         QStringList ctxTypes;
         for (int i = 0; i < ctxBaseTypes.size(); ++i)
             if (ctxBaseTypes[i])
@@ -1525,7 +1652,7 @@ SymFactory::TypeConflicts SymFactory::compareConflictingTypes(
         factoryError("At least one of the given BaseTypes is null!");
 
     // Do we have conflicting target types?
-    if (oldType->id() == newType->id())
+    if (oldType->id() == newType->id() && oldType->id() != siCreatred)
         return tcNoConflict;
 
     // Compare the conflicting types

@@ -289,6 +289,11 @@ public:
 	void symbolsFinished(RestoreType rt);
 
 	/**
+	 * Prints out some statistics about the parsed source.
+	 */
+	void sourceParcingFinished();
+
+	/**
      * This function is mainly for debugging purposes.
 	 * @return some statistics about the types with missing references
 	 */
@@ -555,6 +560,8 @@ private:
     TypeConflicts compareConflictingTypes(const BaseType* oldType,
                                           const BaseType* newType);
 
+    BaseTypeList typedefsOfType(BaseType* type);
+
 
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
@@ -575,6 +582,10 @@ private:
 	int _typeFoundByHash;
 	int _structListHeadCount;
 	int _structHListNodeCount;
+	int _uniqeTypesChanged;
+	int _totalTypesChanged;
+	int _typesReplaced;
+	int _conflictingTypeChanges;
 	quint32 _maxTypeSize;
 };
 
