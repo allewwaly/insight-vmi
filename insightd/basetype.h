@@ -118,6 +118,18 @@ public:
             int resolveTypes = trLexicalPointersArrays, int *depth = 0) const;
 
     /**
+     * If this is a referencing type, all types are successively dereferenced
+     * until the final non-referencing type is revealed
+     * @param resolveTypes which types to automatically resolve, see
+     * TypeResolution
+     * @param depth how many types have been dereferenced
+     * @return non-referencing base type if this is a referencing type, \c this
+     * otherwise
+     */
+    BaseType* dereferencedBaseType(
+            int resolveTypes = trLexicalPointersArrays, int *depth = 0);
+
+    /**
      * Create a hash of that type based on type(), size() and name().
      * @return a hash value of this type
      */
