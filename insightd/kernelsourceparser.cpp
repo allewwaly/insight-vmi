@@ -135,6 +135,8 @@ void KernelSourceParser::parse()
 
      shell->out() << "\rParsed " << _filesDone << " files in " << elapsedTime()
              << endl;
+
+     _factory->sourceParcingFinished();
 }
 
 
