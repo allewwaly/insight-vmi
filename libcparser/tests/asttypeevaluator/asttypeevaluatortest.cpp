@@ -365,6 +365,7 @@ TEST_FUNCTION(ignoredTypeChanges)
 }
 
 
+
 TEST_FUNCTION(structInitializers)
 {
     TEST_DATA_COLUMNS;
@@ -374,7 +375,9 @@ TEST_FUNCTION(structInitializers)
     QTest::newRow("structInitEqual3") << "" << "struct list_head foo = { .prev = h, .next = h };" << false;
     QTest::newRow("structInitEqual4") << "" << "struct list_head foo = { &m->list, &m->list };" << false;
     QTest::newRow("structInitEqual5") << "" << "struct module foo = { .foo = 0, .list = { h, h } };" << false;
-    QTest::newRow("structInitEqual5") << "" << "struct module foo = { 0, { h, h } };" << false;
+    QTest::newRow("structInitEqual6") << "" << "struct module foo = { .foo = 0 };" << false;
+    QTest::newRow("structInitEqual7") << "" << "struct module foo = { .list = { h, h } };" << false;
+    QTest::newRow("structInitEqual8") << "" << "struct module foo = { 0, { h, h } };" << false;
 
     QTest::newRow("structInitChanges1") << "" << "struct list_head foo = { .prev = m, .next = h };" << true
         << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
@@ -390,6 +393,15 @@ TEST_FUNCTION(structInitializers)
         << "m" << "Pointer->Struct(module)" << "" << "Int32";
     QTest::newRow("structInitChanges7") << "" << "struct module foo = { .foo = 0, .list = { m, h } };" << true
         << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
+    QTest::newRow("structInitChanges8") << "" << "struct module foo = { .foo = m };" << true
+        << "m" << "Pointer->Struct(module)" << "" << "Int32";
+    QTest::newRow("structInitChanges9") << "" << "struct module foo = { .list = { m, h } };" << true
+        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
+    QTest::newRow("structInitChanges10") << "" << "struct module foo = { .list = { h, m } };" << true
+        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
+    QTest::newRow("structInitChanges11") << "struct bar { int i; int (*func)(); };\nint ifunc() { return 0; }" << "struct bar foo = { .func = m };" << true
+        << "m" << "Pointer->Struct(module)" << "" << "FuncPointer->Int32";
+    QTest::newRow("structInitChanges12") << "struct bar { int i; int (*func)(); };\nint ifunc() { return 0; }" << "struct bar foo = { .func = ifunc };" << false;
 }
 
 
