@@ -115,7 +115,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
             n = n->parent;
         ASTSourcePrinter printer(_ast);
         shell->out()
-                << "File: " << _ast->fileName()
+                << "File: " << _ast->fileName() << endl
                 << "------------------[Source]------------------" << endl
                 << printer.toString(n, true)
                 << "------------------[/Source]-----------------" << endl;
