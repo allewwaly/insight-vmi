@@ -76,7 +76,8 @@ protected:
     	erNoPointerAssignment,
         erIntegerArithmetics,
     	erTypesAreEqual,
-        erTypesAreDifferent
+        erTypesAreDifferent,
+        erLeftHandSide
     };
 
 //    virtual void beforeChildren(pASTNode node, int flags);

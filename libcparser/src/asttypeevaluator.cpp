@@ -2253,11 +2253,15 @@ void ASTTypeEvaluator::afterChildren(pASTNode node, int /* flags */)
 
 ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNode node)
 {
-    // We are only interested in primary expressions having an identifier
+    // We are only interested in primary expressions
     if (!node || node->type != nt_primary_expression)
     	return erNoPrimaryExpression;
+    // The primary expressions must have an identifier
     if (!node->u.primary_expression.identifier)
         return erNoIdentifier;
+    // If the identifier has a leading dot, is it used as initializer identifier
+    if (node->u.primary_expression.hasDot)
+        return erLeftHandSide;
 
     // Is this somewhere in the right-hand of an assignment expression or
     // of an init declarator?
