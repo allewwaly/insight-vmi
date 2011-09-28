@@ -72,28 +72,52 @@ bool Structured::memberExists(const QString& memberName) const
     return _memberNames.indexOf(memberName) >= 0;
 }
 
-
-StructuredMember* Structured::findMember(const QString& memberName)
+template<class T, class S>
+inline T* Structured::findMember(const QString& memberName, bool recursive) const
 {
-    for (MemberList::const_iterator it = _members.constBegin();
-        it != _members.constEnd(); ++it)
+    for (MemberList::const_iterator it = _members.begin();
+        it != _members.end(); ++it)
     {
         if ((*it)->name() == memberName)
             return *it;
     }
-    return 0;
+
+    T* result = 0;
+
+    // If we didn't find the member yet, try all anonymous structs/unions
+    if (recursive) {
+        for (MemberList::const_iterator it = _members.begin();
+            !result && it != _members.end(); ++it)
+        {
+            T* m = *it;
+            // Look out for anonymous struct or union members
+            if (m->refType() && (m->refType()->type() & StructOrUnion) &&
+                m->name().isEmpty() && m->refType()->name().isEmpty())
+            {
+                S* s = dynamic_cast<S*>(m->refType());
+                assert(s != 0);
+                result = s->findMember<T, S>(memberName, recursive);
+            }
+        }
+    }
+
+    return result;
+
 }
 
 
-const StructuredMember* Structured::findMember(const QString& memberName) const
+StructuredMember* Structured::findMember(const QString& memberName,
+                                         bool recursive)
 {
-    for (MemberList::const_iterator it = _members.constBegin();
-        it != _members.constEnd(); ++it)
-    {
-        if ((*it)->name() == memberName)
-            return *it;
-    }
-    return 0;
+    return findMember<StructuredMember, Structured>(memberName, recursive);
+}
+
+
+const StructuredMember* Structured::findMember(const QString& memberName,
+                                               bool recursive) const
+{
+    return findMember<const StructuredMember, const Structured>(
+                memberName, recursive);
 }
 
 

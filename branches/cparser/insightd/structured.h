@@ -77,16 +77,20 @@ public:
 	/**
 	 * Searches for a member with the name \a memberName
 	 * @param memberName name of the member to search
+	 * @param recursive also search in nested, anonymous structs and unions
 	 * @return the member, if it exists, \c 0 otherwise
 	 */
-	StructuredMember* findMember(const QString& memberName);
+	StructuredMember* findMember(const QString& memberName,
+								 bool recursive = true);
 
     /**
      * Searches for a member with the name \a memberName (const version)
      * @param memberName name of the member to search
+     * @param recursive also search in nested, anonymous structs and unions
      * @return the member, if it exists, \c 0 otherwise
      */
-    const StructuredMember* findMember(const QString& memberName) const;
+    const StructuredMember* findMember(const QString& memberName,
+                                       bool recursive = true) const;
 
     /**
      * Reads a serialized version of this object from \a in.
@@ -112,6 +116,17 @@ public:
 protected:
 	MemberList _members;
 	QStringList _memberNames;
+
+private:
+    /**
+     * Searches for a member with the name \a memberName (const version)
+     * @param memberName name of the member to search
+     * @param recursive also search in nested, anonymous structs and unions
+     * @return the member, if it exists, \c 0 otherwise
+     */
+    template<class T, class S>
+    T* findMember(const QString& memberName, bool recursive = true) const;
+
 };
 
 

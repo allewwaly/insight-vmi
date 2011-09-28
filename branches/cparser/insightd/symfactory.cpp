@@ -891,7 +891,7 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     // to the next "children". So we catch special cases like this here.
     int extraOffset = -member->offset();
     if (member->name() == "children") {
-        StructuredMember *sibling = parent->findMember("sibling");
+        StructuredMember *sibling = parent->findMember("sibling", false);
         if (sibling)
             extraOffset = -sibling->offset();
     }
@@ -1403,6 +1403,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
             }
             else {
                 // Create a copy of the embedding struct before manipulation
+                /// @todo What happens hier if member is inside an anonymous struct?
                 Structured* s = dynamic_cast<Structured*>(nestingMember->refType());
                 assert(s != 0);
                 Structured* refTypeCopy = makeStructCopy(s);
