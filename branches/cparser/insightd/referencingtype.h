@@ -187,7 +187,7 @@ inline int ReferencingType::origRefTypeId() const
 inline void ReferencingType::setRefTypeId(int id)
 {
     if (_origRefTypeId < 0)
-        _origRefTypeId = _refTypeId;
+        _origRefTypeId = (_refTypeId < 0) ? id : _refTypeId;
     _refTypeId = id;
 }
 
