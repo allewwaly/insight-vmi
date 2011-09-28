@@ -2391,9 +2391,13 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
             // The negation operator results in a boolean expression
             if ("!" == op)
                 return erNoAssignmentUse;
+            // If the address of something is casted or assigned to something
+            // else, we cannot record this anyhow
+            if ("&" == op)
+                return erNoAssignmentUse;
             // Dereferencing is a type usage, so if the type has already been
             // casted, this is the first effective type change
-            if (("*" == op || "&" == op) && castExNode)
+            if (("*" == op) && castExNode)
                 goto cast_expression_type_change;
             }
             break;
