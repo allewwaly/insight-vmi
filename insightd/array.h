@@ -98,5 +98,14 @@ inline void Array::setLength(qint32 len)
 }
 
 
+inline uint Array::size() const
+{
+    if (_length > 0) {
+        const BaseType* t = refType();
+        return t ? t->size() * _length : Pointer::size();
+    }
+    else
+        return Pointer::size();
+}
 
 #endif /* ARRAY_H_ */

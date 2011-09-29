@@ -41,8 +41,9 @@ uint Array::hash() const
 QString Array::prettyName() const
 {
     QString len = (_length >= 0) ? QString::number(_length) : QString();
-    if (_refType)
-        return QString("%1[%2]").arg(_refType->prettyName()).arg(len);
+    const BaseType* t = refType();
+    if (t)
+        return QString("%1[%2]").arg(t->prettyName()).arg(len);
     else
         return QString("[%1]").arg(len);
 }
@@ -50,15 +51,16 @@ QString Array::prettyName() const
 
 QString Array::toString(QIODevice* mem, size_t offset) const
 {
-    assert(_refType != 0);
+    QString result;
 
-    QString errMsg;
+    const BaseType* t = refType();
+    assert(t != 0);
 
-	// Is this possibly a string?
-    if (_refType && _refType->type() == rtInt8) {
-        QString s = readString(mem, offset, _length > 0 ? _length : 256, &errMsg);
+    // Is this possibly a string?
+    if (t && t->type() == rtInt8) {
+        QString s = readString(mem, offset, _length > 0 ? _length : 256, &result);
 
-        if (errMsg.isEmpty())
+        if (result.isEmpty())
             return QString("\"%1\"").arg(s);
     }
     else {
@@ -66,7 +68,7 @@ QString Array::toString(QIODevice* mem, size_t offset) const
             // Output all array members
             QString s = "(";
             for (int i = 0; i < _length; i++) {
-                s += _refType->toString(mem, offset + i * _refType->size());
+                s += t->toString(mem, offset + i * t->size());
                 if (i+1 < _length)
                     s += ", ";
             }
@@ -77,16 +79,7 @@ QString Array::toString(QIODevice* mem, size_t offset) const
             return "(...)";
     }
 
-    return errMsg;
-}
-
-
-uint Array::size() const
-{
-    if (_refType && _length > 0)
-        return _refType->size() * _length;
-    else
-        return Pointer::size();
+    return result;
 }
 
 

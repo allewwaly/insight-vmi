@@ -15,6 +15,7 @@
 #include "sourceref.h"
 #include "basetype.h"
 #include "instance.h"
+#include "symfactory.h"
 #include "debug.h"
 
 
@@ -46,8 +47,9 @@ public:
     {
         // We put the implementation in the header to allow the compiler to
         // inline the code
-        assert(_refType != 0);
-        return _refType->value<T>(mem, _offset);
+        const BaseType* t = refType();
+        assert(t != 0);
+        return t->value<T>(mem, _offset);
     }
 
     /**
@@ -59,9 +61,22 @@ public:
     {
         // We put the implementation in the header to allow the compiler to
         // inline the code
-        assert(_refType != 0);
-        return _refType->value<T>(mem, _offset);
+        const BaseType* t = refType();
+        assert(t != 0);
+        return t->value<T>(mem, _offset);
     }
+
+    /**
+     * Getter for the directly referenced type, const version
+     * @return the type this referencing type directly points to
+     */
+    virtual const BaseType* refType() const;
+
+    /**
+     * Getter for the directly referenced type
+     * @return the type this referencing type directly points to
+     */
+    virtual BaseType* refType();
 
     /**
      * This gives a pretty name of that variable in a C-style definition.
@@ -114,19 +129,6 @@ protected:
 	size_t _offset;
 };
 
-
-inline size_t Variable::offset() const
-{
-    return _offset;
-}
-
-
-inline void Variable::setOffset(size_t offset)
-{
-    _offset = offset;
-}
-
-
 /**
 * Operator for native usage of the Variable class for streams
 * @param in data stream to read from
@@ -144,4 +146,34 @@ QDataStream& operator>>(QDataStream& in, Variable& var);
 */
 QDataStream& operator<<(QDataStream& out, const Variable& var);
 
+
+inline size_t Variable::offset() const
+{
+    return _offset;
+}
+
+
+inline void Variable::setOffset(size_t offset)
+{
+    _offset = offset;
+}
+
 #endif /* VARIABLE_H_ */
+
+#include "symfactory.h"
+
+#if !defined(VARIABLE_H_INLINE) && defined(SYMFACTORY_DEFINED)
+#define VARIABLE_H_INLINE
+
+inline const BaseType* Variable::refType() const
+{
+    return _factory ? _factory->findBaseTypeById(_id) : 0;
+}
+
+
+inline BaseType* Variable::refType()
+{
+    return _factory ? _factory->findBaseTypeById(_id) : 0;
+}
+
+#endif /* VARIABLE_H_INLINE */

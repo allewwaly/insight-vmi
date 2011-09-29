@@ -40,6 +40,18 @@ public:
     virtual uint size() const;
 
     /**
+     * Getter for the directly referenced type, const version
+     * @return the type this referencing type directly points to
+     */
+    virtual const BaseType* refType() const;
+
+    /**
+     * Getter for the directly referenced type
+     * @return the type this referencing type directly points to
+     */
+    virtual BaseType* refType();
+
+    /**
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
@@ -81,4 +93,32 @@ public:
 };
 
 
+inline uint RefBaseType::size() const
+{
+    if (!_size) {
+        const BaseType* t = refType();
+        return t ? t->size() : _size;
+    }
+    else
+        return _size;
+}
+
 #endif /* REFBASETYPE_H_ */
+
+#include "symfactory.h"
+
+#if !defined(REFBASETYPE_H_INLINE) && defined(SYMFACTORY_DEFINED)
+#define REFBASETYPE_H_INLINE
+
+inline const BaseType* RefBaseType::refType() const
+{
+    return _factory ? _factory->findBaseTypeById(_id) : 0;
+}
+
+
+inline BaseType* RefBaseType::refType()
+{
+    return _factory ? _factory->findBaseTypeById(_id) : 0;
+}
+#endif /* REFBASETYPE_H_INLINE */
+

@@ -8,7 +8,7 @@
 #include "symbol.h"
 
 Symbol::Symbol(SymFactory* factory)
-    : _id(-1), _factory(factory)
+    : _id(0), _factory(factory)
 {
 }
 

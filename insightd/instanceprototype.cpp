@@ -222,7 +222,7 @@ InstanceList InstancePrototype::Members() const
 int InstancePrototype::TypeId() const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) && inst->type() ? inst->type()->id() : -1;
+	return ((inst = thisInstance())) && inst->type() ? inst->type()->id() : 0;
 }
 
 

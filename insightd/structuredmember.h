@@ -48,6 +48,18 @@ public:
     void setOffset(size_t offset);
 
     /**
+     * Getter for the directly referenced type, const version
+     * @return the type this referencing type directly points to
+     */
+    virtual const BaseType* refType() const;
+
+    /**
+     * Getter for the directly referenced type
+     * @return the type this referencing type directly points to
+     */
+    virtual BaseType* refType();
+
+    /**
      * This gives a pretty name of that type which may involve referencing
      * types.
      * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
@@ -109,5 +121,21 @@ QDataStream& operator>>(QDataStream& in, StructuredMember& member);
  */
 QDataStream& operator<<(QDataStream& out, const StructuredMember& member);
 
-
 #endif /* STRUCTUREDMEMBER_H_ */
+
+#include "symfactory.h"
+
+#if !defined(STRUCTUREDMEMBER_H_INLINE) && defined(SYMFACTORY_DEFINED)
+#define STRUCTUREDMEMBER_H_INLINE
+
+inline const BaseType* StructuredMember::refType() const
+{
+    return _factory ? _factory->findBaseTypeById(_id) : 0;
+}
+
+
+inline BaseType* StructuredMember::refType()
+{
+    return _factory ? _factory->findBaseTypeById(_id) : 0;
+}
+#endif /* STRUCTUREDMEMBER_H_INLINE */

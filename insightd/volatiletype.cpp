@@ -28,8 +28,9 @@ RealType VolatileType::type() const
 
 QString VolatileType::prettyName() const
 {
-    if (_refType)
-        return "volatile " + _refType->prettyName();
+    const BaseType* t = refType();
+    if (t)
+        return "volatile " + t->prettyName();
     else
         return "volatile";
 }

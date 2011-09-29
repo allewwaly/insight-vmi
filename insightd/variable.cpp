@@ -24,14 +24,16 @@ Variable::Variable(SymFactory* factory, const TypeInfo& info)
 
 QString Variable::prettyName() const
 {
-    // Shorten the type name, if required
-    QString s_typename = "(unresolved type)";
-    if (_refType) {
-        if (_refType->prettyName().isEmpty())
+    QString s_typename;
+    const BaseType* t = refType();
+    if (t) {
+        if (t->prettyName().isEmpty())
             s_typename = "(anonymous type)";
         else
-            s_typename = _refType->prettyName();
+            s_typename = t->prettyName();
     }
+    else
+        s_typename = "(unresolved type)";
 
     QString s_name = _name.isEmpty() ? "(none)" : _name;
 
@@ -41,8 +43,9 @@ QString Variable::prettyName() const
 
 QString Variable::toString(QIODevice* mem) const
 {
-    if (_refType)
-        return _refType->toString(mem, _offset);
+    const BaseType* t = refType();
+    if (t)
+        return t->toString(mem, _offset);
     else
         return QString();
 }

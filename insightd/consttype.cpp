@@ -27,8 +27,9 @@ RealType ConstType::type() const
 
 QString ConstType::prettyName() const
 {
-    if (_refType)
-        return "const " + _refType->prettyName();
+    const BaseType* t = refType();
+    if (t)
+        return "const " + t->prettyName();
     else
         return "const";
 }

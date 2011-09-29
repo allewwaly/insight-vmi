@@ -97,30 +97,6 @@ void SymFactory::clear()
 }
 
 
-BaseType* SymFactory::findBaseTypeById(int id) const
-{
-	return _typesById.value(id);
-}
-
-
-Variable* SymFactory::findVarById(int id) const
-{
-	return _varsById.value(id);
-}
-
-
-BaseType* SymFactory::findBaseTypeByName(const QString & name) const
-{
-	return _typesByName.value(name);
-}
-
-
-Variable* SymFactory::findVarByName(const QString & name) const
-{
-	return _varsByName.value(name);
-}
-
-
 BaseType* SymFactory::createEmptyType(RealType type)
 {
     BaseType* t = 0;
@@ -248,11 +224,7 @@ T* SymFactory::getTypeInstance(const TypeInfo& info)
             p->setSize(_memSpecs.sizeofUnsignedLong);
     }
 
-    RefBaseType* rbt = 0;
-    // Try to resolve the reference for the hash
-    if ( (rbt = dynamic_cast<RefBaseType*>(t)) ) {
-        rbt->setRefType(findBaseTypeById(rbt->refTypeId()));
-    }
+    RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
 
     // Try to find the type based on its hash, but only if we don't have
     // any unresolved types
@@ -585,9 +557,6 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
                     old_hash = rbt->hash();
                 }
 
-                // Add the missing reference according to type
-                t->setRefType(target);
-
                 // For a RefBaseType only, not for a Variable/StructuredMember:
                 // Remove type at its old index, re-add it at its new index
                 if (rbt) {
@@ -632,33 +601,33 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 {
 	switch (info.symType()) {
 	case hsArrayType:
-		return info.id() != -1 && info.refTypeId() != -1 /*&& info.upperBound() != -1*/;
+		return info.id() != 0 && info.refTypeId() != 0 /*&& info.upperBound() != -1*/;
 	case hsBaseType:
-		return info.id() != -1 && info.byteSize() > 0 && info.enc() != eUndef;
+		return info.id() != 0 && info.byteSize() > 0 && info.enc() != eUndef;
 	case hsCompileUnit:
-		return info.id() != -1 && !info.name().isEmpty() && !info.srcDir().isEmpty();
+		return info.id() != 0 && !info.name().isEmpty() && !info.srcDir().isEmpty();
 	case hsConstType:
-		return info.id() != -1 /*&& info.refTypeId() != -1*/;
+		return info.id() != 0 /*&& info.refTypeId() != 0*/;
 	case hsEnumerationType:
 		// TODO: Check if this is correct
 		// It seems like it is possible to have an enum without any enumvalues.
-		// return info.id() != -1 && !info.enumValues().isEmpty();
-		return info.id() != -1;
+		// return info.id() != 0 && !info.enumValues().isEmpty();
+		return info.id() != 0;
 	case hsSubroutineType:
-        return info.id() != -1;
+		return info.id() != 0;
 	case hsMember:
-		return info.id() != -1 && info.refTypeId() != -1 /*&& info.dataMemberLocation() != -1*/; // location not required
+		return info.id() != 0 && info.refTypeId() != 0 /*&& info.dataMemberLocation() != -1*/; // location not required
 	case hsPointerType:
-		return info.id() != -1 && info.byteSize() > 0;
+		return info.id() != 0 && info.byteSize() > 0;
 	case hsUnionType:
 	case hsStructureType:
-		return info.id() != -1 /*&& info.byteSize() > 0*/; // name not required
+		return info.id() != 0 /*&& info.byteSize() > 0*/; // name not required
 	case hsTypedef:
-		return info.id() != -1 && info.refTypeId() != -1 && !info.name().isEmpty();
+		return info.id() != 0 && info.refTypeId() != 0 && !info.name().isEmpty();
 	case hsVariable:
-		return info.id() != -1 /*&& info.refTypeId() != -1*/ && info.location() > 0 /*&& !info.name().isEmpty()*/;
+		return info.id() != 0 /*&& info.refTypeId() != 0*/ && info.location() > 0 /*&& !info.name().isEmpty()*/;
 	case hsVolatileType:
-        return info.id() != -1 && info.refTypeId() != -1;
+		return info.id() != 0 && info.refTypeId() != 0;
 	default:
 		return false;
 	}
@@ -862,7 +831,7 @@ bool SymFactory::resolveReference(ReferencingType* ref)
     if (ref->refType())
         return true;
     // Don't try to resolve types without valid ID
-    else if (ref->refTypeId() <= 0)
+    else if (ref->refTypeId() == 0)
     	return false;
 
     BaseType* base = 0;
@@ -872,7 +841,6 @@ bool SymFactory::resolveReference(ReferencingType* ref)
         return false;
     }
     else {
-        ref->setRefType(base);
         insertUsedBy(ref);
         return true;
     }
@@ -908,7 +876,6 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     _customTypes.append(nextPtr);
     nextPtr->setId(0);
     nextPtr->setRefTypeId(parent->id());
-    nextPtr->setRefType(parent);
     nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
     // To dereference this pointer, the member's offset has to be subtracted
     nextPtr->setMacroExtraOffset(extraOffset);
@@ -918,7 +885,6 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     next->setName("next");
     next->setOffset(0);
     next->setRefTypeId(nextPtr->id());
-    next->setRefType(nextPtr);
     ret->addMember(next);
 
     //Create "prev" pointer
@@ -929,7 +895,6 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     prev->setName("prev");
     prev->setOffset(_memSpecs.sizeofUnsignedLong);
     prev->setRefTypeId(prevPtr->id());
-    prev->setRefType(prevPtr);
     ret->addMember(prev);
 
     return ret;
@@ -957,7 +922,6 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     _customTypes.append(nextPtr);
     nextPtr->setId(0);
     nextPtr->setRefTypeId(parent->id());
-    nextPtr->setRefType(parent);
     nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
     insertUsedBy(nextPtr);
     // To dereference this pointer, the member's offset has to be subtracted
@@ -968,7 +932,6 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     next->setName("next");
     next->setOffset(0);
     next->setRefTypeId(nextPtr->id());
-    next->setRefType(nextPtr);
     insertUsedBy(next);
     ret->addMember(next);
 
@@ -980,8 +943,6 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     Pointer* pprevPtr = new Pointer(this);
     _customTypes.append(pprevPtr);
     pprevPtr->setId(0);
-    pprevPtr->setRefTypeId(prevPtr->id());
-    pprevPtr->setRefType(prevPtr);
     pprevPtr->setSize(_memSpecs.sizeofUnsignedLong);
     insertUsedBy(pprevPtr);
 
@@ -990,7 +951,6 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     pprev->setName("pprev");
     pprev->setOffset(_memSpecs.sizeofUnsignedLong);
     pprev->setRefTypeId(pprevPtr->id());
-    pprev->setRefType(pprevPtr);
     insertUsedBy(pprev);
     ret->addMember(pprev);
 
@@ -1030,14 +990,13 @@ bool SymFactory::resolveReference(StructuredMember* member)
     if (member->refType())
         return true;
     // Don't try to resolve types without valid ID
-    else if (member->refTypeId() <= 0)
+    else if (member->refTypeId() == 0)
         return false;
 
     BaseType* base = findBaseTypeById(member->refTypeId());
 
     if (member->refTypeId() == siListHead || isStructListHead(base)) {
         Struct* list_head = makeStructListHead(member);
-        member->setRefType(list_head);
         member->setRefTypeId(list_head->id());
         insertUsedBy(member);
         _structListHeadCount++;
@@ -1045,7 +1004,6 @@ bool SymFactory::resolveReference(StructuredMember* member)
     }
     else if (member->refTypeId() == siHListNode || isStructHListNode(base)) {
         Struct* hlist_node = makeStructHListNode(member);
-        member->setRefType(hlist_node);
         member->setRefTypeId(hlist_node->id());
         insertUsedBy(member);
         _structHListNodeCount++;
@@ -1458,9 +1416,8 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
                 _customTypes.append(ptr);
                 ptr->setId(siCreatred);
                 ptr->setRefTypeId(targetBaseType->id());
-                ptr->setRefType(targetBaseType);
                 ptr->setSize(_memSpecs.sizeofUnsignedLong);
-                if (targetBaseType->id() > 0 && targetBaseType->id() != siCreatred)
+                if (targetBaseType->id() != 0 && targetBaseType->id() != siCreatred)
                     insertUsedBy(ptr);
                 targetBaseType = ptr;
             }
@@ -1532,7 +1489,6 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
                 Structured* s = dynamic_cast<Structured*>(nestingMember->refType());
                 assert(s != 0);
                 Structured* refTypeCopy = makeStructCopy(s);
-                nestingMember->setRefType(refTypeCopy);
                 nestingMember->setRefTypeId(refTypeCopy->id());
                 member = refTypeCopy->findMember(ctxMembers.last());
                 assert(member != 0);
@@ -1598,7 +1554,6 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
                 /// @todo may need to adjust member->memberOffset() somehow
                 ++membersChanged;
                 ++_totalTypesChanged;
-                member->setRefType(targetBaseType);
                 member->setRefTypeId(targetBaseType->id());
             }
         }
@@ -1636,7 +1591,6 @@ void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
         Variable* v = vars[i];
         if (v->refType() && v->refType()->hash() == targetBaseType->hash()) {
             ++varsFound;
-            v->setRefType(targetBaseType);
             v->setRefTypeId(targetBaseType->id());
         }
     }

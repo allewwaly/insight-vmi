@@ -15,13 +15,13 @@
 #include <assert.h>
 
 ReferencingType::ReferencingType()
-    : _refType(0), _refTypeId(-1), _origRefTypeId(-1)
+    : _refTypeId(0), _origRefTypeId(0)
 {
 }
 
 
 ReferencingType::ReferencingType(const TypeInfo& info)
-    : _refType(0), _refTypeId(info.refTypeId()), _origRefTypeId(_refTypeId)
+    : _refTypeId(info.refTypeId()), _origRefTypeId(_refTypeId)
 {
 }
 
@@ -33,11 +33,12 @@ ReferencingType::~ReferencingType()
 
 const BaseType* ReferencingType::refTypeDeep(int resolveTypes) const
 {
-    if ( !_refType && !(_refType->type() & resolveTypes) )
-        return _refType;
+    const BaseType* t = refType();
+    if ( !t || !(t->type() & resolveTypes) )
+        return t;
 
     const ReferencingType* prev = this;
-    const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(_refType);
+    const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
     while (rbt && (rbt->type() & resolveTypes)) {
         prev = rbt;
         rbt = dynamic_cast<const RefBaseType*>(rbt->refType());
@@ -48,7 +49,6 @@ const BaseType* ReferencingType::refTypeDeep(int resolveTypes) const
 
 void ReferencingType::readFrom(QDataStream& in)
 {
-    _refType = 0;
     in >> _refTypeId >> _origRefTypeId;
 }
 
@@ -85,7 +85,10 @@ inline Instance ReferencingType::createRefInstance(size_t address,
     if (derefCount)
         *derefCount = 0;
 
-	if (!_refType)
+    // The "cursor" for resolving the type
+    const BaseType* b = refType();
+
+	if (!b)
 		return Instance();
 
     // We need to keep track of the address
@@ -96,8 +99,6 @@ inline Instance ReferencingType::createRefInstance(size_t address,
                 .arg(addr, 0, 16));
 #endif
 
-    // The "cursor" for resolving the type
-    const BaseType* b = _refType;
     const RefBaseType* rbt = 0;
     if (derefCount)
         (*derefCount)++;

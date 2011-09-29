@@ -24,26 +24,19 @@ uint RefBaseType::hash() const
 {
     if (!_typeReadFromStream) {
         _hash = BaseType::hash();
-        if (_refType)
-            _hash ^= _refType->hash();
+        const BaseType* t = refType();
+        if (t)
+            _hash ^= t->hash();
     }
     return _hash;
 }
 
 
-uint RefBaseType::size() const
-{
-    if (!_size && _refType)
-        return _refType->size();
-    else
-        return _size;
-}
-
-
 QString RefBaseType::toString(QIODevice* mem, size_t offset) const
 {
-	assert(_refType != 0);
-	return _refType->toString(mem, offset);
+    const BaseType* t = refType();
+    assert(t != 0);
+    return t->toString(mem, offset);
 }
 
 
@@ -68,3 +61,4 @@ void RefBaseType::writeTo(QDataStream& out) const
     BaseType::writeTo(out);
     ReferencingType::writeTo(out);
 }
+
