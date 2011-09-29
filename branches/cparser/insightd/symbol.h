@@ -11,6 +11,9 @@
 #include "typeinfo.h"
 #include <QDataStream>
 
+// forward declaration
+class SymFactory;
+
 /**
  * Special IDs for special symbol types
  */
@@ -27,17 +30,21 @@ enum SpecialIds {
  */
 class Symbol
 {
+    friend class SymFactory;
+
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Symbol();
+    Symbol(SymFactory* factory);
 
 	/**
 	 * Constructor
+	 * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
 	 */
-	Symbol(const TypeInfo& info);
+	Symbol(SymFactory* factory, const TypeInfo& info);
 
 	/**
 	 * Destructor
@@ -87,9 +94,21 @@ public:
      */
     virtual void writeTo(QDataStream& out) const;
 
+    /**
+     * @return the factory that created this symbol
+     */
+    SymFactory* factory() const;
+
 protected:
+    /**
+     * Sets the factory for this symbol
+     * @param factory the factory to set
+     */
+    void setFactory(SymFactory* factory);
+
     int _id;         ///< ID of this type, given by objdump
     QString _name;       ///< name of this type, e.g. "int"
+    SymFactory* _factory; ///< the factory that created this symbol
 };
 
 
@@ -114,6 +133,18 @@ inline int Symbol::id() const
 inline void Symbol::setId(int id)
 {
     _id = id;
+}
+
+
+inline SymFactory* Symbol::factory() const
+{
+    return _factory;
+}
+
+
+inline void Symbol::setFactory(SymFactory* factory)
+{
+    _factory = factory;
 }
 
 

@@ -10,14 +10,14 @@
 
 #include <assert.h>
 
-Variable::Variable()
-    : _offset(0)
+Variable::Variable(SymFactory* factory)
+	: Symbol(factory), _offset(0)
 {
 }
 
 
-Variable::Variable(const TypeInfo& info)
-	: Symbol(info), ReferencingType(info), SourceRef(info), _offset(info.location())
+Variable::Variable(SymFactory* factory, const TypeInfo& info)
+	: Symbol(factory, info), ReferencingType(info), SourceRef(info), _offset(info.location())
 {
 }
 

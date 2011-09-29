@@ -21,14 +21,16 @@ public:
 
 	/**
 	 * Constructor
+	 * @param factory the factory that created this symbol
 	 */
-	Enum();
+	Enum(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Enum(const TypeInfo& info);
+    Enum(SymFactory* factory, const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable

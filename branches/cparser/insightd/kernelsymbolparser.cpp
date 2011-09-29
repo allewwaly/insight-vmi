@@ -127,7 +127,7 @@ void KernelSymbolParser::finishLastSymbol()
             _info.addEnumValue(_subInfo.name(), _subInfo.constValue().toInt());
             break;
         case hsMember:
-            _info.members().append(new StructuredMember(_subInfo));
+            _info.members().append(new StructuredMember(_factory, _subInfo));
             break;
         default:
             parserError(QString("Unhandled sub-type: %1").arg(_subInfo.symType()));

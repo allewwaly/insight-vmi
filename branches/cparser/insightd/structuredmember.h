@@ -25,14 +25,16 @@ class StructuredMember: public Symbol, public ReferencingType, public SourceRef
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    StructuredMember();
+    StructuredMember(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    StructuredMember(const TypeInfo& info);
+    StructuredMember(SymFactory* factory, const TypeInfo& info);
 
     /**
      * @return the offset of this member within a struct or union

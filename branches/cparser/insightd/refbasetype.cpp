@@ -8,13 +8,14 @@
 #include "refbasetype.h"
 #include "debug.h"
 
-RefBaseType::RefBaseType()
+RefBaseType::RefBaseType(SymFactory* factory)
+    : BaseType(factory)
 {
 }
 
 
-RefBaseType::RefBaseType(const TypeInfo& info)
-    : BaseType(info), ReferencingType(info)
+RefBaseType::RefBaseType(SymFactory* factory, const TypeInfo& info)
+    : BaseType(factory, info), ReferencingType(info)
 {
 }
 

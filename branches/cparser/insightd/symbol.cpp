@@ -7,14 +7,14 @@
 
 #include "symbol.h"
 
-Symbol::Symbol()
-    : _id(-1)
+Symbol::Symbol(SymFactory* factory)
+    : _id(-1), _factory(factory)
 {
 }
 
 
-Symbol::Symbol(const TypeInfo& info)
-	: _id(info.id()), _name(info.name())
+Symbol::Symbol(SymFactory* factory, const TypeInfo& info)
+    : _id(info.id()), _name(info.name()), _factory(factory)
 {
 }
 

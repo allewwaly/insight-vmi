@@ -18,14 +18,16 @@ class CompileUnit: public Symbol
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    CompileUnit();
+    CompileUnit(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    CompileUnit(const TypeInfo& info);
+    CompileUnit(SymFactory* factory, const TypeInfo& info);
 
     /**
      * @return the directory name of this compilation unit

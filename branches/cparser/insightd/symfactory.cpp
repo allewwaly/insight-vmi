@@ -127,95 +127,95 @@ BaseType* SymFactory::createEmptyType(RealType type)
 
     switch (type) {
     case rtInt8:
-        t = new Int8();
+        t = new Int8(this);
         break;
 
     case rtUInt8:
-        t = new UInt8();
+        t = new UInt8(this);
         break;
 
     case rtBool8:
-        t = new Bool8();
+        t = new Bool8(this);
         break;
 
     case rtInt16:
-        t = new Int16();
+        t = new Int16(this);
         break;
 
     case rtUInt16:
-        t = new UInt16();
+        t = new UInt16(this);
         break;
 
     case rtBool16:
-        t = new Bool16();
+        t = new Bool16(this);
         break;
 
     case rtInt32:
-        t = new Int32();
+        t = new Int32(this);
         break;
 
     case rtUInt32:
-        t = new UInt32();
+        t = new UInt32(this);
         break;
 
     case rtBool32:
-        t = new Bool32();
+        t = new Bool32(this);
         break;
 
     case rtInt64:
-        t = new Int64();
+        t = new Int64(this);
         break;
 
     case rtUInt64:
-        t = new UInt64();
+        t = new UInt64(this);
         break;
 
     case rtBool64:
-        t = new Bool64();
+        t = new Bool64(this);
         break;
 
     case rtFloat:
-        t = new Float();
+        t = new Float(this);
         break;
 
     case rtDouble:
-        t = new Double();
+        t = new Double(this);
         break;
 
     case rtPointer:
-        t = new Pointer();
+        t = new Pointer(this);
         break;
 
     case rtArray:
-        t = new Array();
+        t = new Array(this);
         break;
 
     case rtEnum:
-        t = new Enum();
+        t = new Enum(this);
         break;
 
     case rtStruct:
-        t = new Struct();
+        t = new Struct(this);
         break;
 
     case rtUnion:
-        t = new Union();
+        t = new Union(this);
         break;
 
     case rtConst:
-        t = new ConstType();
+        t = new ConstType(this);
         break;
 
     case rtVolatile:
-        t = new VolatileType();
+        t = new VolatileType(this);
         break;
 
     case rtTypedef:
-        t = new Typedef();
+        t = new Typedef(this);
         break;
 
     case rtFuncPointer:
-        t = new FuncPointer();
+        t = new FuncPointer(this);
         break;
 
     default:
@@ -234,7 +234,7 @@ template<class T>
 T* SymFactory::getTypeInstance(const TypeInfo& info)
 {
     // Create a new type from the info
-    T* t = new T(info);
+    T* t = new T(this, info);
 
     if (!t)
         genericError("Out of memory.");
@@ -381,7 +381,7 @@ BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 
 Variable* SymFactory::getVarInstance(const TypeInfo& info)
 {
-	Variable* var = new Variable(info);
+	Variable* var = new Variable(this, info);
 	insert(var);
 	return var;
 }
@@ -393,6 +393,7 @@ void SymFactory::insert(const TypeInfo& info, BaseType* type)
 
 	// Only add to the list if this is a new type
 	if (isNewType(info, type)) {
+		type->setFactory(this);
 	    _types.append(type);
 	    if (type->size() > _maxTypeSize)
 	        _maxTypeSize = type->size();
@@ -408,6 +409,7 @@ void SymFactory::insert(BaseType* type)
     assert(type != 0);
 
     // Add to the list of types
+    type->setFactory(this);
     _types.append(type);
     if (type->size() > _maxTypeSize)
         _maxTypeSize = type->size();
@@ -611,6 +613,7 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
 void SymFactory::insert(CompileUnit* unit)
 {
 	assert(unit != 0);
+	unit->setFactory(this);
 	_sources.insert(unit->id(), unit);
 }
 
@@ -618,7 +621,7 @@ void SymFactory::insert(CompileUnit* unit)
 void SymFactory::insert(Variable* var)
 {
 	assert(var != 0);
-	// Check if this variable already exists
+	var->setFactory(this);
 	_vars.append(var);
 	_varsById.insert(var->id(), var);
 	_varsByName.insert(var->name(), var);
@@ -679,7 +682,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
 		break;
 	}
 	case hsCompileUnit: {
-		CompileUnit* c = new CompileUnit(info);
+		CompileUnit* c = new CompileUnit(this, info);
 		insert(c);
 		break;
 	}
@@ -882,7 +885,7 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
 
     // Create a new struct a special ID. This way, the type will be recognized
     // as "struct list_head" when the symbols are stored and loaded again.
-    Struct* ret = new Struct();
+    Struct* ret = new Struct(this);
     _customTypes.append(ret);
     Structured* parent = member->belongsTo();
 
@@ -901,7 +904,7 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     }
 
     // Create "next" pointer
-    Pointer* nextPtr = new Pointer();
+    Pointer* nextPtr = new Pointer(this);
     _customTypes.append(nextPtr);
     nextPtr->setId(0);
     nextPtr->setRefTypeId(parent->id());
@@ -910,7 +913,7 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     // To dereference this pointer, the member's offset has to be subtracted
     nextPtr->setMacroExtraOffset(extraOffset);
 
-    StructuredMember* next = new StructuredMember(); // deleted by ~Structured()
+    StructuredMember* next = new StructuredMember(this); // deleted by ~Structured()
     next->setId(0);
     next->setName("next");
     next->setOffset(0);
@@ -921,7 +924,7 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     //Create "prev" pointer
     Pointer* prevPtr = new Pointer(*nextPtr);
     _customTypes.append(prevPtr);
-    StructuredMember* prev = new StructuredMember(); // deleted by ~Structured()
+    StructuredMember* prev = new StructuredMember(this); // deleted by ~Structured()
     prev->setId(0);
     prev->setName("prev");
     prev->setOffset(_memSpecs.sizeofUnsignedLong);
@@ -939,7 +942,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
 
     // Create a new struct a special ID. This way, the type will be recognized
     // as "struct list_head" when the symbols are stored and loaded again.
-    Struct* ret = new Struct();
+    Struct* ret = new Struct(this);
     _customTypes.append(ret);
     Structured* parent = member->belongsTo();
 
@@ -950,7 +953,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     int extraOffset = -member->offset();
 
     // Create "next" pointer
-    Pointer* nextPtr = new Pointer();
+    Pointer* nextPtr = new Pointer(this);
     _customTypes.append(nextPtr);
     nextPtr->setId(0);
     nextPtr->setRefTypeId(parent->id());
@@ -960,7 +963,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     // To dereference this pointer, the member's offset has to be subtracted
     nextPtr->setMacroExtraOffset(extraOffset);
 
-    StructuredMember* next = new StructuredMember(); // deleted by ~Structured()
+    StructuredMember* next = new StructuredMember(this); // deleted by ~Structured()
     next->setId(0);
     next->setName("next");
     next->setOffset(0);
@@ -974,7 +977,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     _customTypes.append(prevPtr);
 
     // Create the "pprev" pointer which points to the "prev" pointer
-    Pointer* pprevPtr = new Pointer();
+    Pointer* pprevPtr = new Pointer(this);
     _customTypes.append(pprevPtr);
     pprevPtr->setId(0);
     pprevPtr->setRefTypeId(prevPtr->id());
@@ -982,7 +985,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     pprevPtr->setSize(_memSpecs.sizeofUnsignedLong);
     insertUsedBy(pprevPtr);
 
-    StructuredMember* pprev = new StructuredMember(); // deleted by ~Structured()
+    StructuredMember* pprev = new StructuredMember(this); // deleted by ~Structured()
     pprev->setId(0);
     pprev->setName("pprev");
     pprev->setOffset(_memSpecs.sizeofUnsignedLong);
@@ -1001,8 +1004,8 @@ Structured* SymFactory::makeStructCopy(Structured* source)
         return 0;
 
     Structured* dest = (source->type() == rtStruct) ?
-                (Structured*)new Struct() :
-                (Structured*)new Union();
+                (Structured*)new Struct(this) :
+                (Structured*)new Union(this);
     _customTypes.append(dest);
 
     // Use the symbol r/w mechanism to create the copy
@@ -1447,8 +1450,8 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
                 // Create "next" pointer
                 Pointer* ptr = 0;
                 switch (targetPointers[j]->type()) {
-                case rtArray: ptr = new Array(); break;
-                case rtPointer: ptr = new Pointer(); break;
+                case rtArray: ptr = new Array(this); break;
+                case rtPointer: ptr = new Pointer(this); break;
                 default: factoryError("Unexpected type: " +
                                       realTypeToStr(targetPointers[j]->type()));
                 }

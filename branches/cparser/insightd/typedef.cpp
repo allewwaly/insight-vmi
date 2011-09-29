@@ -7,13 +7,14 @@
 
 #include "typedef.h"
 
-Typedef::Typedef()
+Typedef::Typedef(SymFactory* factory)
+    : RefBaseType(factory)
 {
 }
 
 
-Typedef::Typedef(const TypeInfo& info)
-	: RefBaseType(info)
+Typedef::Typedef(SymFactory* factory, const TypeInfo& info)
+    : RefBaseType(factory, info)
 {
 }
 

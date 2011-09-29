@@ -26,14 +26,16 @@ class Variable: public Symbol, public ReferencingType, public SourceRef
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Variable();
+    Variable(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Variable(const TypeInfo& info);
+    Variable(SymFactory* factory, const TypeInfo& info);
 
     /**
      * Generic value function that will return the data as any type

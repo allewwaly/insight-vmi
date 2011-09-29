@@ -23,18 +23,20 @@ public:
 
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    NumericBaseType()
-        : _type(realType)
+    NumericBaseType(SymFactory* factory)
+        : BaseType(factory), _type(realType)
     {
     }
 
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
      */
-    NumericBaseType(const TypeInfo& info)
-        : BaseType(info), _type(realType)
+    NumericBaseType(SymFactory* factory, const TypeInfo& info)
+        : BaseType(factory, info), _type(realType)
     {
     }
 
@@ -60,18 +62,20 @@ class IntegerBaseType: public NumericBaseType<T, realType>
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    IntegerBaseType()
-        : _bitSize(-1), _bitOffset(-1)
+    IntegerBaseType(SymFactory* factory)
+        : NumericBaseType<T, realType>(factory), _bitSize(-1), _bitOffset(-1)
     {
     }
 
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
      */
-    IntegerBaseType(const TypeInfo& info)
-        : NumericBaseType<T, realType>(info),
+    IntegerBaseType(SymFactory* factory, const TypeInfo& info)
+        : NumericBaseType<T, realType>(factory, info),
           _bitSize(info.bitSize()),
           _bitOffset(info.bitOffset())
     {
@@ -180,18 +184,21 @@ class FloatingBaseType: public NumericBaseType<T, realType>
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    FloatingBaseType()
+    FloatingBaseType(SymFactory* factory)
+        : NumericBaseType<T, realType>(factory)
     {
     }
 
 
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
      */
-    FloatingBaseType(const TypeInfo& info)
-        : NumericBaseType<T, realType>(info)
+    FloatingBaseType(SymFactory* factory, const TypeInfo& info)
+        : NumericBaseType<T, realType>(factory, info)
     {
     }
 

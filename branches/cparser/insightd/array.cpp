@@ -9,14 +9,14 @@
 #include "virtualmemoryexception.h"
 #include "debug.h"
 
-Array::Array()
-    : _length(-1)
+Array::Array(SymFactory* factory)
+    : Pointer(factory), _length(-1)
 {
 }
 
 
-Array::Array(const TypeInfo& info)
-    : Pointer(info), _length(info.upperBound() < 0 ? -1 : info.upperBound() + 1)
+Array::Array(SymFactory* factory, const TypeInfo& info)
+    : Pointer(factory, info), _length(info.upperBound() < 0 ? -1 : info.upperBound() + 1)
 {
 }
 

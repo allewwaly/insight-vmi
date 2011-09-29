@@ -10,13 +10,14 @@
 #include "debug.h"
 
 
-Structured::Structured()
+Structured::Structured(SymFactory* factory)
+	: BaseType(factory)
 {
 }
 
 
-Structured::Structured(const TypeInfo& info)
-	: BaseType(info), _members(info.members())
+Structured::Structured(SymFactory* factory, const TypeInfo& info)
+    : BaseType(factory, info), _members(info.members())
 {
     for (int i = 0; i < _members.size(); i++) {
         _members[i]->_belongsTo = this;
@@ -129,7 +130,7 @@ void Structured::readFrom(QDataStream& in)
     in >> memberCnt;
 
     for (qint32 i = 0; i < memberCnt; i++) {
-        StructuredMember* member = new StructuredMember();
+        StructuredMember* member = new StructuredMember(_factory);
         if (!member)
             genericError("Out of memory.");
         in >> *member;
@@ -253,13 +254,14 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
 
 
 //------------------------------------------------------------------------------
-Struct::Struct()
+Struct::Struct(SymFactory* factory)
+    : Structured(factory)
 {
 }
 
 
-Struct::Struct(const TypeInfo& info)
-	: Structured(info)
+Struct::Struct(SymFactory* factory, const TypeInfo& info)
+    : Structured(factory, info)
 {
 }
 
@@ -277,13 +279,14 @@ QString Struct::prettyName() const
 
 
 //------------------------------------------------------------------------------
-Union::Union()
+Union::Union(SymFactory* factory)
+    : Structured(factory)
 {
 }
 
 
-Union::Union(const TypeInfo& info)
-    : Structured(info)
+Union::Union(SymFactory* factory, const TypeInfo& info)
+    : Structured(factory, info)
 {
 }
 

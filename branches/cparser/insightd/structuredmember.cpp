@@ -11,14 +11,14 @@
 #include "pointer.h"
 #include "debug.h"
 
-StructuredMember::StructuredMember()
-    : _offset(0), _belongsTo(0)
+StructuredMember::StructuredMember(SymFactory* factory)
+	: Symbol(factory), _offset(0), _belongsTo(0)
 {
 }
 
 
-StructuredMember::StructuredMember(const TypeInfo& info)
-	: Symbol(info), ReferencingType(info), SourceRef(info),
+StructuredMember::StructuredMember(SymFactory* factory, const TypeInfo& info)
+	: Symbol(factory, info), ReferencingType(info), SourceRef(info),
 	  _offset(info.dataMemberLocation()), _belongsTo(0)
 {
     // This happens for members of unions
