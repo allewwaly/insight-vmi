@@ -35,26 +35,23 @@ Structured::~Structured()
 }
 
 
-uint Structured::hash() const
+uint Structured::hash(bool* isValid) const
 {
-    if (!_typeReadFromStream) {
-        _hash = BaseType::hash();
-        _hash ^= rotl32(_members.size(), 16) ^ _srcLine;
+    if (!_hashValid) {
+        _hash = BaseType::hash(&_hashValid);
+        qsrand(_hash ^ _members.size());
+        _hash ^= qHash(qrand());
         // To place the member hashes at different bit positions
         uint rot = 0;
         // Hash all members (don't recurse!!!)
         for (int i = 0; i < _members.size(); i++) {
             const StructuredMember* member = _members[i];
             _hash ^= rotl32(member->offset(), rot) ^ qHash(member->name());
-            // Recursive hashing should not be necessary, because it is highly
-            // unlikely that the struct name, source line, size and all member names
-            // and offsets are equal AND that the members still have different
-            // types.
-    //        if (member->refType())
-    //            ret ^= rotl32(member->refType()->hash(visited), rot);
             rot = (rot + 4) % 32;
         }
     }
+    if (isValid)
+        *isValid = _hashValid;
     return _hash;
 }
 

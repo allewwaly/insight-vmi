@@ -27,13 +27,17 @@ RealType Array::type() const
 }
 
 
-uint Array::hash() const
+uint Array::hash(bool* isValid) const
 {
-    if (!_typeReadFromStream) {
-        _hash = Pointer::hash();
-        if (_length > 0)
-            _hash ^= rotl32(_length, 8);
+    if (!_hashValid) {
+        _hash = Pointer::hash(&_hashValid);
+        if (_hashValid && _length > 0) {
+            qsrand(_length);
+            _hash ^= qHash(qrand());
+        }
     }
+    if (isValid)
+        *isValid = _hashValid;
     return _hash;
 }
 

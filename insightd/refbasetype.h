@@ -28,11 +28,13 @@ public:
      */
     RefBaseType(SymFactory* factory, const TypeInfo& info);
 
-     /**
+    /**
      * Create a hash of that type based on BaseType::hash() and refType()
+     * @param isValid indicates if the hash is valid, for example, if all
+     * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash() const;
+    virtual uint hash(bool* isValid) const;
 
     /**
      * @return the size of this type in bytes

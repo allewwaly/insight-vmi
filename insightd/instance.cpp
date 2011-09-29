@@ -118,7 +118,9 @@ InstanceList Instance::members() const
 
 bool Instance::equals(const Instance& other) const
 {
-    if (!isValid() || !other.isValid() || _d.type->hash() != other.type()->hash())
+    bool ok1 = false, ok2 = false;
+    if (!isValid() || !other.isValid() ||
+        _d.type->hash(&ok1) != other.type()->hash(&ok2) || !ok1 || !ok2)
         return false;
 
     // If both are null, they are considered to be equal
@@ -266,7 +268,7 @@ void Instance::differencesRek(const Instance& other,
     else
         visited.insert(_d.address);
 
-    if (!isValid() || !other.isValid() || _d.type->hash() != other.type()->hash()) {
+    if (!isValid() || !other.isValid() || _d.type->hash(0) != other.type()->hash(0)) {
         result.append(relParent);
         return;
     }
