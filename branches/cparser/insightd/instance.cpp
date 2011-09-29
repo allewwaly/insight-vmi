@@ -207,7 +207,7 @@ bool Instance::equals(const Instance& other) const
             return false;
         // If this is an untyped void pointer, we just compare the virtual
         // address.
-        if (p1->refTypeId() < 0)
+        if (p1->refTypeId() == 0)
             return toPointer() == other.toPointer();
         // let the switch fall through to the other referencing
         // types following next
@@ -318,7 +318,7 @@ void Instance::differencesRek(const Instance& other,
          }
          // If this is an untyped void pointer, we just compare the virtual
          // address.
-         if (p1->refTypeId() < 0) {
+         if (p1->refTypeId() == 0) {
              if (toPointer() != other.toPointer())
                  result.append(relParent);
              return;

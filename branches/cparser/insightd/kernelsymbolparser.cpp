@@ -150,7 +150,7 @@ void KernelSymbolParser::finishLastSymbol()
                 // statements which we can ignore
                 !(_info.symType() == hsVariable && _info.location() <= 0) &&
                 // Sometimes empty volatile statements occur, ignore those
-                !(_info.symType() == hsVolatileType && _info.refTypeId() < 0)
+                !(_info.symType() == hsVolatileType && _info.refTypeId() == 0)
            )
             _factory->addSymbol(_info);
         // Reset all data for a new symbol

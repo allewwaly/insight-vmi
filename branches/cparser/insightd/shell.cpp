@@ -1940,7 +1940,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
     const RefBaseType* r = dynamic_cast<const RefBaseType*>(t);
     if (r) {
-        QString id = r->refTypeId() < 0 ?
+        QString id = r->refTypeId() == 0 ?
                 QString::number(r->refTypeId()) :
                 QString("0x%1").arg(r->refTypeId(), 0, 16);
         _out << "  Ref. type ID:   " << id << endl;
@@ -1960,7 +1960,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
 		for (int i = 0; i < s->members().size(); i++) {
 			StructuredMember* m = s->members().at(i);
-			QString id = m->refTypeId() < 0 ?
+			QString id = m->refTypeId() == 0 ?
 			        QString::number(m->refTypeId()) :
 			        QString("0x%1").arg(m->refTypeId(), 0, 16);
 			_out << "    "

@@ -37,9 +37,10 @@ RealType Pointer::type() const
 
 QString Pointer::prettyName() const
 {
-    if (_refType)
-        return _refType->prettyName() + " *";
-    else if (_refTypeId < 0)
+    const BaseType* t = refType();
+    if (t)
+        return t->prettyName() + " *";
+    else if (_refTypeId == 0)
         return "void *";
     else
     	return "(unresolved) *";
@@ -55,14 +56,16 @@ QString Pointer::toString(QIODevice* mem, size_t offset) const
 
     QString errMsg;
 
+    const BaseType* t = refType();
+
     // Pointer to referenced type's referenced type
-    const BaseType* refRefType = dynamic_cast<const RefBaseType*>(_refType) ?
-            dynamic_cast<const RefBaseType*>(_refType)->refType() :
+    const BaseType* refRefType = dynamic_cast<const RefBaseType*>(t) ?
+            dynamic_cast<const RefBaseType*>(t)->refType() :
             0;
     // Is this possibly a string (type "char*" or "const char*")?
-    if (_refType &&
-        (_refType->type() == rtInt8 ||
-         (_refType->type() == rtConst &&
+    if (t &&
+        (t->type() == rtInt8 ||
+         (t->type() == rtConst &&
           refRefType &&
           refRefType->type() == rtInt8)))
     {

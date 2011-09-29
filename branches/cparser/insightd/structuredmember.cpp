@@ -47,9 +47,9 @@ Structured* StructuredMember::belongsTo() const
 
 QString StructuredMember::prettyName() const
 {
-    assert(_refType != 0);
-    if (_refType)
-        return QString("%1 %2").arg(_refType->prettyName(), _name);
+    const BaseType* t = refType();
+    if (t)
+        return QString("%1 %2").arg(t->prettyName(), _name);
     else
         return QString("(unresolved type 0x%1) %2").arg(_refTypeId, 0, 16).arg(_name);
 }

@@ -5,8 +5,8 @@
  *      Author: chrschn
  */
 
-#ifndef TYPEFACTORY_H_
-#define TYPEFACTORY_H_
+#ifndef SYMFACTORY_H_
+#define SYMFACTORY_H_
 
 #include <QPair>
 #include <QList>
@@ -18,6 +18,7 @@
 class KernelSymbolReader;
 class BaseType;
 class Structured;
+class Struct;
 class ReferencingType;
 class CompileUnit;
 class Variable;
@@ -109,6 +110,8 @@ typedef QPair<const ASTType*, BaseTypeList> AstBaseTypeList;
 
 // /// This function is required to use pointer to BaseType as a key in a QHash
 // uint qHash(const BaseType* key);
+
+#define SYMFACTORY_DEFINED 1
 
 /**
  * Creates and holds all defined types and variables.
@@ -589,4 +592,28 @@ private:
 	quint32 _maxTypeSize;
 };
 
-#endif /* TYPEFACTORY_H_ */
+
+inline BaseType* SymFactory::findBaseTypeById(int id) const
+{
+	return _typesById.value(id);
+}
+
+
+inline Variable* SymFactory::findVarById(int id) const
+{
+	return _varsById.value(id);
+}
+
+
+inline BaseType* SymFactory::findBaseTypeByName(const QString & name) const
+{
+	return _typesByName.value(name);
+}
+
+
+inline Variable* SymFactory::findVarByName(const QString & name) const
+{
+	return _varsByName.value(name);
+}
+
+#endif /* SYMFACTORY_H_ */

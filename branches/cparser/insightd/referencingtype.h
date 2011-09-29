@@ -36,13 +36,13 @@ public:
      * Getter for the directly referenced type, const version
      * @return the type this referencing type directly points to
      */
-    const BaseType* refType() const;
+    virtual const BaseType* refType() const = 0;
 
     /**
      * Getter for the directly referenced type
      * @return the type this referencing type directly points to
      */
-    BaseType* refType();
+    virtual BaseType* refType() = 0;
 
     /**
      * Follows all referencing types' references until a non-referencing
@@ -52,12 +52,6 @@ public:
      * @return the type this and all chained referencing types point to
      */
     const BaseType* refTypeDeep(int resolveTypes) const;
-
-    /**
-     * Set the base type this pointer points to
-     * @param type new pointed type
-     */
-    void setRefType(BaseType* type);
 
     /**
      * @return ID of the type this object is referencing
@@ -126,7 +120,6 @@ protected:
             const QString& name, int id, int resolveTypes,
             int* derefCount = 0) const;
 
-    BaseType *_refType;        ///< holds the type this object is referencing
     int _refTypeId;            ///< holds ID of the type this object is referencing    
     int _origRefTypeId;        ///< holds ID of the type this object was originally referencing
 
@@ -152,26 +145,6 @@ private:
 };
 
 
-inline const BaseType* ReferencingType::refType() const
-{
-    return _refType;
-}
-
-
-inline BaseType* ReferencingType::refType()
-{
-    return _refType;
-}
-
-
-inline void ReferencingType::setRefType(BaseType* type)
-{
-    _refType = type;
-    if (_refType && _refTypeId < 0)
-        setRefTypeId(_refType->id());
-}
-
-
 inline int ReferencingType::refTypeId() const
 {
     return _refTypeId;
@@ -186,11 +159,9 @@ inline int ReferencingType::origRefTypeId() const
 
 inline void ReferencingType::setRefTypeId(int id)
 {
-    if (_origRefTypeId < 0)
-        _origRefTypeId = (_refTypeId < 0) ? id : _refTypeId;
+    if (_origRefTypeId == 0)
+        _origRefTypeId = (_refTypeId == 0) ? id : _refTypeId;
     _refTypeId = id;
 }
-
-
 
 #endif /* REFERENCINGTYPE_H_ */
