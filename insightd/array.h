@@ -15,14 +15,16 @@ class Array: public Pointer
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Array();
+    Array(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Array(const TypeInfo& info);
+    Array(SymFactory* factory, const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable

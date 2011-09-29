@@ -92,7 +92,7 @@ void KernelSymbolReader::read()
         _phase = phCompileUnits;
         in >> size;
         for (qint32 i = 0; i < size; i++) {
-            CompileUnit* c = new CompileUnit();
+            CompileUnit* c = new CompileUnit(_factory);
             if (!c)
                 genericError("Out of memory.");
             in >> *c;
@@ -105,7 +105,7 @@ void KernelSymbolReader::read()
         in >> size;
         for (int i = 0; i < size; i++) {
             in >> type;
-            BaseType* t = SymFactory::createEmptyType((RealType) type);
+            BaseType* t = _factory->createEmptyType((RealType) type);
             if (!t)
                 genericError("Out of memory.");
             in >> *t;
@@ -136,7 +136,7 @@ void KernelSymbolReader::read()
         _phase = phVariables;
         in >> size;
         for (qint32 i = 0; i < size; i++) {
-            Variable* v = new Variable();
+            Variable* v = new Variable(_factory);
             if (!v)
                 genericError("Out of memory.");
             in >> *v;

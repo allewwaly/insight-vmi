@@ -8,13 +8,14 @@
 #include "enum.h"
 #include "debug.h"
 
-Enum::Enum()
+Enum::Enum(SymFactory* factory)
+    : BaseType(factory)
 {
 }
 
 
-Enum::Enum(const TypeInfo& info)
-	: BaseType(info), _enumValues(info.enumValues())
+Enum::Enum(SymFactory* factory, const TypeInfo& info)
+    : BaseType(factory, info), _enumValues(info.enumValues())
 {
 }
 

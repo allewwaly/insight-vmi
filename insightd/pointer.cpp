@@ -10,14 +10,14 @@
 #include "virtualmemoryexception.h"
 #include "debug.h"
 
-Pointer::Pointer()
-    : _macroExtraOffset(0)
+Pointer::Pointer(SymFactory* factory)
+	: RefBaseType(factory), _macroExtraOffset(0)
 {
 }
 
 
-Pointer::Pointer(const TypeInfo& info)
-	: RefBaseType(info), _macroExtraOffset(0)
+Pointer::Pointer(SymFactory* factory, const TypeInfo& info)
+	: RefBaseType(factory, info), _macroExtraOffset(0)
 {
 	// Make sure the host system can handle the pointer size of the guest
 	if (_size > 0 && _size > sizeof(void*)) {

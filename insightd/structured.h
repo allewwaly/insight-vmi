@@ -22,14 +22,16 @@ class Structured: public BaseType
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Structured();
+    Structured(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Structured(const TypeInfo& info);
+    Structured(SymFactory* factory, const TypeInfo& info);
 
     /**
      * Destructor
@@ -126,7 +128,6 @@ private:
      */
     template<class T, class S>
     T* findMember(const QString& memberName, bool recursive = true) const;
-
 };
 
 
@@ -138,14 +139,16 @@ class Struct: public Structured
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Struct();
+    Struct(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Struct(const TypeInfo& info);
+    Struct(SymFactory* factory, const TypeInfo& info);
 
     /**
      * @return the real type, i. e., \c rtStruct
@@ -175,14 +178,16 @@ class Union: public Structured
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Union();
+    Union(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Union(const TypeInfo& info);
+    Union(SymFactory* factory, const TypeInfo& info);
 
     /**
      * @return the real type, i. e., \c rtUnion

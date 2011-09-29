@@ -17,14 +17,16 @@ class RefBaseType: public BaseType, public ReferencingType
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    RefBaseType();
+    RefBaseType(SymFactory* factory);
 
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
      */
-    RefBaseType(const TypeInfo& info);
+    RefBaseType(SymFactory* factory, const TypeInfo& info);
 
      /**
      * Create a hash of that type based on BaseType::hash() and refType()

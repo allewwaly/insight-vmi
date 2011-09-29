@@ -4,14 +4,14 @@
 
 #include <QIODevice>
 
-BaseType::BaseType()
-        : _size(0), _hash(0), _typeReadFromStream(false)
+BaseType::BaseType(SymFactory* factory)
+        : Symbol(factory), _size(0), _hash(0), _typeReadFromStream(false)
 {
 }
 
 
-BaseType::BaseType(const TypeInfo& info)
-        : Symbol(info), SourceRef(info), _size(info.byteSize()), _hash(0),
+BaseType::BaseType(SymFactory* factory, const TypeInfo& info)
+        : Symbol(factory, info), SourceRef(info), _size(info.byteSize()), _hash(0),
           _typeReadFromStream(false)
 {
 }
