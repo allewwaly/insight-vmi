@@ -104,13 +104,21 @@ public:
     /**
      * Create a hash of that type based on BaseType::hash(), bitSize() and
      * bitOffset().
+     * @param isValid indicates if the hash is valid, for example, if all
+     * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash() const
+    virtual uint hash(bool* isValid) const
     {
-        if (!NumericBaseType<T, realType>::_typeReadFromStream)
-            NumericBaseType<T, realType>::_hash = NumericBaseType<T, realType>::hash() ^ _bitSize ^ rotl32(_bitOffset, 16);
-        return NumericBaseType<T, realType>::_hash;
+        if (!NumericBaseType<T, realType>::_hashValid)
+            BaseType::_hash =
+                    NumericBaseType<T, realType>::hash(
+                        &(BaseType::_hashValid)) ^
+                    _bitSize ^
+                    rotl32(_bitOffset, 16);
+        if (isValid)
+            *isValid = BaseType::_hashValid;
+        return BaseType::_hash;
     }
 
     /**

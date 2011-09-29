@@ -20,14 +20,23 @@ RefBaseType::RefBaseType(SymFactory* factory, const TypeInfo& info)
 }
 
 
-uint RefBaseType::hash() const
+uint RefBaseType::hash(bool* isValid) const
 {
-    if (!_typeReadFromStream) {
-        _hash = BaseType::hash();
+    if (!_hashValid) {
         const BaseType* t = refType();
-        if (t)
-            _hash ^= t->hash();
+        if (t) {
+            _hash = t->hash(&_hashValid);
+            // Don't continue if previous hash was invalid
+            if (_hashValid) {
+                qsrand(_hash);
+                _hash ^= qHash(qrand()) ^ BaseType::hash(&_hashValid);
+            }
+        }
+        else
+            _hashValid = false;
     }
+    if (isValid)
+        *isValid = _hashValid;
     return _hash;
 }
 

@@ -535,17 +535,17 @@ private:
      */
     bool resolveReferences(Structured* s);
 
-    /**
-     * Removes a value in a QMultiHash at given at index \a old_key, if present,
-     * and adds or re-adds it at index \a new_key.
-     * @param old_key the old index at which \a value can be found
-     * @param new_key the new index at which \a value should be inserted
-     * @param value the value to be relocated
-     * @param hash the QMultiHash to perform this operation on
-     */
-    template<class T_key, class T_val>
-    void relocateHashEntry(const T_key& old_key, const T_key& new_key,
-            T_val* value, QMultiHash<T_key, T_val*>* hash);
+//    /**
+//     * Removes a value in a QMultiHash at given at index \a old_key, if present,
+//     * and adds or re-adds it at index \a new_key.
+//     * @param old_key the old index at which \a value can be found
+//     * @param new_key the new index at which \a value should be inserted
+//     * @param value the value to be relocated
+//     * @param hash the QMultiHash to perform this operation on
+//     */
+//    template<class T_key, class T_val>
+//    void relocateHashEntry(const T_key& old_key, const T_key& new_key,
+//            T_val* value, QMultiHash<T_key, T_val*>* hash);
 
     void insertUsedBy(ReferencingType* ref);
     void insertUsedBy(RefBaseType* rbt);

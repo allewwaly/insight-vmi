@@ -489,9 +489,11 @@ bool MemoryMap::objectIsSane(const Instance& inst,
         const MemoryMapNode* otherNode = *it;
 
         // Is the the same object already contained?
+        bool ok1 = false, ok2 = false;
         if (otherNode->address() == inst.address() &&
                 otherNode->type() && inst.type() &&
-                otherNode->type()->hash() == inst.type()->hash())
+                otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
+                ok1 && ok2)
             isSane = false;
         // Is this an overlapping object with a significantly higher
         // probability?

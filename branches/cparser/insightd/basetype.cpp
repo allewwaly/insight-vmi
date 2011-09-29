@@ -5,14 +5,14 @@
 #include <QIODevice>
 
 BaseType::BaseType(SymFactory* factory)
-        : Symbol(factory), _size(0), _hash(0), _typeReadFromStream(false)
+        : Symbol(factory), _size(0), _hash(0), _hashValid(false)
 {
 }
 
 
 BaseType::BaseType(SymFactory* factory, const TypeInfo& info)
         : Symbol(factory, info), SourceRef(info), _size(info.byteSize()), _hash(0),
-          _typeReadFromStream(false)
+          _hashValid(false)
 {
 }
 
@@ -67,9 +67,9 @@ const BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth) con
 }
 
 
-uint BaseType::hash() const
+uint BaseType::hash(bool* isValid) const
 {
-    if (!_typeReadFromStream) {
+    if (!_hashValid) {
         // Create a hash value based on name, size and type. Always do this,
         // don't cache the hash, because it might change for chained referencing
         // types unnoticed
@@ -77,9 +77,14 @@ uint BaseType::hash() const
         // Ignore the name for numeric types
         if (!_name.isEmpty() && !(type() & (IntegerTypes & ~rtEnum)))
             _hash ^= qHash(_name);
-        if (_size > 0)
-            _hash ^= qHash(_size);
+        if (_size > 0) {
+            qsrand(_hash ^ _size);
+            _hash ^= qHash(qrand());
+        }
+        _hashValid = true;
     }
+    if (isValid)
+        *isValid = _hashValid;
     return _hash;
 }
 
@@ -124,8 +129,8 @@ void BaseType::readFrom(QDataStream& in)
     // Read inherited values
     Symbol::readFrom(in);
     SourceRef::readFrom(in);
-    in >> _size >> _hash;
-    _typeReadFromStream = true;
+    in >> _size;
+    _hashValid = false;
 }
 
 
@@ -134,7 +139,7 @@ void BaseType::writeTo(QDataStream& out) const
     // Write inherited values
     Symbol::writeTo(out);
     SourceRef::writeTo(out);
-    out << _size << hash();
+    out << _size;
 }
 
 

@@ -40,9 +40,11 @@ public:
     /**
      * Create a hash of that type based on BaseType::hash(), srcLine() and the
      * enumeration values.
+     * @param isValid indicates if the hash is valid, for example, if all
+     * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash() const;
+    virtual uint hash(bool* isValid) const;
 
     /**
      * @param mem the memory device to read the data from

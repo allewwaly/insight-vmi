@@ -41,9 +41,11 @@ public:
     /**
      * Create a hash of that type based on BaseType::hash(), srcLine() and the
      * name and hash() of all members.
+     * @param isValid indicates if the hash is valid, for example, if all
+     * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash() const;
+    virtual uint hash(bool* isValid) const;
 
     /**
      * @return the list of members of this struct or union

@@ -226,12 +226,11 @@ T* SymFactory::getTypeInstance(const TypeInfo& info)
 
     RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
 
-    // Try to find the type based on its hash, but only if we don't have
-    // any unresolved types
-    uint hash = t->hash();
-    bool foundByHash = false;
+    // Try to find the type based on its hash, but only if hash is valid
+    bool hashValid = false, foundByHash = false;
+    uint hash = t->hash(&hashValid);
 
-    if ((!rbt || rbt->refType()) && _typesByHash.contains(hash)) {
+    if (hashValid && _typesByHash.contains(hash)) {
         BaseTypeList list = _typesByHash.values(hash);
 
         // Go through the list and make sure we found the correct type
@@ -241,6 +240,7 @@ T* SymFactory::getTypeInstance(const TypeInfo& info)
                 // and return the found one
                 delete t;
                 t = dynamic_cast<T*>(list[i]);
+                assert(t != 0);
                 foundByHash = true;
                 _typeFoundByHash++;
                 break;
@@ -257,10 +257,8 @@ T* SymFactory::getTypeInstance(const TypeInfo& info)
             assert(s != 0);
             resolveReferences(s);
         }
-        // We don't need to re-calc the hash here because for
-        // structs or unions it does not depend on the member's hash,
-        // so it has not changed.
-        _typesByHash.insert(hash, t);
+        if (hashValid)
+            _typesByHash.insert(hash, t);
     }
 
     insert(info, t);
@@ -455,32 +453,32 @@ bool SymFactory::isStructHListNode(const BaseType* type) const
 }
 
 
-template<class T_key, class T_val>
-void SymFactory::relocateHashEntry(const T_key& old_key, const T_key& new_key,
-        T_val* value, QMultiHash<T_key, T_val*>* hash)
-{
-    bool removed = false;
+//template<class T_key, class T_val>
+//void SymFactory::relocateHashEntry(const T_key& old_key, const T_key& new_key,
+//        T_val* value, QMultiHash<T_key, T_val*>* hash)
+//{
+//    bool removed = false;
 
-    // Remove type at old hash-index
-    QList<T_val*> list = hash->values(old_key);
-    for (int i = 0; i < list.size(); i++) {
-        if (value->id() == list[i]->id()) {
-        	// Remove either the complete list or the single entry
-        	if (list.size() == 1)
-        		hash->remove(old_key);
-        	else
-        		hash->remove(old_key, list[i]);
-            removed = true;
-            break;
-        }
-    }
+//    // Remove type at old hash-index
+//    QList<T_val*> list = hash->values(old_key);
+//    for (int i = 0; i < list.size(); i++) {
+//        if (value->id() == list[i]->id()) {
+//        	// Remove either the complete list or the single entry
+//        	if (list.size() == 1)
+//        		hash->remove(old_key);
+//        	else
+//        		hash->remove(old_key, list[i]);
+//            removed = true;
+//            break;
+//        }
+//    }
 
-    if (!removed)
-        debugerr("Did not find entry in hash table at index 0x" << std::hex << old_key << std::dec << "");
+//    if (!removed)
+//        debugerr("Did not find entry in hash table at index 0x" << std::hex << old_key << std::dec << "");
 
-    // Re-add it at new hash-index
-    hash->insert(new_key, value);
-}
+//    // Re-add it at new hash-index
+//    hash->insert(new_key, value);
+//}
 
 
 QList<int> SymFactory::equivalentTypes(int id) const
@@ -517,9 +515,9 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
         return;
 
     // Insert new ID/type relation into lookup tables
-	assert(_typesById.contains(new_id) == false);
-	_typesById.insert(new_id, target);
-	_equivalentTypes.insertMulti(target->id(), new_id);
+    assert(_typesById.contains(new_id) == false);
+    _typesById.insert(new_id, target);
+    _equivalentTypes.insertMulti(target->id(), new_id);
 
     // Perform certain actions for new types
     if (isNewType(new_id, target)) {
@@ -532,14 +530,16 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
             insertUsedBy(rbt);
     }
 
-	// See if we have types with missing references to the given type
-	if (_postponedTypes.contains(new_id)) {
-		QList<ReferencingType*> list = _postponedTypes.values(new_id);
-		QList<ReferencingType*>::iterator it = list.begin();
+    // See if we have types with missing references to the given type
+    if (_postponedTypes.contains(new_id)) {
+        QList<ReferencingType*> list = _postponedTypes.values(new_id);
 
-		while (it != list.end())
-		{
-			ReferencingType* t = *it;
+        int changes = 0;
+
+        QList<ReferencingType*>::iterator it = list.begin();
+        while (it != list.end())
+        {
+            ReferencingType* t = *it;
             StructuredMember* m = dynamic_cast<StructuredMember*>(t);
 
             // If this is a StructuredMember, use the special resolveReference()
@@ -549,33 +549,29 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
             }
             else {
                 RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
-                uint hash = 0, old_hash = 0;
+                bool hashValid = false;
+                uint hash = rbt->hash(&hashValid);
 
-                // If this a RefBaseType, we need to save the old hash
-                if (rbt) {
-                    // Get previous hash and name of type
-                    old_hash = rbt->hash();
+                if (hashValid) {
+                    ++changes;
+                    /// @todo remove rbt from _postponedTypes
                 }
 
-                // For a RefBaseType only, not for a Variable/StructuredMember:
-                // Remove type at its old index, re-add it at its new index
-                if (rbt) {
-                    // Calculate new hash of type
-                    hash = rbt->hash();
-                    // Did the hash change?
-                    if (hash != old_hash)
-                        relocateHashEntry(old_hash, hash, (BaseType*)rbt, &_typesByHash);
-                    // Update the maximum type size
-                    if (rbt->size() > _maxTypeSize)
-                        _maxTypeSize = rbt->size();
-                }
             }
-			++it;
-		}
+            ++it;
+        }
 
-		// Delete the entry from the hash
-		_postponedTypes.remove(new_id);
-	}
+        // Delete the entry from the hash
+        _postponedTypes.remove(new_id);
+
+        // As long as we still can resolve new types, go through whole list
+        // again and again.
+        while (changes) {
+            changes = 0;
+            RefTypeMultiHash::iterator it = _postponedTypes.begin();
+            /// @todo implement me
+        }
+    }
 }
 
 

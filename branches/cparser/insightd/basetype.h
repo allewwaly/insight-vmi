@@ -132,9 +132,11 @@ public:
 
     /**
      * Create a hash of that type based on type(), size() and name().
+     * @param isValid indicates if the hash is valid, for example, if all
+     * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash() const;
+    virtual uint hash(bool* isValid) const;
 
     /**
      * @return the size of this type in bytes
@@ -365,7 +367,7 @@ public:
 protected:
     quint32 _size;             ///< size of this type in byte
     mutable uint _hash;        ///< cashes the hash of this type
-    bool _typeReadFromStream;  ///< hint whether type was initialized by readFrom() function
+    mutable bool _hashValid;   ///< flag for validity of hash
 //    BaseType* _parent;         ///< enclosing struct, if this is a struct member
 
     /**
