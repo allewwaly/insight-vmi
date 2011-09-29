@@ -185,13 +185,13 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
 
         if (m->refType()) {
             // Output all types except structured types
-            if (m->refType()->dereferencedType() & trStructured) {
+            if (m->refType()->dereferencedType() & StructOrUnion) {
                 // Resolve the memory address of that struct
                 quint64 addr = offset + m->offset();
                 int macroExtraOffset = 0;
                 const BaseType* t = m->refType();
                 bool wasPointer = false;
-                while ( addr && !(t->type() & trStructured) ) {
+                while ( addr && !(t->type() & StructOrUnion) ) {
                     const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
                     if (rbt->type() & rtPointer) {
                         addr = (quint64) rbt->toPointer(mem, addr);

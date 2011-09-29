@@ -89,7 +89,7 @@ QStringList Instance::fullNameComponents() const
 
 int Instance::memberCount() const
 {
-    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
         return 0;
 	return dynamic_cast<const Structured*>(_d.type)->members().size();
 }
@@ -97,7 +97,7 @@ int Instance::memberCount() const
 
 const QStringList& Instance::memberNames() const
 {
-    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
         return _emtpyStringList;
 	return dynamic_cast<const Structured*>(_d.type)->memberNames();
 }
@@ -105,7 +105,7 @@ const QStringList& Instance::memberNames() const
 
 InstanceList Instance::members() const
 {
-    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
         return InstanceList();
 
 	const MemberList& list = dynamic_cast<const Structured*>(_d.type)->members();
@@ -190,7 +190,7 @@ bool Instance::equals(const Instance& other) const
         for (int i = 0; i < cnt; ++i) {
             Instance inst1 = member(i, BaseType::trAny);
             // Don't recurse into nested structs
-            if (inst1.type()->type() & (rtStruct|rtUnion))
+            if (inst1.type()->type() & StructOrUnion)
                 continue;
             Instance inst2 = other.member(i, BaseType::trAny);
             if (!inst1.equals(inst2))
@@ -293,7 +293,7 @@ void Instance::differencesRek(const Instance& other,
                     continue;
                 }
                 // Only recurse into nested structs if requested
-                if (inst1.type()->type() & (rtStruct|rtUnion)) {
+                if (inst1.type()->type() & StructOrUnion) {
                     if (includeNestedStructs)
                         inst1.differencesRek(inst2, newRelParent,
                                 includeNestedStructs, result, visited) ;
@@ -419,7 +419,7 @@ quint64 Instance::memberAddress(int index) const
 
 quint64 Instance::memberOffset(const QString& name) const
 {
-    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
         return false;
 
     const StructuredMember* m =
@@ -430,7 +430,7 @@ quint64 Instance::memberOffset(const QString& name) const
 
 bool Instance::memberExists(const QString& name) const
 {
-    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
         return false;
 
 	return dynamic_cast<const Structured*>(_d.type)->memberExists(name);

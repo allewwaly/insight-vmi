@@ -652,7 +652,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
 
     // If this a union or struct, we have to consider the pointer members
     if ( instType &&
-         (instType->type() & BaseType::trStructured) )
+         (instType->type() & StructOrUnion) )
     {
         const Structured* structured =
                 dynamic_cast<const Structured*>(instType);

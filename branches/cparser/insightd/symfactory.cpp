@@ -1264,7 +1264,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
     QList<BaseType*> baseTypes;
 
     // Is the context type a struct or union?
-    if (astTypeNonPtr->type() & (rtStruct|rtUnion|rtEnum)) {
+    if (astTypeNonPtr->type() & (StructOrUnion|rtEnum)) {
         if (astTypeNonPtr->identifier().isEmpty()) {
             assert(astTypeNonPtr->node() != 0);
             // See if this struct appears in a typedef

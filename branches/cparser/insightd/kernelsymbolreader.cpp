@@ -111,9 +111,9 @@ void KernelSymbolReader::read()
             in >> *t;
             _factory->addSymbol(t);
 
-            if (t->type() & (ReferencingTypes & ~(rtStruct|rtUnion)))
+            if (t->type() & (ReferencingTypes & ~StructOrUnion))
                 _phase = phReferencingTypes;
-            else if (t->type() & (rtStruct|rtUnion)) {
+            else if (t->type() & StructOrUnion) {
                 _phase = phStructuredTypes;
             }
 

@@ -1518,7 +1518,7 @@ ASTSymbol ASTTypeEvaluator::findSymbolOfPrimaryExpression(pASTNode node)
     }
 
     // If we have an ASTType node, try to find most inner struct/union
-    while (t && !(t->type() & (rtStruct|rtUnion)))
+    while (t && !(t->type() & StructOrUnion))
         t = t->next();
     if (t)
         sym = t->node()->childrenScope->find(id);
@@ -1806,7 +1806,7 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(pASTNode node)
             // find embedding struct or union
             QString memberName = antlrTokenToStr(pes->u.postfix_expression_suffix.identifier);
             ASTType* t = type;
-            while (t && !(t->type() & (rtStruct|rtUnion)))
+            while (t && !(t->type() & StructOrUnion))
                 t = t->next();
             if (!t) {
             	// Find identifier of primary expression
