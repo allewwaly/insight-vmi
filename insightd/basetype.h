@@ -68,7 +68,6 @@ public:
         trLexicalAndPointers = trLexical|rtPointer, ///< resolve as for trLexical plus rtPointer
         trPointersAndArrays = rtPointer|rtArray,    ///< resolve rtPointer and rtArray
         trLexicalPointersArrays = trLexicalAndPointers|rtArray, ///< resolve as for trLexicalAndPointers plus rtArray
-        trStructured = rtStruct|rtUnion,            ///< structs or unions
         trAny = 0xFFFFFFFF                          ///< resolve all types
     };
 

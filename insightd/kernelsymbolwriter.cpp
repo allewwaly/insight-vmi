@@ -90,8 +90,8 @@ void KernelSymbolWriter::write()
         for (int round = 0; round < 3; ++round) {
             int mask = ElementaryTypes;
             switch (round) {
-            case 1: mask = ReferencingTypes & ~(rtStruct|rtUnion); break;
-            case 2: mask = (rtStruct|rtUnion); break;
+            case 1: mask = ReferencingTypes & ~StructOrUnion; break;
+            case 2: mask = StructOrUnion; break;
             }
 
             for (int i = 0; i < _factory->types().size(); i++) {

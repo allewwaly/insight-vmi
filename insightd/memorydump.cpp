@@ -207,7 +207,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	}
 	else {
 		// We have a instance therefore we resolve the member
-		if (!instance.type()->type() & (rtStruct|rtUnion))
+		if (!instance.type()->type() & StructOrUnion)
             queryError(QString("Member \"%1\" is not a struct or union")
                         .arg(instance.fullName()));
 
@@ -242,7 +242,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 				type = getType(typeString);
 				
 				if (!type ||
-				    !(type->type() & (rtStruct|rtUnion)))
+					!(type->type() & StructOrUnion))
 					queryError(QString("The given type \"%1\" is not a struct "
 					            "or union and therefore has no offset")
 					            .arg(typeString));
