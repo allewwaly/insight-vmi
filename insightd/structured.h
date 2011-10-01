@@ -45,7 +45,7 @@ public:
      * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash(bool* isValid) const;
+    virtual uint hash(bool* isValid = 0) const;
 
     /**
      * @return the list of members of this struct or union

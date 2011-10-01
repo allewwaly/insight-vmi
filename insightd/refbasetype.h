@@ -34,7 +34,7 @@ public:
      * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash(bool* isValid) const;
+    virtual uint hash(bool* isValid = 0) const;
 
     /**
      * @return the size of this type in bytes
@@ -92,6 +92,9 @@ public:
      virtual Instance toInstance(size_t address, VirtualMemory* vmem,
             const QString& name, const QStringList& parentNames,
             int resolveTypes = trLexical, int* derefCount = 0) const;
+
+protected:
+    mutable int _hashRefTypeId; ///< type ID used to generate the hash
 };
 
 
@@ -114,13 +117,13 @@ inline uint RefBaseType::size() const
 
 inline const BaseType* RefBaseType::refType() const
 {
-    return _factory ? _factory->findBaseTypeById(_id) : 0;
+    return _factory ? _factory->findBaseTypeById(_refTypeId) : 0;
 }
 
 
 inline BaseType* RefBaseType::refType()
 {
-    return _factory ? _factory->findBaseTypeById(_id) : 0;
+    return _factory ? _factory->findBaseTypeById(_refTypeId) : 0;
 }
 #endif /* REFBASETYPE_H_INLINE */
 

@@ -62,6 +62,7 @@ void Structured::addMember(StructuredMember* member)
     member->_belongsTo = this;
 	_members.append(member);
 	_memberNames.append(member->name());
+	_hashValid  = false;
 }
 
 

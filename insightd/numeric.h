@@ -108,14 +108,15 @@ public:
      * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash(bool* isValid) const
+    virtual uint hash(bool* isValid = 0) const
     {
-        if (!NumericBaseType<T, realType>::_hashValid)
+        if (!NumericBaseType<T, realType>::_hashValid) {
             BaseType::_hash =
-                    NumericBaseType<T, realType>::hash(
-                        &(BaseType::_hashValid)) ^
+                    NumericBaseType<T, realType>::hash(0) ^
                     _bitSize ^
                     rotl32(_bitOffset, 16);
+            BaseType::_hashValid = true;
+        }
         if (isValid)
             *isValid = BaseType::_hashValid;
         return BaseType::_hash;

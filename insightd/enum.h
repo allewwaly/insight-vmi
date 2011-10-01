@@ -44,7 +44,7 @@ public:
      * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash(bool* isValid) const;
+    virtual uint hash(bool* isValid = 0) const;
 
     /**
      * @param mem the memory device to read the data from
@@ -92,6 +92,7 @@ inline const Enum::EnumHash& Enum::enumValues() const
 inline void Enum::setEnumValues(const EnumHash& values)
 {
     _enumValues = values;
+    _hashValid  = false;
 }
 
 

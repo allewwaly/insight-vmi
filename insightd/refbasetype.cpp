@@ -9,31 +9,37 @@
 #include "debug.h"
 
 RefBaseType::RefBaseType(SymFactory* factory)
-    : BaseType(factory)
+    : BaseType(factory), _hashRefTypeId(0)
 {
 }
 
 
 RefBaseType::RefBaseType(SymFactory* factory, const TypeInfo& info)
-    : BaseType(factory, info), ReferencingType(info)
+    : BaseType(factory, info), ReferencingType(info), _hashRefTypeId(0)
 {
 }
 
 
 uint RefBaseType::hash(bool* isValid) const
 {
-    if (!_hashValid) {
-        const BaseType* t = refType();
-        if (t) {
-            _hash = t->hash(&_hashValid);
-            // Don't continue if previous hash was invalid
-            if (_hashValid) {
-                qsrand(_hash);
-                _hash ^= qHash(qrand()) ^ BaseType::hash(&_hashValid);
+    if (!_hashValid || _hashRefTypeId != _refTypeId) {
+        _hashRefTypeId = _refTypeId;
+        if (_refTypeId) {
+            const BaseType* t = refType();
+            if (t) {
+                _hash = t->hash(&_hashValid);
+                // Don't continue if previous hash was invalid
+                if (_hashValid) {
+                    qsrand(_hash);
+                    _hash ^= qHash(qrand()) ^ BaseType::hash(&_hashValid);
+                }
             }
+            else
+                _hashValid = false;
         }
+        // Void pointers don't reference any type
         else
-            _hashValid = false;
+            _hash = BaseType::hash(&_hashValid);
     }
     if (isValid)
         *isValid = _hashValid;

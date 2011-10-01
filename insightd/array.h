@@ -37,7 +37,7 @@ public:
      * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash(bool* isValid) const;
+    virtual uint hash(bool* isValid = 0) const;
 
     /**
      * This gives a pretty name of that type which may involve referencing
