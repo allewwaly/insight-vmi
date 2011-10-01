@@ -167,13 +167,13 @@ inline void Variable::setOffset(size_t offset)
 
 inline const BaseType* Variable::refType() const
 {
-    return _factory ? _factory->findBaseTypeById(_id) : 0;
+    return _factory ? _factory->findBaseTypeById(_refTypeId) : 0;
 }
 
 
 inline BaseType* Variable::refType()
 {
-    return _factory ? _factory->findBaseTypeById(_id) : 0;
+    return _factory ? _factory->findBaseTypeById(_refTypeId) : 0;
 }
 
 #endif /* VARIABLE_H_INLINE */

@@ -136,7 +136,12 @@ public:
      * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash(bool* isValid) const;
+    virtual uint hash(bool* isValid = 0) const;
+
+    /**
+     * @return \c true if the result of hash() is valid, \c false otherwise
+     */
+    bool hashIsValid() const;
 
     /**
      * @return the size of this type in bytes

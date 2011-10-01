@@ -421,10 +421,23 @@ protected:
      * @param new_id the ID of the type to update the relations for
      * @param new_name the name of the type to update the relations for
      * @param target the BaseType that either was just created from some type
+     * @param checkPostponed if set to \c true, the _postponedTypes are searched
+     * for types referencing \a new_id
      * information, or the equivalent type found by the type hash.
      */
-    void updateTypeRelations(const int new_id, const QString& new_name, BaseType* target);
+    void updateTypeRelations(const int new_id, const QString& new_name,
+                             BaseType* target, bool checkPostponed = true);
 
+    /**
+     * Checks if the type of \a rt was resolved. If \a rt is of type
+     * RefBaseType, it will add the type to the _typesByHash hash.
+     * @param rt the type to check
+     * @param removeFromPostponedTypes set to \c true to have \a rt removed from
+     * the _postponedTypes hash if the referencing type of \a rt could be
+     * resolved
+     */
+    bool postponedTypeResolved(ReferencingType* rt,
+                               bool removeFromPostponedTypes);
     /**
      * Inserts the given type \a type into the internal lists and hashes as if
      * \a type had the ID as provided in \a info. If the type is just appears

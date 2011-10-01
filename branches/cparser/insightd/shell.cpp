@@ -198,6 +198,16 @@ Shell::Shell(bool listenOnSocket)
                 "  symbols save <ksym_file>       Alias for \"store\"\n"
                 "  symbols load <ksym_file>       Loads previously stored symbols for usage"));
 
+    _commands.insert("stats",
+                     Command(
+                         &Shell::cmdStats,
+                         "Shows various statistics.",
+                         "Shows various statistics.\n"
+                         "  stats types             Information about the types\n"
+                         "  stats types-by-hash     Information about the types by their hashes\n"
+                         "  stats postponed         Information about types with missing\n"
+                         "                          references"));
+
     _commands.insert("binary",
             Command(
                 &Shell::cmdBinary,
@@ -2015,6 +2025,54 @@ int Shell::cmdShowVariable(const Variable* v)
 	}
 
 	return ecOk;
+}
+
+
+int Shell::cmdStats(QStringList args)
+{
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() != 1) {
+        cmdHelp(QStringList("stats"));
+        return ecInvalidArguments;
+    }
+
+    QString action = args[0].toLower();
+    args.pop_front();
+
+    // Perform the action
+    if (action.size() > 5 && QString("types-by-hash").startsWith(action))
+        return cmdStatsTypesByHash(args);
+    else if (QString("types").startsWith(action))
+        return cmdStatsTypes(args);
+    else if (QString("postponed").startsWith(action))
+        return cmdStatsPostponed(args);
+    else if (QString("source").startsWith(action))
+        return cmdSymbolsSource(args);
+    else {
+        cmdHelp(QStringList("symbols"));
+        return 2;
+    }
+}
+
+
+int Shell::cmdStatsPostponed(QStringList /*args*/)
+{
+    _out << _sym.factory().postponedTypesStats() << endl;
+    return ecOk;
+}
+
+
+int Shell::cmdStatsTypes(QStringList /*args*/)
+{
+    _sym.factory().symbolsFinished(SymFactory::rtLoading);
+    return ecOk;
+}
+
+
+int Shell::cmdStatsTypesByHash(QStringList /*args*/)
+{
+    _out << _sym.factory().typesByHashStats() << endl;
+    return ecOk;
 }
 
 

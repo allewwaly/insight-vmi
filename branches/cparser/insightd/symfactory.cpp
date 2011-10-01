@@ -224,14 +224,13 @@ T* SymFactory::getTypeInstance(const TypeInfo& info)
             p->setSize(_memSpecs.sizeofUnsignedLong);
     }
 
-    RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
+//    RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
 
     // Try to find the type based on its hash, but only if hash is valid
-    bool hashValid = false, foundByHash = false;
-    uint hash = t->hash(&hashValid);
+    bool foundByHash = false;
 
-    if (hashValid && _typesByHash.contains(hash)) {
-        BaseTypeList list = _typesByHash.values(hash);
+    if (t->hashIsValid() && _typesByHash.contains(t->hash())) {
+        BaseTypeList list = _typesByHash.values(t->hash());
 
         // Go through the list and make sure we found the correct type
         for (int i = 0; i < list.size(); i++) {
@@ -257,8 +256,8 @@ T* SymFactory::getTypeInstance(const TypeInfo& info)
             assert(s != 0);
             resolveReferences(s);
         }
-        if (hashValid)
-            _typesByHash.insert(hash, t);
+//        if (t->hashIsValid())
+//            _typesByHash.insert(t->hash(), t);
     }
 
     insert(info, t);
@@ -364,7 +363,6 @@ void SymFactory::insert(const TypeInfo& info, BaseType* type)
 	// Only add to the list if this is a new type
 	if (isNewType(info, type)) {
 		type->setFactory(this);
-	    _types.append(type);
 	    if (type->size() > _maxTypeSize)
 	        _maxTypeSize = type->size();
 	}
@@ -380,7 +378,6 @@ void SymFactory::insert(BaseType* type)
 
     // Add to the list of types
     type->setFactory(this);
-    _types.append(type);
     if (type->size() > _maxTypeSize)
         _maxTypeSize = type->size();
 
@@ -509,10 +506,20 @@ void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 }
 
 
-void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, BaseType* target)
+void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
+                                     BaseType* target, bool checkPostponed)
 {
-    if (new_id < 0)
+    if (new_id == 0)
         return;
+
+    if (new_id == 0x11a)
+        debugmsg("Hier");
+
+    if (!target->hashIsValid()) {
+        RefBaseType* rbt = dynamic_cast<RefBaseType*>(target);
+        _postponedTypes.insertMulti(rbt->refTypeId(), rbt);
+        return;
+    }
 
     // Insert new ID/type relation into lookup tables
     assert(_typesById.contains(new_id) == false);
@@ -521,9 +528,11 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
 
     // Perform certain actions for new types
     if (isNewType(new_id, target)) {
+        _types.append(target);
+        _typesByHash.insertMulti(target->hash(), target);
         // Add this type into the name relation table
         if (!new_name.isEmpty())
-            _typesByName.insert(new_name, target);
+            _typesByName.insertMulti(new_name, target);
         // Add referencing types into the used-by hash tables
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(target);
         if (rbt)
@@ -531,7 +540,7 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
     }
 
     // See if we have types with missing references to the given type
-    if (_postponedTypes.contains(new_id)) {
+    if (checkPostponed && _postponedTypes.contains(new_id)) {
         QList<ReferencingType*> list = _postponedTypes.values(new_id);
 
         int changes = 0;
@@ -539,39 +548,75 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name, 
         QList<ReferencingType*>::iterator it = list.begin();
         while (it != list.end())
         {
-            ReferencingType* t = *it;
-            StructuredMember* m = dynamic_cast<StructuredMember*>(t);
-
-            // If this is a StructuredMember, use the special resolveReference()
-            // function to handle "struct list_head" and the like.
-            if (m) {
-                assert(resolveReference(m) == true);
-            }
-            else {
-                RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
-                bool hashValid = false;
-                uint hash = rbt->hash(&hashValid);
-
-                if (hashValid) {
-                    ++changes;
-                    /// @todo remove rbt from _postponedTypes
-                }
-
-            }
+            if (postponedTypeResolved(*it, true))
+                ++changes;
             ++it;
         }
 
-        // Delete the entry from the hash
-        _postponedTypes.remove(new_id);
+//        // As long as we still can resolve new types, go through whole list
+//        // again and again. This will resolve all chained types.
+//        while (changes) {
+//            changes = 0;
+//            RefTypeMultiHash::iterator it = _postponedTypes.begin();
+//            while (it != _postponedTypes.end()) {
+//                if (postponedTypeResolved(*it, false)) {
+//                    ++changes;
+//                    it = _postponedTypes.erase(it);
+//                }
+//                else
+//                    ++it;
+//            }
+//        }
+    }
+}
 
-        // As long as we still can resolve new types, go through whole list
-        // again and again.
-        while (changes) {
-            changes = 0;
-            RefTypeMultiHash::iterator it = _postponedTypes.begin();
-            /// @todo implement me
+
+bool SymFactory::postponedTypeResolved(ReferencingType* rt,
+                                       bool removeFromPostponedTypes)
+{
+    StructuredMember* m = dynamic_cast<StructuredMember*>(rt);
+
+    // If this is a StructuredMember, use the special resolveReference()
+    // function to handle "struct list_head" and the like.
+    if (m) {
+        if (resolveReference(m)) {
+            // Delete the entry from the hash
+            if (removeFromPostponedTypes)
+                _postponedTypes.remove(rt->refTypeId(), rt);
+        }
+        else
+            return false;
+    }
+    else {
+        RefBaseType* rbt = dynamic_cast<RefBaseType*>(rt);
+        // The type may still be invalid for some weired chaned types
+        if (rbt && rbt->hashIsValid()) {
+            // Delete the entry from the hash
+            if (removeFromPostponedTypes)
+                _postponedTypes.remove(rt->refTypeId(), rt);
+
+            // Check if this is dublicated type
+            uint hash = rbt->hash();
+            BaseTypeUIntHash::const_iterator it = _typesByHash.find(hash);
+            while (it != _typesByHash.end() && it.key() == hash) {
+                BaseType* t = it.value();
+                if (*rbt == *t) {
+                    // Update type relations with equivalent type
+                    updateTypeRelations(rbt->id(), rbt->name(), t);
+                    delete rbt;
+                    rbt = 0;
+                    break;
+                }
+                ++it;
+            }
+            if (rbt)
+                // Update type relations with new type
+                updateTypeRelations(rbt->id(), rbt->name(), rbt);
+            return true;
         }
     }
+
+    return false;
 }
 
 
@@ -590,6 +635,7 @@ void SymFactory::insert(Variable* var)
 	_vars.append(var);
 	_varsById.insert(var->id(), var);
 	_varsByName.insert(var->name(), var);
+	insertUsedBy(var);
 }
 
 
@@ -716,7 +762,7 @@ void SymFactory::addSymbol(Variable* var)
 {
     // Insert and find referenced type
     insert(var);
-    resolveReference(var);
+//    resolveReference(var);
 }
 
 
@@ -733,7 +779,7 @@ void SymFactory::addSymbol(BaseType* type)
     else if (s)
         resolveReferences(s);
 
-    _typesByHash.insert(type->hash(), type);
+//    _typesByHash.insert(type->hash(), type);
 }
 
 
@@ -823,17 +869,15 @@ bool SymFactory::resolveReference(ReferencingType* ref)
 {
     assert(ref != 0);
 
-    // Don't resolve already resolved types
-    if (ref->refType())
-        return true;
     // Don't try to resolve types without valid ID
     else if (ref->refTypeId() == 0)
     	return false;
 
-    BaseType* base = 0;
-    if (! (base = findBaseTypeById(ref->refTypeId())) ) {
+    // Don't resolve already resolved types
+    if (!ref->refType()) {
         // Add this type into the waiting queue
-        _postponedTypes.insert(ref->refTypeId(), ref);
+        if (!_postponedTypes.contains(ref->refTypeId(), ref))
+            _postponedTypes.insert(ref->refTypeId(), ref);
         return false;
     }
     else {
@@ -989,7 +1033,7 @@ bool SymFactory::resolveReference(StructuredMember* member)
     else if (member->refTypeId() == 0)
         return false;
 
-    BaseType* base = findBaseTypeById(member->refTypeId());
+    BaseType* base = member->refType();
 
     if (member->refTypeId() == siListHead || isStructListHead(base)) {
         Struct* list_head = makeStructListHead(member);
@@ -1030,6 +1074,27 @@ bool SymFactory::resolveReferences(Structured* s)
 
 void SymFactory::symbolsFinished(RestoreType rt)
 {
+
+    // One last try to resolve any remaining types
+    int changes;
+    // As long as we still can resolve new types, go through whole list
+    // again and again. This will resolve all chained types.
+    do {
+        changes = 0;
+        RefTypeMultiHash::iterator it = _postponedTypes.begin();
+        while (it != _postponedTypes.end()) {
+            if (it.key() == 0x11a || it.value()->refTypeId() == 0x11a)
+                debugmsg("hier");
+            if (postponedTypeResolved(*it, false)) {
+                ++changes;
+                it = _postponedTypes.erase(it);
+            }
+            else
+                ++it;
+        }
+    } while (changes);
+
+
     shell->out() << "Statistics:" << endl;
 
     shell->out() << qSetFieldWidth(10) << right;
@@ -1120,7 +1185,7 @@ QString SymFactory::postponedTypesStats() const
     }
 
     QMap<int, int>::const_iterator it = --typeCount.constEnd();
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 20; ++i) {
         ret += QString("%1 types waiting for id 0x%2\n")
                 .arg(it.key(), 10)
                 .arg(it.value(), 0, 16);

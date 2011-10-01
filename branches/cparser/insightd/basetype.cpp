@@ -89,6 +89,14 @@ uint BaseType::hash(bool* isValid) const
 }
 
 
+bool BaseType::hashIsValid() const
+{
+    if (!_hashValid)
+        hash(0);
+    return _hashValid;
+}
+
+
 quint32 BaseType::size() const
 {
     return _size;
@@ -111,16 +119,10 @@ Instance BaseType::toInstance(size_t address, VirtualMemory* vmem,
 
 bool BaseType::operator==(const BaseType& other) const
 {
-    bool ret =
-        type() == other.type() &&
-        size() == other.size();
-
-    if (ret && !(type() & (IntegerTypes & ~rtEnum))) {
-        ret = (srcLine() < 0 || other.srcLine() < 0 || srcLine() == other.srcLine()) &&
-                name() == other.name();
-    }
-
-    return ret;
+    return type() == other.type() &&
+            size() == other.size() &&
+            hash() == hash() &&
+            hashIsValid() && other.hashIsValid();
 }
 
 
