@@ -30,6 +30,8 @@ QString ConstType::prettyName() const
     const BaseType* t = refType();
     if (t)
         return "const " + t->prettyName();
+    else if (refTypeId() == 0)
+        return "const void";
     else
         return "const";
 }
