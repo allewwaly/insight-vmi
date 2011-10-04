@@ -130,12 +130,12 @@ QDataStream& operator<<(QDataStream& out, const StructuredMember& member);
 
 inline const BaseType* StructuredMember::refType() const
 {
-    return _factory ? _factory->findBaseTypeById(_refTypeId) : 0;
+    return _factory && _refTypeId ? _factory->findBaseTypeById(_refTypeId) : 0;
 }
 
 
 inline BaseType* StructuredMember::refType()
 {
-    return _factory ? _factory->findBaseTypeById(_refTypeId) : 0;
+    return _factory && _refTypeId ? _factory->findBaseTypeById(_refTypeId) : 0;
 }
 #endif /* STRUCTUREDMEMBER_H_INLINE */

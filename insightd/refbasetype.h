@@ -117,13 +117,13 @@ inline uint RefBaseType::size() const
 
 inline const BaseType* RefBaseType::refType() const
 {
-    return _factory ? _factory->findBaseTypeById(_refTypeId) : 0;
+    return _factory && _refTypeId ? _factory->findBaseTypeById(_refTypeId) : 0;
 }
 
 
 inline BaseType* RefBaseType::refType()
 {
-    return _factory ? _factory->findBaseTypeById(_refTypeId) : 0;
+    return _factory && _refTypeId ? _factory->findBaseTypeById(_refTypeId) : 0;
 }
 #endif /* REFBASETYPE_H_INLINE */
 
