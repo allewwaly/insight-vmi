@@ -31,6 +31,8 @@ QString VolatileType::prettyName() const
     const BaseType* t = refType();
     if (t)
         return "volatile " + t->prettyName();
+    else if (refTypeId() == 0)
+        return "const void";
     else
         return "volatile";
 }
