@@ -66,6 +66,9 @@ typedef QList<BaseType*> BaseTypeList;
 /// List of Variable elements
 typedef QList<Variable*> VariableList;
 
+/// List of Structured elements
+typedef QList<Structured*> StructuredList;
+
 /// Key for hashing elements of BaseType based on their name and size
 typedef QPair<QString, quint32> BaseTypeHashKey;
 
@@ -422,11 +425,14 @@ protected:
      * @param new_name the name of the type to update the relations for
      * @param target the BaseType that either was just created from some type
      * @param checkPostponed if set to \c true, the _postponedTypes are searched
-     * for types referencing \a new_id
+     *   for types referencing \a new_id
+     * @param forceInsert insert this type into lists even if its hash is
+     *   invalid
      * information, or the equivalent type found by the type hash.
      */
     void updateTypeRelations(const int new_id, const QString& new_name,
-                             BaseType* target, bool checkPostponed = true);
+                             BaseType* target, bool checkPostponed = true,
+                             bool forceInsert = false);
 
     /**
      * Checks if the type of \a rt was resolved. If \a rt is of type
@@ -578,6 +584,19 @@ private:
 
     BaseTypeList typedefsOfType(BaseType* type);
 
+    /**
+     * Goes to the list of zero-sized structs/unions and tries to find the
+     * matching definition by name. This is only done for unique struct names.
+     * @return the number of replaced structs
+     */
+    int replaceZeroSizeStructs();
+
+    /**
+     * Removes the given symbol from all internal data structures and deletes
+     * it.
+     * @param t the BaseType to remove
+     */
+    void deleteSymbol(BaseType* t);
 
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
@@ -590,6 +609,7 @@ private:
 	IntIntMultiHash _equivalentTypes; ///< Holds all type IDs of equivalent types
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
+	StructuredList _zeroSizeStructs;  ///< Holds all structs or unions with a size of zero
 	RefBaseTypeMultiHash _usedByRefTypes;///< Holds all RefBaseType objects that hold a reference to another type
 	VarMultiHash _usedByVars;         ///< Holds all Variable objects that hold a reference to another type
 	StructMemberMultiHash _usedByStructMembers;///< Holds all StructuredMember objects that hold a reference to another type
