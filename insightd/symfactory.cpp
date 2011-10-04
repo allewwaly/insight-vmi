@@ -84,6 +84,7 @@ void SymFactory::clear()
 	_usedByRefTypes.clear();
 	_usedByVars.clear();
 	_usedByStructMembers.clear();
+	_zeroSizeStructs.clear();
 
 	// Reset other vars
 	_typeFoundByHash = 0;
@@ -507,15 +508,13 @@ void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 
 
 void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
-                                     BaseType* target, bool checkPostponed)
+                                     BaseType* target, bool checkPostponed,
+                                     bool forceInsert)
 {
     if (new_id == 0)
         return;
 
-    if (new_id == 0x11a)
-        debugmsg("Hier");
-
-    if (!target->hashIsValid()) {
+    if (!target->hashIsValid() && !forceInsert) {
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(target);
         _postponedTypes.insertMulti(rbt->refTypeId(), rbt);
         return;
@@ -529,7 +528,8 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
     // Perform certain actions for new types
     if (isNewType(new_id, target)) {
         _types.append(target);
-        _typesByHash.insertMulti(target->hash(), target);
+        if (target->hashIsValid())
+            _typesByHash.insertMulti(target->hash(), target);
         // Add this type into the name relation table
         if (!new_name.isEmpty())
             _typesByName.insertMulti(new_name, target);
@@ -575,6 +575,7 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
                                        bool removeFromPostponedTypes)
 {
     StructuredMember* m = dynamic_cast<StructuredMember*>(rt);
+    Variable* v = dynamic_cast<Variable*>(rt);
 
     // If this is a StructuredMember, use the special resolveReference()
     // function to handle "struct list_head" and the like.
@@ -586,6 +587,12 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
         }
         else
             return false;
+    }
+    // For variables just make sure that the type exists
+    else if (v && v->refType()) {
+        // Delete the entry from the hash
+        if (removeFromPostponedTypes)
+            _postponedTypes.remove(rt->refTypeId(), rt);
     }
     else {
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(rt);
@@ -669,7 +676,7 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 	case hsVariable:
 		return info.id() != 0 /*&& info.refTypeId() != 0*/ && info.location() > 0 /*&& !info.name().isEmpty()*/;
 	case hsVolatileType:
-		return info.id() != 0 && info.refTypeId() != 0;
+		return info.id() != 0 /*&& info.refTypeId() != 0*/;
 	default:
 		return false;
 	}
@@ -682,6 +689,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
 		factoryError(QString("Type information for the following symbol is incomplete:\n%1").arg(info.dump()));
 
 	ReferencingType* ref = 0;
+	Structured* str = 0;
 
 	switch(info.symType()) {
 	case hsArrayType: {
@@ -710,7 +718,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
 		break;
 	}
     case hsStructureType: {
-        getTypeInstance<Struct>(info);
+        str = getTypeInstance<Struct>(info);
         break;
     }
 	case hsSubroutineType: {
@@ -722,7 +730,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
         break;
 	}
     case hsUnionType: {
-        getTypeInstance<Union>(info);
+        str = getTypeInstance<Union>(info);
         break;
     }
 	case hsVariable: {
@@ -739,6 +747,10 @@ void SymFactory::addSymbol(const TypeInfo& info)
 		break;
 	}
 	}
+
+	// Add structs or unions with a size of zero to the list
+	if (str && str->size() == 0 && isNewType(info, str))
+		_zeroSizeStructs.append(str);;
 
 	// Resolve references to another type, if necessary
 	if (ref) {
@@ -776,8 +788,12 @@ void SymFactory::addSymbol(BaseType* type)
     Structured* s = dynamic_cast<Structured*>(type);
     if (rbt)
         resolveReference(rbt);
-    else if (s)
+    else if (s) {
+        // Add structs or unions with a size of zero to the list
+        if (s && s->size() == 0)
+            _zeroSizeStructs.append(s);;
         resolveReferences(s);
+    }
 
 //    _typesByHash.insert(type->hash(), type);
 }
@@ -870,14 +886,14 @@ bool SymFactory::resolveReference(ReferencingType* ref)
     assert(ref != 0);
 
     // Don't try to resolve types without valid ID
-    else if (ref->refTypeId() == 0)
-    	return false;
+    if (ref->refTypeId() == 0)
+        return true;
 
     // Don't resolve already resolved types
     if (!ref->refType()) {
         // Add this type into the waiting queue
         if (!_postponedTypes.contains(ref->refTypeId(), ref))
-            _postponedTypes.insert(ref->refTypeId(), ref);
+            _postponedTypes.insertMulti(ref->refTypeId(), ref);
         return false;
     }
     else {
@@ -1071,9 +1087,94 @@ bool SymFactory::resolveReferences(Structured* s)
     return ret;
 }
 
+void SymFactory::deleteSymbol(BaseType* t)
+{
+    assert(t != 0);
+
+    if (!t->name().isEmpty())
+        _typesByName.remove(t->name(), t);
+    if (_typesById.contains(t->id())) {
+        _equivalentTypes.remove(_typesById[t->id()]->id(), t->id());
+        _typesById.remove(t->id());
+    }
+    if (t->hashIsValid())
+        _typesByHash.remove(t->hash(), t);
+
+    RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
+    if (rbt) {
+        if (rbt->refTypeId() && !rbt->refType())
+            _postponedTypes.remove(rbt->refTypeId(), (ReferencingType*)rbt);
+        _usedByRefTypes.remove(rbt->refTypeId(), rbt);
+    }
+
+    Structured* s = dynamic_cast<Structured*>(t);
+    if (s) {
+//        if (s->size() == 0)
+//            _zeroSizeStructs.removeAll(s);
+        for (int i = 0; i < s->members().size(); ++i) {
+            StructuredMember* m = s->members().at(i);
+            _usedByStructMembers.remove(m->refTypeId(), m);
+        }
+    }
+
+    _types.removeAll(t);
+    _customTypes.removeAll(t);
+
+    delete t;
+}
+
+
+int SymFactory::replaceZeroSizeStructs()
+{
+    int ret = 0;
+
+    StructuredList::iterator it = _zeroSizeStructs.begin();
+    while (it != _zeroSizeStructs.end()) {
+        Structured* s = *it;
+        BaseType* target = 0;
+        int count = 0;
+        // Skip anonymous types
+        if (!s->name().isEmpty()) {
+            // Count the number of structured types with that name
+            BaseTypeStringHash::iterator bit = _typesByName.find(s->name());
+            while (bit != _typesByName.end() &&
+                   bit.value()->name() == s->name())
+            {
+                BaseType* t = bit.value();
+                if ((t->type() & StructOrUnion) && t->size() > 0) {
+                    target = t;
+                    ++count;
+                }
+                ++bit;
+            }
+        }
+
+        // Replace the zero-sized type if its name is not ambiguous
+        if (count == 1) {
+            // Erase element prior to calling deleteSymbol()
+            it = _zeroSizeStructs.erase(it);
+
+            // Remove empty type from the factory
+            int s_id = s->id();
+            deleteSymbol(s);
+            s = 0;
+
+            _typesById.insert(s_id, target);
+            _equivalentTypes.insertMulti(target->id(), s_id);
+            ++ret;
+        }
+        else
+            ++it;
+    }
+
+    return ret;
+}
+
 
 void SymFactory::symbolsFinished(RestoreType rt)
 {
+    // Replace all zero-sized structs
+    int zeroReplaced = replaceZeroSizeStructs();
 
     // One last try to resolve any remaining types
     int changes;
@@ -1083,7 +1184,7 @@ void SymFactory::symbolsFinished(RestoreType rt)
         changes = 0;
         RefTypeMultiHash::iterator it = _postponedTypes.begin();
         while (it != _postponedTypes.end()) {
-            if (it.key() == 0x11a || it.value()->refTypeId() == 0x11a)
+            if (it.value()->refTypeId() == 0x24a64d2)
                 debugmsg("hier");
             if (postponedTypeResolved(*it, false)) {
                 ++changes;
@@ -1094,6 +1195,15 @@ void SymFactory::symbolsFinished(RestoreType rt)
         }
     } while (changes);
 
+    // Finally, add all remaining types to the list, regardless of the fact that
+    // they could not be resolved.
+    RefTypeMultiHash::iterator it = _postponedTypes.begin();
+    while (it != _postponedTypes.end()) {
+        RefBaseType* rbt = dynamic_cast<RefBaseType*>(*it);
+        if (rbt)
+            updateTypeRelations(rbt->id(), rbt->name(), rbt, false, true);
+        ++it;
+    }
 
     shell->out() << "Statistics:" << endl;
 
@@ -1110,6 +1220,10 @@ void SymFactory::symbolsFinished(RestoreType rt)
     shell->out() << "  | No. of variables:          " << _vars.size() << endl;
     shell->out() << "  | No. of variables by ID:    " << _varsById.size() << endl;
     shell->out() << "  | No. of variables by name:  " << _varsByName.size() << endl;
+
+    if (rt == rtParsing)
+        shell->out() << "  | Empty structs replaced:    " << zeroReplaced << endl;
+    shell->out() << "  | Empty structs remaining:   " << _zeroSizeStructs.size() << endl;
 
     shell->out() << qSetFieldWidth(0) << left;
 
@@ -1164,7 +1278,7 @@ QString SymFactory::postponedTypesStats() const
     QString ret;
     QList<RefTypeMultiHash::key_type> keys = _postponedTypes.uniqueKeys();
 
-    QMap<int, int> typeCount;
+    QMultiMap<int, int> typeCount;
 
     ret = QString("The postponedTypes hash contains %1 elements waiting for "
             "%2 types.\n")
@@ -1174,7 +1288,7 @@ QString SymFactory::postponedTypesStats() const
     for (int i = 0; i < keys.size(); ++i) {
         int cnt = _postponedTypes.count(keys[i]);
 //        if (typeCount.size() < 10)
-            typeCount.insert(cnt, keys[i]);
+            typeCount.insertMulti(cnt, keys[i]);
 //        else {
 //            QMap<int, int>::iterator it = --typeCount.end();
 //            if (it.key() < cnt) {
@@ -1185,15 +1299,43 @@ QString SymFactory::postponedTypesStats() const
     }
 
     QMap<int, int>::const_iterator it = --typeCount.constEnd();
-    for (int i = 0; i < 20; ++i) {
-        ret += QString("%1 types waiting for id 0x%2\n")
+    int i;
+    for (i = 0; i < 20; ++i) {
+        ret += QString("%1 types waiting for id 0x%2: ")
                 .arg(it.key(), 10)
                 .arg(it.value(), 0, 16);
+        // Print list of at most 5 type IDs
+        RefTypeMultiHash::const_iterator pit = _postponedTypes.find(it.value());
+        for (int j = 0;
+             j < 5 && pit != _postponedTypes.end() && pit.key() == it.value();
+             ++j)
+        {
+            if (j > 0)
+                ret += ", ";
+            const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(pit.value());
+            const Variable* v = dynamic_cast<const Variable*>(pit.value());
+            const StructuredMember* m = dynamic_cast<const StructuredMember*>(pit.value());
+            if (rbt)
+                ret += QString("0x%1").arg(rbt->id(), 0, 16);
+            else if (v)
+                ret += QString("0x%1").arg(v->id(), 0, 16);
+            else if (m)
+                ret += QString("0x%1").arg(m->id(), 0, 16);
+            ++pit;
+        }
+        if (pit != _postponedTypes.end() && pit.key() == it.value())
+            ret += ", ...";
+        ret += "\n";
 
         if (it == typeCount.constBegin())
             break;
         else
             --it;
+    }
+    if (i < typeCount.size()) {
+        ret += QString("%1 (%2 more)\n")
+                .arg("", 10)
+                .arg(typeCount.size() - i);
     }
 
     return ret;
