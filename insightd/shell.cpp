@@ -1014,7 +1014,7 @@ int Shell::cmdListTypes(QStringList args)
        }
 
         // Construct name and line of the source file
-        if (type->srcFile() >= 0) {
+        if (type->srcFile() > 0) {
             if (!unit || unit->id() != type->srcFile())
                 unit = _sym.factory().sources().value(type->srcFile());
             if (!unit)
