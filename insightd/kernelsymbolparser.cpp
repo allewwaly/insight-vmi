@@ -145,13 +145,9 @@ void KernelSymbolParser::finishLastSymbol()
     // Otherwise finish the main-symbol and save parsed data into
     // main symbol (again).
     else {
-        if (
-                // Variables without a location belong to inline assembler
-                // statements which we can ignore
-                !(_info.symType() == hsVariable && _info.location() <= 0) &&
-                // Sometimes empty volatile statements occur, ignore those
-                !(_info.symType() == hsVolatileType && _info.refTypeId() == 0)
-           )
+        // Variables without a location belong to inline assembler
+        // statements which we can ignore
+        if ( !(_info.symType() == hsVariable && _info.location() <= 0) )
             _factory->addSymbol(_info);
         // Reset all data for a new symbol
         _info.clear();
@@ -373,13 +369,9 @@ void KernelSymbolParser::parse()
 
                 // skip all symbols till the id saved in skipUntil is reached
                 parseInt16(i, rxHdr.cap(1), &ok);
-                if (skipUntil != -1 && skipUntil != i) {
-                    continue;
-                }
-                else {
+                if (skipUntil == i)
                     // We reached the mark, reset values
                     skipUntil = -1;
-                }
 
                 // See if we have to finish the last symbol before we continue parsing
                 if (_isRelevant) {
@@ -387,8 +379,16 @@ void KernelSymbolParser::parse()
                     _isRelevant = false;
                 }
 
+                // We are interested in all local symbols except variables and
+                // all global symbols
+                if (skipUntil > 0)
+                    // Ignore local variables
+                    _isRelevant = (_hdrSym & relevantHdr & ~hsVariable);
+                else
+                    _isRelevant = (_hdrSym & relevantHdr);
+
                 // Are we interested in this symbol?
-                if ( (_isRelevant = (_hdrSym & relevantHdr)) ) {
+                if (_isRelevant) {
                     _pInfo->setSymType(_hdrSym);
                     parseInt16(i, rxHdr.cap(1), &ok);
                     _pInfo->setId(i);
@@ -398,7 +398,7 @@ void KernelSymbolParser::parse()
                 }
                 else {
                     // If this is a function we skip all symbols that belong to it.
-                    if (_hdrSym & hsSubprogram) {
+                    if (_hdrSym & (hsSubprogram|hsInlinedSubroutine)) {
                         // Parse the parameters
                         _isRelevant = true;
                         skip = true;
