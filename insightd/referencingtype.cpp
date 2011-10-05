@@ -15,13 +15,13 @@
 #include <assert.h>
 
 ReferencingType::ReferencingType()
-    : _refTypeId(0), _origRefTypeId(0)
+    : _refTypeId(0)
 {
 }
 
 
 ReferencingType::ReferencingType(const TypeInfo& info)
-    : _refTypeId(info.refTypeId()), _origRefTypeId(_refTypeId)
+    : _refTypeId(info.refTypeId())
 {
 }
 
@@ -49,13 +49,13 @@ const BaseType* ReferencingType::refTypeDeep(int resolveTypes) const
 
 void ReferencingType::readFrom(QDataStream& in)
 {
-    in >> _refTypeId >> _origRefTypeId;
+    in >> _refTypeId >> _altRefTypeIds;
 }
 
 
 void ReferencingType::writeTo(QDataStream& out) const
 {
-    out << _refTypeId << _origRefTypeId;
+    out << _refTypeId << _altRefTypeIds;
 }
 
 

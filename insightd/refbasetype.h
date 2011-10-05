@@ -42,18 +42,6 @@ public:
     virtual uint size() const;
 
     /**
-     * Getter for the directly referenced type, const version
-     * @return the type this referencing type directly points to
-     */
-    virtual const BaseType* refType() const;
-
-    /**
-     * Getter for the directly referenced type
-     * @return the type this referencing type directly points to
-     */
-    virtual BaseType* refType();
-
-    /**
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
@@ -94,6 +82,16 @@ public:
             int resolveTypes = trLexical, int* derefCount = 0) const;
 
 protected:
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual SymFactory* fac();
+
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual const SymFactory* fac() const;
+
     mutable int _hashRefTypeId; ///< type ID used to generate the hash
 };
 
@@ -108,22 +106,17 @@ inline uint RefBaseType::size() const
         return _size;
 }
 
+
+inline const SymFactory* RefBaseType::fac() const
+{
+    return _factory;
+}
+
+
+inline SymFactory* RefBaseType::fac()
+{
+    return _factory;
+}
+
 #endif /* REFBASETYPE_H_ */
-
-#include "symfactory.h"
-
-#if !defined(REFBASETYPE_H_INLINE) && defined(SYMFACTORY_DEFINED)
-#define REFBASETYPE_H_INLINE
-
-inline const BaseType* RefBaseType::refType() const
-{
-    return _factory && _refTypeId ? _factory->findBaseTypeById(_refTypeId) : 0;
-}
-
-
-inline BaseType* RefBaseType::refType()
-{
-    return _factory && _refTypeId ? _factory->findBaseTypeById(_refTypeId) : 0;
-}
-#endif /* REFBASETYPE_H_INLINE */
 

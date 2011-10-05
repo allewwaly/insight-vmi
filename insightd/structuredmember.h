@@ -48,18 +48,6 @@ public:
     void setOffset(size_t offset);
 
     /**
-     * Getter for the directly referenced type, const version
-     * @return the type this referencing type directly points to
-     */
-    virtual const BaseType* refType() const;
-
-    /**
-     * Getter for the directly referenced type
-     * @return the type this referencing type directly points to
-     */
-    virtual BaseType* refType();
-
-    /**
      * This gives a pretty name of that type which may involve referencing
      * types.
      * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
@@ -98,10 +86,33 @@ public:
     		const Instance *parent, int resolveTypes =
     		BaseType::trLexical) const;
 
+protected:
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual SymFactory* fac();
+
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual const SymFactory* fac() const;
+
 private:
 	size_t _offset;          ///< the member's offset within the struct;
 	Structured* _belongsTo;  ///< Struct or Union this member belongs to
 };
+
+
+inline const SymFactory* StructuredMember::fac() const
+{
+	return _factory;
+}
+
+
+inline SymFactory* StructuredMember::fac()
+{
+    return _factory;
+}
 
 
 /**
@@ -122,20 +133,3 @@ QDataStream& operator>>(QDataStream& in, StructuredMember& member);
 QDataStream& operator<<(QDataStream& out, const StructuredMember& member);
 
 #endif /* STRUCTUREDMEMBER_H_ */
-
-#include "symfactory.h"
-
-#if !defined(STRUCTUREDMEMBER_H_INLINE) && defined(SYMFACTORY_DEFINED)
-#define STRUCTUREDMEMBER_H_INLINE
-
-inline const BaseType* StructuredMember::refType() const
-{
-    return _factory && _refTypeId ? _factory->findBaseTypeById(_refTypeId) : 0;
-}
-
-
-inline BaseType* StructuredMember::refType()
-{
-    return _factory && _refTypeId ? _factory->findBaseTypeById(_refTypeId) : 0;
-}
-#endif /* STRUCTUREDMEMBER_H_INLINE */
