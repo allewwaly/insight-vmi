@@ -97,6 +97,12 @@ bool BaseType::hashIsValid() const
 }
 
 
+void BaseType::rehash() const
+{
+    _hashValid = false;
+}
+
+
 quint32 BaseType::size() const
 {
     return _size;
