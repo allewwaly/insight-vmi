@@ -4,10 +4,16 @@
  *  Created on: 28.05.2010
  *      Author: chrschn
  */
+//#define WRITE_ASCII_FILE 1
+#undef WRITE_ASCII_FILE
 
 #include "kernelsymbolwriter.h"
 #include <QIODevice>
 #include <QDataStream>
+#ifdef WRITE_ASCII_FILE
+#include <QFile>
+#include <QTextStream>
+#endif
 #include <QSet>
 #include "kernelsymbolconsts.h"
 #include "symfactory.h"
@@ -35,6 +41,12 @@ void KernelSymbolWriter::write()
     // First, write the header information to the uncompressed device
     QDataStream out(_to);
 
+#ifdef WRITE_ASCII_FILE
+    QFile debugOutFile("/tmp/insight.log");
+    debugOutFile.open(QIODevice::WriteOnly);
+    QTextStream dout(&debugOutFile);
+#endif
+
     // Write the file header in the following format:
     // 1. (qint32) magic number
     // 2. (qint16) file version number
@@ -42,6 +54,11 @@ void KernelSymbolWriter::write()
     // 4. (qint32) Qt's serialization format version (see QDataStream::Version)
 
     out << kSym::fileMagic << kSym::fileVersion << flags << (qint32) out.version();
+#ifdef WRITE_ASCII_FILE
+    dout << QString::fromAscii((char*)(&kSym::fileMagic), sizeof(kSym::fileMagic))
+         << " " << kSym::fileVersion  << " 0x" << hex << flags
+         << dec << " " << out.version() << endl;
+#endif
 
     // Write all information from SymFactory in the following format:
     // 1.   (MemSpecs) data of _specs
@@ -71,19 +88,34 @@ void KernelSymbolWriter::write()
 
         // Write the memory specifications
         out << *_specs;
+#ifdef WRITE_ASCII_FILE
+        dout << endl << "# Memory specifications" << endl
+                << _specs->toString();
+#endif
 
         // Write list of compile units
         out << (qint32) _factory->sources().size();
+#ifdef WRITE_ASCII_FILE
+        dout << endl << "# Compile units" << endl
+             << _factory->sources().size() << endl;
+#endif
         CompileUnitIntHash::const_iterator cu_it = _factory->sources().constBegin();
         while (cu_it != _factory->sources().constEnd()) {
             const CompileUnit* c = cu_it.value();
             out << *c;
+#ifdef WRITE_ASCII_FILE
+            dout << "0x" << hex << c->id() << " " << c->name() << endl;
+#endif
             ++cu_it;
             checkOperationProgress();
         }
 
         // Write list of types
         out << (qint32) _factory->types().size();
+#ifdef WRITE_ASCII_FILE
+        dout << endl << "# Types" << endl
+             << dec << _factory->types().size() << endl;
+#endif
 
         // Make three rounds: first write elementary types, then the
         // simple referencing types, finally the structs and unions
@@ -99,6 +131,17 @@ void KernelSymbolWriter::write()
                 if (t->type() & mask) {
                     out << (qint32) t->type();
                     out << *t;
+
+#ifdef WRITE_ASCII_FILE
+                    dout << "0x" << hex << t->id() << " "
+                         << realTypeToStr(t->type()) << " "
+                         << t->name();
+                    RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
+                    if (rbt)
+                        dout << ", refTypeId = 0x" << rbt->refTypeId();
+                    dout << endl;
+#endif
+
                     // Remember which types we have written out
                     written_types.insert(t->id());
                 }
@@ -106,21 +149,45 @@ void KernelSymbolWriter::write()
             }
         }
 
+        assert(_factory->types().size() == written_types.size());
+
         // Write list of missing types by ID
         out << _factory->typesById().size() - _factory->types().size();
+#ifdef WRITE_ASCII_FILE
+        dout << endl << "# Further type relations" << endl
+             << dec << _factory->typesById().size() - _factory->types().size()
+             << endl;
+#endif
         BaseTypeIntHash::const_iterator bt_id_it = _factory->typesById().constBegin();
+        int written = 0;
         while (bt_id_it != _factory->typesById().constEnd()) {
             if (!written_types.contains(bt_id_it.key())) {
                 out << (qint32) bt_id_it.key() << (qint32) bt_id_it.value()->id();
+#ifdef WRITE_ASCII_FILE
+                dout << hex << "0x" << bt_id_it.key() << " -> 0x"
+                     << bt_id_it.value()->id() << endl;
+#endif
+                ++written;
             }
             ++bt_id_it;
             checkOperationProgress();
         }
 
+        assert(written_types.size() + written == _factory->typesById().size());
+
         // Write list of variables
         out << (qint32) _factory->vars().size();
+#ifdef WRITE_ASCII_FILE
+        dout << endl << "# List of variables" << endl
+             << dec << _factory->vars().size() << endl;
+#endif
         for (int i = 0; i < _factory->vars().size(); i++) {
             out << *_factory->vars().at(i);
+#ifdef WRITE_ASCII_FILE
+            dout << hex << "0x" << _factory->vars().at(i)->id() << " "
+                 << _factory->vars().at(i)->name() << ", refTypeId = 0x"
+                 << _factory->vars().at(i)->refTypeId() << endl;
+#endif
             checkOperationProgress();
         }
     }
