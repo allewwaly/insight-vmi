@@ -85,6 +85,8 @@ void SymFactory::clear()
 	_usedByVars.clear();
 	_usedByStructMembers.clear();
 	_zeroSizeStructs.clear();
+	_varsByName.clear();
+	_varsById.clear();
 
 	// Reset other vars
 	_typeFoundByHash = 0;
@@ -230,23 +232,19 @@ T* SymFactory::getTypeInstance(const TypeInfo& info)
     // Try to find the type based on its hash, but only if hash is valid
     bool foundByHash = false;
 
-    if (t->hashIsValid() && _typesByHash.contains(t->hash())) {
-        BaseTypeList list = _typesByHash.values(t->hash());
-
-        // Go through the list and make sure we found the correct type
-        for (int i = 0; i < list.size(); i++) {
-            if (*list[i] == *t ) {
-                // We found it, so delete the previously created object
-                // and return the found one
-                delete t;
-                t = dynamic_cast<T*>(list[i]);
-                assert(t != 0);
-                foundByHash = true;
-                _typeFoundByHash++;
-                break;
-            }
+    if (t->hashIsValid()) {
+        BaseType* other = findTypeByHash(t);
+        if (other) {
+            // We found it, so delete the previously created object
+            // and return the found one
+            delete t;
+            t = dynamic_cast<T*>(other);
+            assert(t != 0);
+            foundByHash = true;
+            _typeFoundByHash++;
         }
     }
+
     // Either the hash did not contain this type or it was just a
     // collision, so add it to the type-by-hash table.
     if (!foundByHash) {
@@ -257,8 +255,6 @@ T* SymFactory::getTypeInstance(const TypeInfo& info)
             assert(s != 0);
             resolveReferences(s);
         }
-//        if (t->hashIsValid())
-//            _typesByHash.insert(t->hash(), t);
     }
 
     insert(info, t);
@@ -571,6 +567,23 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
 }
 
 
+BaseType* SymFactory::findTypeByHash(const BaseType* bt)
+{
+    if (!bt || !bt->hashIsValid())
+        return 0;
+
+    uint hash = bt->hash();
+    BaseTypeUIntHash::const_iterator it = _typesByHash.find(hash);
+    while (it != _typesByHash.end() && it.key() == hash) {
+        BaseType* t = it.value();
+        if (bt != t && *bt == *t)
+            return t;
+        ++it;
+    }
+    return 0;
+}
+
+
 bool SymFactory::postponedTypeResolved(ReferencingType* rt,
                                        bool removeFromPostponedTypes)
 {
@@ -596,27 +609,20 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
     }
     else {
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(rt);
-        // The type may still be invalid for some weired chaned types
+        // The type may still be invalid for some weired chained types
         if (rbt && rbt->hashIsValid()) {
             // Delete the entry from the hash
             if (removeFromPostponedTypes)
                 _postponedTypes.remove(rt->refTypeId(), rt);
 
             // Check if this is dublicated type
-            uint hash = rbt->hash();
-            BaseTypeUIntHash::const_iterator it = _typesByHash.find(hash);
-            while (it != _typesByHash.end() && it.key() == hash) {
-                BaseType* t = it.value();
-                if (*rbt == *t) {
-                    // Update type relations with equivalent type
-                    updateTypeRelations(rbt->id(), rbt->name(), t);
-                    delete rbt;
-                    rbt = 0;
-                    break;
-                }
-                ++it;
+            BaseType* t = findTypeByHash(rbt);
+            if (t) {
+                // Update type relations with equivalent type
+                updateTypeRelations(rbt->id(), rbt->name(), t);
+                delete rbt;
             }
-            if (rbt)
+            else
                 // Update type relations with new type
                 updateTypeRelations(rbt->id(), rbt->name(), rbt);
             return true;
@@ -1087,40 +1093,72 @@ bool SymFactory::resolveReferences(Structured* s)
     return ret;
 }
 
-void SymFactory::deleteSymbol(BaseType* t)
+void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
 {
-    assert(t != 0);
+    assert(oldType != 0);
 
-    if (!t->name().isEmpty())
-        _typesByName.remove(t->name(), t);
-    if (_typesById.contains(t->id())) {
-        _equivalentTypes.remove(_typesById[t->id()]->id(), t->id());
-        _typesById.remove(t->id());
+    if (!oldType->name().isEmpty())
+        _typesByName.remove(oldType->name(), oldType);
+    if (_typesById.contains(oldType->id())) {
+        _equivalentTypes.remove(_typesById[oldType->id()]->id(), oldType->id());
+//        _typesById.remove(oldType->id());
     }
-    if (t->hashIsValid())
-        _typesByHash.remove(t->hash(), t);
+    if (oldType->hashIsValid())
+        _typesByHash.remove(oldType->hash(), oldType);
 
-    RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
+    RefBaseType* rbt = dynamic_cast<RefBaseType*>(oldType);
     if (rbt) {
         if (rbt->refTypeId() && !rbt->refType())
             _postponedTypes.remove(rbt->refTypeId(), (ReferencingType*)rbt);
-        _usedByRefTypes.remove(rbt->refTypeId(), rbt);
+        if (rbt->refTypeId())
+            _usedByRefTypes.remove(rbt->refTypeId(), rbt);
     }
 
-    Structured* s = dynamic_cast<Structured*>(t);
+    Structured* s = dynamic_cast<Structured*>(oldType);
     if (s) {
-//        if (s->size() == 0)
-//            _zeroSizeStructs.removeAll(s);
+        if (s->size() == 0)
+            _zeroSizeStructs.removeAll(s);
         for (int i = 0; i < s->members().size(); ++i) {
             StructuredMember* m = s->members().at(i);
-            _usedByStructMembers.remove(m->refTypeId(), m);
+            if (m->refTypeId())
+                _usedByStructMembers.remove(m->refTypeId(), m);
         }
     }
 
-    _types.removeAll(t);
-    _customTypes.removeAll(t);
+    _types.removeAll(oldType);
+    _customTypes.removeAll(oldType);
 
-    delete t;
+    _equivalentTypes.insertMulti(_typesById[newType->id()]->id(), oldType->id());
+
+    // Update all old equivalent types as well
+    QList<int> equiv = equivalentTypes(oldType->id());
+    equiv += oldType->id();
+    for (int i = 0; i < equiv.size(); ++i) {
+        assert(_typesById.value(equiv[i]) == oldType);
+        // Save the hashes of all types referencing the old type
+        QList<RefBaseType*> refTypes = _usedByRefTypes.values(equiv[i]);
+        QList<uint> refTypeHashes;
+        for (int j = 0; j < refTypes.size(); ++j)
+            refTypeHashes += refTypes[j]->hash();
+        // Apply the change
+        _typesById[equiv[i]] = newType;
+        // Re-hash all referencing types
+        for (int j = 0; j < refTypes.size(); ++j) {
+            refTypes[j]->rehash();
+            if (refTypeHashes[j] != refTypes[j]->hash()) {
+                _typesByHash.remove(refTypeHashes[j], refTypes[j]);
+
+                // Is this a dublicated type?
+                BaseType* other = findTypeByHash(refTypes[j]);
+                if (other) {
+                    replaceType(refTypes[j], other);
+                    delete refTypes[j];
+                }
+                else
+                    _typesByHash.insertMulti(refTypes[j]->hash(), refTypes[j]);
+            }
+        }
+    }
 }
 
 
@@ -1155,12 +1193,8 @@ int SymFactory::replaceZeroSizeStructs()
             it = _zeroSizeStructs.erase(it);
 
             // Remove empty type from the factory
-            int s_id = s->id();
-            deleteSymbol(s);
-            s = 0;
-
-            _typesById.insert(s_id, target);
-            _equivalentTypes.insertMulti(target->id(), s_id);
+            replaceType(s, target);
+            delete s;
             ++ret;
         }
         else
@@ -1168,6 +1202,12 @@ int SymFactory::replaceZeroSizeStructs()
     }
 
     return ret;
+}
+
+
+inline bool idLessThan(const BaseType* t1, const BaseType* t2)
+{
+    return t1->id() < t2->id();
 }
 
 
@@ -1184,8 +1224,6 @@ void SymFactory::symbolsFinished(RestoreType rt)
         changes = 0;
         RefTypeMultiHash::iterator it = _postponedTypes.begin();
         while (it != _postponedTypes.end()) {
-            if (it.value()->refTypeId() == 0x24a64d2)
-                debugmsg("hier");
             if (postponedTypeResolved(*it, false)) {
                 ++changes;
                 it = _postponedTypes.erase(it);
@@ -1204,6 +1242,9 @@ void SymFactory::symbolsFinished(RestoreType rt)
             updateTypeRelations(rbt->id(), rbt->name(), rbt, false, true);
         ++it;
     }
+
+    // Sort the types by ID
+    qSort(_types.begin(), _types.end(), idLessThan);
 
     shell->out() << "Statistics:" << endl;
 
@@ -1348,7 +1389,7 @@ QString SymFactory::typesByHashStats() const
         return "The typesByHash hash is emtpy.";
 
     typedef BaseTypeUIntHash HashType;
-    typedef QMap<int, HashType::key_type> MapType;
+    typedef QMultiMap<int, HashType::key_type> MapType;
 
     QString ret;
     QList<HashType::key_type> keys = _typesByHash.uniqueKeys();
@@ -1374,17 +1415,27 @@ QString SymFactory::typesByHashStats() const
     }
 
     MapType::const_iterator it = --typeCount.constEnd();
-    for (int i = 0; i < 10; ++i) {
-        ret += QString("%1 entries for key 0x%2 (type id 0x%3)\n")
+    int i;
+    for (i = 0; i < 10; ++i) {
+        BaseTypeList list = _typesByHash.values(it.value());
+        QStringList slist;
+        for (int j = 0; j < list.size(); ++j)
+            slist += QString("0x%1").arg(list[j]->id(), 0, 16);
+
+        ret += QString("%1 entries for key 0x%2 (type id %3)\n")
             .arg(it.key(), 10)
             .arg(it.value(), sizeof(HashType::key_type) << 1, 16, QChar('0'))
-            .arg(_typesByHash.value(it.value())->id(), 0, 16);
+                .arg(slist.join(" "));
 
         if (it == typeCount.constBegin())
             break;
         else
             --it;
     }
+    if (it != typeCount.constBegin())
+        ret += QString("%1 (%2 more)\n")
+                .arg("", 10)
+                .arg(keys.size() - i);
 
     return ret;
 }

@@ -592,11 +592,22 @@ private:
     int replaceZeroSizeStructs();
 
     /**
-     * Removes the given symbol from all internal data structures and deletes
-     * it.
-     * @param t the BaseType to remove
+     * Replaces \a oldType with \a newType in all internal data structures.
+     * It is safe to delete \a oldType afterwards.
+     * @param oldType the BaseType to be replaced
+     * @param newType the BaseType to replace \a oldType
      */
-    void deleteSymbol(BaseType* t);
+    void replaceType(BaseType* oldType, BaseType* newType);
+
+    /**
+     * Tries to find a type equal to \a t based on its hash and the comparison
+     * operator.
+     * \note This function will \b not return \a t itself, only another type
+     * that equals \a t.
+     * @param t the type to find an equal type for
+     * @return a type euqal to \a t, or \c null no other type exists
+     */
+    BaseType* findTypeByHash(const BaseType* t);
 
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
