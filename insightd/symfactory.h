@@ -20,6 +20,7 @@ class BaseType;
 class Structured;
 class Struct;
 class ReferencingType;
+class RefBaseType;
 class CompileUnit;
 class Variable;
 class ASTType;
@@ -29,7 +30,6 @@ class ASTType;
 #include "genericexception.h"
 #include "structured.h"
 #include "memspecs.h"
-#include "pointer.h"
 #include <astsymbol.h>
 
 

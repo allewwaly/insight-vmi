@@ -1461,25 +1461,25 @@ void SymFactory::insertUsedBy(ReferencingType* ref)
 
 void SymFactory::insertUsedBy(RefBaseType* rbt)
 {
-    if (!rbt || _usedByRefTypes.contains(rbt->origRefTypeId(), rbt))
+    if (!rbt || _usedByRefTypes.contains(rbt->refTypeId(), rbt))
         return;
-    _usedByRefTypes.insertMulti(rbt->origRefTypeId(), rbt);
+    _usedByRefTypes.insertMulti(rbt->refTypeId(), rbt);
 }
 
 
 void SymFactory::insertUsedBy(Variable* var)
 {
-    if (!var || _usedByVars.contains(var->origRefTypeId(), var))
+    if (!var || _usedByVars.contains(var->refTypeId(), var))
         return;
-    _usedByVars.insertMulti(var->origRefTypeId(), var);
+    _usedByVars.insertMulti(var->refTypeId(), var);
 }
 
 
 void SymFactory::insertUsedBy(StructuredMember* m)
 {
-    if (!m || _usedByStructMembers.contains(m->origRefTypeId(), m))
+    if (!m || _usedByStructMembers.contains(m->refTypeId(), m))
         return;
-    _usedByStructMembers.insertMulti(m->origRefTypeId(), m);
+    _usedByStructMembers.insertMulti(m->refTypeId(), m);
 }
 
 
@@ -1756,20 +1756,18 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
             ++membersFound;
             bool changeType = true;
             // Was the member already manipulated?
-            if (member->refTypeId() != member->origRefTypeId()) {
+            if (member->hasAltRefTypes()) {
                 // Do we have conflicting target types?
-                switch (compareConflictingTypes(member->refType(), targetBaseType)) {
+                switch (compareConflictingTypes(member->altRefType(), targetBaseType)) {
                 case tcNoConflict:
                     changeType = false;
-                    t = findBaseTypeById(member->origRefTypeId());
+                    t = member->refType();
                     debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\"")
                              .arg(member->name())
                              .arg(member->belongsTo()->prettyName())
                              .arg(member->belongsTo()->id(), 0, 16)
                              .arg(t ? t->prettyName() : QString("???"))
-                             .arg(member->refType() ?
-                                      member->refType()->prettyName() :
-                                      QString("???")));
+                             .arg(member->altRefType()->prettyName()));
                     break;
 
                 case tcIgnore:
@@ -1787,6 +1785,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
                 case tcConflict:
                     changeType = false;
                     ++_conflictingTypeChanges;
+                    member->addAltRefTypeId(targetBaseType->id());
                     debugerr(QString("Conflicting target types: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
                                  .arg(member->refType() ?
                                           member->refType()->prettyName() :
@@ -1808,7 +1807,8 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
                 /// @todo may need to adjust member->memberOffset() somehow
                 ++membersChanged;
                 ++_totalTypesChanged;
-                member->setRefTypeId(targetBaseType->id());
+                /// @todo replace member->altRefType() with target
+                member->addAltRefTypeId(targetBaseType->id());
             }
         }
     }
@@ -1845,7 +1845,7 @@ void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
         Variable* v = vars[i];
         if (v->refType() && v->refType()->hash() == targetBaseType->hash()) {
             ++varsFound;
-            v->setRefTypeId(targetBaseType->id());
+            v->addAltRefTypeId(targetBaseType->id());
         }
     }
 
