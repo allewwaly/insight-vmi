@@ -13,11 +13,7 @@
 #include "symbol.h"
 #include "referencingtype.h"
 #include "sourceref.h"
-#include "basetype.h"
-#include "instance.h"
-#include "symfactory.h"
 #include "debug.h"
-
 
 /**
  * This class represents a variable variable of a certain type.
@@ -67,18 +63,6 @@ public:
     }
 
     /**
-     * Getter for the directly referenced type, const version
-     * @return the type this referencing type directly points to
-     */
-    virtual const BaseType* refType() const;
-
-    /**
-     * Getter for the directly referenced type
-     * @return the type this referencing type directly points to
-     */
-    virtual BaseType* refType();
-
-    /**
      * This gives a pretty name of that variable in a C-style definition.
      * @return the pretty name of that type
      */
@@ -126,6 +110,16 @@ public:
 	virtual void writeTo(QDataStream& out) const;
 
 protected:
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual SymFactory* fac();
+
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual const SymFactory* fac() const;
+
 	size_t _offset;
 };
 
@@ -158,22 +152,16 @@ inline void Variable::setOffset(size_t offset)
     _offset = offset;
 }
 
+
+inline const SymFactory* Variable::fac() const
+{
+    return _factory;
+}
+
+
+inline SymFactory* Variable::fac()
+{
+    return _factory;
+}
+
 #endif /* VARIABLE_H_ */
-
-#include "symfactory.h"
-
-#if !defined(VARIABLE_H_INLINE) && defined(SYMFACTORY_DEFINED)
-#define VARIABLE_H_INLINE
-
-inline const BaseType* Variable::refType() const
-{
-    return _factory && _refTypeId ? _factory->findBaseTypeById(_refTypeId) : 0;
-}
-
-
-inline BaseType* Variable::refType()
-{
-    return _factory && _refTypeId ? _factory->findBaseTypeById(_refTypeId) : 0;
-}
-
-#endif /* VARIABLE_H_INLINE */
