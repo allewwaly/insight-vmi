@@ -144,6 +144,11 @@ public:
     bool hashIsValid() const;
 
     /**
+     * Forces the hash to be re-calculated.
+     */
+    void rehash() const;
+
+    /**
      * @return the size of this type in bytes
      */
     virtual quint32 size() const;
