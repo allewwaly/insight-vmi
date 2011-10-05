@@ -9,6 +9,8 @@
 #include <QIODevice>
 #include <QDataStream>
 #include <QSet>
+#include <QPair>
+#include <QLinkedList>
 #include "kernelsymbolconsts.h"
 #include "symfactory.h"
 #include "basetype.h"
@@ -124,12 +126,36 @@ void KernelSymbolReader::read()
         _phase = phTypeRelations;
         in >> size;
 
-        QString s; // empty string
+        typedef QPair<int, int> IntInt;
+        typedef QLinkedList<IntInt> IntIntList;
+        IntIntList typeRelations; // buffer for not-yet existing types
+        const QString empty; // empty string
         for (int i = 0; i < size; i++) {
             in >> source >> target;
             BaseType* t = _factory->findBaseTypeById(target);
-            _factory->updateTypeRelations(source, s, t);
+            // Is the type already in the list?
+            if (t)
+                _factory->updateTypeRelations(source, empty, t);
+            // If not, we update the type relations later
+            else
+                typeRelations.append(IntInt(source, target));
             checkOperationProgress();
+        }
+
+        IntIntList::iterator it = typeRelations.begin();
+        while (it != typeRelations.end()) {
+            source = it->first;
+            target = it->second;
+            BaseType* t = _factory->findBaseTypeById(target);
+            if (t) {
+                _factory->updateTypeRelations(source, empty, t);
+                it = typeRelations.erase(it);
+            }
+            else
+                ++it;
+
+            if (it == typeRelations.end())
+                it = typeRelations.begin();
         }
 
         // Read list of variables
