@@ -1970,17 +1970,36 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
 		for (int i = 0; i < s->members().size(); i++) {
 			StructuredMember* m = s->members().at(i);
-			QString id = m->refTypeId() == 0 ?
-			        QString::number(m->refTypeId()) :
-			        QString("0x%1").arg(m->refTypeId(), 0, 16);
+			const BaseType* rt = (m->altRefTypeCount() == 1) ?
+						m->altRefType() :
+						m->refType();
+
+			QString pretty = rt ?
+						rt->prettyName() :
+						QString("(unresolved type, 0x%1)")
+							.arg(m->refTypeId(), 0, 16);
+
+			if (m->altRefTypeCount() == 1)
+				pretty = "<" + pretty + ">";
+			else if (m->altRefTypeCount() > 1) {
+				BaseType* tmp;
+				pretty += " <";
+				for (int j = 0; j < m->altRefTypeCount(); ++j) {
+					if (! (tmp = m->altRefType(j)))
+						continue;
+					if (j > 0)
+						pretty += ", ";
+					pretty += tmp->prettyName();
+				}
+				pretty += ">";
+			}
+
 			_out << "    "
                     << QString("0x%1").arg(m->offset(), 4, 16, QChar('0'))
                     << "  "
                     << qSetFieldWidth(20) << left << (m->name() + ": ")
 					<< qSetFieldWidth(0)
-					<< (m->refType() ?
-					        m->refType()->prettyName() :
-					        QString("(unresolved type, %1)").arg(id))
+					<< pretty
 					<< endl;
 		}
 	}
