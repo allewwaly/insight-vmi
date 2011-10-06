@@ -891,12 +891,8 @@ bool SymFactory::resolveReference(ReferencingType* ref)
 {
     assert(ref != 0);
 
-    // Don't try to resolve types without valid ID
-    if (ref->refTypeId() == 0)
-        return true;
-
     // Don't resolve already resolved types
-    if (!ref->refType()) {
+    if (ref->refTypeId() != 0 && !ref->refType()) {
         // Add this type into the waiting queue
         if (!_postponedTypes.contains(ref->refTypeId(), ref))
             _postponedTypes.insertMulti(ref->refTypeId(), ref);
@@ -1585,7 +1581,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
                 zero++;
         }
     }
-    // If we non-zero-sized types, then remove all zero-sized types
+    // If we have non-zero-sized types, then remove all zero-sized types
     if (non_zero && zero) {
         for (int i = baseTypes.size() - 1; i >= 0; --i) {
             if (baseTypes[i] && baseTypes[i]->type() != rtTypedef &&
@@ -1601,10 +1597,20 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
 
 
 void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
-                                      const ASTType* ctxType,
-                                      const QStringList& ctxMembers,
-                                      const ASTType* targetType)
+                                    const ASTType* srcType,
+                                    const ASTType* ctxType,
+                                    const QStringList& ctxMembers,
+                                    const ASTType* targetType)
 {
+    // Find the source base type
+    AstBaseTypeList srcTypeRet = findBaseTypesForAstType(srcType);
+//    const ASTType* srcTypeNonPtr = targetTypeRet.first;
+    BaseType* srcBaseType = 0;
+    if (srcTypeRet.second.isEmpty())
+        factoryError("Could not find source BaseType.");
+    else
+        srcBaseType = srcTypeRet.second.first();
+
     // Find the target base types
     AstBaseTypeList targetTypeRet = findBaseTypesForAstType(targetType);
     const ASTType* targetTypeNonPtr = targetTypeRet.first;
@@ -1630,7 +1636,7 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
                 BaseType* candidate = candidates[k];
                 // Get all types that use the current candidate
                 QList<RefBaseType*> typesUsingSrc =
-                        typesUsingId(candidate ? candidate->id() : -1);
+                        typesUsingId(candidate ? candidate->id() : 0);
 
                 // Next candidates are all that use the type in the way
                 // defined by targetPointers[j]
@@ -1669,15 +1675,23 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
                 }
                 _customTypes.append(ptr);
                 ptr->setId(siCreatred);
-                ptr->setRefTypeId(targetBaseType->id());
+                // For void pointers, targetBaseType is null
+                if (targetBaseType)
+                    ptr->setRefTypeId(targetBaseType->id());
                 ptr->setSize(_memSpecs.sizeofUnsignedLong);
-                if (targetBaseType->id() != 0 && targetBaseType->id() != siCreatred)
-                    insertUsedBy(ptr);
+                insertUsedBy(ptr);
                 targetBaseType = ptr;
             }
         }
         else
             factoryError("Could not find target BaseType.");
+    }
+
+    // Compare source and target type
+    if (compareConflictingTypes(srcBaseType, targetBaseType) == tcIgnore) {
+        debugmsg("Ignoring change from " << srcType->toString() << " to "
+                 << targetType->toString());
+        return;
     }
 
     switch (srcSymbol.type()) {
@@ -1786,13 +1800,14 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
                     changeType = false;
                     ++_conflictingTypeChanges;
                     member->addAltRefTypeId(targetBaseType->id());
-                    debugerr(QString("Conflicting target types: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
-                                 .arg(member->refType() ?
-                                          member->refType()->prettyName() :
-                                          QString("???"))
-                                 .arg(member->refTypeId(), 0, 16)
-                                 .arg(targetBaseType->prettyName())
-                                 .arg(targetBaseType->id(), 0, 16));
+                    debugerr(QString("Conflicting target types in 0x%0: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
+                             .arg(member->belongsTo()->id(), 0, 16)
+                             .arg(member->refType() ?
+                                      member->refType()->prettyName() :
+                                      QString("???"))
+                             .arg(member->refTypeId(), 0, 16)
+                             .arg(targetBaseType->prettyName())
+                             .arg(targetBaseType->id(), 0, 16));
                     break;
 
                 case tcReplace:
@@ -1859,24 +1874,26 @@ void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
 SymFactory::TypeConflicts SymFactory::compareConflictingTypes(
         const BaseType* oldType, const BaseType* newType)
 {
-    if (!oldType || !newType)
-        factoryError("At least one of the given BaseTypes is null!");
+    int oldTypeId = oldType ? oldType->id() : 0;
+    int newTypeId = newType ? newType->id() : 0;
 
     // Do we have conflicting target types?
-    if (oldType->id() == newType->id() && oldType->id() != siCreatred)
+    if (oldTypeId == newTypeId && oldTypeId != siCreatred)
         return tcNoConflict;
 
     // Compare the conflicting types
     int ctr_old = 0, ctr_new = 0;
-    oldType = oldType->dereferencedBaseType(
-                BaseType::trLexicalPointersArrays,
-                &ctr_old);
-    newType = newType->dereferencedBaseType(
-                BaseType::trLexicalPointersArrays,
-                &ctr_new);
+    if (oldType)
+        oldType = oldType->dereferencedBaseType(
+                    BaseType::trLexicalPointersArrays,
+                    &ctr_old);
+    if (newType)
+        newType = newType->dereferencedBaseType(
+                    BaseType::trLexicalPointersArrays,
+                    &ctr_new);
 
-    RealType old_rt = oldType->type();
-    RealType new_rt = newType->type();
+    RealType old_rt = oldType ? oldType->type() : rtVoid;
+    RealType new_rt = newType ? newType->type() : rtVoid;
     // A void pointer has no referencing type and is thus not dereferenced
     if (old_rt == rtPointer) {
         old_rt = rtVoid;
