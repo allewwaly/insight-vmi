@@ -68,7 +68,7 @@ void Structured::addMember(StructuredMember* member)
 
 bool Structured::memberExists(const QString& memberName, bool recursive) const
 {
-	return findMember(memberName) != 0;
+	return findMember(memberName, recursive) != 0;
 }
 
 
