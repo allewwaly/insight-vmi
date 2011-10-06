@@ -90,6 +90,9 @@ private slots:
 	void test_castExpressions_func();
 	void test_castExpressions_func_data();
 
+	void test_conditionalExpressions_func();
+	void test_conditionalExpressions_func_data();
+
 private:
 	AbstractSyntaxTree* _ast;
 	ASTBuilder* _builder;

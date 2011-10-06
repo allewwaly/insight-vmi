@@ -744,4 +744,20 @@ TEST_FUNCTION(castExpressions)
 }
 
 
+TEST_FUNCTION(conditionalExpressions)
+{
+    TEST_DATA_COLUMNS;
+    // Cast expressions
+    QTest::newRow("condExpr1") << "struct bus_type { char* name; }; "
+                                  "struct dev_type { struct bus_type* bus; }; "
+                                  "char* f(struct dev_type* dev) { return dev->bus ? dev->bus->name : \"\"; }"
+                               << "" << false;
+    QTest::newRow("condExpr2") << "struct bus_type { char* name; }; "
+                                  "struct dev_type { struct bus_type* bus; }; "
+                                  "void* f(struct dev_type* dev) { return dev->bus ? dev->bus->name : \"\"; }"
+                               << "" << true
+                               << "dev" << "Struct(bus_type)" << "name" << "Pointer->Void";
+}
+
+
 QTEST_MAIN(ASTTypeEvaluatorTest)
