@@ -72,7 +72,8 @@ enum ShellErrorCodes {
     ecNoMemoryDumpsLoaded = -6,
     ecInvalidArguments    = -7,
     ecCaughtException     = -8,
-    ecInvalidId           = -9
+    ecInvalidId           = -9,
+    ecInvalidExpression   = -10
 };
 
 
@@ -1880,7 +1881,8 @@ int Shell::cmdShow(QStringList args)
     	return 1;
     }
 
-    QString s = args.front();
+    QStringList expr = args.front().split('.');
+    QString s = expr.front();
 
     // Try to parse an ID
     if (s.startsWith("0x"))
@@ -1888,27 +1890,24 @@ int Shell::cmdShow(QStringList args)
     bool ok = false;
     int id = s.toInt(&ok, 16);
 
-    BaseType* bt = 0;
-    Variable * var = 0;
+    const BaseType* bt = 0;
+    const Variable * var = 0;
 
     // Did we parse an ID?
     if (ok) {
     	// Try to find this ID in types and variables
     	if ( (bt = _sym.factory().findBaseTypeById(id)) ) {
-    		_out << "Found type with ID 0x" << hex << id << dec << ":" << endl;
-    		return cmdShowBaseType(bt);
+            _out << "Found type with ID 0x" << hex << id << dec;
     	}
     	else if ( (var = _sym.factory().findVarById(id)) ) {
-    		_out << "Found variable with ID 0x" << hex << id << ":" << endl;
-    		return cmdShowVariable(var);
+            _out << "Found variable with ID 0x" << hex << id << dec;
     	}
     }
 
-    // Reset s
-    s = args.front();
-
     // If we did not find a type by that ID, try the names
     if (!var && !bt) {
+        // Reset s
+        s = expr.front();
     	QList<BaseType*> types = _sym.factory().typesByName().values(s);
     	QList<Variable*> vars = _sym.factory().varsByName().values(s);
     	if (types.size() + vars.size() > 1) {
@@ -1925,16 +1924,56 @@ int Shell::cmdShow(QStringList args)
     	}
 
     	if (!types.isEmpty()) {
-    		_out << "Found type with name " << s << ":" << endl;
-    		return cmdShowBaseType(types.first());
+            _out << "Found type with name " << s;
+            bt = types.first();
     	}
     	if (!vars.isEmpty()) {
-    		_out << "Found variable with name " << s << ":" << endl;
-    		return cmdShowVariable(vars.first());
+            _out << "Found variable with name " << s;
+            if (expr.size() > 1)
+                bt = vars.first()->refType();
+            else
+                var = vars.first();
 		}
     }
 
-    // If we came here, we were not successful
+    if (var)
+        return cmdShowVariable(var);
+    else if (bt) {
+        if (expr.size() > 1) {
+            _out << ", showing " << expr.join(".") << ":" << endl;
+
+            // Resolve the expression
+            const Structured* s;
+            const StructuredMember* m;
+            QString errorMsg;
+            for (int i = 1; i < expr.size(); ++i) {
+                bt = bt->dereferencedBaseType();
+
+                if (! (s = dynamic_cast<const Structured*>(bt)) )
+                    errorMsg = "Not a struct or a union: ";
+                else if ( (m = s->findMember(expr[i])) )
+                    bt = m->refType();
+                else
+                    errorMsg = "No such member: ";
+
+                if (!errorMsg.isEmpty()) {
+                    _err << errorMsg;
+                    for (int j = 0; j <= i; ++j) {
+                        if (j > 0)
+                            _err << ".";
+                        _err << expr[j];
+                    }
+                    _err << endl;
+                    return ecInvalidExpression;
+                }
+            }
+        }
+        else
+            _out << ":" << endl;
+        return cmdShowBaseType(bt);
+    }
+
+	// If we came here, we were not successful
 	_out << "No type or variable by name or ID \"" << s << "\" found." << endl;
 
 	return 2;
