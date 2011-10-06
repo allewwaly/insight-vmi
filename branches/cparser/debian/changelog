@@ -4,7 +4,7 @@ insight (0.2) unstable; urgency=low
   * Resolved almost any type ambiguities
   * Started with integration of C source parser, still experimental
 
- -- Christian Schneider <chrschn@ernie>  Thu, 06 Oct 2011 16:05:09 +0200
+ -- Christian Schneider <chrschn@sec.in.tum.de>  Thu, 06 Oct 2011 16:05:09 +0200
 
 insight (0.1) unstable; urgency=low
 
