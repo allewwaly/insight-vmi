@@ -357,7 +357,7 @@ Variable* SymFactory::getVarInstance(const TypeInfo& info)
 {
 	Variable* var = new Variable(this, info);
 	// Do not add external declarations to the global lists
-	if (info.external()) {
+	if (info.location() <= 0 && info.external()) {
 		_externalVars.append(var);
 		return 0;
 	}
@@ -1247,10 +1247,6 @@ void SymFactory::insertNewExternalVars()
 
 void SymFactory::symbolsFinished(RestoreType rt)
 {
-    // Add all external variable declarations for which we don't have a
-    // definition
-    insertNewExternalVars();
-
     // Replace all zero-sized structs
     int zeroReplaced = replaceZeroSizeStructs();
 
@@ -1280,6 +1276,10 @@ void SymFactory::symbolsFinished(RestoreType rt)
             updateTypeRelations(rbt->id(), rbt->name(), rbt, false, true);
         ++it;
     }
+
+    // Add all external variable declarations for which we don't have a
+    // definition
+    insertNewExternalVars();
 
     // Sort the types by ID
     qSort(_types.begin(), _types.end(), idLessThan);
