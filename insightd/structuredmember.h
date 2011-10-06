@@ -25,14 +25,16 @@ class StructuredMember: public Symbol, public ReferencingType, public SourceRef
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    StructuredMember();
+    StructuredMember(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    StructuredMember(const TypeInfo& info);
+    StructuredMember(SymFactory* factory, const TypeInfo& info);
 
     /**
      * @return the offset of this member within a struct or union
@@ -84,10 +86,33 @@ public:
     		const Instance *parent, int resolveTypes =
     		BaseType::trLexical) const;
 
+protected:
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual SymFactory* fac();
+
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual const SymFactory* fac() const;
+
 private:
 	size_t _offset;          ///< the member's offset within the struct;
 	Structured* _belongsTo;  ///< Struct or Union this member belongs to
 };
+
+
+inline const SymFactory* StructuredMember::fac() const
+{
+	return _factory;
+}
+
+
+inline SymFactory* StructuredMember::fac()
+{
+    return _factory;
+}
 
 
 /**
@@ -106,6 +131,5 @@ QDataStream& operator>>(QDataStream& in, StructuredMember& member);
  * @return the data stream \a out
  */
 QDataStream& operator<<(QDataStream& out, const StructuredMember& member);
-
 
 #endif /* STRUCTUREDMEMBER_H_ */

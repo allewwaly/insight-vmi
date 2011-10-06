@@ -9,31 +9,35 @@
 #include "virtualmemoryexception.h"
 #include "debug.h"
 
-Array::Array()
-    : _length(-1)
+Array::Array(SymFactory* factory)
+    : Pointer(factory), _length(-1)
 {
 }
 
 
-Array::Array(const TypeInfo& info)
-    : Pointer(info), _length(info.upperBound() < 0 ? -1 : info.upperBound() + 1)
+Array::Array(SymFactory* factory, const TypeInfo& info)
+    : Pointer(factory, info), _length(info.upperBound() < 0 ? -1 : info.upperBound() + 1)
 {
 }
 
 
-BaseType::RealType Array::type() const
+RealType Array::type() const
 {
 	return rtArray;
 }
 
 
-uint Array::hash() const
+uint Array::hash(bool* isValid) const
 {
-    if (!_typeReadFromStream) {
-        _hash = Pointer::hash();
-        if (_length > 0)
-            _hash ^= rotl32(_length, 8);
+    if (!_hashValid) {
+        _hash = Pointer::hash(&_hashValid);
+        if (_hashValid && _length > 0) {
+            qsrand(_length);
+            _hash ^= qHash(qrand());
+        }
     }
+    if (isValid)
+        *isValid = _hashValid;
     return _hash;
 }
 
@@ -41,8 +45,9 @@ uint Array::hash() const
 QString Array::prettyName() const
 {
     QString len = (_length >= 0) ? QString::number(_length) : QString();
-    if (_refType)
-        return QString("%1[%2]").arg(_refType->prettyName()).arg(len);
+    const BaseType* t = refType();
+    if (t)
+        return QString("%1[%2]").arg(t->prettyName()).arg(len);
     else
         return QString("[%1]").arg(len);
 }
@@ -50,15 +55,16 @@ QString Array::prettyName() const
 
 QString Array::toString(QIODevice* mem, size_t offset) const
 {
-    assert(_refType != 0);
+    QString result;
 
-    QString errMsg;
+    const BaseType* t = refType();
+    assert(t != 0);
 
-	// Is this possibly a string?
-    if (_refType && _refType->type() == rtInt8) {
-        QString s = readString(mem, offset, _length > 0 ? _length : 256, &errMsg);
+    // Is this possibly a string?
+    if (t && t->type() == rtInt8) {
+        QString s = readString(mem, offset, _length > 0 ? _length : 256, &result);
 
-        if (errMsg.isEmpty())
+        if (result.isEmpty())
             return QString("\"%1\"").arg(s);
     }
     else {
@@ -66,7 +72,7 @@ QString Array::toString(QIODevice* mem, size_t offset) const
             // Output all array members
             QString s = "(";
             for (int i = 0; i < _length; i++) {
-                s += _refType->toString(mem, offset + i * _refType->size());
+                s += t->toString(mem, offset + i * t->size());
                 if (i+1 < _length)
                     s += ", ";
             }
@@ -77,16 +83,7 @@ QString Array::toString(QIODevice* mem, size_t offset) const
             return "(...)";
     }
 
-    return errMsg;
-}
-
-
-uint Array::size() const
-{
-    if (_refType && _length > 0)
-        return _refType->size() * _length;
-    else
-        return Pointer::size();
+    return result;
 }
 
 

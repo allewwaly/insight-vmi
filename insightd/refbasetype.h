@@ -17,20 +17,24 @@ class RefBaseType: public BaseType, public ReferencingType
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    RefBaseType();
+    RefBaseType(SymFactory* factory);
 
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
      */
-    RefBaseType(const TypeInfo& info);
+    RefBaseType(SymFactory* factory, const TypeInfo& info);
 
-     /**
+    /**
      * Create a hash of that type based on BaseType::hash() and refType()
+     * @param isValid indicates if the hash is valid, for example, if all
+     * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash() const;
+    virtual uint hash(bool* isValid = 0) const;
 
     /**
      * @return the size of this type in bytes
@@ -76,7 +80,43 @@ public:
      virtual Instance toInstance(size_t address, VirtualMemory* vmem,
             const QString& name, const QStringList& parentNames,
             int resolveTypes = trLexical, int* derefCount = 0) const;
+
+protected:
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual SymFactory* fac();
+
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual const SymFactory* fac() const;
+
+    mutable int _hashRefTypeId; ///< type ID used to generate the hash
 };
 
 
+inline uint RefBaseType::size() const
+{
+    if (!_size) {
+        const BaseType* t = refType();
+        return t ? t->size() : _size;
+    }
+    else
+        return _size;
+}
+
+
+inline const SymFactory* RefBaseType::fac() const
+{
+    return _factory;
+}
+
+
+inline SymFactory* RefBaseType::fac()
+{
+    return _factory;
+}
+
 #endif /* REFBASETYPE_H_ */
+

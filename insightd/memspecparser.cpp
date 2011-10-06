@@ -276,7 +276,9 @@ void MemSpecParser::buildHelperProg(const MemSpecs& specs)
     QStringList cmdlines;
     QString arch = (specs.arch & MemSpecs::x86_64) ? "x86_64" : "i386";
 
-    cmdlines += QString("make KDIR=%1 ARCH=%2").arg(_kernelSrcDir).arg(arch);
+    cmdlines += QString("make KDIR=%1 ARCH=%2")
+            .arg(QDir::current().absoluteFilePath(_kernelSrcDir))
+            .arg(arch);
     cmdlines += QString("make memspec");
 
     for (int i = 0; i < cmdlines.size(); ++i) {

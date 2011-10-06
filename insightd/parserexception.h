@@ -8,6 +8,7 @@
 #ifndef PARSEREXCEPTION_H_
 #define PARSEREXCEPTION_H_
 
+#include <genericexception.h>
 
 #define parserError(x) do { throw ParserException((x), __FILE__, __LINE__); } while (0)
 

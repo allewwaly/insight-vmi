@@ -88,6 +88,11 @@ public:
     /**
      * @return the symbol factory that holds all kernel symbols
      */
+    SymFactory& factory();
+
+    /**
+     * @return the symbol factory that holds all kernel symbols (const version)
+     */
     const SymFactory& factory() const;
 
     /**
@@ -111,5 +116,35 @@ private:
     SymFactory _factory;
     QString _fileName;
 };
+
+
+inline SymFactory& KernelSymbols::factory()
+{
+    return _factory;
+}
+
+
+inline const SymFactory& KernelSymbols::factory() const
+{
+    return _factory;
+}
+
+
+inline const MemSpecs&  KernelSymbols::memSpecs() const
+{
+    return _memSpecs;
+}
+
+
+inline const QString& KernelSymbols::fileName() const
+{
+    return _fileName;
+}
+
+
+inline bool KernelSymbols::symbolsAvailable() const
+{
+    return !_factory.types().isEmpty();
+}
 
 #endif /* KERNELSYMBOLS_H_ */

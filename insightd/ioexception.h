@@ -8,9 +8,7 @@
 #ifndef IOEXCEPTION_H_
 #define IOEXCEPTION_H_
 
-#include "genericexception.h"
-
-#include "genericexception.h"
+#include <genericexception.h>
 
 /**
  * Exception class for I/O operations

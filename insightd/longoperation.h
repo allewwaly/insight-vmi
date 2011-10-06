@@ -56,6 +56,12 @@ protected:
     void checkOperationProgress();
 
     /**
+     * This function does the same as checkOperationProgress() except that it
+     * always calls operationProgress(), regardless of the elapsed time.
+     */
+    void forceOperationProgress();
+
+    /**
      * @return QString representing the elapsed time in the format mm:ss
      */
     QString elapsedTime() const;

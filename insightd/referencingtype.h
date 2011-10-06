@@ -12,6 +12,7 @@
 #include "instance.h"
 #include "basetype.h"
 
+class SymFactory;
 
 class ReferencingType
 {
@@ -33,10 +34,16 @@ public:
     virtual ~ReferencingType();
 
     /**
-     * Getter for the directly referenced type
+     * Getter for the directly referenced type, const version
      * @return the type this referencing type directly points to
      */
     const BaseType* refType() const;
+
+    /**
+     * Getter for the directly referenced type
+     * @return the type this referencing type directly points to
+     */
+    BaseType* refType();
 
     /**
      * Follows all referencing types' references until a non-referencing
@@ -48,12 +55,6 @@ public:
     const BaseType* refTypeDeep(int resolveTypes) const;
 
     /**
-     * Set the base type this pointer points to
-     * @param type new pointed type
-     */
-    void setRefType(const BaseType* type);
-
-    /**
      * @return ID of the type this object is referencing
      */
     int refTypeId() const;
@@ -63,6 +64,45 @@ public:
      * @param id new ID
      */
     void setRefTypeId(int id);
+
+    /**
+     * Adds \a id to the list of alternative referencing type IDs.
+     * @param id the ID to add
+     * \sa hasAltRefTypes(), altRefType(), refTypeId()
+     */
+    void addAltRefTypeId(int id);
+
+    /**
+     * @return \c true if at least one alternative referencing type ID exists,
+     *   \c false otherwise
+     */
+    bool hasAltRefTypes() const;
+
+    /**
+     * @return the number of alternative referencing type IDs
+     */
+    int altRefTypeCount() const;
+
+    /**
+     * When this symbol has alternative referencing type IDs and \a index is -1,
+     * this function returns the most useful type, e. g., a struct or union, if
+     * possible, or an otherwise typed pointer. If multiple such potential
+     * candidates exist, the first one that is found is returned.
+     *
+     * If \a index is >= 0, then the alterantive type with that list index is
+     * returned, if available, otherwise \c null is returned.
+     *
+     * @param index the list index of the alterative type, or -1 for a "best
+     *   guess"
+     * @return the alternative referencing type if found, \c null otherwise
+     */
+    BaseType* altRefType(int index = -1);
+
+    /**
+     * Overloaded method.
+     * \sa altRefType()
+     */
+    const BaseType* altRefType(int index = -1) const;
 
     /**
      * Reads a serialized version of this object from \a in.
@@ -112,8 +152,18 @@ protected:
             const QString& name, int id, int resolveTypes,
             int* derefCount = 0) const;
 
-	const BaseType *_refType;  ///< holds the type this object is referencing
-    int _refTypeId;            ///< holds ID of the type this object is referencing
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual SymFactory* fac() = 0;
+
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual const SymFactory* fac() const = 0;
+
+    int _refTypeId;            ///< holds ID of the type this object is referencing    
+    QList<int> _altRefTypeIds; ///< a list of alternative types
 
 private:
     /**
@@ -134,21 +184,11 @@ private:
     inline Instance createRefInstance(size_t address, VirtualMemory* vmem,
             const QString& name, const QStringList& parentNames, int id,
             int resolveTypes, int* derefCount) const;
+
+    template<class T>
+    T* altRefTypeTempl(int index = -1) const;
+
 };
-
-
-inline const BaseType* ReferencingType::refType() const
-{
-    return _refType;
-}
-
-
-inline void ReferencingType::setRefType(const BaseType* type)
-{
-    _refType = type;
-    if (_refType && _refTypeId < 0)
-        _refTypeId = _refType->id();
-}
 
 
 inline int ReferencingType::refTypeId() const
@@ -163,5 +203,99 @@ inline void ReferencingType::setRefTypeId(int id)
 }
 
 
+inline void ReferencingType::addAltRefTypeId(int id)
+{
+    if (!_altRefTypeIds.contains(id))
+        _altRefTypeIds.append(id);
+}
+
+
+inline bool ReferencingType::hasAltRefTypes() const
+{
+    return !_altRefTypeIds.isEmpty();
+}
+
+
+inline int ReferencingType::altRefTypeCount() const
+{
+    return _altRefTypeIds.size();
+}
 
 #endif /* REFERENCINGTYPE_H_ */
+
+
+#include "symfactory.h"
+
+#if !defined(REFERENCINGTYPE_H_INLINE) && defined(SYMFACTORY_DEFINED)
+#define REFERENCINGTYPE_H_INLINE
+
+inline const BaseType* ReferencingType::refType() const
+{
+    return fac() && _refTypeId ? fac()->findBaseTypeById(_refTypeId) : 0;
+}
+
+
+inline BaseType* ReferencingType::refType()
+{
+    return fac() && _refTypeId ? fac()->findBaseTypeById(_refTypeId) : 0;
+}
+
+
+inline BaseType* ReferencingType::altRefType(int index)
+{
+    return altRefTypeTempl<BaseType>(index);
+}
+
+
+inline const BaseType* ReferencingType::altRefType(int index) const
+{
+    return altRefTypeTempl<const BaseType>(index);
+}
+
+
+template<class T>
+inline T* ReferencingType::altRefTypeTempl(int index) const
+{
+    if (_altRefTypeIds.isEmpty() || index >= _altRefTypeIds.size() || !fac())
+        return 0;
+    if (index >= 0)
+        return fac()->findBaseTypeById(_altRefTypeIds[index]);
+
+    // No index given, find the most usable type
+
+    // If we have only one alternative, the job is easy
+    if (_altRefTypeIds.size() == 1)
+        return fac()->findBaseTypeById(_altRefTypeIds.first());
+    else {
+        RealType useType = rtUndefined;
+        T *t, *useBt = 0;
+        for (int i = 0; i < _altRefTypeIds.size(); ++i) {
+            if (!(t = fac()->findBaseTypeById(_altRefTypeIds[i])))
+                continue;
+            RealType curType = t->dereferencedType();
+            // Init variables
+            if (!useBt) {
+                useBt = t;
+                useType = curType;
+            }
+            // Compare types
+            else {
+                // Prefer structs/unions, followed by function pointers,
+                // followed by pointers
+                if ((curType & StructOrUnion) ||
+                    (((useType & (NumericTypes|rtPointer)) && curType == rtFuncPointer)) ||
+                    ((useType & NumericTypes) && curType == rtPointer))
+                {
+                    useType = curType;
+                    useBt = t;
+                }
+            }
+            if (useType & StructOrUnion)
+                break;
+        }
+
+        return useBt;
+    }
+}
+
+#endif /* REFERENCINGTYPE_H_INLINE */

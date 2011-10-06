@@ -1,7 +1,7 @@
 Source: insight
 Section: unknown
 Priority: extra
-Maintainer: Thomas Kittel <kittel@in.tum.de>
+Maintainer: Christian Schneider <chrschn@sec.in.tum.de>
 Build-Depends: debhelper (>= 7.0.50~), libreadline6-dev
 Standards-Version: 3.8.4
 Homepage: https://code.google.com/p/insight-vmi/

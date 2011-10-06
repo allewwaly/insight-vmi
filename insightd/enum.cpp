@@ -8,28 +8,30 @@
 #include "enum.h"
 #include "debug.h"
 
-Enum::Enum()
+Enum::Enum(SymFactory* factory)
+    : BaseType(factory)
 {
 }
 
 
-Enum::Enum(const TypeInfo& info)
-	: BaseType(info), _enumValues(info.enumValues())
+Enum::Enum(SymFactory* factory, const TypeInfo& info)
+    : BaseType(factory, info), _enumValues(info.enumValues())
 {
 }
 
 
-BaseType::RealType Enum::type() const
+RealType Enum::type() const
 {
 	return rtEnum;
 }
 
 
-uint Enum::hash() const
+uint Enum::hash(bool* isValid) const
 {
-    if (!_typeReadFromStream) {
-        _hash = BaseType::hash();
-        _hash ^= rotl32(_enumValues.size(), 16) ^ (_srcLine);
+    if (!_hashValid) {
+        _hash = BaseType::hash(&_hashValid);
+        qsrand(_hash ^ _enumValues.size());
+        _hash ^= qHash(qrand());
         // To place the enum values at different bit positions
         uint rot = 0;
         // Extend the hash to all enumeration values
@@ -40,6 +42,8 @@ uint Enum::hash() const
             ++it;
         }
     }
+    if (isValid)
+        *isValid = _hashValid;
     return _hash;
 }
 

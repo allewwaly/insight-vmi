@@ -7,18 +7,19 @@
 
 #include "consttype.h"
 
-ConstType::ConstType()
+ConstType::ConstType(SymFactory* factory)
+    : RefBaseType(factory)
 {
 }
 
 
-ConstType::ConstType(const TypeInfo& info)
-	: RefBaseType(info)
+ConstType::ConstType(SymFactory* factory, const TypeInfo& info)
+    : RefBaseType(factory, info)
 {
 }
 
 
-BaseType::RealType ConstType::type() const
+RealType ConstType::type() const
 {
 	return rtConst;
 }
@@ -26,8 +27,11 @@ BaseType::RealType ConstType::type() const
 
 QString ConstType::prettyName() const
 {
-    if (_refType)
-        return "const " + _refType->prettyName();
+    const BaseType* t = refType();
+    if (t)
+        return "const " + t->prettyName();
+    else if (refTypeId() == 0)
+        return "const void";
     else
         return "const";
 }

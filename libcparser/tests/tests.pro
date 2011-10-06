@@ -1,0 +1,2 @@
+SUBDIRS += asttypeevaluator
+TEMPLATE = subdirs

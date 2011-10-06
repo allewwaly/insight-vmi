@@ -8,41 +8,50 @@
 #include "refbasetype.h"
 #include "debug.h"
 
-RefBaseType::RefBaseType()
+RefBaseType::RefBaseType(SymFactory* factory)
+    : BaseType(factory), _hashRefTypeId(0)
 {
 }
 
 
-RefBaseType::RefBaseType(const TypeInfo& info)
-    : BaseType(info), ReferencingType(info)
+RefBaseType::RefBaseType(SymFactory* factory, const TypeInfo& info)
+    : BaseType(factory, info), ReferencingType(info), _hashRefTypeId(0)
 {
 }
 
 
-uint RefBaseType::hash() const
+uint RefBaseType::hash(bool* isValid) const
 {
-    if (!_typeReadFromStream) {
-        _hash = BaseType::hash();
-        if (_refType)
-            _hash ^= _refType->hash();
+    if (!_hashValid || _hashRefTypeId != _refTypeId) {
+        _hashRefTypeId = _refTypeId;
+        if (_refTypeId) {
+            const BaseType* t = refType();
+            if (t) {
+                _hash = t->hash(&_hashValid);
+                // Don't continue if previous hash was invalid
+                if (_hashValid) {
+                    qsrand(_hash);
+                    _hash ^= qHash(qrand()) ^ BaseType::hash(&_hashValid);
+                }
+            }
+            else
+                _hashValid = false;
+        }
+        // Void pointers don't reference any type
+        else
+            _hash = BaseType::hash(&_hashValid);
     }
+    if (isValid)
+        *isValid = _hashValid;
     return _hash;
-}
-
-
-uint RefBaseType::size() const
-{
-    if (!_size && _refType)
-        return _refType->size();
-    else
-        return _size;
 }
 
 
 QString RefBaseType::toString(QIODevice* mem, size_t offset) const
 {
-	assert(_refType != 0);
-	return _refType->toString(mem, offset);
+    const BaseType* t = refType();
+    assert(t != 0);
+    return t->toString(mem, offset);
 }
 
 
@@ -67,3 +76,4 @@ void RefBaseType::writeTo(QDataStream& out) const
     BaseType::writeTo(out);
     ReferencingType::writeTo(out);
 }
+
