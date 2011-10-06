@@ -7,18 +7,19 @@
 
 #include "funcpointer.h"
 
-FuncPointer::FuncPointer()
+FuncPointer::FuncPointer(SymFactory* factory)
+    : BaseType(factory)
 {
 }
 
 
-FuncPointer::FuncPointer(const TypeInfo& info)
-	: BaseType(info)
+FuncPointer::FuncPointer(SymFactory* factory, const TypeInfo& info)
+    : BaseType(factory, info)
 {
 }
 
 
-BaseType::RealType FuncPointer::type() const
+RealType FuncPointer::type() const
 {
 	return rtFuncPointer;
 }

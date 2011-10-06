@@ -15,14 +15,16 @@ class ConstType: public RefBaseType
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    ConstType();
+    ConstType(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    ConstType(const TypeInfo& info);
+    ConstType(SymFactory* factory, const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable

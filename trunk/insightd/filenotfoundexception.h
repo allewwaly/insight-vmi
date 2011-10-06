@@ -10,6 +10,8 @@
 
 #include "ioexception.h"
 
+#define fileNotFoundError(x) do { throw FileNotFoundException((x), __FILE__, __LINE__); } while (0)
+
 /**
  * Exception class for file not found errors
  */

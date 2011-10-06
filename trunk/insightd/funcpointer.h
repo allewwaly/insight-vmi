@@ -15,14 +15,16 @@ class FuncPointer: public BaseType
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    FuncPointer();
+    FuncPointer(SymFactory* factory);
 
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
      */
-    FuncPointer(const TypeInfo& info);
+    FuncPointer(SymFactory* factory, const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable

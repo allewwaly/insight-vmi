@@ -10,13 +10,14 @@
 #include "debug.h"
 
 
-Structured::Structured()
+Structured::Structured(SymFactory* factory)
+	: BaseType(factory)
 {
 }
 
 
-Structured::Structured(const TypeInfo& info)
-	: BaseType(info), _members(info.members())
+Structured::Structured(SymFactory* factory, const TypeInfo& info)
+    : BaseType(factory, info), _members(info.members())
 {
     for (int i = 0; i < _members.size(); i++) {
         _members[i]->_belongsTo = this;
@@ -34,26 +35,23 @@ Structured::~Structured()
 }
 
 
-uint Structured::hash() const
+uint Structured::hash(bool* isValid) const
 {
-    if (!_typeReadFromStream) {
-        _hash = BaseType::hash();
-        _hash ^= rotl32(_members.size(), 16) ^ _srcLine;
+    if (!_hashValid) {
+        _hash = BaseType::hash(&_hashValid);
+        qsrand(_hash ^ _members.size());
+        _hash ^= qHash(qrand());
         // To place the member hashes at different bit positions
         uint rot = 0;
         // Hash all members (don't recurse!!!)
         for (int i = 0; i < _members.size(); i++) {
             const StructuredMember* member = _members[i];
             _hash ^= rotl32(member->offset(), rot) ^ qHash(member->name());
-            // Recursive hashing should not be necessary, because it is highly
-            // unlikely that the struct name, source line, size and all member names
-            // and offsets are equal AND that the members still have different
-            // types.
-    //        if (member->refType())
-    //            ret ^= rotl32(member->refType()->hash(visited), rot);
             rot = (rot + 4) % 32;
         }
     }
+    if (isValid)
+        *isValid = _hashValid;
     return _hash;
 }
 
@@ -64,36 +62,62 @@ void Structured::addMember(StructuredMember* member)
     member->_belongsTo = this;
 	_members.append(member);
 	_memberNames.append(member->name());
+	_hashValid  = false;
 }
 
 
-bool Structured::memberExists(const QString& memberName) const
+bool Structured::memberExists(const QString& memberName, bool recursive) const
 {
-    return _memberNames.indexOf(memberName) >= 0;
+	return findMember(memberName) != 0;
 }
 
 
-StructuredMember* Structured::findMember(const QString& memberName)
+template<class T, class S>
+inline T* Structured::findMember(const QString& memberName, bool recursive) const
 {
-    for (MemberList::const_iterator it = _members.constBegin();
-        it != _members.constEnd(); ++it)
+    for (MemberList::const_iterator it = _members.begin();
+        it != _members.end(); ++it)
     {
         if ((*it)->name() == memberName)
             return *it;
     }
-    return 0;
+
+    T* result = 0;
+
+    // If we didn't find the member yet, try all anonymous structs/unions
+    if (recursive) {
+        for (MemberList::const_iterator it = _members.begin();
+            !result && it != _members.end(); ++it)
+        {
+            T* m = *it;
+            // Look out for anonymous struct or union members
+            if (m->refType() && (m->refType()->type() & StructOrUnion) &&
+                m->name().isEmpty() && m->refType()->name().isEmpty())
+            {
+                S* s = dynamic_cast<S*>(m->refType());
+                assert(s != 0);
+                result = s->findMember<T, S>(memberName, recursive);
+            }
+        }
+    }
+
+    return result;
+
 }
 
 
-const StructuredMember* Structured::findMember(const QString& memberName) const
+StructuredMember* Structured::findMember(const QString& memberName,
+                                         bool recursive)
 {
-    for (MemberList::const_iterator it = _members.constBegin();
-        it != _members.constEnd(); ++it)
-    {
-        if ((*it)->name() == memberName)
-            return *it;
-    }
-    return 0;
+    return findMember<StructuredMember, Structured>(memberName, recursive);
+}
+
+
+const StructuredMember* Structured::findMember(const QString& memberName,
+                                               bool recursive) const
+{
+    return findMember<const StructuredMember, const Structured>(
+                memberName, recursive);
 }
 
 
@@ -105,7 +129,7 @@ void Structured::readFrom(QDataStream& in)
     in >> memberCnt;
 
     for (qint32 i = 0; i < memberCnt; i++) {
-        StructuredMember* member = new StructuredMember();
+        StructuredMember* member = new StructuredMember(_factory);
         if (!member)
             genericError("Out of memory.");
         in >> *member;
@@ -127,7 +151,7 @@ void Structured::writeTo(QDataStream& out) const
 
 QString Structured::toString(QIODevice* mem, size_t offset) const
 {
-//    static BaseType::RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
+//    static RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
 
     QString s;
     int index_len = 0, offset_len = 1, name_len = 1, type_len = 1;
@@ -160,13 +184,13 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
 
         if (m->refType()) {
             // Output all types except structured types
-            if (m->refType()->dereferencedType() & trStructured) {
+            if (m->refType()->dereferencedType() & StructOrUnion) {
                 // Resolve the memory address of that struct
                 quint64 addr = offset + m->offset();
                 int macroExtraOffset = 0;
                 const BaseType* t = m->refType();
                 bool wasPointer = false;
-                while ( addr && !(t->type() & trStructured) ) {
+                while ( addr && !(t->type() & StructOrUnion) ) {
                     const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
                     if (rbt->type() & rtPointer) {
                         addr = (quint64) rbt->toPointer(mem, addr);
@@ -229,18 +253,19 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
 
 
 //------------------------------------------------------------------------------
-Struct::Struct()
+Struct::Struct(SymFactory* factory)
+    : Structured(factory)
 {
 }
 
 
-Struct::Struct(const TypeInfo& info)
-	: Structured(info)
+Struct::Struct(SymFactory* factory, const TypeInfo& info)
+    : Structured(factory, info)
 {
 }
 
 
-BaseType::RealType Struct::type() const
+RealType Struct::type() const
 {
 	return rtStruct;
 }
@@ -253,18 +278,19 @@ QString Struct::prettyName() const
 
 
 //------------------------------------------------------------------------------
-Union::Union()
+Union::Union(SymFactory* factory)
+    : Structured(factory)
 {
 }
 
 
-Union::Union(const TypeInfo& info)
-    : Structured(info)
+Union::Union(SymFactory* factory, const TypeInfo& info)
+    : Structured(factory, info)
 {
 }
 
 
-BaseType::RealType Union::type() const
+RealType Union::type() const
 {
 	return rtUnion;
 }

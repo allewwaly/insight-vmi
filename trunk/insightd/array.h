@@ -15,14 +15,16 @@ class Array: public Pointer
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Array();
+    Array(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Array(const TypeInfo& info);
+    Array(SymFactory* factory, const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable
@@ -31,9 +33,11 @@ public:
 
     /**
      * Create a hash of that type based on Pointer::hash() and length()
+     * @param isValid indicates if the hash is valid, for example, if all
+     * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash() const;
+    virtual uint hash(bool* isValid = 0) const;
 
     /**
      * This gives a pretty name of that type which may involve referencing
@@ -96,5 +100,14 @@ inline void Array::setLength(qint32 len)
 }
 
 
+inline uint Array::size() const
+{
+    if (_length > 0) {
+        const BaseType* t = refType();
+        return t ? t->size() * _length : Pointer::size();
+    }
+    else
+        return Pointer::size();
+}
 
 #endif /* ARRAY_H_ */

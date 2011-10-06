@@ -21,14 +21,16 @@ public:
 
 	/**
 	 * Constructor
+	 * @param factory the factory that created this symbol
 	 */
-	Enum();
+	Enum(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Enum(const TypeInfo& info);
+    Enum(SymFactory* factory, const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable
@@ -38,9 +40,11 @@ public:
     /**
      * Create a hash of that type based on BaseType::hash(), srcLine() and the
      * enumeration values.
+     * @param isValid indicates if the hash is valid, for example, if all
+     * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash() const;
+    virtual uint hash(bool* isValid = 0) const;
 
     /**
      * @param mem the memory device to read the data from
@@ -88,6 +92,7 @@ inline const Enum::EnumHash& Enum::enumValues() const
 inline void Enum::setEnumValues(const EnumHash& values)
 {
     _enumValues = values;
+    _hashValid  = false;
 }
 
 

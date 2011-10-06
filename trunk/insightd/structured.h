@@ -22,14 +22,16 @@ class Structured: public BaseType
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Structured();
+    Structured(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Structured(const TypeInfo& info);
+    Structured(SymFactory* factory, const TypeInfo& info);
 
     /**
      * Destructor
@@ -39,9 +41,11 @@ public:
     /**
      * Create a hash of that type based on BaseType::hash(), srcLine() and the
      * name and hash() of all members.
+     * @param isValid indicates if the hash is valid, for example, if all
+     * referencing types could be resolved
      * @return a hash value of this type
      */
-    virtual uint hash() const;
+    virtual uint hash(bool* isValid = 0) const;
 
     /**
      * @return the list of members of this struct or union
@@ -70,23 +74,28 @@ public:
 	/**
 	 * Finds out if a member with name \a memberName exists.
 	 * @param memberName name of the member
+	 * @param recursive also search in nested, anonymous structs and unions
 	 * @return \c true if that member exists, \a false otherwise
 	 */
-	bool memberExists(const QString& memberName) const;
+	bool memberExists(const QString& memberName, bool recursive = true) const;
 
 	/**
 	 * Searches for a member with the name \a memberName
 	 * @param memberName name of the member to search
+	 * @param recursive also search in nested, anonymous structs and unions
 	 * @return the member, if it exists, \c 0 otherwise
 	 */
-	StructuredMember* findMember(const QString& memberName);
+	StructuredMember* findMember(const QString& memberName,
+								 bool recursive = true);
 
     /**
      * Searches for a member with the name \a memberName (const version)
      * @param memberName name of the member to search
+     * @param recursive also search in nested, anonymous structs and unions
      * @return the member, if it exists, \c 0 otherwise
      */
-    const StructuredMember* findMember(const QString& memberName) const;
+    const StructuredMember* findMember(const QString& memberName,
+                                       bool recursive = true) const;
 
     /**
      * Reads a serialized version of this object from \a in.
@@ -112,6 +121,16 @@ public:
 protected:
 	MemberList _members;
 	QStringList _memberNames;
+
+private:
+    /**
+     * Searches for a member with the name \a memberName (const version)
+     * @param memberName name of the member to search
+     * @param recursive also search in nested, anonymous structs and unions
+     * @return the member, if it exists, \c 0 otherwise
+     */
+    template<class T, class S>
+    T* findMember(const QString& memberName, bool recursive = true) const;
 };
 
 
@@ -123,14 +142,16 @@ class Struct: public Structured
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Struct();
+    Struct(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Struct(const TypeInfo& info);
+    Struct(SymFactory* factory, const TypeInfo& info);
 
     /**
      * @return the real type, i. e., \c rtStruct
@@ -160,14 +181,16 @@ class Union: public Structured
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Union();
+    Union(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Union(const TypeInfo& info);
+    Union(SymFactory* factory, const TypeInfo& info);
 
     /**
      * @return the real type, i. e., \c rtUnion

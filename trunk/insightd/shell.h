@@ -258,6 +258,7 @@ private:
     int cmdListSources(QStringList args);
     int cmdListTypes(QStringList args);
     int cmdListVars(QStringList args);
+    int cmdListTypesUsing(QStringList args);
     int cmdListTypesById(QStringList args);
     int cmdListTypesByName(QStringList args);
     int cmdMemory(QStringList args);
@@ -277,7 +278,12 @@ private:
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t);
     int cmdShowVariable(const Variable* v);
+    int cmdStats(QStringList args);
+    int cmdStatsPostponed(QStringList args);
+    int cmdStatsTypes(QStringList args);
+    int cmdStatsTypesByHash(QStringList args);
     int cmdSymbols(QStringList args);
+    int cmdSymbolsSource(QStringList args);
     int cmdSymbolsParse(QStringList args);
     int cmdSymbolsLoad(QStringList args);
     int cmdSymbolsStore(QStringList args);

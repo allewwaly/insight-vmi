@@ -4,65 +4,15 @@
 
 #include <QIODevice>
 
-// The integer-based types
-const qint32 IntegerTypes =
-    BaseType::rtInt8        |
-    BaseType::rtUInt8       |
-    BaseType::rtBool8       |
-    BaseType::rtInt16       |
-    BaseType::rtUInt16      |
-    BaseType::rtBool16      |
-    BaseType::rtInt32       |
-    BaseType::rtUInt32      |
-    BaseType::rtBool32      |
-    BaseType::rtInt64       |
-    BaseType::rtUInt64      |
-    BaseType::rtBool64;
-
-// The floating-point types
-const qint32 FloatingTypes =
-    BaseType::rtFloat       |
-    BaseType::rtDouble;
-
-// These types need further resolution
-const qint32 ReferencingTypes =
-    BaseType::rtPointer     |
-    BaseType::rtArray       |
-    BaseType::rtConst       |
-    BaseType::rtVolatile    |
-    BaseType::rtTypedef     |
-    BaseType::rtStruct      |
-    BaseType::rtUnion;
-
-// These types cannot be resolved anymore
-const qint32 ElementaryTypes =
-    BaseType::rtInt8        |
-    BaseType::rtUInt8       |
-    BaseType::rtBool8       |
-    BaseType::rtInt16       |
-    BaseType::rtUInt16      |
-    BaseType::rtBool16      |
-    BaseType::rtInt32       |
-    BaseType::rtUInt32      |
-    BaseType::rtBool32      |
-    BaseType::rtInt64       |
-    BaseType::rtUInt64      |
-    BaseType::rtBool64      |
-    BaseType::rtFloat       |
-    BaseType::rtDouble      |
-    BaseType::rtEnum        |
-    BaseType::rtFuncPointer;
-
-
-BaseType::BaseType()
-        : _size(0), _hash(0), _typeReadFromStream(false)
+BaseType::BaseType(SymFactory* factory)
+        : Symbol(factory), _size(0), _hash(0), _hashValid(false)
 {
 }
 
 
-BaseType::BaseType(const TypeInfo& info)
-        : Symbol(info), SourceRef(info), _size(info.byteSize()), _hash(0),
-          _typeReadFromStream(false)
+BaseType::BaseType(SymFactory* factory, const TypeInfo& info)
+        : Symbol(factory, info), SourceRef(info), _size(info.byteSize()), _hash(0),
+          _hashValid(false)
 {
 }
 
@@ -72,15 +22,36 @@ BaseType::~BaseType()
 }
 
 
-BaseType::RealType BaseType::dereferencedType(int resolveTypes) const
+RealType BaseType::dereferencedType(int resolveTypes, int *depth) const
 {
-    const BaseType* b = dereferencedBaseType(resolveTypes);
+    const BaseType* b = dereferencedBaseType(resolveTypes, depth);
     return b ? b->type() : type();
 }
 
 
-const BaseType* BaseType::dereferencedBaseType(int resolveTypes) const
+BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth)
 {
+    if (depth)
+        *depth = 0;
+    if (! (type() & resolveTypes) )
+        return this;
+
+    BaseType* prev = this;
+    RefBaseType* curr = dynamic_cast<RefBaseType*>(prev);
+    while (curr && curr->refType() && (curr->type() & resolveTypes) ) {
+        prev = curr->refType();
+        curr = dynamic_cast<RefBaseType*>(prev);
+        if (depth)
+            *depth += 1;
+    }
+    return prev;
+}
+
+
+const BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth) const
+{
+    if (depth)
+        *depth = 0;
     if (! (type() & resolveTypes) )
         return this;
 
@@ -89,24 +60,46 @@ const BaseType* BaseType::dereferencedBaseType(int resolveTypes) const
     while (curr && curr->refType() && (curr->type() & resolveTypes) ) {
         prev = curr->refType();
         curr = dynamic_cast<const RefBaseType*>(prev);
+        if (depth)
+            *depth += 1;
     }
     return prev;
 }
 
 
-uint BaseType::hash() const
+uint BaseType::hash(bool* isValid) const
 {
-    if (!_typeReadFromStream) {
+    if (!_hashValid) {
         // Create a hash value based on name, size and type. Always do this,
         // don't cache the hash, because it might change for chained referencing
         // types unnoticed
-            _hash = type();
-        if (!_name.isEmpty())
+        _hash = type();
+        // Ignore the name for numeric types
+        if (!_name.isEmpty() && !(type() & (IntegerTypes & ~rtEnum)))
             _hash ^= qHash(_name);
-        if (_size > 0)
-            _hash ^= qHash(_size);
+        if (_size > 0) {
+            qsrand(_hash ^ _size);
+            _hash ^= qHash(qrand());
+        }
+        _hashValid = true;
     }
+    if (isValid)
+        *isValid = _hashValid;
     return _hash;
+}
+
+
+bool BaseType::hashIsValid() const
+{
+    if (!_hashValid)
+        hash(0);
+    return _hashValid;
+}
+
+
+void BaseType::rehash() const
+{
+    _hashValid = false;
 }
 
 
@@ -122,36 +115,6 @@ void BaseType::setSize(quint32 size)
 }
 
 
-BaseType::RealTypeRevMap BaseType::getRealTypeRevMap()
-{
-    RealTypeRevMap ret;
-    ret.insert(BaseType::rtInt8, "Int8");
-    ret.insert(BaseType::rtUInt8, "UInt8");
-    ret.insert(BaseType::rtBool8, "Bool8");
-    ret.insert(BaseType::rtInt16, "Int16");
-    ret.insert(BaseType::rtUInt16, "UInt16");
-    ret.insert(BaseType::rtBool16, "Bool16");
-    ret.insert(BaseType::rtInt32, "Int32");
-    ret.insert(BaseType::rtUInt32, "UInt32");
-    ret.insert(BaseType::rtBool32, "Bool32");
-    ret.insert(BaseType::rtInt64, "Int64");
-    ret.insert(BaseType::rtUInt64, "UInt64");
-    ret.insert(BaseType::rtBool64, "Bool64");
-    ret.insert(BaseType::rtFloat, "Float");
-    ret.insert(BaseType::rtDouble, "Double");
-    ret.insert(BaseType::rtPointer, "Pointer");
-    ret.insert(BaseType::rtArray, "Array");
-    ret.insert(BaseType::rtEnum, "Enum");
-    ret.insert(BaseType::rtStruct, "Struct");
-    ret.insert(BaseType::rtUnion, "Union");
-    ret.insert(BaseType::rtTypedef, "Typedef");
-    ret.insert(BaseType::rtConst, "Const");
-    ret.insert(BaseType::rtVolatile, "Volatile");
-    ret.insert(BaseType::rtFuncPointer, "FuncPointer");
-    return ret;
-}
-
-
 Instance BaseType::toInstance(size_t address, VirtualMemory* vmem,
         const QString& name, const QStringList& parentNames,
         int /*resolveTypes*/, int* /*derefCount*/) const
@@ -162,11 +125,10 @@ Instance BaseType::toInstance(size_t address, VirtualMemory* vmem,
 
 bool BaseType::operator==(const BaseType& other) const
 {
-    return
-        type() == other.type() &&
-        size() == other.size() &&
-        srcLine() == other.srcLine() &&
-        name() == other.name();
+    return type() == other.type() &&
+            size() == other.size() &&
+            hash() == hash() &&
+            hashIsValid() && other.hashIsValid();
 }
 
 
@@ -175,8 +137,8 @@ void BaseType::readFrom(QDataStream& in)
     // Read inherited values
     Symbol::readFrom(in);
     SourceRef::readFrom(in);
-    in >> _size >> _hash;
-    _typeReadFromStream = true;
+    in >> _size;
+    _hashValid = false;
 }
 
 
@@ -185,7 +147,7 @@ void BaseType::writeTo(QDataStream& out) const
     // Write inherited values
     Symbol::writeTo(out);
     SourceRef::writeTo(out);
-    out << _size << hash();
+    out << _size;
 }
 
 

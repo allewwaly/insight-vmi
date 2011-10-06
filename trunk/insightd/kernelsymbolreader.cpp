@@ -9,6 +9,8 @@
 #include <QIODevice>
 #include <QDataStream>
 #include <QSet>
+#include <QPair>
+#include <QLinkedList>
 #include "kernelsymbolconsts.h"
 #include "symfactory.h"
 #include "basetype.h"
@@ -67,9 +69,9 @@ void KernelSymbolReader::read()
     // 2.c  (CompileUnit) data of 2nd compile unit
     // 2.d  ...
     // 3.a  (qint32) number of types
-    // 3.b  (qint32) type (BaseType::RealType casted to qint32)
+    // 3.b  (qint32) type (RealType casted to qint32)
     // 3.c  (subclass of BaseType) data of type
-    // 3.d  (qint32) type (BaseType::RealType casted to qint32)
+    // 3.d  (qint32) type (RealType casted to qint32)
     // 3.e  (subclass of BaseType) data of type
     // 3.f  ...
     // 4.a  (qint32) number of id-mappings for types
@@ -92,7 +94,7 @@ void KernelSymbolReader::read()
         _phase = phCompileUnits;
         in >> size;
         for (qint32 i = 0; i < size; i++) {
-            CompileUnit* c = new CompileUnit();
+            CompileUnit* c = new CompileUnit(_factory);
             if (!c)
                 genericError("Out of memory.");
             in >> *c;
@@ -105,15 +107,15 @@ void KernelSymbolReader::read()
         in >> size;
         for (int i = 0; i < size; i++) {
             in >> type;
-            BaseType* t = SymFactory::createEmptyType((BaseType::RealType) type);
+            BaseType* t = _factory->createEmptyType((RealType) type);
             if (!t)
                 genericError("Out of memory.");
             in >> *t;
             _factory->addSymbol(t);
 
-            if (t->type() & (ReferencingTypes & ~(BaseType::rtStruct|BaseType::rtUnion)))
+            if (t->type() & (ReferencingTypes & ~StructOrUnion))
                 _phase = phReferencingTypes;
-            else if (t->type() & (BaseType::rtStruct|BaseType::rtUnion)) {
+            else if (t->type() & StructOrUnion) {
                 _phase = phStructuredTypes;
             }
 
@@ -124,19 +126,43 @@ void KernelSymbolReader::read()
         _phase = phTypeRelations;
         in >> size;
 
-        QString s; // empty string
+        typedef QPair<int, int> IntInt;
+        typedef QLinkedList<IntInt> IntIntList;
+        IntIntList typeRelations; // buffer for not-yet existing types
+        const QString empty; // empty string
         for (int i = 0; i < size; i++) {
             in >> source >> target;
             BaseType* t = _factory->findBaseTypeById(target);
-            _factory->updateTypeRelations(source, s, t);
+            // Is the type already in the list?
+            if (t)
+                _factory->updateTypeRelations(source, empty, t);
+            // If not, we update the type relations later
+            else
+                typeRelations.append(IntInt(source, target));
             checkOperationProgress();
+        }
+
+        IntIntList::iterator it = typeRelations.begin();
+        while (it != typeRelations.end()) {
+            source = it->first;
+            target = it->second;
+            BaseType* t = _factory->findBaseTypeById(target);
+            if (t) {
+                _factory->updateTypeRelations(source, empty, t);
+                it = typeRelations.erase(it);
+            }
+            else
+                ++it;
+
+            if (it == typeRelations.end())
+                it = typeRelations.begin();
         }
 
         // Read list of variables
         _phase = phVariables;
         in >> size;
         for (qint32 i = 0; i < size; i++) {
-            Variable* v = new Variable();
+            Variable* v = new Variable(_factory);
             if (!v)
                 genericError("Out of memory.");
             in >> *v;

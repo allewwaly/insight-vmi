@@ -89,7 +89,7 @@ QStringList Instance::fullNameComponents() const
 
 int Instance::memberCount() const
 {
-    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
         return 0;
 	return dynamic_cast<const Structured*>(_d.type)->members().size();
 }
@@ -97,7 +97,7 @@ int Instance::memberCount() const
 
 const QStringList& Instance::memberNames() const
 {
-    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
         return _emtpyStringList;
 	return dynamic_cast<const Structured*>(_d.type)->memberNames();
 }
@@ -105,7 +105,7 @@ const QStringList& Instance::memberNames() const
 
 InstanceList Instance::members() const
 {
-    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
         return InstanceList();
 
 	const MemberList& list = dynamic_cast<const Structured*>(_d.type)->members();
@@ -118,7 +118,9 @@ InstanceList Instance::members() const
 
 bool Instance::equals(const Instance& other) const
 {
-    if (!isValid() || !other.isValid() || _d.type->hash() != other.type()->hash())
+    bool ok1 = false, ok2 = false;
+    if (!isValid() || !other.isValid() ||
+        _d.type->hash(&ok1) != other.type()->hash(&ok2) || !ok1 || !ok2)
         return false;
 
     // If both are null, they are considered to be equal
@@ -130,44 +132,45 @@ bool Instance::equals(const Instance& other) const
         return _d.address == other.address();
 
     switch (_d.type->type()) {
-    case BaseType::rtBool8:
-    case BaseType::rtInt8:
-    case BaseType::rtUInt8:
+    case rtBool8:
+    case rtInt8:
+    case rtUInt8:
         return toUInt8() == other.toUInt8();
 
-    case BaseType::rtBool16:
-    case BaseType::rtInt16:
-    case BaseType::rtUInt16:
+    case rtBool16:
+    case rtInt16:
+    case rtUInt16:
         return toUInt16() == other.toUInt16();
 
-    case BaseType::rtBool32:
-    case BaseType::rtInt32:
-    case BaseType::rtUInt32:
+    case rtBool32:
+    case rtInt32:
+    case rtUInt32:
         return toUInt32() == other.toUInt32();
 
-    case BaseType::rtBool64:
-    case BaseType::rtInt64:
-    case BaseType::rtUInt64:
+    case rtBool64:
+    case rtInt64:
+    case rtUInt64:
         return toUInt64() == other.toUInt64();
 
-    case BaseType::rtFloat:
+    case rtFloat:
         return toFloat() == other.toFloat();
 
-    case BaseType::rtDouble:
+    case rtDouble:
         return toDouble() == other.toDouble();
 
-    case BaseType::rtEnum:
+    case rtEnum:
         switch (size()) {
         case 8: return toUInt64() == other.toUInt64();
         case 4: return toUInt32() == other.toUInt32();
         case 2: return toUInt16() == other.toUInt16();
         default: return toUInt8() == other.toUInt8();
         }
+        // no break
 
-    case BaseType::rtFuncPointer:
+    case rtFuncPointer:
         return address() == other.address();
 
-    case BaseType::rtArray: {
+    case rtArray: {
         const Array* a1 = dynamic_cast<const Array*>(type());
         const Array* a2 = dynamic_cast<const Array*>(other.type());
 
@@ -183,13 +186,13 @@ bool Instance::equals(const Instance& other) const
         return true;
     }
 
-    case BaseType::rtStruct:
-    case BaseType::rtUnion: {
+    case rtStruct:
+    case rtUnion: {
         const int cnt = memberCount();
         for (int i = 0; i < cnt; ++i) {
             Instance inst1 = member(i, BaseType::trAny);
             // Don't recurse into nested structs
-            if (inst1.type()->type() & (BaseType::rtStruct|BaseType::rtUnion))
+            if (inst1.type()->type() & StructOrUnion)
                 continue;
             Instance inst2 = other.member(i, BaseType::trAny);
             if (!inst1.equals(inst2))
@@ -198,7 +201,7 @@ bool Instance::equals(const Instance& other) const
         return true;
     }
 
-    case BaseType::rtPointer: {
+    case rtPointer: {
         const Pointer* p1 = dynamic_cast<const Pointer*>(type());
         const Pointer* p2 = dynamic_cast<const Pointer*>(other.type());
 
@@ -206,15 +209,16 @@ bool Instance::equals(const Instance& other) const
             return false;
         // If this is an untyped void pointer, we just compare the virtual
         // address.
-        if (p1->refTypeId() < 0)
+        if (p1->refTypeId() == 0)
             return toPointer() == other.toPointer();
-        // No break here, let the switch fall through to the other referencing
+        // let the switch fall through to the other referencing
         // types following next
     }
+    // no break
 
-    case BaseType::rtConst:
-    case BaseType::rtTypedef:
-    case BaseType::rtVolatile: {
+    case rtConst:
+    case rtTypedef:
+    case rtVolatile: {
         int cnt1, cnt2;
         Instance inst1 = dereference(BaseType::trAny, &cnt1);
         Instance inst2 = other.dereference(BaseType::trAny, &cnt2);
@@ -224,6 +228,11 @@ bool Instance::equals(const Instance& other) const
 
         return inst1.equals(inst2);
     }
+
+    case rtUndefined:
+    case rtVoid:
+    case rtVaList:
+        return false;
 
     } // end of switch
 
@@ -259,7 +268,7 @@ void Instance::differencesRek(const Instance& other,
     else
         visited.insert(_d.address);
 
-    if (!isValid() || !other.isValid() || _d.type->hash() != other.type()->hash()) {
+    if (!isValid() || !other.isValid() || _d.type->hash(0) != other.type()->hash(0)) {
         result.append(relParent);
         return;
     }
@@ -270,8 +279,8 @@ void Instance::differencesRek(const Instance& other,
 
     switch (_d.type->type()) {
     // For structs or unions we do a member-by-member comparison
-    case BaseType::rtStruct:
-    case BaseType::rtUnion: {
+    case rtStruct:
+    case rtUnion: {
             // New relative parent name in dotted notation
             QString newRelParent = dotglue(relParent, _d.name);
 
@@ -286,7 +295,7 @@ void Instance::differencesRek(const Instance& other,
                     continue;
                 }
                 // Only recurse into nested structs if requested
-                if (inst1.type()->type() & (BaseType::rtStruct|BaseType::rtUnion)) {
+                if (inst1.type()->type() & StructOrUnion) {
                     if (includeNestedStructs)
                         inst1.differencesRek(inst2, newRelParent,
                                 includeNestedStructs, result, visited) ;
@@ -301,7 +310,7 @@ void Instance::differencesRek(const Instance& other,
             return;
     }
     // Check if this is an untyped pointer
-    case BaseType::rtPointer: {
+    case rtPointer: {
          const Pointer* p1 = dynamic_cast<const Pointer*>(type());
          const Pointer* p2 = dynamic_cast<const Pointer*>(other.type());
 
@@ -311,7 +320,7 @@ void Instance::differencesRek(const Instance& other,
          }
          // If this is an untyped void pointer, we just compare the virtual
          // address.
-         if (p1->refTypeId() < 0) {
+         if (p1->refTypeId() == 0) {
              if (toPointer() != other.toPointer())
                  result.append(relParent);
              return;
@@ -320,9 +329,10 @@ void Instance::differencesRek(const Instance& other,
          // types following next
     }
     // We dereference referencing types and then call dereference() again
-    case BaseType::rtConst:
-    case BaseType::rtTypedef:
-    case BaseType::rtVolatile: {
+    // no break
+    case rtConst:
+    case rtTypedef:
+    case rtVolatile: {
         int cnt1, cnt2;
         Instance inst1 = dereference(BaseType::trAny, &cnt1);
         Instance inst2 = other.dereference(BaseType::trAny, &cnt2);
@@ -346,7 +356,7 @@ void Instance::differencesRek(const Instance& other,
 
 Instance Instance::arrayElem(int index) const
 {
-    if (!_d.type || !(_d.type->type() & BaseType::rtPointer))
+    if (!_d.type || !(_d.type->type() & rtPointer))
         return Instance();
 
     const Pointer* p = dynamic_cast<const Pointer*>(_d.type);
@@ -411,7 +421,7 @@ quint64 Instance::memberAddress(int index) const
 
 quint64 Instance::memberOffset(const QString& name) const
 {
-    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
         return false;
 
     const StructuredMember* m =
@@ -422,7 +432,7 @@ quint64 Instance::memberOffset(const QString& name) const
 
 bool Instance::memberExists(const QString& name) const
 {
-    if (!_d.type || !(_d.type->type() & BaseType::trStructured))
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
         return false;
 
 	return dynamic_cast<const Structured*>(_d.type)->memberExists(name);

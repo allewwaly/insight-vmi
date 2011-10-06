@@ -5,7 +5,7 @@
  *      Author: chrschn
  */
 
-#include "genericexception.h"
+#include <genericexception.h>
 
 GenericException::GenericException(QString msg, const char* file, int line)
 	: message(msg), file(file), line(line)

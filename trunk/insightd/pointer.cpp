@@ -10,14 +10,14 @@
 #include "virtualmemoryexception.h"
 #include "debug.h"
 
-Pointer::Pointer()
-    : _macroExtraOffset(0)
+Pointer::Pointer(SymFactory* factory)
+	: RefBaseType(factory), _macroExtraOffset(0)
 {
 }
 
 
-Pointer::Pointer(const TypeInfo& info)
-	: RefBaseType(info), _macroExtraOffset(0)
+Pointer::Pointer(SymFactory* factory, const TypeInfo& info)
+	: RefBaseType(factory, info), _macroExtraOffset(0)
 {
 	// Make sure the host system can handle the pointer size of the guest
 	if (_size > 0 && _size > sizeof(void*)) {
@@ -29,7 +29,7 @@ Pointer::Pointer(const TypeInfo& info)
 }
 
 
-BaseType::RealType Pointer::type() const
+RealType Pointer::type() const
 {
 	return rtPointer;
 }
@@ -37,9 +37,10 @@ BaseType::RealType Pointer::type() const
 
 QString Pointer::prettyName() const
 {
-    if (_refType)
-        return _refType->prettyName() + " *";
-    else if (_refTypeId < 0)
+    const BaseType* t = refType();
+    if (t)
+        return t->prettyName() + " *";
+    else if (_refTypeId == 0)
         return "void *";
     else
     	return "(unresolved) *";
@@ -55,16 +56,18 @@ QString Pointer::toString(QIODevice* mem, size_t offset) const
 
     QString errMsg;
 
+    const BaseType* t = refType();
+
     // Pointer to referenced type's referenced type
-    const BaseType* refRefType = dynamic_cast<const RefBaseType*>(_refType) ?
-            dynamic_cast<const RefBaseType*>(_refType)->refType() :
+    const BaseType* refRefType = dynamic_cast<const RefBaseType*>(t) ?
+            dynamic_cast<const RefBaseType*>(t)->refType() :
             0;
     // Is this possibly a string (type "char*" or "const char*")?
-    if (_refType &&
-        (_refType->type() == rtInt8 ||
-         (_refType->type() == rtConst &&
+    if (t &&
+        (t->type() == rtInt8 ||
+         (t->type() == rtConst &&
           refRefType &&
-          refRefType->type() == BaseType::rtInt8)))
+          refRefType->type() == rtInt8)))
     {
         QString s = readString(mem, p, 255, &errMsg);
         if (errMsg.isEmpty())
@@ -101,10 +104,10 @@ QString Pointer::readString(QIODevice* mem, size_t offset, const int len, QStrin
         }
         return QString(buf);
     }
-    catch (VirtualMemoryException e) {
+    catch (VirtualMemoryException& e) {
         *errMsg = e.message;
     }
-    catch (MemAccessException e) {
+    catch (MemAccessException& e) {
         *errMsg = e.message;
     }
 

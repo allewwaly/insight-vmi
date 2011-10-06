@@ -15,14 +15,16 @@ class Pointer: public RefBaseType
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Pointer();
+    Pointer(SymFactory* factory);
 
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
      */
-    Pointer(const TypeInfo& info);
+    Pointer(SymFactory* factory, const TypeInfo& info);
 
 	/**
 	 * @return the actual type of that polimorphic variable

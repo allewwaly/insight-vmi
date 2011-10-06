@@ -13,10 +13,7 @@
 #include "symbol.h"
 #include "referencingtype.h"
 #include "sourceref.h"
-#include "basetype.h"
-#include "instance.h"
 #include "debug.h"
-
 
 /**
  * This class represents a variable variable of a certain type.
@@ -26,14 +23,16 @@ class Variable: public Symbol, public ReferencingType, public SourceRef
 public:
     /**
      * Constructor
+     * @param factory the factory that created this symbol
      */
-    Variable();
+    Variable(SymFactory* factory);
 
     /**
-      Constructor
-      @param info the type information to construct this type from
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
      */
-    Variable(const TypeInfo& info);
+    Variable(SymFactory* factory, const TypeInfo& info);
 
     /**
      * Generic value function that will return the data as any type
@@ -44,8 +43,9 @@ public:
     {
         // We put the implementation in the header to allow the compiler to
         // inline the code
-        assert(_refType != 0);
-        return _refType->value<T>(mem, _offset);
+        const BaseType* t = refType();
+        assert(t != 0);
+        return t->value<T>(mem, _offset);
     }
 
     /**
@@ -57,8 +57,9 @@ public:
     {
         // We put the implementation in the header to allow the compiler to
         // inline the code
-        assert(_refType != 0);
-        return _refType->value<T>(mem, _offset);
+        const BaseType* t = refType();
+        assert(t != 0);
+        return t->value<T>(mem, _offset);
     }
 
     /**
@@ -109,21 +110,18 @@ public:
 	virtual void writeTo(QDataStream& out) const;
 
 protected:
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual SymFactory* fac();
+
+    /**
+     * Access function to the factory this symbol belongs to.
+     */
+    virtual const SymFactory* fac() const;
+
 	size_t _offset;
 };
-
-
-inline size_t Variable::offset() const
-{
-    return _offset;
-}
-
-
-inline void Variable::setOffset(size_t offset)
-{
-    _offset = offset;
-}
-
 
 /**
 * Operator for native usage of the Variable class for streams
@@ -141,5 +139,29 @@ QDataStream& operator>>(QDataStream& in, Variable& var);
 * @return the data stream \a out
 */
 QDataStream& operator<<(QDataStream& out, const Variable& var);
+
+
+inline size_t Variable::offset() const
+{
+    return _offset;
+}
+
+
+inline void Variable::setOffset(size_t offset)
+{
+    _offset = offset;
+}
+
+
+inline const SymFactory* Variable::fac() const
+{
+    return _factory;
+}
+
+
+inline SymFactory* Variable::fac()
+{
+    return _factory;
+}
 
 #endif /* VARIABLE_H_ */

@@ -9,17 +9,18 @@
 
 #include <assert.h>
 
-VolatileType::VolatileType()
+VolatileType::VolatileType(SymFactory* factory)
+	: RefBaseType(factory)
 {
 }
 
-VolatileType::VolatileType(const TypeInfo& info)
-	: RefBaseType(info)
+VolatileType::VolatileType(SymFactory* factory, const TypeInfo& info)
+	: RefBaseType(factory, info)
 {
 }
 
 
-BaseType::RealType VolatileType::type() const
+RealType VolatileType::type() const
 {
 	return rtVolatile;
 }
@@ -27,8 +28,11 @@ BaseType::RealType VolatileType::type() const
 
 QString VolatileType::prettyName() const
 {
-    if (_refType)
-        return "volatile " + _refType->prettyName();
+    const BaseType* t = refType();
+    if (t)
+        return "volatile " + t->prettyName();
+    else if (refTypeId() == 0)
+        return "const void";
     else
         return "volatile";
 }

@@ -2,7 +2,7 @@ SOURCEDIR ?= .
 DESTDIR ?= .
 PREFIX ?= /usr
 
-SUBDIRS = libinsight insightd insight
+SUBDIRS = libantlr3c libcparser libinsight insightd insight
 
 # Where to put binary on 'make install'?
 BIN     = $(DESTDIR)$(PREFIX)/bin

@@ -1,4 +1,6 @@
-SOURCES += memorydumpsclass.cpp \
+SOURCES += kernelsourcetypeevaluator.cpp \
+    kernelsourceparser.cpp \
+    memorydumpsclass.cpp \
     scriptengine.cpp \
     kernelsymbolsclass.cpp \
     memorydifftree.cpp \
@@ -32,7 +34,6 @@ SOURCES += memorydumpsclass.cpp \
     sourceref.cpp \
     shell.cpp \
     referencingtype.cpp \
-    genericexception.cpp \
     debug.cpp \
     structuredmember.cpp \
     structured.cpp \
@@ -45,7 +46,9 @@ SOURCES += memorydumpsclass.cpp \
     main.cpp \
     basetype.cpp \
     enum.cpp
-HEADERS += memorydumpsclass.h \
+HEADERS += kernelsourcetypeevaluator.h \
+    kernelsourceparser.h \
+    memorydumpsclass.h \
     scriptengine.h \
     kernelsymbolsclass.h \
     memorydifftree.h \
@@ -89,7 +92,6 @@ HEADERS += memorydumpsclass.h \
     sourceref.h \
     shell.h \
     referencingtype.h \
-    genericexception.h \
     debug.h \
     structuredmember.h \
     structured.h \
@@ -107,8 +109,13 @@ QT += script \
     network \
     gui
 LIBS += -lreadline \
-    -L \
-    ../libinsight \
-    -linsight
-INCLUDEPATH += ../libinsight/include
+    -L../libinsight \
+    -linsight \
+    -L../libantlr3c \
+    -lantlr3c \
+    -L../libcparser \
+    -lcparser
+INCLUDEPATH += ../libinsight/include \
+    ../libantlr3c/include \
+    ../libcparser/include
 FORMS = memorymapwindow.ui

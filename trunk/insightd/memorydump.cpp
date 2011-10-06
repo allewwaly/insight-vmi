@@ -87,7 +87,7 @@ void MemoryDump::init()
             Instance highMem = queryInstance("high_memory");
             _specs.highMemory = highMem.toUInt32();
         }
-        catch (QueryException e) {
+        catch (QueryException& e) {
             genericError("Failed to initialize this MemoryDump instance with "
                     "required run-time values from the dump. Error was: " + e.message);
         }
@@ -99,7 +99,7 @@ void MemoryDump::init()
                 Instance ve = queryInstance(ve_name);
                 _specs.vmallocEarlyreserve = ve.toUInt32();
             }
-            catch (QueryException e) {
+            catch (QueryException& e) {
                 genericError("Failed to initialize this MemoryDump instance with "
                         "required run-time values from the dump. Error was: " + e.message);
             }
@@ -207,7 +207,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	}
 	else {
 		// We have a instance therefore we resolve the member
-		if (!instance.type()->type() & (BaseType::rtStruct|BaseType::rtUnion))
+		if (!instance.type()->type() & StructOrUnion)
             queryError(QString("Member \"%1\" is not a struct or union")
                         .arg(instance.fullName()));
 
@@ -242,7 +242,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 				type = getType(typeString);
 				
 				if (!type ||
-				    !(type->type() & (BaseType::rtStruct|BaseType::rtUnion)))
+					!(type->type() & StructOrUnion))
 					queryError(QString("The given type \"%1\" is not a struct "
 					            "or union and therefore has no offset")
 					            .arg(typeString));
@@ -263,7 +263,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		}
 
 		// Get address
-		if (result.type()->type() & (BaseType::rtPointer)) {
+		if (result.type()->type() & (rtPointer)) {
 			// Manipulate pointer to enable list navigation
 			//pointer = (Pointer *)(result.type());
 //			pointer->setMacroExtraOffset(offset);
@@ -332,7 +332,7 @@ Instance MemoryDump::queryInstance(const int queryId) const
         queryError(QString("Variable with ID 0x%1 does not exist")
                 .arg(queryId, 0, 16));
 
-//    return v->toInstance(_vmem, BaseType::rtArray);
+//    return v->toInstance(_vmem, rtArray);
     return v->toInstance(_vmem, BaseType::trLexicalAndPointers);
 }
 

@@ -134,7 +134,7 @@ void MemoryMap::build(float minProbability)
                 _shared->queue.insert(node->probability(), node);
             }
         }
-        catch (GenericException e) {
+        catch (GenericException& e) {
             debugerr("Caught exception for variable " << (*it)->name()
                     << " at " << e.file << ":" << e.line << ":" << e.message);
         }
@@ -489,9 +489,11 @@ bool MemoryMap::objectIsSane(const Instance& inst,
         const MemoryMapNode* otherNode = *it;
 
         // Is the the same object already contained?
+        bool ok1 = false, ok2 = false;
         if (otherNode->address() == inst.address() &&
                 otherNode->type() && inst.type() &&
-                otherNode->type()->hash() == inst.type()->hash())
+                otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
+                ok1 && ok2)
             isSane = false;
         // Is this an overlapping object with a significantly higher
         // probability?
@@ -519,11 +521,11 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
 {
     static const int interestingTypes =
             BaseType::trLexical |
-            BaseType::rtArray |
-            BaseType::rtFuncPointer |
-            BaseType::rtPointer |
-            BaseType::rtStruct |
-            BaseType::rtUnion;
+            rtArray |
+            rtFuncPointer |
+            rtPointer |
+            rtStruct |
+            rtUnion;
 
     // Dereference, if required
     const Instance i = (inst.type()->type() & BaseType::trLexical) ?
@@ -652,7 +654,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
 
     // If this a union or struct, we have to consider the pointer members
     if ( instType &&
-         (instType->type() & BaseType::trStructured) )
+         (instType->type() & StructOrUnion) )
     {
         const Structured* structured =
                 dynamic_cast<const Structured*>(instType);
@@ -661,7 +663,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
             const BaseType* m_type =
                     structured->members().at(i)->refTypeDeep(BaseType::trLexical);
 
-            if (m_type && m_type->type() & BaseType::rtPointer) {
+            if (m_type && (m_type->type() & rtPointer)) {
                 try {
                     quint64 m_addr = inst->address() + structured->members().at(i)->offset();
 //                    quint64 m_addr = inst->memberAddress(i);
@@ -685,12 +687,12 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
                         degForInvalidChildAddrCnt++;
                     }
                 }
-                catch (MemAccessException) {
+                catch (MemAccessException&) {
                     // Address was invalid
                     prob *= degForInvalidChildAddr;
                     degForInvalidChildAddrCnt++;
                 }
-                catch (VirtualMemoryException) {
+                catch (VirtualMemoryException&) {
                     // Address was invalid
                     prob *= degForInvalidChildAddr;
                     degForInvalidChildAddrCnt++;
