@@ -601,6 +601,13 @@ private:
     void replaceType(BaseType* oldType, BaseType* newType);
 
     /**
+     * Inserts all external variable declarations into the factory's symbols
+     * for which we do not have a declaration. Afterwards all remaining
+     * external variables are deleted and the _externalVars list is cleared.
+     */
+    void insertNewExternalVars();
+
+    /**
      * Tries to find a type equal to \a t based on its hash and the comparison
      * operator.
      * \note This function will \b not return \a t itself, only another type
@@ -612,6 +619,7 @@ private:
 
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
+	VariableList _externalVars;       ///< Holds all external Variable declarations
 	VariableStringHash _varsByName;   ///< Holds all Variable objects, indexed by name
 	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
 	BaseTypeList _types;              ///< Holds all BaseType objects which were parsed or read from symbol files

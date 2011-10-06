@@ -61,6 +61,14 @@ void SymFactory::clear()
 	}
 	_vars.clear();
 
+	// Delete all external variables
+	for (VariableList::iterator it = _externalVars.begin();
+		 it != _externalVars.end(); ++it)
+	{
+		delete *it;
+	}
+	_externalVars.clear();
+
 	// Delete all types
 	for (BaseTypeList::iterator it = _types.begin(); it != _types.end(); ++it) {
 		delete *it;
@@ -348,8 +356,15 @@ BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 Variable* SymFactory::getVarInstance(const TypeInfo& info)
 {
 	Variable* var = new Variable(this, info);
-	insert(var);
-	return var;
+	// Do not add external declarations to the global lists
+	if (info.external()) {
+		_externalVars.append(var);
+		return 0;
+	}
+	else {
+		insert(var);
+		return var;
+	}
 }
 
 
@@ -656,33 +671,30 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 {
 	switch (info.symType()) {
 	case hsArrayType:
-		return info.id() != 0 && info.refTypeId() != 0 /*&& info.upperBound() != -1*/;
+		return info.id() != 0 && info.refTypeId() != 0;
 	case hsBaseType:
 		return info.id() != 0 && info.byteSize() > 0 && info.enc() != eUndef;
 	case hsCompileUnit:
 		return info.id() != 0 && !info.name().isEmpty() && !info.srcDir().isEmpty();
 	case hsConstType:
-		return info.id() != 0 /*&& info.refTypeId() != 0*/;
+		return info.id() != 0;
 	case hsEnumerationType:
-		// TODO: Check if this is correct
-		// It seems like it is possible to have an enum without any enumvalues.
-		// return info.id() != 0 && !info.enumValues().isEmpty();
 		return info.id() != 0;
 	case hsSubroutineType:
 		return info.id() != 0;
 	case hsMember:
-		return info.id() != 0 && info.refTypeId() != 0 /*&& info.dataMemberLocation() != -1*/; // location not required
+		return info.id() != 0 && info.refTypeId() != 0;
 	case hsPointerType:
 		return info.id() != 0 && info.byteSize() > 0;
 	case hsUnionType:
 	case hsStructureType:
-		return info.id() != 0 /*&& info.byteSize() > 0*/; // name not required
+		return info.id() != 0;
 	case hsTypedef:
 		return info.id() != 0 && info.refTypeId() != 0 && !info.name().isEmpty();
 	case hsVariable:
-		return info.id() != 0 /*&& info.refTypeId() != 0*/ && info.location() > 0 /*&& !info.name().isEmpty()*/;
+		return info.id() != 0 && (info.location() > 0 || info.external());
 	case hsVolatileType:
-		return info.id() != 0 /*&& info.refTypeId() != 0*/;
+		return info.id() != 0;
 	default:
 		return false;
 	}
@@ -1207,8 +1219,38 @@ inline bool idLessThan(const BaseType* t1, const BaseType* t2)
 }
 
 
+void SymFactory::insertNewExternalVars()
+{
+    for (int i = 0; i < _externalVars.size(); ++i) {
+        Variable* v = _externalVars[i];
+        bool found = false;
+        if (!v->name().isEmpty()) {
+            VariableStringHash::const_iterator it = _varsByName.find(v->name());
+            for (; it != _varsByName.end() && it.key() == v->name(); ++it) {
+                Variable* other = it.value();
+                if (v->refType() && other->refType() &&
+                    *v->refType() == *other->refType())
+                {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (found)
+            delete v;
+        else
+            insert(v);
+    }
+    _externalVars.clear();
+}
+
+
 void SymFactory::symbolsFinished(RestoreType rt)
 {
+    // Add all external variable declarations for which we don't have a
+    // definition
+    insertNewExternalVars();
+
     // Replace all zero-sized structs
     int zeroReplaced = replaceZeroSizeStructs();
 
