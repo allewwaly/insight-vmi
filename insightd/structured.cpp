@@ -66,10 +66,11 @@ void Structured::addMember(StructuredMember* member)
 }
 
 
-bool Structured::memberExists(const QString& memberName) const
+bool Structured::memberExists(const QString& memberName, bool recursive) const
 {
-    return _memberNames.indexOf(memberName) >= 0;
+	return findMember(memberName) != 0;
 }
+
 
 template<class T, class S>
 inline T* Structured::findMember(const QString& memberName, bool recursive) const

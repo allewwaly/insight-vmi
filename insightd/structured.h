@@ -74,9 +74,10 @@ public:
 	/**
 	 * Finds out if a member with name \a memberName exists.
 	 * @param memberName name of the member
+	 * @param recursive also search in nested, anonymous structs and unions
 	 * @return \c true if that member exists, \a false otherwise
 	 */
-	bool memberExists(const QString& memberName) const;
+	bool memberExists(const QString& memberName, bool recursive = true) const;
 
 	/**
 	 * Searches for a member with the name \a memberName
