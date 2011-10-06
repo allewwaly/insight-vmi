@@ -149,9 +149,10 @@ void KernelSymbolParser::finishLastSymbol()
         // factory
         if (_info.symType() & (hsConstType|hsVolatileType))
             _info.setName(QString());
-        // Variables without a location belong to inline assembler
+        // Non-external variables without a location belong to inline assembler
         // statements which we can ignore
-        if ( !(_info.symType() == hsVariable && _info.location() <= 0) )
+        if (_info.symType() != hsVariable || _info.location() > 0 ||
+            _info.external())
             _factory->addSymbol(_info);
         // Reset all data for a new symbol
         _info.clear();
@@ -200,8 +201,6 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
         {
             _pInfo->setByteSize(-1);
         }
-
-
         break;
     }
     case psCompDir: {
@@ -281,6 +280,11 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
             parserError(QString(str::regexErrorMsg).arg(rxBound.pattern()).arg(value));
         parseInt(i, rxBound.cap(1), &ok);
         _pInfo->setUpperBound(i);
+        break;
+    }
+    case psExternal: {
+        parseInt(i, value, &ok);
+        _pInfo->setExternal(i);
         break;
     }
     case psSibling: {

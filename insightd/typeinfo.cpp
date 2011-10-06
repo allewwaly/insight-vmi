@@ -25,6 +25,7 @@ void TypeInfo::clear()
 	_location = 0;
 	_dataMemberLoc = -1;
 	_upperBound = -1;
+	_external = 0;
 	_sibling = -1;
 	_constValue = -1;
 	_symType = hsUnknownSymbol;
@@ -202,6 +203,19 @@ void TypeInfo::setUpperBound(qint32 bound)
 	_upperBound = bound;
 }
 
+
+int TypeInfo::external() const
+{
+	return _external;
+}
+
+
+void TypeInfo::setExternal(int value)
+{
+	_external = value;
+}
+
+
 qint32 TypeInfo::sibling() const
 {
 	return _sibling;
@@ -275,7 +289,8 @@ QString TypeInfo::dump() const
 	if (_dataMemberLoc >= 0)    ret += QString("  dataMemberLoc: %1\n").arg(_dataMemberLoc);
 	if (_refTypeId != 0)        ret += QString("  refTypeId:     0x%1\n").arg(_refTypeId, 0, 16);
 	if (_upperBound >= 0)       ret += QString("  upperBound:    %1\n").arg(_upperBound);
-	if (!_srcDir.isEmpty()   )  ret += QString("  srcDir:        %1\n").arg(_srcDir);
+	if (_external)              ret += QString("  external:      %1\n").arg(_external);
+	if (!_srcDir.isEmpty())     ret += QString("  srcDir:        %1\n").arg(_srcDir);
 	if (_srcFileId != 0)        ret += QString("  srcFile:       %1\n").arg(_srcFileId);
 	if (_srcLine >= 0)          ret += QString("  srcLine:       %1\n").arg(_srcLine);
 	if (_sibling >= 0)          ret += QString("  sibling:       %1\n").arg(_sibling);
@@ -379,4 +394,3 @@ DataEncMap getDataEncMap()
 	ret.insert("unsigned", eUnsigned);
 	return ret;
 }
-
