@@ -1322,23 +1322,26 @@ int Shell::cmdListVars(QStringList args)
         else
             s_src = "--";
 
-        assert(var->refType() != 0);
-
         // Find out the basic data type of this variable
-        const BaseType* base = var->refType();
-        while ( dynamic_cast<const RefBaseType*>(base) )
-            base = dynamic_cast<const RefBaseType*>(base)->refType();
+        const BaseType* base = var->refTypeDeep(BaseType::trLexical);
         QString s_datatype = base ? realTypeToStr(base->type()) : "(undef)";
 
         // Shorten the type name, if required
-        QString s_typename = var->refType()->name().isEmpty() ?
-                "(anonymous type)" : var->refType()->name();
+        QString s_typename = var->refType() ?
+                    (var->refType()->name().isEmpty() ?
+                         var->refType()->prettyName() :
+                         var->refType()->name()) :
+                    "void";
         if (s_typename.length() > w_typename)
             s_typename = s_typename.left(w_typename - 3) + "...";
 
         QString s_name = var->name().isEmpty() ? "(none)" : var->name();
         if (s_name.length() > w_name)
             s_name = s_name.left(w_name - 3) + "...";
+
+        QString s_size = var->refType() ?
+                    QString::number(var->refType()->size()) :
+                    QString("n/a");
 
         _out
             << qSetFieldWidth(w_id)  << right << hex << var->id()
@@ -1349,7 +1352,7 @@ int Shell::cmdListVars(QStringList args)
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(w_name) << s_name
             << qSetFieldWidth(w_colsep) << " "
-            << qSetFieldWidth(w_size)  << right << right << var->refType()->size()
+            << qSetFieldWidth(w_size)  << right << right << s_size
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(w_src) << left << s_src
             << qSetFieldWidth(w_colsep) << " "
@@ -1936,8 +1939,10 @@ int Shell::cmdShow(QStringList args)
 		}
     }
 
-    if (var)
+    if (var) {
+        _out << ":" << endl;
         return cmdShowVariable(var);
+    }
     else if (bt) {
         if (expr.size() > 1) {
             _out << ", showing " << expr.join(".") << ":" << endl;
