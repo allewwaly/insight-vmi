@@ -331,6 +331,7 @@ public:
 
 
 	void typeAlternateUsage(const ASTSymbol& srcSymbol,
+							const ASTType* srcType,
 							const ASTType* ctxType,
 							const QStringList& ctxMembers,
 							const ASTType* targetType);
