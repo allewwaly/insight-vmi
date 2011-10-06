@@ -38,7 +38,7 @@ Structured::~Structured()
 uint Structured::hash(bool* isValid) const
 {
     if (!_hashValid) {
-        _hash = BaseType::hash(&_hashValid);
+        _hash = BaseType::hash(0);
         qsrand(_hash ^ _members.size());
         _hash ^= qHash(qrand());
         // To place the member hashes at different bit positions

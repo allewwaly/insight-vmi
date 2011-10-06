@@ -23,23 +23,23 @@ RefBaseType::RefBaseType(SymFactory* factory, const TypeInfo& info)
 uint RefBaseType::hash(bool* isValid) const
 {
     if (!_hashValid || _hashRefTypeId != _refTypeId) {
+        bool valid = false;
         _hashRefTypeId = _refTypeId;
         if (_refTypeId) {
             const BaseType* t = refType();
             if (t) {
-                _hash = t->hash(&_hashValid);
+                _hash = t->hash(&valid);
                 // Don't continue if previous hash was invalid
-                if (_hashValid) {
+                if (valid) {
                     qsrand(_hash);
-                    _hash ^= qHash(qrand()) ^ BaseType::hash(&_hashValid);
+                    _hash ^= qHash(qrand()) ^ BaseType::hash(&valid);
                 }
             }
-            else
-                _hashValid = false;
         }
         // Void pointers don't reference any type
         else
-            _hash = BaseType::hash(&_hashValid);
+            _hash = BaseType::hash(&valid);
+        _hashValid = valid;
     }
     if (isValid)
         *isValid = _hashValid;

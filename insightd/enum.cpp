@@ -29,7 +29,7 @@ RealType Enum::type() const
 uint Enum::hash(bool* isValid) const
 {
     if (!_hashValid) {
-        _hash = BaseType::hash(&_hashValid);
+        _hash = BaseType::hash(0);
         qsrand(_hash ^ _enumValues.size());
         _hash ^= qHash(qrand());
         // To place the enum values at different bit positions

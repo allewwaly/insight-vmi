@@ -30,11 +30,13 @@ RealType Array::type() const
 uint Array::hash(bool* isValid) const
 {
     if (!_hashValid) {
-        _hash = Pointer::hash(&_hashValid);
-        if (_hashValid && _length > 0) {
+        bool valid = false;
+        _hash = Pointer::hash(&valid);
+        if (valid && _length > 0) {
             qsrand(_length);
             _hash ^= qHash(qrand());
         }
+        _hashValid = valid;
     }
     if (isValid)
         *isValid = _hashValid;
