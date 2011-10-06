@@ -2320,6 +2320,15 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
 
         case nt_compound_braces_statement:
         case nt_compound_statement:
+            return erNoAssignmentUse;
+
+        case nt_conditional_expression:
+            // Is this the condition in a conditional expression (.. ? .. : ..) ?
+            if (root->u.conditional_expression.logical_or_expression == rNode &&
+                root->u.conditional_expression.conditional_expression)
+                return erNoAssignmentUse;
+            break;
+
         case nt_expression_statement:
             return erNoAssignmentUse;
 
