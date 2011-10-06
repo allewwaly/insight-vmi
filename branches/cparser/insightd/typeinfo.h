@@ -151,7 +151,7 @@ static const quint32 relevantParam =
 	psDeclLine |
 	psEncoding |
 //	psEntryPc |
-//	psExternal |
+	psExternal |
 //	psFrameBase |
 //	psHighPc |
 //	psInline |
@@ -234,6 +234,9 @@ public:
     qint32 upperBound() const;
     void setUpperBound(qint32 bound);
 
+    int external() const;
+    void setExternal(int value);
+
     qint32 sibling() const;
     void setSibling(qint32 sibling);
 
@@ -259,6 +262,7 @@ private:
 	int _bitSize;            ///< holds the number of bits for a bit-split struct
 	int _bitOffset;          ///< holds the bit offset for a bit-split struct
 	size_t _location;        ///< holds the absolute offset offset of this symbol
+	int _external;			 ///< holds whether this is an external symbol
 	qint32 _dataMemberLoc;   ///< holds the offset relative offset of this symbol
 	qint32 _upperBound;      ///< holds the upper bound for an integer type symbol
 	qint32 _sibling;         ///< holds the sibling for a subprogram type symbol
