@@ -145,6 +145,10 @@ void KernelSymbolParser::finishLastSymbol()
     // Otherwise finish the main-symbol and save parsed data into
     // main symbol (again).
     else {
+        // Do not pass the type name of constant or volatile types to the
+        // factory
+        if (_info.symType() & (hsConstType|hsVolatileType))
+            _info.setName(QString());
         // Variables without a location belong to inline assembler
         // statements which we can ignore
         if ( !(_info.symType() == hsVariable && _info.location() <= 0) )
