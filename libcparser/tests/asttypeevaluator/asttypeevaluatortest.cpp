@@ -446,6 +446,8 @@ TEST_FUNCTION(arrayInitializers)
     QTest::newRow("arrayInitEqual3") << "" << "struct list_head a[2] = { [0] = { .prev = h, .next = h } };" << false;
     QTest::newRow("arrayInitEqual4") << "" << "struct module* a[2] = { m, m };" << false;
     QTest::newRow("arrayInitEqual5") << "" << "struct module* a[2] = { [0] = m };" << false;
+    QTest::newRow("arrayInitEqual6") << "enum en { enVal1, enVal2, enSize };"
+                                     << "int array[enSize][enSize] = { [enVal1] = { 0, 1 }, [enVal2] = { 2, 3 } };" << false;
 
     QTest::newRow("arrayInitChange1") << "" << "struct list_head a[2] = { {h, m}, {h, h} };" << true
         << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
@@ -461,6 +463,7 @@ TEST_FUNCTION(arrayInitializers)
         << "h" << "Struct(list_head)" << "prev" << "Pointer->Struct(module)";
     QTest::newRow("arrayInitChange7") << "" << "struct module* a[2] = { [0] = h->prev };" << true
         << "h" << "Struct(list_head)" << "prev" << "Pointer->Struct(module)";
+
 }
 
 
