@@ -1082,9 +1082,6 @@ int Shell::cmdListTypesUsing(QStringList args)
         return ecInvalidId;
     }
 
-
-
-
     QList<RefBaseType*> types = _sym.factory().typesUsingId(id);
 
     if (types.isEmpty()) {
@@ -1972,6 +1969,7 @@ int Shell::cmdShow(QStringList args)
                     return ecInvalidExpression;
                 }
             }
+            bt = bt->dereferencedBaseType(BaseType::trLexical);
         }
         else
             _out << ":" << endl;
@@ -1994,13 +1992,21 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
     const RefBaseType* r = dynamic_cast<const RefBaseType*>(t);
     if (r) {
-        QString id = r->refTypeId() == 0 ?
-                QString::number(r->refTypeId()) :
-                QString("0x%1").arg(r->refTypeId(), 0, 16);
-        _out << "  Ref. type ID:   " << id << endl;
+        _out << "  Ref. type ID:   " << "0x" << hex << r->refTypeId() << dec << endl;
         _out << "  Ref. type:      "
-            <<  (r->refType() ? r->refType()->prettyName() : QString("(unresolved)"))
+             <<  (r->refType() ? r->refType()->prettyName() :
+                                 QString(r->refTypeId() ? "(unresolved)" : "void"))
             << endl;
+        if (r->hasAltRefTypes()) {
+            _out << "  Alt. ref. type: ";
+            for (int i = 0; i < r->altRefTypeCount(); ++i) {
+                if (i > 0)
+                    _out << ", ";
+                const BaseType* t = r->altRefType(i);
+                _out << "0x" << hex << t->id() << dec << t->prettyName();
+            }
+            _out << endl;
+        }
     }
 
 	if (t->srcFile() >= 0 && _sym.factory().sources().contains(t->srcFile())) {
@@ -2074,6 +2080,23 @@ int Shell::cmdShowVariable(const Variable* v)
 	_out << "  ID:             " << "0x" << hex << v->id() << dec << endl;
 	_out << "  Name:           " << v->name() << endl;
 	_out << "  Location:       " << "0x" << hex << v->offset() << dec << endl;
+
+    _out << "  Ref. type ID:   " << "0x" << hex << v->refTypeId() << dec << endl;
+    _out << "  Ref. type:      "
+         <<  (v->refType() ? v->refType()->prettyName() :
+                             QString(v->refTypeId() ? "(unresolved)" : "void"))
+         << endl;
+    if (v->hasAltRefTypes()) {
+        _out << "  Alt. ref. type: ";
+        for (int i = 0; i < v->altRefTypeCount(); ++i) {
+            if (i > 0)
+                _out << ", ";
+            const BaseType* t = v->altRefType(i);
+            _out << "0x" << hex << t->id() << dec << t->prettyName();
+        }
+        _out << endl;
+    }
+
 	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {
 		_out << "  Source file:    " << _sym.factory().sources().value(v->srcFile())->name()
 			<< ":" << v->srcLine() << endl;
