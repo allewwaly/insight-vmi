@@ -23,7 +23,11 @@
 #define FONT_FACE_STR " FACE=\"Courier\" "
 #define FONT_DEF_STR FONT_FACE_STR
 
-#define NODE_NEW_SCOPE_BG "fillcolor=\"#FFFF99\""
+#define NODE_NEW_SCOPE_BG      "fillcolor=\"#FFFF99\""
+#define TOK_PRIM_EX_IDENTIFIER "fillcolor=\"#99FF99\""
+#define TOK_POSTFIX_EX         "fillcolor=\"#AACCAA\""
+#define TOK_DIR_DECL           "fillcolor=\"#FF9999\""
+#define TOK_TYPE_SPECIFIER     "fillcolor=\"#AAAACC\""
 
 
 ASTDotGraph::ASTDotGraph(AbstractSyntaxTree* ast)
@@ -86,25 +90,27 @@ inline void ASTDotGraph::printDotGraphNodeLabel(pASTNode node)
 }
 
 
-inline void ASTDotGraph::printDotGraphTokenLabel(pANTLR3_COMMON_TOKEN token)
+inline void ASTDotGraph::printDotGraphTokenLabel(pANTLR3_COMMON_TOKEN token,
+                                                 const char* extraStyle)
 {
     if (!token)
         return;
 
-    _out << QString("\ttoken_%1 [label=< <FONT " FONT_DEF_STR ">%2</FONT> >,style=filled];")
+    _out << QString("\ttoken_%1 [label=< <FONT " FONT_DEF_STR ">%2</FONT> >,style=filled%3];")
             .arg(getTokenId(token))
             .arg(dotEscape((const char*)token->getText(token)->chars))
+            .arg(extraStyle ? QString(",%1").arg(extraStyle) : QString())
         << endl;
 }
 
 
 void ASTDotGraph::printDotGraphToken(pANTLR3_COMMON_TOKEN token,
-        const QString& parentNodeId)
+        const QString& parentNodeId, const char* extraStyle)
 {
     if (!token)
         return;
 
-    printDotGraphTokenLabel(token);
+    printDotGraphTokenLabel(token, extraStyle);
     _out << QString("\t\tnode_%1 -> token_%2;")
             .arg(parentNodeId)
             .arg(getTokenId(token))
@@ -113,14 +119,15 @@ void ASTDotGraph::printDotGraphToken(pANTLR3_COMMON_TOKEN token,
 
 
 void ASTDotGraph::printDotGraphString(const QString& s,
-        const QString& parentNodeId)
+        const QString& parentNodeId, const char* extraStyle)
 {
     static int stringId = 0;
     int id = stringId++;
 
-    _out << QString("\tstring_%1 [label=< <FONT " FONT_DEF_STR ">%2</FONT> >,style=filled];")
+    _out << QString("\tstring_%1 [label=< <FONT " FONT_DEF_STR ">%2</FONT> >,style=filled%3];")
             .arg(id)
             .arg(dotEscape(s))
+            .arg(extraStyle ? QString(",%1").arg(extraStyle) : QString())
         << endl;
     _out << QString("\t\tnode_%1 -> string_%2;")
             .arg(parentNodeId)
@@ -130,13 +137,13 @@ void ASTDotGraph::printDotGraphString(const QString& s,
 
 
 void ASTDotGraph::printDotGraphTokenList(pASTTokenList list,
-        const QString& delim, const QString& nodeId)
+        const QString& delim, const QString& nodeId, const char* extraStyle)
 {
     if (!list)
         return;
 
     for (pASTTokenList p = list; p; p = p->next) {
-        printDotGraphToken(p->item, nodeId);
+        printDotGraphToken(p->item, nodeId, extraStyle);
         if (p->next && !delim.isEmpty())
             printDotGraphString(delim, nodeId);
     }
@@ -317,14 +324,15 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
     case nt_direct_abstract_declarator:
         break;
     case nt_direct_declarator:
-        printDotGraphToken(node->u.direct_declarator.identifier, nodeId);
+        printDotGraphToken(node->u.direct_declarator.identifier, nodeId,
+                           TOK_DIR_DECL);
         if (node->u.direct_declarator.declarator) {
             printDotGraphString("(", nodeId);
         }
         break;
     case nt_enum_specifier:
-        printDotGraphString("enum", nodeId);
-        printDotGraphToken(node->u.enum_specifier.identifier, nodeId);
+        printDotGraphString("enum", nodeId, TOK_TYPE_SPECIFIER);
+        printDotGraphToken(node->u.enum_specifier.identifier, nodeId, TOK_TYPE_SPECIFIER);
         break;
     case nt_enumerator:
         if (flags & wfFirstInList)
@@ -407,9 +415,17 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
                 node->parent->u.binary_expression.right == node)
             printDotGraphToken(node->parent->u.binary_expression.op, getNodeId(node->parent));
         break;
-    case nt_pointer:
-        printDotGraphString("*", nodeId);
+    case nt_pointer: {
+        // Is this within a declaration?
+        pASTNode p = node->parent;
+        while (p && p->type != nt_declarator)
+            p = p->parent;
+        if (p)
+            printDotGraphString("*", nodeId, TOK_DIR_DECL);
+        else
+            printDotGraphString("*", nodeId);
         printDotGraphTokenList(node->u.pointer.type_qualifier_list, "", nodeId);
+    }
         break;
     case nt_postfix_expression:
         break;
@@ -420,12 +436,12 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
         printDotGraphString("(", nodeId);
         break;
     case nt_postfix_expression_dot:
-        printDotGraphString(".", nodeId);
-        printDotGraphToken(node->u.postfix_expression_suffix.identifier, nodeId);
+        printDotGraphString(".", nodeId, TOK_POSTFIX_EX);
+        printDotGraphToken(node->u.postfix_expression_suffix.identifier, nodeId, TOK_POSTFIX_EX);
         break;
     case nt_postfix_expression_arrow:
-        printDotGraphString("->", nodeId);
-        printDotGraphToken(node->u.postfix_expression_suffix.identifier, nodeId);
+        printDotGraphString("->", nodeId, TOK_POSTFIX_EX);
+        printDotGraphToken(node->u.postfix_expression_suffix.identifier, nodeId, TOK_POSTFIX_EX);
         break;
     case nt_postfix_expression_inc:
         printDotGraphString("++", nodeId);
@@ -438,7 +454,7 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
             printDotGraphString("(", nodeId);
         if (node->u.primary_expression.hasDot)
             printDotGraphString(".", nodeId);
-        printDotGraphToken(node->u.primary_expression.identifier, nodeId);
+        printDotGraphToken(node->u.primary_expression.identifier, nodeId, TOK_PRIM_EX_IDENTIFIER);
         break;
     case nt_relational_expression:
         if (node->parent->type == nt_equality_expression &&
@@ -469,20 +485,20 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
         if (node->u.struct_or_union_specifier.struct_or_union) {
             pASTNode sou = node->u.struct_or_union_specifier.struct_or_union;
             if (sou->type == nt_struct_or_union_struct)
-                printDotGraphString("struct", nodeId);
+                printDotGraphString("struct", nodeId, TOK_TYPE_SPECIFIER);
             else
-                printDotGraphString("union", nodeId);
+                printDotGraphString("union", nodeId, TOK_TYPE_SPECIFIER);
         }
-        printDotGraphToken(node->u.struct_or_union_specifier.identifier, nodeId);
+        printDotGraphToken(node->u.struct_or_union_specifier.identifier, nodeId, TOK_TYPE_SPECIFIER);
         break;
     case nt_type_id:
-        printDotGraphToken(node->u.type_id.identifier, nodeId);
+        printDotGraphToken(node->u.type_id.identifier, nodeId, TOK_TYPE_SPECIFIER);
         break;
     case nt_type_qualifier:
         printDotGraphToken(node->u.type_qualifier.token, nodeId);
         break;
     case nt_type_specifier:
-        printDotGraphTokenList(node->u.type_specifier.builtin_type_list, QString(), nodeId);
+        printDotGraphTokenList(node->u.type_specifier.builtin_type_list, QString(), nodeId, TOK_TYPE_SPECIFIER);
         break;
     case nt_typeof_specification:
         printDotGraphString("typeof", nodeId);
