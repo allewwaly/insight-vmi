@@ -273,7 +273,8 @@ RealType Struct::type() const
 
 QString Struct::prettyName() const
 {
-    return _name.isEmpty() ? QString("struct") : QString("struct %1").arg(_name);
+    return _name.isEmpty() ?
+                QString("struct (anon.)") : QString("struct %1").arg(_name);
 }
 
 
@@ -298,7 +299,8 @@ RealType Union::type() const
 
 QString Union::prettyName() const
 {
-    return _name.isEmpty() ? QString("union") : QString("union %1").arg(_name);
+    return _name.isEmpty() ?
+                QString("union (anon.)") : QString("union %1").arg(_name);
 }
 
 
