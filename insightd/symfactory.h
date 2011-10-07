@@ -516,10 +516,11 @@ private:
 
     /**
      * Creates a shallow copy of the given type \a source and returns it. The
-     * copy will have an ID of siCopy to be distinguishable from the original.
+     * copy will have a unique ID < 0 to be distinguishable from the original.
+     * \warning Make sure to add this type to the local types by a call to
+     * addSymbol().
      * @param source the source type
-     * @return a shallow copy of \a source with an ID of siCopy.
-     * \sa SpecialIds
+     * @return a shallow copy of \a source with a new, unique ID
      */
     Structured* makeStructCopy(Structured* source);
 
@@ -581,9 +582,14 @@ private:
     };
 
     TypeConflicts compareConflictingTypes(const BaseType* oldType,
-                                          const BaseType* newType);
+                                          const BaseType* newType) const;
+
+    bool typeChangeDecision(const ReferencingType* r,
+                            const BaseType* targetBaseType);
 
     BaseTypeList typedefsOfType(BaseType* type);
+
+    int getUniqueTypeId();
 
     /**
      * Goes to the list of zero-sized structs/unions and tries to find the
@@ -642,6 +648,7 @@ private:
 	int _totalTypesChanged;
 	int _typesReplaced;
 	int _conflictingTypeChanges;
+	int _artificialTypeId;
 	quint32 _maxTypeSize;
 };
 

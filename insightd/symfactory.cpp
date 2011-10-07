@@ -34,7 +34,7 @@
 
 SymFactory::SymFactory(const MemSpecs& memSpecs)
 	: _memSpecs(memSpecs), _typeFoundByHash(0), _structListHeadCount(0),
-	  _structHListNodeCount(0), _maxTypeSize(0)
+	  _structHListNodeCount(0), _artificialTypeId(-1), _maxTypeSize(0)
 {
 }
 
@@ -105,6 +105,7 @@ void SymFactory::clear()
 	_totalTypesChanged = 0;
 	_typesReplaced = 0;
 	_conflictingTypeChanges = 0;
+	_artificialTypeId = -1;
 }
 
 
@@ -1036,7 +1037,6 @@ Structured* SymFactory::makeStructCopy(Structured* source)
     Structured* dest = (source->type() == rtStruct) ?
                 (Structured*)new Struct(this) :
                 (Structured*)new Union(this);
-    _customTypes.append(dest);
 
     // Use the symbol r/w mechanism to create the copy
     QByteArray ba;
@@ -1047,7 +1047,7 @@ Structured* SymFactory::makeStructCopy(Structured* source)
     dest->readFrom(data);
 
     // Set the special ID
-    dest->setId(siCopy);
+    dest->setId(getUniqueTypeId());
     return dest;
 }
 
@@ -1599,6 +1599,20 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
             baseTypes = _typesByName.values(astTypeNonPtr->identifier());
         }
     }
+    else if (astTypeNonPtr->type() == rtFuncPointer) {
+        assert(astTypeNonPtr->node() != 0);
+        if (astTypeNonPtr->node()->type != nt_declarator_suffix_parens)
+            factoryError(QString("Expected type nt_declarator_suffix_parens "
+                                 "but got %1")
+                         .arg(ast_node_type_to_str(astTypeNonPtr->node())));
+        struct ASTNode* dd = astTypeNonPtr->node()->parent;
+        assert(dd->u.direct_declarator.declarator != 0);
+        assert(dd->u.direct_declarator.declarator->u.declarator.direct_declarator != 0);
+        dd = dd->u.direct_declarator.declarator->u.declarator.direct_declarator;
+        assert(dd->u.direct_declarator.identifier != 0);
+        QString name = antlrTokenToStr(dd->u.direct_declarator.identifier);
+        baseTypes = _typesByName.values(name);
+    }
     // Is the source a numeric type?
     else if (astTypeNonPtr->type() & (~rtEnum & NumericTypes)) {
         baseTypes += getNumericInstance(astTypeNonPtr);
@@ -1715,13 +1729,12 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
                 default: factoryError("Unexpected type: " +
                                       realTypeToStr(targetPointers[j]->type()));
                 }
-                _customTypes.append(ptr);
-                ptr->setId(siCreatred);
+                ptr->setId(getUniqueTypeId());
                 // For void pointers, targetBaseType is null
                 if (targetBaseType)
                     ptr->setRefTypeId(targetBaseType->id());
                 ptr->setSize(_memSpecs.sizeofUnsignedLong);
-                insertUsedBy(ptr);
+                addSymbol(ptr);
                 targetBaseType = ptr;
             }
         }
@@ -1777,7 +1790,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
             Structured* s = dynamic_cast<Structured*>(t);
             nestingMember = member; // previous struct for nested structs
             if ( s && (member = s->findMember(ctxMembers[j])) ) {
-                t = member->refType();
+                t = member->refTypeDeep(BaseType::trLexical);
             }
             else {
                 nestingMember = member = 0;
@@ -1787,8 +1800,8 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 
         // Is the source type a member of a struct embedded in the context type?
         if (nestingMember) {
-            // Was the embedding member already manipulated?
-            if (nestingMember->refTypeId() == siCopy) {
+            // Was the embedding member already copied?
+            if (nestingMember->refTypeId() < 0) {
                 debugmsg(QString("Member %1 %2 is already a type copy.")
                          .arg(nestingMember->prettyName())
                          .arg(nestingMember->name()));
@@ -1796,71 +1809,28 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
             else {
                 // Create a copy of the embedding struct before manipulation
                 /// @todo What happens hier if member is inside an anonymous struct?
-                Structured* s = dynamic_cast<Structured*>(nestingMember->refType());
+                Structured* s = dynamic_cast<Structured*>(
+                            nestingMember->refTypeDeep(BaseType::trLexical));
                 assert(s != 0);
                 Structured* refTypeCopy = makeStructCopy(s);
+                addSymbol(refTypeCopy);
+                // Update the type relations
+                _usedByStructMembers.remove(nestingMember->refTypeId(), nestingMember);
                 nestingMember->setRefTypeId(refTypeCopy->id());
+                insertUsedBy(nestingMember);
                 member = refTypeCopy->findMember(ctxMembers.last());
                 assert(member != 0);
-                debugmsg(QString("Created copy of embedding member %1 %2.")
+                debugmsg(QString("Created copy of embedding member %1 (0x%2 -> 0x%3).")
                          .arg(nestingMember->prettyName())
-                         .arg(nestingMember->name()));
+                         .arg(s->id(), 0, 16)
+                         .arg(refTypeCopy->id(), 0, 16));
             }
         }
         // If we have a member here, it is the one whose reference is to be replaced
         if (member) {
             ++membersFound;
-            bool changeType = true;
-            // Was the member already manipulated?
-            if (member->hasAltRefTypes()) {
-                // Do we have conflicting target types?
-                switch (compareConflictingTypes(member->altRefType(), targetBaseType)) {
-                case tcNoConflict:
-                    changeType = false;
-                    t = member->refType();
-                    debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\"")
-                             .arg(member->name())
-                             .arg(member->belongsTo()->prettyName())
-                             .arg(member->belongsTo()->id(), 0, 16)
-                             .arg(t ? t->prettyName() : QString("???"))
-                             .arg(member->altRefType()->prettyName()));
-                    break;
-
-                case tcIgnore:
-                    changeType = false;
-                    debugmsg(QString("Not changing \"%0\" of %1 (0x%2) from \"%3\" to \"%4\"")
-                             .arg(member->name())
-                             .arg(member->belongsTo()->prettyName())
-                             .arg(member->belongsTo()->id(), 0, 16)
-                             .arg(member->refType() ?
-                                      member->refType()->prettyName() :
-                                      QString("???"))
-                             .arg(targetBaseType->prettyName()));
-                    break;
-
-                case tcConflict:
-                    changeType = false;
-                    ++_conflictingTypeChanges;
-                    member->addAltRefTypeId(targetBaseType->id());
-                    debugerr(QString("Conflicting target types in 0x%0: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
-                             .arg(member->belongsTo()->id(), 0, 16)
-                             .arg(member->refType() ?
-                                      member->refType()->prettyName() :
-                                      QString("???"))
-                             .arg(member->refTypeId(), 0, 16)
-                             .arg(targetBaseType->prettyName())
-                             .arg(targetBaseType->id(), 0, 16));
-                    break;
-
-                case tcReplace:
-                    changeType = true;
-                    ++_typesReplaced;
-                    break;
-                }
-            }
-
             // Apply new type, if applicable
-            if (changeType) {
+            if (typeChangeDecision(member, targetBaseType)) {
                 /// @todo may need to adjust member->memberOffset() somehow
                 ++membersChanged;
                 ++_totalTypesChanged;
@@ -1899,28 +1869,96 @@ void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
 
     // Find the variable(s) using the targetBaseType
     for (int i = 0; i < vars.size(); ++i) {
-        Variable* v = vars[i];
-        if (v->refType() && v->refType()->hash() == targetBaseType->hash()) {
-            ++varsFound;
-            v->addAltRefTypeId(targetBaseType->id());
+        ++varsFound;
+        // Apply new type, if applicable
+        if (typeChangeDecision(vars[i], targetBaseType)) {
+            ++_totalTypesChanged;
+            /// @todo replace v->altRefType() with target
+            vars[i]->addAltRefTypeId(targetBaseType->id());
         }
     }
 
     if (!varsFound)
         factoryError("Did not find any variables to adjust!");
-    else
-        debugmsg("Adjusted " << varsFound << " variables.");
+    else {
+        QStringList varIds;
+        for (int i = 0; i < vars.size(); ++i)
+                varIds += QString("0x%1").arg(vars[i]->id(), 0, 16);
+        debugmsg(QString("Changed %1 type%2 of variable%3 %4 to target type 0x%5: %6")
+                 .arg(varsFound)
+                 .arg(varsFound == 1 ? "" : "s")
+                 .arg(varIds.size() > 1 ? "s" : "")
+                 .arg(varIds.join(", "))
+                 .arg(targetBaseType->id(), 0, 16)
+                 .arg(targetBaseType->prettyName()));
+    }
+}
+
+
+bool SymFactory::typeChangeDecision(const ReferencingType* r,
+                                    const BaseType* targetBaseType)
+{
+    bool changeType = true;
+    // Was the member already manipulated?
+    if (r->hasAltRefTypes()) {
+        const BaseType* t = r->altRefType();
+        const StructuredMember* m = dynamic_cast<const StructuredMember*>(r);
+        const Variable* v = dynamic_cast<const Variable*>(r);
+        // Do we have conflicting target types?
+        switch (compareConflictingTypes(r->altRefType(), targetBaseType)) {
+        case tcNoConflict:
+            changeType = false;
+            t = r->refType();
+            debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\"")
+                     .arg(m ? m->name() : v->name())
+                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
+                     .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
+                     .arg(t ? t->prettyName() : QString("???"))
+                     .arg(r->altRefType()->prettyName()));
+            break;
+
+        case tcIgnore:
+            changeType = false;
+            debugmsg(QString("Not changing \"%0\" of %1 (0x%2) from \"%3\" to \"%4\"")
+                     .arg(m ? m->name() : v->name())
+                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
+                     .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
+                     .arg(r->refType() ?
+                              r->refType()->prettyName() :
+                              QString("???"))
+                     .arg(targetBaseType->prettyName()));
+            break;
+
+        case tcConflict:
+            ++_conflictingTypeChanges;
+            debugerr(QString("Conflicting target types in 0x%0: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
+                     .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
+                     .arg(r->refType() ?
+                              r->refType()->prettyName() :
+                              QString("???"))
+                     .arg(r->refTypeId(), 0, 16)
+                     .arg(targetBaseType->prettyName())
+                     .arg(targetBaseType->id(), 0, 16));
+            break;
+
+        case tcReplace:
+            ++_typesReplaced;
+            break;
+        }
+    }
+
+    return changeType;
 }
 
 
 SymFactory::TypeConflicts SymFactory::compareConflictingTypes(
-        const BaseType* oldType, const BaseType* newType)
+        const BaseType* oldType, const BaseType* newType) const
 {
     int oldTypeId = oldType ? oldType->id() : 0;
     int newTypeId = newType ? newType->id() : 0;
 
     // Do we have conflicting target types?
-    if (oldTypeId == newTypeId && oldTypeId != siCreatred)
+    if (oldTypeId == newTypeId)
         return tcNoConflict;
 
     // Compare the conflicting types
@@ -1974,6 +2012,15 @@ SymFactory::TypeConflicts SymFactory::compareConflictingTypes(
     }
     // This is a conflict
     return tcConflict;
+}
+
+
+int SymFactory::getUniqueTypeId()
+{
+    while (_typesById.contains(_artificialTypeId))
+        --_artificialTypeId;
+
+    return _artificialTypeId--;
 }
 
 
