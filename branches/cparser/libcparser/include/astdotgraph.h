@@ -31,12 +31,14 @@ private:
     QString getNodeId(pASTNode node) const;
     QString getTokenId(pANTLR3_COMMON_TOKEN token) const;
     void printDotGraphNodeLabel(pASTNode node);
-    void printDotGraphTokenLabel(pANTLR3_COMMON_TOKEN token);
+    void printDotGraphTokenLabel(pANTLR3_COMMON_TOKEN token,
+                                 const char* extraStyle = 0);
     void printDotGraphToken(pANTLR3_COMMON_TOKEN token,
-            const QString& parentNodeId);
-    void printDotGraphString(const QString& s, const QString& parentNodeId);
+            const QString& parentNodeId, const char* extraStyle = 0);
+    void printDotGraphString(const QString& s, const QString& parentNodeId,
+                             const char* extraStyle = 0);
     void printDotGraphTokenList(pASTTokenList list, const QString& delim,
-            const QString& nodeId);
+            const QString& nodeId, const char* extraStyle = 0);
 
     QTextStream _out;
 };
