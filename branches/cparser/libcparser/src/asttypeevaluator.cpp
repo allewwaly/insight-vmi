@@ -2329,6 +2329,11 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
                 return erNoAssignmentUse;
             break;
 
+        case nt_declarator_suffix_brackets:
+        case nt_designated_initializer:
+            // Used as an array size or index value
+            return erNoAssignmentUse;
+
         case nt_expression_statement:
             return erNoAssignmentUse;
 
@@ -2796,7 +2801,7 @@ RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list) const
 		fLongLong = (1 << 1),
 		fShort    = (1 << 2),
 		fSigned   = (1 << 3),
-		fUnsigned = (1 << 4),
+		fUnsigned = (1 << 4)
 	};
 
 	enum Types
