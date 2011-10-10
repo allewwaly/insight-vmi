@@ -9,6 +9,7 @@
 #include "symfactory.h"
 #include "parserexception.h"
 #include "shell.h"
+#include "funcparam.h"
 #include <QRegExp>
 #include <QTime>
 #include <QProcess>
@@ -102,8 +103,18 @@ KernelSymbolParser::KernelSymbolParser(QIODevice* from, SymFactory* factory)
       _factory(factory),
       _line(0),
       _bytesRead(0),
-      _pInfo(0)
+      _pInfo(0),
+      _skipTrigger(hsUnknownSymbol),
+      _skipUntil(-1)
 {
+    _infos.push(new TypeInfo);
+}
+
+
+KernelSymbolParser::~KernelSymbolParser()
+{
+    for (int i = 0; i < _infos.size(); ++i)
+        delete _infos[i];
 }
 
 
@@ -115,50 +126,73 @@ quint64 KernelSymbolParser::line() const
 
 void KernelSymbolParser::finishLastSymbol()
 {
-    // See if this is a sub-type of a multi-part type, if yes, merge
-    // its data with the "main" info
-    if (_subInfo.symType()) {
-        switch (_subInfo.symType()) {
-        case hsSubrangeType:
-            // We ignore subInfo.type() for now...
-            _info.setUpperBound(_subInfo.upperBound());
-            break;
-        case hsEnumerator:
-            _info.addEnumValue(_subInfo.name(), _subInfo.constValue().toInt());
-            break;
-        case hsMember:
-            _info.members().append(new StructuredMember(_factory, _subInfo));
-            break;
-        default:
-            parserError(QString("Unhandled sub-type: %1").arg(_subInfo.symType()));
-            // no break
-        }
-        // Reset all data for a new sub-symbol
-        _subInfo.clear();
+    // Do we need to open a new scope?
+    if (_infos.top()->sibling() > 0 && _infos.top()->sibling() > _nextId) {
+        _infos.push(new TypeInfo());
     }
-
-    // If this is a symbol for a multi-part type, continue parsing
-    // and save data into subInfo
-    if (_hdrSym & (hsSubrangeType|hsEnumerator|hsMember)) {
-        _pInfo = &_subInfo;
-    }
-    // Otherwise finish the main-symbol and save parsed data into
-    // main symbol (again).
     else {
-        // Do not pass the type name of constant or volatile types to the
-        // factory
-        if (_info.symType() & (hsConstType|hsVolatileType))
-            _info.setName(QString());
-        // Non-external variables without a location belong to inline assembler
-        // statements which we can ignore
-        if (_info.symType() != hsVariable || _info.location() > 0 ||
-            _info.external())
-            _factory->addSymbol(_info);
-        // Reset all data for a new symbol
-        _info.clear();
+        TypeInfo* parent = 0;
+        // See if this is a sub-type of a multi-part type, if yes, merge
+        // its data with the previous info
+        while (_infos.size() > 1) {
+            parent = _infos[_infos.size()-2];
 
-        _pInfo = &_info;
+            if (_infos.top()->isRelevant()) {
+                switch (_infos.top()->symType()) {
+                case hsSubrangeType:
+                    // We ignore subInfo.type() for now...
+                    parent->setUpperBound(_infos.top()->upperBound());
+                    break;
+                case hsEnumerator:
+                    parent->addEnumValue(_infos.top()->name(), _infos.top()->constValue().toInt());
+                    break;
+                case hsMember:
+                    parent->members().append(new StructuredMember(_factory, *_infos.top()));
+                    break;
+                case hsFormalParameter:
+                    parent->params().append(new FuncParam(_factory, *_infos.top()));
+                    break;
+                default:
+                    parserError(QString("Unhandled sub-type: %1").arg(_infos.top()->symType()));
+                    // no break
+                }
+            }
+
+            // See if this is the end of the parent's scope
+            if (parent->sibling() > _nextId) {
+                _infos.top()->clear();
+                 break;
+            }
+            else {
+                parent = 0;
+                delete _infos.pop();
+            }
+        }
+
+        if (_infos.top()->symType() && _infos.top()->sibling() <= _nextId) {
+            // Do not pass the type name of constant or volatile types to the
+            // factory
+            if (_infos.top()->symType() & (hsConstType|hsVolatileType))
+                _infos.top()->setName(QString());
+
+            // Ignore functions without a name
+            if (_infos.top()->symType() == hsSubprogram && _infos.top()->name().isEmpty()) {
+                _infos.top()->deleteParams();
+            }
+            // Non-external variables without a location belong to inline assembler
+            // statements which we can ignore
+            else if (_infos.top()->symType() &&
+                     (_infos.top()->symType() != hsVariable ||
+                      _infos.top()->location() > 0 ||
+                      _infos.top()->external()) &&
+                     _infos.top()->isRelevant())
+                _factory->addSymbol(*_infos.top());
+            // Reset all data for a new symbol
+            _infos.top()->clear();
+        }
     }
+
+    _pInfo = _infos.top();
 }
 
 
@@ -252,10 +286,31 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
             _pInfo->clear();
             _isRelevant = false;
         }
+        // Ignore location for parameters
+        else if (_hdrSym == hsFormalParameter) {
+            break;
+        }
         else {
             HdrSymRevMap revMap = invertHash(getHdrSymMap());
             parserError(QString("Could not parse location for symbol %1: %2\nRegex: %3").arg(revMap[_hdrSym]).arg(value).arg(rxLocation.pattern()));
         }
+        break;
+    }
+    case psHighPc: {
+        parseULongLong16(ul, value, &ok);
+        _pInfo->setPcHigh(ul);
+        break;
+    }
+    case psInline: {
+        if (!rxBound.exactMatch(value))
+            parserError(QString(str::regexErrorMsg).arg(rxBound.pattern()).arg(value));
+        parseInt(i, rxBound.cap(1), &ok);
+        _pInfo->setInlined(i != 0);
+        break;
+    }
+    case psLowPc: {
+        parseULongLong16(ul, value, &ok);
+        _pInfo->setPcLow(ul);
         break;
     }
     case psName: {
@@ -321,12 +376,17 @@ void KernelSymbolParser::parse()
     QString line;
     ParamSymbolType paramSym;
     qint32 i;
+    _nextId = 0;
     bool ok;
-    bool skip = false;
-    qint32 skipUntil = -1;
+    bool skipSome = false;
+    _skipTrigger = hsUnknownSymbol;
+    _skipUntil = -1;
     _curSrcID = -1;
-    _isRelevant = false;
-    _pInfo = &_info;
+    while (_infos.size() > 1)
+        delete _infos.top();
+    _infos.top()->clear();
+    _pInfo = _infos.top();
+
     _hdrSym = hsUnknownSymbol;
 
     operationStarted();
@@ -365,38 +425,45 @@ void KernelSymbolParser::parse()
                     parserError(QString("Unknown debug symbol type encountered: %1").arg(rxHdr.cap(2)));
 
                 // If skip is set, we are going to skip all symbols until we reach skipUntil
-                if (skip) {
+                if (skipSome) {
+                    skipSome = false;
                     // Set skip value
-                    skipUntil = _pInfo->sibling();
-
-                    // Clear the skip symbol & set variables accordingly
-                    _pInfo->clear();
-                    skip = false;
-                    _isRelevant = false;
+                    _skipUntil = _pInfo->sibling();
+                    _skipTrigger = (_skipUntil < 0) ?
+                                hsUnknownSymbol : _pInfo->symType();
+                    // Ignore inlined subroutines as symbols
+                    if (_skipTrigger == hsInlinedSubroutine)
+                        _pInfo->clear();
                 }
 
                 // skip all symbols till the id saved in skipUntil is reached
-                parseInt16(i, rxHdr.cap(1), &ok);
-                if (skipUntil == i)
+                parseInt16(_nextId, rxHdr.cap(1), &ok);
+                if (_skipUntil == _nextId) {
                     // We reached the mark, reset values
-                    skipUntil = -1;
-
-                // See if we have to finish the last symbol before we continue parsing
-                if (_isRelevant) {
-                    finishLastSymbol();
-                    _isRelevant = false;
+                    _skipUntil = -1;
+                    _skipTrigger = hsUnknownSymbol;
                 }
 
-                // We are interested in all local symbols except variables and
-                // all global symbols
-                if (skipUntil > 0)
-                    // Ignore local variables
-                    _isRelevant = (_hdrSym & relevantHdr & ~hsVariable);
+                // See if we have to finish the last symbol before we continue parsing
+                finishLastSymbol();
+
+                // For functions ignore local variables
+                if (_skipTrigger == hsSubprogram)
+                    _pInfo->setIsRelevant(_hdrSym & relevantHdr & ~hsVariable);
+                // For inlined functions ignore parameters and local variables
+                else if (_skipTrigger == hsInlinedSubroutine)
+                    _pInfo->setIsRelevant(_hdrSym & relevantHdr &
+                                   ~(hsVariable|hsFormalParameter));
+                // For functions pointers parse the parameters
+                else if (_infos.size() > 1 &&
+                         _infos[_infos.size() - 2]->symType() == hsSubroutineType)
+                    _pInfo->setIsRelevant(_hdrSym & relevantHdr);
+                // Otherwise ignore all parameters
                 else
-                    _isRelevant = (_hdrSym & relevantHdr);
+                    _pInfo->setIsRelevant(_hdrSym & relevantHdr & ~hsFormalParameter);
 
                 // Are we interested in this symbol?
-                if (_isRelevant) {
+                if (_pInfo->isRelevant()) {
                     _pInfo->setSymType(_hdrSym);
                     parseInt16(i, rxHdr.cap(1), &ok);
                     _pInfo->setId(i);
@@ -404,17 +471,13 @@ void KernelSymbolParser::parse()
                     if (_hdrSym == hsCompileUnit)
                         _curSrcID = _pInfo->id();
                 }
-                else {
-                    // If this is a function we skip all symbols that belong to it.
-                    if (_hdrSym & (hsSubprogram|hsInlinedSubroutine)) {
-                        // Parse the parameters
-                        _isRelevant = true;
-                        skip = true;
-                    }
+                // If this is a function we skip all variables that belong to it.
+                if (_hdrSym & (hsSubprogram|hsInlinedSubroutine)) {
+                    skipSome = true;
                 }
             }
             // Next see if this matches a parameter
-            else if (_isRelevant && rxParam.exactMatch(line)) {
+            else if (_pInfo->isRelevant() && rxParam.exactMatch(line)) {
                 paramSym = paramMap.value(rxParam.cap(1));
 
                 // Are we interested in this parameter?

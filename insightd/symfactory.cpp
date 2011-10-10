@@ -21,6 +21,7 @@
 #include "variable.h"
 #include "shell.h"
 #include "debug.h"
+#include "function.h"
 #include <string.h>
 #include <asttypeevaluator.h>
 #include <astnode.h>
@@ -683,12 +684,14 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 		return info.id() != 0;
 	case hsSubroutineType:
 		return info.id() != 0;
+	case hsSubprogram:
+		return info.id() != 0 && !info.name().isEmpty();
 	case hsMember:
 		return info.id() != 0 && info.refTypeId() != 0;
 	case hsPointerType:
 		return info.id() != 0 && info.byteSize() > 0;
-	case hsUnionType:
 	case hsStructureType:
+	case hsUnionType:
 		return info.id() != 0;
 	case hsTypedef:
 		return info.id() != 0 && info.refTypeId() != 0 && !info.name().isEmpty();
@@ -743,6 +746,10 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	case hsSubroutineType: {
 	    getTypeInstance<FuncPointer>(info);
 	    break;
+	}
+	case hsSubprogram: {
+		getTypeInstance<Function>(info);
+		break;
 	}
 	case hsTypedef: {
         ref = getTypeInstance<Typedef>(info);
@@ -1606,10 +1613,13 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
                                  "but got %1")
                          .arg(ast_node_type_to_str(astTypeNonPtr->node())));
         struct ASTNode* dd = astTypeNonPtr->node()->parent;
-        assert(dd->u.direct_declarator.declarator != 0);
-        assert(dd->u.direct_declarator.declarator->u.declarator.direct_declarator != 0);
-        dd = dd->u.direct_declarator.declarator->u.declarator.direct_declarator;
-        assert(dd->u.direct_declarator.identifier != 0);
+        if (!dd->u.direct_declarator.identifier) {
+            struct ASTNode* dclr = dd->u.direct_declarator.declarator;
+            assert(dclr != 0);
+            dd = dclr->u.declarator.direct_declarator;
+            assert(dd != 0);
+            assert(dd->u.direct_declarator.identifier != 0);
+        }
         QString name = antlrTokenToStr(dd->u.direct_declarator.identifier);
         baseTypes = _typesByName.values(name);
     }

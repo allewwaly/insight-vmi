@@ -1,36 +1,28 @@
-/*
- * array.h
+#ifndef FUNCTION_H
+#define FUNCTION_H
+
+#include "funcpointer.h"
+
+/**
+ * This class represents a function definition.
  *
- *  Created on: 03.04.2010
- *      Author: chrschn
+ * \sa FuncPointer, FuncParam
  */
-
-#ifndef FUNCPOINTER_H_
-#define FUNCPOINTER_H_
-
-#include "refbasetype.h"
-#include "funcparam.h"
-
-class FuncPointer: public RefBaseType
+class Function : public FuncPointer
 {
 public:
     /**
      * Constructor
      * @param factory the factory that created this symbol
      */
-    FuncPointer(SymFactory* factory);
+    Function(SymFactory* factory);
 
     /**
      * Constructor
      * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
      */
-    FuncPointer(SymFactory* factory, const TypeInfo& info);
-
-    /**
-     * Destructor
-     */
-    virtual ~FuncPointer();
+    Function(SymFactory* factory, const TypeInfo& info);
 
     /**
      * Create a hash of that type based on BaseType::hash(), srcLine() and the
@@ -46,42 +38,21 @@ public:
 	 */
 	virtual RealType type() const;
 
-    /**
-     * @return the list of parameters of this struct or union
-     */
-    inline const ParamList& params() const
-    {
-        return _params;
-    }
-
-    /**
-     * Adds a parameter to this struct or union. This transfers the ownership of
-     * \a param to this object, so \a param will be freed when the destructor
-     * of this struct/union is called.
-     * @param param the parameter to add, transfers ownership
-     */
-    void addParam(FuncParam* param);
+	/**
+	 * @return the low program counter
+	 */
+	inline size_t pcLow() const
+	{
+		return _pcLow;
+	}
 
 	/**
-	 * Finds out if a parameter with name \a paramName exists.
-	 * @param paramName name of the param
-	 * @return \c true if that parameter exists, \a false otherwise
+	 * @return the high program counter
 	 */
-	bool paramExists(const QString& paramName) const;
-
-	/**
-	 * Searches for a parameter with the name \a paramName.
-	 * @param paramName name of the param to search
-	 * @return the param, if it exists, \c 0 otherwise
-	 */
-	FuncParam* findParam(const QString& paramName);
-
-    /**
-     * Searches for a parameter with the name \a paramName (const version)
-     * @param paramName name of the parameter to search
-     * @return the parameter, if it exists, \c 0 otherwise
-     */
-    const FuncParam* findParam(const QString& paramName) const;
+	inline size_t pcHigh() const
+	{
+		return _pcHigh;
+	}
 
     /**
      * This gives a pretty name of that type which may involve referencing
@@ -111,9 +82,10 @@ public:
      */
     virtual void writeTo(QDataStream& out) const;
 
-protected:
-    ParamList _params;  ///< Holds all parameters
+private:
+    bool _inlined;  ///< Is this an inlined function?
+    size_t _pcLow;  ///< Low program counter
+    size_t _pcHigh; ///< High program counter
 };
 
-
-#endif /* FUNCPOINTER_H_ */
+#endif // FUNCTION_H
