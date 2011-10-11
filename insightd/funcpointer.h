@@ -91,6 +91,13 @@ public:
     virtual QString prettyName() const;
 
     /**
+     * This gives a pretty name of this function pointer with the given name
+     * as variable or typedef of name \a name.
+     * @return the pretty name of this function pointer, e.g., "int (*name)()"
+     */
+    QString prettyName(const QString& name) const;
+
+    /**
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
