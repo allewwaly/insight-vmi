@@ -217,6 +217,8 @@ int ASTTypeEvaluator::sizeofType(RealType type) const
     	return 0;
     case rtFuncPointer:
     	return sizeofLong();
+    case rtFunction:
+        return 0;
     case rtVoid:
     	return 0;
     case rtVaList:
