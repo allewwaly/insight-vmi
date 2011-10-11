@@ -65,6 +65,12 @@ uint FuncPointer::hash(bool* isValid) const
 
 QString FuncPointer::prettyName() const
 {
+    return prettyName(_name);
+}
+
+
+QString FuncPointer::prettyName(const QString& name) const
+{
 	QString s, rt;
 	for (int i = 0; i < _params.size(); ++i) {
 		if (i > 0)
@@ -79,7 +85,7 @@ QString FuncPointer::prettyName() const
 	}
 	else
 		rt = "void";
-	return QString("%1 (*%2)(%3)").arg(rt).arg(_name).arg(s);
+	return QString("%1 (*%2)(%3)").arg(rt).arg(name).arg(s);
 }
 
 
