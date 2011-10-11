@@ -34,6 +34,7 @@ QString realTypeToStr(RealType type)
     case rtVolatile:	return "Volatile";
     case rtTypedef:	    return "Typedef";
     case rtFuncPointer:	return "FuncPointer";
+    case rtFunction:    return "Function";
     case rtVoid:	    return "Void";
     case rtVaList:	    return "VaList";
 //    case rtFuncCall:	return "FuncCall";
