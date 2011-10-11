@@ -207,6 +207,10 @@ BaseType* SymFactory::createEmptyType(RealType type)
         t = new FuncPointer(this);
         break;
 
+    case rtFunction:
+        t = new Function(this);
+        break;
+
     default:
         factoryError(QString("We don't handle symbol type %1, but we should!").arg(type));
         break;
@@ -1606,7 +1610,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
             baseTypes = _typesByName.values(astTypeNonPtr->identifier());
         }
     }
-    else if (astTypeNonPtr->type() == rtFuncPointer) {
+    else if (astTypeNonPtr->type() & FunctionTypes) {
         assert(astTypeNonPtr->node() != 0);
         if (astTypeNonPtr->node()->type != nt_declarator_suffix_parens)
             factoryError(QString("Expected type nt_declarator_suffix_parens "

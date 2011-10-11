@@ -13,6 +13,7 @@
 #ifdef WRITE_ASCII_FILE
 #include <QFile>
 #include <QTextStream>
+#include "refbasetype.h"
 #endif
 #include <QSet>
 #include "kernelsymbolconsts.h"
