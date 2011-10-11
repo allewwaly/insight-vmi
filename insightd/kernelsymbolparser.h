@@ -60,12 +60,11 @@ private:
     quint64 _line;
     qint64 _bytesRead;
     QStack<TypeInfo*> _infos;
-    TypeInfo* _pInfo; // Points to the type that is acutally parsed: info or subInfo
+    TypeInfo* _info;
+    TypeInfo* _parentInfo;
     HdrSymbolType _hdrSym;
     bool _isRelevant;
     int _curSrcID;
-    HdrSymbolType _skipTrigger;
-    qint32 _skipUntil;
     qint32 _nextId;
 };
 

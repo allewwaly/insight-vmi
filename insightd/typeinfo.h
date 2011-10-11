@@ -112,14 +112,14 @@ QHash<typename T::mapped_type, typename T::key_type> invertHash(T hash)
 }
 
 
-static const quint32 relevantHdr =
+static const quint32 RelevantHdr =
 	hsArrayType |
 	hsBaseType |
 	hsCompileUnit |
 	hsConstType |
 	hsEnumerationType |
 	hsEnumerator |
-	hsFormalParameter |
+//	hsFormalParameter |
 //	hsInlinedSubroutine |
 //	hsLabel |
 //	hsLexicalBlock |
@@ -135,8 +135,16 @@ static const quint32 relevantHdr =
 	hsVariable |
 	hsVolatileType;
 
-static const quint32 relevantParam =
-//	psAbstractOrigin |
+
+static const quint32 SubHdrTypes =
+    hsSubrangeType |
+    hsEnumerator |
+    hsMember |
+    hsFormalParameter;
+
+
+static const quint32 RelevantParam =
+	psAbstractOrigin |
 //	psArtificial |
 	psBitOffset |
 	psBitSize |

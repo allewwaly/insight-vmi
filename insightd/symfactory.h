@@ -72,9 +72,6 @@ typedef QList<Structured*> StructuredList;
 /// Key for hashing elements of BaseType based on their name and size
 typedef QPair<QString, quint32> BaseTypeHashKey;
 
-// /// Hash table for BaseType pointers
-// typedef QMultiHash<BaseTypeHashKey, BaseType*> BaseTypeKeyHash;
-
 /// Hash table for BaseType pointers
 typedef QMultiHash<QString, BaseType*> BaseTypeStringHash;
 
@@ -110,9 +107,6 @@ typedef QMultiHash<int, StructuredMember*> StructMemberMultiHash;
 
 typedef QPair<const ASTType*, BaseTypeList> AstBaseTypeList;
 
-
-// /// This function is required to use pointer to BaseType as a key in a QHash
-// uint qHash(const BaseType* key);
 
 #define SYMFACTORY_DEFINED 1
 
@@ -555,18 +549,6 @@ private:
      * one was added to the _postponedTypes hash.
      */
     bool resolveReferences(Structured* s);
-
-//    /**
-//     * Removes a value in a QMultiHash at given at index \a old_key, if present,
-//     * and adds or re-adds it at index \a new_key.
-//     * @param old_key the old index at which \a value can be found
-//     * @param new_key the new index at which \a value should be inserted
-//     * @param value the value to be relocated
-//     * @param hash the QMultiHash to perform this operation on
-//     */
-//    template<class T_key, class T_val>
-//    void relocateHashEntry(const T_key& old_key, const T_key& new_key,
-//            T_val* value, QMultiHash<T_key, T_val*>* hash);
 
     void insertUsedBy(ReferencingType* ref);
     void insertUsedBy(RefBaseType* rbt);
