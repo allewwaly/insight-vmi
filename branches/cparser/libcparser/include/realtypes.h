@@ -102,8 +102,7 @@ static const int ReferencingTypes =
 
 /// These types cannot be resolved anymore
 static const int ElementaryTypes =
-    NumericTypes |
-    rtFuncPointer;
+    NumericTypes;
 
 /// Structured types
 static const int StructOrUnion =
