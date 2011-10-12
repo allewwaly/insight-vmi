@@ -54,6 +54,14 @@ public:
 		return _pcHigh;
 	}
 
+	/**
+	 * @return was this function inlined
+	 */
+	inline bool inlined() const
+	{
+		return _inlined;
+	}
+
     /**
      * This gives a pretty name of that type which may involve referencing
      * types.
