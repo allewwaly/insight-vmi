@@ -47,7 +47,8 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     basetype.cpp \
     enum.cpp \
     funcparam.cpp \
-    function.cpp
+    function.cpp \
+    shell_readline.cpp
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
     memorydumpsclass.h \
@@ -123,6 +124,7 @@ INCLUDEPATH += ../libinsight/include \
     ../libantlr3c/include \
     ../libcparser/include
 FORMS = memorymapwindow.ui
+
 
 
 

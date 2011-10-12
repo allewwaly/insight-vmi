@@ -10,15 +10,12 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <readline/readline.h>
-#include <readline/history.h>
 #include <insight/constdefs.h>
 #include <insight/devicemuxer.h>
 #include <insight/insight.h>
 #include <QtAlgorithms>
 #include <QProcess>
 #include <QCoreApplication>
-#include <QDir>
 #include <QLocalSocket>
 #include <QLocalServer>
 #include <QMutexLocker>
@@ -40,10 +37,11 @@
 #include "basetype.h"
 #include "scriptengine.h"
 #include "kernelsourceparser.h"
+#include "function.h"
 
 // Register socket enums for the Qt meta type system
-Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
-Q_DECLARE_METATYPE(QAbstractSocket::SocketError);
+Q_DECLARE_METATYPE(QAbstractSocket::SocketState)
+Q_DECLARE_METATYPE(QAbstractSocket::SocketError)
 
 #define safe_delete(x) do { if ( (x) ) { delete x; x = 0; } } while (0)
 
@@ -260,17 +258,7 @@ void Shell::prepare()
         _retChan->open(QIODevice::WriteOnly);
     }
     else {
-        // Enable readline history
-        using_history();
-
-        // Load the readline history
-        QString histFile = QDir::home().absoluteFilePath(mt_history_file);
-        if (QFile::exists(histFile)) {
-            int ret = read_history(histFile.toLocal8Bit().constData());
-            if (ret)
-                debugerr("Error #" << ret << " occured when trying to read the "
-                        "history data from \"" << histFile << "\"");
-        }
+        prepareReadline();
     }
 
     // Open the console devices
@@ -301,15 +289,8 @@ Shell::~Shell()
     }
     else {
         // Only save history for interactive sessions
-        if (!_listenOnSocket) {
-            // Save the history for the next launch
-            QString histFile = QDir::home().absoluteFilePath(mt_history_file);
-            QByteArray ba = histFile.toLocal8Bit();
-            int ret = write_history(ba.constData());
-            if (ret)
-                debugerr("Error #" << ret << " occured when trying to save the "
-                        "history data to \"" << histFile << "\"");
-        }
+        if (!_listenOnSocket)
+            saveShellHistory();
     }
 
     safe_delete(_clSocket);
@@ -358,46 +339,6 @@ bool Shell::interactive() const
 int Shell::lastStatus() const
 {
     return _lastStatus;
-}
-
-
-QString Shell::readLine(const QString& prompt)
-{
-    QString ret;
-    QString p = prompt.isEmpty() ? QString(">>> ") : prompt;
-
-    // Read input from stdin or from socket?
-    if (_listenOnSocket) {
-        // Print prompt in interactive mode
-        if (_interactive)
-            _out << p << flush;
-        // Wait until a complete line is readable
-        _sockSem.acquire(1);
-        // The socket might already be null if we received a kill signal
-        if (_clSocket) {
-            // Read input from socket
-            ret = QString::fromLocal8Bit(_clSocket->readLine().data()).trimmed();
-        }
-    }
-    else {
-        // Read input from stdin
-        char* line = readline(p.toLocal8Bit().constData());
-
-        // If line is NULL, the user wants to exit.
-        if (!line) {
-            _finished = true;
-            return QString();
-        }
-
-        // Add the line to the history in interactive sessions
-        if (strlen(line) > 0)
-            add_history(line);
-
-        ret = QString::fromLocal8Bit(line, strlen(line)).trimmed();
-        free(line);
-    }
-
-    return ret;
 }
 
 
@@ -990,7 +931,7 @@ int Shell::cmdListTypes(QStringList args)
     QRegExp rxFilter(args.isEmpty() ? QString() : args.first(),
     		Qt::CaseSensitive, QRegExp::WildcardUnix);
 
-    QString src, srcLine;
+    QString src, srcLine, name;
     for (int i = 0; i < types.size(); i++) {
         BaseType* type = types[i];
 
@@ -1033,10 +974,45 @@ int Shell::cmdListTypes(QStringList args)
         else
             srcLine = "--";
 
+        // Get the pretty name
+        name = type->prettyName();
+        if (name.isEmpty())
+            name = "(none)";
+        // Shorten name, if necessary
+        else if (name.size() > w_name) {
+            if (type->type() & FunctionTypes) {
+                const FuncPointer* fp = dynamic_cast<FuncPointer*>(type);
+                if (!fp->refTypeId())
+                    name = "void";
+                else if (fp->refType())
+                    name = fp->refType()->prettyName();
+                else
+                    name = QString("(unresolved 0x%1)")
+                            .arg(fp->refTypeId(), 0, 16);
+                if (!fp->name().isEmpty())
+                    name += " " + fp->name();
+
+                QString params;
+                for (int i = 0; i < fp->params().size(); ++i) {
+                    if (i > 0)
+                        params += ", ";
+                    params += fp->params().at(i)->prettyName();
+                }
+
+                if (name.size() + params.size() + 2 <= w_name)
+                    name += "(" + params + ")";
+                else
+                    name += "(" + params.left(w_name - name.size() - 5) + "...)";
+            }
+
+            if (name.size() > w_name)
+                name = name.left(w_name - 3) + "...";
+        }
+
         _out << qSetFieldWidth(w_id)  << right << hex << type->id()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
-             << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
+             << qSetFieldWidth(w_name) << name
              << qSetFieldWidth(w_size) << right << dec << type->size()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_src) << left << src
@@ -2068,6 +2044,68 @@ int Shell::cmdShowBaseType(const BaseType* t)
                     << endl;
         }
 	}
+
+	const FuncPointer* fp = dynamic_cast<const FuncPointer*>(t);
+	if (fp) {
+		const Function* func = dynamic_cast<const Function*>(fp);
+		if (func) {
+			_out << "  Inlined:        " << func->inlined() << endl;
+			_out << "  PC low:         "
+				 << QString("0x%1")
+					.arg(func->pcLow(),
+						 _sym.memSpecs().sizeofUnsignedLong << 1,
+						 16,
+						 QChar('0'))
+				 << endl;
+			_out << "  PC high:        "
+				 << QString("0x%1")
+					.arg(func->pcHigh(),
+						 _sym.memSpecs().sizeofUnsignedLong << 1,
+						 16,
+						 QChar('0'))
+				 << endl;
+		}
+
+		_out << "  Parameters:     " << fp->params().size() << endl;
+
+		for (int i = 0; i < fp->params().size(); i++) {
+			FuncParam* param = fp->params().at(i);
+			const BaseType* rt = (param->altRefTypeCount() == 1) ?
+						param->altRefType() :
+						param->refType();
+
+			QString pretty = rt ?
+						rt->prettyName() :
+						QString("(unresolved type, 0x%1)")
+							.arg(param->refTypeId(), 0, 16);
+
+			if (param->altRefTypeCount() == 1)
+				pretty = "<" + pretty + ">";
+			else if (param->altRefTypeCount() > 1) {
+				BaseType* tmp;
+				pretty += " <";
+				for (int j = 0; j < param->altRefTypeCount(); ++j) {
+					if (! (tmp = param->altRefType(j)))
+						continue;
+					if (j > 0)
+						pretty += ", ";
+					pretty += tmp->prettyName();
+				}
+				pretty += ">";
+			}
+
+			_out << "    "
+				 << (i + 1)
+					<< ". "
+					<< qSetFieldWidth(16) << left << (param->name() + ": ")
+					<< qSetFieldWidth(12)
+					<< QString("0x%1, ").arg(param->refTypeId(), 0, 16)
+					<< qSetFieldWidth(0)
+					<< pretty
+					<< endl;
+		}
+	}
+
 
 	return ecOk;
 }
