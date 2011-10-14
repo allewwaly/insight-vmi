@@ -423,7 +423,6 @@ protected:
      *   for types referencing \a new_id
      * @param forceInsert insert this type into lists even if its hash is
      *   invalid
-     * information, or the equivalent type found by the type hash.
      */
     void updateTypeRelations(const int new_id, const QString& new_name,
                              BaseType* target, bool checkPostponed = true,
@@ -436,6 +435,7 @@ protected:
      * @param removeFromPostponedTypes set to \c true to have \a rt removed from
      * the _postponedTypes hash if the referencing type of \a rt could be
      * resolved
+     * @return \c true if \a rt could be resolved, \c false otherwise
      */
     bool postponedTypeResolved(ReferencingType* rt,
                                bool removeFromPostponedTypes);
@@ -555,6 +555,8 @@ private:
     void insertUsedBy(Variable* var);
     void insertUsedBy(StructuredMember* m);
     AstBaseTypeList findBaseTypesForAstType(const ASTType* astType);
+    void insertPostponed(ReferencingType* ref);
+    void removePostponed(ReferencingType* ref);
 
     enum TypeConflicts {
         tcNoConflict,

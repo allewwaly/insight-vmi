@@ -533,7 +533,7 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
 
     if (!target->hashIsValid() && !forceInsert) {
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(target);
-        _postponedTypes.insertMulti(rbt->refTypeId(), rbt);
+        insertPostponed(rbt);
         return;
     }
 
@@ -547,6 +547,9 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
         _types.append(target);
         if (target->hashIsValid())
             _typesByHash.insertMulti(target->hash(), target);
+        else if (!forceInsert)
+            factoryError(QString("Hash for type 0x%1 is not valid!")
+                         .arg(target->id(), 0, 16));
         // Add this type into the name relation table
         if (!new_name.isEmpty())
             _typesByName.insertMulti(new_name, target);
@@ -558,32 +561,20 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
 
     // See if we have types with missing references to the given type
     if (checkPostponed && _postponedTypes.contains(new_id)) {
-        QList<ReferencingType*> list = _postponedTypes.values(new_id);
-
-        int changes = 0;
-
-        QList<ReferencingType*>::iterator it = list.begin();
-        while (it != list.end())
+        RefTypeMultiHash::iterator it = _postponedTypes.find(new_id);
+        int pt_size = _postponedTypes.size();
+        while (it != _postponedTypes.end() && it.key() == new_id)
         {
-            if (postponedTypeResolved(*it, true))
-                ++changes;
-            ++it;
+            postponedTypeResolved(*it, true);
+            // More types might have been changed, iterator might not be
+            // valid anymore, so start over
+            if (pt_size != _postponedTypes.size()) {
+                it = _postponedTypes.find(new_id);
+                pt_size = _postponedTypes.size();
+            }
+            else
+                ++it;
         }
-
-//        // As long as we still can resolve new types, go through whole list
-//        // again and again. This will resolve all chained types.
-//        while (changes) {
-//            changes = 0;
-//            RefTypeMultiHash::iterator it = _postponedTypes.begin();
-//            while (it != _postponedTypes.end()) {
-//                if (postponedTypeResolved(*it, false)) {
-//                    ++changes;
-//                    it = _postponedTypes.erase(it);
-//                }
-//                else
-//                    ++it;
-//            }
-//        }
     }
 }
 
@@ -617,7 +608,7 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
         if (resolveReference(m)) {
             // Delete the entry from the hash
             if (removeFromPostponedTypes)
-                _postponedTypes.remove(rt->refTypeId(), rt);
+                removePostponed(rt);
         }
         else
             return false;
@@ -626,7 +617,8 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
     else if (v && v->refType()) {
         // Delete the entry from the hash
         if (removeFromPostponedTypes)
-            _postponedTypes.remove(rt->refTypeId(), rt);
+            removePostponed(rt);
+        return true;
     }
     else {
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(rt);
@@ -634,7 +626,7 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
         if (rbt && rbt->hashIsValid()) {
             // Delete the entry from the hash
             if (removeFromPostponedTypes)
-                _postponedTypes.remove(rt->refTypeId(), rt);
+                removePostponed(rt);
 
             // Check if this is dublicated type
             BaseType* t = findTypeByHash(rbt);
@@ -911,6 +903,51 @@ BaseType* SymFactory::getNumericInstance(const ASTType* astType)
 }
 
 
+void SymFactory::insertPostponed(ReferencingType* ref)
+{
+    // Add this type into the waiting queue
+    if (!_postponedTypes.contains(ref->refTypeId(), ref)) {
+        FuncPointer* fp = dynamic_cast<FuncPointer*>(ref);
+        // Do not add types waiting for "void"
+        if (ref->refTypeId())
+            _postponedTypes.insertMulti(ref->refTypeId(), ref);
+        // Only function (pointers) may refer to "void" and be added here
+        else
+            assert(fp != 0);
+
+        if (fp) {
+            // For FuncPointer types, add this type to the list for every
+            // missing parameter as well
+            for (int i = 0; i < fp->params().size(); ++i) {
+                FuncParam* param = fp->params().at(i);
+                if (param->refTypeId() && !param->refType() &&
+                    !_postponedTypes.contains(param->refTypeId(), ref))
+                {
+                    _postponedTypes.insertMulti(param->refTypeId(), ref);
+                }
+            }
+        }
+
+    }
+}
+
+
+void SymFactory::removePostponed(ReferencingType* ref)
+{
+    // Add this type into the waiting queue
+    _postponedTypes.remove(ref->refTypeId(), ref);
+
+    FuncPointer* fp = dynamic_cast<FuncPointer*>(ref);
+    if (fp) {
+        // For FuncPointer types, remove this type from everywhere
+        for (int i = 0; i < fp->params().size(); ++i) {
+            FuncParam* param = fp->params().at(i);
+            _postponedTypes.remove(param->refTypeId(), ref);
+        }
+    }
+}
+
+
 bool SymFactory::resolveReference(ReferencingType* ref)
 {
     assert(ref != 0);
@@ -918,8 +955,7 @@ bool SymFactory::resolveReference(ReferencingType* ref)
     // Don't resolve already resolved types
     if (ref->refTypeId() != 0 && !ref->refType()) {
         // Add this type into the waiting queue
-        if (!_postponedTypes.contains(ref->refTypeId(), ref))
-            _postponedTypes.insertMulti(ref->refTypeId(), ref);
+        insertPostponed(ref);
         return false;
     }
     else {
@@ -1128,7 +1164,7 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
     RefBaseType* rbt = dynamic_cast<RefBaseType*>(oldType);
     if (rbt) {
         if (rbt->refTypeId() && !rbt->refType())
-            _postponedTypes.remove(rbt->refTypeId(), (ReferencingType*)rbt);
+            removePostponed(rbt);
         if (rbt->refTypeId())
             _usedByRefTypes.remove(rbt->refTypeId(), rbt);
     }
@@ -1269,9 +1305,15 @@ void SymFactory::symbolsFinished(RestoreType rt)
         changes = 0;
         RefTypeMultiHash::iterator it = _postponedTypes.begin();
         while (it != _postponedTypes.end()) {
-            if (postponedTypeResolved(*it, false)) {
+            int pt_size = _postponedTypes.size();
+            if (postponedTypeResolved(*it, true)) {
                 ++changes;
-                it = _postponedTypes.erase(it);
+            }
+
+            // Iterator might not be valid anymore, start over again
+            if (pt_size != _postponedTypes.size()) {
+                it = _postponedTypes.begin();
+                pt_size = _postponedTypes.size();
             }
             else
                 ++it;
