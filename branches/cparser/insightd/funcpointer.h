@@ -41,6 +41,11 @@ public:
      */
     virtual uint hash(bool* isValid = 0) const;
 
+    /**
+     * Forces the hash to be re-calculated.
+     */
+    virtual void rehash() const;
+
 	/**
 	 @return the actual type of that polimorphic variable
 	 */
