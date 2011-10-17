@@ -1170,10 +1170,6 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
 
     if (!oldType->name().isEmpty())
         _typesByName.remove(oldType->name(), oldType);
-    if (_typesById.contains(oldType->id())) {
-        _equivalentTypes.remove(_typesById[oldType->id()]->id(), oldType->id());
-//        _typesById.remove(oldType->id());
-    }
     if (oldType->hashIsValid())
         _typesByHash.remove(oldType->hash(), oldType);
 
@@ -1207,20 +1203,23 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
     _types.removeAll(oldType);
     _customTypes.removeAll(oldType);
 
-    _equivalentTypes.insertMulti(_typesById[newType->id()]->id(), oldType->id());
-
     // Update all old equivalent types as well
     QList<int> equiv = equivalentTypes(oldType->id());
     equiv += oldType->id();
+    _equivalentTypes.remove(oldType->id());
     for (int i = 0; i < equiv.size(); ++i) {
-        assert(_typesById.value(equiv[i]) == oldType);
+//        assert(_typesById.value(equiv[i]) == oldType);
         // Save the hashes of all types referencing the old type
         QList<RefBaseType*> refTypes = _usedByRefTypes.values(equiv[i]);
         QList<uint> refTypeHashes;
         for (int j = 0; j < refTypes.size(); ++j)
             refTypeHashes += refTypes[j]->hash();
+
         // Apply the change
         _typesById[equiv[i]] = newType;
+        if (!_equivalentTypes.contains(newType->id(), equiv[i]))
+            _equivalentTypes.insertMulti(newType->id(), equiv[i]);
+
         // Re-hash all referencing types
         for (int j = 0; j < refTypes.size(); ++j) {
             refTypes[j]->rehash();
