@@ -146,7 +146,7 @@ public:
     /**
      * Forces the hash to be re-calculated.
      */
-    void rehash() const;
+    virtual void rehash() const;
 
     /**
      * @return the size of this type in bytes

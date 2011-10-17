@@ -47,6 +47,14 @@ uint RefBaseType::hash(bool* isValid) const
 }
 
 
+void RefBaseType::rehash() const
+{
+    BaseType::rehash();
+    if (refType())
+        refType()->rehash();
+}
+
+
 QString RefBaseType::toString(QIODevice* mem, size_t offset) const
 {
     const BaseType* t = refType();
