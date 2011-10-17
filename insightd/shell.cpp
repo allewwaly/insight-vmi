@@ -1965,6 +1965,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 	_out << "  Name:           " << (t->prettyName().isEmpty() ? QString("(unnamed)") : t->prettyName()) << endl;
 	_out << "  Type:           " << realTypeToStr(t->type()) << endl;
 	_out << "  Size:           " << t->size() << endl;
+	_out << "  Hash:           " << "0x" << hex << t->hash() << dec << endl;
 
     const RefBaseType* r = dynamic_cast<const RefBaseType*>(t);
     if (r) {
