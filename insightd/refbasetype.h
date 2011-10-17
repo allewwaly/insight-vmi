@@ -37,11 +37,6 @@ public:
     virtual uint hash(bool* isValid = 0) const;
 
     /**
-     * Forces the hash to be re-calculated.
-     */
-    virtual void rehash() const;
-
-    /**
      * @return the size of this type in bytes
      */
     virtual uint size() const;
