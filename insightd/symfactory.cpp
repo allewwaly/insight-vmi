@@ -1181,7 +1181,7 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
         if (rbt->refTypeId())
             _usedByRefTypes.remove(rbt->refTypeId(), rbt);
 
-        FuncPointer* fp = dynamic_cast<FuncPointer*>(oldType);
+        FuncPointer* fp = dynamic_cast<FuncPointer*>(rbt);
         if (fp) {
             for (int i = 0; i < fp->params().size(); ++i) {
                 FuncParam* param = fp->params().at(i);
@@ -1240,8 +1240,11 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
         int params_size = _usedByFuncParams.size();
         FuncParamMultiHash::iterator it = _usedByFuncParams.find(equiv[i]);
         while (it != _usedByFuncParams.end() && it.key() == equiv[i]) {
+            FuncParam* param = it.value();
             FuncPointer* fp = it.value()->belongsTo();
             uint old_hash = fp->hash();
+            if (param->refType())
+                param->refType()->rehash();
             fp->rehash();
             if (old_hash != fp->hash()) {
                 _typesByHash.remove(old_hash, fp);
@@ -1627,11 +1630,11 @@ void SymFactory::insertUsedBy(StructuredMember* m)
 }
 
 
-void SymFactory::insertUsedBy(FuncParam* fp)
+void SymFactory::insertUsedBy(FuncParam* param)
 {
-    if (!fp || _usedByFuncParams.contains(fp->refTypeId(), fp))
+    if (!param || _usedByFuncParams.contains(param->refTypeId(), param))
         return;
-    _usedByFuncParams.insertMulti(fp->refTypeId(), fp);
+    _usedByFuncParams.insertMulti(param->refTypeId(), param);
 }
 
 
