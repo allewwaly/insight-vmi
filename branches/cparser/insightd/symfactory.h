@@ -105,6 +105,9 @@ typedef QMultiHash<int, Variable*> VarMultiHash;
 /// Hash table to find all StructuredMember's that use a particular type
 typedef QMultiHash<int, StructuredMember*> StructMemberMultiHash;
 
+/// Hash table to find all FuncParam's that use a particular type
+typedef QMultiHash<int, FuncParam*> FuncParamMultiHash;
+
 typedef QPair<const ASTType*, BaseTypeList> AstBaseTypeList;
 
 
@@ -554,6 +557,7 @@ private:
     void insertUsedBy(RefBaseType* rbt);
     void insertUsedBy(Variable* var);
     void insertUsedBy(StructuredMember* m);
+    void insertUsedBy(FuncParam* fp);
     AstBaseTypeList findBaseTypesForAstType(const ASTType* astType);
     void insertPostponed(ReferencingType* ref);
     void removePostponed(ReferencingType* ref);
@@ -623,6 +627,7 @@ private:
 	RefBaseTypeMultiHash _usedByRefTypes;///< Holds all RefBaseType objects that hold a reference to another type
 	VarMultiHash _usedByVars;         ///< Holds all Variable objects that hold a reference to another type
 	StructMemberMultiHash _usedByStructMembers;///< Holds all StructuredMember objects that hold a reference to another type
+	FuncParamMultiHash _usedByFuncParams;///< Holds all FuncParam objects that hold a reference to another type
 	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
 
 	int _typeFoundByHash;
