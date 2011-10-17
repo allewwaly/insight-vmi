@@ -270,11 +270,6 @@ T* SymFactory::getTypeInstance(const TypeInfo& info)
             assert(s != 0);
             resolveReferences(s);
         }
-        else if (t->type() & FunctionTypes) {
-            FuncPointer* fp = dynamic_cast<FuncPointer*>(t);
-            for (int i = 0; i < fp->params().size(); i++)
-                insertUsedBy(fp->params().at(i));
-        }
     }
 
     insert(info, t);
@@ -561,8 +556,15 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
             _typesByName.insertMulti(new_name, target);
         // Add referencing types into the used-by hash tables
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(target);
-        if (rbt)
+        if (rbt) {
             insertUsedBy(rbt);
+            // Also add function (type) parameters
+            if (rbt->type() & FunctionTypes) {
+                FuncPointer* fp = dynamic_cast<FuncPointer*>(rbt);
+                for (int i = 0; i < fp->params().size(); ++i)
+                    insertUsedBy(fp->params().at(i));
+            }
+        }
     }
 
     // See if we have types with missing references to the given type
@@ -1161,6 +1163,7 @@ bool SymFactory::resolveReferences(Structured* s)
     return ret;
 }
 
+
 void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
 {
     assert(oldType != 0);
@@ -1178,8 +1181,7 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
     if (rbt) {
         if (rbt->refTypeId() && !rbt->refType())
             removePostponed(rbt);
-        if (rbt->refTypeId())
-            _usedByRefTypes.remove(rbt->refTypeId(), rbt);
+        _usedByRefTypes.remove(rbt->refTypeId(), rbt);
 
         FuncPointer* fp = dynamic_cast<FuncPointer*>(rbt);
         if (fp) {
