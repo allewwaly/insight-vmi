@@ -63,15 +63,6 @@ uint FuncPointer::hash(bool* isValid) const
 }
 
 
-void FuncPointer::rehash() const
-{
-    RefBaseType::rehash();
-    for (int i = 0; i < _params.size(); ++i)
-        if (_params[i]->refType())
-            _params[i]->refType()->rehash();
-}
-
-
 QString FuncPointer::prettyName() const
 {
     return prettyName(_name);
