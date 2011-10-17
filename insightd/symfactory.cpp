@@ -93,6 +93,7 @@ void SymFactory::clear()
 	_usedByRefTypes.clear();
 	_usedByVars.clear();
 	_usedByStructMembers.clear();
+	_usedByFuncParams.clear();
 	_zeroSizeStructs.clear();
 	_varsByName.clear();
 	_varsById.clear();
@@ -268,6 +269,11 @@ T* SymFactory::getTypeInstance(const TypeInfo& info)
             Structured* s = dynamic_cast<Structured*>(t);
             assert(s != 0);
             resolveReferences(s);
+        }
+        else if (t->type() & FunctionTypes) {
+            FuncPointer* fp = dynamic_cast<FuncPointer*>(t);
+            for (int i = 0; i < fp->params().size(); i++)
+                insertUsedBy(fp->params().at(i));
         }
     }
 
@@ -633,6 +639,13 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
             if (t) {
                 // Update type relations with equivalent type
                 updateTypeRelations(rbt->id(), rbt->name(), t);
+//                debugmsg(QString("\nDeleting      %2 (id 0x%3) @ 0x%4,\n"
+//                                 "other type is %5 (id 0x%6)")
+//                         .arg(rbt->prettyName())
+//                         .arg(rbt->id(), 0, 16)
+//                         .arg((quint64)rbt, 0, 16)
+//                         .arg(t->prettyName())
+//                         .arg(t->id(), 0, 16));
                 delete rbt;
             }
             else
@@ -1167,6 +1180,15 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
             removePostponed(rbt);
         if (rbt->refTypeId())
             _usedByRefTypes.remove(rbt->refTypeId(), rbt);
+
+        FuncPointer* fp = dynamic_cast<FuncPointer*>(oldType);
+        if (fp) {
+            for (int i = 0; i < fp->params().size(); ++i) {
+                FuncParam* param = fp->params().at(i);
+                if (param->refTypeId())
+                    _usedByFuncParams.remove(param->refTypeId(), param);
+            }
+        }
     }
 
     Structured* s = dynamic_cast<Structured*>(oldType);
@@ -1211,6 +1233,34 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
                 }
                 else
                     _typesByHash.insertMulti(refTypes[j]->hash(), refTypes[j]);
+            }
+        }
+
+        // Handle all function parameters referencing this type
+        int params_size = _usedByFuncParams.size();
+        FuncParamMultiHash::iterator it = _usedByFuncParams.find(equiv[i]);
+        while (it != _usedByFuncParams.end() && it.key() == equiv[i]) {
+            FuncPointer* fp = it.value()->belongsTo();
+            uint old_hash = fp->hash();
+            fp->rehash();
+            if (old_hash != fp->hash()) {
+                _typesByHash.remove(old_hash, fp);
+
+                // Is this a dublicated type?
+                BaseType* other = findTypeByHash(fp);
+                if (other) {
+                    replaceType(fp, other);
+                    delete fp;
+                }
+                else
+                    _typesByHash.insertMulti(fp->hash(), fp);
+            }
+            // Iterator might be invalid now
+            if (params_size == _usedByFuncParams.size())
+                ++it;
+            else {
+                it = _usedByFuncParams.find(equiv[i]);
+                params_size = _usedByFuncParams.size();
             }
         }
     }
@@ -1539,6 +1589,7 @@ void SymFactory::insertUsedBy(ReferencingType* ref)
     RefBaseType* rbt = 0;
     Variable* var = 0;
     StructuredMember* m = 0;
+    FuncParam* p = 0;
 
     // Add type into the used-by hash tables
     if ( (rbt = dynamic_cast<RefBaseType*>(ref)) )
@@ -1547,6 +1598,8 @@ void SymFactory::insertUsedBy(ReferencingType* ref)
         insertUsedBy(var);
     else if ( (m = dynamic_cast<StructuredMember*>(ref)) )
         insertUsedBy(m);
+    else if ( (p = dynamic_cast<FuncParam*>(ref)) )
+        insertUsedBy(p);
 }
 
 
@@ -1571,6 +1624,14 @@ void SymFactory::insertUsedBy(StructuredMember* m)
     if (!m || _usedByStructMembers.contains(m->refTypeId(), m))
         return;
     _usedByStructMembers.insertMulti(m->refTypeId(), m);
+}
+
+
+void SymFactory::insertUsedBy(FuncParam* fp)
+{
+    if (!fp || _usedByFuncParams.contains(fp->refTypeId(), fp))
+        return;
+    _usedByFuncParams.insertMulti(fp->refTypeId(), fp);
 }
 
 
