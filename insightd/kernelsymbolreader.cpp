@@ -143,6 +143,7 @@ void KernelSymbolReader::read()
         }
 
         IntIntList::iterator it = typeRelations.begin();
+        int prev_size = typeRelations.size();
         while (it != typeRelations.end()) {
             source = it->first;
             target = it->second;
@@ -154,8 +155,22 @@ void KernelSymbolReader::read()
             else
                 ++it;
 
-            if (it == typeRelations.end())
+            if (it == typeRelations.end()) {
+                if (prev_size == typeRelations.size()) {
+                    std::cout << std::endl;
+                    debugerr("Cannot find all types of the typeRelations, "
+                             << typeRelations.size() << " types still missing");
+                    for (it = typeRelations.begin(); it != typeRelations.end(); ++it) {
+                        debugerr(QString("  Missing type: 0x%1 -> 0x%2")
+                                 .arg(it->first, 0, 16)
+                                 .arg(it->second, 0, 16));
+                    }
+                    break;
+                }
+
                 it = typeRelations.begin();
+                prev_size = typeRelations.size();
+            }
         }
 
         // Read list of variables
