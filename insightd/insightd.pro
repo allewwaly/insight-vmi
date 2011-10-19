@@ -110,6 +110,8 @@ HEADERS += kernelsourcetypeevaluator.h \
     function.h
 CONFIG += console \
     debug_and_release
+QMAKE_CFLAGS_RELEASE += -O3
+QMAKE_CXXFLAGS_RELEASE += -O3
 QT += script \
     network \
     gui
@@ -124,8 +126,4 @@ INCLUDEPATH += ../libinsight/include \
     ../libantlr3c/include \
     ../libcparser/include
 FORMS = memorymapwindow.ui
-
-
-
-
 
