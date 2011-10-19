@@ -893,7 +893,7 @@ int Shell::cmdListSources(QStringList /*args*/)
     }
 
     hline();
-    _out << "Total source files: " << keys.size() << endl;
+    _out << "Total source files: " << dec << keys.size() << endl;
 
     return ecOk;
 }
