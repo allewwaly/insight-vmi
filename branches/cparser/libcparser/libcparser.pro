@@ -4,6 +4,8 @@ VERSION = 1.0.0
 CONFIG += debug_and_release \
     staticlib \
     create_prl
+QMAKE_CFLAGS_RELEASE += -O3
+QMAKE_CXXFLAGS_RELEASE += -O3
 QT += core
 HEADERS += include/ast_interface.h \
     include/astscopemanager.h \
