@@ -2022,20 +2022,56 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
     bool changeType = true;
     // Was the member already manipulated?
     if (r->hasAltRefTypes()) {
-        const BaseType* t = r->altRefType();
+        TypeConflicts ret = tcNoConflict;
+        const BaseType* cmpType = 0;
+        // Compare to ALL alternative types
+        for (int i = 0; i < r->altRefTypeCount(); ++i) {
+            const BaseType* t = r->altRefType(i);
+            switch (compareConflictingTypes(t, targetBaseType)) {
+            // If we found the same type, we take this as the final decision
+            case tcNoConflict:
+                ret = tcNoConflict;
+                cmpType = t;
+                goto for_end;
+            // Ignore overrides conflicts
+            case tcIgnore:
+                ret = tcIgnore;
+                cmpType = t;
+                break;
+            // Conflict overrides replace
+            case tcConflict:
+                if (ret != tcIgnore) {
+                    ret = tcConflict;
+                    cmpType = t;
+                }
+                break;
+            // Replace only if no other decision was already made
+            case tcReplace:
+                if (ret != tcIgnore && ret != tcConflict) {
+                    ret = tcReplace;
+                    cmpType = t;
+                }
+                break;
+            }
+        }
+
+        for_end:
+
         const StructuredMember* m = dynamic_cast<const StructuredMember*>(r);
         const Variable* v = dynamic_cast<const Variable*>(r);
+
         // Do we have conflicting target types?
-        switch (compareConflictingTypes(r->altRefType(), targetBaseType)) {
+        switch (ret) {
         case tcNoConflict:
             changeType = false;
-            t = r->refType();
             debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\"")
                      .arg(m ? m->name() : v->name())
                      .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
                      .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
-                     .arg(t ? t->prettyName() : QString("???"))
-                     .arg(r->altRefType()->prettyName()));
+                     .arg(r->refType() ?
+                              r->refType()->prettyName() :
+                              QString("???"))
+                     .arg(targetBaseType->prettyName()));
             break;
 
         case tcIgnore:
