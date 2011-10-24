@@ -134,8 +134,8 @@ void KernelSymbolParser::finishLastSymbol()
     else {
         // See if this is a sub-type of a multi-part type, if yes, merge
         // its data with the previous info
-        while (_info->symType() && _info->sibling() <= _nextId) {
-            if (_info->isRelevant()) {
+        while (_info->sibling() <= _nextId) {
+            if (_info->symType() && _info->isRelevant()) {
                 if (_info->symType() & SubHdrTypes) {
                     assert(_parentInfo != 0);
                     switch (_info->symType()) {
