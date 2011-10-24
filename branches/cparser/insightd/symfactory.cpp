@@ -1999,8 +1999,13 @@ void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
         }
     }
 
-    if (!varsFound)
-        factoryError("Did not find any variables to adjust!");
+    if (!varsFound) {
+//        factoryError("Did not find any variables to adjust!");
+
+        // Rarely happens, but sometimes we find references to externally
+        // declared variables that are not in the debugging symbols.
+        debugerr("Did not find any variables to adjust!");
+    }
     else {
         QStringList varIds;
         for (int i = 0; i < vars.size(); ++i)
