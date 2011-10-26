@@ -763,4 +763,28 @@ TEST_FUNCTION(conditionalExpressions)
 }
 
 
+TEST_FUNCTION(pointerDerefByArrayOperator)
+{
+    TEST_DATA_COLUMNS;
+    // For pointers dereferenced by an array operator, the context type is the
+    // type embedding the pointer member, in this case "struct foo"
+    QTest::newRow("arrayOp1") << "struct foo { struct foo* next; }; struct bar { struct foo *f; };"
+                              << "struct bar b; void *p = b.f[0].next;" << true
+                              << "b" << "Struct(foo)" << "next" << "Pointer->Void";
+    // For arrays dereferenced by an array operator, the context type is the
+    // type embedding the array, in this case "struct bar"
+    QTest::newRow("arrayOp2") << "struct foo { struct foo* next; }; struct bar { struct foo f[4]; };"
+                              << "struct bar b; void *p = b.f[0].next;" << true
+                              << "b" << "Struct(bar)" << "f.next" << "Pointer->Void";
+    // If the source symbol is dereferenced, there is no difference in whether
+    // it was defined as an array or as a pointer.
+    QTest::newRow("arrayOp3") << "struct foo { struct foo* next; };"
+                              << "struct foo *f; void *p = f[0].next;" << true
+                              << "f" << "Struct(foo)" << "next" << "Pointer->Void";
+    QTest::newRow("arrayOp4") << "struct foo { struct foo* next; };"
+                              << "struct foo f[4]; void *p = f[0].next;" << true
+                              << "f" << "Struct(foo)" << "next" << "Pointer->Void";
+}
+
+
 QTEST_MAIN(ASTTypeEvaluatorTest)
