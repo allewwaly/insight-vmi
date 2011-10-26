@@ -1994,6 +1994,10 @@ int Shell::cmdShowBaseType(const BaseType* t)
 	const Structured* s = dynamic_cast<const Structured*>(t);
 	if (s) {
 		_out << "  Members:        " << s->members().size() << endl;
+		// Find out required ID width for members
+		int id_width = 2;
+		for (int i = t->id(); i > 0; i >>= 4)
+			id_width++;
 
 		for (int i = 0; i < s->members().size(); i++) {
 			StructuredMember* m = s->members().at(i);
@@ -2025,7 +2029,8 @@ int Shell::cmdShowBaseType(const BaseType* t)
                     << QString("0x%1").arg(m->offset(), 4, 16, QChar('0'))
                     << "  "
                     << qSetFieldWidth(20) << left << (m->name() + ": ")
-					<< qSetFieldWidth(0)
+                    << qSetFieldWidth(id_width) << left << QString("0x%1").arg(m->refTypeId(), 0, 16)
+                    << qSetFieldWidth(0) << " "
 					<< pretty
 					<< endl;
 		}
