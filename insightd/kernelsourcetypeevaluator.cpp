@@ -81,7 +81,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
                  typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
                                 targetType, rootNode));
         _factory->typeAlternateUsage(srcSymbol, srcType, ctxType, ctxMembers,
-                                     targetType);
+                                     targetType, this);
     }
     catch (FactoryException& e) {
         // Print the source of the embedding external declaration
