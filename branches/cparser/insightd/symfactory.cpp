@@ -22,6 +22,7 @@
 #include "shell.h"
 #include "debug.h"
 #include "function.h"
+#include "kernelsourcetypeevaluator.h"
 #include <string.h>
 #include <asttypeevaluator.h>
 #include <astnode.h>
@@ -1661,7 +1662,8 @@ BaseTypeList SymFactory::typedefsOfType(BaseType* type)
 }
 
 
-AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
+AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
+                                                    KernelSourceTypeEvaluator* eval)
 {
     // Find the first non-pointer ASTType
     const ASTType* astTypeNonPtr = astType;
@@ -1724,7 +1726,9 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
                                  "but got %1")
                          .arg(ast_node_type_to_str(astTypeNonPtr->node())));
         struct ASTNode* dd = astTypeNonPtr->node()->parent;
+        bool nameInNestedDeclarator = false;
         if (!dd->u.direct_declarator.identifier) {
+            nameInNestedDeclarator = true;
             struct ASTNode* dclr = dd->u.direct_declarator.declarator;
             assert(dclr != 0);
             dd = dclr->u.declarator.direct_declarator;
@@ -1732,7 +1736,36 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
             assert(dd->u.direct_declarator.identifier != 0);
         }
         QString name = antlrTokenToStr(dd->u.direct_declarator.identifier);
-        baseTypes = _typesByName.values(name);
+        // If the name appears in a nested direct_declarator, we have to check
+        // whether it appears in a struct definition. In this case we won't find
+        // the identifer in _typesByName, we have to find it over its struct!
+        if (nameInNestedDeclarator &&
+            astTypeNonPtr->node()->parent->parent->parent->type == nt_struct_declarator)
+        {
+            // Get the BaseType of the embedding struct
+            ASTNode* structSpecifier = astTypeNonPtr->node()->parent;
+            while (structSpecifier) {
+                if (structSpecifier->type == nt_struct_or_union_specifier) {
+                    // Get the ASTType for the struct, and from there the BaseType
+                    ASTType* structAstType = eval->typeofNode(structSpecifier);
+                    baseTypes = findBaseTypesForAstType(structAstType, eval).second;
+                    if (!baseTypes.isEmpty()) {
+                        // Now find the member of that struct by name
+                        Structured* s = dynamic_cast<Structured*>(baseTypes.first());
+                        baseTypes.clear();
+                        if (s && s->memberExists(name))
+                            baseTypes += s->findMember(name)->refType();
+                        break;
+                    }
+                }
+                structSpecifier = structSpecifier->parent;
+            }
+        }
+        else {
+            baseTypes = _typesByName.values(name);
+            if (baseTypes.isEmpty())
+                debugerr("No type with name " << name << " found!");
+        }
     }
     // Is the source a numeric type?
     else if (astTypeNonPtr->type() & (~rtEnum & NumericTypes)) {
@@ -1777,10 +1810,11 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
                                     const ASTType* srcType,
                                     const ASTType* ctxType,
                                     const QStringList& ctxMembers,
-                                    const ASTType* targetType)
+                                    const ASTType* targetType,
+                                    KernelSourceTypeEvaluator* eval)
 {
     // Find the source base type
-    AstBaseTypeList srcTypeRet = findBaseTypesForAstType(srcType);
+    AstBaseTypeList srcTypeRet = findBaseTypesForAstType(srcType, eval);
 //    const ASTType* srcTypeNonPtr = targetTypeRet.first;
     BaseType* srcBaseType = 0;
     if (srcTypeRet.second.isEmpty())
@@ -1789,7 +1823,7 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
         srcBaseType = srcTypeRet.second.first();
 
     // Find the target base types
-    AstBaseTypeList targetTypeRet = findBaseTypesForAstType(targetType);
+    AstBaseTypeList targetTypeRet = findBaseTypesForAstType(targetType, eval);
     const ASTType* targetTypeNonPtr = targetTypeRet.first;
     BaseTypeList targetBaseTypes = targetTypeRet.second;
 
@@ -1875,14 +1909,14 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
     case stVariableDef:
         // Only change global variables
         if (srcSymbol.isGlobal())
-            typeAlternateUsageVar(ctxType, srcSymbol, targetBaseType);
+            typeAlternateUsageVar(ctxType, srcSymbol, targetBaseType, eval);
         else
             debugmsg("Ignoring local variable " << srcSymbol.name());
         break;
 
     case stFunctionParam:
     case stStructMember:
-        typeAlternateUsageStructMember(ctxType, ctxMembers, targetBaseType);
+        typeAlternateUsageStructMember(ctxType, ctxMembers, targetBaseType, eval);
         break;
 
     default:
@@ -1894,10 +1928,11 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
 
 void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 												const QStringList& ctxMembers,
-												BaseType* targetBaseType)
+												BaseType* targetBaseType,
+												KernelSourceTypeEvaluator* eval)
 {
     // Find context base types
-    AstBaseTypeList ctxTypeRet = findBaseTypesForAstType(ctxType);
+    AstBaseTypeList ctxTypeRet = findBaseTypesForAstType(ctxType, eval);
     BaseTypeList ctxBaseTypes = ctxTypeRet.second;
 
     int membersFound = 0, membersChanged = 0;
@@ -1982,7 +2017,8 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 
 void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
                                        const ASTSymbol& srcSymbol,
-                                       BaseType* targetBaseType)
+                                       BaseType* targetBaseType,
+                                       KernelSourceTypeEvaluator* /*eval*/)
 {
     Q_UNUSED(ctxType);
     VariableList vars = _varsByName.values(srcSymbol.name());
