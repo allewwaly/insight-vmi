@@ -2600,7 +2600,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
         if (searchMember) {
             switch(n->type) {
             case nt_postfix_expression_dot:
-                // Prepend name of member and a dot
+                // Prepend name of member
             	ctxMembers.prepend(
             			antlrTokenToStr(n->u.postfix_expression_suffix.identifier));
                 // Type chages, so clear all type operations
@@ -2608,7 +2608,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
                 break;
 
             case nt_postfix_expression_arrow:
-                // Prepend name of member and a dot
+                // Prepend name of member
                 ctxMembers.prepend(
                 		antlrTokenToStr(n->u.postfix_expression_suffix.identifier));
                 // Type changes now, so clear all pending operations
@@ -2618,9 +2618,25 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
                 searchMember = false;
                 break;
 
-            case nt_postfix_expression_brackets:
-                ctxTypeOps.push(n->type);
+            case nt_postfix_expression_brackets:{
+                // If brackets are used on a pointer type, then this is a
+                // dereference and the next suffix is the context type,
+                // but for embedded array types we treat it the same way as a
+                // "dot" member access
+                pASTNode pred = pesStack.isEmpty() ?
+                            postExNode->u.postfix_expression.primary_expression :
+                            pesStack.top();
+                if (typeofNode(pred)->type() == rtArray)
+                    ctxTypeOps.push(n->type);
+                else {
+                    // Type changes now, so clear all pending operations
+                    ctxTypeOps.clear();
+                    // The arrow is by itself a dereference
+                    ctxTypeOps.push(n->type);
+                    searchMember = false;
+                }
                 break;
+            }
 
             case nt_postfix_expression_parens:
                 ctxTypeOps.push(n->type);
@@ -2695,6 +2711,32 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
 }
 
 
+QString ASTTypeEvaluator::typeChangeInfo(
+        const ASTNode* srcNode, const ASTType* srcType,
+        const ASTSymbol& srcSymbol, const ASTNode* targetNode,
+        const ASTType* targetType, const ASTNode* rootNode)
+{
+    ASTSourcePrinter printer(_ast);
+#   define INDENT "    "
+    QString scope;
+    if (srcSymbol.type() == stVariableDef ||
+         srcSymbol.type() == stVariableDecl)
+        scope = srcSymbol.isGlobal() ? "global " : "local ";
+
+    return QString(INDENT "Symbol: %1 (%2)\n"
+                   INDENT "Source: %3 %4\n"
+                   INDENT "Target: %5 %6\n"
+                   INDENT "Line %7")
+            .arg(srcSymbol.name(), -30)
+            .arg(scope + srcSymbol.typeToString())
+            .arg(printer.toString(srcNode->parent, false).trimmed() + ",", -30)
+            .arg(srcType->toString())
+            .arg(printer.toString(targetNode, false).trimmed() + ",", -30)
+            .arg(targetType->toString())
+            .arg(printer.toString(rootNode, true).trimmed());
+}
+
+
 void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
             const ASTType* srcType, const ASTSymbol& srcSymbol,
             const ASTType* ctxType, const ASTNode* ctxNode,
@@ -2735,7 +2777,10 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
     if (srcSymbol.name() != var)
         std::cout << " in \"" << var << "\"";
 
-    std::cout << std::endl;
+    std::cout << std::endl
+              << typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
+                                targetType, rootNode).toStdString()
+              << std::endl;
 }
 
 

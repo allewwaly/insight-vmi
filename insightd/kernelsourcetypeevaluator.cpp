@@ -30,32 +30,6 @@ KernelSourceTypeEvaluator::~KernelSourceTypeEvaluator()
 }
 
 
-QString KernelSourceTypeEvaluator::typeChangeInfo(
-        const ASTNode* srcNode, const ASTType* srcType,
-        const ASTSymbol& srcSymbol, const ASTNode* targetNode,
-        const ASTType* targetType, const ASTNode* rootNode)
-{
-    ASTSourcePrinter printer(_ast);
-#   define INDENT "    "
-    QString scope;
-    if (srcSymbol.type() == stVariableDef ||
-         srcSymbol.type() == stVariableDecl)
-        scope = srcSymbol.isGlobal() ? "global " : "local ";
-
-    return QString(INDENT "Symbol: %1 (%2)\n"
-                   INDENT "Source: %3 %4\n"
-                   INDENT "Target: %5 %6\n"
-                   INDENT "Line %7")
-            .arg(srcSymbol.name(), -30)
-            .arg(scope + srcSymbol.typeToString())
-            .arg(printer.toString(srcNode->parent, false).trimmed() + ",", -30)
-            .arg(srcType->toString())
-            .arg(printer.toString(targetNode, false).trimmed() + ",", -30)
-            .arg(targetType->toString())
-            .arg(printer.toString(rootNode, true).trimmed());
-}
-
-
 void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         const ASTNode* srcNode, const ASTType* srcType,
         const ASTSymbol& srcSymbol, const ASTType* ctxType,
