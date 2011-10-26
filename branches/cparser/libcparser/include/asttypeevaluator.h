@@ -108,6 +108,13 @@ protected:
             const QStringList& ctxMembers, const ASTNode* targetNode,
             const ASTType* targetType, const ASTNode* rootNode);
 
+    /**
+     * @return a string with details about the given type change.
+     */
+    QString typeChangeInfo(const ASTNode* srcNode, const ASTType* srcType,
+            const ASTSymbol& srcSymbol, const ASTNode* targetNode,
+            const ASTType* targetType, const ASTNode* rootNode);
+
 private:
     ASTType* copyASTType(const ASTType* src);
     ASTType* createASTType(RealType type, ASTType* next = 0);

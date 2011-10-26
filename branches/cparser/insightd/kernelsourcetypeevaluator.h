@@ -51,10 +51,6 @@ protected:
             const ASTType* targetType, const ASTNode* rootNode);
 
 private:
-    QString typeChangeInfo(const ASTNode* srcNode, const ASTType* srcType,
-            const ASTSymbol& srcSymbol, const ASTNode* targetNode,
-            const ASTType* targetType, const ASTNode* rootNode);
-
     SymFactory* _factory;
 };
 
