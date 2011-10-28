@@ -2265,12 +2265,18 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
     if (node->u.primary_expression.hasDot)
         return erLeftHandSide;
 
+//    debugmsg("Inspecting identifier \""
+//             << antlrTokenToStr(node->u.primary_expression.identifier)
+//             << "\" at " << node->start->line << ":" << node->start->charPosition);
+
     // Is this somewhere in the right-hand of an assignment expression or
     // of an init declarator?
-    pASTNode lNode = 0, rNode = node, root = node->parent,
-            primExNode = node, postExNode = node->parent, castExNode = 0;
+    ASTNode *lNode = 0, *rNode = node, *root = node->parent,
+            *primExNode = node, *postExNode = node->parent, *castExNode = 0;
     // Type of left-hand
     ASTType* lType = 0;
+    // No. of de-/references
+    int derefs = 0;
 
     while (root) {
         // Find out the situation in which the identifier is used
@@ -2314,13 +2320,25 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
             return erUseInBuiltinFunction;
 
         case nt_cast_expression:
-            // Save the last actual casting cast expression for later reference
+            // Save the last actual casting cast expression for later reference,
+            // but only if the cast actually changes the type
             if (root->u.cast_expression.type_name &&
-                rNode == root->u.cast_expression.cast_expression)
+                rNode == root->u.cast_expression.cast_expression &&
+                !typeofNode(rNode)->equalTo(typeofNode(root->u.cast_expression.type_name)))
                 castExNode = root;
             break;
 
-        case nt_compound_braces_statement:
+        case nt_compound_braces_statement: {
+            // If rNode was NOT the last expression within the list, then it's
+            // of no interest
+            struct ASTNodeList *l =
+                    root->u.compound_braces_statement.declaration_or_statement_list;
+            for (; l; l = l->next)
+                if (l->item == rNode && l->next)
+                    return erNoAssignmentUse;
+            }
+            break;
+
         case nt_compound_statement:
             return erNoAssignmentUse;
 
@@ -2337,7 +2355,11 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
             return erNoAssignmentUse;
 
         case nt_expression_statement:
-            return erNoAssignmentUse;
+            // Expressions might be the return value fu compound braces
+            // statements if the appear last
+            if (root->parent->type != nt_compound_braces_statement)
+                return erNoAssignmentUse;
+            break;
 
         case nt_init_declarator:
             // Is this in the right-hand of an init declarator?
@@ -2377,7 +2399,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
         case nt_postfix_expression:
             if (root->u.postfix_expression.postfix_expression_suffix_list) {
                 // Postfix expression suffixes represent a type usage, so if the
-                // type has already been casted, this esd the first effective
+                // type has already been casted, this is the first effective
                 // type change
                 if (castExNode)
                     goto cast_expression_type_change;
@@ -2390,6 +2412,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
             break;
 
         case nt_postfix_expression_brackets:
+            // Used as array index
         case nt_postfix_expression_parens:
             /// @todo Use as a function parameter in nt_postfix_expression_parens might be interesting!
             return erNoAssignmentUse;
@@ -2407,14 +2430,17 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
             // The negation operator results in a boolean expression
             if ("!" == op)
                 return erNoAssignmentUse;
-            // If the address of something is casted or assigned to something
-            // else, we cannot record this anyhow
+//            // If the address of something is casted or assigned to something
+//            // else, we cannot record this anyhow
             if ("&" == op)
-                return erNoAssignmentUse;
+                --derefs;
             // Dereferencing is a type usage, so if the type has already been
             // casted, this is the first effective type change
-            if (("*" == op) && castExNode)
-                goto cast_expression_type_change;
+            else if ("*" == op) {
+                ++derefs;
+                if (castExNode)
+                    goto cast_expression_type_change;
+            }
             }
             break;
 
@@ -2454,6 +2480,11 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(pASTNod
     // Skip if source and target types are equal
     if (lType->equalTo(typeofNode(postExNode)))
         return erTypesAreEqual;
+
+    // Skip if address of some object is assigned/cast/whatever without being
+    // dereferenced again by some postfix expression suffix
+    if ((derefs < 0) && !postExNode)
+        return erAddressOperation;
 
     // Find the chain of changing types up to ae on the right-hand
     TypeChain typeChain;

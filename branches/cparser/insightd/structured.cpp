@@ -244,7 +244,7 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
                     .arg(m->offset(), offset_len, 16, QChar('0'))
                     .arg(m->name(), -name_len)
                     .arg(m->refType()->prettyName(), -type_len)
-                    .arg(m->refTypeId(), 0, 16);
+                    .arg((uint)m->refTypeId(), 0, 16);
         }
     }
 
