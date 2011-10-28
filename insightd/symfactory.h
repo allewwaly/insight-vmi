@@ -516,14 +516,16 @@ private:
     Struct* makeStructHListNode(StructuredMember* member);
 
     /**
-     * Creates a shallow copy of the given type \a source and returns it. The
+     * Creates a deep copy of the given type \a source and returns it. The
      * copy will have a unique ID < 0 to be distinguishable from the original.
-     * \warning Make sure to add this type to the local types by a call to
+     * The copy is deep for "real" referencing types such as typedefs and
+     * pointers but does not duplicate function parameters or struct members.
+     * \note The type will be automatically added to the factory with a call to
      * addSymbol().
      * @param source the source type
      * @return a shallow copy of \a source with a new, unique ID
      */
-    Structured* makeStructCopy(Structured* source);
+    BaseType* makeDeepTypeCopy(BaseType* source);
 
 	/**
      * Tries to resolve the type reference of a ReferencingType object \a ref.
