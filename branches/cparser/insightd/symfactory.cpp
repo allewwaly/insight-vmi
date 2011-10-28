@@ -1092,14 +1092,53 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
 }
 
 
-Structured* SymFactory::makeStructCopy(Structured* source)
+BaseType* SymFactory::makeDeepTypeCopy(BaseType* source)
 {
     if (!source)
         return 0;
 
-    Structured* dest = (source->type() == rtStruct) ?
-                (Structured*)new Struct(this) :
-                (Structured*)new Union(this);
+    BaseType* dest;
+    switch (source->type()) {
+    case rtArray:
+        dest = new Array(this);
+        break;
+
+    case rtPointer:
+        dest = new Pointer(this);
+        break;
+
+    case rtStruct:
+        dest = new Struct(this);
+        break;
+
+    case rtUnion:
+        dest = new Union(this);
+        break;
+
+    case rtConst:
+        dest = new ConstType(this);
+        break;
+
+    case rtVolatile:
+        dest = new VolatileType(this);
+        break;
+
+    case rtTypedef:
+        dest = new Typedef(this);
+        break;
+
+    case rtFuncPointer:
+        dest = new FuncPointer(this);
+        break;
+
+    case rtFunction:
+        dest = new Function(this);
+        break;
+
+    default:
+        factoryError("Don't know how to copy type "
+                     + realTypeToStr(source->type()));
+    }
 
     // Use the symbol r/w mechanism to create the copy
     QByteArray ba;
@@ -1111,6 +1150,20 @@ Structured* SymFactory::makeStructCopy(Structured* source)
 
     // Set the special ID
     dest->setId(getUniqueTypeId());
+
+    // Recurse for referencing types
+    RefBaseType *rbt;
+    if ( (rbt = dynamic_cast<RefBaseType*>(dest)) ) {
+        // We create copies of all referencing types and structs/unions
+        BaseType* t = rbt->refType();
+        if (t && t->type() & ReferencingTypes) {
+            t = makeDeepTypeCopy(t);
+            rbt->setRefTypeId(t->id());
+        }
+    }
+
+    addSymbol(dest);
+
     return dest;
 }
 
@@ -1893,8 +1946,13 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
                 targetBaseType = ptr;
             }
         }
-        else
-            factoryError("Could not find target BaseType.");
+        else {
+            // It can happen that GCC excludes unused symbols from the debugging
+            // symbols, so don't fail if we don't find the target base type
+            debugerr("Could not find target BaseType: "
+                     << targetType->toString());
+            return;
+        }
     }
 
     // Compare source and target type
@@ -1943,10 +2001,13 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 
         // Find the correct member of the struct or union
         for (int j = 0; j < ctxMembers.size(); ++j) {
-            Structured* s = dynamic_cast<Structured*>(t);
+            // Dereference static arrays
+            while (t && t->type() == rtArray)
+                t = dynamic_cast<Array*>(t)->refTypeDeep(BaseType::trLexicalAndArrays);
+            Structured* s =  dynamic_cast<Structured*>(t);
             nestingMember = member; // previous struct for nested structs
             if ( s && (member = s->findMember(ctxMembers[j])) ) {
-                t = member->refTypeDeep(BaseType::trLexical);
+                t = member->refTypeDeep(BaseType::trLexicalAndArrays);
             }
             else {
                 nestingMember = member = 0;
@@ -1954,39 +2015,46 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
             }
         }
 
-        // Is the source type a member of a struct embedded in the context type?
-        if (nestingMember) {
-            // Was the embedding member already copied?
-            if (nestingMember->refTypeId() < 0) {
-                debugmsg(QString("Member %1 %2 is already a type copy.")
-                         .arg(nestingMember->prettyName())
-                         .arg(nestingMember->name()));
-            }
-            else {
-                // Create a copy of the embedding struct before manipulation
-                /// @todo What happens hier if member is inside an anonymous struct?
-                Structured* s = dynamic_cast<Structured*>(
-                            nestingMember->refTypeDeep(BaseType::trLexical));
-                assert(s != 0);
-                Structured* refTypeCopy = makeStructCopy(s);
-                addSymbol(refTypeCopy);
-                // Update the type relations
-                _usedByStructMembers.remove(nestingMember->refTypeId(), nestingMember);
-                nestingMember->setRefTypeId(refTypeCopy->id());
-                insertUsedBy(nestingMember);
-                member = refTypeCopy->findMember(ctxMembers.last());
-                assert(member != 0);
-                debugmsg(QString("Created copy of embedding member %1 (0x%2 -> 0x%3).")
-                         .arg(nestingMember->prettyName())
-                         .arg(s->id(), 0, 16)
-                         .arg(refTypeCopy->id(), 0, 16));
-            }
-        }
         // If we have a member here, it is the one whose reference is to be replaced
         if (member) {
             ++membersFound;
             // Apply new type, if applicable
             if (typeChangeDecision(member, targetBaseType)) {
+                // If the the source type is a member of a struct embedded in
+                // the context type, we create a copy before any manipulations
+                if (nestingMember) {
+                    // Was the embedding member already copied?
+                    if (nestingMember->refTypeId() < 0) {
+                        debugmsg(QString("Member %1 %2 is already a type copy.")
+                                 .arg(nestingMember->prettyName())
+                                 .arg(nestingMember->name()));
+                    }
+                    // Create a copy of the embedding struct
+                    else {
+                        /// @todo What happens here if member is inside an anonymous struct?
+                        int origRefTypeId = nestingMember->refTypeId();
+                        BaseType* typeCopy =
+                                makeDeepTypeCopy(nestingMember->refType());
+                        // Update the type relations
+                        _usedByStructMembers.remove(nestingMember->refTypeId(), nestingMember);
+                        nestingMember->setRefTypeId(typeCopy->id());
+                        insertUsedBy(nestingMember);
+                        // Find the member within the copied type
+                        t = typeCopy->dereferencedBaseType(BaseType::trLexicalAndArrays);
+                        Structured* s = dynamic_cast<Structured*>(t);
+                        assert(s != 0);
+                        member = s->findMember(ctxMembers.last());
+                        assert(member != 0);
+                        debugmsg(QString("Created copy (0x%1 -> 0x%2) of "
+                                         "embedding member %3 in %4 (0x%5).")
+                                 .arg((uint)origRefTypeId, 0, 16)
+                                 .arg((uint)typeCopy->id(), 0, 16)
+                                 .arg(nestingMember->prettyName())
+                                 .arg(nestingMember->belongsTo()->prettyName())
+                                 .arg((uint)nestingMember->belongsTo()->id(), 0, 16));
+                    }
+                }
+
                 /// @todo may need to adjust member->memberOffset() somehow
                 ++membersChanged;
                 ++_totalTypesChanged;
