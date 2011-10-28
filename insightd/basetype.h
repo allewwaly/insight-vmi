@@ -65,6 +65,7 @@ public:
     enum TypeResolution {
         trNone = 0,                                 ///< no resolution is performed
         trLexical = rtConst|rtVolatile|rtTypedef,   ///< resolve rtConst, rtVolatile, rtTypedef only
+        trLexicalAndArrays = trLexical|rtArray,     ///< resolve as for trLexical plus rtArray
         trLexicalAndPointers = trLexical|rtPointer, ///< resolve as for trLexical plus rtPointer
         trPointersAndArrays = rtPointer|rtArray,    ///< resolve rtPointer and rtArray
         trLexicalPointersArrays = trLexicalAndPointers|rtArray, ///< resolve as for trLexicalAndPointers plus rtArray
