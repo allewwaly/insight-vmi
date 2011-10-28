@@ -1977,8 +1977,13 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
         typeAlternateUsageStructMember(ctxType, ctxMembers, targetBaseType, eval);
         break;
 
+    case stEnumerator:
+        // Enum values are no referencing types, so ignore such changes
+        debugmsg("Ignoring type change of enum value " << srcSymbol.name());
+        break;
+
     default:
-        factoryError("Symbol " + srcSymbol.name() + " is of type " +
+        factoryError("Source symbol " + srcSymbol.name() + " is of type " +
                      srcSymbol.typeToString());
     }
 }
