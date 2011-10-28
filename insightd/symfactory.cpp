@@ -106,7 +106,8 @@ void SymFactory::clear()
 	_maxTypeSize = 0;
 	_uniqeTypesChanged = 0;
 	_totalTypesChanged = 0;
-	_typesReplaced = 0;
+	_varTypeChanges = 0;
+	_typesCopied = 0;
 	_conflictingTypeChanges = 0;
 	_artificialTypeId = -1;
 }
@@ -1501,10 +1502,11 @@ void SymFactory::sourceParcingFinished()
 {
     shell->out() << "Statistics:" << endl;
     shell->out() << qSetFieldWidth(10) << right;
-    shell->out() << "  | Unique type changes:   " << _uniqeTypesChanged << endl;
-    shell->out() << "  | Replaced type changes: " << _typesReplaced << endl;
-    shell->out() << "  | Total type changes:    " << _totalTypesChanged << endl;
-    shell->out() << "  | Type conflicts:        " << _conflictingTypeChanges << endl;
+    shell->out() << "  | Unique type changes:        " << _uniqeTypesChanged << endl;
+    shell->out() << "  | Type changes of variables:  " << _varTypeChanges << endl;
+    shell->out() << "  | Types copied:               " << _typesCopied << endl;
+    shell->out() << "  | Total type changes:         " << _totalTypesChanged << endl;
+    shell->out() << "  | Type conflicts:             " << _conflictingTypeChanges << endl;
     shell->out() << "  `-------------------------------------------" << endl;
     shell->out() << qSetFieldWidth(0) << left;
 }
@@ -1732,13 +1734,12 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
     if (astTypeNonPtr->type() & (StructOrUnion|rtEnum)) {
         if (astTypeNonPtr->identifier().isEmpty()) {
             assert(astTypeNonPtr->node() != 0);
-            // See if this struct appears in a typedef
+            // See if this struct appears in a typedef or a variable definition
             pASTNode dec_spec = astTypeNonPtr->node()->parent->parent;
             pASTNode dec = dec_spec->parent;
-            // Did we find the typedef declaration?
+            // Did we find a declaration?
             if (dec_spec->type == nt_declaration_specifier &&
                 dec->type == nt_declaration &&
-                dec->u.declaration.isTypedef &&
                 dec->u.declaration.declaration_specifier == dec_spec)
             {
                 // Take the first declarator from thie list and resolve it
@@ -1749,21 +1750,35 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
                         ->u.declarator.direct_declarator
                         ->u.direct_declarator.identifier;
                 QString id = antlrTokenToStr(tok);
-                BaseTypeList temp;
-                baseTypes = _typesByName.values(id);
-                for (int i = baseTypes.size() - 1; i >= 0; --i) {
-                    // Dereference any pointers or typedefs
-                    baseTypes[i] = baseTypes[i]->dereferencedBaseType();
-                    // See if the type matches
-                    if (baseTypes[i]->type() == astTypeNonPtr->type())
-                        // Add all typedefs of that type to a separate list
-                        temp += typedefsOfType(baseTypes[i]);
-                    // Remove non-matching types
-                    else
-                        baseTypes.removeAt(i);
+                // Distinguish between typedef and variable
+                if (dec->u.declaration.isTypedef) {
+                    BaseTypeList temp;
+                    baseTypes = _typesByName.values(id);
+                    for (int i = baseTypes.size() - 1; i >= 0; --i) {
+                        // Dereference any pointers or typedefs
+                        baseTypes[i] = baseTypes[i]->dereferencedBaseType();
+                        // See if the type matches
+                        if (baseTypes[i]->type() == astTypeNonPtr->type())
+                            // Add all typedefs of that type to a separate list
+                            temp += typedefsOfType(baseTypes[i]);
+                        // Remove non-matching types
+                        else
+                            baseTypes.removeAt(i);
+                    }
+                    // Join the lists
+                    baseTypes += temp;
                 }
-                // Join the lists
-                baseTypes += temp;
+                else {
+                    VariableList vars = _varsByName.values(id);
+                    for (int i = 0; i < vars.size(); ++i) {
+                        // Dereference any pointers, arrays or typedefs
+                        BaseType* t = vars[i]->refTypeDeep(
+                                    BaseType::trLexicalPointersArrays);
+                        // See if the type matches
+                        if (t->type() == astTypeNonPtr->type())
+                            baseTypes += t;
+                    }
+                }
             }
             else
                 debugmsg("The context type has no identifier.");
@@ -2036,6 +2051,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
                     }
                     // Create a copy of the embedding struct
                     else {
+                        ++_typesCopied;
                         /// @todo What happens here if member is inside an anonymous struct?
                         int origRefTypeId = nestingMember->refTypeId();
                         BaseType* typeCopy =
@@ -2063,13 +2079,15 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
                 /// @todo may need to adjust member->memberOffset() somehow
                 ++membersChanged;
                 ++_totalTypesChanged;
+                if (member->altRefTypeCount() > 0)
+                    ++_conflictingTypeChanges;
                 /// @todo replace member->altRefType() with target
                 member->addAltRefTypeId(targetBaseType->id());
             }
         }
     }
 
-    if (!membersFound)
+    if (!ctxBaseTypes.isEmpty() && !membersFound)
         factoryError("Did not find any members to adjust!");
     else if (membersChanged) {
         ++_uniqeTypesChanged;
@@ -2103,6 +2121,9 @@ void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
         // Apply new type, if applicable
         if (typeChangeDecision(vars[i], targetBaseType)) {
             ++_totalTypesChanged;
+            ++_varTypeChanges;
+            if (vars[i]->altRefTypeCount() > 0)
+                ++_conflictingTypeChanges;
             /// @todo replace v->altRefType() with target
             vars[i]->addAltRefTypeId(targetBaseType->id());
         }
@@ -2201,7 +2222,6 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
             break;
 
         case tcConflict:
-            ++_conflictingTypeChanges;
             debugerr(QString("Conflicting target types in 0x%0: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
                      .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
                      .arg(r->refType() ?
@@ -2213,7 +2233,6 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
             break;
 
         case tcReplace:
-            ++_typesReplaced;
             break;
         }
     }

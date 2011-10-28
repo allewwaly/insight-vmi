@@ -642,7 +642,8 @@ private:
 	int _structHListNodeCount;
 	int _uniqeTypesChanged;
 	int _totalTypesChanged;
-	int _typesReplaced;
+	int _typesCopied;
+	int _varTypeChanges;
 	int _conflictingTypeChanges;
 	int _artificialTypeId;
 	quint32 _maxTypeSize;
