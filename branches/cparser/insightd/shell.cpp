@@ -1096,9 +1096,9 @@ int Shell::cmdListTypesUsing(QStringList args)
 
     for (int i = 0; i < types.size(); i++) {
         RefBaseType* type = types[i];
-        _out << qSetFieldWidth(w_id)  << right << hex << type->id()
+        _out << qSetFieldWidth(w_id)  << right << hex << (uint)type->id()
              << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_refTypeId) << type->refTypeId()
+             << qSetFieldWidth(w_refTypeId) << (uint)type->refTypeId()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
@@ -1864,7 +1864,7 @@ int Shell::cmdShow(QStringList args)
     if (s.startsWith("0x"))
     	s = s.right(s.size() - 2);
     bool ok = false;
-    int id = s.toInt(&ok, 16);
+    int id = (int)s.toUInt(&ok, 16);
 
     const BaseType* bt = 0;
     const Variable * var = 0;
@@ -1961,7 +1961,7 @@ int Shell::cmdShow(QStringList args)
 
 int Shell::cmdShowBaseType(const BaseType* t)
 {
-	_out << "  ID:             " << "0x" << hex << t->id() << dec << endl;
+	_out << "  ID:             " << "0x" << hex << (uint)t->id() << dec << endl;
 	_out << "  Name:           " << (t->prettyName().isEmpty() ? QString("(unnamed)") : t->prettyName()) << endl;
 	_out << "  Type:           " << realTypeToStr(t->type()) << endl;
 	_out << "  Size:           " << t->size() << endl;
@@ -1969,7 +1969,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
     const RefBaseType* r = dynamic_cast<const RefBaseType*>(t);
     if (r) {
-        _out << "  Ref. type ID:   " << "0x" << hex << r->refTypeId() << dec << endl;
+        _out << "  Ref. type ID:   " << "0x" << hex << (uint)r->refTypeId() << dec << endl;
         _out << "  Ref. type:      "
              <<  (r->refType() ? r->refType()->prettyName() :
                                  QString(r->refTypeId() ? "(unresolved)" : "void"))
@@ -1980,7 +1980,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
                 if (i > 0)
                     _out << ", ";
                 const BaseType* t = r->altRefType(i);
-                _out << "0x" << hex << t->id() << dec << t->prettyName();
+                _out << "0x" << hex << (uint)t->id() << dec << t->prettyName();
             }
             _out << endl;
         }
@@ -2008,7 +2008,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 			QString pretty = rt ?
 						rt->prettyName() :
 						QString("(unresolved type, 0x%1)")
-							.arg(m->refTypeId(), 0, 16);
+							.arg((uint)m->refTypeId(), 0, 16);
 
 			if (m->altRefTypeCount() == 1)
 				pretty = "<" + pretty + ">";
@@ -2029,7 +2029,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
                     << QString("0x%1").arg(m->offset(), 4, 16, QChar('0'))
                     << "  "
                     << qSetFieldWidth(20) << left << (m->name() + ": ")
-                    << qSetFieldWidth(id_width) << left << QString("0x%1").arg(m->refTypeId(), 0, 16)
+                    << qSetFieldWidth(id_width) << left << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
                     << qSetFieldWidth(0) << " "
 					<< pretty
 					<< endl;
@@ -2083,7 +2083,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 			QString pretty = rt ?
 						rt->prettyName() :
 						QString("(unresolved type, 0x%1)")
-							.arg(param->refTypeId(), 0, 16);
+							.arg((uint)param->refTypeId(), 0, 16);
 
 			if (param->altRefTypeCount() == 1)
 				pretty = "<" + pretty + ">";
@@ -2105,7 +2105,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 					<< ". "
 					<< qSetFieldWidth(16) << left << (param->name() + ": ")
 					<< qSetFieldWidth(12)
-					<< QString("0x%1, ").arg(param->refTypeId(), 0, 16)
+					<< QString("0x%1, ").arg((uint)param->refTypeId(), 0, 16)
 					<< qSetFieldWidth(0)
 					<< pretty
 					<< endl;
@@ -2121,11 +2121,11 @@ int Shell::cmdShowVariable(const Variable* v)
 {
 	assert(v != 0);
 
-	_out << "  ID:             " << "0x" << hex << v->id() << dec << endl;
+	_out << "  ID:             " << "0x" << hex << (uint)v->id() << dec << endl;
 	_out << "  Name:           " << v->name() << endl;
 	_out << "  Location:       " << "0x" << hex << v->offset() << dec << endl;
 
-    _out << "  Ref. type ID:   " << "0x" << hex << v->refTypeId() << dec << endl;
+    _out << "  Ref. type ID:   " << "0x" << hex << (uint)v->refTypeId() << dec << endl;
     _out << "  Ref. type:      "
          <<  (v->refType() ? v->refType()->prettyName() :
                              QString(v->refTypeId() ? "(unresolved)" : "void"))
