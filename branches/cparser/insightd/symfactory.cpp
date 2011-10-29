@@ -1735,14 +1735,14 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
         if (astTypeNonPtr->identifier().isEmpty()) {
             assert(astTypeNonPtr->node() != 0);
             // See if this struct appears in a typedef or a variable definition
-            pASTNode dec_spec = astTypeNonPtr->node()->parent->parent;
-            pASTNode dec = dec_spec->parent;
+            ASTNode *dec_spec = astTypeNonPtr->node()->parent->parent;
+            ASTNode *dec = dec_spec->parent;
             // Did we find a declaration?
             if (dec_spec->type == nt_declaration_specifier &&
                 dec->type == nt_declaration &&
                 dec->u.declaration.declaration_specifier == dec_spec)
             {
-                // Take the first declarator from thie list and resolve it
+                // Take the first declarator from the list and resolve it
                 pANTLR3_COMMON_TOKEN tok = dec
                         ->u.declaration.init_declarator_list
                         ->item
@@ -1778,6 +1778,38 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
                         if (t->type() == astTypeNonPtr->type())
                             baseTypes += t;
                     }
+                }
+            }
+            // Did we find a nested struct or union declaration?
+            else if (dec_spec->type == nt_struct_declaration) {
+                // Take the first declarator from the list and resolve it
+                pANTLR3_COMMON_TOKEN tok = dec_spec
+                        ->u.struct_declaration.struct_declarator_list
+                        ->item
+                        ->u.struct_declarator.declarator
+                        ->u.declarator.direct_declarator
+                        ->u.direct_declarator.identifier;
+                QString id = antlrTokenToStr(tok);
+
+                // Get the BaseType of the embedding struct
+                ASTNode* structSpecifier = astTypeNonPtr->node()->parent;
+                while (structSpecifier) {
+                    if (structSpecifier->type == nt_struct_or_union_specifier) {
+                        // Get the ASTType for the struct, and from there the BaseType
+                        ASTType* structAstType = eval->typeofNode(structSpecifier);
+                        BaseTypeList candidates = findBaseTypesForAstType(structAstType, eval).second;
+                        for (int i = 0; i < candidates.size(); ++i) {
+                            // Now find the member of that struct by name
+                            Structured* s = dynamic_cast<Structured*>(candidates[i]);
+                            if (s && s->memberExists(id)) {
+                                baseTypes += s->findMember(id)->refType();
+                                // Exit the outer loop
+                                structSpecifier = 0;
+                            }
+                        }
+                    }
+                    if (structSpecifier)
+                        structSpecifier = structSpecifier->parent;
                 }
             }
             else
@@ -1816,17 +1848,19 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
                 if (structSpecifier->type == nt_struct_or_union_specifier) {
                     // Get the ASTType for the struct, and from there the BaseType
                     ASTType* structAstType = eval->typeofNode(structSpecifier);
-                    baseTypes = findBaseTypesForAstType(structAstType, eval).second;
-                    if (!baseTypes.isEmpty()) {
+                    BaseTypeList candidates = findBaseTypesForAstType(structAstType, eval).second;
+                    for (int i = 0; i < candidates.size(); ++i) {
                         // Now find the member of that struct by name
-                        Structured* s = dynamic_cast<Structured*>(baseTypes.first());
-                        baseTypes.clear();
-                        if (s && s->memberExists(name))
+                        Structured* s = dynamic_cast<Structured*>(candidates[i]);
+                        if (s && s->memberExists(name)) {
                             baseTypes += s->findMember(name)->refType();
-                        break;
+                            // Exit the outer loop
+                            structSpecifier = 0;
+                        }
                     }
                 }
-                structSpecifier = structSpecifier->parent;
+                if (structSpecifier)
+                    structSpecifier = structSpecifier->parent;
             }
         }
         else {
