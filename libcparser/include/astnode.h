@@ -167,7 +167,6 @@ struct ASTNode
         {
             struct ASTNode* declaration_specifier;
             struct ASTNode* declarator;
-            struct ASTNodeList* declaration_list;
             struct ASTNode* compound_statement;
         } function_definition;
 
