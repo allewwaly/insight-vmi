@@ -21,6 +21,7 @@ extern "C" {
 
 #include <astsymboltypes.h>
 #include <QString>
+#include <QList>
 
 // forward declaration
 struct ASTNode;
@@ -33,6 +34,7 @@ class ASTSymbol
 	QString _name;
 	ASTSymbolType _type;
 	struct ASTNode* _astNode;
+	QList<ASTNode*> _assignedAstNodes;
 
 public:
 	/**
@@ -77,6 +79,18 @@ public:
 	 * built-in types
 	 */
 	struct ASTNode* astNode() const;
+
+	/**
+	 * @return list of nodes that have been assigned to this symbol
+	 */
+	const QList<ASTNode*>& assignedAstNodes() const;
+
+	/**
+	 * Append a new ASTNode that has been assigned to this symbol.
+	 * @param node the node to append
+	 * @return a reference to this object
+	 */
+	void appendAssignedNode(ASTNode* node);
 
 	/**
 	 * @return the name of the symbol
@@ -132,6 +146,18 @@ inline ASTSymbolType ASTSymbol::type() const
 inline struct ASTNode* ASTSymbol::astNode() const
 {
     return _astNode;
+}
+
+
+inline const QList<ASTNode *>& ASTSymbol::assignedAstNodes() const
+{
+    return _assignedAstNodes;
+}
+
+
+inline void ASTSymbol::appendAssignedNode(ASTNode *node)
+{
+    _assignedAstNodes.append(node);
 }
 
 

@@ -83,7 +83,7 @@ protected:
 
 //    virtual void beforeChildren(pASTNode node, int flags);
     virtual void afterChildren(pASTNode node, int flags);
-    EvalResult evaluatePrimaryExpression(pASTNode node);
+    EvalResult evaluatePrimaryExpression(ASTNode *node);
 
     /**
      * This function is called during the execution of evaluateTypes() each
@@ -164,6 +164,7 @@ private:
     ASTType* typeofPostfixExpressionSuffix(pASTNode node);
 
     ASTType* embeddingFuncReturnType(pASTNode node);
+    ASTSymbol embeddingFuncSymbol(ASTNode *node);
     ASTType* expectedTypeAtInitializerPosition(pASTNode node);
     ASTType* preprendPointers(pASTNode d_ad, ASTType* type);
     ASTType* preprendArrays(pASTNode dd_dad, ASTType* type);
