@@ -243,7 +243,6 @@ int ASTWalker::walkTree(pASTNode node, int flags)
     case nt_function_definition: {
         visits += walkTree(node->u.function_definition.declaration_specifier);
         visits += walkTree(node->u.function_definition.declarator);
-        visits += walkTree(node->u.function_definition.declaration_list);
         visits += walkTree(node->u.function_definition.compound_statement);
         break;
     }
