@@ -14,7 +14,7 @@
 #include <QString>
 
 struct ASTNode;
-typedef QHash<QString, ASTSymbol> ASTSymbolHash;
+typedef QHash<QString, ASTSymbol*> ASTSymbolHash;
 
 
 class ASTScope
@@ -41,6 +41,8 @@ public:
 	ASTScope(struct ASTNode* astNode, ASTScope* parent = 0)
 		: _astNode(astNode), _parent(parent) {}
 
+	~ASTScope();
+
 	inline ASTSymbolHash& symbols() { return _symbols; }
 	inline ASTSymbolHash& compoundTypes() { return _compoundTypes; }
 	inline ASTSymbolHash& typedefs() { return _typedefs; }
@@ -49,7 +51,7 @@ public:
 
 	void add(const QString& name, ASTSymbolType type, struct ASTNode* node);
 	void varAssignment(const QString& name, struct ASTNode* assignedNode);
-	ASTSymbol find(const QString& name, int searchSymbols = ssAnySymbol) const;
+	ASTSymbol* find(const QString& name, int searchSymbols = ssAnySymbol) const;
 };
 
 

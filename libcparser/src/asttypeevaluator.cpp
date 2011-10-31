@@ -849,7 +849,7 @@ ASTType* ASTTypeEvaluator::embeddingFuncReturnType(pASTNode node)
  * @param node the node contained in a function
  * @return
  */
-ASTSymbol ASTTypeEvaluator::embeddingFuncSymbol(ASTNode* node)
+const ASTSymbol* ASTTypeEvaluator::embeddingFuncSymbol(ASTNode* node)
 {
     while (node && node->type != nt_function_definition)
         node = node->parent;
@@ -858,8 +858,8 @@ ASTSymbol ASTTypeEvaluator::embeddingFuncSymbol(ASTNode* node)
     ASTNode* dd = node->u.function_definition.declarator->u.declarator.direct_declarator;
     QString name = antlrTokenToStr(dd->u.direct_declarator.identifier);
 
-    ASTSymbol sym = node->scope->find(name, ASTScope::ssSymbols);
-    assert(sym.type() == stFunctionDef);
+    const ASTSymbol* sym = node->scope->find(name, ASTScope::ssSymbols);
+    assert(sym && sym->type() == stFunctionDef);
     return sym;
 }
 
@@ -1043,40 +1043,40 @@ ASTType* ASTTypeEvaluator::typeofParameterDeclaration(pASTNode node)
 }
 
 
-ASTType* ASTTypeEvaluator::typeofSymbolDeclaration(const ASTSymbol& sym)
+ASTType* ASTTypeEvaluator::typeofSymbolDeclaration(const ASTSymbol* sym)
 {
-    if (!sym.astNode())
+    if (!sym || !sym->astNode())
         return 0;
-    checkNodeType(sym.astNode(), nt_declaration);
+    checkNodeType(sym->astNode(), nt_declaration);
 
-    ASTType* ret = typeofNode(sym.astNode()->u.declaration.declaration_specifier);
-    ret = preprendPointersArraysOfIdentifier(sym.name(), sym.astNode(), ret);
+    ASTType* ret = typeofNode(sym->astNode()->u.declaration.declaration_specifier);
+    ret = preprendPointersArraysOfIdentifier(sym->name(), sym->astNode(), ret);
 
     return ret;
 }
 
 
-ASTType* ASTTypeEvaluator::typeofSymbolFunctionDef(const ASTSymbol& sym)
+ASTType* ASTTypeEvaluator::typeofSymbolFunctionDef(const ASTSymbol* sym)
 {
-    if (!sym.astNode())
+    if (!sym || !sym->astNode())
         return 0;
-    checkNodeType(sym.astNode(), nt_function_definition);
+    checkNodeType(sym->astNode(), nt_function_definition);
 
-    pASTNode declarator = sym.astNode()->u.function_definition.declarator;
+    pASTNode declarator = sym->astNode()->u.function_definition.declarator;
     return typeofNode(declarator->u.declarator.direct_declarator);
 }
 
 
-ASTType* ASTTypeEvaluator::typeofSymbolFunctionParam(const ASTSymbol& sym)
+ASTType* ASTTypeEvaluator::typeofSymbolFunctionParam(const ASTSymbol* sym)
 {
-    if (!sym.astNode())
+    if (!sym || !sym->astNode())
         return 0;
-    checkNodeType(sym.astNode(), nt_parameter_declaration);
+    checkNodeType(sym->astNode(), nt_parameter_declaration);
 
-    ASTType* ret = typeofNode(sym.astNode()->u.parameter_declaration.declaration_specifier);
+    ASTType* ret = typeofNode(sym->astNode()->u.parameter_declaration.declaration_specifier);
 
     // Find identifier matching sym to see if it's a pointer
-    for (pASTNodeList list = sym.astNode()
+    for (pASTNodeList list = sym->astNode()
             ->u.parameter_declaration.declarator_list;
          list;
          list = list->next)
@@ -1147,9 +1147,9 @@ ASTType* ASTTypeEvaluator::typeofStructOrUnionSpecifier(pASTNode node)
         // We have to search in upward scope because id may be a struct
         // declaration in the current scope
         for (ASTScope *scope = node->scope; scope; scope = scope->parent()) {
-            ASTSymbol def = scope->find(id, ASTScope::ssCompoundTypes);
-            if (def.type() == stStructOrUnionDef)
-                return _types[node] = typeofNode(def.astNode());
+            const ASTSymbol* def = scope->find(id, ASTScope::ssCompoundTypes);
+            if (def && def->type() == stStructOrUnionDef)
+                return _types[node] = typeofNode(def->astNode());
         }
     }
 
@@ -1429,9 +1429,12 @@ ASTType* ASTTypeEvaluator::typeofBuiltinFunction(pASTNode node)
 
 
 
-ASTType* ASTTypeEvaluator::typeofSymbol(const ASTSymbol& sym)
+ASTType* ASTTypeEvaluator::typeofSymbol(const ASTSymbol* sym)
 {
-    switch (sym.type()) {
+    if (!sym)
+        return 0;
+
+    switch (sym->type()) {
     case stNull:
         return 0;
 
@@ -1442,31 +1445,31 @@ ASTType* ASTTypeEvaluator::typeofSymbol(const ASTSymbol& sym)
     case stVariableDef:
     case stStructOrUnionDecl:
     case stStructOrUnionDef:
-        return typeofNode(sym.astNode());
+        return typeofNode(sym->astNode());
 
     case stStructMember:
 //        return typeofStructDeclarator(sym.astNode());
-        return typeofNode(sym.astNode());
+        return typeofNode(sym->astNode());
 
     case stFunctionDecl:
 //        return typeofSymbolDeclaration(sym);
-    	return typeofNode(sym.astNode());
+        return typeofNode(sym->astNode());
 
     case stFunctionDef:
 //        return typeofSymbolFunctionDef(sym);
-    	return typeofNode(sym.astNode());
+        return typeofNode(sym->astNode());
 
     case stFunctionParam:
 //        return typeofSymbolFunctionParam(sym);
-    	return typeofNode(sym.astNode());
+        return typeofNode(sym->astNode());
 
     case stEnumDecl:
     case stEnumDef:
-    	return typeofNode(sym.astNode());
+        return typeofNode(sym->astNode());
 
 
     case stEnumerator:
-        return typeofEnumerator(sym.astNode());
+        return typeofEnumerator(sym->astNode());
         break;
     }
 
@@ -1482,10 +1485,10 @@ ASTType* ASTTypeEvaluator::typeofBuiltinType(const pASTTokenList list,
 }
 
 
-ASTSymbol ASTTypeEvaluator::findSymbolOfPrimaryExpression(pASTNode node)
+const ASTSymbol* ASTTypeEvaluator::findSymbolOfPrimaryExpression(pASTNode node)
 {
     if (!node)
-        return ASTSymbol();
+        return 0;
     checkNodeType(node, nt_primary_expression);
     if (!node->u.primary_expression.identifier)
         typeEvaluatorError(
@@ -1494,7 +1497,7 @@ ASTSymbol ASTTypeEvaluator::findSymbolOfPrimaryExpression(pASTNode node)
                 .arg(node->start->line));
 
     QString id = antlrTokenToStr(node->u.primary_expression.identifier);
-    ASTSymbol sym;
+    ASTSymbol* sym = 0;
     ASTType* t = 0;
 
     // Is this a struct initializer or an initializer-like struct member
@@ -1544,7 +1547,7 @@ ASTSymbol ASTTypeEvaluator::findSymbolOfPrimaryExpression(pASTNode node)
     if (t)
         sym = t->node()->childrenScope->find(id);
 
-    if (sym.isNull()) {
+    if (!sym) {
         _ast->printScopeRek(t ? t->node()->childrenScope : node->scope);
         typeEvaluatorError(
                 QString("Could not find symbol \"%1\" at %2:%3")
@@ -1575,7 +1578,7 @@ ASTType* ASTTypeEvaluator::typeofPrimaryExpression(pASTNode node)
     else if (node->u.primary_expression.compound_braces_statement)
         _types[node] = typeofNode(node->u.primary_expression.compound_braces_statement);
     else if (node->u.primary_expression.identifier) {
-        ASTSymbol sym = findSymbolOfPrimaryExpression(node);
+        const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
         _types[node] = typeofSymbol(sym);
     }
 
@@ -1849,7 +1852,7 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(pASTNode node)
             QList<pASTNode> queue;
 
             // Get symbol of struct/union definition which embeds memberName
-            ASTSymbol structDeclSym, memberSym;
+            ASTSymbol *structDeclSym = 0, *memberSym = 0;
             // If the ASTNode has no identifier, it must be an anonymous struct
             // definition, either in a direct declaration or in a typedef. In
             // that case, we have to search in the scope of the struct
@@ -1874,17 +1877,17 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(pASTNode node)
                     structDeclSym = scope->find(t->identifier(),
                             ASTScope::ssCompoundTypes);
 					// If not found, widen search to symbols
-                    if (structDeclSym.isNull())
+					if (!structDeclSym)
                         structDeclSym = scope->find(t->identifier(),
                                 ASTScope::ssSymbols|ASTScope::ssTypedefs);
 
                     // If symbol is still null, it cannot be resolved
-                    if (structDeclSym.isNull() ||
-                            structDeclSym.type() == stStructOrUnionDef)
+                    if (!structDeclSym ||
+                            structDeclSym->type() == stStructOrUnionDef)
                         break;
                 }
 
-                if (structDeclSym.isNull()) {
+                if (!structDeclSym) {
                     _ast->printScopeRek(startScope);
                     typeEvaluatorError(
                             QString("Could not resolve type \"%1\" of member "
@@ -1897,13 +1900,13 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(pASTNode node)
                                 .arg(pes->start->charPosition));
                 }
                 else
-                    queue.push_back(structDeclSym.astNode());
+                    queue.push_back(structDeclSym->astNode());
             }
 
             // Recursively search for identifier in the members of current
             // struct and any nesting anonymous structs or unions
             // See http://gcc.gnu.org/onlinedocs/gcc/Unnamed-Fields.html
-			while (memberSym.isNull() && !queue.isEmpty()) {
+            while (!memberSym && !queue.isEmpty()) {
 				pASTNode inner = queue.front();
 				queue.pop_front();
 
@@ -1919,7 +1922,7 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(pASTNode node)
 				// current struct/union
 				for (pASTNodeList list =
 						inner->u.struct_or_union_specifier.struct_declaration_list;
-					list && memberSym.isNull();
+					list && !memberSym;
 					list = list->next)
 				{
 					pASTNode strDec = list->item;
@@ -1946,10 +1949,10 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(pASTNode node)
             }
 
 			// We should have resolved the member by now
-            if (memberSym.isNull()) {
+			if (!memberSym) {
                 typeEvaluatorError(
                         QString("Could not resolve member \"%1.%2\" at %3:%4:%5")
-                            .arg(structDeclSym.name())
+                            .arg(structDeclSym->name())
                             .arg(memberName)
                             .arg(_ast->fileName())
                             .arg(pes->start->line)
@@ -1957,7 +1960,7 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(pASTNode node)
             }
 
 			// Set new starting scope to scope of member found
-			startScope = memberSym.astNode()->childrenScope;
+			startScope = memberSym->astNode()->childrenScope;
 
             type = typeofSymbol(memberSym);
             break;
@@ -2297,7 +2300,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
     ASTType* lType = 0;
     // No. of de-/references
     int derefs = 0;
-    ASTSymbol sym;
+    const ASTSymbol* sym = 0;
 
     while (root) {
         // Find out the situation in which the identifier is used
@@ -2314,13 +2317,13 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
             if (rNode == root->u.assignment_expression.lvalue &&
                 root->u.assignment_expression.assignment_expression)
             {
-                if (sym.isNull())
+                if (!sym)
                     sym = findSymbolOfPrimaryExpression(node);
                 // Record assignments for local variables and parameters
-                if (sym.isLocal() &&
-                    (sym.type() & (stVariableDef|stFunctionParam)))
+                if (sym->isLocal() &&
+                    (sym->type() & (stVariableDef|stFunctionParam)))
                 {
-                    node->scope->varAssignment(sym.name(),
+                    node->scope->varAssignment(sym->name(),
                                                root->u.assignment_expression.assignment_expression);
                 }
             }
@@ -2401,12 +2404,13 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
             if (rNode == root->u.init_declarator.declarator &&
                 root->u.init_declarator.initializer)
             {
-                ASTSymbol sym = findSymbolOfPrimaryExpression(node);
+                const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
+                assert(sym != 0);
                 // Record assignments for local variables and parameters
-                if (sym.isLocal() &&
-                    (sym.type() & (stVariableDef|stFunctionParam)))
+                if (sym->isLocal() &&
+                    (sym->type() & (stVariableDef|stFunctionParam)))
                 {
-                    node->scope->varAssignment(sym.name(),
+                    node->scope->varAssignment(sym->name(),
                                                root->u.init_declarator.initializer);
                 }
             }
@@ -2444,7 +2448,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
 
             // Treat any return statement as an assignment to the function
             // definition symbol
-            root->scope->varAssignment(embeddingFuncSymbol(root).name(),
+            root->scope->varAssignment(embeddingFuncSymbol(root)->name(),
                                        root->u.jump_statement.initializer);
 
             goto while_exit;
@@ -2784,7 +2788,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
                 .arg((quint64)ctxType, 0, 16)
                 .arg((quint64)ctxNode, 0, 16));
 
-    if (sym.isNull())
+    if (!sym)
         sym = findSymbolOfPrimaryExpression(node);
 
     primaryExpressionTypeChange(primExNode, srcType, sym, ctxType, ctxNode,
@@ -2796,22 +2800,22 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
 
 QString ASTTypeEvaluator::typeChangeInfo(
         const ASTNode* srcNode, const ASTType* srcType,
-        const ASTSymbol& srcSymbol, const ASTNode* targetNode,
+        const ASTSymbol* srcSymbol, const ASTNode* targetNode,
         const ASTType* targetType, const ASTNode* rootNode)
 {
     ASTSourcePrinter printer(_ast);
 #   define INDENT "    "
     QString scope;
-    if (srcSymbol.type() == stVariableDef ||
-         srcSymbol.type() == stVariableDecl)
-        scope = srcSymbol.isGlobal() ? "global " : "local ";
+    if (srcSymbol->type() == stVariableDef ||
+         srcSymbol->type() == stVariableDecl)
+        scope = srcSymbol->isGlobal() ? "global " : "local ";
 
     return QString(INDENT "Symbol: %1 (%2)\n"
                    INDENT "Source: %3 %4\n"
                    INDENT "Target: %5 %6\n"
                    INDENT "Line %7")
-            .arg(srcSymbol.name(), -30)
-            .arg(scope + srcSymbol.typeToString())
+            .arg(srcSymbol->name(), -30)
+            .arg(scope + srcSymbol->typeToString())
             .arg(printer.toString(srcNode->parent, false).trimmed() + ",", -30)
             .arg(srcType->toString())
             .arg(printer.toString(targetNode, false).trimmed() + ",", -30)
@@ -2821,7 +2825,7 @@ QString ASTTypeEvaluator::typeChangeInfo(
 
 
 void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
-            const ASTType* srcType, const ASTSymbol& srcSymbol,
+            const ASTType* srcType, const ASTSymbol* srcSymbol,
             const ASTType* ctxType, const ASTNode* ctxNode,
     		const QStringList& ctxMembers, const ASTNode* targetNode,
             const ASTType* targetType, const ASTNode* rootNode)
@@ -2832,8 +2836,8 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
 	checkNodeType(srcNode, nt_primary_expression);
 	checkNodeType(srcNode->parent, nt_postfix_expression);
 
-    QString symScope = srcSymbol.isLocal() ? "local" : "global";
-    QStringList symType = srcSymbol.typeToString().split(' ');
+    QString symScope = srcSymbol->isLocal() ? "local" : "global";
+    QStringList symType = srcSymbol->typeToString().split(' ');
     if (symType.last().startsWith('('))
     	symType.pop_back();
 
@@ -2855,9 +2859,9 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
                         srcType->toString())
             << " is used as " << targetType->toString()
             << " via " << symScope  << " " << symType.join(" ") << " "
-            << "\"" << srcSymbol.name() << "\"";
+            << "\"" << srcSymbol->name() << "\"";
 
-    if (srcSymbol.name() != var)
+    if (srcSymbol->name() != var)
         std::cout << " in \"" << var << "\"";
 
     std::cout << std::endl
@@ -2875,9 +2879,9 @@ ASTType* ASTTypeEvaluator::typeofTypeId(pASTNode node)
 
 	QString name = antlrTokenToStr(node->u.type_id.identifier);
 
-	ASTSymbol s = node->scope->find(name, ASTScope::ssTypedefs);
+	const ASTSymbol* s = node->scope->find(name, ASTScope::ssTypedefs);
 
-	if (s.type() != stTypedef) {
+	if (!s || s->type() != stTypedef) {
 	    typeEvaluatorError(
 	            QString("Failed to resolve type \"%1\" at %2:%3")
 	            .arg(name)
@@ -2888,7 +2892,7 @@ ASTType* ASTTypeEvaluator::typeofTypeId(pASTNode node)
 	// Find node with given name in init_declarator_list
     pASTNode ddec = findIdentifierInIDL(
     		name,
-    		s.astNode()->u.declaration.init_declarator_list);
+            s->astNode()->u.declaration.init_declarator_list);
 
 	if (!typeofNode(ddec)) {
         typeEvaluatorError(

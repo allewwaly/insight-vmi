@@ -328,7 +328,7 @@ public:
     QList<RefBaseType*> typesUsingId(int id) const;
 
 
-	void typeAlternateUsage(const ASTSymbol& srcSymbol,
+	void typeAlternateUsage(const ASTSymbol* srcSymbol,
 							const ASTType* srcType,
 							const ASTType* ctxType,
 							const QStringList& ctxMembers,
@@ -342,7 +342,7 @@ protected:
 										KernelSourceTypeEvaluator* eval);
 
 	void typeAlternateUsageVar(const ASTType* ctxType,
-							   const ASTSymbol& srcSymbol,
+							   const ASTSymbol* srcSymbol,
 							   BaseType* targetBaseType,
 							   KernelSourceTypeEvaluator* eval);
 

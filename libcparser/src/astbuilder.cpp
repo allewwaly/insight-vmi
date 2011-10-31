@@ -38,8 +38,8 @@ int ASTBuilder::buildFrom(const QString& fileName)
 bool ASTBuilder::isTypeName(const QString& name) const
 {
     return _ast->_scopeMgr->currentScope() &&
-           !_ast->_scopeMgr->currentScope()
-               ->find(name, ASTScope::ssTypedefs).isNull();
+           _ast->_scopeMgr->currentScope()
+               ->find(name, ASTScope::ssTypedefs);
 }
 
 
@@ -47,7 +47,7 @@ bool ASTBuilder::isSymbolName(const QString& name) const
 {
     return _ast->_scopeMgr->currentScope() &&
            !_ast->_scopeMgr->currentScope()
-               ->find(name, ASTScope::ssSymbols).isNull();
+               ->find(name, ASTScope::ssSymbols);
 }
 
 

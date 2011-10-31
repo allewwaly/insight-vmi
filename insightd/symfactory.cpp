@@ -1908,7 +1908,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
 }
 
 
-void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
+void SymFactory::typeAlternateUsage(const ASTSymbol* srcSymbol,
                                     const ASTType* srcType,
                                     const ASTType* ctxType,
                                     const QStringList& ctxMembers,
@@ -2011,14 +2011,14 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
         return;
     }
 
-    switch (srcSymbol.type()) {
+    switch (srcSymbol->type()) {
     case stVariableDecl:
     case stVariableDef:
         // Only change global variables
-        if (srcSymbol.isGlobal())
+        if (srcSymbol->isGlobal())
             typeAlternateUsageVar(ctxType, srcSymbol, targetBaseType, eval);
         else
-            debugmsg("Ignoring local variable " << srcSymbol.name());
+            debugmsg("Ignoring local variable " << srcSymbol->name());
         break;
 
     case stFunctionParam:
@@ -2028,12 +2028,12 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
 
     case stEnumerator:
         // Enum values are no referencing types, so ignore such changes
-        debugmsg("Ignoring type change of enum value " << srcSymbol.name());
+        debugmsg("Ignoring type change of enum value " << srcSymbol->name());
         break;
 
     default:
-        factoryError("Source symbol " + srcSymbol.name() + " is of type " +
-                     srcSymbol.typeToString());
+        factoryError("Source symbol " + srcSymbol->name() + " is of type " +
+                     srcSymbol->typeToString());
     }
 }
 
@@ -2141,12 +2141,12 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 
 
 void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
-                                       const ASTSymbol& srcSymbol,
+                                       const ASTSymbol* srcSymbol,
                                        BaseType* targetBaseType,
                                        KernelSourceTypeEvaluator* /*eval*/)
 {
     Q_UNUSED(ctxType);
-    VariableList vars = _varsByName.values(srcSymbol.name());
+    VariableList vars = _varsByName.values(srcSymbol->name());
     int varsFound = 0;
 
     // Find the variable(s) using the targetBaseType

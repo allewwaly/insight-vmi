@@ -25,7 +25,10 @@ HEADERS += include/ast_interface.h \
     src/C.h \
     antlr_generated/CLexer.h \
     antlr_generated/CParser.h \
-    include/astsourceprinter.h
+    include/astsourceprinter.h \
+    include/astexpressionevaluator.h \
+    include/astexpression.h \
+    include/expressionevalexception.h
 SOURCES += src/astscopemanager.cpp \
     src/astsymbol.cpp \
     src/realtypes.cpp \
@@ -41,13 +44,22 @@ SOURCES += src/astscopemanager.cpp \
     src/genericexception.cpp \
     antlr_generated/CLexer.c \
     antlr_generated/CParser.c \
-    src/astsourceprinter.cpp
+    src/astsourceprinter.cpp \
+    src/astexpressionevaluator.cpp
 LIBS += -L../libantlr3c \
     -lantlr3c
 INCLUDEPATH += ./antlr_generated \
     ./src \
     ./include \
     ../libantlr3c/include
+
+
+
+
+
+
+
+
 
 
 
