@@ -106,7 +106,7 @@ void ASTScope::addSymbol(const QString& name, ASTSymbolType type,
 					 );
 	}
 
-	_symbols[name] = ASTSymbol(name, type, node);
+	_symbols.insert(name, ASTSymbol(name, type, node));
 }
 
 
