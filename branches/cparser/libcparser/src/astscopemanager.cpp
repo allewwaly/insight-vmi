@@ -9,6 +9,22 @@
 #include <astscopemanager.h>
 #include <debug.h>
 
+ASTScope::~ASTScope()
+{
+	ASTSymbolHash::iterator it, e;
+	// Delete all data
+	for (it = _symbols.begin(), e = _symbols.end(); it != e; ++it)
+		delete it.value();
+	_symbols.clear();
+	for (it = _compoundTypes.begin(), e = _compoundTypes.end(); it != e; ++it)
+		delete it.value();
+	_compoundTypes.clear();
+	for (it = _typedefs.begin(), e = _typedefs.end(); it != e; ++it)
+		delete it.value();
+	_typedefs.clear();
+}
+
+
 void ASTScope::add(const QString& name, ASTSymbolType type, struct ASTNode* node)
 {
 	switch (type) {
@@ -42,10 +58,10 @@ void ASTScope::varAssignment(const QString &name, ASTNode *assignedNode)
     // Search for variables, parameters and functions with given name
     for (ASTScope* p = this; p; p = p->_parent) {
         if (p->_symbols.contains(name) &&
-            (p->_symbols[name].type() &
+            (p->_symbols[name]->type() &
              (stVariableDef|stFunctionParam|stFunctionDef)))
         {
-            p->_symbols[name].appendAssignedNode(assignedNode);
+            p->_symbols[name]->appendAssignedNode(assignedNode);
             return;
         }
     }
@@ -60,7 +76,7 @@ void ASTScope::addSymbol(const QString& name, ASTSymbolType type,
 	if (_symbols.contains(name)) {
 		bool warn = true;
 		// See if we found a definition for a declaration
-		switch (_symbols[name].type()) {
+		switch (_symbols[name]->type()) {
 		case stFunctionDecl:
 			// No warning if definition follows declaration
 			warn = (type != stFunctionDef);
@@ -99,14 +115,19 @@ void ASTScope::addSymbol(const QString& name, ASTSymbolType type,
 		if (warn)
 			debugerr("Line " << (node ? node->start->line : 0) << ": scope already "
 					 << "contains symbol \"" << name << "\" as "
-					 << ASTSymbol::typeToString(_symbols[name].type())
+					 << ASTSymbol::typeToString(_symbols[name]->type())
 					 << ", defined at line "
-					 << (_symbols[name].astNode() ? _symbols[name].astNode()->start->line : 0)
+					 << (_symbols[name]->astNode() ?
+							 _symbols[name]->astNode()->start->line :
+							 0)
 					 << ", new type is " << ASTSymbol::typeToString(type)
 					 );
+
+		// Delete previous value
+		delete _symbols[name];
 	}
 
-	_symbols.insert(name, ASTSymbol(name, type, node));
+	_symbols.insert(name, new ASTSymbol(name, type, node));
 }
 
 
@@ -116,7 +137,7 @@ void ASTScope::addCompoundType(const QString& name, ASTSymbolType type,
 	if (_compoundTypes.contains(name)) {
 		bool warn = true;
 		// See if we found a definition for a declaration
-		switch (_compoundTypes[name].type()){
+		switch (_compoundTypes[name]->type()){
 		case stEnumDecl:
 			// No warning if definition follows declaration
 			warn = (type != stEnumDef);
@@ -144,13 +165,19 @@ void ASTScope::addCompoundType(const QString& name, ASTSymbolType type,
 		if (warn)
 			debugerr("Line " << (node ? node->start->line : 0) << ": scope already "
 					 << "contains tagged type \"" << qPrintable(name) << "\" as "
-					 << ASTSymbol::typeToString(_compoundTypes[name].type()) << ", defined at line "
-					 << (_compoundTypes[name].astNode() ? _compoundTypes[name].astNode()->start->line : 0)
+					 << ASTSymbol::typeToString(_compoundTypes[name]->type())
+					 << ", defined at line "
+					 << (_compoundTypes[name]->astNode() ?
+							 _compoundTypes[name]->astNode()->start->line :
+							 0)
 					 << ", new type is " << ASTSymbol::typeToString(type)
 					 );
+
+		// Delete previous value
+		delete _compoundTypes[name];
 	}
 
-	_compoundTypes[name] = ASTSymbol(name, type, node);
+	_compoundTypes.insert(name, new ASTSymbol(name, type, node));
 }
 
 
@@ -160,17 +187,23 @@ void ASTScope::addTypedef(const QString& name, ASTSymbolType type,
 	if (_typedefs.contains(name)) {
         debugerr("Line " << (node ? node->start->line : 0) << ": scope already "
                  << "contains tagged type \"" << qPrintable(name) << "\" as "
-                 << qPrintable(ASTSymbol::typeToString(_typedefs[name].type())) << ", defined at line "
-                 << (_typedefs[name].astNode() ? _typedefs[name].astNode()->start->line : 0)
+                 << qPrintable(ASTSymbol::typeToString(_typedefs[name]->type()))
+                 << ", defined at line "
+                 << (_typedefs[name]->astNode() ?
+                         _typedefs[name]->astNode()->start->line :
+                         0)
                  << ", new type is " << qPrintable(ASTSymbol::typeToString(type))
                  );
+
+		// Delete previous value
+		delete _typedefs[name];
 	}
 
-	_typedefs[name] = ASTSymbol(name, type, node);
+	_typedefs.insert(name, new ASTSymbol(name, type, node));
 }
 
 
-ASTSymbol ASTScope::find(const QString& name, int searchSymbols) const
+ASTSymbol* ASTScope::find(const QString& name, int searchSymbols) const
 {
 #   undef DEBUG_SCOPE_FIND
 //#   define DEBUG_SCOPE_FIND 1
@@ -254,7 +287,7 @@ ASTSymbol ASTScope::find(const QString& name, int searchSymbols) const
 			}
 		}
 
-	return ASTSymbol();
+	return 0;
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

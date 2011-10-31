@@ -58,6 +58,11 @@ typedef QList<ASTType*> ASTTypeList;
 typedef QStack<pASTNode> ASTNodeStack;
 
 
+/**
+  This class evaluates the types of primary expressions within the syntax tree
+  and searches for expressions that change the type between the right-and and
+  the left-hand side of expressions, i.e. through type casts.
+ */
 class ASTTypeEvaluator: protected ASTWalker
 {
 public:
@@ -104,7 +109,7 @@ protected:
      * nt_assignment_expression or an nt_init_declarator node.
      */
     virtual void primaryExpressionTypeChange(const ASTNode* srcNode,
-            const ASTType* srcType, const ASTSymbol& srcSymbol,
+            const ASTType* srcType, const ASTSymbol* srcSymbol,
             const ASTType* ctxType, const ASTNode* ctxNode,
             const QStringList& ctxMembers, const ASTNode* targetNode,
             const ASTType* targetType, const ASTNode* rootNode);
@@ -113,7 +118,7 @@ protected:
      * @return a string with details about the given type change.
      */
     QString typeChangeInfo(const ASTNode* srcNode, const ASTType* srcType,
-            const ASTSymbol& srcSymbol, const ASTNode* targetNode,
+            const ASTSymbol* srcSymbol, const ASTNode* targetNode,
             const ASTType* targetType, const ASTNode* rootNode);
 
 private:
@@ -134,16 +139,16 @@ private:
     inline bool hasValidType(pASTNode node) const;
     void genDotGraphForNode(pASTNode node) const;
     QString postfixExpressionToStr(const ASTNode* postfix_exp, const ASTNode* last_pes = 0) const;
-    ASTSymbol findSymbolOfPrimaryExpression(pASTNode node);
+    const ASTSymbol *findSymbolOfPrimaryExpression(pASTNode node);
 
     ASTType* typeofIntegerExpression(ASTType* lt, ASTType* rt, const QString& op) const;
     ASTType* typeofNumericExpression(ASTType* lt, ASTType* rt, const QString& op) const;
     ASTType* typeofAdditiveExpression(ASTType* lt, ASTType* rt, const QString& op);
     ASTType* typeofBooleanExpression(ASTType* lt, ASTType* rt);
-    ASTType* typeofSymbol(const ASTSymbol& sym);
-    ASTType* typeofSymbolDeclaration(const ASTSymbol& sym);
-    ASTType* typeofSymbolFunctionDef(const ASTSymbol& sym);
-    ASTType* typeofSymbolFunctionParam(const ASTSymbol& sym);
+    ASTType* typeofSymbol(const ASTSymbol* sym);
+    ASTType* typeofSymbolDeclaration(const ASTSymbol* sym);
+    ASTType* typeofSymbolFunctionDef(const ASTSymbol* sym);
+    ASTType* typeofSymbolFunctionParam(const ASTSymbol* sym);
     ASTType* typeofDesignatedInitializer(pASTNode node);
     ASTType* typeofInitializer(pASTNode node);
     ASTType* typeofStructDeclarator(pASTNode node);
@@ -164,7 +169,7 @@ private:
     ASTType* typeofPostfixExpressionSuffix(pASTNode node);
 
     ASTType* embeddingFuncReturnType(pASTNode node);
-    ASTSymbol embeddingFuncSymbol(ASTNode *node);
+    const ASTSymbol* embeddingFuncSymbol(ASTNode *node);
     ASTType* expectedTypeAtInitializerPosition(pASTNode node);
     ASTType* preprendPointers(pASTNode d_ad, ASTType* type);
     ASTType* preprendArrays(pASTNode dd_dad, ASTType* type);

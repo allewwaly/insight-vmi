@@ -32,7 +32,7 @@ KernelSourceTypeEvaluator::~KernelSourceTypeEvaluator()
 
 void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         const ASTNode* srcNode, const ASTType* srcType,
-        const ASTSymbol& srcSymbol, const ASTType* ctxType,
+        const ASTSymbol* srcSymbol, const ASTType* ctxType,
         const ASTNode* ctxNode, const QStringList& ctxMembers,
         const ASTNode* targetNode, const ASTType* targetType,
         const ASTNode* rootNode)
@@ -48,16 +48,16 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         return;
     }
     // Ignore function parameters of non-struct source types as source
-    if (srcSymbol.type() == stFunctionParam && ctxMembers.isEmpty()) {
+    if (srcSymbol->type() == stFunctionParam && ctxMembers.isEmpty()) {
         debugmsg("Source is a paramter without struct member reference:\n" +
                  typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
                                 targetType, rootNode));
         return;
     }
     // Ignore local variables of non-struct source types as source
-    if ((srcSymbol.type() == stVariableDecl ||
-         srcSymbol.type() == stVariableDef)
-            && srcSymbol.isLocal() && ctxMembers.isEmpty())
+    if ((srcSymbol->type() == stVariableDecl ||
+         srcSymbol->type() == stVariableDef)
+            && srcSymbol->isLocal() && ctxMembers.isEmpty())
     {
         debugmsg("Source is a local variable without struct member reference:\n" +
                  typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
@@ -65,8 +65,8 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         return;
     }
     // Ignore values return by functions
-    if (srcSymbol.type() == stFunctionDef ||
-        srcSymbol.type() == stFunctionDecl)
+    if (srcSymbol->type() == stFunctionDef ||
+        srcSymbol->type() == stFunctionDecl)
     {
         debugmsg("Source is return value of function invocation:\n" +
                  typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
