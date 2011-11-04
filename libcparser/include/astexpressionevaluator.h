@@ -21,7 +21,9 @@ public:
     ASTExpression* exprOfNode(ASTNode * node);
 
 private:
+    ASTExpression *exprOfNodeList(ASTNodeList *list);
     ASTExpression *exprOfAssignmentExpr(ASTNode *node);
+    ASTExpression *exprOfConditionalExpr(ASTNode *node);
 
     ASTExpressionList _allExpressions;
     ASTNodeExpressionHash _expressions;
