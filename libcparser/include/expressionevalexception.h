@@ -3,8 +3,8 @@
 
 #include <genericexception.h>
 
-#define expressionEvalError(x) do { \
-        throw ExpressionEvaluatorException((x), __FILE__, __LINE__); \
+#define exprEvalError(x) do { \
+        throw ExpressionEvalException((x), __FILE__, __LINE__); \
     } while (0)
 
 

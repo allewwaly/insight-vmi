@@ -26,15 +26,36 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(ASTNode *node)
     if (_expressions.contains(node))
         return _expressions[node];
 
+    ASTExpression* expr = 0;
+
     switch (node->type) {
     case nt_assignment_expression:
-        return exprOfAssignmentExpr(node);
+        expr = exprOfAssignmentExpr(node);
+        break;
+
+    case nt_lvalue:
+        // Could be an lvalue cast
+        if (node->u.lvalue.lvalue)
+            expr = exprOfNode(node->u.lvalue.lvalue);
+        else
+            expr = exprOfNode(node->u.lvalue.unary_expression);
         break;
 
     default:
-        expressionEvalError("Unexpexted node type: "
-                            << ast_node_type_to_str(node->type));
+        exprEvalError(QString("Unexpexted node type: %1")
+                      .arg(ast_node_type_to_str(node)));
     }
+
+    if (!expr) {
+        exprEvalError(QString("Failed to evaluate node %1 at %2:%3:%4")
+                .arg(ast_node_type_to_str(node))
+                .arg(_ast->fileName())
+                .arg(node->start->line)
+                .arg(node->start->charPosition));
+    }
+
+    _expressions[node] = expr;
+    return expr;
 }
 
 
