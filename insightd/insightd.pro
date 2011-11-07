@@ -48,7 +48,8 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     enum.cpp \
     funcparam.cpp \
     function.cpp \
-    shell_readline.cpp
+    shell_readline.cpp \
+    astexpressionevaluator.cpp
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
     memorydumpsclass.h \
@@ -107,7 +108,10 @@ HEADERS += kernelsourcetypeevaluator.h \
     basetype.h \
     enum.h \
     funcparam.h \
-    function.h
+    function.h \
+    astexpressionevaluator.h \
+    astexpression.h \
+    expressionevalexception.h
 CONFIG += console \
     debug_and_release
 QMAKE_CFLAGS_RELEASE += -O3
@@ -126,4 +130,7 @@ INCLUDEPATH += ../libinsight/include \
     ../libantlr3c/include \
     ../libcparser/include
 FORMS = memorymapwindow.ui
+
+
+
 
