@@ -63,7 +63,7 @@ typedef QStack<pASTNode> ASTNodeStack;
   and searches for expressions that change the type between the right-and and
   the left-hand side of expressions, i.e. through type casts.
  */
-class ASTTypeEvaluator: protected ASTWalker
+class ASTTypeEvaluator: public ASTWalker
 {
 public:
     ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong);
@@ -71,6 +71,7 @@ public:
 
     bool evaluateTypes();
     ASTType* typeofNode(pASTNode node);
+    int sizeofLong() const;
 
 protected:
     enum EvalResult {
@@ -130,7 +131,6 @@ private:
     ASTType* copyDeep(const ASTType* src);
     RealType evaluateBuiltinType(const pASTTokenList list) const;
     ASTType* typeofTypeId(pASTNode node);
-    inline int sizeofLong() const;
     inline RealType realTypeOfLong() const;
     inline RealType realTypeOfULong() const;
     RealType resolveBaseType(const ASTType* type) const;
@@ -183,5 +183,11 @@ private:
     ASTNodeStack _nodeStack;
     int _sizeofLong;
 };
+
+
+inline int ASTTypeEvaluator::sizeofLong() const
+{
+    return _sizeofLong;
+}
 
 #endif /* ASTTYPEEVALUATOR_H_ */
