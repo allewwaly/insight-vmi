@@ -24,7 +24,7 @@ class RefBaseType;
 class CompileUnit;
 class Variable;
 class ASTType;
-class KernelSourceTypeEvaluator;
+class ASTTypeEvaluator;
 
 #include "numeric.h"
 #include "typeinfo.h"
@@ -333,18 +333,21 @@ public:
 							const ASTType* ctxType,
 							const QStringList& ctxMembers,
 							const ASTType* targetType,
-							KernelSourceTypeEvaluator* eval);
+							ASTTypeEvaluator* eval);
+
+    AstBaseTypeList findBaseTypesForAstType(const ASTType* astType,
+                                            ASTTypeEvaluator *eval);
 
 protected:
 	void typeAlternateUsageStructMember(const ASTType* ctxType,
 										const QStringList& ctxMembers,
 										BaseType* targetBaseType,
-										KernelSourceTypeEvaluator* eval);
+										ASTTypeEvaluator* eval);
 
 	void typeAlternateUsageVar(const ASTType* ctxType,
 							   const ASTSymbol* srcSymbol,
 							   BaseType* targetBaseType,
-							   KernelSourceTypeEvaluator* eval);
+							   ASTTypeEvaluator* eval);
 
 
 	/**
@@ -564,8 +567,6 @@ private:
     void insertUsedBy(Variable* var);
     void insertUsedBy(StructuredMember* m);
     void insertUsedBy(FuncParam* fp);
-    AstBaseTypeList findBaseTypesForAstType(const ASTType* astType,
-                                            KernelSourceTypeEvaluator* eval);
     void insertPostponed(ReferencingType* ref);
     void removePostponed(ReferencingType* ref);
 
