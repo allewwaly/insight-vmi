@@ -29,6 +29,8 @@ public:
     virtual ~ASTWalker();
 
     int walkTree();
+    AbstractSyntaxTree* ast();
+    const AbstractSyntaxTree* ast() const;
 
 protected:
     int walkTree(pASTNodeList head);
@@ -48,5 +50,7 @@ inline void ASTWalker::beforeChildren(pASTNode /*node*/, int /*flags*/) {}
 inline void ASTWalker::beforeChild(pASTNode /*node*/, pASTNode /*childNode*/) {}
 inline void ASTWalker::afterChild(pASTNode /*node*/, pASTNode /*childNode*/) {}
 inline void ASTWalker::afterChildren(pASTNode /*node*/, int /*flags*/) {}
+inline const AbstractSyntaxTree* ASTWalker::ast() const { return _ast; }
+inline AbstractSyntaxTree* ASTWalker::ast() { return _ast; }
 
 #endif /* ASTWALKER_H_ */
