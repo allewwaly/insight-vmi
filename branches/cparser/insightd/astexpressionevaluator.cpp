@@ -139,10 +139,19 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(ASTNode *node)
         expr = exprOfBuiltinFuncExpect(node);
         break;
 
+    case nt_builtin_function_extract_return_addr:
+        expr = createExprNode<ASTRuntimeExpression>();
+        break;
+
+    case nt_builtin_function_object_size:
+        expr = exprOfBuiltinFuncObjectSize(node);
+        break;
+
+    case nt_builtin_function_offsetof:
+        expr = exprOfBuiltinFuncOffsetOf(node);
+        break;
+
         /// @todo Implement me
-//    case nt_builtin_function_extract_return_addr:
-//    case nt_builtin_function_object_size:
-//    case nt_builtin_function_offsetof:
 //    case nt_builtin_function_prefetch:
 //    case nt_builtin_function_return_address:
 //    case nt_builtin_function_sizeof:
@@ -512,64 +521,43 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncChooseExpr(ASTNode *node
 }
 
 /*
-  You can use the built-in function __builtin_types_compatible_p to determine
-  whether two types are the same.
+  Built-in Function: size_t __builtin_object_size (void * ptr, int type)
 
-  This built-in function returns 1 if the unqualified versions of the types
-  type1 and type2 (which are types, not expressions) are compatible, 0
-  otherwise. The result of this built-in function can be used in integer
-  constant expressions.
+  is a built-in construct that returns a constant number of bytes from ptr to
+  the end of the object ptr pointer points to (if known at compile time).
+  __builtin_object_size never evaluates its arguments for side-effects. If there
+  are any side-effects in them, it returns (size_t) -1 for type 0 or 1 and
+  (size_t) 0 for type 2 or 3. If there are multiple objects ptr can point to and
+  all of them are known at compile time, the returned number is the maximum of
+  remaining byte counts in those objects if type & 2 is 0 and minimum if
+  nonzero. If it is not possible to determine which objects ptr points to at
+  compile time, __builtin_object_size should return (size_t) -1 for type 0 or 1
+  and (size_t) 0 for type 2 or 3.
 
-  This built-in function ignores top level qualifiers (e.g., const, volatile).
-  For example, int is equivalent to const int.
+  type is an integer constant from 0 to 3. If the least significant bit is
+  clear, objects are whole variables, if it is set, a closest surrounding
+  subobject is considered the object a pointer points to. The second bit
+  determines if maximum or minimum of remaining bytes is computed.
 
-  The type int[] and int[5] are compatible. On the other hand, int and char *
-  are not compatible, even if the size of their types, on the particular
-  architecture are the same. Also, the amount of pointer indirection is taken
-  into account when determining similarity. Consequently, short * is not similar
-  to short **. Furthermore, two types that are typedefed are considered
-  compatible if their underlying types are compatible.
-
-  An enum type is not considered to be compatible with another enum type even if
-  both are compatible with the same integer type; this is what the C standard
-  specifies. For example, enum {foo, bar} is not similar to enum {hot, dog}.
-
-  You would typically use this function in code whose execution varies depending
-  on the arguments' types. For example:
-
-              #define foo(x)                                                  \
-                ({                                                           \
-                  typeof (x) tmp = (x);                                       \
-                  if (__builtin_types_compatible_p (typeof (x), long double)) \
-                    tmp = foo_long_double (tmp);                              \
-                  else if (__builtin_types_compatible_p (typeof (x), double)) \
-                    tmp = foo_double (tmp);                                   \
-                  else if (__builtin_types_compatible_p (typeof (x), float))  \
-                    tmp = foo_float (tmp);                                    \
-                  else                                                        \
-                    abort ();                                                 \
-                  tmp;                                                        \
-                })
-
-  Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
+  Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Object-Size-Checking.html
  */
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncTypesCompatible(
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncObjectSize(
         ASTNode *node)
 {
     if (!node)
         return 0;
-    checkNodeType(node, nt_builtin_function_types_compatible_p);
+    checkNodeType(node, nt_builtin_function_object_size);
 
-    ASTType *t1 = _eval->typeofNode(
-                node->u.builtin_function_types_compatible_p.type_name1);
-    ASTType *t2 = _eval->typeofNode(
-                node->u.builtin_function_types_compatible_p.type_name2);
-    // Defer equality decision to ASTType for now. This might not be exactly
-    // what GCC decides.
-    /// @todo More acurate type equality decision
-    return t1->equalTo(t2) ?
-                createExprNode<ASTConstantExpression>(1ULL) :
-                createExprNode<ASTConstantExpression>(0ULL);
+    ASTExpression *expr = exprOfNode(node->u.builtin_function_object_size.constant);
+    ExpressionResult res = expr->result();
+    assert(res.resultType == erConstant);
+
+    ASTConstantExpression* ret = createExprNode<ASTConstantExpression>(0ULL);
+    // If the maximum remaining bytes are requested, return (size_t) -1 instead
+    // of 0.
+    if (res.result.ui64 & 2)
+        ret->setValue((size_t) -1);
+    return ret;
 }
 
 
@@ -636,11 +624,105 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncConstant(ASTNode *node)
 */
 ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncExpect(ASTNode *node)
 {
-  if (!node)
-      return 0;
-  checkNodeType(node, nt_builtin_function_constant_p);
+    if (!node)
+        return 0;
+    checkNodeType(node, nt_builtin_function_constant_p);
 
-  return exprOfNode(node->u.builtin_function_expect.assignment_expression);
+    return exprOfNode(node->u.builtin_function_expect.assignment_expression);
+}
+
+
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(ASTNode *node)
+{
+    /*
+    if (!node)
+        return 0;
+    checkNodeType(node, nt_builtin_function_offsetof);
+
+    ASTNode *pe = node->u.builtin_function_offsetof.postfix_expression;
+    ASTNodeList *pesl = pe->u.postfix_expression.postfix_expression_suffix_list;
+    ASTType* type = _eval->typeofNode(node->u.builtin_function_offsetof.type_name);
+    assert(type != 0);
+    BaseType* bt = _factory->findBaseTypesForAstType(type, _eval);
+    quint64 offset = 0;
+
+    do {
+        Structured* s = dynamic_cast<Structured*>(bt);
+        QString name = antlrTokenToStr(
+                    pe->u.postfix_expression.primary_expression
+                      ->u.primary_expression.identifier);
+        if (!s)
+            exprEvalError(QString("Cannot find type structured BaseType for \"%1\" "
+                                  "at %2:%3:%4")
+                          .arg(type->toString())
+                          .arg(_ast->fileName())
+                          .arg(node->start->line)
+                          .arg(node->start->charPosition));
+        StructuredMember* m = s->findMember(name);
+        offset += m->offset();
+    } while (pesl);
+    */
+}
+
+/*
+  You can use the built-in function __builtin_types_compatible_p to determine
+  whether two types are the same.
+
+  This built-in function returns 1 if the unqualified versions of the types
+  type1 and type2 (which are types, not expressions) are compatible, 0
+  otherwise. The result of this built-in function can be used in integer
+  constant expressions.
+
+  This built-in function ignores top level qualifiers (e.g., const, volatile).
+  For example, int is equivalent to const int.
+
+  The type int[] and int[5] are compatible. On the other hand, int and char *
+  are not compatible, even if the size of their types, on the particular
+  architecture are the same. Also, the amount of pointer indirection is taken
+  into account when determining similarity. Consequently, short * is not similar
+  to short **. Furthermore, two types that are typedefed are considered
+  compatible if their underlying types are compatible.
+
+  An enum type is not considered to be compatible with another enum type even if
+  both are compatible with the same integer type; this is what the C standard
+  specifies. For example, enum {foo, bar} is not similar to enum {hot, dog}.
+
+  You would typically use this function in code whose execution varies depending
+  on the arguments' types. For example:
+
+              #define foo(x)                                                  \
+                ({                                                           \
+                  typeof (x) tmp = (x);                                       \
+                  if (__builtin_types_compatible_p (typeof (x), long double)) \
+                    tmp = foo_long_double (tmp);                              \
+                  else if (__builtin_types_compatible_p (typeof (x), double)) \
+                    tmp = foo_double (tmp);                                   \
+                  else if (__builtin_types_compatible_p (typeof (x), float))  \
+                    tmp = foo_float (tmp);                                    \
+                  else                                                        \
+                    abort ();                                                 \
+                  tmp;                                                        \
+                })
+
+  Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
+ */
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncTypesCompatible(
+        ASTNode *node)
+{
+    if (!node)
+        return 0;
+    checkNodeType(node, nt_builtin_function_types_compatible_p);
+
+    ASTType *t1 = _eval->typeofNode(
+                node->u.builtin_function_types_compatible_p.type_name1);
+    ASTType *t2 = _eval->typeofNode(
+                node->u.builtin_function_types_compatible_p.type_name2);
+    // Defer equality decision to ASTType for now. This might not be exactly
+    // what GCC decides.
+    /// @todo More acurate type equality decision
+    return t1->equalTo(t2) ?
+                createExprNode<ASTConstantExpression>(1ULL) :
+                createExprNode<ASTConstantExpression>(0ULL);
 }
 
 
