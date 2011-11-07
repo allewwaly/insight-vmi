@@ -1718,7 +1718,7 @@ BaseTypeList SymFactory::typedefsOfType(BaseType* type)
 
 
 AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
-                                                    KernelSourceTypeEvaluator* eval)
+                                                    ASTTypeEvaluator* eval)
 {
     // Find the first non-pointer ASTType
     const ASTType* astTypeNonPtr = astType;
@@ -1913,7 +1913,7 @@ void SymFactory::typeAlternateUsage(const ASTSymbol* srcSymbol,
                                     const ASTType* ctxType,
                                     const QStringList& ctxMembers,
                                     const ASTType* targetType,
-                                    KernelSourceTypeEvaluator* eval)
+                                    ASTTypeEvaluator *eval)
 {
     // Find the source base type
     AstBaseTypeList srcTypeRet = findBaseTypesForAstType(srcType, eval);
@@ -2041,7 +2041,7 @@ void SymFactory::typeAlternateUsage(const ASTSymbol* srcSymbol,
 void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 												const QStringList& ctxMembers,
 												BaseType* targetBaseType,
-												KernelSourceTypeEvaluator* eval)
+												ASTTypeEvaluator *eval)
 {
     // Find context base types
     AstBaseTypeList ctxTypeRet = findBaseTypesForAstType(ctxType, eval);
@@ -2143,7 +2143,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
                                        const ASTSymbol* srcSymbol,
                                        BaseType* targetBaseType,
-                                       KernelSourceTypeEvaluator* /*eval*/)
+                                       ASTTypeEvaluator * /*eval*/)
 {
     Q_UNUSED(ctxType);
     VariableList vars = _varsByName.values(srcSymbol->name());
