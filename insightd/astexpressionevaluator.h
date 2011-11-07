@@ -38,6 +38,8 @@ private:
     ASTExpression *exprOfBuiltinFuncChooseExpr(ASTNode *node);
     ASTExpression *exprOfBuiltinFuncConstant(ASTNode *node);
     ASTExpression *exprOfBuiltinFuncExpect(ASTNode *node);
+    ASTExpression *exprOfBuiltinFuncObjectSize(ASTNode *node);
+    ASTExpression *exprOfBuiltinFuncOffsetOf(ASTNode *node);
     ASTExpression *exprOfBuiltinFuncTypesCompatible(ASTNode *node);
     ASTExpression *exprOfConditionalExpr(ASTNode *node);
     ASTExpression *exprOfNodeList(ASTNodeList *list);

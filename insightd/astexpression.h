@@ -155,6 +155,11 @@ public:
         return _value;
     }
 
+    inline void setValue(quint64 value)
+    {
+        _value = value;
+    }
+
 private:
     quint64 _value;
 };
