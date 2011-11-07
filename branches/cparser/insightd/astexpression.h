@@ -6,6 +6,7 @@
 
 /// Different types of expressions
 enum ExpressionType {
+    etRuntimeDependent,
     etConstant,
     etVariable,
     etLogicalOr,
@@ -22,7 +23,14 @@ enum ExpressionType {
     etShiftLeft,
     etShiftRight,
     etAdditive,
-    etMultiplicative
+    etMultiplicative,
+    etUnaryDec,
+    etUnaryInc,
+    etUnaryStar,
+    etUnaryAmp,
+    etUnaryMinus,
+    etUnaryInv,
+    etUnaryNot
 };
 
 /**
@@ -34,7 +42,9 @@ enum ExpressionResultType {
     erConstant  = (1 << 0),  ///< Expression is compile-time constant
     erGlobalVar = (1 << 1),  ///< Expression involves global variable
     erLocalVar  = (1 << 2),  ///< Expression involves local variable
-    erParameter = (1 << 3)   ///< Expression involves function parameters
+    erParameter = (1 << 3),  ///< Expression involves function parameters
+    erRuntime   = (1 << 4),  ///< Expression involves run-time dependencies
+    erInvalid   = (1 << 5)   ///< Expression result cannot be determined
 };
 
 
@@ -59,7 +69,7 @@ struct ExpressionResult
 };
 
 /**
-  Abstract base class for a syntax tree expression.
+ * Abstract base class for a syntax tree expression.
  */
 class ASTExpression
 {
@@ -95,7 +105,31 @@ protected:
     ASTExpression* _alternative;
 };
 
+/**
+ * This expression involves run-time depencencies and cannot be evaluated.
+ */
+class ASTRuntimeExpression: public ASTExpression
+{
+public:
+    inline virtual ExpressionType type() const
+    {
+        return etRuntimeDependent;
+    }
 
+    inline virtual int resultType()
+    {
+        return erRuntime;
+    }
+
+    inline virtual ExpressionResult result()
+    {
+        return ExpressionResult(erRuntime, 0);
+    }
+};
+
+/**
+ * This expression represents a compile-time constant value.
+ */
 class ASTConstantExpression: public ASTExpression
 {
 public:
@@ -125,7 +159,10 @@ private:
     quint64 _value;
 };
 
-
+/**
+ * This expression represents a local or global variable that may or may not be
+ * evaluated.
+ */
 class ASTVariableExpression: public ASTExpression
 {
 public:
@@ -150,11 +187,14 @@ public:
         return _symbol;
     }
 
-private:
+protected:
     const ASTSymbol* _symbol;
 };
 
-
+/**
+ * This expression represents any type of binary arithmetic or logical
+ * expression, such as "x && y ", "x + y", or "x << y".
+ */
 class ASTBinaryExpression: public ASTExpression
 {
 public:
@@ -188,11 +228,16 @@ public:
 
     inline virtual int resultType()
     {
-        return _left->resultType() | _right->resultType();
+        return (_left && _right) ?
+                    _left->resultType() | _right->resultType() :
+                    erUndefined;
     }
 
     inline virtual ExpressionResult result()
     {
+        if (!_left || !_right)
+            return ExpressionResult();
+
         ExpressionResult lr = _left->result();
         ExpressionResult rr = _right->result();
         ExpressionResult ret(lr.resultType | rr.resultType);
@@ -276,6 +321,88 @@ protected:
     ASTExpression* _left;
     ASTExpression* _right;
 };
+
+/**
+ * This expression represents any type of unary prefix expression, such as
+ * "++i" or
+ */
+class ASTUnaryExpression: public ASTExpression
+{
+public:
+    ASTUnaryExpression(ExpressionType type) :
+        _type(type), _child(0) {}
+
+    inline ASTExpression* child() const
+    {
+        return _child;
+    }
+
+    inline void setChild(ASTExpression* expr)
+    {
+        _child = expr;
+    }
+
+    inline virtual ExpressionType type() const
+    {
+        return _type;
+    }
+
+    inline virtual int resultType()
+    {
+        return _child ? _child->resultType() : erUndefined;
+    }
+
+    inline virtual ExpressionResult result()
+    {
+        if (!_child)
+            return ExpressionResult();
+
+        ExpressionResult res = _child->result();
+        // Is the expression decidable?
+        if (res.resultType != erConstant) {
+            // Undecidable, so return the correct result type
+            res.resultType |= erInvalid;
+            return res;
+        }
+
+        switch (_type) {
+        case etUnaryInc:
+            ++res.result.ui64;
+            break;
+
+        case etUnaryDec:
+            --res.result.ui64;
+            break;
+
+            /// @todo Fixme
+//        case etUnaryStar:
+//        case etUnaryAmp:
+
+        case etUnaryMinus:
+            res.result.i64 = -res.result.i64;
+            break;
+
+        case etUnaryInv:
+            res.result.ui64 = ~res.result.ui64;
+            break;
+
+        case etUnaryNot:
+            res.result.ui64 = !res.result.ui64 ? 1 : 0;
+            break;
+
+        default:
+            res.resultType = erUndefined;
+        }
+
+        return res;
+    }
+
+protected:
+    ExpressionType _type;
+    ASTExpression* _child;
+};
+
+
 
 
 #endif // ASTEXPRESSION_H
