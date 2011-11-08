@@ -4,8 +4,10 @@
 #include <expressionevalexception.h>
 #include <astnode.h>
 #include <asttypeevaluator.h>
+#include <astsourceprinter.h>
 #include "symfactory.h"
 #include "basetype.h"
+#include "array.h"
 
 #define checkNodeType(node, expected_type) \
     if ((node)->type != (expected_type)) { \
@@ -634,34 +636,142 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncExpect(ASTNode *node)
 
 ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(ASTNode *node)
 {
-    /*
     if (!node)
         return 0;
     checkNodeType(node, nt_builtin_function_offsetof);
 
-    ASTNode *pe = node->u.builtin_function_offsetof.postfix_expression;
-    ASTNodeList *pesl = pe->u.postfix_expression.postfix_expression_suffix_list;
+    ASTNode *pfe = node->u.builtin_function_offsetof.postfix_expression;
+    ASTNode* pre = pfe->u.postfix_expression.primary_expression;
     ASTType* type = _eval->typeofNode(node->u.builtin_function_offsetof.type_name);
-    assert(type != 0);
-    BaseType* bt = _factory->findBaseTypesForAstType(type, _eval);
+    if (!type || !(type->type() & StructOrUnion)) {
+        ASTSourcePrinter printer(_ast);
+        exprEvalError(QString("Cannot find struct/union definition for \"%1\" "
+                              "at %2:%3:%4")
+                      .arg(printer.toString(pfe).trimmed())
+                      .arg(_ast->fileName())
+                      .arg(node->start->line)
+                      .arg(node->start->charPosition));
+    }
+
     quint64 offset = 0;
+    QString name = antlrTokenToStr(pre->u.primary_expression.identifier);
+    ASTNode *arrayIndexExpr = 0;
+    ASTNodeList *pfesl = pfe->u.postfix_expression.postfix_expression_suffix_list;
+    BaseType* bt = 0;
+    BaseTypeList bt_list = _factory->findBaseTypesForAstType(type, _eval).second;
+    for (int i = 0; !bt && i < bt_list.size(); ++i)
+        if (bt_list[i]->type() & StructOrUnion)
+            bt = bt_list[i];
+
+    Structured* s = 0;
+    StructuredMember* m = 0;
 
     do {
-        Structured* s = dynamic_cast<Structured*>(bt);
-        QString name = antlrTokenToStr(
-                    pe->u.postfix_expression.primary_expression
-                      ->u.primary_expression.identifier);
-        if (!s)
-            exprEvalError(QString("Cannot find type structured BaseType for \"%1\" "
-                                  "at %2:%3:%4")
-                          .arg(type->toString())
-                          .arg(_ast->fileName())
-                          .arg(node->start->line)
-                          .arg(node->start->charPosition));
-        StructuredMember* m = s->findMember(name);
-        offset += m->offset();
-    } while (pesl);
-    */
+        // Offset of array operator to member
+        if (arrayIndexExpr) {
+            // We should have found a member already
+            assert(m != 0);
+            assert(bt != 0);
+            // The type of bt should be rtArray
+            Array* a = dynamic_cast<Array*>(bt);
+            if (!a)
+                exprEvalError(QString("Type \"%1\" is not an array at %2:%3:%4")
+                              .arg(bt ? bt->prettyName() : QString("NULL"))
+                              .arg(_ast->fileName())
+                              .arg(pfesl ?
+                                       pfesl->item->start->line :
+                                       pfe->start->line)
+                              .arg(pfesl ?
+                                       pfesl->item->start->charPosition :
+                                       pfe->start->charPosition));
+            // The new BaseType is the array's referencing type
+            bt = a->refTypeDeep(BaseType::trLexical);
+
+            ASTExpression* expr = exprOfNode(arrayIndexExpr);
+            ExpressionResult index = expr->result();
+            // We should find at least one constant expression
+            while (expr->hasAlternative() && index.resultType != etConstant) {
+                expr = expr->alternative();
+                index = expr->result();
+            }
+            // Make sure we can evaluate the expression
+            if (index.resultType != etConstant) {
+                ASTSourcePrinter printer(_ast);
+                exprEvalError(QString("Expression in brackets is not constant "
+                                      "in \"%1\" at %2:%3:%4")
+                              .arg(printer.toString(pfe).trimmed())
+                              .arg(_ast->fileName())
+                              .arg(arrayIndexExpr->start->line)
+                              .arg(arrayIndexExpr->start->charPosition));
+            }
+            // Add array offset to total offset
+            offset += index.result.ui64 * bt->size();
+            // Dereference
+        }
+        // Offset of member by name
+        else {
+            s = dynamic_cast<Structured*>(bt);
+            if (!s)
+                exprEvalError(QString("Cannot find type struct/union BaseType "
+                                      "for \"%1\" at %2:%3:%4")
+                              .arg(type->toString())
+                              .arg(_ast->fileName())
+                              .arg(pfesl ?
+                                       pfesl->item->start->line :
+                                       pfe->start->line)
+                              .arg(pfesl ?
+                                       pfesl->item->start->charPosition :
+                                       pfe->start->charPosition));
+
+            m = s->findMember(name);
+            if (!m)
+                exprEvalError(QString("Cannot find member \"%1\" in %2 at "
+                                      "%3:%4:%5")
+                              .arg(name)
+                              .arg(s->prettyName())
+                              .arg(_ast->fileName())
+                              .arg(pfesl ?
+                                       pfesl->item->start->line :
+                                       pfe->start->line)
+                              .arg(pfesl ?
+                                       pfesl->item->start->charPosition :
+                                       pfe->start->charPosition));
+            // Add the member's offset to total offset
+            offset += m->offset();
+            bt = m->refTypeDeep(BaseType::trLexical);
+        }
+
+        // Advance to next item in list, or end the loop
+        if (pfesl) {
+            if (pfesl->item->type == nt_postfix_expression_dot) {
+                name = antlrTokenToStr(pfesl->item
+                                       ->u.postfix_expression_suffix.identifier);
+                arrayIndexExpr = 0;
+            }
+            else if (pfesl->item->type == nt_postfix_expression_brackets) {
+                name.clear();
+                arrayIndexExpr = pfesl->item
+                        ->u.postfix_expression_suffix.expression
+                        ->item;
+            }
+            else {
+                exprEvalError(QString("Unexpected postfix expression suffix "
+                                      "type: %1 at %2:%3:%4")
+                              .arg(ast_node_type_to_str(pfesl->item))
+                              .arg(_ast->fileName())
+                              .arg(node->start->line)
+                              .arg(node->start->charPosition));
+
+            }
+            pfesl = pfesl->next;
+        }
+        else
+            break;
+
+    } while (true);
+
+    // Return the result
+    return createExprNode<ASTConstantExpression>(offset);
 }
 
 /*
