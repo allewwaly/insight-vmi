@@ -771,12 +771,6 @@ QString ASTSourcePrinter::toString(bool lineNo)
 
 QString ASTSourcePrinter::toString(const ASTNode* node, bool lineNo)
 {
-    return toString(const_cast<ASTNode*>(node), lineNo);
-}
-
-
-QString ASTSourcePrinter::toString(ASTNode* node, bool lineNo)
-{
     _line.clear();
     _out.clear();
     _lineIndent = _indent = 0;
