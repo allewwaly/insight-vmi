@@ -6,6 +6,7 @@
 
 /// Different types of expressions
 enum ExpressionType {
+    etVoid,
     etRuntimeDependent,
     etConstant,
     etVariable,
@@ -44,7 +45,8 @@ enum ExpressionResultType {
     erLocalVar  = (1 << 2),  ///< Expression involves local variable
     erParameter = (1 << 3),  ///< Expression involves function parameters
     erRuntime   = (1 << 4),  ///< Expression involves run-time dependencies
-    erInvalid   = (1 << 5)   ///< Expression result cannot be determined
+    erInvalid   = (1 << 5),  ///< Expression result cannot be determined
+    erVoid      = (1 << 6)   ///< Expression result is void
 };
 
 
@@ -77,7 +79,7 @@ public:
     ASTExpression() : _alternative(0) {}
 
     virtual ExpressionType type() const = 0;
-    virtual int resultType() = 0;
+    virtual int resultType() const = 0;
     virtual ExpressionResult result() = 0;
 
     inline bool hasAlternative() const
@@ -106,6 +108,28 @@ protected:
 };
 
 /**
+ * This expression returns nothing and cannot be evaluated.
+ */
+class ASTVoidExpression: public ASTExpression
+{
+public:
+    inline virtual ExpressionType type() const
+    {
+        return etVoid;
+    }
+
+    inline virtual int resultType() const
+    {
+        return erInvalid|erRuntime;
+    }
+
+    inline virtual ExpressionResult result()
+    {
+        return ExpressionResult(resultType(), 0);
+    }
+};
+
+/**
  * This expression involves run-time depencencies and cannot be evaluated.
  */
 class ASTRuntimeExpression: public ASTExpression
@@ -116,14 +140,14 @@ public:
         return etRuntimeDependent;
     }
 
-    inline virtual int resultType()
+    inline virtual int resultType() const
     {
         return erRuntime;
     }
 
     inline virtual ExpressionResult result()
     {
-        return ExpressionResult(erRuntime, 0);
+        return ExpressionResult(resultType(), 0);
     }
 };
 
@@ -140,7 +164,7 @@ public:
         return etConstant;
     }
 
-    inline virtual int resultType()
+    inline virtual int resultType() const
     {
         return erConstant;
     }
@@ -178,7 +202,7 @@ public:
         return etVariable;
     }
 
-    inline virtual int resultType()
+    inline virtual int resultType() const
     {
         if (!_symbol)
             return erUndefined;
@@ -231,7 +255,7 @@ public:
         return _type;
     }
 
-    inline virtual int resultType()
+    inline virtual int resultType() const
     {
         return (_left && _right) ?
                     _left->resultType() | _right->resultType() :
@@ -352,7 +376,7 @@ public:
         return _type;
     }
 
-    inline virtual int resultType()
+    inline virtual int resultType() const
     {
         return _child ? _child->resultType() : erUndefined;
     }
