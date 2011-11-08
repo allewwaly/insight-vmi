@@ -1,7 +1,7 @@
 #include "astexpressionevaluator.h"
 #include <abstractsyntaxtree.h>
-#include <astexpression.h>
-#include <expressionevalexception.h>
+#include "astexpression.h"
+#include "expressionevalexception.h"
 #include <astnode.h>
 #include <asttypeevaluator.h>
 #include <astsourceprinter.h>
@@ -22,7 +22,7 @@
 
 ASTExpressionEvaluator::ASTExpressionEvaluator(ASTTypeEvaluator *eval,
                                                SymFactory *factory)
-    : ASTWalker(eval ? eval->ast() : 0), _eval(eval), _factory(factory)
+    : _ast(eval ? eval->ast() : 0), _eval(eval), _factory(factory)
 {
 }
 

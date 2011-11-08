@@ -1,16 +1,19 @@
 #ifndef ASTEXPRESSIONEVALUATOR_H
 #define ASTEXPRESSIONEVALUATOR_H
 
-#include <astwalker.h>
+//#include <astwalker.h>
 #include <QHash>
 #include <QList>
 #include "astexpression.h"
 
 class ASTType;
+class ASTNode;
+class ASTNodeList;
 class ASTExpression;
 class ASTBinaryExpression;
 class ASTTypeEvaluator;
 class SymFactory;
+class AbstractSyntaxTree;
 
 typedef QList<ASTExpression*> ASTExpressionList;
 typedef QHash<const ASTNode*, ASTExpression*> ASTNodeExpressionHash;
@@ -18,7 +21,7 @@ typedef QHash<const ASTNode*, ASTExpression*> ASTNodeExpressionHash;
 /**
   This class evaluates expressions within a syntax tree.
  */
-class ASTExpressionEvaluator : public ASTWalker
+class ASTExpressionEvaluator
 {
 public:
     ASTExpressionEvaluator(ASTTypeEvaluator* eval, SymFactory* factory);
@@ -50,6 +53,7 @@ private:
 
     ASTExpressionList _allExpressions;
     ASTNodeExpressionHash _expressions;
+    AbstractSyntaxTree* _ast;
     ASTTypeEvaluator* _eval;
     SymFactory* _factory;
 };
