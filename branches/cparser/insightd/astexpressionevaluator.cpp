@@ -82,7 +82,7 @@ inline ASTExpression* setExprOrAddAlternative(ASTExpression *dest,
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfNodeList(ASTNodeList *list)
+ASTExpression* ASTExpressionEvaluator::exprOfNodeList(const ASTNodeList *list)
 {
     ASTExpression* expr = 0;
     while (list) {
@@ -96,7 +96,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfNodeList(ASTNodeList *list)
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfNode(ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
 {
     if (!node)
         return 0;
@@ -205,7 +205,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(ASTNode *node)
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfAssignmentExpr(ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfAssignmentExpr(const ASTNode *node)
 {
     if (!node)
         return 0;
@@ -220,7 +220,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfAssignmentExpr(ASTNode *node)
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfConditionalExpr(ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfConditionalExpr(const ASTNode *node)
 {
     if (!node)
         return 0;
@@ -261,7 +261,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfConditionalExpr(ASTNode *node)
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfBinaryExpr(ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBinaryExpr(const ASTNode *node)
 {
     if (!node)
         return 0;
@@ -334,7 +334,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBinaryExpr(ASTNode *node)
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(const ASTNode *node)
 {
     if (!node)
         return 0;
@@ -418,16 +418,16 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(ASTNode *node)
 
   Source: http://gcc.gnu.org/onlinedocs/gcc/Alignment.html
  */
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncAlignOf(ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncAlignOf(const ASTNode *node)
 {
     if (!node)
         return 0;
     checkNodeType(node, nt_builtin_function_alignof);
 
-    ASTNode* n = node->u.builtin_function_alignof.unary_expression ?
+    const ASTNode* n = node->u.builtin_function_alignof.unary_expression ?
                 node->u.builtin_function_alignof.unary_expression :
                 node->u.builtin_function_alignof.type_name;
-    ASTType* t = _eval->typeofNode(n);
+    const ASTType* t = _eval->typeofNode(n);
     quint64 value = 0;
 
     // Alignment ignores arrays and top-level qualifiers
@@ -486,7 +486,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncAlignOf(ASTNode *node)
 
   Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
  */
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncChooseExpr(ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncChooseExpr(const ASTNode *node)
 {
     if (!node)
         return 0;
@@ -502,7 +502,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncChooseExpr(ASTNode *node
         ExpressionResult res = expr->result();
         // Is the result valid?
         if (res.resultType == erConstant) {
-            ASTNode *n = res.result.i64 ?
+            const ASTNode *n = res.result.i64 ?
                         node->u.builtin_function_choose_expr.assignment_expression1 :
                         node->u.builtin_function_choose_expr.assignment_expression2;
             ae1 = exprOfNode(n);
@@ -544,7 +544,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncChooseExpr(ASTNode *node
   Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Object-Size-Checking.html
  */
 ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncObjectSize(
-        ASTNode *node)
+        const ASTNode *node)
 {
     if (!node)
         return 0;
@@ -584,7 +584,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncObjectSize(
 
   Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
  */
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncConstant(ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncConstant(const ASTNode *node)
 {
     if (!node)
         return 0;
@@ -624,7 +624,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncConstant(ASTNode *node)
 
   Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
 */
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncExpect(ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncExpect(const ASTNode *node)
 {
     if (!node)
         return 0;
@@ -634,14 +634,14 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncExpect(ASTNode *node)
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *node)
 {
     if (!node)
         return 0;
     checkNodeType(node, nt_builtin_function_offsetof);
 
-    ASTNode *pfe = node->u.builtin_function_offsetof.postfix_expression;
-    ASTNode* pre = pfe->u.postfix_expression.primary_expression;
+    const ASTNode *pfe = node->u.builtin_function_offsetof.postfix_expression;
+    const ASTNode* pre = pfe->u.postfix_expression.primary_expression;
     ASTType* type = _eval->typeofNode(node->u.builtin_function_offsetof.type_name);
     if (!type || !(type->type() & StructOrUnion)) {
         ASTSourcePrinter printer(_ast);
@@ -655,8 +655,9 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(ASTNode *node)
 
     quint64 offset = 0;
     QString name = antlrTokenToStr(pre->u.primary_expression.identifier);
-    ASTNode *arrayIndexExpr = 0;
-    ASTNodeList *pfesl = pfe->u.postfix_expression.postfix_expression_suffix_list;
+    const ASTNode *arrayIndexExpr = 0;
+    const ASTNodeList *pfesl =
+            pfe->u.postfix_expression.postfix_expression_suffix_list;
     BaseType* bt = 0;
     BaseTypeList bt_list = _factory->findBaseTypesForAstType(type, _eval).second;
     for (int i = 0; !bt && i < bt_list.size(); ++i)
@@ -817,7 +818,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(ASTNode *node)
   Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
  */
 ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncTypesCompatible(
-        ASTNode *node)
+        const ASTNode *node)
 {
     if (!node)
         return 0;
@@ -836,7 +837,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncTypesCompatible(
 }
 
 
-unsigned int ASTExpressionEvaluator::sizeofType(ASTType *type)
+unsigned int ASTExpressionEvaluator::sizeofType(const ASTType *type)
 {
     while (type && (type->type() & (rtConst|rtVolatile)))
         type = type->next();
@@ -844,7 +845,7 @@ unsigned int ASTExpressionEvaluator::sizeofType(ASTType *type)
     if (!type)
         return 0;
 
-    ASTNode* node = 0;
+    const ASTNode* node = 0;
 
     switch (type->type()) {
     case rtInt8:

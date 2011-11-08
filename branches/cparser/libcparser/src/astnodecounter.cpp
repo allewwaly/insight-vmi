@@ -20,7 +20,7 @@ ASTNodeCounter::~ASTNodeCounter()
 }
 
 
-int ASTNodeCounter::count(pASTNode startNode, enum ASTNodeType type)
+int ASTNodeCounter::count(const ASTNode *startNode, enum ASTNodeType type)
 {
     _counter = 0;
     _type = type;
@@ -30,7 +30,7 @@ int ASTNodeCounter::count(pASTNode startNode, enum ASTNodeType type)
 }
 
 
-void ASTNodeCounter::beforeChildren(pASTNode node, int /* flags */)
+void ASTNodeCounter::beforeChildren(const ASTNode *node, int /* flags */)
 {
     if (node->type != _type)
         return;

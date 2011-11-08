@@ -47,7 +47,7 @@ inline QString ASTDotGraph::dotEscape(const QString& s) const
 }
 
 
-inline QString ASTDotGraph::getNodeId(pASTNode node) const
+inline QString ASTDotGraph::getNodeId(const ASTNode *node) const
 {
     return QString::number((quint64)node, 16);
 }
@@ -59,7 +59,7 @@ inline QString ASTDotGraph::getTokenId(pANTLR3_COMMON_TOKEN token) const
 }
 
 
-inline void ASTDotGraph::printDotGraphNodeLabel(pASTNode node)
+inline void ASTDotGraph::printDotGraphNodeLabel(const ASTNode *node)
 {
     if (!node)
         return;
@@ -150,7 +150,7 @@ void ASTDotGraph::printDotGraphTokenList(pASTTokenList list,
 }
 
 
-void ASTDotGraph::beforeChildren(pASTNode node, int flags)
+void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
 {
     Q_UNUSED(flags);
 
@@ -417,7 +417,7 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
         break;
     case nt_pointer: {
         // Is this within a declaration?
-        pASTNode p = node->parent;
+        const ASTNode* p = node->parent;
         while (p && p->type != nt_declarator)
             p = p->parent;
         if (p)
@@ -483,7 +483,7 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
         break;
     case nt_struct_or_union_specifier:
         if (node->u.struct_or_union_specifier.struct_or_union) {
-            pASTNode sou = node->u.struct_or_union_specifier.struct_or_union;
+            const ASTNode* sou = node->u.struct_or_union_specifier.struct_or_union;
             if (sou->type == nt_struct_or_union_struct)
                 printDotGraphString("struct", nodeId, TOK_TYPE_SPECIFIER);
             else
@@ -577,7 +577,7 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
 }
 
 
-void ASTDotGraph::afterChildren(pASTNode node, int flags)
+void ASTDotGraph::afterChildren(const ASTNode* node, int flags)
 {
     Q_UNUSED(flags);
     QString nodeId = QString::number((quint64)node, 16);
@@ -817,7 +817,7 @@ int ASTDotGraph::writeDotGraph(const QString& fileName)
                 .arg("translation_unit")
             << endl;
 
-        for (pASTNodeList p = _ast->rootNodes(); p; p = p->next) {
+        for (const ASTNodeList* p = _ast->rootNodes(); p; p = p->next) {
             if (!p->item)
                 continue;
             _out << QString("\t\tnode_%1 -> node_%2;")
@@ -838,7 +838,7 @@ int ASTDotGraph::writeDotGraph(const QString& fileName)
 }
 
 
-int ASTDotGraph::writeDotGraph(pASTNode node, const QString& fileName)
+int ASTDotGraph::writeDotGraph(const ASTNode* node, const QString& fileName)
 {
     QFile file(fileName);
     if (!file.open(QIODevice::WriteOnly|QIODevice::Truncate)) {
@@ -859,7 +859,7 @@ int ASTDotGraph::writeDotGraph(pASTNode node, const QString& fileName)
 
     if (node) {
         // Work our way up from node to the first parent
-        pASTNode child = node, par = node->parent;
+        const ASTNode *child = node, *par = node->parent;
         while (par) {
             // Parent's label
             printDotGraphNodeLabel(par);

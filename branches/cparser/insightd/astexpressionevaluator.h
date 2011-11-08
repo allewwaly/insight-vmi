@@ -13,7 +13,7 @@ class ASTTypeEvaluator;
 class SymFactory;
 
 typedef QList<ASTExpression*> ASTExpressionList;
-typedef QHash<pASTNode, ASTExpression*> ASTNodeExpressionHash;
+typedef QHash<const ASTNode*, ASTExpression*> ASTNodeExpressionHash;
 
 /**
   This class evaluates expressions within a syntax tree.
@@ -24,7 +24,7 @@ public:
     ASTExpressionEvaluator(ASTTypeEvaluator* eval, SymFactory* factory);
     virtual ~ASTExpressionEvaluator();
 
-    ASTExpression* exprOfNode(ASTNode * node);
+    ASTExpression* exprOfNode(const ASTNode *node);
 
 private:
     template<class T> T* createExprNode();
@@ -32,20 +32,20 @@ private:
     template<class T> T* createExprNode(quint64 value);
     template<class T> T* createExprNode(const ASTSymbol* symbol);
 
-    ASTExpression *exprOfAssignmentExpr(ASTNode *node);
-    ASTExpression *exprOfBinaryExpr(ASTNode *node);
-    ASTExpression *exprOfBuiltinFuncAlignOf(ASTNode *node);
-    ASTExpression *exprOfBuiltinFuncChooseExpr(ASTNode *node);
-    ASTExpression *exprOfBuiltinFuncConstant(ASTNode *node);
-    ASTExpression *exprOfBuiltinFuncExpect(ASTNode *node);
-    ASTExpression *exprOfBuiltinFuncObjectSize(ASTNode *node);
-    ASTExpression *exprOfBuiltinFuncOffsetOf(ASTNode *node);
-    ASTExpression *exprOfBuiltinFuncTypesCompatible(ASTNode *node);
-    ASTExpression *exprOfConditionalExpr(ASTNode *node);
-    ASTExpression *exprOfNodeList(ASTNodeList *list);
-    ASTExpression *exprOfUnaryExpr(ASTNode *node);
+    ASTExpression *exprOfAssignmentExpr(const ASTNode *node);
+    ASTExpression *exprOfBinaryExpr(const ASTNode *node);
+    ASTExpression *exprOfBuiltinFuncAlignOf(const ASTNode *node);
+    ASTExpression *exprOfBuiltinFuncChooseExpr(const ASTNode *node);
+    ASTExpression *exprOfBuiltinFuncConstant(const ASTNode *node);
+    ASTExpression *exprOfBuiltinFuncExpect(const ASTNode *node);
+    ASTExpression *exprOfBuiltinFuncObjectSize(const ASTNode *node);
+    ASTExpression *exprOfBuiltinFuncOffsetOf(const ASTNode *node);
+    ASTExpression *exprOfBuiltinFuncTypesCompatible(const ASTNode *node);
+    ASTExpression *exprOfConditionalExpr(const ASTNode *node);
+    ASTExpression *exprOfNodeList(const ASTNodeList *list);
+    ASTExpression *exprOfUnaryExpr(const ASTNode *node);
 
-    unsigned int sizeofType(ASTType *type);
+    unsigned int sizeofType(const ASTType *type);
 
     ASTExpressionList _allExpressions;
     ASTNodeExpressionHash _expressions;
