@@ -28,10 +28,10 @@ int ASTWalker::walkTree()
 }
 
 
-int ASTWalker::walkTree(pASTNodeList head)
+int ASTWalker::walkTree(const ASTNodeList *head)
 {
 	int visits = 0;
-    for (pASTNodeList p = head; p && !_stopWalking; p = p->next) {
+	for (const ASTNodeList *p = head; p && !_stopWalking; p = p->next) {
         // List flags of current item
         int flags = wfIsList;
         if (p == head)
@@ -45,7 +45,7 @@ int ASTWalker::walkTree(pASTNodeList head)
 }
 
 
-int ASTWalker::walkTree(pASTNode node, int flags)
+int ASTWalker::walkTree(const ASTNode *node, int flags)
 {
     if (!node || _stopWalking)
         return 0;

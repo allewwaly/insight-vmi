@@ -20,18 +20,18 @@ public:
     ASTNodeCounter(AbstractSyntaxTree* ast = 0);
     virtual ~ASTNodeCounter();
 
-    int count(pASTNode startNode, ASTNodeType type);
+    int count(const ASTNode *startNode, ASTNodeType type);
 
     template<class T>
-    inline int countEqual(pASTNode startNode, ASTNodeType type, quint32 memberOffset,
-            T compareTo)
+    inline int countEqual(const ASTNode *startNode, ASTNodeType type,
+                          quint32 memberOffset, T compareTo)
     {
         _method = cmMembersEqual;
         return count(startNode, type, memberOffset, compareTo);
     }
 
     template<class T>
-    inline int countNotEqual(pASTNode startNode, ASTNodeType type,
+    inline int countNotEqual(const ASTNode *startNode, ASTNodeType type,
             quint32 memberOffset, T compareTo)
     {
         _method = cmMembersNotEqual;
@@ -39,10 +39,10 @@ public:
     }
 
 protected:
-    virtual void beforeChildren(pASTNode node, int flags);
+    virtual void beforeChildren(const ASTNode *node, int flags);
 
     template<class T>
-    int count(pASTNode startNode, ASTNodeType type, quint32 memberOffset,
+    int count(const ASTNode *startNode, ASTNodeType type, quint32 memberOffset,
             T compareTo);
 
 private:
@@ -62,7 +62,7 @@ private:
 
 
 template<class T>
-int ASTNodeCounter::count(pASTNode startNode, enum ASTNodeType type,
+int ASTNodeCounter::count(const ASTNode *startNode, enum ASTNodeType type,
         quint32 memberOffset, T compareTo)
 {
     assert(memberOffset + sizeof(T) <= sizeof(ASTNode::Children));

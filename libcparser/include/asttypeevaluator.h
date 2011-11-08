@@ -24,7 +24,7 @@ public:
     ASTType(RealType type, const QString& identifier)
     	: _type(type), _next(0), _identifier(identifier), _node(0),
     	  _pointerSkipped(false) {}
-    ASTType(RealType type, ASTNode* node)
+    ASTType(RealType type, const ASTNode* node)
     	: _type(type), _next(0), _node(node), _pointerSkipped(false) {}
 
     inline bool isNull() const { return _type == 0; }
@@ -34,8 +34,8 @@ public:
     inline void setNext(ASTType* next) { _next = next; }
     inline const QString& identifier() const { return _identifier; }
     inline void setIdentifier(const QString& id) { _identifier = id; }
-    inline ASTNode* node() const { return _node; }
-    inline void setNode(ASTNode* node) { _node = node; }
+    inline const ASTNode* node() const { return _node; }
+    inline void setNode(const ASTNode* node) { _node = node; }
     inline bool pointerSkipped() const { return _pointerSkipped; }
     inline void setPointerSkipped(bool value) { _pointerSkipped = value; }
     inline bool isPointer() const {
@@ -49,13 +49,13 @@ private:
     RealType _type;
     ASTType* _next;
     QString _identifier;
-    ASTNode* _node;
+    const ASTNode* _node;
     bool _pointerSkipped;
 };
 
-typedef QHash<const pASTNode, ASTType*> ASTNodeTypeHash;
+typedef QHash<const ASTNode*, ASTType*> ASTNodeTypeHash;
 typedef QList<ASTType*> ASTTypeList;
-typedef QStack<pASTNode> ASTNodeStack;
+typedef QStack<const ASTNode*> ASTNodeStack;
 
 
 /**
@@ -70,7 +70,7 @@ public:
     virtual ~ASTTypeEvaluator();
 
     bool evaluateTypes();
-    ASTType* typeofNode(pASTNode node);
+    ASTType* typeofNode(const ASTNode* node);
     int sizeofLong() const;
 
 protected:
@@ -87,9 +87,9 @@ protected:
         erAddressOperation
     };
 
-//    virtual void beforeChildren(pASTNode node, int flags);
-    virtual void afterChildren(pASTNode node, int flags);
-    EvalResult evaluatePrimaryExpression(ASTNode *node);
+//    virtual void beforeChildren(const ASTNode *node, int flags);
+    virtual void afterChildren(const ASTNode *node, int flags);
+    EvalResult evaluatePrimaryExpression(const ASTNode *node);
 
     /**
      * This function is called during the execution of evaluateTypes() each
@@ -125,21 +125,23 @@ protected:
 private:
     ASTType* copyASTType(const ASTType* src);
     ASTType* createASTType(RealType type, ASTType* next = 0);
-    ASTType* createASTType(RealType type, ASTNode* node, const QString& identifier);
-    ASTType* createASTType(RealType type, ASTNode* node, ASTType* next = 0);
+    ASTType* createASTType(RealType type, const ASTNode* node,
+                           const QString& identifier);
+    ASTType* createASTType(RealType type, const ASTNode* node,
+                           ASTType* next = 0);
     ASTType* copyDeepAppend(const ASTType* src, ASTType* next);
     ASTType* copyDeep(const ASTType* src);
     RealType evaluateBuiltinType(const pASTTokenList list) const;
-    ASTType* typeofTypeId(pASTNode node);
+    ASTType* typeofTypeId(const ASTNode* node);
     inline RealType realTypeOfLong() const;
     inline RealType realTypeOfULong() const;
     RealType resolveBaseType(const ASTType* type) const;
     int sizeofType(RealType type) const;
     inline bool typeIsLargerThen(RealType typeA, RealType typeB) const;
-    inline bool hasValidType(pASTNode node) const;
-    void genDotGraphForNode(pASTNode node) const;
+    inline bool hasValidType(const ASTNode* node) const;
+    void genDotGraphForNode(const ASTNode* node) const;
     QString postfixExpressionToStr(const ASTNode* postfix_exp, const ASTNode* last_pes = 0) const;
-    const ASTSymbol *findSymbolOfPrimaryExpression(pASTNode node);
+    const ASTSymbol *findSymbolOfPrimaryExpression(const ASTNode* node);
 
     ASTType* typeofIntegerExpression(ASTType* lt, ASTType* rt, const QString& op) const;
     ASTType* typeofNumericExpression(ASTType* lt, ASTType* rt, const QString& op) const;
@@ -149,35 +151,35 @@ private:
     ASTType* typeofSymbolDeclaration(const ASTSymbol* sym);
     ASTType* typeofSymbolFunctionDef(const ASTSymbol* sym);
     ASTType* typeofSymbolFunctionParam(const ASTSymbol* sym);
-    ASTType* typeofDesignatedInitializer(pASTNode node);
-    ASTType* typeofInitializer(pASTNode node);
-    ASTType* typeofStructDeclarator(pASTNode node);
-    ASTType* typeofStructOrUnionSpecifier(pASTNode node);
-    ASTType* typeofEnumSpecifier(pASTNode node);
-    ASTType* typeofSpecifierQualifierList(pASTNodeList sql);
-    ASTType* typeofEnumerator(pASTNode node);
-    ASTType* typeofParameterDeclaration(pASTNode node);
-    ASTType* typeofTypeName(pASTNode node);
-    ASTType* typeofUnaryExpressionOp(pASTNode node);
-    ASTType* typeofCompoundBracesStatement(pASTNode node);
-    ASTType* typeofBuiltinFunction(pASTNode node);
-    ASTType* typeofBuiltinType(const pASTTokenList list, pASTNode node);
-    ASTType* typeofPrimaryExpression(pASTNode node);
-    ASTType* typeofDirectDeclarator(pASTNode node);
-    ASTType* typeofDeclarationSpecifier(pASTNode node);
-    ASTType* typeofPostfixExpression(pASTNode node);
-    ASTType* typeofPostfixExpressionSuffix(pASTNode node);
+    ASTType* typeofDesignatedInitializer(const ASTNode* node);
+    ASTType* typeofInitializer(const ASTNode* node);
+    ASTType* typeofStructDeclarator(const ASTNode* node);
+    ASTType* typeofStructOrUnionSpecifier(const ASTNode* node);
+    ASTType* typeofEnumSpecifier(const ASTNode* node);
+    ASTType* typeofSpecifierQualifierList(const ASTNodeList* sql);
+    ASTType* typeofEnumerator(const ASTNode* node);
+    ASTType* typeofParameterDeclaration(const ASTNode* node);
+    ASTType* typeofTypeName(const ASTNode* node);
+    ASTType* typeofUnaryExpressionOp(const ASTNode* node);
+    ASTType* typeofCompoundBracesStatement(const ASTNode* node);
+    ASTType* typeofBuiltinFunction(const ASTNode* node);
+    ASTType* typeofBuiltinType(const pASTTokenList list, const ASTNode* node);
+    ASTType* typeofPrimaryExpression(const ASTNode* node);
+    ASTType* typeofDirectDeclarator(const ASTNode* node);
+    ASTType* typeofDeclarationSpecifier(const ASTNode* node);
+    ASTType* typeofPostfixExpression(const ASTNode* node);
+    ASTType* typeofPostfixExpressionSuffix(const ASTNode* node);
 
-    ASTType* embeddingFuncReturnType(pASTNode node);
-    const ASTSymbol* embeddingFuncSymbol(ASTNode *node);
-    ASTType* expectedTypeAtInitializerPosition(pASTNode node);
-    ASTType* preprendPointers(pASTNode d_ad, ASTType* type);
-    ASTType* preprendArrays(pASTNode dd_dad, ASTType* type);
-    ASTType* preprendPointersArrays(pASTNode d_ad, ASTType* type);
+    ASTType* embeddingFuncReturnType(const ASTNode* node);
+    const ASTSymbol* embeddingFuncSymbol(const ASTNode *node);
+    ASTType* expectedTypeAtInitializerPosition(const ASTNode* node);
+    ASTType* preprendPointers(const ASTNode* d_ad, ASTType* type);
+    ASTType* preprendArrays(const ASTNode* dd_dad, ASTType* type);
+    ASTType* preprendPointersArrays(const ASTNode* d_ad, ASTType* type);
     ASTType* preprendPointersArraysOfIdentifier(const QString& identifier,
-            pASTNode declaration, ASTType* type);
-    pASTNode findIdentifierInIDL(const QString& identifier,
-    		pASTNodeList initDeclaratorList);
+            const ASTNode* declaration, ASTType* type);
+    const ASTNode* findIdentifierInIDL(const QString& identifier,
+            const ASTNodeList* initDeclaratorList);
     ASTNodeTypeHash _types;
     ASTTypeList _allTypes;
     ASTNodeStack _nodeStack;
@@ -188,6 +190,17 @@ private:
 inline int ASTTypeEvaluator::sizeofLong() const
 {
     return _sizeofLong;
+}
+
+inline RealType ASTTypeEvaluator::realTypeOfLong() const
+{
+    return (sizeofLong() == 4) ? rtInt32 : rtInt64;
+}
+
+
+inline RealType ASTTypeEvaluator::realTypeOfULong() const
+{
+    return (sizeofLong() == 4) ? rtUInt32 : rtUInt64;
 }
 
 #endif /* ASTTYPEEVALUATOR_H_ */

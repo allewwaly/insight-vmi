@@ -1735,8 +1735,8 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
         if (astTypeNonPtr->identifier().isEmpty()) {
             assert(astTypeNonPtr->node() != 0);
             // See if this struct appears in a typedef or a variable definition
-            ASTNode *dec_spec = astTypeNonPtr->node()->parent->parent;
-            ASTNode *dec = dec_spec->parent;
+            const ASTNode *dec_spec = astTypeNonPtr->node()->parent->parent;
+            const ASTNode *dec = dec_spec->parent;
             // Did we find a declaration?
             if (dec_spec->type == nt_declaration_specifier &&
                 dec->type == nt_declaration &&
@@ -1792,7 +1792,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
                 QString id = antlrTokenToStr(tok);
 
                 // Get the BaseType of the embedding struct
-                ASTNode* structSpecifier = astTypeNonPtr->node()->parent;
+                const ASTNode* structSpecifier = astTypeNonPtr->node()->parent;
                 while (structSpecifier) {
                     if (structSpecifier->type == nt_struct_or_union_specifier) {
                         // Get the ASTType for the struct, and from there the BaseType
@@ -1825,11 +1825,11 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
             factoryError(QString("Expected type nt_declarator_suffix_parens "
                                  "but got %1")
                          .arg(ast_node_type_to_str(astTypeNonPtr->node())));
-        struct ASTNode* dd = astTypeNonPtr->node()->parent;
+        const ASTNode* dd = astTypeNonPtr->node()->parent;
         bool nameInNestedDeclarator = false;
         if (!dd->u.direct_declarator.identifier) {
             nameInNestedDeclarator = true;
-            struct ASTNode* dclr = dd->u.direct_declarator.declarator;
+            const ASTNode* dclr = dd->u.direct_declarator.declarator;
             assert(dclr != 0);
             dd = dclr->u.declarator.direct_declarator;
             assert(dd != 0);
@@ -1843,7 +1843,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
             astTypeNonPtr->node()->parent->parent->parent->type == nt_struct_declarator)
         {
             // Get the BaseType of the embedding struct
-            ASTNode* structSpecifier = astTypeNonPtr->node()->parent;
+            const ASTNode* structSpecifier = astTypeNonPtr->node()->parent;
             while (structSpecifier) {
                 if (structSpecifier->type == nt_struct_or_union_specifier) {
                     // Get the ASTType for the struct, and from there the BaseType
