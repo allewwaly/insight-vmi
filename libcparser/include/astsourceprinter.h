@@ -21,7 +21,6 @@ public:
 
     QString toString(bool lineNo = false);
     QString toString(const ASTNode* node, bool lineNo = false);
-    QString toString(ASTNode* node, bool lineNo = false);
 
 protected:
     virtual void beforeChildren(const ASTNode *node, int flags);
