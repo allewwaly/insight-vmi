@@ -153,19 +153,34 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
         expr = exprOfBuiltinFuncOffsetOf(node);
         break;
 
-        /// @todo Implement me
-//    case nt_builtin_function_prefetch:
-//    case nt_builtin_function_return_address:
-//    case nt_builtin_function_sizeof:
-//    case nt_builtin_function_types_compatible_p:
-//    case nt_builtin_function_va_arg:
-//    case nt_builtin_function_va_copy:
-//    case nt_builtin_function_va_end:
-//    case nt_builtin_function_va_start:
+    case nt_builtin_function_prefetch:
+        expr = createExprNode<ASTVoidExpression>();
+        break;
+
+    case nt_builtin_function_return_address:
+        expr = createExprNode<ASTRuntimeExpression>();
+        break;
+
+    case nt_builtin_function_sizeof:
+        expr = exprOfBuiltinFuncSizeof(node);
+        break;
+
+    case nt_builtin_function_types_compatible_p:
+        expr = exprOfBuiltinFuncTypesCompatible(node);
+        break;
+
+    case nt_builtin_function_va_arg:
+    case nt_builtin_function_va_copy:
+    case nt_builtin_function_va_end:
+    case nt_builtin_function_va_start:
+        expr = createExprNode<ASTRuntimeExpression>();
+        break;
 
     case nt_cast_expression:
-        if (node->u.cast_expression.cast_expression)
+        if (node->u.cast_expression.type_name) {
+            assert(node->u.cast_expression.cast_expression != 0);
             return exprOfNode(node->u.cast_expression.cast_expression);
+        }
         else
             return exprOfNode(node->u.cast_expression.unary_expression);
         break;
@@ -773,6 +788,40 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *
 
     // Return the result
     return createExprNode<ASTConstantExpression>(offset);
+}
+
+
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *node)
+{
+    if (!node)
+        return 0;
+    checkNodeType(node, nt_builtin_function_sizeof);
+
+    const ASTNode* n = node->u.builtin_function_sizeof.unary_expression ?
+                node->u.builtin_function_sizeof.unary_expression :
+                node->u.builtin_function_sizeof.type_name;
+
+    ASTType* type = _eval->typeofNode(n);
+    assert(type != 0);
+    // For pointers, we can make this quick
+    if (type->type() & (rtPointer|rtFuncPointer|rtFunction))
+        return createExprNode<ASTConstantExpression>((quint64)_eval->sizeofLong());
+    // Return alternatives for all sizes
+    BaseTypeList list = _factory->findBaseTypesForAstType(type, _eval).second;
+    QSet<quint32> sizes;
+    ASTExpression *ret = 0;
+    for (int i = 0; i < list.size(); ++i) {
+        quint32 size = list[i]->size();
+        // Add each size greater zero only once
+        if (size > 0 && !sizes.contains(size)) {
+            ASTExpression *expr =
+                    createExprNode<ASTConstantExpression>((quint64)size);
+            ret = setExprOrAddAlternative(ret, expr);
+            sizes.insert(size);
+        }
+    }
+
+    return ret;
 }
 
 /*

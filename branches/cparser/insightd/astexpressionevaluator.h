@@ -40,6 +40,7 @@ private:
     ASTExpression *exprOfBuiltinFuncExpect(const ASTNode *node);
     ASTExpression *exprOfBuiltinFuncObjectSize(const ASTNode *node);
     ASTExpression *exprOfBuiltinFuncOffsetOf(const ASTNode *node);
+    ASTExpression *exprOfBuiltinFuncSizeof(const ASTNode *node);
     ASTExpression *exprOfBuiltinFuncTypesCompatible(const ASTNode *node);
     ASTExpression *exprOfConditionalExpr(const ASTNode *node);
     ASTExpression *exprOfNodeList(const ASTNodeList *list);
