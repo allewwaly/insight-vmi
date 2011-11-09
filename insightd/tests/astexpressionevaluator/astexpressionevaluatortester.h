@@ -3,11 +3,12 @@
 
 #include <QObject>
 #include <QtTest>
+#include <QByteArray>
 
 class MemSpecs;
 class SymFactory;
 class ASTTypeEvaluator;
-class ASTExpressionEvaluator;
+class ASTExpressionTester;
 class AbstractSyntaxTree;
 class ASTBuilder;
 
@@ -28,13 +29,17 @@ private slots:
 	/// Per test-case cleanup
 	void cleanup();
 
+	void test_basic_func();
+	void test_basic_func_data();
+
 private:
     MemSpecs* _specs;
     SymFactory* _factory;
     ASTTypeEvaluator* _eval;
-    ASTExpressionEvaluator* _expr;
+    ASTExpressionTester* _tester;
     AbstractSyntaxTree* _ast;
     ASTBuilder* _builder;
+    QByteArray _ascii;
 };
 
 #endif // ASTEXPRESSIONEVALUATORTESTER_H

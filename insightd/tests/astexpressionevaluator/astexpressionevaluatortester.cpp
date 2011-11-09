@@ -9,9 +9,36 @@
 #include "../../astexpression.h"
 #include "../../astexpressionevaluator.h"
 #include "../../kernelsymbolparser.h"
+#include "../../shell.h"
 
 #define safe_delete(x) \
     do { if ((x)) { delete (x); (x) = 0; } } while (0)
+
+const char* test_prog_begin =
+        "struct A {\n"
+        "       long l;\n"
+        "       short s;\n"
+        "       int i;\n"
+        "       char c;\n"
+        "};\n"
+        "\n"
+        "struct B {\n"
+        "       int j;\n"
+        "       struct A a[4];\n"
+        "       struct A* pa;\n"
+        "       struct B* pb;\n"
+        "};\n"
+        "\n"
+        "struct A a;\n"
+        "struct B b;\n"
+        "\n"
+        "int main(int argc, char** argv)\n"
+        "{\n";
+
+const char* test_prog_end =
+        "\n"
+        "}\n"
+        "\n";
 
 // Created with the following command:
 // gcc -g -o test test.c && objdump -W test | grep '^\s*<' | sed 's/^.*$/"\0\\n"/'
@@ -175,11 +202,48 @@ const char* objdump =
         "    <166>   DW_AT_location    : 9 byte block: 3 60 10 60 0 0 0 0 0     (DW_OP_addr: 601060)\n"
         "\n";
 
+QTEST_MAIN(ASTExpressionEvaluatorTester)
+
+
+class ASTExpressionTester: public ASTWalker
+{
+public:
+    ASTExpressionTester(AbstractSyntaxTree* ast, SymFactory* factory,
+                        ASTTypeEvaluator* eval)
+        : ASTWalker(ast), _expr(eval, factory) {}
+
+    ExpressionResult result;
+
+protected:
+    void afterChildren(const ASTNode *node, int flags)
+    {
+        Q_UNUSED(flags);
+        ASTExpression *e = 0;
+
+        if (node && node->type == nt_assignment_expression &&
+            node->u.assignment_expression.assignment_expression)
+            e = _expr.exprOfNode(
+                        node->u.assignment_expression.assignment_expression);
+        else if (node && node->type == nt_initializer &&
+                 node->u.initializer.assignment_expression)
+            e = _expr.exprOfNode(
+                        node->u.initializer.assignment_expression);
+
+        if (e)
+            result = e->result();
+    }
+
+private:
+    SymFactory* _factory;
+    ASTExpressionEvaluator _expr;
+};
+
 
 ASTExpressionEvaluatorTester::ASTExpressionEvaluatorTester(QObject *parent) :
-    QObject(parent), _specs(0), _factory(0), _eval(0), _expr(0), _ast(0),
+    QObject(parent), _specs(0), _factory(0), _eval(0), _tester(0), _ast(0),
     _builder(0)
 {
+    shell = new Shell(false);
 }
 
 
@@ -199,14 +263,11 @@ void ASTExpressionEvaluatorTester::initTestCase()
     // Parse the object dump
     KernelSymbolParser parser(&buf, _factory);
     parser.parse();
-
-
 }
 
 
 void ASTExpressionEvaluatorTester::cleanupTestCase()
 {
-
     safe_delete(_factory);
     safe_delete(_specs);
 }
@@ -214,11 +275,77 @@ void ASTExpressionEvaluatorTester::cleanupTestCase()
 
 void ASTExpressionEvaluatorTester::init()
 {
+    _ast = new AbstractSyntaxTree();
+    _builder = new ASTBuilder(_ast);
+    _tester = new ASTExpressionTester(_ast, _factory, _eval);
 }
 
 
 void ASTExpressionEvaluatorTester::cleanup()
 {
+	if (!_ascii.isEmpty()) {
+		QString asciiStr = QString::fromAscii(_ascii.constData(), _ascii.size());
+		std::cerr << "--------[Failed program]--------" << std::endl
+				<< asciiStr.toStdString() << std::endl
+				<< "--------[/Failed program]--------" << std::endl;
+		_ascii.clear();
+	}
+
+    safe_delete(_tester);
+    safe_delete(_builder);
+    safe_delete(_ast);
 }
 
-QTEST_MAIN(ASTExpressionEvaluatorTester)
+
+#define TEST_DATA_COLUMNS \
+    QTest::addColumn<QString>("localCode"); \
+    QTest::addColumn<int>("resultType"); \
+    QTest::addColumn<quint64>("result"); \
+
+#define	TEST_FUNCTION(methodName) \
+	void ASTExpressionEvaluatorTester::test_##methodName##_func() \
+	{ \
+		QFETCH(QString, localCode); \
+		\
+		_ascii += test_prog_begin; \
+		if (!localCode.isEmpty()) { \
+			_ascii += "    "; \
+			_ascii += localCode.toAscii(); \
+		} \
+		\
+		_ascii += test_prog_end; \
+		\
+		try{ \
+			QCOMPARE(_builder->buildFrom(_ascii), 0); \
+			QVERIFY(_tester->walkTree() > 0); \
+		\
+			QTEST(_tester->result.resultType, "resultType"); \
+			if (_tester->result.resultType == erConstant) \
+				QTEST(_tester->result.resultType, "result"); \
+		\
+		} \
+		catch (GenericException& e) { \
+			/* Re-throw unexpected exceptions */ \
+			std::cerr << "Caught exception at " << qPrintable(e.file) << ":" \
+						<< e.line << ": " << qPrintable(e.message) << std::endl; \
+			throw; \
+		} \
+		catch (...){ \
+			cleanup(); \
+			throw; \
+		} \
+		\
+		_ascii.clear(); \
+	} \
+	\
+   void ASTExpressionEvaluatorTester::test_##methodName##_func_data()
+
+
+TEST_FUNCTION(basic)
+{
+    TEST_DATA_COLUMNS;
+
+    QTest::newRow("basic1") << "int i = 0;" << (int)etConstant << (quint64)0;
+    QTest::newRow("basic2") << "int i = 1;" << (int)etConstant << (quint64)1;
+    QTest::newRow("basic3") << "int i = -1;" << (int)etConstant << (quint64)-1;
+}
