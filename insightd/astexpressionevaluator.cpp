@@ -44,28 +44,10 @@ T* ASTExpressionEvaluator::createExprNode()
 }
 
 
-template<class T>
-T* ASTExpressionEvaluator::createExprNode(ExpressionType type)
+template<class T, class PT>
+T* ASTExpressionEvaluator::createExprNode(PT param)
 {
-    T* t = new T(type);
-    _allExpressions.append(t);
-    return t;
-}
-
-
-template<class T>
-T* ASTExpressionEvaluator::createExprNode(quint64 value)
-{
-    T* t = new T(value);
-    _allExpressions.append(t);
-    return t;
-}
-
-
-template<class T>
-T* ASTExpressionEvaluator::createExprNode(const ASTSymbol* symbol)
-{
-    T* t = new T(symbol);
+    T* t = new T(param);
     _allExpressions.append(t);
     return t;
 }
@@ -185,12 +167,29 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
             return exprOfNode(node->u.cast_expression.unary_expression);
         break;
 
+    case nt_conditional_expression:
+        expr = exprOfConditionalExpr(node);
+        break;
+
+    case nt_constant_char:
+    case nt_constant_int:
+        expr = exprOfConstant(node);
+        break;
+
     case nt_lvalue:
         // Could be an lvalue cast
         if (node->u.lvalue.lvalue)
             expr = exprOfNode(node->u.lvalue.lvalue);
         else
             expr = exprOfNode(node->u.lvalue.unary_expression);
+        break;
+
+    case nt_postfix_expression:
+        expr = exprOfPostfixExpr(node);
+        break;
+
+    case nt_primary_expression:
+        expr = exprOfPrimaryExpr(node);
         break;
 
     case nt_unary_expression:
@@ -201,10 +200,12 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
         expr = exprOfUnaryExpr(node);
         break;
 
-
     default:
-        exprEvalError(QString("Unexpexted node type: %1")
-                      .arg(ast_node_type_to_str(node)));
+        exprEvalError(QString("Unexpexted node type: %1 at %2:%3:%4")
+                      .arg(ast_node_type_to_str(node))
+                      .arg(_ast ? _ast->fileName() : QString())
+                      .arg(node->start->line)
+                      .arg(node->start->charPosition));
     }
 
     if (!expr) {
@@ -329,10 +330,18 @@ ASTExpression* ASTExpressionEvaluator::exprOfBinaryExpr(const ASTNode *node)
             exprType = etShiftRight;
         break;
     case nt_additive_expression:
-        exprType = etAdditive;
+        op = antlrTokenToStr(node->u.binary_expression.op);
+        if (op == "+")
+            exprType = etAdditivePlus;
+        else
+            exprType = etAdditiveMinus;
         break;
     case nt_multiplicative_expression:
-        exprType = etMultiplicative;
+        op = antlrTokenToStr(node->u.binary_expression.op);
+        if (op == "*")
+            exprType = etMultiplicativeMult;
+        else
+            exprType = etMultiplicativeDiv;
         break;
     default:
         exprEvalError(QString("Type \"%1\" represents no binary expression at %2:%3:%4")
@@ -386,10 +395,25 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(const ASTNode *node)
             ue->setChild(ue2);
             return ue;
         }
+        else if (op == "*")
+            ue = createExprNode<ASTUnaryExpression>(etUnaryStar);
         else if (op == "+")
             return exprOfNode(node->u.unary_expression.cast_expression);
+        else if (op == "-")
+            ue = createExprNode<ASTUnaryExpression>(etUnaryMinus);
+        else if (op == "~")
+            ue = createExprNode<ASTUnaryExpression>(etUnaryInv);
+        else if (op == "!")
+            ue = createExprNode<ASTUnaryExpression>(etUnaryNot);
+        else
+            exprEvalError(QString("Unhandled unary operator: \"%1\" at %2:%3:%4")
+                    .arg(op)
+                    .arg(_ast->fileName())
+                    .arg(node->start->line)
+                    .arg(node->start->charPosition));
 
-        return exprOfNode(node->u.unary_expression.builtin_function);
+        ue->setChild(exprOfNode(node->u.unary_expression.cast_expression));
+        break;
     }
 
     default:
@@ -400,7 +424,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(const ASTNode *node)
                 .arg(node->start->charPosition));
     }
 
-    return 0;
+    return ue;
 }
 
 
@@ -569,7 +593,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncObjectSize(
     ExpressionResult res = expr->result();
     assert(res.resultType == erConstant);
 
-    ASTConstantExpression* ret = createExprNode<ASTConstantExpression>(0ULL);
+    ASTConstantExpression* ret = createExprNode<ASTConstantExpression, quint64>(0);
     // If the maximum remaining bytes are requested, return (size_t) -1 instead
     // of 0.
     if (res.result.ui64 & 2)
@@ -609,8 +633,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncConstant(const ASTNode *
                 node->u.builtin_function_constant_p.unary_expression);
     // We can only approximate GCC's constant value decision here
     return expr->resultType() == etConstant ?
-                createExprNode<ASTConstantExpression>(1ULL) :
-                createExprNode<ASTConstantExpression>(0ULL);
+                createExprNode<ASTConstantExpression, quint64>(1) :
+                createExprNode<ASTConstantExpression, quint64>(0);
 
 }
 
@@ -805,7 +829,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *no
     assert(type != 0);
     // For pointers, we can make this quick
     if (type->type() & (rtPointer|rtFuncPointer|rtFunction))
-        return createExprNode<ASTConstantExpression>((quint64)_eval->sizeofLong());
+        return createExprNode<ASTConstantExpression, quint64>(_eval->sizeofLong());
     // Return alternatives for all sizes
     BaseTypeList list = _factory->findBaseTypesForAstType(type, _eval).second;
     QSet<quint32> sizes;
@@ -815,7 +839,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *no
         // Add each size greater zero only once
         if (size > 0 && !sizes.contains(size)) {
             ASTExpression *expr =
-                    createExprNode<ASTConstantExpression>((quint64)size);
+                    createExprNode<ASTConstantExpression, quint64>(size);
             ret = setExprOrAddAlternative(ret, expr);
             sizes.insert(size);
         }
@@ -881,8 +905,80 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncTypesCompatible(
     // what GCC decides.
     /// @todo More acurate type equality decision
     return t1->equalTo(t2) ?
-                createExprNode<ASTConstantExpression>(1ULL) :
-                createExprNode<ASTConstantExpression>(0ULL);
+                createExprNode<ASTConstantExpression, quint64>(1) :
+                createExprNode<ASTConstantExpression, quint64>(0);
+}
+
+
+ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
+{
+    if (!node)
+        return 0;
+
+    bool ok = false;
+    qint64 value;
+    if (node->type == nt_constant_int) {
+        QString s = antlrTokenToStr(node->u.constant.literal);
+        // Remove any size or signedness specifiers from the string
+        while (s.endsWith('l', Qt::CaseInsensitive) ||
+               s.endsWith('u', Qt::CaseInsensitive))
+            s = s.left(s.size() - 1);
+        // Use the C convention to choose the correct base
+        value = s.toLongLong(&ok, 0);
+        if (!ok)
+            exprEvalError(QString("Failed to parse constant value \"%1\" "
+                                  "at %2:%3:%4")
+                          .arg(s)
+                          .arg(_ast->fileName())
+                          .arg(node->start->line)
+                          .arg(node->start->charPosition));
+        return createExprNode<ASTConstantExpression, quint64>(value);
+    }
+    else {
+        exprEvalError(QString("Unexpected constant value type: %1 at %2:%3:%4")
+                      .arg(ast_node_type_to_str(node))
+                      .arg(_ast->fileName())
+                      .arg(node->start->line)
+                      .arg(node->start->charPosition));
+    }
+}
+
+
+ASTExpression* ASTExpressionEvaluator::exprOfPostfixExpr(const ASTNode *node)
+{
+    if (!node)
+        return 0;
+    checkNodeType(node, nt_postfix_expression);
+
+    if (!node->u.postfix_expression.postfix_expression_suffix_list)
+        return exprOfNode(node->u.postfix_expression.primary_expression);
+    else
+        // Keep it simple for now
+        exprEvalError("We do not hande postfix expressions properly!");
+}
+
+
+ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(const ASTNode *node)
+{
+    if (!node)
+        return 0;
+    checkNodeType(node, nt_primary_expression);
+
+    if (node->u.primary_expression.expression)
+        return exprOfNode(node->u.primary_expression.expression->item);
+    else if (node->u.primary_expression.identifier &&
+             !node->u.primary_expression.hasDot)
+    {
+        const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);
+        return createExprNode<ASTVariableExpression>(sym);
+    }
+    else if (node->u.primary_expression.constant)
+        return exprOfNode(node->u.primary_expression.constant);
+    else
+        exprEvalError(QString("Unexpected primary expression at %2:%3:%4")
+                      .arg(_ast->fileName())
+                      .arg(node ? node->start->line : 0)
+                      .arg(node ? node->start->charPosition : 0));
 }
 
 

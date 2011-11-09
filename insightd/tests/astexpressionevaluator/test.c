@@ -1,5 +1,3 @@
-#include <stddef.h>
-
 struct A {
 	long l;
 	short s;

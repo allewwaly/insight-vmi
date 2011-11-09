@@ -115,7 +115,7 @@ QT += core \
     network \
     gui \
     testlib
-CONFIG += qtestlib
+CONFIG += qtestlib debug
 INCLUDEPATH += ../../src \
 	../../../libcparser/include \
 	../../../libcparser/antlr_generated \
