@@ -12,7 +12,7 @@
 #include <astscopemanager.h>
 #include <astsourceprinter.h>
 #include <abstractsyntaxtree.h>
-#include <shell.h>
+#include "shell.h"
 
 #define typeEvaluatorError(x) do { throw SourceTypeEvaluatorException((x), __FILE__, __LINE__); } while (0)
 
