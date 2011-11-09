@@ -73,6 +73,8 @@ public:
     ASTType* typeofNode(const ASTNode* node);
     int sizeofLong() const;
 
+    const ASTSymbol *findSymbolOfPrimaryExpression(const ASTNode* node);
+
 protected:
     enum EvalResult {
     	erNoPrimaryExpression,
@@ -140,8 +142,8 @@ private:
     inline bool typeIsLargerThen(RealType typeA, RealType typeB) const;
     inline bool hasValidType(const ASTNode* node) const;
     void genDotGraphForNode(const ASTNode* node) const;
-    QString postfixExpressionToStr(const ASTNode* postfix_exp, const ASTNode* last_pes = 0) const;
-    const ASTSymbol *findSymbolOfPrimaryExpression(const ASTNode* node);
+    QString postfixExpressionToStr(const ASTNode* postfix_exp,
+                                   const ASTNode* last_pes = 0) const;
 
     ASTType* typeofIntegerExpression(ASTType* lt, ASTType* rt, const QString& op) const;
     ASTType* typeofNumericExpression(ASTType* lt, ASTType* rt, const QString& op) const;
