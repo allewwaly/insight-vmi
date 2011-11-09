@@ -31,9 +31,7 @@ public:
 
 private:
     template<class T> T* createExprNode();
-    template<class T> T* createExprNode(ExpressionType type);
-    template<class T> T* createExprNode(quint64 value);
-    template<class T> T* createExprNode(const ASTSymbol* symbol);
+    template<class T, class PT> T* createExprNode(PT param);
 
     ASTExpression *exprOfAssignmentExpr(const ASTNode *node);
     ASTExpression *exprOfBinaryExpr(const ASTNode *node);
@@ -46,7 +44,10 @@ private:
     ASTExpression *exprOfBuiltinFuncSizeof(const ASTNode *node);
     ASTExpression *exprOfBuiltinFuncTypesCompatible(const ASTNode *node);
     ASTExpression *exprOfConditionalExpr(const ASTNode *node);
+    ASTExpression *exprOfConstant(const ASTNode *node);
     ASTExpression *exprOfNodeList(const ASTNodeList *list);
+    ASTExpression *exprOfPostfixExpr(const ASTNode *node);
+    ASTExpression *exprOfPrimaryExpr(const ASTNode *node);
     ASTExpression *exprOfUnaryExpr(const ASTNode *node);
 
     unsigned int sizeofType(const ASTType *type);

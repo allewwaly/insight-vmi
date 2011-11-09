@@ -277,6 +277,7 @@ void ASTExpressionEvaluatorTester::init()
 {
     _ast = new AbstractSyntaxTree();
     _builder = new ASTBuilder(_ast);
+    _eval = new ASTTypeEvaluator(_ast, 8);
     _tester = new ASTExpressionTester(_ast, _factory, _eval);
 }
 
@@ -292,6 +293,7 @@ void ASTExpressionEvaluatorTester::cleanup()
 	}
 
     safe_delete(_tester);
+    safe_delete(_eval);
     safe_delete(_builder);
     safe_delete(_ast);
 }
@@ -321,7 +323,7 @@ void ASTExpressionEvaluatorTester::cleanup()
 		\
 			QTEST(_tester->result.resultType, "resultType"); \
 			if (_tester->result.resultType == erConstant) \
-				QTEST(_tester->result.resultType, "result"); \
+				QTEST(_tester->result.result.ui64, "result"); \
 		\
 		} \
 		catch (GenericException& e) { \
@@ -345,7 +347,24 @@ TEST_FUNCTION(basic)
 {
     TEST_DATA_COLUMNS;
 
-    QTest::newRow("basic1") << "int i = 0;" << (int)etConstant << (quint64)0;
-    QTest::newRow("basic2") << "int i = 1;" << (int)etConstant << (quint64)1;
-    QTest::newRow("basic3") << "int i = -1;" << (int)etConstant << (quint64)-1;
+    QTest::newRow("basic1") << "int i = 0;" << (int)erConstant << (quint64)0;
+    QTest::newRow("basic2") << "int i = 1;" << (int)erConstant << (quint64)1;
+    QTest::newRow("basic3") << "int i = -1;" << (int)erConstant << (quint64)-1;
+    QTest::newRow("basic4") << "int i = 99999L;" << (int)erConstant << (quint64)99999L;
+    QTest::newRow("basic4") << "int i = 99999UL;" << (int)erConstant << (quint64)99999UL;
+    QTest::newRow("basic4") << "int i = 99999LL;" << (int)erConstant << (quint64)99999LL;
+    QTest::newRow("basic4") << "int i = 99999ULL;" << (int)erConstant << (quint64)99999ULL;
+    QTest::newRow("basic5") << "int i = 0xcafebabe;" << (int)erConstant << (quint64)0xcafebabe;
+    QTest::newRow("basic5") << "int i = 0xcafebabeUL;" << (int)erConstant << (quint64)0xcafebabeUL;
+    QTest::newRow("basic6") << "int i = 01234567;" << (int)erConstant << (quint64)01234567;
+    QTest::newRow("basic6") << "int i = 01234567UL;" << (int)erConstant << (quint64)01234567UL;
+    QTest::newRow("basic7") << "int i = 1 + 1;" << (int)erConstant << (quint64)2;
+    QTest::newRow("basic7") << "int i = 2 + 1;" << (int)erConstant << (quint64)3;
+    QTest::newRow("basic8") << "int i = 2 - 1;" << (int)erConstant << (quint64)1;
+    QTest::newRow("basic9") << "int i = 2 + -1;" << (int)erConstant << (quint64)1;
+    QTest::newRow("basic10") << "int i = (2) + (-1);" << (int)erConstant << (quint64)1;
+    QTest::newRow("basic11") << "int i = -1 + 2;" << (int)erConstant << (quint64)1;
+    QTest::newRow("basic12") << "int i = (-1) + (2);" << (int)erConstant << (quint64)1;
+    QTest::newRow("basic13") << "int i = -1 + 2 - 3;" << (int)erConstant << (quint64)-2;
+    QTest::newRow("basic14") << "int i = 1 - 2 + 3;" << (int)erConstant << (quint64)2;
 }

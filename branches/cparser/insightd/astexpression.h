@@ -23,8 +23,10 @@ enum ExpressionType {
     etRelationalLT,
     etShiftLeft,
     etShiftRight,
-    etAdditive,
-    etMultiplicative,
+    etAdditivePlus,
+    etAdditiveMinus,
+    etMultiplicativeMult,
+    etMultiplicativeDiv,
     etUnaryDec,
     etUnaryInc,
     etUnaryStar,
@@ -171,7 +173,7 @@ public:
 
     inline virtual ExpressionResult result()
     {
-        return ExpressionResult(erConstant, _value);
+        return ExpressionResult(resultType(), _value);
     }
 
     inline quint64 value() const
@@ -209,7 +211,10 @@ public:
         return _symbol->isGlobal() ? erGlobalVar : erLocalVar;
     }
 
-    //    virtual ExpressionResult result() = 0;
+    virtual ExpressionResult result()
+    {
+        return ExpressionResult(resultType(), 0);
+    }
 
     const ASTSymbol* symbol() const
     {
@@ -329,13 +334,22 @@ public:
             ret.result.ui64 = lr.result.ui64 >> rr.result.ui64;
             break;
 
-        case etAdditive:
+        case etAdditivePlus:
             ret.result.ui64 = lr.result.ui64 + rr.result.ui64;
             break;
 
-        case etMultiplicative:
+        case etAdditiveMinus:
+            ret.result.ui64 = lr.result.ui64 - rr.result.ui64;
+            break;
+
+        case etMultiplicativeMult:
             /// @todo What about signedness here???
             ret.result.ui64 = lr.result.ui64 * rr.result.ui64;
+            break;
+
+        case etMultiplicativeDiv:
+            /// @todo What about signedness here???
+            ret.result.ui64 = lr.result.ui64 / rr.result.ui64;
             break;
 
         default:
