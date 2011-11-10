@@ -29,8 +29,14 @@ private slots:
 	/// Per test-case cleanup
 	void cleanup();
 
-	void test_basic_func();
-	void test_basic_func_data();
+	void test_constants_func();
+	void test_constants_func_data();
+
+	void test_arithmetic_func();
+	void test_arithmetic_func_data();
+
+	void test_sign_extension_func();
+	void test_sign_extension_func_data();
 
 private:
     MemSpecs* _specs;

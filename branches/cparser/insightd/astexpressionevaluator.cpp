@@ -53,6 +53,15 @@ T* ASTExpressionEvaluator::createExprNode(PT param)
 }
 
 
+template<class T, class PT1, class PT2>
+T* ASTExpressionEvaluator::createExprNode(PT1 param1, PT2 param2)
+{
+    T* t = new T(param1, param2);
+    _allExpressions.append(t);
+    return t;
+}
+
+
 inline ASTExpression* setExprOrAddAlternative(ASTExpression *dest,
                                               ASTExpression *src)
 {
@@ -489,7 +498,9 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncAlignOf(const ASTNode *n
             value = 1;
     }
 
-    return createExprNode<ASTConstantExpression>(value);
+    return createExprNode<ASTConstantExpression>(
+                _eval->sizeofLong() == 4 ? esUInt32 : esUInt64,
+                value);
 }
 
 /*
@@ -593,11 +604,14 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncObjectSize(
     ExpressionResult res = expr->result();
     assert(res.resultType == erConstant);
 
-    ASTConstantExpression* ret = createExprNode<ASTConstantExpression, quint64>(0);
+    ASTConstantExpression* ret =
+            createExprNode<ASTConstantExpression>(
+                _eval->sizeofLong() == 4 ? esUInt32 : esUInt64,
+                0);
     // If the maximum remaining bytes are requested, return (size_t) -1 instead
     // of 0.
     if (res.result.ui64 & 2)
-        ret->setValue((size_t) -1);
+        ret->setValue(res.size, -1);
     return ret;
 }
 
@@ -633,8 +647,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncConstant(const ASTNode *
                 node->u.builtin_function_constant_p.unary_expression);
     // We can only approximate GCC's constant value decision here
     return expr->resultType() == etConstant ?
-                createExprNode<ASTConstantExpression, quint64>(1) :
-                createExprNode<ASTConstantExpression, quint64>(0);
+                createExprNode<ASTConstantExpression>(esInt32, 1) :
+                createExprNode<ASTConstantExpression>(esInt32, 0);
 
 }
 
@@ -811,7 +825,9 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *
     } while (true);
 
     // Return the result
-    return createExprNode<ASTConstantExpression>(offset);
+    return createExprNode<ASTConstantExpression>(
+                _eval->sizeofLong() == 4 ? esUInt32 : esUInt64,
+                offset);
 }
 
 
@@ -829,7 +845,9 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *no
     assert(type != 0);
     // For pointers, we can make this quick
     if (type->type() & (rtPointer|rtFuncPointer|rtFunction))
-        return createExprNode<ASTConstantExpression, quint64>(_eval->sizeofLong());
+        return createExprNode<ASTConstantExpression>(
+                    _eval->sizeofLong() == 4 ? esUInt32 : esUInt64,
+                    _eval->sizeofLong());
     // Return alternatives for all sizes
     BaseTypeList list = _factory->findBaseTypesForAstType(type, _eval).second;
     QSet<quint32> sizes;
@@ -839,7 +857,9 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *no
         // Add each size greater zero only once
         if (size > 0 && !sizes.contains(size)) {
             ASTExpression *expr =
-                    createExprNode<ASTConstantExpression, quint64>(size);
+                    createExprNode<ASTConstantExpression>(
+                        _eval->sizeofLong() == 4 ? esUInt32 : esUInt64,
+                        size);
             ret = setExprOrAddAlternative(ret, expr);
             sizes.insert(size);
         }
@@ -905,8 +925,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncTypesCompatible(
     // what GCC decides.
     /// @todo More acurate type equality decision
     return t1->equalTo(t2) ?
-                createExprNode<ASTConstantExpression, quint64>(1) :
-                createExprNode<ASTConstantExpression, quint64>(0);
+                createExprNode<ASTConstantExpression>(esInt32, 1) :
+                createExprNode<ASTConstantExpression>(esInt32, 0);
 }
 
 
@@ -919,10 +939,14 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
     qint64 value;
     if (node->type == nt_constant_int) {
         QString s = antlrTokenToStr(node->u.constant.literal);
+        QString suffix;
         // Remove any size or signedness specifiers from the string
         while (s.endsWith('l', Qt::CaseInsensitive) ||
                s.endsWith('u', Qt::CaseInsensitive))
+        {
+            suffix.prepend(s.right(1));
             s = s.left(s.size() - 1);
+        }
         // Use the C convention to choose the correct base
         value = s.toLongLong(&ok, 0);
         if (!ok)
@@ -932,7 +956,23 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
                           .arg(_ast->fileName())
                           .arg(node->start->line)
                           .arg(node->start->charPosition));
-        return createExprNode<ASTConstantExpression, quint64>(value);
+        // Hex constants are unsigned per default
+        int size = s.startsWith("0x") ? esUInt32 : esInt32;
+        // Check explicit size and constant suffixes
+        if (!suffix.isEmpty()) {
+            suffix = suffix.toLower();
+            // Honor the unsigned flag. If not present, the constant is signed.
+            if (suffix.startsWith('u'))
+                size |= esUnsigned;
+            else
+                size &= ~esUnsigned;
+            // Extend the size to 64 bit, depending on the number of l's and
+            // the architecture of the guest
+            if (suffix.endsWith("ll") ||
+                (suffix.endsWith('l') && _eval->sizeofLong() > 4))
+                size |= es64Bit;
+        }
+        return createExprNode<ASTConstantExpression>(size, value);
     }
     else {
         exprEvalError(QString("Unexpected constant value type: %1 at %2:%3:%4")

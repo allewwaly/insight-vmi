@@ -51,25 +51,59 @@ enum ExpressionResultType {
     erVoid      = (1 << 6)   ///< Expression result is void
 };
 
+enum ExpressionResultSize {
+    es64Bit     = (1 << 1),
+    esUnsigned  = (1 << 2),
+    esInt32     = 0,
+    esUInt32    = esUnsigned,
+    esInt64     = es64Bit,
+    esUInt64    = es64Bit|esUnsigned
+};
+
 
 /// The result of an expression
 struct ExpressionResult
 {
     /// Constructor
-    ExpressionResult() : resultType(erUndefined) { this->result.i64 = 0; }
-    ExpressionResult(int resultType) :
-        resultType(resultType) { this->result.i64 = 0; }
-    ExpressionResult(int resultType, quint64 result) :
-        resultType(resultType) { this->result.ui64 = result; }
+    ExpressionResult() : resultType(erUndefined), size(esInt32) { this->result.i64 = 0; }
+    ExpressionResult(int resultType)
+        : resultType(resultType), size(esInt32) { this->result.i64 = 0; }
+    ExpressionResult(int resultType, int size, quint64 result)
+        : resultType(resultType), size(size) { this->result.ui64 = result; }
 
     /// ORed combination of ExpressionResultType values
     int resultType;
+
+    /// size of result of expression. \sa ExpressionResultSize
+    int size;
 
     /// Expression result, if valid
     union Result {
         quint64 ui64;
         qint64 i64;
+        quint32 ui32;
+        qint32 i32;
     } result;
+
+    /// Expands the value according to signdness and size
+    inline qint64 valueExpanded() const
+    {
+        return (size & es64Bit) ?
+                    result.i64 :
+                    (size & esUnsigned) ?
+                        (qint64)((quint64)result.ui32) :
+                        (qint64) result.i32;
+    }
+
+    inline qint64 value() const
+    {
+        return (size & es64Bit) ? result.i64 : (qint64) result.i32;
+    }
+
+    inline quint64 uvalue() const
+    {
+        return (size & es64Bit) ? result.ui64 : (quint64) result.ui32;
+    }
 };
 
 /**
@@ -127,7 +161,7 @@ public:
 
     inline virtual ExpressionResult result()
     {
-        return ExpressionResult(resultType(), 0);
+        return ExpressionResult(resultType(), esInt32, 0);
     }
 };
 
@@ -149,7 +183,7 @@ public:
 
     inline virtual ExpressionResult result()
     {
-        return ExpressionResult(resultType(), 0);
+        return ExpressionResult(resultType(), esInt32, 0);
     }
 };
 
@@ -159,7 +193,9 @@ public:
 class ASTConstantExpression: public ASTExpression
 {
 public:
-    ASTConstantExpression(quint64 value = 0) : _value(value) {}
+    ASTConstantExpression() {}
+    ASTConstantExpression(int size, quint64 value)
+        : _value(erConstant, size, value) {}
 
     inline virtual ExpressionType type() const
     {
@@ -173,21 +209,17 @@ public:
 
     inline virtual ExpressionResult result()
     {
-        return ExpressionResult(resultType(), _value);
-    }
-
-    inline quint64 value() const
-    {
         return _value;
     }
 
-    inline void setValue(quint64 value)
+    inline void setValue(int size, quint64 value)
     {
-        _value = value;
+        _value.size = size;
+        _value.result.ui64 = value;
     }
 
 private:
-    quint64 _value;
+    ExpressionResult _value;
 };
 
 /**
@@ -213,7 +245,8 @@ public:
 
     virtual ExpressionResult result()
     {
-        return ExpressionResult(resultType(), 0);
+        /// @todo Fixme
+        return ExpressionResult(resultType(), esInt32, 0);
     }
 
     const ASTSymbol* symbol() const
@@ -275,81 +308,173 @@ public:
         ExpressionResult lr = _left->result();
         ExpressionResult rr = _right->result();
         ExpressionResult ret(lr.resultType | rr.resultType);
+        // Unsigned flag is dominant over signed flag and 64bit is dominant
+        // over 32 bit, so just OR the sizes
+        ret.size = lr.size | rr.size;
         // Is the expression decidable?
         if (lr.resultType != erConstant || rr.resultType != erConstant) {
-            // Undecidable, so return the correct result type
+            // Undecidable, so return the combined result type
             return ret;
         }
 
+//        bool is64Bit = ((lr.size|rr.size) & es64Bit) ? true : false;
+        bool isUnsigned = ((lr.size|rr.size) & esUnsigned) ? true : false;
+
         switch (_type) {
         case etLogicalOr:
-            ret.result.ui64 = (lr.result.ui64 || rr.result.ui64) ? 1 : 0;
+            ret.size = esInt32;
+            ret.result.i32 = (lr.value() || rr.value()) ? 1 : 0;
             break;
 
         case etLogicalAnd:
-            ret.result.ui64 = (lr.result.ui64 && rr.result.ui64) ? 1 : 0;
+            ret.size = esInt32;
+            ret.result.i32 = (lr.value() && rr.value()) ? 1 : 0;
             break;
 
         case etInclusiveOr:
-            ret.result.ui64 = lr.result.ui64 | rr.result.ui64;
+            ret.result.i64 = lr.valueExpanded() | rr.valueExpanded();
             break;
 
         case etExclusiveOr:
-            ret.result.ui64 = lr.result.ui64 ^ rr.result.ui64;
+            ret.result.i64 = lr.valueExpanded() ^ rr.valueExpanded();
             break;
 
         case etAnd:
-            ret.result.ui64 = lr.result.ui64 & rr.result.ui64;
+            ret.result.i64 = lr.valueExpanded() & rr.valueExpanded();
             break;
 
         case etEquality:
-            ret.result.ui64 = (lr.result.ui64 == rr.result.ui64) ? 1 : 0;
+            ret.size = esInt32;
+            ret.result.i32 = (lr.value() == rr.value()) ? 1 : 0;
             break;
 
         case etUnequality:
-            ret.result.ui64 = (lr.result.ui64 != rr.result.ui64) ? 1 : 0;
+            ret.size = esInt32;
+            ret.result.i32 = (lr.value() != rr.value()) ? 1 : 0;
             break;
 
         case etRelationalGE:
-            ret.result.ui64 = (lr.result.ui64 >= rr.result.ui64) ? 1 : 0;
+            ret.size = esInt32;
+            if (isUnsigned)
+                ret.result.i32 = (lr.uvalue() >= rr.uvalue()) ? 1 : 0;
+            else
+                ret.result.i32 = (lr.value() >= rr.value()) ? 1 : 0;
             break;
 
         case etRelationalGT:
-            ret.result.ui64 = (lr.result.ui64 > rr.result.ui64) ? 1 : 0;
+            ret.size = esInt32;
+            if (isUnsigned)
+                ret.result.i32 = (lr.uvalue() > rr.uvalue()) ? 1 : 0;
+            else
+                ret.result.i32 = (lr.value() > rr.value()) ? 1 : 0;
             break;
 
         case etRelationalLE:
-            ret.result.ui64 = (lr.result.ui64 <= rr.result.ui64) ? 1 : 0;
+            ret.size = esInt32;
+            if (isUnsigned)
+                ret.result.i32 = (lr.uvalue() <= rr.uvalue()) ? 1 : 0;
+            else
+                ret.result.i32 = (lr.value() <= rr.value()) ? 1 : 0;
             break;
 
         case etRelationalLT:
-            ret.result.ui64 = (lr.result.ui64 < rr.result.ui64) ? 1 : 0;
+            ret.size = esInt32;
+            if (isUnsigned)
+                ret.result.i32 = (lr.uvalue() < rr.uvalue()) ? 1 : 0;
+            else
+                ret.result.i32 = (lr.value() < rr.value()) ? 1 : 0;
             break;
 
         case etShiftLeft:
-            ret.result.ui64 = lr.result.ui64 << rr.result.ui64;
+            ret.size = lr.size;
+            if (lr.size & es64Bit) {
+                if (lr.size & esUnsigned) {
+                    if (rr.size & esUnsigned)
+                        ret.result.ui64 = lr.uvalue() << rr.uvalue();
+                    else
+                        ret.result.ui64 = lr.uvalue() << rr.value();
+                }
+                else {
+                    if (rr.size & esUnsigned)
+                        ret.result.i64 = lr.value() << rr.uvalue();
+                    else
+                        ret.result.i64 = lr.value() << rr.value();
+                }
+            }
+            else {
+                if (lr.size & esUnsigned) {
+                    if (rr.size & esUnsigned)
+                        ret.result.ui32 = lr.uvalue() << rr.uvalue();
+                    else
+                        ret.result.ui32 = lr.uvalue() << rr.value();
+                }
+                else {
+                    if (rr.size & esUnsigned)
+                        ret.result.i32 = lr.value() << rr.uvalue();
+                    else
+                        ret.result.i32 = lr.value() << rr.value();
+                }
+            }
             break;
 
         case etShiftRight:
-            ret.result.ui64 = lr.result.ui64 >> rr.result.ui64;
+            ret.size = lr.size;
+            if (lr.size & es64Bit) {
+                if (lr.size & esUnsigned) {
+                    if (rr.size & esUnsigned)
+                        ret.result.ui64 = lr.uvalue() >> rr.uvalue();
+                    else
+                        ret.result.ui64 = lr.uvalue() >> rr.value();
+                }
+                else {
+                    if (rr.size & esUnsigned)
+                        ret.result.i64 = lr.value() >> rr.uvalue();
+                    else
+                        ret.result.i64 = lr.value() >> rr.value();
+                }
+            }
+            else {
+                if (lr.size & esUnsigned) {
+                    if (rr.size & esUnsigned)
+                        ret.result.ui32 = lr.uvalue() >> rr.uvalue();
+                    else
+                        ret.result.ui32 = lr.uvalue() >> rr.value();
+                }
+                else {
+                    if (rr.size & esUnsigned)
+                        ret.result.i32 = lr.value() >> rr.uvalue();
+                    else
+                        ret.result.i32 = lr.value() >> rr.value();
+                }
+            }
             break;
 
         case etAdditivePlus:
-            ret.result.ui64 = lr.result.ui64 + rr.result.ui64;
+            if (isUnsigned)
+                ret.result.ui64 = lr.result.ui64 + rr.result.ui64;
+            else
+                ret.result.i64 = lr.result.i64 + rr.result.i64;
             break;
 
         case etAdditiveMinus:
-            ret.result.ui64 = lr.result.ui64 - rr.result.ui64;
+            if (isUnsigned)
+                ret.result.ui64 = lr.result.ui64 - rr.result.ui64;
+            else
+                ret.result.i64 = lr.result.i64 - rr.result.i64;
             break;
 
         case etMultiplicativeMult:
-            /// @todo What about signedness here???
-            ret.result.ui64 = lr.result.ui64 * rr.result.ui64;
+            if (isUnsigned)
+                ret.result.ui64 = lr.result.ui64 * rr.result.ui64;
+            else
+                ret.result.i64 = lr.result.i64 * rr.result.i64;
             break;
 
         case etMultiplicativeDiv:
-            /// @todo What about signedness here???
-            ret.result.ui64 = lr.result.ui64 / rr.result.ui64;
+            if (isUnsigned)
+                ret.result.ui64 = lr.result.ui64 / rr.result.ui64;
+            else
+                ret.result.i64 = lr.result.i64 / rr.result.i64;
             break;
 
         default:
@@ -410,11 +535,17 @@ public:
 
         switch (_type) {
         case etUnaryInc:
-            ++res.result.ui64;
+            if (res.size & es64Bit)
+                ++res.result.ui64;
+            else
+                ++res.result.ui32;
             break;
 
         case etUnaryDec:
-            --res.result.ui64;
+            if (res.size & es64Bit)
+                --res.result.ui64;
+            else
+                --res.result.ui32;
             break;
 
             /// @todo Fixme
@@ -422,15 +553,22 @@ public:
 //        case etUnaryAmp:
 
         case etUnaryMinus:
-            res.result.i64 = -res.result.i64;
+            if (res.size & es64Bit)
+                res.result.i64  = -res.result.i64;
+            else
+                res.result.i32 = -res.result.i32;
             break;
 
         case etUnaryInv:
-            res.result.ui64 = ~res.result.ui64;
+            if (res.size & es64Bit)
+                res.result.ui64  = ~res.result.ui64;
+            else
+                res.result.ui32 = ~res.result.ui32;
             break;
 
         case etUnaryNot:
-            res.result.ui64 = !res.result.ui64 ? 1 : 0;
+            res.size = esInt32;
+            res.result.i32 = !res.value() ? 1 : 0;
             break;
 
         default:
