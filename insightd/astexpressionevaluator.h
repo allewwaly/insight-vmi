@@ -32,6 +32,8 @@ public:
 private:
     template<class T> T* createExprNode();
     template<class T, class PT> T* createExprNode(PT param);
+    template<class T, class PT1, class PT2> T* createExprNode(PT1 param1,
+                                                              PT2 param2);
 
     ASTExpression *exprOfAssignmentExpr(const ASTNode *node);
     ASTExpression *exprOfBinaryExpr(const ASTNode *node);

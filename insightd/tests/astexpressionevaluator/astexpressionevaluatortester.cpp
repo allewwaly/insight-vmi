@@ -298,6 +298,14 @@ void ASTExpressionEvaluatorTester::cleanup()
     safe_delete(_ast);
 }
 
+#define STRING2(s) #s
+#define STRING(s) STRING2(s)
+#define LN "line: " STRING(__LINE__)
+
+#define CONSTANT_EXPR2(expr, expected) \
+    QTest::newRow(LN) << "int i = " #expr ";" << (int)erConstant \
+        << (quint64)((qint64)(expected))
+#define CONSTANT_EXPR(expr) CONSTANT_EXPR2(expr, expr)
 
 #define TEST_DATA_COLUMNS \
     QTest::addColumn<QString>("localCode"); \
@@ -322,8 +330,13 @@ void ASTExpressionEvaluatorTester::cleanup()
 			QVERIFY(_tester->walkTree() > 0); \
 		\
 			QTEST(_tester->result.resultType, "resultType"); \
-			if (_tester->result.resultType == erConstant) \
-				QTEST(_tester->result.result.ui64, "result"); \
+			if (_tester->result.resultType == erConstant) { \
+				QFETCH(quint64, result); \
+				if (_tester->result.size & es64Bit) \
+					QCOMPARE(_tester->result.result.ui64, result); \
+				else \
+					QCOMPARE(_tester->result.result.ui32, (quint32)result); \
+			} \
 		\
 		} \
 		catch (GenericException& e) { \
@@ -343,28 +356,147 @@ void ASTExpressionEvaluatorTester::cleanup()
    void ASTExpressionEvaluatorTester::test_##methodName##_func_data()
 
 
-TEST_FUNCTION(basic)
+TEST_FUNCTION(constants)
 {
     TEST_DATA_COLUMNS;
 
-    QTest::newRow("basic1") << "int i = 0;" << (int)erConstant << (quint64)0;
-    QTest::newRow("basic2") << "int i = 1;" << (int)erConstant << (quint64)1;
-    QTest::newRow("basic3") << "int i = -1;" << (int)erConstant << (quint64)-1;
-    QTest::newRow("basic4") << "int i = 99999L;" << (int)erConstant << (quint64)99999L;
-    QTest::newRow("basic4") << "int i = 99999UL;" << (int)erConstant << (quint64)99999UL;
-    QTest::newRow("basic4") << "int i = 99999LL;" << (int)erConstant << (quint64)99999LL;
-    QTest::newRow("basic4") << "int i = 99999ULL;" << (int)erConstant << (quint64)99999ULL;
-    QTest::newRow("basic5") << "int i = 0xcafebabe;" << (int)erConstant << (quint64)0xcafebabe;
-    QTest::newRow("basic5") << "int i = 0xcafebabeUL;" << (int)erConstant << (quint64)0xcafebabeUL;
-    QTest::newRow("basic6") << "int i = 01234567;" << (int)erConstant << (quint64)01234567;
-    QTest::newRow("basic6") << "int i = 01234567UL;" << (int)erConstant << (quint64)01234567UL;
-    QTest::newRow("basic7") << "int i = 1 + 1;" << (int)erConstant << (quint64)2;
-    QTest::newRow("basic7") << "int i = 2 + 1;" << (int)erConstant << (quint64)3;
-    QTest::newRow("basic8") << "int i = 2 - 1;" << (int)erConstant << (quint64)1;
-    QTest::newRow("basic9") << "int i = 2 + -1;" << (int)erConstant << (quint64)1;
-    QTest::newRow("basic10") << "int i = (2) + (-1);" << (int)erConstant << (quint64)1;
-    QTest::newRow("basic11") << "int i = -1 + 2;" << (int)erConstant << (quint64)1;
-    QTest::newRow("basic12") << "int i = (-1) + (2);" << (int)erConstant << (quint64)1;
-    QTest::newRow("basic13") << "int i = -1 + 2 - 3;" << (int)erConstant << (quint64)-2;
-    QTest::newRow("basic14") << "int i = 1 - 2 + 3;" << (int)erConstant << (quint64)2;
+    CONSTANT_EXPR(-1LL > 0xcafebabe);
+
+    // Positive constants
+    CONSTANT_EXPR(0);
+    CONSTANT_EXPR(1);
+    CONSTANT_EXPR(1234567890);
+    // Negative constants
+    CONSTANT_EXPR(-1);
+    CONSTANT_EXPR(-1234567890);
+    // Constants with length specifieer
+    CONSTANT_EXPR(99999L);
+    CONSTANT_EXPR(99999UL);
+    CONSTANT_EXPR(99999LL);
+    CONSTANT_EXPR(99999ULL);
+    CONSTANT_EXPR(-99999L);
+    CONSTANT_EXPR(-99999UL);
+    CONSTANT_EXPR(-99999LL);
+    CONSTANT_EXPR(-99999ULL);
+    // Hex constants
+    CONSTANT_EXPR(0xcafebabe);
+    CONSTANT_EXPR(0xcafebabeUL);
+    CONSTANT_EXPR(-0xcafebabe);
+    CONSTANT_EXPR(-0xcafebabeL);
+    CONSTANT_EXPR(-0xcafebabeUL);
+    // Octal constants
+    CONSTANT_EXPR(01234567);
+    CONSTANT_EXPR(01234567L);
+    CONSTANT_EXPR(01234567UL);
+    CONSTANT_EXPR(-01234567);
+    CONSTANT_EXPR(-01234567L);
+    CONSTANT_EXPR(-01234567UL);
+}
+
+TEST_FUNCTION(arithmetic)
+{
+    TEST_DATA_COLUMNS;
+
+    CONSTANT_EXPR(1 + 1);
+    CONSTANT_EXPR(2 + 1);
+    CONSTANT_EXPR(2 - 1);
+    CONSTANT_EXPR(2 + -1);
+    CONSTANT_EXPR((2) + (-1));
+    CONSTANT_EXPR(-1 + 2);
+    CONSTANT_EXPR((-1) + (2));
+    CONSTANT_EXPR(-1 + 2 - 3);
+    CONSTANT_EXPR(1 - 2 + 3);
+}
+
+TEST_FUNCTION(sign_extension)
+{
+    TEST_DATA_COLUMNS;
+
+    // Bitwise expressions
+    CONSTANT_EXPR(-1 ^ 0xcafebabe);
+    CONSTANT_EXPR(-1 ^ 0xcafebabeLL);
+    CONSTANT_EXPR(-1 ^ 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1LL ^ 0xcafebabe);
+    CONSTANT_EXPR(-1LL ^ 0xcafebabeLL);
+    CONSTANT_EXPR(-1LL ^ 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1ULL ^ 0xcafebabe);
+    CONSTANT_EXPR(-1ULL ^ 0xcafebabeLL);
+    CONSTANT_EXPR(-1ULL ^ 0xcafebabeULL);
+
+    CONSTANT_EXPR(1 ^ -0xcafebabe);
+    CONSTANT_EXPR(1 ^ -0xcafebabeLL);
+    CONSTANT_EXPR(1 ^ -0xcafebabeULL);
+
+    CONSTANT_EXPR(1LL ^ -0xcafebabe);
+    CONSTANT_EXPR(1LL ^ -0xcafebabeLL);
+    CONSTANT_EXPR(1LL ^ -0xcafebabeULL);
+
+    CONSTANT_EXPR(1ULL ^ -0xcafebabe);
+    CONSTANT_EXPR(1ULL ^ -0xcafebabeLL);
+    CONSTANT_EXPR(1ULL ^ -0xcafebabeULL);
+
+    // Logical expressions
+    CONSTANT_EXPR(-1 && 0xcafebabe);
+    CONSTANT_EXPR(-1 && 0xcafebabeLL);
+    CONSTANT_EXPR(-1 && 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1LL && 0xcafebabe);
+    CONSTANT_EXPR(-1LL && 0xcafebabeLL);
+    CONSTANT_EXPR(-1LL && 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1ULL && 0xcafebabe);
+    CONSTANT_EXPR(-1ULL && 0xcafebabeLL);
+    CONSTANT_EXPR(-1ULL && 0xcafebabeULL);
+
+    // Comparisons
+    CONSTANT_EXPR(-1 > 0xcafebabe);
+    CONSTANT_EXPR(-1 > 0xcafebabeLL);
+    CONSTANT_EXPR(-1 > 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1LL > 0xcafebabe);
+    CONSTANT_EXPR(-1LL > 0xcafebabeLL);
+    CONSTANT_EXPR(-1LL > 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1ULL > 0xcafebabe);
+    CONSTANT_EXPR(-1ULL > 0xcafebabeLL);
+    CONSTANT_EXPR(-1ULL > 0xcafebabeULL);
+
+    CONSTANT_EXPR(1 > -0xcafebabe);
+    CONSTANT_EXPR(1 > -0xcafebabeLL);
+    CONSTANT_EXPR(1 > -0xcafebabeULL);
+
+    CONSTANT_EXPR(1LL > -0xcafebabe);
+    CONSTANT_EXPR(1LL > -0xcafebabeLL);
+    CONSTANT_EXPR(1LL > -0xcafebabeULL);
+
+    CONSTANT_EXPR(1ULL > -0xcafebabe);
+    CONSTANT_EXPR(1ULL > -0xcafebabeLL);
+    CONSTANT_EXPR(1ULL > -0xcafebabeULL);
+
+    CONSTANT_EXPR(-1 < 0xcafebabe);
+    CONSTANT_EXPR(-1 < 0xcafebabeLL);
+    CONSTANT_EXPR(-1 < 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1LL < 0xcafebabe);
+    CONSTANT_EXPR(-1LL < 0xcafebabeLL);
+    CONSTANT_EXPR(-1LL < 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1ULL < 0xcafebabe);
+    CONSTANT_EXPR(-1ULL < 0xcafebabeLL);
+    CONSTANT_EXPR(-1ULL < 0xcafebabeULL);
+
+    CONSTANT_EXPR(1 < -0xcafebabe);
+    CONSTANT_EXPR(1 < -0xcafebabeLL);
+    CONSTANT_EXPR(1 < -0xcafebabeULL);
+
+    CONSTANT_EXPR(1LL < -0xcafebabe);
+    CONSTANT_EXPR(1LL < -0xcafebabeLL);
+    CONSTANT_EXPR(1LL < -0xcafebabeULL);
+
+    CONSTANT_EXPR(1ULL < -0xcafebabe);
+    CONSTANT_EXPR(1ULL < -0xcafebabeLL);
+    CONSTANT_EXPR(1ULL < -0xcafebabeULL);
+
 }
