@@ -936,7 +936,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
         return 0;
 
     bool ok = false;
-    qint64 value;
+    quint64 value;
     if (node->type == nt_constant_int) {
         QString s = antlrTokenToStr(node->u.constant.literal);
         QString suffix;
@@ -948,7 +948,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
             s = s.left(s.size() - 1);
         }
         // Use the C convention to choose the correct base
-        value = s.toLongLong(&ok, 0);
+        value = s.toULongLong(&ok, 0);
         if (!ok)
             exprEvalError(QString("Failed to parse constant value \"%1\" "
                                   "at %2:%3:%4")
@@ -956,21 +956,31 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
                           .arg(_ast->fileName())
                           .arg(node->start->line)
                           .arg(node->start->charPosition));
-        // Hex constants are unsigned per default
-        int size = s.startsWith("0x") ? esUInt32 : esInt32;
-        // Check explicit size and constant suffixes
-        if (!suffix.isEmpty()) {
-            suffix = suffix.toLower();
-            // Honor the unsigned flag. If not present, the constant is signed.
-            if (suffix.startsWith('u'))
-                size |= esUnsigned;
+        ExpressionResultSize size = esUndefined;
+        // Without suffix find the smallest type fitting the value
+        if (suffix.isEmpty()) {
+            if (value < (1ULL << 31))
+                size = esInt32;
+            else if (value < (1ULL << 32))
+                size = esUInt32;
+            else if (value < (1ULL << 63))
+                size = esInt64;
             else
-                size &= ~esUnsigned;
+                size = esUInt64;
+        }
+        // Check explicit size and constant suffixes
+        else {
+            suffix = suffix.toLower();
             // Extend the size to 64 bit, depending on the number of l's and
             // the architecture of the guest
             if (suffix.endsWith("ll") ||
                 (suffix.endsWith('l') && _eval->sizeofLong() > 4))
-                size |= es64Bit;
+                size = esInt64;
+            else
+                size = esInt32;
+            // Honor the unsigned flag. If not present, the constant is signed.
+            if (suffix.startsWith('u'))
+                size = (ExpressionResultSize) (size|esUnsigned);
         }
         return createExprNode<ASTConstantExpression>(size, value);
     }

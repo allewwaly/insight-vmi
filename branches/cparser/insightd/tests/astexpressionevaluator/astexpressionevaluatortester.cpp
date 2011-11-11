@@ -360,7 +360,7 @@ TEST_FUNCTION(constants)
 {
     TEST_DATA_COLUMNS;
 
-    CONSTANT_EXPR(-1LL > 0xcafebabe);
+    CONSTANT_EXPR(-1U > -0xcafe);
 
     // Positive constants
     CONSTANT_EXPR(0);
@@ -413,90 +413,486 @@ TEST_FUNCTION(sign_extension)
     TEST_DATA_COLUMNS;
 
     // Bitwise expressions
+    CONSTANT_EXPR(1 ^ 0xcafe);
+    CONSTANT_EXPR(1 ^ 0xcafeU);
+    CONSTANT_EXPR(1 ^ 0xcafeLL);
+    CONSTANT_EXPR(1 ^ 0xcafeULL);
+
+    CONSTANT_EXPR(1U ^ 0xcafe);
+    CONSTANT_EXPR(1U ^ 0xcafeU);
+    CONSTANT_EXPR(1U ^ 0xcafeLL);
+    CONSTANT_EXPR(1U ^ 0xcafeULL);
+
+    CONSTANT_EXPR(1LL ^ 0xcafe);
+    CONSTANT_EXPR(1LL ^ 0xcafeU);
+    CONSTANT_EXPR(1LL ^ 0xcafeLL);
+    CONSTANT_EXPR(1LL ^ 0xcafeULL);
+
+    CONSTANT_EXPR(1ULL ^ 0xcafe);
+    CONSTANT_EXPR(1ULL ^ 0xcafeU);
+    CONSTANT_EXPR(1ULL ^ 0xcafeLL);
+    CONSTANT_EXPR(1ULL ^ 0xcafeULL);
+
+    CONSTANT_EXPR(-1 ^ 0xcafe);
+    CONSTANT_EXPR(-1 ^ 0xcafeU);
+    CONSTANT_EXPR(-1 ^ 0xcafeLL);
+    CONSTANT_EXPR(-1 ^ 0xcafeULL);
+
+    CONSTANT_EXPR(-1U ^ 0xcafe);
+    CONSTANT_EXPR(-1U ^ 0xcafeU);
+    CONSTANT_EXPR(-1U ^ 0xcafeLL);
+    CONSTANT_EXPR(-1U ^ 0xcafeULL);
+
+    CONSTANT_EXPR(-1LL ^ 0xcafe);
+    CONSTANT_EXPR(-1LL ^ 0xcafeU);
+    CONSTANT_EXPR(-1LL ^ 0xcafeLL);
+    CONSTANT_EXPR(-1LL ^ 0xcafeULL);
+
+    CONSTANT_EXPR(-1ULL ^ 0xcafe);
+    CONSTANT_EXPR(-1ULL ^ 0xcafeU);
+    CONSTANT_EXPR(-1ULL ^ 0xcafeLL);
+    CONSTANT_EXPR(-1ULL ^ 0xcafeULL);
+
+    CONSTANT_EXPR(1 ^ -0xcafe);
+    CONSTANT_EXPR(1 ^ -0xcafeU);
+    CONSTANT_EXPR(1 ^ -0xcafeLL);
+    CONSTANT_EXPR(1 ^ -0xcafeULL);
+
+    CONSTANT_EXPR(1U ^ -0xcafe);
+    CONSTANT_EXPR(1U ^ -0xcafeU);
+    CONSTANT_EXPR(1U ^ -0xcafeLL);
+    CONSTANT_EXPR(1U ^ -0xcafeULL);
+
+    CONSTANT_EXPR(1LL ^ -0xcafe);
+    CONSTANT_EXPR(1LL ^ -0xcafeU);
+    CONSTANT_EXPR(1LL ^ -0xcafeLL);
+    CONSTANT_EXPR(1LL ^ -0xcafeULL);
+
+    CONSTANT_EXPR(1ULL ^ -0xcafe);
+    CONSTANT_EXPR(1ULL ^ -0xcafeU);
+    CONSTANT_EXPR(1ULL ^ -0xcafeLL);
+    CONSTANT_EXPR(1ULL ^ -0xcafeULL);
+
+    CONSTANT_EXPR(-1 ^ -0xcafe);
+    CONSTANT_EXPR(-1 ^ -0xcafeU);
+    CONSTANT_EXPR(-1 ^ -0xcafeLL);
+    CONSTANT_EXPR(-1 ^ -0xcafeULL);
+
+    CONSTANT_EXPR(-1U ^ -0xcafe);
+    CONSTANT_EXPR(-1U ^ -0xcafeU);
+    CONSTANT_EXPR(-1U ^ -0xcafeLL);
+    CONSTANT_EXPR(-1U ^ -0xcafeULL);
+
+    CONSTANT_EXPR(-1LL ^ -0xcafe);
+    CONSTANT_EXPR(-1LL ^ -0xcafeU);
+    CONSTANT_EXPR(-1LL ^ -0xcafeLL);
+    CONSTANT_EXPR(-1LL ^ -0xcafeULL);
+
+    CONSTANT_EXPR(-1ULL ^ -0xcafe);
+    CONSTANT_EXPR(-1ULL ^ -0xcafeU);
+    CONSTANT_EXPR(-1ULL ^ -0xcafeLL);
+    CONSTANT_EXPR(-1ULL ^ -0xcafeULL);
+
+    CONSTANT_EXPR(1 ^ 0xcafebabe);
+    CONSTANT_EXPR(1 ^ 0xcafebabeU);
+    CONSTANT_EXPR(1 ^ 0xcafebabeLL);
+    CONSTANT_EXPR(1 ^ 0xcafebabeULL);
+
+    CONSTANT_EXPR(1U ^ 0xcafebabe);
+    CONSTANT_EXPR(1U ^ 0xcafebabeU);
+    CONSTANT_EXPR(1U ^ 0xcafebabeLL);
+    CONSTANT_EXPR(1U ^ 0xcafebabeULL);
+
+    CONSTANT_EXPR(1LL ^ 0xcafebabe);
+    CONSTANT_EXPR(1LL ^ 0xcafebabeU);
+    CONSTANT_EXPR(1LL ^ 0xcafebabeLL);
+    CONSTANT_EXPR(1LL ^ 0xcafebabeULL);
+
+    CONSTANT_EXPR(1ULL ^ 0xcafebabe);
+    CONSTANT_EXPR(1ULL ^ 0xcafebabeU);
+    CONSTANT_EXPR(1ULL ^ 0xcafebabeLL);
+    CONSTANT_EXPR(1ULL ^ 0xcafebabeULL);
+
     CONSTANT_EXPR(-1 ^ 0xcafebabe);
+    CONSTANT_EXPR(-1 ^ 0xcafebabeU);
     CONSTANT_EXPR(-1 ^ 0xcafebabeLL);
     CONSTANT_EXPR(-1 ^ 0xcafebabeULL);
 
+    CONSTANT_EXPR(-1U ^ 0xcafebabe);
+    CONSTANT_EXPR(-1U ^ 0xcafebabeU);
+    CONSTANT_EXPR(-1U ^ 0xcafebabeLL);
+    CONSTANT_EXPR(-1U ^ 0xcafebabeULL);
+
     CONSTANT_EXPR(-1LL ^ 0xcafebabe);
+    CONSTANT_EXPR(-1LL ^ 0xcafebabeU);
     CONSTANT_EXPR(-1LL ^ 0xcafebabeLL);
     CONSTANT_EXPR(-1LL ^ 0xcafebabeULL);
 
     CONSTANT_EXPR(-1ULL ^ 0xcafebabe);
+    CONSTANT_EXPR(-1ULL ^ 0xcafebabeU);
     CONSTANT_EXPR(-1ULL ^ 0xcafebabeLL);
     CONSTANT_EXPR(-1ULL ^ 0xcafebabeULL);
 
     CONSTANT_EXPR(1 ^ -0xcafebabe);
+    CONSTANT_EXPR(1 ^ -0xcafebabeU);
     CONSTANT_EXPR(1 ^ -0xcafebabeLL);
     CONSTANT_EXPR(1 ^ -0xcafebabeULL);
 
+    CONSTANT_EXPR(1U ^ -0xcafebabe);
+    CONSTANT_EXPR(1U ^ -0xcafebabeU);
+    CONSTANT_EXPR(1U ^ -0xcafebabeLL);
+    CONSTANT_EXPR(1U ^ -0xcafebabeULL);
+
     CONSTANT_EXPR(1LL ^ -0xcafebabe);
+    CONSTANT_EXPR(1LL ^ -0xcafebabeU);
     CONSTANT_EXPR(1LL ^ -0xcafebabeLL);
     CONSTANT_EXPR(1LL ^ -0xcafebabeULL);
 
     CONSTANT_EXPR(1ULL ^ -0xcafebabe);
+    CONSTANT_EXPR(1ULL ^ -0xcafebabeU);
     CONSTANT_EXPR(1ULL ^ -0xcafebabeLL);
     CONSTANT_EXPR(1ULL ^ -0xcafebabeULL);
 
+    CONSTANT_EXPR(-1 ^ -0xcafebabe);
+    CONSTANT_EXPR(-1 ^ -0xcafebabeU);
+    CONSTANT_EXPR(-1 ^ -0xcafebabeLL);
+    CONSTANT_EXPR(-1 ^ -0xcafebabeULL);
+
+    CONSTANT_EXPR(-1U ^ -0xcafebabe);
+    CONSTANT_EXPR(-1U ^ -0xcafebabeU);
+    CONSTANT_EXPR(-1U ^ -0xcafebabeLL);
+    CONSTANT_EXPR(-1U ^ -0xcafebabeULL);
+
+    CONSTANT_EXPR(-1LL ^ -0xcafebabe);
+    CONSTANT_EXPR(-1LL ^ -0xcafebabeU);
+    CONSTANT_EXPR(-1LL ^ -0xcafebabeLL);
+    CONSTANT_EXPR(-1LL ^ -0xcafebabeULL);
+
+    CONSTANT_EXPR(-1ULL ^ -0xcafebabe);
+    CONSTANT_EXPR(-1ULL ^ -0xcafebabeU);
+    CONSTANT_EXPR(-1ULL ^ -0xcafebabeLL);
+    CONSTANT_EXPR(-1ULL ^ -0xcafebabeULL);
+
     // Logical expressions
-    CONSTANT_EXPR(-1 && 0xcafebabe);
-    CONSTANT_EXPR(-1 && 0xcafebabeLL);
-    CONSTANT_EXPR(-1 && 0xcafebabeULL);
+    CONSTANT_EXPR(1 > 0xcafe);
+    CONSTANT_EXPR(1 > 0xcafeU);
+    CONSTANT_EXPR(1 > 0xcafeLL);
+    CONSTANT_EXPR(1 > 0xcafeULL);
 
-    CONSTANT_EXPR(-1LL && 0xcafebabe);
-    CONSTANT_EXPR(-1LL && 0xcafebabeLL);
-    CONSTANT_EXPR(-1LL && 0xcafebabeULL);
+    CONSTANT_EXPR(1U > 0xcafe);
+    CONSTANT_EXPR(1U > 0xcafeU);
+    CONSTANT_EXPR(1U > 0xcafeLL);
+    CONSTANT_EXPR(1U > 0xcafeULL);
 
-    CONSTANT_EXPR(-1ULL && 0xcafebabe);
-    CONSTANT_EXPR(-1ULL && 0xcafebabeLL);
-    CONSTANT_EXPR(-1ULL && 0xcafebabeULL);
+    CONSTANT_EXPR(1LL > 0xcafe);
+    CONSTANT_EXPR(1LL > 0xcafeU);
+    CONSTANT_EXPR(1LL > 0xcafeLL);
+    CONSTANT_EXPR(1LL > 0xcafeULL);
 
-    // Comparisons
+    CONSTANT_EXPR(1ULL > 0xcafe);
+    CONSTANT_EXPR(1ULL > 0xcafeU);
+    CONSTANT_EXPR(1ULL > 0xcafeLL);
+    CONSTANT_EXPR(1ULL > 0xcafeULL);
+
+    CONSTANT_EXPR(-1 > 0xcafe);
+    CONSTANT_EXPR(-1 > 0xcafeU);
+    CONSTANT_EXPR(-1 > 0xcafeLL);
+    CONSTANT_EXPR(-1 > 0xcafeULL);
+
+    CONSTANT_EXPR(-1U > 0xcafe);
+    CONSTANT_EXPR(-1U > 0xcafeU);
+    CONSTANT_EXPR(-1U > 0xcafeLL);
+    CONSTANT_EXPR(-1U > 0xcafeULL);
+
+    CONSTANT_EXPR(-1LL > 0xcafe);
+    CONSTANT_EXPR(-1LL > 0xcafeU);
+    CONSTANT_EXPR(-1LL > 0xcafeLL);
+    CONSTANT_EXPR(-1LL > 0xcafeULL);
+
+    CONSTANT_EXPR(-1ULL > 0xcafe);
+    CONSTANT_EXPR(-1ULL > 0xcafeU);
+    CONSTANT_EXPR(-1ULL > 0xcafeLL);
+    CONSTANT_EXPR(-1ULL > 0xcafeULL);
+
+    CONSTANT_EXPR(1 > -0xcafe);
+    CONSTANT_EXPR(1 > -0xcafeU);
+    CONSTANT_EXPR(1 > -0xcafeLL);
+    CONSTANT_EXPR(1 > -0xcafeULL);
+
+    CONSTANT_EXPR(1U > -0xcafe);
+    CONSTANT_EXPR(1U > -0xcafeU);
+    CONSTANT_EXPR(1U > -0xcafeLL);
+    CONSTANT_EXPR(1U > -0xcafeULL);
+
+    CONSTANT_EXPR(1LL > -0xcafe);
+    CONSTANT_EXPR(1LL > -0xcafeU);
+    CONSTANT_EXPR(1LL > -0xcafeLL);
+    CONSTANT_EXPR(1LL > -0xcafeULL);
+
+    CONSTANT_EXPR(1ULL > -0xcafe);
+    CONSTANT_EXPR(1ULL > -0xcafeU);
+    CONSTANT_EXPR(1ULL > -0xcafeLL);
+    CONSTANT_EXPR(1ULL > -0xcafeULL);
+
+    CONSTANT_EXPR(-1 > -0xcafe);
+    CONSTANT_EXPR(-1 > -0xcafeU);
+    CONSTANT_EXPR(-1 > -0xcafeLL);
+    CONSTANT_EXPR(-1 > -0xcafeULL);
+
+    CONSTANT_EXPR(-1U > -0xcafe);
+    CONSTANT_EXPR(-1U > -0xcafeU);
+    CONSTANT_EXPR(-1U > -0xcafeLL);
+    CONSTANT_EXPR(-1U > -0xcafeULL);
+
+    CONSTANT_EXPR(-1LL > -0xcafe);
+    CONSTANT_EXPR(-1LL > -0xcafeU);
+    CONSTANT_EXPR(-1LL > -0xcafeLL);
+    CONSTANT_EXPR(-1LL > -0xcafeULL);
+
+    CONSTANT_EXPR(-1ULL > -0xcafe);
+    CONSTANT_EXPR(-1ULL > -0xcafeU);
+    CONSTANT_EXPR(-1ULL > -0xcafeLL);
+    CONSTANT_EXPR(-1ULL > -0xcafeULL);
+
+    CONSTANT_EXPR(1 > 0xcafebabe);
+    CONSTANT_EXPR(1 > 0xcafebabeU);
+    CONSTANT_EXPR(1 > 0xcafebabeLL);
+    CONSTANT_EXPR(1 > 0xcafebabeULL);
+
+    CONSTANT_EXPR(1U > 0xcafebabe);
+    CONSTANT_EXPR(1U > 0xcafebabeU);
+    CONSTANT_EXPR(1U > 0xcafebabeLL);
+    CONSTANT_EXPR(1U > 0xcafebabeULL);
+
+    CONSTANT_EXPR(1LL > 0xcafebabe);
+    CONSTANT_EXPR(1LL > 0xcafebabeU);
+    CONSTANT_EXPR(1LL > 0xcafebabeLL);
+    CONSTANT_EXPR(1LL > 0xcafebabeULL);
+
+    CONSTANT_EXPR(1ULL > 0xcafebabe);
+    CONSTANT_EXPR(1ULL > 0xcafebabeU);
+    CONSTANT_EXPR(1ULL > 0xcafebabeLL);
+    CONSTANT_EXPR(1ULL > 0xcafebabeULL);
+
     CONSTANT_EXPR(-1 > 0xcafebabe);
+    CONSTANT_EXPR(-1 > 0xcafebabeU);
     CONSTANT_EXPR(-1 > 0xcafebabeLL);
     CONSTANT_EXPR(-1 > 0xcafebabeULL);
 
+    CONSTANT_EXPR(-1U > 0xcafebabe);
+    CONSTANT_EXPR(-1U > 0xcafebabeU);
+    CONSTANT_EXPR(-1U > 0xcafebabeLL);
+    CONSTANT_EXPR(-1U > 0xcafebabeULL);
+
     CONSTANT_EXPR(-1LL > 0xcafebabe);
+    CONSTANT_EXPR(-1LL > 0xcafebabeU);
     CONSTANT_EXPR(-1LL > 0xcafebabeLL);
     CONSTANT_EXPR(-1LL > 0xcafebabeULL);
 
     CONSTANT_EXPR(-1ULL > 0xcafebabe);
+    CONSTANT_EXPR(-1ULL > 0xcafebabeU);
     CONSTANT_EXPR(-1ULL > 0xcafebabeLL);
     CONSTANT_EXPR(-1ULL > 0xcafebabeULL);
 
     CONSTANT_EXPR(1 > -0xcafebabe);
+    CONSTANT_EXPR(1 > -0xcafebabeU);
     CONSTANT_EXPR(1 > -0xcafebabeLL);
     CONSTANT_EXPR(1 > -0xcafebabeULL);
 
+    CONSTANT_EXPR(1U > -0xcafebabe);
+    CONSTANT_EXPR(1U > -0xcafebabeU);
+    CONSTANT_EXPR(1U > -0xcafebabeLL);
+    CONSTANT_EXPR(1U > -0xcafebabeULL);
+
     CONSTANT_EXPR(1LL > -0xcafebabe);
+    CONSTANT_EXPR(1LL > -0xcafebabeU);
     CONSTANT_EXPR(1LL > -0xcafebabeLL);
     CONSTANT_EXPR(1LL > -0xcafebabeULL);
 
     CONSTANT_EXPR(1ULL > -0xcafebabe);
+    CONSTANT_EXPR(1ULL > -0xcafebabeU);
     CONSTANT_EXPR(1ULL > -0xcafebabeLL);
     CONSTANT_EXPR(1ULL > -0xcafebabeULL);
 
-    CONSTANT_EXPR(-1 < 0xcafebabe);
-    CONSTANT_EXPR(-1 < 0xcafebabeLL);
-    CONSTANT_EXPR(-1 < 0xcafebabeULL);
+    CONSTANT_EXPR(-1 > -0xcafebabe);
+    CONSTANT_EXPR(-1 > -0xcafebabeU);
+    CONSTANT_EXPR(-1 > -0xcafebabeLL);
+    CONSTANT_EXPR(-1 > -0xcafebabeULL);
 
-    CONSTANT_EXPR(-1LL < 0xcafebabe);
-    CONSTANT_EXPR(-1LL < 0xcafebabeLL);
-    CONSTANT_EXPR(-1LL < 0xcafebabeULL);
+    CONSTANT_EXPR(-1U > -0xcafebabe);
+    CONSTANT_EXPR(-1U > -0xcafebabeU);
+    CONSTANT_EXPR(-1U > -0xcafebabeLL);
+    CONSTANT_EXPR(-1U > -0xcafebabeULL);
 
-    CONSTANT_EXPR(-1ULL < 0xcafebabe);
-    CONSTANT_EXPR(-1ULL < 0xcafebabeLL);
-    CONSTANT_EXPR(-1ULL < 0xcafebabeULL);
+    CONSTANT_EXPR(-1LL > -0xcafebabe);
+    CONSTANT_EXPR(-1LL > -0xcafebabeU);
+    CONSTANT_EXPR(-1LL > -0xcafebabeLL);
+    CONSTANT_EXPR(-1LL > -0xcafebabeULL);
 
-    CONSTANT_EXPR(1 < -0xcafebabe);
-    CONSTANT_EXPR(1 < -0xcafebabeLL);
-    CONSTANT_EXPR(1 < -0xcafebabeULL);
+    CONSTANT_EXPR(-1ULL > -0xcafebabe);
+    CONSTANT_EXPR(-1ULL > -0xcafebabeU);
+    CONSTANT_EXPR(-1ULL > -0xcafebabeLL);
+    CONSTANT_EXPR(-1ULL > -0xcafebabeULL);
 
-    CONSTANT_EXPR(1LL < -0xcafebabe);
-    CONSTANT_EXPR(1LL < -0xcafebabeLL);
-    CONSTANT_EXPR(1LL < -0xcafebabeULL);
+    // Comparisons
+    CONSTANT_EXPR(1 && 0xcafe);
+    CONSTANT_EXPR(1 && 0xcafeU);
+    CONSTANT_EXPR(1 && 0xcafeLL);
+    CONSTANT_EXPR(1 && 0xcafeULL);
 
-    CONSTANT_EXPR(1ULL < -0xcafebabe);
-    CONSTANT_EXPR(1ULL < -0xcafebabeLL);
-    CONSTANT_EXPR(1ULL < -0xcafebabeULL);
+    CONSTANT_EXPR(1U && 0xcafe);
+    CONSTANT_EXPR(1U && 0xcafeU);
+    CONSTANT_EXPR(1U && 0xcafeLL);
+    CONSTANT_EXPR(1U && 0xcafeULL);
+
+    CONSTANT_EXPR(1LL && 0xcafe);
+    CONSTANT_EXPR(1LL && 0xcafeU);
+    CONSTANT_EXPR(1LL && 0xcafeLL);
+    CONSTANT_EXPR(1LL && 0xcafeULL);
+
+    CONSTANT_EXPR(1ULL && 0xcafe);
+    CONSTANT_EXPR(1ULL && 0xcafeU);
+    CONSTANT_EXPR(1ULL && 0xcafeLL);
+    CONSTANT_EXPR(1ULL && 0xcafeULL);
+
+    CONSTANT_EXPR(-1 && 0xcafe);
+    CONSTANT_EXPR(-1 && 0xcafeU);
+    CONSTANT_EXPR(-1 && 0xcafeLL);
+    CONSTANT_EXPR(-1 && 0xcafeULL);
+
+    CONSTANT_EXPR(-1U && 0xcafe);
+    CONSTANT_EXPR(-1U && 0xcafeU);
+    CONSTANT_EXPR(-1U && 0xcafeLL);
+    CONSTANT_EXPR(-1U && 0xcafeULL);
+
+    CONSTANT_EXPR(-1LL && 0xcafe);
+    CONSTANT_EXPR(-1LL && 0xcafeU);
+    CONSTANT_EXPR(-1LL && 0xcafeLL);
+    CONSTANT_EXPR(-1LL && 0xcafeULL);
+
+    CONSTANT_EXPR(-1ULL && 0xcafe);
+    CONSTANT_EXPR(-1ULL && 0xcafeU);
+    CONSTANT_EXPR(-1ULL && 0xcafeLL);
+    CONSTANT_EXPR(-1ULL && 0xcafeULL);
+
+    CONSTANT_EXPR(1 && -0xcafe);
+    CONSTANT_EXPR(1 && -0xcafeU);
+    CONSTANT_EXPR(1 && -0xcafeLL);
+    CONSTANT_EXPR(1 && -0xcafeULL);
+
+    CONSTANT_EXPR(1U && -0xcafe);
+    CONSTANT_EXPR(1U && -0xcafeU);
+    CONSTANT_EXPR(1U && -0xcafeLL);
+    CONSTANT_EXPR(1U && -0xcafeULL);
+
+    CONSTANT_EXPR(1LL && -0xcafe);
+    CONSTANT_EXPR(1LL && -0xcafeU);
+    CONSTANT_EXPR(1LL && -0xcafeLL);
+    CONSTANT_EXPR(1LL && -0xcafeULL);
+
+    CONSTANT_EXPR(1ULL && -0xcafe);
+    CONSTANT_EXPR(1ULL && -0xcafeU);
+    CONSTANT_EXPR(1ULL && -0xcafeLL);
+    CONSTANT_EXPR(1ULL && -0xcafeULL);
+
+    CONSTANT_EXPR(-1 && -0xcafe);
+    CONSTANT_EXPR(-1 && -0xcafeU);
+    CONSTANT_EXPR(-1 && -0xcafeLL);
+    CONSTANT_EXPR(-1 && -0xcafeULL);
+
+    CONSTANT_EXPR(-1U && -0xcafe);
+    CONSTANT_EXPR(-1U && -0xcafeU);
+    CONSTANT_EXPR(-1U && -0xcafeLL);
+    CONSTANT_EXPR(-1U && -0xcafeULL);
+
+    CONSTANT_EXPR(-1LL && -0xcafe);
+    CONSTANT_EXPR(-1LL && -0xcafeU);
+    CONSTANT_EXPR(-1LL && -0xcafeLL);
+    CONSTANT_EXPR(-1LL && -0xcafeULL);
+
+    CONSTANT_EXPR(-1ULL && -0xcafe);
+    CONSTANT_EXPR(-1ULL && -0xcafeU);
+    CONSTANT_EXPR(-1ULL && -0xcafeLL);
+    CONSTANT_EXPR(-1ULL && -0xcafeULL);
+
+    CONSTANT_EXPR(1 && 0xcafebabe);
+    CONSTANT_EXPR(1 && 0xcafebabeU);
+    CONSTANT_EXPR(1 && 0xcafebabeLL);
+    CONSTANT_EXPR(1 && 0xcafebabeULL);
+
+    CONSTANT_EXPR(1U && 0xcafebabe);
+    CONSTANT_EXPR(1U && 0xcafebabeU);
+    CONSTANT_EXPR(1U && 0xcafebabeLL);
+    CONSTANT_EXPR(1U && 0xcafebabeULL);
+
+    CONSTANT_EXPR(1LL && 0xcafebabe);
+    CONSTANT_EXPR(1LL && 0xcafebabeU);
+    CONSTANT_EXPR(1LL && 0xcafebabeLL);
+    CONSTANT_EXPR(1LL && 0xcafebabeULL);
+
+    CONSTANT_EXPR(1ULL && 0xcafebabe);
+    CONSTANT_EXPR(1ULL && 0xcafebabeU);
+    CONSTANT_EXPR(1ULL && 0xcafebabeLL);
+    CONSTANT_EXPR(1ULL && 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1 && 0xcafebabe);
+    CONSTANT_EXPR(-1 && 0xcafebabeU);
+    CONSTANT_EXPR(-1 && 0xcafebabeLL);
+    CONSTANT_EXPR(-1 && 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1U && 0xcafebabe);
+    CONSTANT_EXPR(-1U && 0xcafebabeU);
+    CONSTANT_EXPR(-1U && 0xcafebabeLL);
+    CONSTANT_EXPR(-1U && 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1LL && 0xcafebabe);
+    CONSTANT_EXPR(-1LL && 0xcafebabeU);
+    CONSTANT_EXPR(-1LL && 0xcafebabeLL);
+    CONSTANT_EXPR(-1LL && 0xcafebabeULL);
+
+    CONSTANT_EXPR(-1ULL && 0xcafebabe);
+    CONSTANT_EXPR(-1ULL && 0xcafebabeU);
+    CONSTANT_EXPR(-1ULL && 0xcafebabeLL);
+    CONSTANT_EXPR(-1ULL && 0xcafebabeULL);
+
+    CONSTANT_EXPR(1 && -0xcafebabe);
+    CONSTANT_EXPR(1 && -0xcafebabeU);
+    CONSTANT_EXPR(1 && -0xcafebabeLL);
+    CONSTANT_EXPR(1 && -0xcafebabeULL);
+
+    CONSTANT_EXPR(1U && -0xcafebabe);
+    CONSTANT_EXPR(1U && -0xcafebabeU);
+    CONSTANT_EXPR(1U && -0xcafebabeLL);
+    CONSTANT_EXPR(1U && -0xcafebabeULL);
+
+    CONSTANT_EXPR(1LL && -0xcafebabe);
+    CONSTANT_EXPR(1LL && -0xcafebabeU);
+    CONSTANT_EXPR(1LL && -0xcafebabeLL);
+    CONSTANT_EXPR(1LL && -0xcafebabeULL);
+
+    CONSTANT_EXPR(1ULL && -0xcafebabe);
+    CONSTANT_EXPR(1ULL && -0xcafebabeU);
+    CONSTANT_EXPR(1ULL && -0xcafebabeLL);
+    CONSTANT_EXPR(1ULL && -0xcafebabeULL);
+
+    CONSTANT_EXPR(-1 && -0xcafebabe);
+    CONSTANT_EXPR(-1 && -0xcafebabeU);
+    CONSTANT_EXPR(-1 && -0xcafebabeLL);
+    CONSTANT_EXPR(-1 && -0xcafebabeULL);
+
+    CONSTANT_EXPR(-1U && -0xcafebabe);
+    CONSTANT_EXPR(-1U && -0xcafebabeU);
+    CONSTANT_EXPR(-1U && -0xcafebabeLL);
+    CONSTANT_EXPR(-1U && -0xcafebabeULL);
+
+    CONSTANT_EXPR(-1LL && -0xcafebabe);
+    CONSTANT_EXPR(-1LL && -0xcafebabeU);
+    CONSTANT_EXPR(-1LL && -0xcafebabeLL);
+    CONSTANT_EXPR(-1LL && -0xcafebabeULL);
+
+    CONSTANT_EXPR(-1ULL && -0xcafebabe);
+    CONSTANT_EXPR(-1ULL && -0xcafebabeU);
+    CONSTANT_EXPR(-1ULL && -0xcafebabeLL);
+    CONSTANT_EXPR(-1ULL && -0xcafebabeULL);
 
 }
