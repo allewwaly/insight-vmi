@@ -3,6 +3,7 @@
 
 #include <QtGlobal>
 #include <astsymbol.h>
+#include <debug.h>
 
 /// Different types of expressions
 enum ExpressionType {
@@ -68,7 +69,10 @@ enum ExpressionResultSize {
     esInt32     = es32Bit,
     esUInt32    = es32Bit|esUnsigned,
     esInt64     = es64Bit,
-    esUInt64    = es64Bit|esUnsigned
+    esUInt64    = es64Bit|esUnsigned,
+    esInteger   = es8Bit|es16Bit|es32Bit|es64Bit,
+    esReal      = esFloat|esDouble
+
 };
 
 
@@ -81,6 +85,10 @@ struct ExpressionResult
         : resultType(resultType), size(esInt32) { this->result.i64 = 0; }
     ExpressionResult(int resultType, ExpressionResultSize size, quint64 result)
         : resultType(resultType), size(size) { this->result.ui64 = result; }
+    ExpressionResult(int resultType, ExpressionResultSize size, float result)
+        : resultType(resultType), size(size) { this->result.f = result; }
+    ExpressionResult(int resultType, ExpressionResultSize size, double result)
+        : resultType(resultType), size(size) { this->result.d = result; }
 
     /// ORed combination of ExpressionResultType values
     int resultType;
@@ -102,56 +110,13 @@ struct ExpressionResult
         double d;
     } result;
 
-    inline qint64 value(ExpressionResultSize target = esUndefined) const
-    {
-        // If no target is specified or our own size is 64 bit or own type is
-        // not unsigned, just sign-extend the signed value to 64 bit
-        if (!target || (size & es64Bit) || !(size & esUnsigned)) {
-            return (size & es64Bit) ?
-                        result.i64 :
-                        (size & es32Bit) ?
-                            (qint64) result.i32 :
-                            (size & es16Bit) ?
-                                (qint64) result.i16 :
-                                (qint64) result.i8;
-        }
-        // Target is specified, our type is unsigned and 32 bit or less
-        else {
-            // If our unsigned type fits into signed target type, then use it
-            if ((target & es64Bit) ||
-                ((target & es32Bit) && (size & (es16Bit|es8Bit))) ||
-                ((target & es16Bit) && (size & es8Bit)))
-                return uvalue();
-            // Otherwise return sign-extended unsigned value, should actually
-            // never happen
-            else
-                return value();
-        }
-    }
+    qint64 value(ExpressionResultSize target = esUndefined) const;
 
-    inline quint64 uvalue(ExpressionResultSize target = esUndefined) const
-    {
-        // If we accidently got called for an unsigned target, return this value
-        if (target && (!(target & esUnsigned) || !(size & esUnsigned)))
-            return value((ExpressionResultSize) (target & ~esUnsigned));
-        return (size & es64Bit) ?
-                    result.ui64 :
-                    (size & es32Bit) ?
-                        (quint64) result.ui32 :
-                        (size & es16Bit) ?
-                            (quint64) result.ui16 :
-                            (quint64) result.ui8;
-    }
+    quint64 uvalue(ExpressionResultSize target = esUndefined) const;
 
-    inline float fvalue() const
-    {
-        return result.f;
-    }
+    float fvalue() const;
 
-    inline double dvalue() const
-    {
-        return result.d;
-    }
+    double dvalue() const;
 };
 
 /**
@@ -164,7 +129,7 @@ public:
 
     virtual ExpressionType type() const = 0;
     virtual int resultType() const = 0;
-    virtual ExpressionResult result() = 0;
+    virtual ExpressionResult result() const = 0;
 
     inline bool hasAlternative() const
     {
@@ -207,9 +172,9 @@ public:
         return erInvalid|erRuntime;
     }
 
-    inline virtual ExpressionResult result()
+    inline virtual ExpressionResult result() const
     {
-        return ExpressionResult(resultType(), esInt32, 0);
+        return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 };
 
@@ -229,9 +194,9 @@ public:
         return erRuntime;
     }
 
-    inline virtual ExpressionResult result()
+    inline virtual ExpressionResult result() const
     {
-        return ExpressionResult(resultType(), esInt32, 0);
+        return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 };
 
@@ -244,6 +209,10 @@ public:
     ASTConstantExpression() {}
     ASTConstantExpression(ExpressionResultSize size, quint64 value)
         : _value(erConstant, size, value) {}
+    ASTConstantExpression(ExpressionResultSize size, float value)
+        : _value(erConstant, size, value) {}
+    ASTConstantExpression(ExpressionResultSize size, double value)
+        : _value(erConstant, size, value) {}
 
     inline virtual ExpressionType type() const
     {
@@ -255,7 +224,7 @@ public:
         return erConstant;
     }
 
-    inline virtual ExpressionResult result()
+    inline virtual ExpressionResult result() const
     {
         return _value;
     }
@@ -264,6 +233,18 @@ public:
     {
         _value.size = size;
         _value.result.ui64 = value;
+    }
+
+    inline void setValue(ExpressionResultSize size, float value)
+    {
+        _value.size = size;
+        _value.result.f = value;
+    }
+
+    inline void setValue(ExpressionResultSize size, double value)
+    {
+        _value.size = size;
+        _value.result.d = value;
     }
 
 private:
@@ -291,10 +272,10 @@ public:
         return _symbol->isGlobal() ? erGlobalVar : erLocalVar;
     }
 
-    virtual ExpressionResult result()
+    virtual ExpressionResult result() const
     {
         /// @todo Fixme
-        return ExpressionResult(resultType(), esInt32, 0);
+        return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 
     const ASTSymbol* symbol() const
@@ -348,252 +329,10 @@ public:
                     erUndefined;
     }
 
-    inline virtual ExpressionResult result()
-    {
-        if (!_left || !_right)
-            return ExpressionResult();
-
-        ExpressionResult lr = _left->result();
-        ExpressionResult rr = _right->result();
-        ExpressionResult ret(lr.resultType | rr.resultType);
-        ExpressionResultSize target = ret.size = binaryExprSize(lr, rr);
-        // Is the expression decidable?
-        if (lr.resultType != erConstant || rr.resultType != erConstant) {
-            // Undecidable, so return the combined result type
-            return ret;
-        }
-
-        bool isUnsigned = (ret.size & esUnsigned) ? true : false;
-
-        switch (_type) {
-        case etLogicalOr:
-            ret.size = esInt32;
-            ret.result.i32 = (lr.value() || rr.value()) ? 1 : 0;
-            break;
-
-        case etLogicalAnd:
-            ret.size = esInt32;
-            ret.result.i32 = (lr.value() && rr.value()) ? 1 : 0;
-            break;
-
-        case etInclusiveOr:
-            if (isUnsigned)
-                ret.result.ui64 = lr.uvalue(target) | rr.uvalue(target);
-            else
-                ret.result.i64 = lr.value(target) | rr.value(target);
-            break;
-
-        case etExclusiveOr:
-            if (isUnsigned)
-                ret.result.ui64 = lr.uvalue(target) ^ rr.uvalue(target);
-            else
-                ret.result.i64 = lr.value(target) ^ rr.value(target);
-            break;
-
-        case etAnd:
-            if (isUnsigned)
-                ret.result.ui64 = lr.uvalue(target) & rr.uvalue(target);
-            else
-                ret.result.i64 = lr.value(target) & rr.value(target);
-            break;
-
-        case etEquality:
-            ret.size = esInt32;
-            if (isUnsigned)
-                ret.result.i32 = (lr.uvalue(target) == rr.uvalue(target)) ? 1 : 0;
-            else
-                ret.result.i32 = (lr.value(target) == rr.value(target)) ? 1 : 0;
-            break;
-
-        case etUnequality:
-            ret.size = esInt32;
-            if (isUnsigned)
-                ret.result.i32 = (lr.uvalue(target) != rr.uvalue(target)) ? 1 : 0;
-            else
-                ret.result.i32 = (lr.value(target) != rr.value(target)) ? 1 : 0;
-            break;
-
-        case etRelationalGE:
-            ret.size = esInt32;
-            if (isUnsigned)
-                ret.result.i32 = (lr.uvalue(target) >= rr.uvalue(target)) ? 1 : 0;
-            else
-                ret.result.i32 = (lr.value(target) >= rr.value(target)) ? 1 : 0;
-            break;
-
-        case etRelationalGT:
-            ret.size = esInt32;
-            if (isUnsigned)
-                ret.result.i32 = (lr.uvalue(target) > rr.uvalue(target)) ? 1 : 0;
-            else
-                ret.result.i32 = (lr.value(target) > rr.value(target)) ? 1 : 0;
-            break;
-
-        case etRelationalLE:
-            ret.size = esInt32;
-            if (isUnsigned)
-                ret.result.i32 = (lr.uvalue(target) <= rr.uvalue(target)) ? 1 : 0;
-            else
-                ret.result.i32 = (lr.value(target) <= rr.value(target)) ? 1 : 0;
-            break;
-
-        case etRelationalLT:
-            ret.size = esInt32;
-            if (isUnsigned)
-                ret.result.i32 = (lr.uvalue(target) < rr.uvalue(target)) ? 1 : 0;
-            else
-                ret.result.i32 = (lr.value(target) < rr.value(target)) ? 1 : 0;
-            break;
-
-        case etShiftLeft:
-            ret.size = lr.size; // result is the type of the left hand
-            // If right-hand operand is negative, the result is undefined.
-            if (lr.size & esUnsigned)
-                ret.result.ui64 = lr.uvalue() << rr.value();
-            else
-                ret.result.i64 = lr.value() << rr.value();
-            break;
-
-        case etShiftRight:
-            ret.size = lr.size; // result is the type of the left hand
-            // If right-hand operand is negative, the result is undefined.
-            if (lr.size & esUnsigned)
-                ret.result.ui64 = lr.uvalue() >> rr.value();
-            else
-                ret.result.i64 = lr.value() >> rr.value();
-            break;
-
-        case etAdditivePlus:
-            if (isUnsigned)
-                ret.result.ui64 = lr.uvalue(target) + rr.uvalue(target);
-            else
-                ret.result.i64 = lr.value(target) + rr.value(target);
-            break;
-
-        case etAdditiveMinus:
-            if (isUnsigned)
-                ret.result.ui64 = lr.uvalue(target) - rr.uvalue(target);
-            else
-                ret.result.i64 = lr.value(target) - rr.value(target);
-            break;
-
-        case etMultiplicativeMult:
-            if (lr.size & esUnsigned) {
-                if (rr.size & esUnsigned)
-                    ret.result.i64 = lr.uvalue(target) * rr.uvalue(target);
-                else
-                    ret.result.i64 = lr.uvalue(target) * rr.value(target);
-            }
-            else {
-                if (rr.size & esUnsigned)
-                    ret.result.i64 = lr.value(target) * rr.uvalue(target);
-                else
-                    ret.result.i64 = lr.value(target) * rr.value(target);
-            }
-            break;
-
-        case etMultiplicativeDiv:
-            if (lr.size & esUnsigned) {
-                if (rr.size & esUnsigned)
-                    ret.result.i64 = lr.uvalue(target) / rr.uvalue(target);
-                else
-                    ret.result.i64 = lr.uvalue(target) / rr.value(target);
-            }
-            else {
-                if (rr.size & esUnsigned)
-                    ret.result.i64 = lr.value(target) / rr.uvalue(target);
-                else
-                    ret.result.i64 = lr.value(target) / rr.value(target);
-            }
-            break;
-
-        case etMultiplicativeMod:
-            if (lr.size & esUnsigned) {
-                if (rr.size & esUnsigned)
-                    ret.result.i64 = lr.uvalue(target) % rr.uvalue(target);
-                else
-                    ret.result.i64 = lr.uvalue(target) % rr.value(target);
-            }
-            else {
-                if (rr.size & esUnsigned)
-                    ret.result.i64 = lr.value(target) % rr.uvalue(target);
-                else
-                    ret.result.i64 = lr.value(target) % rr.value(target);
-            }
-            break;
-
-        default:
-            ret.resultType = erUndefined;
-        }
-
-        return ret;
-    }
+    virtual ExpressionResult result() const;
 
     static ExpressionResultSize binaryExprSize(const ExpressionResult& r1,
-                                               const ExpressionResult& r2)
-    {
-        /*
-        Many binary operators that expect operands of arithmetic or enumeration
-        type cause conversions and yield result types in a similar way. The
-        purpose is to yield a common type, which is also the type of the result.
-        This pattern is called the usual arithmetic conversions, which are
-        defined as follows:
-        - If either operand is of type long double, the other shall be converted
-          to long double.
-        - Otherwise, if either operand is double, the other shall be converted
-          to double.
-        - Otherwise, if either operand is float, the other shall be converted to
-          float.
-        - Otherwise, the integral promotions (4.5) shall be performed on both
-          operands.
-        - Then, if either operand is unsigned long the other shall be converted
-          to unsigned long.
-        - Otherwise, if one operand is a long int and the other unsigned int,
-          then if a long int can represent all the values of an unsigned int,
-          the unsigned int shall be converted to a long int; otherwise both
-          operands shall be converted to unsigned long int.
-        - Otherwise, if either operand is long, the other shall be converted to
-          long.
-        - Otherwise, if either operand is unsigned, the other shall be converted
-          to unsigned. [Note: otherwise, the only remaining case is that both
-          operands are int ]
-
-        Integral promotions:
-        An rvalue of type char, signed char, unsigned char, short int, or
-        unsigned short int can be converted to an rvalue of type int if int can
-        represent all the values of the source type; otherwise, the source
-        rvalue can be converted to an rvalue of type unsigned int.
-        */
-
-        int r1r2_size = r1.size | r2.size;
-        // If either is double, the result is double
-        if (r1r2_size & esDouble)
-            return esDouble;
-        // Otherwise, if either is float, the result is float
-        else if (r1r2_size & esFloat)
-            return esFloat;
-        // Otherwise
-        else {
-            // Integral promition
-            ExpressionResultSize r1_size = (r1.size & (es8Bit|es16Bit)) ?
-                        esInt32 : r1.size;
-            ExpressionResultSize r2_size = (r2.size & (es8Bit|es16Bit)) ?
-                        esInt32 : r2.size;
-            r1r2_size = r1_size | r2_size;
-
-            // If either is unsigned long, the result is unsigned long
-            if (r1_size == esUInt64 || r2_size == esUInt64)
-                return esUInt64;
-            // Otherwise, if one is long and the other unsigned, result is long
-            // Otherwise, if either is long, the result is long.
-            else if (r1r2_size & esInt64)
-                return esInt64;
-            // Otherwise, if either is unsigned, the result is unsigned
-            else if (r1r2_size & esUnsigned)
-                return esUInt32;
-        }
-        return esInt32;
-    }
+                                               const ExpressionResult& r2);
 
 protected:
     ExpressionType _type;
@@ -631,69 +370,7 @@ public:
         return _child ? _child->resultType() : erUndefined;
     }
 
-    inline virtual ExpressionResult result()
-    {
-        if (!_child)
-            return ExpressionResult();
-
-        ExpressionResult res = _child->result();
-        // Is the expression decidable?
-        if (res.resultType != erConstant) {
-            /// @todo constants cannot be incremented, that makes no sense at all!
-            // Undecidable, so return the correct result type
-            res.resultType |= erInvalid;
-            return res;
-        }
-
-        switch (_type) {
-        case etUnaryInc:
-            if (res.size & es64Bit)
-                ++res.result.ui64;
-            else if (res.size & es32Bit)
-                ++res.result.ui32;
-            else if (res.size & es16Bit)
-                ++res.result.ui16;
-            else
-                ++res.result.ui8;
-            break;
-
-        case etUnaryDec:
-            if (res.size & es64Bit)
-                --res.result.ui64;
-            else if (res.size & es32Bit)
-                --res.result.ui32;
-            else if (res.size & es16Bit)
-                --res.result.ui16;
-            else
-                --res.result.ui8;
-            break;
-
-            /// @todo Fixme
-//        case etUnaryStar:
-//        case etUnaryAmp:
-
-        case etUnaryMinus:
-            if (res.size & esUnsigned)
-                res.result.ui64 = -res.result.ui64;
-            else
-                res.result.i64 = -res.result.i64;
-            break;
-
-        case etUnaryInv:
-            res.result.ui64 = ~res.result.ui64;
-            break;
-
-        case etUnaryNot:
-            res.size = esInt32;
-            res.result.i32 = (!res.uvalue()) ? 1 : 0;
-            break;
-
-        default:
-            res.resultType = erUndefined;
-        }
-
-        return res;
-    }
+    virtual ExpressionResult result() const;
 
 protected:
     ExpressionType _type;

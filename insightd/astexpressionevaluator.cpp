@@ -182,6 +182,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
 
     case nt_constant_char:
     case nt_constant_int:
+    case nt_constant_float:
         expr = exprOfConstant(node);
         break;
 
@@ -242,47 +243,6 @@ ASTExpression* ASTExpressionEvaluator::exprOfAssignmentExpr(const ASTNode *node)
         return exprOfNode(node->u.assignment_expression.lvalue);
     else
         return exprOfNode(node->u.assignment_expression.conditional_expression);
-}
-
-
-ASTExpression* ASTExpressionEvaluator::exprOfConditionalExpr(const ASTNode *node)
-{
-    if (!node)
-        return 0;
-    checkNodeType(node, nt_conditional_expression);
-
-    if (node->u.conditional_expression.conditional_expression) {
-        // Evaluate condition
-        ASTExpression* ret = 0, *tmp = 0;
-
-        for (ASTExpression* expr = exprOfNode(
-                    node->u.conditional_expression.logical_or_expression);
-             expr;
-             expr = expr->alternative())
-        {
-            // For constant conditions we can choose the correct path
-            if (expr->resultType() == erConstant) {
-                if (expr->result().result.i64)
-                    tmp = exprOfNodeList(
-                                node->u.conditional_expression.expression);
-                else
-                    tmp = exprOfNode(node->u.conditional_expression.conditional_expression);
-                ret = setExprOrAddAlternative(ret, tmp);
-            }
-            // Otherwise add both possibilities as alternatives
-            else {
-                tmp = exprOfNodeList(node->u.conditional_expression.expression);
-                setExprOrAddAlternative(ret, tmp);
-                tmp = exprOfNode(
-                            node->u.conditional_expression.conditional_expression);
-                setExprOrAddAlternative(ret, tmp);
-            }
-        }
-
-        return ret;
-    }
-    else
-        return exprOfNode(node->u.conditional_expression.logical_or_expression);
 }
 
 
@@ -365,77 +325,6 @@ ASTExpression* ASTExpressionEvaluator::exprOfBinaryExpr(const ASTNode *node)
     expr->setRight(exprOfNode(node->u.binary_expression.right));
     return expr;
 }
-
-
-ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(const ASTNode *node)
-{
-    if (!node)
-        return 0;
-
-    ASTUnaryExpression* ue = 0;
-
-    switch (node->type) {
-    case nt_unary_expression:
-        return exprOfNode(node->u.unary_expression.postfix_expression);
-
-    case nt_unary_expression_builtin:
-        return exprOfNode(node->u.unary_expression.builtin_function);
-
-    case nt_unary_expression_dec:
-        ue = createExprNode<ASTUnaryExpression>(etUnaryDec);
-        ue->setChild(exprOfNode(node->u.unary_expression.unary_expression));
-        return ue;
-
-    case nt_unary_expression_inc:
-        ue = createExprNode<ASTUnaryExpression>(etUnaryInc);
-        ue->setChild(exprOfNode(node->u.unary_expression.unary_expression));
-        return ue;
-
-    case nt_unary_expression_op: {
-        QString op = antlrTokenToStr(node->u.unary_expression.unary_operator);
-        if (op == "&")
-            ue = createExprNode<ASTUnaryExpression>(etUnaryAmp);
-        else if (op == "&&") {
-            // Double ampersand operator
-            ASTUnaryExpression* ue2 =
-                    createExprNode<ASTUnaryExpression>(etUnaryAmp);
-            ue2->setChild(exprOfNode(node->u.unary_expression.cast_expression));
-            ue = createExprNode<ASTUnaryExpression>(etUnaryAmp);
-            ue->setChild(ue2);
-            return ue;
-        }
-        else if (op == "*")
-            ue = createExprNode<ASTUnaryExpression>(etUnaryStar);
-        else if (op == "+")
-            return exprOfNode(node->u.unary_expression.cast_expression);
-        else if (op == "-")
-            ue = createExprNode<ASTUnaryExpression>(etUnaryMinus);
-        else if (op == "~")
-            ue = createExprNode<ASTUnaryExpression>(etUnaryInv);
-        else if (op == "!")
-            ue = createExprNode<ASTUnaryExpression>(etUnaryNot);
-        else
-            exprEvalError(QString("Unhandled unary operator: \"%1\" at %2:%3:%4")
-                    .arg(op)
-                    .arg(_ast->fileName())
-                    .arg(node->start->line)
-                    .arg(node->start->charPosition));
-
-        ue->setChild(exprOfNode(node->u.unary_expression.cast_expression));
-        break;
-    }
-
-    default:
-        exprEvalError(QString("Type \"%1\" represents no unary expression at %2:%3:%4")
-                .arg(ast_node_type_to_str(node))
-                .arg(_ast->fileName())
-                .arg(node->start->line)
-                .arg(node->start->charPosition));
-    }
-
-    return ue;
-}
-
 
 /*
   The keyword __alignof__ allows you to inquire about how an object is aligned,
@@ -607,11 +496,11 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncObjectSize(
     ASTConstantExpression* ret =
             createExprNode<ASTConstantExpression>(
                 _eval->sizeofLong() == 4 ? esUInt32 : esUInt64,
-                0);
+                0ULL);
     // If the maximum remaining bytes are requested, return (size_t) -1 instead
     // of 0.
     if (res.result.ui64 & 2)
-        ret->setValue(res.size, -1);
+        ret->setValue(res.size, -1ULL);
     return ret;
 }
 
@@ -647,8 +536,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncConstant(const ASTNode *
                 node->u.builtin_function_constant_p.unary_expression);
     // We can only approximate GCC's constant value decision here
     return expr->resultType() == etConstant ?
-                createExprNode<ASTConstantExpression>(esInt32, 1) :
-                createExprNode<ASTConstantExpression>(esInt32, 0);
+                createExprNode<ASTConstantExpression>(esInt32, 1ULL) :
+                createExprNode<ASTConstantExpression>(esInt32, 0ULL);
 
 }
 
@@ -847,7 +736,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *no
     if (type->type() & (rtPointer|rtFuncPointer|rtFunction))
         return createExprNode<ASTConstantExpression>(
                     _eval->sizeofLong() == 4 ? esUInt32 : esUInt64,
-                    _eval->sizeofLong());
+                    (quint64)_eval->sizeofLong());
     // Return alternatives for all sizes
     BaseTypeList list = _factory->findBaseTypesForAstType(type, _eval).second;
     QSet<quint32> sizes;
@@ -859,7 +748,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *no
             ASTExpression *expr =
                     createExprNode<ASTConstantExpression>(
                         _eval->sizeofLong() == 4 ? esUInt32 : esUInt64,
-                        size);
+                        (quint64)size);
             ret = setExprOrAddAlternative(ret, expr);
             sizes.insert(size);
         }
@@ -925,8 +814,49 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncTypesCompatible(
     // what GCC decides.
     /// @todo More acurate type equality decision
     return t1->equalTo(t2) ?
-                createExprNode<ASTConstantExpression>(esInt32, 1) :
-                createExprNode<ASTConstantExpression>(esInt32, 0);
+                createExprNode<ASTConstantExpression>(esInt32, 1ULL) :
+                createExprNode<ASTConstantExpression>(esInt32, 0ULL);
+}
+
+
+ASTExpression* ASTExpressionEvaluator::exprOfConditionalExpr(const ASTNode *node)
+{
+    if (!node)
+        return 0;
+    checkNodeType(node, nt_conditional_expression);
+
+    if (node->u.conditional_expression.conditional_expression) {
+        // Evaluate condition
+        ASTExpression* ret = 0, *tmp = 0;
+
+        for (ASTExpression* expr = exprOfNode(
+                    node->u.conditional_expression.logical_or_expression);
+             expr;
+             expr = expr->alternative())
+        {
+            // For constant conditions we can choose the correct path
+            if (expr->resultType() == erConstant) {
+                if (expr->result().result.i64)
+                    tmp = exprOfNodeList(
+                                node->u.conditional_expression.expression);
+                else
+                    tmp = exprOfNode(node->u.conditional_expression.conditional_expression);
+                ret = setExprOrAddAlternative(ret, tmp);
+            }
+            // Otherwise add both possibilities as alternatives
+            else {
+                tmp = exprOfNodeList(node->u.conditional_expression.expression);
+                setExprOrAddAlternative(ret, tmp);
+                tmp = exprOfNode(
+                            node->u.conditional_expression.conditional_expression);
+                setExprOrAddAlternative(ret, tmp);
+            }
+        }
+
+        return ret;
+    }
+    else
+        return exprOfNode(node->u.conditional_expression.logical_or_expression);
 }
 
 
@@ -937,9 +867,12 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
 
     bool ok = false;
     quint64 value;
-    if (node->type == nt_constant_int) {
-        QString s = antlrTokenToStr(node->u.constant.literal);
-        QString suffix;
+    ExpressionResultSize size = esUndefined;
+    QString s = antlrTokenToStr(node->u.constant.literal);
+    QString suffix;
+
+    switch (node->type) {
+    case nt_constant_int: {
         // Remove any size or signedness specifiers from the string
         while (s.endsWith('l', Qt::CaseInsensitive) ||
                s.endsWith('u', Qt::CaseInsensitive))
@@ -950,14 +883,13 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
         // Use the C convention to choose the correct base
         value = s.toULongLong(&ok, 0);
         if (!ok)
-            exprEvalError(QString("Failed to parse constant value \"%1\" "
+            exprEvalError(QString("Failed to parse constant integer \"%1\" "
                                   "at %2:%3:%4")
                           .arg(s)
                           .arg(_ast->fileName())
                           .arg(node->start->line)
                           .arg(node->start->charPosition));
-        ExpressionResultSize size = esUndefined;
-        // Without suffix find the smallest type fitting the value
+        // Without suffix given, find the smallest type fitting the value
         if (suffix.isEmpty()) {
             if (value < (1ULL << 31))
                 size = esInt32;
@@ -984,13 +916,83 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
         }
         return createExprNode<ASTConstantExpression>(size, value);
     }
-    else {
+
+    case nt_constant_char: {
+        // Keep it simple for now
+        unsigned char c = 0; // unsigned to avoid sign expansion
+        // Single letter
+        if (s.size() == 1)
+            c = s[0].toLatin1();
+        // Simple escape sequence
+        else if (s.size() == 2 && s[0] == QChar('\\')) {
+            switch (s[1].toLatin1()) {
+            case 'a':  c = '\a'; break;
+            case 'b':  c = '\b'; break;
+            case 't':  c = '\t'; break;
+            case 'n':  c = '\n'; break;
+            case 'f':  c = '\f'; break;
+            case 'r':  c = '\r'; break;
+            case 'e':  c = '\e'; break;
+            case 'E':  c = '\E'; break;
+            case 'v':  c = '\v'; break;
+            case '\"': c = '\"'; break;
+            case '\'': c = '\''; break;
+            case '\\': c = '\\'; break;
+            default:
+                exprEvalError(QString("Unsupported escape sequence: %1 at %2:%3:%4")
+                              .arg(s)
+                              .arg(_ast->fileName())
+                              .arg(node->start->line)
+                              .arg(node->start->charPosition));
+            }
+        }
+        else {
+            exprEvalError(QString("Unsupported escape sequence: %1 at %2:%3:%4")
+                          .arg(s)
+                          .arg(_ast->fileName())
+                          .arg(node->start->line)
+                          .arg(node->start->charPosition));
+        }
+        return createExprNode<ASTConstantExpression>(esInt8, (quint64)c);
+    }
+
+    case nt_constant_float: {
+        ASTConstantExpression *expr = 0;
+        // Is this a double value?
+        if (s.endsWith('d', Qt::CaseInsensitive)) {
+            s = s.left(s.size() - 1);
+            expr = createExprNode<ASTConstantExpression>(esDouble,
+                                                         s.toDouble(&ok));
+        }
+        // Default type is float
+        else {
+            if (s.endsWith('f', Qt::CaseInsensitive))
+                s = s.left(s.size() - 1);
+            expr = createExprNode<ASTConstantExpression>(esFloat,
+                                                         s.toDouble(&ok));
+        }
+
+        // Check conversion result
+        if (!ok)
+            exprEvalError(QString("Failed to convert constant \"%1\" to float "
+                                  "at %2:%3:%4")
+                          .arg(s)
+                          .arg(_ast->fileName())
+                          .arg(node->start->line)
+                          .arg(node->start->charPosition));
+        return expr;
+
+    }
+
+    default:
         exprEvalError(QString("Unexpected constant value type: %1 at %2:%3:%4")
                       .arg(ast_node_type_to_str(node))
                       .arg(_ast->fileName())
                       .arg(node->start->line)
                       .arg(node->start->charPosition));
     }
+
+    return 0;
 }
 
 
@@ -1029,6 +1031,76 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(const ASTNode *node)
                       .arg(_ast->fileName())
                       .arg(node ? node->start->line : 0)
                       .arg(node ? node->start->charPosition : 0));
+}
+
+
+ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(const ASTNode *node)
+{
+    if (!node)
+        return 0;
+
+    ASTUnaryExpression* ue = 0;
+
+    switch (node->type) {
+    case nt_unary_expression:
+        return exprOfNode(node->u.unary_expression.postfix_expression);
+
+    case nt_unary_expression_builtin:
+        return exprOfNode(node->u.unary_expression.builtin_function);
+
+    case nt_unary_expression_dec:
+        ue = createExprNode<ASTUnaryExpression>(etUnaryDec);
+        ue->setChild(exprOfNode(node->u.unary_expression.unary_expression));
+        return ue;
+
+    case nt_unary_expression_inc:
+        ue = createExprNode<ASTUnaryExpression>(etUnaryInc);
+        ue->setChild(exprOfNode(node->u.unary_expression.unary_expression));
+        return ue;
+
+    case nt_unary_expression_op: {
+        QString op = antlrTokenToStr(node->u.unary_expression.unary_operator);
+        if (op == "&")
+            ue = createExprNode<ASTUnaryExpression>(etUnaryAmp);
+        else if (op == "&&") {
+            // Double ampersand operator
+            ASTUnaryExpression* ue2 =
+                    createExprNode<ASTUnaryExpression>(etUnaryAmp);
+            ue2->setChild(exprOfNode(node->u.unary_expression.cast_expression));
+            ue = createExprNode<ASTUnaryExpression>(etUnaryAmp);
+            ue->setChild(ue2);
+            return ue;
+        }
+        else if (op == "*")
+            ue = createExprNode<ASTUnaryExpression>(etUnaryStar);
+        else if (op == "+")
+            return exprOfNode(node->u.unary_expression.cast_expression);
+        else if (op == "-")
+            ue = createExprNode<ASTUnaryExpression>(etUnaryMinus);
+        else if (op == "~")
+            ue = createExprNode<ASTUnaryExpression>(etUnaryInv);
+        else if (op == "!")
+            ue = createExprNode<ASTUnaryExpression>(etUnaryNot);
+        else
+            exprEvalError(QString("Unhandled unary operator: \"%1\" at %2:%3:%4")
+                    .arg(op)
+                    .arg(_ast->fileName())
+                    .arg(node->start->line)
+                    .arg(node->start->charPosition));
+
+        ue->setChild(exprOfNode(node->u.unary_expression.cast_expression));
+        break;
+    }
+
+    default:
+        exprEvalError(QString("Type \"%1\" represents no unary expression at %2:%3:%4")
+                .arg(ast_node_type_to_str(node))
+                .arg(_ast->fileName())
+                .arg(node->start->line)
+                .arg(node->start->charPosition));
+    }
+
+    return ue;
 }
 
 

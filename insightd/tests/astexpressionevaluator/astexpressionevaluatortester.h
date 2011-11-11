@@ -32,11 +32,32 @@ private slots:
 	void test_constants_func();
 	void test_constants_func_data();
 
-	void test_arithmetic_func();
-	void test_arithmetic_func_data();
-
 	void test_sign_extension_func();
 	void test_sign_extension_func_data();
+
+	void test_additive_func();
+	void test_additive_func_data();
+
+	void test_multiplicative_func();
+	void test_multiplicative_func_data();
+
+	void test_logical_func();
+	void test_logical_func_data();
+
+	void test_bitwise_func();
+	void test_bitwise_func_data();
+
+	void test_equality_func();
+	void test_equality_func_data();
+
+	void test_relational_func();
+	void test_relational_func_data();
+
+	void test_shift_func();
+	void test_shift_func_data();
+
+	void test_unary_func();
+	void test_unary_func_data();
 
 private:
     MemSpecs* _specs;
