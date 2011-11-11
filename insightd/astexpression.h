@@ -27,6 +27,7 @@ enum ExpressionType {
     etAdditiveMinus,
     etMultiplicativeMult,
     etMultiplicativeDiv,
+    etMultiplicativeMod,
     etUnaryDec,
     etUnaryInc,
     etUnaryStar,
@@ -52,10 +53,20 @@ enum ExpressionResultType {
 };
 
 enum ExpressionResultSize {
-    es64Bit     = (1 << 1),
-    esUnsigned  = (1 << 2),
-    esInt32     = 0,
-    esUInt32    = esUnsigned,
+    esUndefined = 0,
+    es8Bit      = (1 << 1),
+    es16Bit     = (1 << 2),
+    es32Bit     = (1 << 3),
+    es64Bit     = (1 << 4),
+    esUnsigned  = (1 << 5),
+    esFloat     = (1 << 6),
+    esDouble    = (1 << 7),
+    esInt8      = es8Bit,
+    esUInt8     = es8Bit|esUnsigned,
+    esInt16     = es16Bit,
+    esUInt16    = es16Bit|esUnsigned,
+    esInt32     = es32Bit,
+    esUInt32    = es32Bit|esUnsigned,
     esInt64     = es64Bit,
     esUInt64    = es64Bit|esUnsigned
 };
@@ -68,14 +79,14 @@ struct ExpressionResult
     ExpressionResult() : resultType(erUndefined), size(esInt32) { this->result.i64 = 0; }
     ExpressionResult(int resultType)
         : resultType(resultType), size(esInt32) { this->result.i64 = 0; }
-    ExpressionResult(int resultType, int size, quint64 result)
+    ExpressionResult(int resultType, ExpressionResultSize size, quint64 result)
         : resultType(resultType), size(size) { this->result.ui64 = result; }
 
     /// ORed combination of ExpressionResultType values
     int resultType;
 
     /// size of result of expression. \sa ExpressionResultSize
-    int size;
+    ExpressionResultSize size;
 
     /// Expression result, if valid
     union Result {
@@ -83,26 +94,63 @@ struct ExpressionResult
         qint64 i64;
         quint32 ui32;
         qint32 i32;
+        quint16 ui16;
+        qint16 i16;
+        quint8 ui8;
+        qint8 i8;
+        float f;
+        double d;
     } result;
 
-    /// Expands the value according to signdness and size
-    inline qint64 valueExpanded() const
+    inline qint64 value(ExpressionResultSize target = esUndefined) const
     {
+        // If no target is specified or our own size is 64 bit or own type is
+        // not unsigned, just sign-extend the signed value to 64 bit
+        if (!target || (size & es64Bit) || !(size & esUnsigned)) {
+            return (size & es64Bit) ?
+                        result.i64 :
+                        (size & es32Bit) ?
+                            (qint64) result.i32 :
+                            (size & es16Bit) ?
+                                (qint64) result.i16 :
+                                (qint64) result.i8;
+        }
+        // Target is specified, our type is unsigned and 32 bit or less
+        else {
+            // If our unsigned type fits into signed target type, then use it
+            if ((target & es64Bit) ||
+                ((target & es32Bit) && (size & (es16Bit|es8Bit))) ||
+                ((target & es16Bit) && (size & es8Bit)))
+                return uvalue();
+            // Otherwise return sign-extended unsigned value, should actually
+            // never happen
+            else
+                return value();
+        }
+    }
+
+    inline quint64 uvalue(ExpressionResultSize target = esUndefined) const
+    {
+        // If we accidently got called for an unsigned target, return this value
+        if (target && (!(target & esUnsigned) || !(size & esUnsigned)))
+            return value((ExpressionResultSize) (target & ~esUnsigned));
         return (size & es64Bit) ?
-                    result.i64 :
-                    (size & esUnsigned) ?
-                        (qint64)((quint64)result.ui32) :
-                        (qint64) result.i32;
+                    result.ui64 :
+                    (size & es32Bit) ?
+                        (quint64) result.ui32 :
+                        (size & es16Bit) ?
+                            (quint64) result.ui16 :
+                            (quint64) result.ui8;
     }
 
-    inline qint64 value() const
+    inline float fvalue() const
     {
-        return (size & es64Bit) ? result.i64 : (qint64) result.i32;
+        return result.f;
     }
 
-    inline quint64 uvalue() const
+    inline double dvalue() const
     {
-        return (size & es64Bit) ? result.ui64 : (quint64) result.ui32;
+        return result.d;
     }
 };
 
@@ -194,7 +242,7 @@ class ASTConstantExpression: public ASTExpression
 {
 public:
     ASTConstantExpression() {}
-    ASTConstantExpression(int size, quint64 value)
+    ASTConstantExpression(ExpressionResultSize size, quint64 value)
         : _value(erConstant, size, value) {}
 
     inline virtual ExpressionType type() const
@@ -212,7 +260,7 @@ public:
         return _value;
     }
 
-    inline void setValue(int size, quint64 value)
+    inline void setValue(ExpressionResultSize size, quint64 value)
     {
         _value.size = size;
         _value.result.ui64 = value;
@@ -308,17 +356,14 @@ public:
         ExpressionResult lr = _left->result();
         ExpressionResult rr = _right->result();
         ExpressionResult ret(lr.resultType | rr.resultType);
-        // Unsigned flag is dominant over signed flag and 64bit is dominant
-        // over 32 bit, so just OR the sizes
-        ret.size = lr.size | rr.size;
+        ExpressionResultSize target = ret.size = binaryExprSize(lr, rr);
         // Is the expression decidable?
         if (lr.resultType != erConstant || rr.resultType != erConstant) {
             // Undecidable, so return the combined result type
             return ret;
         }
 
-//        bool is64Bit = ((lr.size|rr.size) & es64Bit) ? true : false;
-        bool isUnsigned = ((lr.size|rr.size) & esUnsigned) ? true : false;
+        bool isUnsigned = (ret.size & esUnsigned) ? true : false;
 
         switch (_type) {
         case etLogicalOr:
@@ -332,149 +377,149 @@ public:
             break;
 
         case etInclusiveOr:
-            ret.result.i64 = lr.valueExpanded() | rr.valueExpanded();
+            if (isUnsigned)
+                ret.result.ui64 = lr.uvalue(target) | rr.uvalue(target);
+            else
+                ret.result.i64 = lr.value(target) | rr.value(target);
             break;
 
         case etExclusiveOr:
-            ret.result.i64 = lr.valueExpanded() ^ rr.valueExpanded();
+            if (isUnsigned)
+                ret.result.ui64 = lr.uvalue(target) ^ rr.uvalue(target);
+            else
+                ret.result.i64 = lr.value(target) ^ rr.value(target);
             break;
 
         case etAnd:
-            ret.result.i64 = lr.valueExpanded() & rr.valueExpanded();
+            if (isUnsigned)
+                ret.result.ui64 = lr.uvalue(target) & rr.uvalue(target);
+            else
+                ret.result.i64 = lr.value(target) & rr.value(target);
             break;
 
         case etEquality:
             ret.size = esInt32;
-            ret.result.i32 = (lr.value() == rr.value()) ? 1 : 0;
+            if (isUnsigned)
+                ret.result.i32 = (lr.uvalue(target) == rr.uvalue(target)) ? 1 : 0;
+            else
+                ret.result.i32 = (lr.value(target) == rr.value(target)) ? 1 : 0;
             break;
 
         case etUnequality:
             ret.size = esInt32;
-            ret.result.i32 = (lr.value() != rr.value()) ? 1 : 0;
+            if (isUnsigned)
+                ret.result.i32 = (lr.uvalue(target) != rr.uvalue(target)) ? 1 : 0;
+            else
+                ret.result.i32 = (lr.value(target) != rr.value(target)) ? 1 : 0;
             break;
 
         case etRelationalGE:
             ret.size = esInt32;
             if (isUnsigned)
-                ret.result.i32 = (lr.uvalue() >= rr.uvalue()) ? 1 : 0;
+                ret.result.i32 = (lr.uvalue(target) >= rr.uvalue(target)) ? 1 : 0;
             else
-                ret.result.i32 = (lr.value() >= rr.value()) ? 1 : 0;
+                ret.result.i32 = (lr.value(target) >= rr.value(target)) ? 1 : 0;
             break;
 
         case etRelationalGT:
             ret.size = esInt32;
             if (isUnsigned)
-                ret.result.i32 = (lr.uvalue() > rr.uvalue()) ? 1 : 0;
+                ret.result.i32 = (lr.uvalue(target) > rr.uvalue(target)) ? 1 : 0;
             else
-                ret.result.i32 = (lr.value() > rr.value()) ? 1 : 0;
+                ret.result.i32 = (lr.value(target) > rr.value(target)) ? 1 : 0;
             break;
 
         case etRelationalLE:
             ret.size = esInt32;
             if (isUnsigned)
-                ret.result.i32 = (lr.uvalue() <= rr.uvalue()) ? 1 : 0;
+                ret.result.i32 = (lr.uvalue(target) <= rr.uvalue(target)) ? 1 : 0;
             else
-                ret.result.i32 = (lr.value() <= rr.value()) ? 1 : 0;
+                ret.result.i32 = (lr.value(target) <= rr.value(target)) ? 1 : 0;
             break;
 
         case etRelationalLT:
             ret.size = esInt32;
             if (isUnsigned)
-                ret.result.i32 = (lr.uvalue() < rr.uvalue()) ? 1 : 0;
+                ret.result.i32 = (lr.uvalue(target) < rr.uvalue(target)) ? 1 : 0;
             else
-                ret.result.i32 = (lr.value() < rr.value()) ? 1 : 0;
+                ret.result.i32 = (lr.value(target) < rr.value(target)) ? 1 : 0;
             break;
 
         case etShiftLeft:
-            ret.size = lr.size;
-            if (lr.size & es64Bit) {
-                if (lr.size & esUnsigned) {
-                    if (rr.size & esUnsigned)
-                        ret.result.ui64 = lr.uvalue() << rr.uvalue();
-                    else
-                        ret.result.ui64 = lr.uvalue() << rr.value();
-                }
-                else {
-                    if (rr.size & esUnsigned)
-                        ret.result.i64 = lr.value() << rr.uvalue();
-                    else
-                        ret.result.i64 = lr.value() << rr.value();
-                }
-            }
-            else {
-                if (lr.size & esUnsigned) {
-                    if (rr.size & esUnsigned)
-                        ret.result.ui32 = lr.uvalue() << rr.uvalue();
-                    else
-                        ret.result.ui32 = lr.uvalue() << rr.value();
-                }
-                else {
-                    if (rr.size & esUnsigned)
-                        ret.result.i32 = lr.value() << rr.uvalue();
-                    else
-                        ret.result.i32 = lr.value() << rr.value();
-                }
-            }
+            ret.size = lr.size; // result is the type of the left hand
+            // If right-hand operand is negative, the result is undefined.
+            if (lr.size & esUnsigned)
+                ret.result.ui64 = lr.uvalue() << rr.value();
+            else
+                ret.result.i64 = lr.value() << rr.value();
             break;
 
         case etShiftRight:
-            ret.size = lr.size;
-            if (lr.size & es64Bit) {
-                if (lr.size & esUnsigned) {
-                    if (rr.size & esUnsigned)
-                        ret.result.ui64 = lr.uvalue() >> rr.uvalue();
-                    else
-                        ret.result.ui64 = lr.uvalue() >> rr.value();
-                }
-                else {
-                    if (rr.size & esUnsigned)
-                        ret.result.i64 = lr.value() >> rr.uvalue();
-                    else
-                        ret.result.i64 = lr.value() >> rr.value();
-                }
-            }
-            else {
-                if (lr.size & esUnsigned) {
-                    if (rr.size & esUnsigned)
-                        ret.result.ui32 = lr.uvalue() >> rr.uvalue();
-                    else
-                        ret.result.ui32 = lr.uvalue() >> rr.value();
-                }
-                else {
-                    if (rr.size & esUnsigned)
-                        ret.result.i32 = lr.value() >> rr.uvalue();
-                    else
-                        ret.result.i32 = lr.value() >> rr.value();
-                }
-            }
+            ret.size = lr.size; // result is the type of the left hand
+            // If right-hand operand is negative, the result is undefined.
+            if (lr.size & esUnsigned)
+                ret.result.ui64 = lr.uvalue() >> rr.value();
+            else
+                ret.result.i64 = lr.value() >> rr.value();
             break;
 
         case etAdditivePlus:
             if (isUnsigned)
-                ret.result.ui64 = lr.result.ui64 + rr.result.ui64;
+                ret.result.ui64 = lr.uvalue(target) + rr.uvalue(target);
             else
-                ret.result.i64 = lr.result.i64 + rr.result.i64;
+                ret.result.i64 = lr.value(target) + rr.value(target);
             break;
 
         case etAdditiveMinus:
             if (isUnsigned)
-                ret.result.ui64 = lr.result.ui64 - rr.result.ui64;
+                ret.result.ui64 = lr.uvalue(target) - rr.uvalue(target);
             else
-                ret.result.i64 = lr.result.i64 - rr.result.i64;
+                ret.result.i64 = lr.value(target) - rr.value(target);
             break;
 
         case etMultiplicativeMult:
-            if (isUnsigned)
-                ret.result.ui64 = lr.result.ui64 * rr.result.ui64;
-            else
-                ret.result.i64 = lr.result.i64 * rr.result.i64;
+            if (lr.size & esUnsigned) {
+                if (rr.size & esUnsigned)
+                    ret.result.i64 = lr.uvalue(target) * rr.uvalue(target);
+                else
+                    ret.result.i64 = lr.uvalue(target) * rr.value(target);
+            }
+            else {
+                if (rr.size & esUnsigned)
+                    ret.result.i64 = lr.value(target) * rr.uvalue(target);
+                else
+                    ret.result.i64 = lr.value(target) * rr.value(target);
+            }
             break;
 
         case etMultiplicativeDiv:
-            if (isUnsigned)
-                ret.result.ui64 = lr.result.ui64 / rr.result.ui64;
-            else
-                ret.result.i64 = lr.result.i64 / rr.result.i64;
+            if (lr.size & esUnsigned) {
+                if (rr.size & esUnsigned)
+                    ret.result.i64 = lr.uvalue(target) / rr.uvalue(target);
+                else
+                    ret.result.i64 = lr.uvalue(target) / rr.value(target);
+            }
+            else {
+                if (rr.size & esUnsigned)
+                    ret.result.i64 = lr.value(target) / rr.uvalue(target);
+                else
+                    ret.result.i64 = lr.value(target) / rr.value(target);
+            }
+            break;
+
+        case etMultiplicativeMod:
+            if (lr.size & esUnsigned) {
+                if (rr.size & esUnsigned)
+                    ret.result.i64 = lr.uvalue(target) % rr.uvalue(target);
+                else
+                    ret.result.i64 = lr.uvalue(target) % rr.value(target);
+            }
+            else {
+                if (rr.size & esUnsigned)
+                    ret.result.i64 = lr.value(target) % rr.uvalue(target);
+                else
+                    ret.result.i64 = lr.value(target) % rr.value(target);
+            }
             break;
 
         default:
@@ -482,6 +527,72 @@ public:
         }
 
         return ret;
+    }
+
+    static ExpressionResultSize binaryExprSize(const ExpressionResult& r1,
+                                               const ExpressionResult& r2)
+    {
+        /*
+        Many binary operators that expect operands of arithmetic or enumeration
+        type cause conversions and yield result types in a similar way. The
+        purpose is to yield a common type, which is also the type of the result.
+        This pattern is called the usual arithmetic conversions, which are
+        defined as follows:
+        - If either operand is of type long double, the other shall be converted
+          to long double.
+        - Otherwise, if either operand is double, the other shall be converted
+          to double.
+        - Otherwise, if either operand is float, the other shall be converted to
+          float.
+        - Otherwise, the integral promotions (4.5) shall be performed on both
+          operands.
+        - Then, if either operand is unsigned long the other shall be converted
+          to unsigned long.
+        - Otherwise, if one operand is a long int and the other unsigned int,
+          then if a long int can represent all the values of an unsigned int,
+          the unsigned int shall be converted to a long int; otherwise both
+          operands shall be converted to unsigned long int.
+        - Otherwise, if either operand is long, the other shall be converted to
+          long.
+        - Otherwise, if either operand is unsigned, the other shall be converted
+          to unsigned. [Note: otherwise, the only remaining case is that both
+          operands are int ]
+
+        Integral promotions:
+        An rvalue of type char, signed char, unsigned char, short int, or
+        unsigned short int can be converted to an rvalue of type int if int can
+        represent all the values of the source type; otherwise, the source
+        rvalue can be converted to an rvalue of type unsigned int.
+        */
+
+        int r1r2_size = r1.size | r2.size;
+        // If either is double, the result is double
+        if (r1r2_size & esDouble)
+            return esDouble;
+        // Otherwise, if either is float, the result is float
+        else if (r1r2_size & esFloat)
+            return esFloat;
+        // Otherwise
+        else {
+            // Integral promition
+            ExpressionResultSize r1_size = (r1.size & (es8Bit|es16Bit)) ?
+                        esInt32 : r1.size;
+            ExpressionResultSize r2_size = (r2.size & (es8Bit|es16Bit)) ?
+                        esInt32 : r2.size;
+            r1r2_size = r1_size | r2_size;
+
+            // If either is unsigned long, the result is unsigned long
+            if (r1_size == esUInt64 || r2_size == esUInt64)
+                return esUInt64;
+            // Otherwise, if one is long and the other unsigned, result is long
+            // Otherwise, if either is long, the result is long.
+            else if (r1r2_size & esInt64)
+                return esInt64;
+            // Otherwise, if either is unsigned, the result is unsigned
+            else if (r1r2_size & esUnsigned)
+                return esUInt32;
+        }
+        return esInt32;
     }
 
 protected:
@@ -528,6 +639,7 @@ public:
         ExpressionResult res = _child->result();
         // Is the expression decidable?
         if (res.resultType != erConstant) {
+            /// @todo constants cannot be incremented, that makes no sense at all!
             // Undecidable, so return the correct result type
             res.resultType |= erInvalid;
             return res;
@@ -537,15 +649,23 @@ public:
         case etUnaryInc:
             if (res.size & es64Bit)
                 ++res.result.ui64;
-            else
+            else if (res.size & es32Bit)
                 ++res.result.ui32;
+            else if (res.size & es16Bit)
+                ++res.result.ui16;
+            else
+                ++res.result.ui8;
             break;
 
         case etUnaryDec:
             if (res.size & es64Bit)
                 --res.result.ui64;
-            else
+            else if (res.size & es32Bit)
                 --res.result.ui32;
+            else if (res.size & es16Bit)
+                --res.result.ui16;
+            else
+                --res.result.ui8;
             break;
 
             /// @todo Fixme
@@ -553,22 +673,19 @@ public:
 //        case etUnaryAmp:
 
         case etUnaryMinus:
-            if (res.size & es64Bit)
-                res.result.i64  = -res.result.i64;
+            if (res.size & esUnsigned)
+                res.result.ui64 = -res.result.ui64;
             else
-                res.result.i32 = -res.result.i32;
+                res.result.i64 = -res.result.i64;
             break;
 
         case etUnaryInv:
-            if (res.size & es64Bit)
-                res.result.ui64  = ~res.result.ui64;
-            else
-                res.result.ui32 = ~res.result.ui32;
+            res.result.ui64 = ~res.result.ui64;
             break;
 
         case etUnaryNot:
             res.size = esInt32;
-            res.result.i32 = !res.value() ? 1 : 0;
+            res.result.i32 = (!res.uvalue()) ? 1 : 0;
             break;
 
         default:
