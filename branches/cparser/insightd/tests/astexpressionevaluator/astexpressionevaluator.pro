@@ -88,6 +88,7 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../compileunit.cpp \
     ../../basetype.cpp \
     ../../astexpressionevaluator.cpp \
+    ../../astexpression.cpp \
     ../../programoptions.cpp \
     ../../scriptengine.cpp \
     ../../instance.cpp \

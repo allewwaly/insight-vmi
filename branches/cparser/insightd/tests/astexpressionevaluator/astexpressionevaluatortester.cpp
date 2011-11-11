@@ -302,15 +302,34 @@ void ASTExpressionEvaluatorTester::cleanup()
 #define STRING(s) STRING2(s)
 #define LN "line: " STRING(__LINE__)
 
-#define CONSTANT_EXPR2(expr, expected) \
-    QTest::newRow(LN) << "int i = " #expr ";" << (int)erConstant \
-        << (quint64)((qint64)(expected))
 #define CONSTANT_EXPR(expr) CONSTANT_EXPR2(expr, expr)
+#define CONSTANT_EXPR2(expr, expected) \
+    QTest::newRow(LN) << "int i = " #expr ";" \
+        << (int)erConstant << (int)esInt32 \
+        << (quint64)((qint64)(expected)) << 0.0f << 0.0d
+
+#define CONSTANT_EXPR_F(expr) CONSTANT_EXPR2_F(expr, expr)
+#define CONSTANT_EXPR2_F(expr, expected) \
+    QTest::newRow(LN) << "float f = " #expr ";" \
+        << (int)erConstant << (int)esFloat \
+        << 0ULL << (float)(expected) << 0.0d
+
+#define CONSTANT_EXPR_D(expr) CONSTANT_EXPR2_D(expr, expr)
+#define CONSTANT_EXPR2_D(expr, expected) \
+    QTest::newRow(LN) << "double d = " #expr ";" \
+        << (int)erConstant << (int)esDouble \
+        << 0ULL << 0.0f << (double)(expected)
+
+//#define CONSTANT_EXPR_F(x)
+//#define CONSTANT_EXPR_D(x)
 
 #define TEST_DATA_COLUMNS \
     QTest::addColumn<QString>("localCode"); \
     QTest::addColumn<int>("resultType"); \
+    QTest::addColumn<int>("resultSiz"); \
     QTest::addColumn<quint64>("result"); \
+    QTest::addColumn<float>("resultf"); \
+    QTest::addColumn<double>("resultd");
 
 #define	TEST_FUNCTION(methodName) \
 	void ASTExpressionEvaluatorTester::test_##methodName##_func() \
@@ -331,11 +350,28 @@ void ASTExpressionEvaluatorTester::cleanup()
 		\
 			QTEST(_tester->result.resultType, "resultType"); \
 			if (_tester->result.resultType == erConstant) { \
-				QFETCH(quint64, result); \
-				if (_tester->result.size & es64Bit) \
-					QCOMPARE(_tester->result.result.ui64, result); \
-				else \
-					QCOMPARE(_tester->result.result.ui32, (quint32)result); \
+				if (_tester->result.size & esInteger) { \
+					QFETCH(quint64, result); \
+					if (_tester->result.size & es64Bit) \
+						QCOMPARE(_tester->result.result.ui64, result); \
+					else if (_tester->result.size & es32Bit) \
+						QCOMPARE(_tester->result.result.ui32, (quint32)result); \
+					else if (_tester->result.size & es16Bit) \
+						QCOMPARE(_tester->result.result.ui16, (quint16)result); \
+					else \
+						QCOMPARE(_tester->result.result.ui8, (quint8)result); \
+				} \
+				else if (_tester->result.size & esFloat) { \
+					QFETCH(float, resultf); \
+					QCOMPARE(_tester->result.result.f, resultf); \
+				} \
+				else if (_tester->result.size & esDouble) { \
+					QFETCH(double, resultd); \
+					QCOMPARE(_tester->result.result.d, resultd); \
+				} \
+				else { \
+					QFAIL("Invalid result type"); \
+				} \
 			} \
 		\
 		} \
@@ -360,7 +396,7 @@ TEST_FUNCTION(constants)
 {
     TEST_DATA_COLUMNS;
 
-    CONSTANT_EXPR(-1U > -0xcafe);
+    CONSTANT_EXPR_F(1.0);
 
     // Positive constants
     CONSTANT_EXPR(0);
@@ -391,22 +427,46 @@ TEST_FUNCTION(constants)
     CONSTANT_EXPR(-01234567);
     CONSTANT_EXPR(-01234567L);
     CONSTANT_EXPR(-01234567UL);
+    // Float constants w/o exponent
+    CONSTANT_EXPR_F(0.0);
+    CONSTANT_EXPR_F(.0);
+    CONSTANT_EXPR_F(1.0);
+    CONSTANT_EXPR_F(-1.0);
+    CONSTANT_EXPR_F(.34);
+    CONSTANT_EXPR_F(12.34);
+    CONSTANT_EXPR_F(-.34);
+    CONSTANT_EXPR_F(-12.34);
+    CONSTANT_EXPR_F(-1.0f);
+    CONSTANT_EXPR_F(.34f);
+    CONSTANT_EXPR_F(12.34f);
+    CONSTANT_EXPR_F(-.34f);
+    CONSTANT_EXPR_F(-12.34f);
+    CONSTANT_EXPR_D(-1.0d);
+    CONSTANT_EXPR_D(.34d);
+    CONSTANT_EXPR_D(12.34d);
+    CONSTANT_EXPR_D(-.34d);
+    CONSTANT_EXPR_D(-12.34d);
+    // Float constants w/ exponent
+    CONSTANT_EXPR_F(0e0);
+    CONSTANT_EXPR_F(0E0);
+    CONSTANT_EXPR_F(1e0);
+    CONSTANT_EXPR_F(1E0);
+    CONSTANT_EXPR_F(-1e0);
+    CONSTANT_EXPR_F(0e34);
+    CONSTANT_EXPR_F(12e34);
+    CONSTANT_EXPR_F(-0e34);
+    CONSTANT_EXPR_F(-12e34);
+    CONSTANT_EXPR_F(-12E34);
+    CONSTANT_EXPR_F(12e34f);
+    CONSTANT_EXPR_F(-0e34f);
+    CONSTANT_EXPR_F(-12e34f);
+    CONSTANT_EXPR_F(-12E34f);
+    CONSTANT_EXPR_D(12e34d);
+    CONSTANT_EXPR_D(-0e34d);
+    CONSTANT_EXPR_D(-12e34d);
+    CONSTANT_EXPR_D(-12E34d);
 }
 
-TEST_FUNCTION(arithmetic)
-{
-    TEST_DATA_COLUMNS;
-
-    CONSTANT_EXPR(1 + 1);
-    CONSTANT_EXPR(2 + 1);
-    CONSTANT_EXPR(2 - 1);
-    CONSTANT_EXPR(2 + -1);
-    CONSTANT_EXPR((2) + (-1));
-    CONSTANT_EXPR(-1 + 2);
-    CONSTANT_EXPR((-1) + (2));
-    CONSTANT_EXPR(-1 + 2 - 3);
-    CONSTANT_EXPR(1 - 2 + 3);
-}
 
 TEST_FUNCTION(sign_extension)
 {
@@ -894,5 +954,80 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(-1ULL && -0xcafebabeU);
     CONSTANT_EXPR(-1ULL && -0xcafebabeLL);
     CONSTANT_EXPR(-1ULL && -0xcafebabeULL);
-
 }
+
+
+TEST_FUNCTION(additive)
+{
+    TEST_DATA_COLUMNS;
+
+    CONSTANT_EXPR(1 + 1);
+    CONSTANT_EXPR(2 + 1);
+    CONSTANT_EXPR(2 - 1);
+    CONSTANT_EXPR(2 + -1);
+    CONSTANT_EXPR((2) + (-1));
+    CONSTANT_EXPR(-1 + 2);
+    CONSTANT_EXPR((-1) + (2));
+    CONSTANT_EXPR(-1 + 2 - 3);
+    CONSTANT_EXPR(1 - 2 + 3);
+    CONSTANT_EXPR((1 - 2) + 3);
+    CONSTANT_EXPR(1 - (2 + 3));
+    CONSTANT_EXPR(1 + (-2 + 3));
+    CONSTANT_EXPR(1 + -(-(2 + 3) - 4 + -(5 - 6)));
+}
+
+
+TEST_FUNCTION(multiplicative)
+{
+    TEST_DATA_COLUMNS;
+
+    CONSTANT_EXPR(3 * 5);
+}
+
+TEST_FUNCTION(logical)
+{
+    TEST_DATA_COLUMNS;
+
+    CONSTANT_EXPR(0);
+}
+
+TEST_FUNCTION(bitwise)
+{
+    TEST_DATA_COLUMNS;
+
+    CONSTANT_EXPR(0);
+}
+
+
+TEST_FUNCTION(equality)
+{
+    TEST_DATA_COLUMNS;
+
+    CONSTANT_EXPR(0);
+}
+
+
+TEST_FUNCTION(relational)
+{
+    TEST_DATA_COLUMNS;
+
+    CONSTANT_EXPR(0);
+}
+
+
+TEST_FUNCTION(shift)
+{
+    TEST_DATA_COLUMNS;
+
+    CONSTANT_EXPR(0);
+}
+
+
+TEST_FUNCTION(unary)
+{
+    TEST_DATA_COLUMNS;
+
+    CONSTANT_EXPR(0);
+}
+
+

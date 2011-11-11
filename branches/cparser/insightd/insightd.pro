@@ -49,7 +49,8 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     funcparam.cpp \
     function.cpp \
     shell_readline.cpp \
-    astexpressionevaluator.cpp
+    astexpressionevaluator.cpp \
+    astexpression.cpp
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
     memorydumpsclass.h \
@@ -130,6 +131,7 @@ INCLUDEPATH += ../libinsight/include \
     ../libantlr3c/include \
     ../libcparser/include
 FORMS = memorymapwindow.ui
+
 
 
 
