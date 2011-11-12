@@ -174,7 +174,7 @@ ExpressionResult ASTBinaryExpression::result() const
 
 #define LOGICAL_OP(op) \
     do { \
-        ret.size = esInt32; \
+        ret.size = esUInt8; \
         if (target & esInteger) { \
             if (isUnsigned) \
                 ret.result.i32 = (lr.uvalue(target) op rr.uvalue(target)) ? \
@@ -499,8 +499,20 @@ ExpressionResult ASTUnaryExpression::result() const
         break;
 
     case etUnaryInv:
-        if (res.size & esInteger)
-            res.result.ui64 = ~res.result.ui64;
+        if (res.size & esInteger) {
+            // Extend smaller values to 32 bit
+            if (res.size & (es8Bit|es16Bit)) {
+                res.result.i32 = ~res.value(esInt32);
+                res.size = esInt32;
+            }
+            else {
+                // I don't understand why, but GCC changes any int64 to unsigned
+                // if the value was negative before, so just play the game...
+                if (res.size == esInt64 && res.result.i64 < 0)
+                    res.size = esUInt64;
+                res.result.ui64 = ~res.result.ui64;
+            }
+        }
         else
             exprEvalError(QString("Invalid operator \"%1\" for target type %2")
                           .arg("~")
@@ -516,7 +528,7 @@ ExpressionResult ASTUnaryExpression::result() const
             res.result.i32 = (!res.fvalue()) ? 1 : 0;
         else
             exprEvalError(QString("Invalid target type: %1").arg(res.size));
-        res.size = esInt32;
+        res.size = esUInt8;
         break;
 
     default:

@@ -72,7 +72,6 @@ enum ExpressionResultSize {
     esUInt64    = es64Bit|esUnsigned,
     esInteger   = es8Bit|es16Bit|es32Bit|es64Bit,
     esReal      = esFloat|esDouble
-
 };
 
 
