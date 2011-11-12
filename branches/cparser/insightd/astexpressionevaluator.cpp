@@ -309,8 +309,10 @@ ASTExpression* ASTExpressionEvaluator::exprOfBinaryExpr(const ASTNode *node)
         op = antlrTokenToStr(node->u.binary_expression.op);
         if (op == "*")
             exprType = etMultiplicativeMult;
-        else
+        else if (op == "/")
             exprType = etMultiplicativeDiv;
+        else
+            exprType = etMultiplicativeMod;
         break;
     default:
         exprEvalError(QString("Type \"%1\" represents no binary expression at %2:%3:%4")
@@ -868,6 +870,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
     bool ok = false;
     quint64 value;
     ExpressionResultSize size = esUndefined;
+    ASTConstantExpression *expr = 0;
     QString s = antlrTokenToStr(node->u.constant.literal);
     QString suffix;
 
@@ -921,11 +924,13 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
         // Keep it simple for now
         unsigned char c = 0; // unsigned to avoid sign expansion
         // Single letter
-        if (s.size() == 1)
-            c = s[0].toLatin1();
+        if (s.size() == 3) {
+            c = s[1].toLatin1();
+            expr = createExprNode<ASTConstantExpression>(esInt8, (quint64)c);
+        }
         // Simple escape sequence
-        else if (s.size() == 2 && s[0] == QChar('\\')) {
-            switch (s[1].toLatin1()) {
+        else if (s.size() >= 4 && s[1] == QChar('\\')) {
+            switch (s[2].toLatin1()) {
             case 'a':  c = '\a'; break;
             case 'b':  c = '\b'; break;
             case 't':  c = '\t'; break;
@@ -938,37 +943,52 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
             case '\"': c = '\"'; break;
             case '\'': c = '\''; break;
             case '\\': c = '\\'; break;
-            default:
-                exprEvalError(QString("Unsupported escape sequence: %1 at %2:%3:%4")
-                              .arg(s)
-                              .arg(_ast->fileName())
-                              .arg(node->start->line)
-                              .arg(node->start->charPosition));
+            }
+            if (c)
+                expr = createExprNode<ASTConstantExpression>(esInt8, (quint64)c);
+            else {
+                // Hex escape sequence
+                if (s[2] == QChar('x')) {
+                    c = s.mid(3, s.length() - 4).toUInt(&ok, 16);
+                    expr = createExprNode<ASTConstantExpression>(esInt8,
+                                                                 (quint64)c);
+                }
+//                else if (s[2] == QChar('u') || s[2] == QChar('U')) {
+//                    unsigned int i;
+//                    i = s.mid(3, s.length() - 4).toUInt(&ok, 16);
+//                    expr = createExprNode<ASTConstantExpression>(esInt32,
+//                                                                 (quint64)i);
+//                }
+                else if (s[2].category() == QChar::Number_DecimalDigit) {
+                    c = s.mid(2, s.length() - 3).toUInt(&ok, 8);
+                    expr = createExprNode<ASTConstantExpression>(esInt8,
+                                                                 (quint64)c);
+                }
             }
         }
-        else {
+
+        if (!expr)
             exprEvalError(QString("Unsupported escape sequence: %1 at %2:%3:%4")
                           .arg(s)
                           .arg(_ast->fileName())
                           .arg(node->start->line)
                           .arg(node->start->charPosition));
-        }
-        return createExprNode<ASTConstantExpression>(esInt8, (quint64)c);
+
+        return expr;
     }
 
     case nt_constant_float: {
-        ASTConstantExpression *expr = 0;
-        // Is this a double value?
-        if (s.endsWith('d', Qt::CaseInsensitive)) {
+        // Is this a float value?
+        if (s.endsWith('f', Qt::CaseInsensitive)) {
             s = s.left(s.size() - 1);
-            expr = createExprNode<ASTConstantExpression>(esDouble,
-                                                         s.toDouble(&ok));
-        }
-        // Default type is float
-        else {
-            if (s.endsWith('f', Qt::CaseInsensitive))
-                s = s.left(s.size() - 1);
             expr = createExprNode<ASTConstantExpression>(esFloat,
+                                                         s.toFloat(&ok));
+        }
+        // Default type is double
+        else {
+            if (s.endsWith('d', Qt::CaseInsensitive))
+                s = s.left(s.size() - 1);
+            expr = createExprNode<ASTConstantExpression>(esDouble,
                                                          s.toDouble(&ok));
         }
 
@@ -981,7 +1001,6 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
                           .arg(node->start->line)
                           .arg(node->start->charPosition));
         return expr;
-
     }
 
     default:
