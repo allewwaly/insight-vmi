@@ -6,7 +6,6 @@
 #include <asttypeevaluator.h>
 #include "../../memspecs.h"
 #include "../../symfactory.h"
-#include "../../astexpression.h"
 #include "../../astexpressionevaluator.h"
 #include "../../kernelsymbolparser.h"
 #include "../../shell.h"
@@ -285,10 +284,10 @@ void ASTExpressionEvaluatorTester::init()
 void ASTExpressionEvaluatorTester::cleanup()
 {
 	if (!_ascii.isEmpty()) {
-		QString asciiStr = QString::fromAscii(_ascii.constData(), _ascii.size());
-		std::cerr << "--------[Failed program]--------" << std::endl
-				<< asciiStr.toStdString() << std::endl
-				<< "--------[/Failed program]--------" << std::endl;
+//		QString asciiStr = QString::fromAscii(_ascii.constData(), _ascii.size());
+//		std::cerr << "--------[Failed program]--------" << std::endl
+//				<< asciiStr.toStdString() << std::endl
+//				<< "--------[/Failed program]--------" << std::endl;
 		_ascii.clear();
 	}
 
@@ -304,29 +303,25 @@ void ASTExpressionEvaluatorTester::cleanup()
 
 #define CONSTANT_EXPR(expr) CONSTANT_EXPR2(expr, expr)
 #define CONSTANT_EXPR2(expr, expected) \
-    QTest::newRow(LN) << "int i = " #expr ";" \
-        << (int)erConstant << (int)esInt32 \
-        << (quint64)((qint64)(expected)) << 0.0f << 0.0d
-
-#define CONSTANT_EXPR_F(expr) CONSTANT_EXPR2_F(expr, expr)
-#define CONSTANT_EXPR2_F(expr, expected) \
-    QTest::newRow(LN) << "float f = " #expr ";" \
-        << (int)erConstant << (int)esFloat \
-        << 0ULL << (float)(expected) << 0.0d
-
-#define CONSTANT_EXPR_D(expr) CONSTANT_EXPR2_D(expr, expr)
-#define CONSTANT_EXPR2_D(expr, expected) \
-    QTest::newRow(LN) << "double d = " #expr ";" \
-        << (int)erConstant << (int)esDouble \
-        << 0ULL << 0.0f << (double)(expected)
-
-//#define CONSTANT_EXPR_F(x)
-//#define CONSTANT_EXPR_D(x)
+    do { \
+        if (exprSize(expr) & esInteger) \
+            QTest::newRow(LN) << "int i = " #expr ";" \
+                << (int)erConstant << (int)exprSize(expr) \
+                << (quint64)((qint64)(expected)) << 0.0f << 0.0d; \
+        else if (exprSize(expr) & esFloat) \
+            QTest::newRow(LN) << "float f = " #expr ";" \
+                << (int)erConstant << (int)exprSize(expr) \
+                << 0ULL << (float)(expected) << 0.0d; \
+        else  \
+            QTest::newRow(LN) << "int i = " #expr ";" \
+                << (int)erConstant << (int)exprSize(expr) \
+                << 0ULL << 0.0f << (double)(expected); \
+    } while (0)
 
 #define TEST_DATA_COLUMNS \
     QTest::addColumn<QString>("localCode"); \
     QTest::addColumn<int>("resultType"); \
-    QTest::addColumn<int>("resultSiz"); \
+    QTest::addColumn<int>("resultSize"); \
     QTest::addColumn<quint64>("result"); \
     QTest::addColumn<float>("resultf"); \
     QTest::addColumn<double>("resultd");
@@ -335,6 +330,7 @@ void ASTExpressionEvaluatorTester::cleanup()
 	void ASTExpressionEvaluatorTester::test_##methodName##_func() \
 	{ \
 		QFETCH(QString, localCode); \
+		QFETCH(int, resultSize); \
 		\
 		_ascii += test_prog_begin; \
 		if (!localCode.isEmpty()) { \
@@ -349,6 +345,8 @@ void ASTExpressionEvaluatorTester::cleanup()
 			QVERIFY(_tester->walkTree() > 0); \
 		\
 			QTEST(_tester->result.resultType, "resultType"); \
+			QCOMPARE((int)_tester->result.size, resultSize); \
+		\
 			if (_tester->result.resultType == erConstant) { \
 				if (_tester->result.size & esInteger) { \
 					QFETCH(quint64, result); \
@@ -396,7 +394,7 @@ TEST_FUNCTION(constants)
 {
     TEST_DATA_COLUMNS;
 
-    CONSTANT_EXPR_F(1.0);
+    CONSTANT_EXPR(5 % 2);
 
     // Positive constants
     CONSTANT_EXPR(0);
@@ -414,6 +412,19 @@ TEST_FUNCTION(constants)
     CONSTANT_EXPR(-99999UL);
     CONSTANT_EXPR(-99999LL);
     CONSTANT_EXPR(-99999ULL);
+    // Character constants
+    CONSTANT_EXPR('a');
+    CONSTANT_EXPR('z');
+    CONSTANT_EXPR('0');
+    CONSTANT_EXPR(' ');
+    CONSTANT_EXPR('\a');
+    CONSTANT_EXPR('\r');
+    CONSTANT_EXPR('\n');
+    CONSTANT_EXPR('\t');
+    CONSTANT_EXPR('\0');
+    CONSTANT_EXPR('\001');
+    CONSTANT_EXPR('\377');
+    CONSTANT_EXPR('\xff');
     // Hex constants
     CONSTANT_EXPR(0xcafebabe);
     CONSTANT_EXPR(0xcafebabeUL);
@@ -428,43 +439,43 @@ TEST_FUNCTION(constants)
     CONSTANT_EXPR(-01234567L);
     CONSTANT_EXPR(-01234567UL);
     // Float constants w/o exponent
-    CONSTANT_EXPR_F(0.0);
-    CONSTANT_EXPR_F(.0);
-    CONSTANT_EXPR_F(1.0);
-    CONSTANT_EXPR_F(-1.0);
-    CONSTANT_EXPR_F(.34);
-    CONSTANT_EXPR_F(12.34);
-    CONSTANT_EXPR_F(-.34);
-    CONSTANT_EXPR_F(-12.34);
-    CONSTANT_EXPR_F(-1.0f);
-    CONSTANT_EXPR_F(.34f);
-    CONSTANT_EXPR_F(12.34f);
-    CONSTANT_EXPR_F(-.34f);
-    CONSTANT_EXPR_F(-12.34f);
-    CONSTANT_EXPR_D(-1.0d);
-    CONSTANT_EXPR_D(.34d);
-    CONSTANT_EXPR_D(12.34d);
-    CONSTANT_EXPR_D(-.34d);
-    CONSTANT_EXPR_D(-12.34d);
+    CONSTANT_EXPR(0.0);
+    CONSTANT_EXPR(.0);
+    CONSTANT_EXPR(1.0);
+    CONSTANT_EXPR(-1.0);
+    CONSTANT_EXPR(.34);
+    CONSTANT_EXPR(12.34);
+    CONSTANT_EXPR(-.34);
+    CONSTANT_EXPR(-12.34);
+    CONSTANT_EXPR(-1.0f);
+    CONSTANT_EXPR(.34f);
+    CONSTANT_EXPR(12.34f);
+    CONSTANT_EXPR(-.34f);
+    CONSTANT_EXPR(-12.34f);
+    CONSTANT_EXPR(-1.0d);
+    CONSTANT_EXPR(.34d);
+    CONSTANT_EXPR(12.34d);
+    CONSTANT_EXPR(-.34d);
+    CONSTANT_EXPR(-12.34d);
     // Float constants w/ exponent
-    CONSTANT_EXPR_F(0e0);
-    CONSTANT_EXPR_F(0E0);
-    CONSTANT_EXPR_F(1e0);
-    CONSTANT_EXPR_F(1E0);
-    CONSTANT_EXPR_F(-1e0);
-    CONSTANT_EXPR_F(0e34);
-    CONSTANT_EXPR_F(12e34);
-    CONSTANT_EXPR_F(-0e34);
-    CONSTANT_EXPR_F(-12e34);
-    CONSTANT_EXPR_F(-12E34);
-    CONSTANT_EXPR_F(12e34f);
-    CONSTANT_EXPR_F(-0e34f);
-    CONSTANT_EXPR_F(-12e34f);
-    CONSTANT_EXPR_F(-12E34f);
-    CONSTANT_EXPR_D(12e34d);
-    CONSTANT_EXPR_D(-0e34d);
-    CONSTANT_EXPR_D(-12e34d);
-    CONSTANT_EXPR_D(-12E34d);
+    CONSTANT_EXPR(0e0);
+    CONSTANT_EXPR(0E0);
+    CONSTANT_EXPR(1e0);
+    CONSTANT_EXPR(1E0);
+    CONSTANT_EXPR(-1e0);
+    CONSTANT_EXPR(0e34);
+    CONSTANT_EXPR(12e34);
+    CONSTANT_EXPR(-0e34);
+    CONSTANT_EXPR(-12e34);
+    CONSTANT_EXPR(-12E34);
+    CONSTANT_EXPR(12e34f);
+    CONSTANT_EXPR(-0e34f);
+    CONSTANT_EXPR(-12e34f);
+    CONSTANT_EXPR(-12E34f);
+    CONSTANT_EXPR(12e34d);
+    CONSTANT_EXPR(-0e34d);
+    CONSTANT_EXPR(-12e34d);
+    CONSTANT_EXPR(-12E34d);
 }
 
 
@@ -473,6 +484,11 @@ TEST_FUNCTION(sign_extension)
     TEST_DATA_COLUMNS;
 
     // Bitwise expressions
+    CONSTANT_EXPR('1' ^ 0xcafe);
+    CONSTANT_EXPR('1' ^ 0xcafeU);
+    CONSTANT_EXPR('1' ^ 0xcafeLL);
+    CONSTANT_EXPR('1' ^ 0xcafeULL);
+
     CONSTANT_EXPR(1 ^ 0xcafe);
     CONSTANT_EXPR(1 ^ 0xcafeU);
     CONSTANT_EXPR(1 ^ 0xcafeLL);
@@ -492,6 +508,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(1ULL ^ 0xcafeU);
     CONSTANT_EXPR(1ULL ^ 0xcafeLL);
     CONSTANT_EXPR(1ULL ^ 0xcafeULL);
+
+    CONSTANT_EXPR(-'1' ^ 0xcafe);
+    CONSTANT_EXPR(-'1' ^ 0xcafeU);
+    CONSTANT_EXPR(-'1' ^ 0xcafeLL);
+    CONSTANT_EXPR(-'1' ^ 0xcafeULL);
 
     CONSTANT_EXPR(-1 ^ 0xcafe);
     CONSTANT_EXPR(-1 ^ 0xcafeU);
@@ -513,6 +534,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(-1ULL ^ 0xcafeLL);
     CONSTANT_EXPR(-1ULL ^ 0xcafeULL);
 
+    CONSTANT_EXPR('\1' ^ -0xcafe);
+    CONSTANT_EXPR('\1' ^ -0xcafeU);
+    CONSTANT_EXPR('\1' ^ -0xcafeLL);
+    CONSTANT_EXPR('\1' ^ -0xcafeULL);
+
     CONSTANT_EXPR(1 ^ -0xcafe);
     CONSTANT_EXPR(1 ^ -0xcafeU);
     CONSTANT_EXPR(1 ^ -0xcafeLL);
@@ -532,6 +558,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(1ULL ^ -0xcafeU);
     CONSTANT_EXPR(1ULL ^ -0xcafeLL);
     CONSTANT_EXPR(1ULL ^ -0xcafeULL);
+
+    CONSTANT_EXPR(-'\1' ^ -0xcafe);
+    CONSTANT_EXPR(-'\1' ^ -0xcafeU);
+    CONSTANT_EXPR(-'\1' ^ -0xcafeLL);
+    CONSTANT_EXPR(-'\1' ^ -0xcafeULL);
 
     CONSTANT_EXPR(-1 ^ -0xcafe);
     CONSTANT_EXPR(-1 ^ -0xcafeU);
@@ -553,6 +584,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(-1ULL ^ -0xcafeLL);
     CONSTANT_EXPR(-1ULL ^ -0xcafeULL);
 
+    CONSTANT_EXPR('\1' ^ 0xcafebabe);
+    CONSTANT_EXPR('\1' ^ 0xcafebabeU);
+    CONSTANT_EXPR('\1' ^ 0xcafebabeLL);
+    CONSTANT_EXPR('\1' ^ 0xcafebabeULL);
+
     CONSTANT_EXPR(1 ^ 0xcafebabe);
     CONSTANT_EXPR(1 ^ 0xcafebabeU);
     CONSTANT_EXPR(1 ^ 0xcafebabeLL);
@@ -572,6 +608,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(1ULL ^ 0xcafebabeU);
     CONSTANT_EXPR(1ULL ^ 0xcafebabeLL);
     CONSTANT_EXPR(1ULL ^ 0xcafebabeULL);
+
+    CONSTANT_EXPR(-'\1' ^ 0xcafebabe);
+    CONSTANT_EXPR(-'\1' ^ 0xcafebabeU);
+    CONSTANT_EXPR(-'\1' ^ 0xcafebabeLL);
+    CONSTANT_EXPR(-'\1' ^ 0xcafebabeULL);
 
     CONSTANT_EXPR(-1 ^ 0xcafebabe);
     CONSTANT_EXPR(-1 ^ 0xcafebabeU);
@@ -593,6 +634,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(-1ULL ^ 0xcafebabeLL);
     CONSTANT_EXPR(-1ULL ^ 0xcafebabeULL);
 
+    CONSTANT_EXPR('\1' ^ -0xcafebabe);
+    CONSTANT_EXPR('\1' ^ -0xcafebabeU);
+    CONSTANT_EXPR('\1' ^ -0xcafebabeLL);
+    CONSTANT_EXPR('\1' ^ -0xcafebabeULL);
+
     CONSTANT_EXPR(1 ^ -0xcafebabe);
     CONSTANT_EXPR(1 ^ -0xcafebabeU);
     CONSTANT_EXPR(1 ^ -0xcafebabeLL);
@@ -612,6 +658,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(1ULL ^ -0xcafebabeU);
     CONSTANT_EXPR(1ULL ^ -0xcafebabeLL);
     CONSTANT_EXPR(1ULL ^ -0xcafebabeULL);
+
+    CONSTANT_EXPR(-'\1' ^ -0xcafebabe);
+    CONSTANT_EXPR(-'\1' ^ -0xcafebabeU);
+    CONSTANT_EXPR(-'\1' ^ -0xcafebabeLL);
+    CONSTANT_EXPR(-'\1' ^ -0xcafebabeULL);
 
     CONSTANT_EXPR(-1 ^ -0xcafebabe);
     CONSTANT_EXPR(-1 ^ -0xcafebabeU);
@@ -634,6 +685,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(-1ULL ^ -0xcafebabeULL);
 
     // Logical expressions
+    CONSTANT_EXPR('\1' > 0xcafe);
+    CONSTANT_EXPR('\1' > 0xcafeU);
+    CONSTANT_EXPR('\1' > 0xcafeLL);
+    CONSTANT_EXPR('\1' > 0xcafeULL);
+
     CONSTANT_EXPR(1 > 0xcafe);
     CONSTANT_EXPR(1 > 0xcafeU);
     CONSTANT_EXPR(1 > 0xcafeLL);
@@ -653,6 +709,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(1ULL > 0xcafeU);
     CONSTANT_EXPR(1ULL > 0xcafeLL);
     CONSTANT_EXPR(1ULL > 0xcafeULL);
+
+    CONSTANT_EXPR(-'\1' > 0xcafe);
+    CONSTANT_EXPR(-'\1' > 0xcafeU);
+    CONSTANT_EXPR(-'\1' > 0xcafeLL);
+    CONSTANT_EXPR(-'\1' > 0xcafeULL);
 
     CONSTANT_EXPR(-1 > 0xcafe);
     CONSTANT_EXPR(-1 > 0xcafeU);
@@ -674,6 +735,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(-1ULL > 0xcafeLL);
     CONSTANT_EXPR(-1ULL > 0xcafeULL);
 
+    CONSTANT_EXPR('\1' > -0xcafe);
+    CONSTANT_EXPR('\1' > -0xcafeU);
+    CONSTANT_EXPR('\1' > -0xcafeLL);
+    CONSTANT_EXPR('\1' > -0xcafeULL);
+
     CONSTANT_EXPR(1 > -0xcafe);
     CONSTANT_EXPR(1 > -0xcafeU);
     CONSTANT_EXPR(1 > -0xcafeLL);
@@ -693,6 +759,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(1ULL > -0xcafeU);
     CONSTANT_EXPR(1ULL > -0xcafeLL);
     CONSTANT_EXPR(1ULL > -0xcafeULL);
+
+    CONSTANT_EXPR(-'\1' > -0xcafe);
+    CONSTANT_EXPR(-'\1' > -0xcafeU);
+    CONSTANT_EXPR(-'\1' > -0xcafeLL);
+    CONSTANT_EXPR(-'\1' > -0xcafeULL);
 
     CONSTANT_EXPR(-1 > -0xcafe);
     CONSTANT_EXPR(-1 > -0xcafeU);
@@ -714,6 +785,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(-1ULL > -0xcafeLL);
     CONSTANT_EXPR(-1ULL > -0xcafeULL);
 
+    CONSTANT_EXPR('\1' > 0xcafebabe);
+    CONSTANT_EXPR('\1' > 0xcafebabeU);
+    CONSTANT_EXPR('\1' > 0xcafebabeLL);
+    CONSTANT_EXPR('\1' > 0xcafebabeULL);
+
     CONSTANT_EXPR(1 > 0xcafebabe);
     CONSTANT_EXPR(1 > 0xcafebabeU);
     CONSTANT_EXPR(1 > 0xcafebabeLL);
@@ -733,6 +809,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(1ULL > 0xcafebabeU);
     CONSTANT_EXPR(1ULL > 0xcafebabeLL);
     CONSTANT_EXPR(1ULL > 0xcafebabeULL);
+
+    CONSTANT_EXPR(-'\1' > 0xcafebabe);
+    CONSTANT_EXPR(-'\1' > 0xcafebabeU);
+    CONSTANT_EXPR(-'\1' > 0xcafebabeLL);
+    CONSTANT_EXPR(-'\1' > 0xcafebabeULL);
 
     CONSTANT_EXPR(-1 > 0xcafebabe);
     CONSTANT_EXPR(-1 > 0xcafebabeU);
@@ -754,6 +835,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(-1ULL > 0xcafebabeLL);
     CONSTANT_EXPR(-1ULL > 0xcafebabeULL);
 
+    CONSTANT_EXPR('\1' > -0xcafebabe);
+    CONSTANT_EXPR('\1' > -0xcafebabeU);
+    CONSTANT_EXPR('\1' > -0xcafebabeLL);
+    CONSTANT_EXPR('\1' > -0xcafebabeULL);
+
     CONSTANT_EXPR(1 > -0xcafebabe);
     CONSTANT_EXPR(1 > -0xcafebabeU);
     CONSTANT_EXPR(1 > -0xcafebabeLL);
@@ -773,6 +859,11 @@ TEST_FUNCTION(sign_extension)
     CONSTANT_EXPR(1ULL > -0xcafebabeU);
     CONSTANT_EXPR(1ULL > -0xcafebabeLL);
     CONSTANT_EXPR(1ULL > -0xcafebabeULL);
+
+    CONSTANT_EXPR(-'\1' > -0xcafebabe);
+    CONSTANT_EXPR(-'\1' > -0xcafebabeU);
+    CONSTANT_EXPR(-'\1' > -0xcafebabeLL);
+    CONSTANT_EXPR(-'\1' > -0xcafebabeULL);
 
     CONSTANT_EXPR(-1 > -0xcafebabe);
     CONSTANT_EXPR(-1 > -0xcafebabeU);
@@ -961,6 +1052,7 @@ TEST_FUNCTION(additive)
 {
     TEST_DATA_COLUMNS;
 
+    // Integers
     CONSTANT_EXPR(1 + 1);
     CONSTANT_EXPR(2 + 1);
     CONSTANT_EXPR(2 - 1);
@@ -974,6 +1066,73 @@ TEST_FUNCTION(additive)
     CONSTANT_EXPR(1 - (2 + 3));
     CONSTANT_EXPR(1 + (-2 + 3));
     CONSTANT_EXPR(1 + -(-(2 + 3) - 4 + -(5 - 6)));
+
+    // Mixed integer sizes and signedness
+    CONSTANT_EXPR(1U + (-2 + '\3'));
+    CONSTANT_EXPR('\1' + (-2U + 3));
+    CONSTANT_EXPR('\1' + (-2 + 3U));
+    CONSTANT_EXPR(1L + (-'\2' + 3));
+    CONSTANT_EXPR('\1' + (-2L + 3));
+    CONSTANT_EXPR('\1' + (-2 + 3L));
+    CONSTANT_EXPR(1UL + (-2 + '\3'));
+    CONSTANT_EXPR('\1' + (-2UL + 3));
+    CONSTANT_EXPR('\1' + (-2 + 3UL));
+    CONSTANT_EXPR(1LL + (-'\2' + 3));
+    CONSTANT_EXPR(1 + (-2LL + '\3'));
+    CONSTANT_EXPR(1 + (-'\2' + 3LL));
+    CONSTANT_EXPR(1ULL + (-2 + '\3'));
+    CONSTANT_EXPR(1 + (-2ULL + '\3'));
+    CONSTANT_EXPR('\1' + (-2 + 3ULL));
+    CONSTANT_EXPR(1L + (-2UL + 3U));
+    CONSTANT_EXPR(1U + (-2L + 3UL));
+    CONSTANT_EXPR(1UL + (-2U + 3L));
+
+    // Floats and integers mixed
+    CONSTANT_EXPR('\1' + 2.2);
+    CONSTANT_EXPR(1 + 2.2);
+    CONSTANT_EXPR(1.1 + 2);
+    CONSTANT_EXPR(1U + 2.2);
+    CONSTANT_EXPR(1.1 + 2U);
+    CONSTANT_EXPR(1L + 2.2);
+    CONSTANT_EXPR(1.1 + 2L);
+    CONSTANT_EXPR(1UL + 2.2);
+    CONSTANT_EXPR(1.1 + 2UL);
+
+    CONSTANT_EXPR('\1' + 2.2f);
+    CONSTANT_EXPR(1 + 2.2f);
+    CONSTANT_EXPR(1.1f + 2);
+    CONSTANT_EXPR(1U + 2.2f);
+    CONSTANT_EXPR(1.1f + 2U);
+    CONSTANT_EXPR(1L + 2.2f);
+    CONSTANT_EXPR(1.1f + 2L);
+    CONSTANT_EXPR(1UL + 2.2f);
+    CONSTANT_EXPR(1.1f + 2UL);
+
+    CONSTANT_EXPR('\1' + 2.2d);
+    CONSTANT_EXPR(1 + 2.2d);
+    CONSTANT_EXPR(1.1d + 2);
+    CONSTANT_EXPR(1U + 2.2d);
+    CONSTANT_EXPR(1.1d + 2U);
+    CONSTANT_EXPR(1L + 2.2d);
+    CONSTANT_EXPR(1.1d + 2L);
+    CONSTANT_EXPR(1UL + 2.2d);
+    CONSTANT_EXPR(1.1d + 2UL);
+
+    // Floats mixed
+    CONSTANT_EXPR(1.1 + 2.2);
+    CONSTANT_EXPR(1.1 + 2.2f);
+    CONSTANT_EXPR(1.1 + 2.2d);
+
+    CONSTANT_EXPR(1.1f + 2.2);
+    CONSTANT_EXPR(1.1f + 2.2f);
+    CONSTANT_EXPR(1.1f + 2.2d);
+
+    CONSTANT_EXPR(1.1d + 2.2);
+    CONSTANT_EXPR(1.1d + 2.2f);
+    CONSTANT_EXPR(1.1d + 2.2d);
+
+    // All in the mix
+    CONSTANT_EXPR(1 + -(-(2l + 3u) - 4ul + -(5ll - 6ull) + 7.654f + -(8.76) - 9.876d));
 }
 
 
@@ -981,21 +1140,426 @@ TEST_FUNCTION(multiplicative)
 {
     TEST_DATA_COLUMNS;
 
-    CONSTANT_EXPR(3 * 5);
+    // Integers
+    CONSTANT_EXPR(5 * 5);
+    CONSTANT_EXPR(2 * 5);
+    CONSTANT_EXPR(2 / 1);
+    CONSTANT_EXPR(5 % 2);
+    CONSTANT_EXPR(-5 % 2);
+    CONSTANT_EXPR(5 % -2);
+    CONSTANT_EXPR(-5 % -2);
+    CONSTANT_EXPR(2 * -1);
+    CONSTANT_EXPR((2) * (-1));
+    CONSTANT_EXPR(-1 * 2);
+    CONSTANT_EXPR((-1) * (2));
+    CONSTANT_EXPR(-1 * 2 / 3);
+    CONSTANT_EXPR(5 % 7 / 3);
+    CONSTANT_EXPR(5 / 2 * 3);
+    CONSTANT_EXPR(5 / 2 % 3);
+    CONSTANT_EXPR((5 / 2) * 3);
+    CONSTANT_EXPR(5 / (2 * 3));
+    CONSTANT_EXPR((5 % 2) * 3);
+    CONSTANT_EXPR(5 / (2 % 3));
+    CONSTANT_EXPR(1 * (-2 * 3));
+    CONSTANT_EXPR((4 * -(5 / 6)) % 1 * -(-(2 * 3)));
+
+    // Mixed integer sizes and signedness
+    CONSTANT_EXPR(1U * (-2 * 3));
+    CONSTANT_EXPR(1 * (-2U * 3));
+    CONSTANT_EXPR(1 * (-2 * 3U));
+    CONSTANT_EXPR(1L * (-2 * 3));
+    CONSTANT_EXPR(1 * (-2L * 3));
+    CONSTANT_EXPR(1 * (-2 * 3L));
+    CONSTANT_EXPR(1UL * (-2 * 3));
+    CONSTANT_EXPR(1 * (-2UL * 3));
+    CONSTANT_EXPR(1 * (-2 * 3UL));
+    CONSTANT_EXPR(1LL * (-2 * 3));
+    CONSTANT_EXPR(1 * (-2LL * 3));
+    CONSTANT_EXPR(1 * (-2 * 3LL));
+    CONSTANT_EXPR(1ULL * (-2 * 3));
+    CONSTANT_EXPR(1 * (-2ULL * 3));
+    CONSTANT_EXPR(1 * (-2 * 3ULL));
+    CONSTANT_EXPR(1L * (-2UL * 3U));
+    CONSTANT_EXPR(1U * (-2L * 3UL));
+    CONSTANT_EXPR(1UL * (-2U * 3L));
+
+    // Floats and integers mixed
+    CONSTANT_EXPR(1 * 2.2);
+    CONSTANT_EXPR(1.1 * 2);
+    CONSTANT_EXPR(1U * 2.2);
+    CONSTANT_EXPR(1.1 * 2U);
+    CONSTANT_EXPR(1L * 2.2);
+    CONSTANT_EXPR(1.1 * 2L);
+    CONSTANT_EXPR(1UL * 2.2);
+    CONSTANT_EXPR(1.1 * 2UL);
+
+    CONSTANT_EXPR(1 * 2.2f);
+    CONSTANT_EXPR(1.1f * 2);
+    CONSTANT_EXPR(1U * 2.2f);
+    CONSTANT_EXPR(1.1f * 2U);
+    CONSTANT_EXPR(1L * 2.2f);
+    CONSTANT_EXPR(1.1f * 2L);
+    CONSTANT_EXPR(1UL * 2.2f);
+    CONSTANT_EXPR(1.1f * 2UL);
+
+    CONSTANT_EXPR(1 * 2.2d);
+    CONSTANT_EXPR(1.1d * 2);
+    CONSTANT_EXPR(1U * 2.2d);
+    CONSTANT_EXPR(1.1d * 2U);
+    CONSTANT_EXPR(1L * 2.2d);
+    CONSTANT_EXPR(1.1d * 2L);
+    CONSTANT_EXPR(1UL * 2.2d);
+    CONSTANT_EXPR(1.1d * 2UL);
+
+    CONSTANT_EXPR(-1.0 * 2.0 / 3.0);
+    CONSTANT_EXPR(5.0 / 2.0 * 3.0);
+    CONSTANT_EXPR((5.0 / 2.0) * 3.0);
+    CONSTANT_EXPR(5.0 / (2.0 * 3.0));
+    CONSTANT_EXPR(1.0 * (-2.0 * 3.0));
+    CONSTANT_EXPR((4.0 * -(5.0 / 6.0)) / 1.0 * -(-(2.0 * 3.0)));
+
+    // Floats mixed
+    CONSTANT_EXPR(1.1 * 2.2);
+    CONSTANT_EXPR(1.1 * 2.2f);
+    CONSTANT_EXPR(1.1 * 2.2d);
+
+    CONSTANT_EXPR(1.1f * 2.2);
+    CONSTANT_EXPR(1.1f * 2.2f);
+    CONSTANT_EXPR(1.1f * 2.2d);
+
+    CONSTANT_EXPR(1.1d * 2.2);
+    CONSTANT_EXPR(1.1d * 2.2f);
+    CONSTANT_EXPR(1.1d * 2.2d);
+
+    // All in the mix
+    CONSTANT_EXPR(1 * -(-(2l * 3u) / 4ul * -(5ll / 6ull) * 7.654f * -(8.76) / 9.876d));
 }
 
 TEST_FUNCTION(logical)
 {
     TEST_DATA_COLUMNS;
 
-    CONSTANT_EXPR(0);
+    CONSTANT_EXPR(0 && 0);
+    CONSTANT_EXPR(1 && 0);
+    CONSTANT_EXPR(-1 && 0);
+    CONSTANT_EXPR(0 && 1);
+    CONSTANT_EXPR(0 && -1);
+    CONSTANT_EXPR(1 && 1);
+    CONSTANT_EXPR(1 && -1);
+    CONSTANT_EXPR(-1 && -1);
+
+    CONSTANT_EXPR(0u && 0);
+    CONSTANT_EXPR(1l && 0);
+    CONSTANT_EXPR(0ul && 1);
+    CONSTANT_EXPR(1ll && 1);
+    CONSTANT_EXPR(1ull && 1);
+
+    CONSTANT_EXPR(0 && 0u);
+    CONSTANT_EXPR(1 && 0l);
+    CONSTANT_EXPR(0 && 1ul);
+    CONSTANT_EXPR(1 && 1ll);
+    CONSTANT_EXPR(1 && 1ull);
+
+    CONSTANT_EXPR(0u && 0u);
+    CONSTANT_EXPR(1l && 0l);
+    CONSTANT_EXPR(0ul && 1ul);
+    CONSTANT_EXPR(1ll && 1ll);
+    CONSTANT_EXPR(1ull && 1ull);
+
+    CONSTANT_EXPR(0 && 0.0);
+    CONSTANT_EXPR(1 && 0.0);
+    CONSTANT_EXPR(0 && 1.0);
+    CONSTANT_EXPR(1 && 1.0);
+
+    CONSTANT_EXPR(0.0 && 0);
+    CONSTANT_EXPR(1.0 && 0);
+    CONSTANT_EXPR(0.0 && 1);
+    CONSTANT_EXPR(1.0 && 1);
+
+    CONSTANT_EXPR(0.0 && 0.0);
+    CONSTANT_EXPR(1.0 && 0.0);
+    CONSTANT_EXPR(0.0 && 1.0);
+    CONSTANT_EXPR(1.0 && 1.0);
+
+    CONSTANT_EXPR(0.0f && 0.0f);
+    CONSTANT_EXPR(1.0f && 0.0f);
+    CONSTANT_EXPR(0.0f && 1.0f);
+    CONSTANT_EXPR(1.0f && 1.0f);
+
+    CONSTANT_EXPR(0.0d && 0.0d);
+    CONSTANT_EXPR(1.0d && 0.0d);
+    CONSTANT_EXPR(0.0d && 1.0d);
+    CONSTANT_EXPR(1.0d && 1.0d);
+
+    CONSTANT_EXPR((1 && 1) && 1);
+    CONSTANT_EXPR((1 && 1) && 0);
+    CONSTANT_EXPR((1 && 0) && 1);
+    CONSTANT_EXPR((0 && 1) && 1);
+    CONSTANT_EXPR(1 && (1 && 1));
+    CONSTANT_EXPR(1 && (1 && 0));
+    CONSTANT_EXPR(1 && (0 && 1));
+    CONSTANT_EXPR(0 && (1 && 1));
+
+    CONSTANT_EXPR('\1' && 1 && 1u && 1l && 1ul && 1ll && 1ull && 1.0f && 1.0d);
+    CONSTANT_EXPR('\0' && 1 && 1u && 1l && 1ul && 1ll && 1ull && 1.0f && 1.0d);
+    CONSTANT_EXPR('\1' && 0 && 1u && 1l && 1ul && 1ll && 1ull && 1.0f && 1.0d);
+    CONSTANT_EXPR('\1' && 1 && 0u && 1l && 1ul && 1ll && 1ull && 1.0f && 1.0d);
+    CONSTANT_EXPR('\1' && 1 && 1u && 0l && 1ul && 1ll && 1ull && 1.0f && 1.0d);
+    CONSTANT_EXPR('\1' && 1 && 1u && 1l && 0ul && 1ll && 1ull && 1.0f && 1.0d);
+    CONSTANT_EXPR('\1' && 1 && 1u && 1l && 1ul && 0ll && 1ull && 1.0f && 1.0d);
+    CONSTANT_EXPR('\1' && 1 && 1u && 1l && 1ul && 1ll && 0ull && 1.0f && 1.0d);
+    CONSTANT_EXPR('\1' && 1 && 1u && 1l && 1ul && 1ll && 1ull && 0.0f && 1.0d);
+    CONSTANT_EXPR('\1' && 1 && 1u && 1l && 1ul && 1ll && 1ull && 1.0f && 0.0d);
+
+
+    CONSTANT_EXPR(0 || 0);
+    CONSTANT_EXPR(1 || 0);
+    CONSTANT_EXPR(-1 || 0);
+    CONSTANT_EXPR(0 || 1);
+    CONSTANT_EXPR(0 || -1);
+    CONSTANT_EXPR(1 || 1);
+    CONSTANT_EXPR(1 || -1);
+    CONSTANT_EXPR(-1 || -1);
+
+    CONSTANT_EXPR(0u || 0);
+    CONSTANT_EXPR(1l || 0);
+    CONSTANT_EXPR(0ul || 1);
+    CONSTANT_EXPR(1ll || 1);
+    CONSTANT_EXPR(1ull || 1);
+
+    CONSTANT_EXPR(0 || 0u);
+    CONSTANT_EXPR(1 || 0l);
+    CONSTANT_EXPR(0 || 1ul);
+    CONSTANT_EXPR(1 || 1ll);
+    CONSTANT_EXPR(1 || 1ull);
+
+    CONSTANT_EXPR(0u || 0u);
+    CONSTANT_EXPR(1l || 0l);
+    CONSTANT_EXPR(0ul || 1ul);
+    CONSTANT_EXPR(1ll || 1ll);
+    CONSTANT_EXPR(1ull || 1ull);
+
+    CONSTANT_EXPR(0 || 0.0);
+    CONSTANT_EXPR(1 || 0.0);
+    CONSTANT_EXPR(0 || 1.0);
+    CONSTANT_EXPR(1 || 1.0);
+
+    CONSTANT_EXPR(0.0 || 0);
+    CONSTANT_EXPR(1.0 || 0);
+    CONSTANT_EXPR(0.0 || 1);
+    CONSTANT_EXPR(1.0 || 1);
+
+    CONSTANT_EXPR(0.0 || 0.0);
+    CONSTANT_EXPR(1.0 || 0.0);
+    CONSTANT_EXPR(0.0 || 1.0);
+    CONSTANT_EXPR(1.0 || 1.0);
+
+    CONSTANT_EXPR(0.0f || 0.0f);
+    CONSTANT_EXPR(1.0f || 0.0f);
+    CONSTANT_EXPR(0.0f || 1.0f);
+    CONSTANT_EXPR(1.0f || 1.0f);
+
+    CONSTANT_EXPR(0.0d || 0.0d);
+    CONSTANT_EXPR(1.0d || 0.0d);
+    CONSTANT_EXPR(0.0d || 1.0d);
+    CONSTANT_EXPR(1.0d || 1.0d);
+
+    CONSTANT_EXPR((0 || 0) || 0);
+    CONSTANT_EXPR((0 || 0) || 1);
+    CONSTANT_EXPR((0 || 1) || 0);
+    CONSTANT_EXPR((1 || 0) || 0);
+    CONSTANT_EXPR(0 || (0 || 0));
+    CONSTANT_EXPR(0 || (0 || 1));
+    CONSTANT_EXPR(0 || (1 || 0));
+    CONSTANT_EXPR(1 || (0 || 0));
+
+    CONSTANT_EXPR('\0' || 0 || 0u || 0l || 0ul || 0ll || 0ull || 0.0f || 0.0d);
+    CONSTANT_EXPR('\1' || 0 || 0u || 0l || 0ul || 0ll || 0ull || 0.0f || 0.0d);
+    CONSTANT_EXPR('\0' || 1 || 0u || 0l || 0ul || 0ll || 0ull || 0.0f || 0.0d);
+    CONSTANT_EXPR('\0' || 0 || 1u || 0l || 0ul || 0ll || 0ull || 0.0f || 0.0d);
+    CONSTANT_EXPR('\0' || 0 || 0u || 1l || 0ul || 0ll || 0ull || 0.0f || 0.0d);
+    CONSTANT_EXPR('\0' || 0 || 0u || 0l || 1ul || 0ll || 0ull || 0.0f || 0.0d);
+    CONSTANT_EXPR('\0' || 0 || 0u || 0l || 0ul || 1ll || 0ull || 0.0f || 0.0d);
+    CONSTANT_EXPR('\0' || 0 || 0u || 0l || 0ul || 0ll || 1ull || 0.0f || 0.0d);
+    CONSTANT_EXPR('\0' || 0 || 0u || 0l || 0ul || 0ll || 0ull || 1.0f || 0.0d);
+    CONSTANT_EXPR('\0' || 0 || 0u || 0l || 0ul || 0ll || 0ull || 0.0f || 1.0d);
 }
 
 TEST_FUNCTION(bitwise)
 {
     TEST_DATA_COLUMNS;
 
-    CONSTANT_EXPR(0);
+    CONSTANT_EXPR(0xcafe0000 | 0x0000babe);
+    CONSTANT_EXPR(0xcafebabe & 0x00ffff00);
+    CONSTANT_EXPR(0xcafebabe ^ 0x00ffff00);
+
+    CONSTANT_EXPR('\1' | '\3');
+    CONSTANT_EXPR('\1' | 3);
+    CONSTANT_EXPR('\1' | 3u);
+    CONSTANT_EXPR('\1' | 3l);
+    CONSTANT_EXPR('\1' | 3ul);
+    CONSTANT_EXPR('\1' | 3ll);
+    CONSTANT_EXPR('\1' | 3ull);
+
+    CONSTANT_EXPR(1 | '\3');
+    CONSTANT_EXPR(1 | 3);
+    CONSTANT_EXPR(1 | 3u);
+    CONSTANT_EXPR(1 | 3l);
+    CONSTANT_EXPR(1 | 3ul);
+    CONSTANT_EXPR(1 | 3ll);
+    CONSTANT_EXPR(1 | 3ull);
+
+    CONSTANT_EXPR(1u | '\3');
+    CONSTANT_EXPR(1u | 3);
+    CONSTANT_EXPR(1u | 3u);
+    CONSTANT_EXPR(1u | 3l);
+    CONSTANT_EXPR(1u | 3ul);
+    CONSTANT_EXPR(1u | 3ll);
+    CONSTANT_EXPR(1u | 3ull);
+
+    CONSTANT_EXPR(1l | '\3');
+    CONSTANT_EXPR(1l | 3);
+    CONSTANT_EXPR(1l | 3u);
+    CONSTANT_EXPR(1l | 3l);
+    CONSTANT_EXPR(1l | 3ul);
+    CONSTANT_EXPR(1l | 3ll);
+    CONSTANT_EXPR(1l | 3ull);
+
+    CONSTANT_EXPR(1ul | '\3');
+    CONSTANT_EXPR(1ul | 3);
+    CONSTANT_EXPR(1ul | 3u);
+    CONSTANT_EXPR(1ul | 3l);
+    CONSTANT_EXPR(1ul | 3ul);
+    CONSTANT_EXPR(1ul | 3ll);
+    CONSTANT_EXPR(1ul | 3ull);
+
+    CONSTANT_EXPR(1ll | '\3');
+    CONSTANT_EXPR(1ll | 3);
+    CONSTANT_EXPR(1ll | 3u);
+    CONSTANT_EXPR(1ll | 3l);
+    CONSTANT_EXPR(1ll | 3ul);
+    CONSTANT_EXPR(1ll | 3ll);
+    CONSTANT_EXPR(1ll | 3ull);
+
+    CONSTANT_EXPR(1ull | '\3');
+    CONSTANT_EXPR(1ull | 3);
+    CONSTANT_EXPR(1ull | 3u);
+    CONSTANT_EXPR(1ull | 3l);
+    CONSTANT_EXPR(1ull | 3ul);
+    CONSTANT_EXPR(1ull | 3ll);
+    CONSTANT_EXPR(1ull | 3ull);
+
+    CONSTANT_EXPR('\1' & '\3');
+    CONSTANT_EXPR('\1' & 3);
+    CONSTANT_EXPR('\1' & 3u);
+    CONSTANT_EXPR('\1' & 3l);
+    CONSTANT_EXPR('\1' & 3ul);
+    CONSTANT_EXPR('\1' & 3ll);
+    CONSTANT_EXPR('\1' & 3ull);
+
+    CONSTANT_EXPR(1 & '\3');
+    CONSTANT_EXPR(1 & 3);
+    CONSTANT_EXPR(1 & 3u);
+    CONSTANT_EXPR(1 & 3l);
+    CONSTANT_EXPR(1 & 3ul);
+    CONSTANT_EXPR(1 & 3ll);
+    CONSTANT_EXPR(1 & 3ull);
+
+    CONSTANT_EXPR(1u & '\3');
+    CONSTANT_EXPR(1u & 3);
+    CONSTANT_EXPR(1u & 3u);
+    CONSTANT_EXPR(1u & 3l);
+    CONSTANT_EXPR(1u & 3ul);
+    CONSTANT_EXPR(1u & 3ll);
+    CONSTANT_EXPR(1u & 3ull);
+
+    CONSTANT_EXPR(1l & '\3');
+    CONSTANT_EXPR(1l & 3);
+    CONSTANT_EXPR(1l & 3u);
+    CONSTANT_EXPR(1l & 3l);
+    CONSTANT_EXPR(1l & 3ul);
+    CONSTANT_EXPR(1l & 3ll);
+    CONSTANT_EXPR(1l & 3ull);
+
+    CONSTANT_EXPR(1ul & '\3');
+    CONSTANT_EXPR(1ul & 3);
+    CONSTANT_EXPR(1ul & 3u);
+    CONSTANT_EXPR(1ul & 3l);
+    CONSTANT_EXPR(1ul & 3ul);
+    CONSTANT_EXPR(1ul & 3ll);
+    CONSTANT_EXPR(1ul & 3ull);
+
+    CONSTANT_EXPR(1ll & '\3');
+    CONSTANT_EXPR(1ll & 3);
+    CONSTANT_EXPR(1ll & 3u);
+    CONSTANT_EXPR(1ll & 3l);
+    CONSTANT_EXPR(1ll & 3ul);
+    CONSTANT_EXPR(1ll & 3ll);
+    CONSTANT_EXPR(1ll & 3ull);
+
+    CONSTANT_EXPR(1ull & '\3');
+    CONSTANT_EXPR(1ull & 3);
+    CONSTANT_EXPR(1ull & 3u);
+    CONSTANT_EXPR(1ull & 3l);
+    CONSTANT_EXPR(1ull & 3ul);
+    CONSTANT_EXPR(1ull & 3ll);
+    CONSTANT_EXPR(1ull & 3ull);
+
+    CONSTANT_EXPR('\1' ^ '\3');
+    CONSTANT_EXPR('\1' ^ 3);
+    CONSTANT_EXPR('\1' ^ 3u);
+    CONSTANT_EXPR('\1' ^ 3l);
+    CONSTANT_EXPR('\1' ^ 3ul);
+    CONSTANT_EXPR('\1' ^ 3ll);
+    CONSTANT_EXPR('\1' ^ 3ull);
+
+    CONSTANT_EXPR(1 ^ '\3');
+    CONSTANT_EXPR(1 ^ 3);
+    CONSTANT_EXPR(1 ^ 3u);
+    CONSTANT_EXPR(1 ^ 3l);
+    CONSTANT_EXPR(1 ^ 3ul);
+    CONSTANT_EXPR(1 ^ 3ll);
+    CONSTANT_EXPR(1 ^ 3ull);
+
+    CONSTANT_EXPR(1u ^ '\3');
+    CONSTANT_EXPR(1u ^ 3);
+    CONSTANT_EXPR(1u ^ 3u);
+    CONSTANT_EXPR(1u ^ 3l);
+    CONSTANT_EXPR(1u ^ 3ul);
+    CONSTANT_EXPR(1u ^ 3ll);
+    CONSTANT_EXPR(1u ^ 3ull);
+
+    CONSTANT_EXPR(1l ^ '\3');
+    CONSTANT_EXPR(1l ^ 3);
+    CONSTANT_EXPR(1l ^ 3u);
+    CONSTANT_EXPR(1l ^ 3l);
+    CONSTANT_EXPR(1l ^ 3ul);
+    CONSTANT_EXPR(1l ^ 3ll);
+    CONSTANT_EXPR(1l ^ 3ull);
+
+    CONSTANT_EXPR(1ul ^ '\3');
+    CONSTANT_EXPR(1ul ^ 3);
+    CONSTANT_EXPR(1ul ^ 3u);
+    CONSTANT_EXPR(1ul ^ 3l);
+    CONSTANT_EXPR(1ul ^ 3ul);
+    CONSTANT_EXPR(1ul ^ 3ll);
+    CONSTANT_EXPR(1ul ^ 3ull);
+
+    CONSTANT_EXPR(1ll ^ '\3');
+    CONSTANT_EXPR(1ll ^ 3);
+    CONSTANT_EXPR(1ll ^ 3u);
+    CONSTANT_EXPR(1ll ^ 3l);
+    CONSTANT_EXPR(1ll ^ 3ul);
+    CONSTANT_EXPR(1ll ^ 3ll);
+    CONSTANT_EXPR(1ll ^ 3ull);
+
+    CONSTANT_EXPR(1ull ^ '\3');
+    CONSTANT_EXPR(1ull ^ 3);
+    CONSTANT_EXPR(1ull ^ 3u);
+    CONSTANT_EXPR(1ull ^ 3l);
+    CONSTANT_EXPR(1ull ^ 3ul);
+    CONSTANT_EXPR(1ull ^ 3ll);
+    CONSTANT_EXPR(1ull ^ 3ull);
 }
 
 
@@ -1003,7 +1567,49 @@ TEST_FUNCTION(equality)
 {
     TEST_DATA_COLUMNS;
 
-    CONSTANT_EXPR(0);
+    CONSTANT_EXPR(1 == '\2');
+    CONSTANT_EXPR(1 == 2);
+    CONSTANT_EXPR(1 == 2u);
+    CONSTANT_EXPR(1 == 2l);
+    CONSTANT_EXPR(1 == 2ul);
+    CONSTANT_EXPR(1 == 2ll);
+    CONSTANT_EXPR(1 == 2ull);
+    CONSTANT_EXPR(1 == 2.0);
+    CONSTANT_EXPR(1 == 2.0f);
+    CONSTANT_EXPR(1 == 2.0d);
+
+    CONSTANT_EXPR(1 != '\2');
+    CONSTANT_EXPR(1 != 2);
+    CONSTANT_EXPR(1 != 2u);
+    CONSTANT_EXPR(1 != 2l);
+    CONSTANT_EXPR(1 != 2ul);
+    CONSTANT_EXPR(1 != 2ll);
+    CONSTANT_EXPR(1 != 2ull);
+    CONSTANT_EXPR(1 != 2.0);
+    CONSTANT_EXPR(1 != 2.0f);
+    CONSTANT_EXPR(1 != 2.0d);
+
+    CONSTANT_EXPR(-1 == '\2');
+    CONSTANT_EXPR(-1 == 2);
+    CONSTANT_EXPR(-1 == 2u);
+    CONSTANT_EXPR(-1 == 2l);
+    CONSTANT_EXPR(-1 == 2ul);
+    CONSTANT_EXPR(-1 == 2ll);
+    CONSTANT_EXPR(-1 == 2ull);
+    CONSTANT_EXPR(-1 == 2.0);
+    CONSTANT_EXPR(-1 == 2.0f);
+    CONSTANT_EXPR(-1 == 2.0d);
+
+    CONSTANT_EXPR(-1 != '\2');
+    CONSTANT_EXPR(-1 != 2);
+    CONSTANT_EXPR(-1 != 2u);
+    CONSTANT_EXPR(-1 != 2l);
+    CONSTANT_EXPR(-1 != 2ul);
+    CONSTANT_EXPR(-1 != 2ll);
+    CONSTANT_EXPR(-1 != 2ull);
+    CONSTANT_EXPR(-1 != 2.0);
+    CONSTANT_EXPR(-1 != 2.0f);
+    CONSTANT_EXPR(-1 != 2.0d);
 }
 
 
@@ -1011,7 +1617,93 @@ TEST_FUNCTION(relational)
 {
     TEST_DATA_COLUMNS;
 
-    CONSTANT_EXPR(0);
+    CONSTANT_EXPR(1 >= '\2');
+    CONSTANT_EXPR(1 >= 2);
+    CONSTANT_EXPR(1 >= 2u);
+    CONSTANT_EXPR(1 >= 2l);
+    CONSTANT_EXPR(1 >= 2ul);
+    CONSTANT_EXPR(1 >= 2ll);
+    CONSTANT_EXPR(1 >= 2ull);
+    CONSTANT_EXPR(1 >= 2.0);
+    CONSTANT_EXPR(1 >= 2.0f);
+    CONSTANT_EXPR(1 >= 2.0d);
+
+    CONSTANT_EXPR(1 > '\2');
+    CONSTANT_EXPR(1 > 2);
+    CONSTANT_EXPR(1 > 2u);
+    CONSTANT_EXPR(1 > 2l);
+    CONSTANT_EXPR(1 > 2ul);
+    CONSTANT_EXPR(1 > 2ll);
+    CONSTANT_EXPR(1 > 2ull);
+    CONSTANT_EXPR(1 > 2.0);
+    CONSTANT_EXPR(1 > 2.0f);
+    CONSTANT_EXPR(1 > 2.0d);
+
+    CONSTANT_EXPR(1 <= '\2');
+    CONSTANT_EXPR(1 <= 2);
+    CONSTANT_EXPR(1 <= 2u);
+    CONSTANT_EXPR(1 <= 2l);
+    CONSTANT_EXPR(1 <= 2ul);
+    CONSTANT_EXPR(1 <= 2ll);
+    CONSTANT_EXPR(1 <= 2ull);
+    CONSTANT_EXPR(1 <= 2.0);
+    CONSTANT_EXPR(1 <= 2.0f);
+    CONSTANT_EXPR(1 <= 2.0d);
+
+    CONSTANT_EXPR(1 < '\2');
+    CONSTANT_EXPR(1 < 2);
+    CONSTANT_EXPR(1 < 2u);
+    CONSTANT_EXPR(1 < 2l);
+    CONSTANT_EXPR(1 < 2ul);
+    CONSTANT_EXPR(1 < 2ll);
+    CONSTANT_EXPR(1 < 2ull);
+    CONSTANT_EXPR(1 < 2.0);
+    CONSTANT_EXPR(1 < 2.0f);
+    CONSTANT_EXPR(1 < 2.0d);
+
+    CONSTANT_EXPR(-1 >= '\2');
+    CONSTANT_EXPR(-1 >= 2);
+    CONSTANT_EXPR(-1 >= 2u);
+    CONSTANT_EXPR(-1 >= 2l);
+    CONSTANT_EXPR(-1 >= 2ul);
+    CONSTANT_EXPR(-1 >= 2ll);
+    CONSTANT_EXPR(-1 >= 2ull);
+    CONSTANT_EXPR(-1 >= 2.0);
+    CONSTANT_EXPR(-1 >= 2.0f);
+    CONSTANT_EXPR(-1 >= 2.0d);
+
+    CONSTANT_EXPR(-1 > '\2');
+    CONSTANT_EXPR(-1 > 2);
+    CONSTANT_EXPR(-1 > 2u);
+    CONSTANT_EXPR(-1 > 2l);
+    CONSTANT_EXPR(-1 > 2ul);
+    CONSTANT_EXPR(-1 > 2ll);
+    CONSTANT_EXPR(-1 > 2ull);
+    CONSTANT_EXPR(-1 > 2.0);
+    CONSTANT_EXPR(-1 > 2.0f);
+    CONSTANT_EXPR(-1 > 2.0d);
+
+    CONSTANT_EXPR(-1 <= '\2');
+    CONSTANT_EXPR(-1 <= 2);
+    CONSTANT_EXPR(-1 <= 2u);
+    CONSTANT_EXPR(-1 <= 2l);
+    CONSTANT_EXPR(-1 <= 2ul);
+    CONSTANT_EXPR(-1 <= 2ll);
+    CONSTANT_EXPR(-1 <= 2ull);
+    CONSTANT_EXPR(-1 <= 2.0);
+    CONSTANT_EXPR(-1 <= 2.0f);
+    CONSTANT_EXPR(-1 <= 2.0d);
+
+    CONSTANT_EXPR(-1 < '\2');
+    CONSTANT_EXPR(-1 < 2);
+    CONSTANT_EXPR(-1 < 2u);
+    CONSTANT_EXPR(-1 < 2l);
+    CONSTANT_EXPR(-1 < 2ul);
+    CONSTANT_EXPR(-1 < 2ll);
+    CONSTANT_EXPR(-1 < 2ull);
+    CONSTANT_EXPR(-1 < 2.0);
+    CONSTANT_EXPR(-1 < 2.0f);
+    CONSTANT_EXPR(-1 < 2.0d);
 }
 
 
@@ -1019,7 +1711,69 @@ TEST_FUNCTION(shift)
 {
     TEST_DATA_COLUMNS;
 
-    CONSTANT_EXPR(0);
+    CONSTANT_EXPR(1 << '\2');
+    CONSTANT_EXPR(1 << 2);
+    CONSTANT_EXPR(1 << 2u);
+    CONSTANT_EXPR(1 << 2l);
+    CONSTANT_EXPR(1 << 2ul);
+    CONSTANT_EXPR(1 << 2ll);
+    CONSTANT_EXPR(1 << 2ull);
+
+    CONSTANT_EXPR(1u << '\2');
+    CONSTANT_EXPR(1u << 2);
+    CONSTANT_EXPR(1u << 2u);
+    CONSTANT_EXPR(1u << 2l);
+    CONSTANT_EXPR(1u << 2ul);
+    CONSTANT_EXPR(1u << 2ll);
+    CONSTANT_EXPR(1u << 2ull);
+
+    CONSTANT_EXPR(1ll << '\2');
+    CONSTANT_EXPR(1ll << 2);
+    CONSTANT_EXPR(1ll << 2u);
+    CONSTANT_EXPR(1ll << 2l);
+    CONSTANT_EXPR(1ll << 2ul);
+    CONSTANT_EXPR(1ll << 2ll);
+    CONSTANT_EXPR(1ll << 2ull);
+
+    CONSTANT_EXPR(1ull << '\2');
+    CONSTANT_EXPR(1ull << 2);
+    CONSTANT_EXPR(1ull << 2u);
+    CONSTANT_EXPR(1ull << 2l);
+    CONSTANT_EXPR(1ull << 2ul);
+    CONSTANT_EXPR(1ull << 2ll);
+    CONSTANT_EXPR(1ull << 2ull);
+
+    CONSTANT_EXPR(-1 >> '\2');
+    CONSTANT_EXPR(-1 >> 2);
+    CONSTANT_EXPR(-1 >> 2u);
+    CONSTANT_EXPR(-1 >> 2l);
+    CONSTANT_EXPR(-1 >> 2ul);
+    CONSTANT_EXPR(-1 >> 2ll);
+    CONSTANT_EXPR(-1 >> 2ull);
+
+    CONSTANT_EXPR(0xffffffffu >> '\2');
+    CONSTANT_EXPR(0xffffffffu >> 2);
+    CONSTANT_EXPR(0xffffffffu >> 2u);
+    CONSTANT_EXPR(0xffffffffu >> 2l);
+    CONSTANT_EXPR(0xffffffffu >> 2ul);
+    CONSTANT_EXPR(0xffffffffu >> 2ll);
+    CONSTANT_EXPR(0xffffffffu >> 2ull);
+
+    CONSTANT_EXPR(-1ll >> '\2');
+    CONSTANT_EXPR(-1ll >> 2);
+    CONSTANT_EXPR(-1ll >> 2u);
+    CONSTANT_EXPR(-1ll >> 2l);
+    CONSTANT_EXPR(-1ll >> 2ul);
+    CONSTANT_EXPR(-1ll >> 2ll);
+    CONSTANT_EXPR(-1ll >> 2ull);
+
+    CONSTANT_EXPR(0xffffffffffffffffull >> '\2');
+    CONSTANT_EXPR(0xffffffffffffffffull >> 2);
+    CONSTANT_EXPR(0xffffffffffffffffull >> 2u);
+    CONSTANT_EXPR(0xffffffffffffffffull >> 2l);
+    CONSTANT_EXPR(0xffffffffffffffffull >> 2ul);
+    CONSTANT_EXPR(0xffffffffffffffffull >> 2ll);
+    CONSTANT_EXPR(0xffffffffffffffffull >> 2ull);
 }
 
 
@@ -1027,7 +1781,97 @@ TEST_FUNCTION(unary)
 {
     TEST_DATA_COLUMNS;
 
-    CONSTANT_EXPR(0);
+    CONSTANT_EXPR(~'\0');
+    CONSTANT_EXPR(~0);
+    CONSTANT_EXPR(~0u);
+    CONSTANT_EXPR(~0l);
+    CONSTANT_EXPR(~0ul);
+    CONSTANT_EXPR(~0ll);
+    CONSTANT_EXPR(~0ull);
+
+    CONSTANT_EXPR(~'\1');
+    CONSTANT_EXPR(~1);
+    CONSTANT_EXPR(~1u);
+    CONSTANT_EXPR(~1l);
+    CONSTANT_EXPR(~1ul);
+    CONSTANT_EXPR(~1ll);
+    CONSTANT_EXPR(~1ull);
+
+    CONSTANT_EXPR(~'\xf0');
+    CONSTANT_EXPR(~0xf0f0f0f0);
+    CONSTANT_EXPR(~0xf0f0f0f0u);
+    CONSTANT_EXPR(~0xf0f0f0f0l);
+    CONSTANT_EXPR(~0xf0f0f0f0ul);
+    CONSTANT_EXPR(~0x0f0f0f0f0f0f0f0fll);
+    CONSTANT_EXPR(~0x0f0f0f0f0f0f0f0full);
+    CONSTANT_EXPR(~0xf0f0f0f0f0f0f0f0ll);
+    CONSTANT_EXPR(~0xf0f0f0f0f0f0f0f0ull);
+
+    CONSTANT_EXPR(~'\xff');
+    CONSTANT_EXPR(~0xffffffff);
+    CONSTANT_EXPR(~0xffffffffu);
+    CONSTANT_EXPR(~0xffffffffl);
+    CONSTANT_EXPR(~0xfffffffful);
+    CONSTANT_EXPR(~0x7fffffffffffffffll);
+    CONSTANT_EXPR(~0x8000000000000000ll);
+    CONSTANT_EXPR(~0xffffffffffffffffll);
+    CONSTANT_EXPR(~0xffffffffffffffffull);
+
+    CONSTANT_EXPR(!0);
+    CONSTANT_EXPR(!1);
+    CONSTANT_EXPR(!-1);
+
+    CONSTANT_EXPR(!0u);
+    CONSTANT_EXPR(!1u);
+    CONSTANT_EXPR(!-1u);
+
+    CONSTANT_EXPR(!0l);
+    CONSTANT_EXPR(!1l);
+    CONSTANT_EXPR(!-1l);
+
+    CONSTANT_EXPR(!0ul);
+    CONSTANT_EXPR(!1ul);
+    CONSTANT_EXPR(!-1ul);
+
+    CONSTANT_EXPR(!0ll);
+    CONSTANT_EXPR(!1ll);
+    CONSTANT_EXPR(!-1ll);
+
+    CONSTANT_EXPR(!0ull);
+    CONSTANT_EXPR(!1ull);
+    CONSTANT_EXPR(!-1ull);
+
+    CONSTANT_EXPR(!0.0);
+    CONSTANT_EXPR(!1.0);
+    CONSTANT_EXPR(!-1.0);
+
+    CONSTANT_EXPR(!0.0f);
+    CONSTANT_EXPR(!1.0f);
+    CONSTANT_EXPR(!-1.0f);
+
+    CONSTANT_EXPR(!0.0d);
+    CONSTANT_EXPR(!1.0d);
+    CONSTANT_EXPR(!-1.0d);
 }
 
+
+template <class T>
+ExpressionResultSize ASTExpressionEvaluatorTester::exprSize(T x) const
+{
+    // Float or integer type?
+    x = 1.5;
+    if (x > 1) {
+        return (sizeof(T) == 4) ? esFloat : esDouble;
+    }
+    else {
+        // Signed or unsigned type?
+        x = -1;
+        switch (sizeof(T)) {
+        case 1:  return (x > 0) ? esUInt8  : esInt8;
+        case 2:  return (x > 0) ? esUInt16 : esInt16;
+        case 4:  return (x > 0) ? esUInt32 : esInt32;
+        default: return (x > 0) ? esUInt64 : esInt64;
+        }
+    }
+}
 

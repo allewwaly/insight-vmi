@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QtTest>
 #include <QByteArray>
+#include "../../astexpression.h"
+
 
 class MemSpecs;
 class SymFactory;
@@ -60,6 +62,9 @@ private slots:
 	void test_unary_func_data();
 
 private:
+    template <class T>
+    ExpressionResultSize exprSize(T x) const;
+
     MemSpecs* _specs;
     SymFactory* _factory;
     ASTTypeEvaluator* _eval;
