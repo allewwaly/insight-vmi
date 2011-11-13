@@ -431,7 +431,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncAlignOf(const ASTNode *n
 
   Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
  */
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncChooseExpr(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncChooseExpr(
+        const ASTNode *node)
 {
     if (!node)
         return 0;
@@ -940,13 +941,14 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
             suffix = suffix.toLower();
             // Extend the size to 64 bit, depending on the number of l's and
             // the architecture of the guest
-            if (suffix.endsWith("ll") ||
-                (suffix.endsWith('l') && _eval->sizeofLong() > 4))
+            if (suffix.startsWith("ll") || suffix.endsWith("ll") ||
+                ((suffix.startsWith('l') || suffix.endsWith('l')) &&
+                 _eval->sizeofLong() > 4))
                 size = esInt64;
             else
                 size = esInt32;
             // Honor the unsigned flag. If not present, the constant is signed.
-            if (suffix.startsWith('u'))
+            if (suffix.startsWith('u') || suffix.endsWith('u'))
                 size = (ExpressionResultSize) (size|esUnsigned);
         }
         return createExprNode<ASTConstantExpression>(size, value);
