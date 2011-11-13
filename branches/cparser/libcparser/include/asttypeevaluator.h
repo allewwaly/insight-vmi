@@ -52,7 +52,7 @@ public:
     inline int arraySize() const { return _arraySize; }
     inline void setArraySize(int size) { _arraySize = size; }
 
-    bool equalTo(const ASTType* other) const;
+    bool equalTo(const ASTType* other, bool exactMatch = false) const;
     QString toString() const;
 
 private:
@@ -85,6 +85,9 @@ public:
     int sizeofLong() const;
 
     const ASTSymbol *findSymbolOfPrimaryExpression(const ASTNode* node);
+
+    RealType realTypeOfConstFloat(const ASTNode* node, double* value = 0) const;
+    RealType realTypeOfConstInt(const ASTNode* node, quint64* value = 0) const;
 
 protected:
     enum EvalResult {

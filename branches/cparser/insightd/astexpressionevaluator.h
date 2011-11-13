@@ -4,6 +4,7 @@
 //#include <astwalker.h>
 #include <QHash>
 #include <QList>
+#include <realtypes.h>
 #include "astexpression.h"
 
 class ASTType;
@@ -28,6 +29,7 @@ public:
     virtual ~ASTExpressionEvaluator();
 
     ASTExpression* exprOfNode(const ASTNode *node);
+    static ExpressionResultSize realTypeToResultSize(RealType type);
 
 private:
     template<class T> T* createExprNode();

@@ -43,17 +43,18 @@ QString ASTType::toString() const
 }
 
 
-bool ASTType::equalTo(const ASTType* other) const
+bool ASTType::equalTo(const ASTType* other, bool exactMatch) const
 {
     const ASTType *a = this, *b = other;
-    int ptrMask = rtPointer|rtArray;
-    int intTypes = IntegerTypes & ~rtEnum;
+    const int ptrMask = rtPointer|rtArray;
+    const int intTypes = IntegerTypes & ~rtEnum;
     bool isPointer = false;
     while (a && b) {
         // Consider rtPointer and rtArray to be equal
         if (a->type() != b->type() && ((a->type()|b->type()) != ptrMask)) {
-            // For non-pointer types, consider all integer types to be equal
-            if (isPointer || (!((a->type() & intTypes) && (b->type() & intTypes))))
+            // For non-exact machtes, consider all integer types to be equal
+            if (exactMatch || isPointer ||
+                    (!((a->type() & intTypes) && (b->type() & intTypes))))
                 return false;
         }
         if (a->identifier() != b->identifier())
@@ -393,11 +394,11 @@ ASTType* ASTTypeEvaluator::typeofNode(const ASTNode *node)
         break;
 
     case nt_constant_float:
-        _types[node] = createASTType(rtFloat, node);
+        _types[node] = createASTType(realTypeOfConstFloat(node), node);
         break;
 
     case nt_constant_int:
-        _types[node] = createASTType(rtInt32, node);
+        _types[node] = createASTType(realTypeOfConstInt(node), node);
         break;
 
     case nt_constant_string:
@@ -1999,6 +2000,107 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(const ASTNode *node)
     }
 
     return _types[node] = type;
+}
+
+
+RealType ASTTypeEvaluator::realTypeOfConstFloat(const ASTNode* node,
+                                                double *value) const
+{
+    if (!node)
+        return rtUndefined;
+    checkNodeType(node, nt_constant_float);
+
+    RealType type = rtUndefined;
+    QString s = antlrTokenToStr(node->u.constant.literal);
+
+
+    // Is this a float value?
+    if (s.endsWith('f', Qt::CaseInsensitive)) {
+        type = rtFloat;
+        s = s.left(s.size() - 1);
+    }
+    // Default type is double
+    else {
+        if (s.endsWith('d', Qt::CaseInsensitive))
+            s = s.left(s.size() - 1);
+        type = rtDouble;
+    }
+
+    if (value) {
+        bool ok;
+        *value = s.toDouble(&ok);
+        // Check conversion result
+        if (!ok)
+            typeEvaluatorError(QString("Failed to convert constant \"%1\" to "
+                                       "float at %2:%3:%4")
+                          .arg(s)
+                          .arg(_ast->fileName())
+                          .arg(node->start->line)
+                          .arg(node->start->charPosition));
+    }
+
+    return type;
+}
+
+
+RealType ASTTypeEvaluator::realTypeOfConstInt(const ASTNode* node,
+                                              quint64* value) const
+{
+    if (!node)
+        return rtUndefined;
+    checkNodeType(node, nt_constant_int);
+
+    RealType type = rtUndefined;
+    QString s = antlrTokenToStr(node->u.constant.literal);
+    QString suffix;
+
+    // Remove any size or signedness specifiers from the string
+    while (s.endsWith('l', Qt::CaseInsensitive) ||
+           s.endsWith('u', Qt::CaseInsensitive))
+    {
+        suffix.prepend(s.right(1));
+        s = s.left(s.size() - 1);
+    }
+    // Use the C convention to choose the correct base
+    bool ok;
+    quint64 val = s.toULongLong(&ok, 0);
+    if (value)
+        *value = val;
+    if (!ok)
+        typeEvaluatorError(QString("Failed to parse constant integer \"%1\" "
+                                   "at %2:%3:%4")
+                           .arg(s)
+                           .arg(_ast->fileName())
+                           .arg(node->start->line)
+                           .arg(node->start->charPosition));
+    // Without suffix given, find the smallest type fitting the value
+    if (suffix.isEmpty()) {
+        if (val < (1ULL << 31))
+            type = rtInt32;
+        else if (val < (1ULL << 32))
+            type = rtUInt32;
+        else if (val < (1ULL << 63))
+            type = rtInt64;
+        else
+            type = rtUInt64;
+    }
+    // Check explicit size and constant suffixes
+    else {
+        suffix = suffix.toLower();
+        // Extend the size to 64 bit, depending on the number of l's and
+        // the architecture of the guest
+        if (suffix.startsWith("ll") || suffix.endsWith("ll") ||
+                ((suffix.startsWith('l') || suffix.endsWith('l')) &&
+                 sizeofLong() > 4))
+            type = rtInt64;
+        else
+            type = rtInt32;
+        // Honor the unsigned flag. If not present, the constant is signed.
+        if (suffix.startsWith('u') || suffix.endsWith('u'))
+            type = (type == rtInt32) ? rtUInt32 : rtUInt64;
+    }
+
+    return type;
 }
 
 
