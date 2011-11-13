@@ -848,7 +848,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncTypesCompatible(
     // Defer equality decision to ASTType for now. This might not be exactly
     // what GCC decides.
     /// @todo More acurate type equality decision
-    return t1->equalTo(t2) ?
+    return t1->equalTo(t2, true) ?
                 createExprNode<ASTConstantExpression>(esInt32, 1ULL) :
                 createExprNode<ASTConstantExpression>(esInt32, 0ULL);
 }
@@ -901,60 +901,19 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
         return 0;
 
     bool ok = false;
-    quint64 value;
     ExpressionResultSize size = esUndefined;
     ASTConstantExpression *expr = 0;
-    QString s = antlrTokenToStr(node->u.constant.literal);
-    QString suffix;
 
     switch (node->type) {
     case nt_constant_int: {
-        // Remove any size or signedness specifiers from the string
-        while (s.endsWith('l', Qt::CaseInsensitive) ||
-               s.endsWith('u', Qt::CaseInsensitive))
-        {
-            suffix.prepend(s.right(1));
-            s = s.left(s.size() - 1);
-        }
-        // Use the C convention to choose the correct base
-        value = s.toULongLong(&ok, 0);
-        if (!ok)
-            exprEvalError(QString("Failed to parse constant integer \"%1\" "
-                                  "at %2:%3:%4")
-                          .arg(s)
-                          .arg(_ast->fileName())
-                          .arg(node->start->line)
-                          .arg(node->start->charPosition));
-        // Without suffix given, find the smallest type fitting the value
-        if (suffix.isEmpty()) {
-            if (value < (1ULL << 31))
-                size = esInt32;
-            else if (value < (1ULL << 32))
-                size = esUInt32;
-            else if (value < (1ULL << 63))
-                size = esInt64;
-            else
-                size = esUInt64;
-        }
-        // Check explicit size and constant suffixes
-        else {
-            suffix = suffix.toLower();
-            // Extend the size to 64 bit, depending on the number of l's and
-            // the architecture of the guest
-            if (suffix.startsWith("ll") || suffix.endsWith("ll") ||
-                ((suffix.startsWith('l') || suffix.endsWith('l')) &&
-                 _eval->sizeofLong() > 4))
-                size = esInt64;
-            else
-                size = esInt32;
-            // Honor the unsigned flag. If not present, the constant is signed.
-            if (suffix.startsWith('u') || suffix.endsWith('u'))
-                size = (ExpressionResultSize) (size|esUnsigned);
-        }
+        quint64 value;
+        RealType rt = _eval->realTypeOfConstInt(node, &value);
+        size = realTypeToResultSize(rt);
         return createExprNode<ASTConstantExpression>(size, value);
     }
 
     case nt_constant_char: {
+        QString s = antlrTokenToStr(node->u.constant.literal);
         // Keep it simple for now
         unsigned char c = 0; // unsigned to avoid sign expansion
         // Single letter
@@ -1012,29 +971,13 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
     }
 
     case nt_constant_float: {
-        // Is this a float value?
-        if (s.endsWith('f', Qt::CaseInsensitive)) {
-            s = s.left(s.size() - 1);
-            expr = createExprNode<ASTConstantExpression>(esFloat,
-                                                         s.toFloat(&ok));
-        }
-        // Default type is double
-        else {
-            if (s.endsWith('d', Qt::CaseInsensitive))
-                s = s.left(s.size() - 1);
-            expr = createExprNode<ASTConstantExpression>(esDouble,
-                                                         s.toDouble(&ok));
-        }
-
-        // Check conversion result
-        if (!ok)
-            exprEvalError(QString("Failed to convert constant \"%1\" to float "
-                                  "at %2:%3:%4")
-                          .arg(s)
-                          .arg(_ast->fileName())
-                          .arg(node->start->line)
-                          .arg(node->start->charPosition));
-        return expr;
+        double value;
+        RealType rt = _eval->realTypeOfConstFloat(node, &value);
+        size = realTypeToResultSize(rt);
+        if (rt == rtFloat)
+            return createExprNode<ASTConstantExpression>(size, (float)value);
+        else
+            return createExprNode<ASTConstantExpression>(size, value);
     }
 
     default:
@@ -1246,4 +1189,22 @@ unsigned int ASTExpressionEvaluator::sizeofType(const ASTType *type)
     }
 
     return 0;
+}
+
+
+ExpressionResultSize ASTExpressionEvaluator::realTypeToResultSize(RealType type)
+{
+    switch (type) {
+    case rtInt8:   return esInt8;
+    case rtUInt8:  return esUInt8;
+    case rtInt16:  return esInt16;
+    case rtUInt16: return esUInt16;
+    case rtInt32:  return esInt32;
+    case rtUInt32: return esUInt32;
+    case rtInt64:  return esInt64;
+    case rtUInt64: return esUInt64;
+    case rtFloat:  return esFloat;
+    case rtDouble: return esDouble;
+    default:       return esUndefined;
+    }
 }
