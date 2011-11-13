@@ -9,7 +9,7 @@
 
 class MemSpecs;
 class SymFactory;
-class ASTTypeEvaluator;
+class KernelSourceTypeEvaluator;
 class ASTExpressionTester;
 class AbstractSyntaxTree;
 class ASTBuilder;
@@ -61,13 +61,16 @@ private slots:
 	void test_unary_func();
 	void test_unary_func_data();
 
+	void test_builtins_func();
+	void test_builtins_func_data();
+
 private:
     template <class T>
     ExpressionResultSize exprSize(T x) const;
 
     MemSpecs* _specs;
     SymFactory* _factory;
-    ASTTypeEvaluator* _eval;
+    KernelSourceTypeEvaluator* _eval;
     ASTExpressionTester* _tester;
     AbstractSyntaxTree* _ast;
     ASTBuilder* _builder;
