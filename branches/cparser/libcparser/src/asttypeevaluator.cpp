@@ -402,6 +402,8 @@ ASTType* ASTTypeEvaluator::typeofNode(const ASTNode *node)
 
     case nt_constant_string:
         _types[node] = createASTType(rtArray, node, createASTType(rtInt8, node));
+        _types[node]->setArraySize(
+                    stringLength(node->u.constant.string_token_list));
         break;
 
 //    case nt_declaration:
@@ -2195,7 +2197,29 @@ ASTType* ASTTypeEvaluator::preprendArrays(const ASTNode *dd_dad, ASTType* type)
         // Brackets lead to an array type
         if (ds_ads->type == nt_declarator_suffix_brackets ||
                 ds_ads->type == nt_abstract_declarator_suffix_brackets)
+        {
             type = createASTType(rtArray, ds_ads, type);
+            // Evaluate expression in brackets, if possible
+            bool ok = false;
+            int size = evaluateExpression(
+                        ds_ads->u.declarator_suffix.constant_expression, &ok);
+            if (ok)
+                type->setArraySize(size);
+            // We should be able to evaluate all expressions!
+            else if (ds_ads->u.declarator_suffix.constant_expression) {
+                ASTSourcePrinter printer(_ast);
+                typeEvaluatorError(
+                            QString("Failed to evaluate constant expression "
+                                    "\"%1\" at %2:%3:%4")
+                            .arg(printer.toString(
+                                     ds_ads
+                                     ->u.declarator_suffix.constant_expression)
+                                 .trimmed())
+                            .arg(_ast->fileName())
+                            .arg(ds_ads->start->line)
+                            .arg(ds_ads->start->charPosition));
+            }
+        }
         // Parens lead to a function pointer type
         else if (ds_ads->type == nt_declarator_suffix_parens ||
         		ds_ads->type == nt_abstract_declarator_suffix_parens)
@@ -3004,8 +3028,9 @@ RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list) const
 
 	if (types & tDouble) {
 		if (flags & fLong)
-			debugerr("In " << _ast->fileName() << ":" << list->item->line << ": "
-					<< "Encountered type \"long double\" which we may handle correctly!");
+			debugerr("In " << _ast->fileName() << ":" << list->item->line
+					 << ": Encountered type \"long double\" which we may not "
+						"handle correctly!");
 		return rtDouble;
 	}
 
@@ -3074,4 +3099,36 @@ void ASTTypeEvaluator::genDotGraphForNode(const ASTNode *node) const
             }
         }
     }
+}
+
+
+
+int ASTTypeEvaluator::evaluateExpression(const ASTNode* /*node*/, bool* ok)
+{
+    // The default implementation does nothing.
+    if (ok)
+        *ok = false;
+    return 0;
+}
+
+
+int ASTTypeEvaluator::stringLength(const ASTTokenList *list)
+{
+    if (!list)
+        return -1;
+
+    int len = 1; // for terminal '\0'
+    QString s;
+    const QString dot(".");
+    QRegExp re("\\\\\\\\|\\\\(?:[abtnfreEv\"]|x[0-9a-fA-F]+|[0-7]{1,3})");
+    for (; list; list = list->next) {
+        s = antlrTokenToStr(list->item);
+        // Remove outer quotes
+        s = s.mid(1, s.length() - 2);
+        // Replace escape sequences with a single character
+        s = s.replace(re, dot);
+        len += s.length();
+    }
+
+    return len;
 }

@@ -13,6 +13,7 @@
 #include <astsourceprinter.h>
 #include <abstractsyntaxtree.h>
 #include "shell.h"
+#include "astexpressionevaluator.h"
 
 #define typeEvaluatorError(x) do { throw SourceTypeEvaluatorException((x), __FILE__, __LINE__); } while (0)
 
@@ -20,13 +21,16 @@
 KernelSourceTypeEvaluator::KernelSourceTypeEvaluator(AbstractSyntaxTree* ast,
         SymFactory* factory)
     : ASTTypeEvaluator(ast, factory->memSpecs().sizeofUnsignedLong),
-      _factory(factory)
+      _factory(factory), _eval(0)
 {
+    _eval = new ASTExpressionEvaluator(this, _factory);
 }
 
 
 KernelSourceTypeEvaluator::~KernelSourceTypeEvaluator()
 {
+    if (_eval)
+        delete _eval;
 }
 
 
@@ -103,3 +107,22 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
     }
 }
 
+
+int KernelSourceTypeEvaluator::evaluateExpression(const ASTNode* node, bool* ok)
+{
+    if (ok)
+        *ok = false;
+
+    if (node) {
+        ASTExpression* expr = _eval->exprOfNode(node);
+        ExpressionResult value = expr->result();
+
+        if (value.resultType == erConstant) {
+            if (ok)
+                *ok = true;
+            return value.value();
+        }
+    }
+
+    return 0;
+}
