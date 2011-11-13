@@ -9,7 +9,7 @@
 enum ExpressionType {
     etVoid,
     etRuntimeDependent,
-    etConstant,
+    etLiteralConstant,
     etVariable,
     etLogicalOr,
     etLogicalAnd,
@@ -215,7 +215,7 @@ public:
 
     inline virtual ExpressionType type() const
     {
-        return etConstant;
+        return etLiteralConstant;
     }
 
     inline virtual int resultType() const

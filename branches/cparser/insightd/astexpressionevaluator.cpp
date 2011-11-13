@@ -180,6 +180,10 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
         expr = exprOfConditionalExpr(node);
         break;
 
+    case nt_constant_expression:
+        expr = exprOfNode(node->u.constant_expression.conditional_expression);
+        break;
+
     case nt_constant_char:
     case nt_constant_int:
     case nt_constant_float:
@@ -502,7 +506,9 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncObjectSize(
     // If the maximum remaining bytes are requested, return (size_t) -1 instead
     // of 0.
     if (res.result.ui64 & 2)
-        ret->setValue(res.size, -1ULL);
+        ret->setValue(ret->result().size, 0ULL);
+    else
+        ret->setValue(ret->result().size, -1ULL);
     return ret;
 }
 
@@ -537,7 +543,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncConstant(const ASTNode *
     ASTExpression *expr = exprOfNode(
                 node->u.builtin_function_constant_p.unary_expression);
     // We can only approximate GCC's constant value decision here
-    return expr->resultType() == etConstant ?
+    return expr->resultType() == erConstant ?
                 createExprNode<ASTConstantExpression>(esInt32, 1ULL) :
                 createExprNode<ASTConstantExpression>(esInt32, 0ULL);
 
@@ -572,9 +578,17 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncExpect(const ASTNode *no
 {
     if (!node)
         return 0;
-    checkNodeType(node, nt_builtin_function_constant_p);
+    checkNodeType(node, nt_builtin_function_expect);
 
-    return exprOfNode(node->u.builtin_function_expect.assignment_expression);
+    ASTExpression* expr =
+            exprOfNode(node->u.builtin_function_expect.assignment_expression);
+    /// @todo Return type is long
+//    if (_eval->sizeofLong() == 4) {
+//    }
+//    else {
+//    }
+
+    return expr;
 }
 
 
@@ -635,12 +649,12 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *
             ASTExpression* expr = exprOfNode(arrayIndexExpr);
             ExpressionResult index = expr->result();
             // We should find at least one constant expression
-            while (expr->hasAlternative() && index.resultType != etConstant) {
+            while (expr->hasAlternative() && index.resultType != erConstant) {
                 expr = expr->alternative();
                 index = expr->result();
             }
             // Make sure we can evaluate the expression
-            if (index.resultType != etConstant) {
+            if (index.resultType != erConstant) {
                 ASTSourcePrinter printer(_ast);
                 exprEvalError(QString("Expression in brackets is not constant "
                                       "in \"%1\" at %2:%3:%4")
@@ -740,11 +754,29 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *no
                     _eval->sizeofLong() == 4 ? esUInt32 : esUInt64,
                     (quint64)_eval->sizeofLong());
     // Return alternatives for all sizes
-    BaseTypeList list = _factory->findBaseTypesForAstType(type, _eval).second;
+    AstBaseTypeList alist = _factory->findBaseTypesForAstType(type, _eval);
+    BaseTypeList list = alist.second;
+    int arrayLen = -1;
+    // Find array definitions of type
+    for (ASTType* tmp = type; tmp && tmp != alist.first; tmp = tmp->next()) {
+        // Consider length of arrays
+        if (tmp->type() == rtArray && tmp->arraySize() >= 0) {
+            if (arrayLen < 0)
+                arrayLen = tmp->arraySize();
+            else
+                arrayLen *= tmp->arraySize();
+        }
+        // No array type or type not evaluatable: reset
+        else
+            arrayLen = -1;
+    }
+
     QSet<quint32> sizes;
     ASTExpression *ret = 0;
     for (int i = 0; i < list.size(); ++i) {
         quint32 size = list[i]->size();
+        if (arrayLen >= 0)
+            size *= arrayLen;
         // Add each size greater zero only once
         if (size > 0 && !sizes.contains(size)) {
             ASTExpression *expr =
@@ -949,7 +981,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
             else {
                 // Hex escape sequence
                 if (s[2] == QChar('x')) {
-                    c = s.mid(3, s.length() - 4).toUInt(&ok, 16);
+                    c = s.mid(3, s.length() - 4).toULong(&ok, 16);
                     expr = createExprNode<ASTConstantExpression>(esInt8,
                                                                  (quint64)c);
                 }
