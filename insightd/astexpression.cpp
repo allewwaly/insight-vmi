@@ -8,7 +8,7 @@ const char* expressionTypeToString(ExpressionType type)
     switch (type) {
     case etVoid:                return "etVoid";
     case etRuntimeDependent:    return "etRuntimeDependent";
-    case etConstant:            return "etConstant";
+    case etLiteralConstant:     return "etLiteralConstant";
     case etVariable:            return "etVariable";
     case etLogicalOr:           return "etLogicalOr";
     case etLogicalAnd:          return "etLogicalAnd";
