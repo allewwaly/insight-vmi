@@ -308,22 +308,23 @@ enum ExpectFail {
     efResult = (1 << 2)
 };
 
-#define CONSTANT_EXPR(expr) CONSTANT_EXPR2(expr, expr, 0)
-#define CONSTANT_EXPR_FAIL(expr, fail) CONSTANT_EXPR2(expr, expr, fail)
-#define CONSTANT_EXPR2(expr, expected, fail) \
+#define CONSTANT_EXPR(expr) CONSTANT_EXPR3(expr, expr, 0)
+#define CONSTANT_EXPR_FAIL(expr, fail) CONSTANT_EXPR3(expr, expr, fail)
+#define CONSTANT_EXPR2(expr, expected) CONSTANT_EXPR3(expr, expected, 0)
+#define CONSTANT_EXPR3(expr, expected, fail) \
     do { \
-        if (exprSize(expr) & esInteger) \
+        if (exprSize(expected) & esInteger) \
             QTest::newRow(LN) << "int i = " #expr ";" \
-                << (int)erConstant << (int)exprSize(expr) \
+                << (int)erConstant << (int)exprSize(expected) \
                 << (quint64)((qint64)(expected)) << 0.0f << 0.0d \
                 << (int)(fail); \
-        else if (exprSize(expr) & esFloat) \
+        else if (exprSize(expected) & esFloat) \
             QTest::newRow(LN) << "float f = " #expr ";" \
-                << (int)erConstant << (int)exprSize(expr) \
+                << (int)erConstant << (int)exprSize(expected) \
                 << 0ULL << (float)(expected) << 0.0d << (int)(fail); \
         else  \
             QTest::newRow(LN) << "int i = " #expr ";" \
-                << (int)erConstant << (int)exprSize(expr) \
+                << (int)erConstant << (int)exprSize(expected) \
                 << 0ULL << 0.0f << (double)(expected) << (int)(fail); \
     } while (0)
 
@@ -412,8 +413,6 @@ TEST_FUNCTION(constants)
 {
     TEST_DATA_COLUMNS;
 
-    CONSTANT_EXPR(5 % 2);
-
     // Positive constants
     CONSTANT_EXPR(0);
     CONSTANT_EXPR(1);
@@ -424,12 +423,16 @@ TEST_FUNCTION(constants)
     // Constants with length specifieer
     CONSTANT_EXPR(99999L);
     CONSTANT_EXPR(99999UL);
+    CONSTANT_EXPR(99999LU);
     CONSTANT_EXPR(99999LL);
     CONSTANT_EXPR(99999ULL);
+    CONSTANT_EXPR(99999LLU);
     CONSTANT_EXPR(-99999L);
     CONSTANT_EXPR(-99999UL);
+    CONSTANT_EXPR(-99999LU);
     CONSTANT_EXPR(-99999LL);
     CONSTANT_EXPR(-99999ULL);
+    CONSTANT_EXPR(-99999LLU);
     // Character constants
     CONSTANT_EXPR('a');
     CONSTANT_EXPR('z');
@@ -446,16 +449,20 @@ TEST_FUNCTION(constants)
     // Hex constants
     CONSTANT_EXPR(0xcafebabe);
     CONSTANT_EXPR(0xcafebabeUL);
+    CONSTANT_EXPR(0xcafebabeLU);
     CONSTANT_EXPR(-0xcafebabe);
     CONSTANT_EXPR(-0xcafebabeL);
     CONSTANT_EXPR(-0xcafebabeUL);
+    CONSTANT_EXPR(-0xcafebabeLU);
     // Octal constants
     CONSTANT_EXPR(01234567);
     CONSTANT_EXPR(01234567L);
     CONSTANT_EXPR(01234567UL);
+    CONSTANT_EXPR(01234567LU);
     CONSTANT_EXPR(-01234567);
     CONSTANT_EXPR(-01234567L);
     CONSTANT_EXPR(-01234567UL);
+    CONSTANT_EXPR(-01234567LU);
     // Float constants w/o exponent
     CONSTANT_EXPR(0.0);
     CONSTANT_EXPR(.0);
@@ -1932,9 +1939,21 @@ TEST_FUNCTION(builtins)
     CONSTANT_EXPR(__alignof__(b.pb->a[2].s));
     CONSTANT_EXPR(__alignof__("foo"));
 
-    // __builtin_choose_expr only available for C
-//    CONSTANT_EXPR(__builtin_choose_expr(0, 2, 3));
-//    CONSTANT_EXPR(__builtin_choose_expr(1, 2, 3))
+    // __builtin_choose_expr, only available for C
+    CONSTANT_EXPR2(__builtin_choose_expr(0, '\2', '\3'), '\3');
+    CONSTANT_EXPR2(__builtin_choose_expr(1, '\2', '\3'), '\2');
+    CONSTANT_EXPR2(__builtin_choose_expr(0, 2, 3), 3);
+    CONSTANT_EXPR2(__builtin_choose_expr(1, 2, 3), 2);
+    CONSTANT_EXPR2(__builtin_choose_expr(0, 2u, 3u), 3u);
+    CONSTANT_EXPR2(__builtin_choose_expr(1, 2u, 3u), 2u);
+    CONSTANT_EXPR2(__builtin_choose_expr(0, 2l, 3l), 3l);
+    CONSTANT_EXPR2(__builtin_choose_expr(1, 2l, 3l), 2l);
+    CONSTANT_EXPR2(__builtin_choose_expr(0, 2lu, 3lu), 3lu);
+    CONSTANT_EXPR2(__builtin_choose_expr(1, 2lu, 3lu), 2lu);
+    CONSTANT_EXPR2(__builtin_choose_expr(0, 2ll, 3ll), 3ll);
+    CONSTANT_EXPR2(__builtin_choose_expr(1, 2ll, 3ll), 2ll);
+    CONSTANT_EXPR2(__builtin_choose_expr(0, 2ull, 3ull), 3ull);
+    CONSTANT_EXPR2(__builtin_choose_expr(1, 2ull, 3ull), 2ull);
 
     // __builtin_constant_p
     CONSTANT_EXPR(__builtin_constant_p(0));
@@ -1978,7 +1997,35 @@ TEST_FUNCTION(builtins)
     CONSTANT_EXPR(__builtin_object_size(b.pa, 2));
     CONSTANT_EXPR(__builtin_object_size(b.pa, 3));
 
-    // __builtin_types_compatible_p only available for C
+    // __builtin_types_compatible_p, only available for C
+    CONSTANT_EXPR2(__builtin_types_compatible_p(char, int), 0);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(int, int), 1);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(const int, int), 1);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(volatile int, int), 1);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(unsigned int, int), 0);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(long, long long),
+                   (_specs->sizeofUnsignedLong == 4) ? 0 : 1);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(long, char*), 0);
+
+    CONSTANT_EXPR2(__builtin_types_compatible_p(float, int), 0);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(double, int), 0);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(double, float), 0);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(double, double), 1);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(double, typeof(1.0)), 1);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(double, typeof(1.0f)), 0);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(double, typeof(1.0d)), 1);
+
+    CONSTANT_EXPR2(__builtin_types_compatible_p(short*, short*), 1);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(short*, short**), 0);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(short**, short**), 1);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(short*[], short*[]), 1);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(int[], int[4]), 1);
+
+    CONSTANT_EXPR2(__builtin_types_compatible_p(struct A, struct B), 0);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(struct A, typeof(a)), 1);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(struct A*, typeof(&a)), 1);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(struct A, typeof(b)), 0);
+    CONSTANT_EXPR2(__builtin_types_compatible_p(struct B*, typeof(&b)), 1);
 
     // sizeof
     CONSTANT_EXPR(sizeof(char));
@@ -2033,7 +2080,8 @@ TEST_FUNCTION(builtins)
     CONSTANT_EXPR(sizeof("\x0foo"));
     CONSTANT_EXPR(sizeof("\xffffffffffffffff"));
     CONSTANT_EXPR(sizeof("foo\x0"));
-    CONSTANT_EXPR(sizeof("foo\xff"));}
+    CONSTANT_EXPR(sizeof("foo\xff"));
+}
 
 
 template <class T>
