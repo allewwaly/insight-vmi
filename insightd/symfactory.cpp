@@ -840,7 +840,7 @@ void SymFactory::addSymbol(BaseType* type)
 
 BaseType* SymFactory::getNumericInstance(const ASTType* astType)
 {
-    if (! (astType->type() & ((~rtEnum) & IntegerTypes)) ) {
+    if (! (astType->type() & ((~rtEnum) & NumericTypes)) ) {
         factoryError("Expected a numeric type, but given type is " +
                      realTypeToStr(astType->type()));
     }
@@ -1955,6 +1955,18 @@ void SymFactory::typeAlternateUsage(const ASTSymbol* srcSymbol,
                 // defined by targetPointers[j]
                 for (int l = 0; l < typesUsingSrc.size(); ++l) {
                     if (typesUsingSrc[l]->type() == targetPointers[j]->type()) {
+                        // Match the array size, if given
+                        if (targetPointers[j]->type() == rtArray &&
+                                targetPointers[j]->arraySize() >= 0)
+                        {
+                            const Array* a =
+                                    dynamic_cast<Array*>(typesUsingSrc[l]);
+                            // In case the array has a specified length and it
+                            // does not match the expected length, then skip it.
+                            if (a->length() >= 0 &&
+                                    a->length() != targetPointers[j]->arraySize())
+                                continue;
+                        }
                         nextCandidates.append(typesUsingSrc[l]);
                         // Additonally add all typedefs for that type
                         nextCandidates.append(typedefsOfType(typesUsingSrc[l]));
@@ -1980,8 +1992,9 @@ void SymFactory::typeAlternateUsage(const ASTSymbol* srcSymbol,
             for (int j = targetPointers.size() - 1; j >= 0; --j) {
                 // Create "next" pointer
                 Pointer* ptr = 0;
+                Array* a = 0;
                 switch (targetPointers[j]->type()) {
-                case rtArray: ptr = new Array(this); break;
+                case rtArray: ptr = a = new Array(this); break;
                 case rtPointer: ptr = new Pointer(this); break;
                 default: factoryError("Unexpected type: " +
                                       realTypeToStr(targetPointers[j]->type()));
@@ -1991,6 +2004,9 @@ void SymFactory::typeAlternateUsage(const ASTSymbol* srcSymbol,
                 if (targetBaseType)
                     ptr->setRefTypeId(targetBaseType->id());
                 ptr->setSize(_memSpecs.sizeofUnsignedLong);
+                // For arrays, set their length
+                if (a)
+                    a->setLength(targetPointers[j]->arraySize());
                 addSymbol(ptr);
                 targetBaseType = ptr;
             }

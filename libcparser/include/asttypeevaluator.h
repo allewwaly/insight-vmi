@@ -15,17 +15,25 @@
 #include <QHash>
 #include <QStack>
 
+
 class ASTType
 {
 public:
-    ASTType() : _type(rtUndefined), _next(0), _node(0), _pointerSkipped(false) {}
+    ASTType()
+        : _type(rtUndefined), _next(0), _node(0), _pointerSkipped(false),
+          _arraySize(-1) {}
     ASTType(RealType type, ASTType* next = 0)
-        : _type(type), _next(next), _node(0), _pointerSkipped(false) {}
+        : _type(type), _next(next), _node(0), _pointerSkipped(false),
+          _arraySize(-1) {}
     ASTType(RealType type, const QString& identifier)
     	: _type(type), _next(0), _identifier(identifier), _node(0),
-    	  _pointerSkipped(false) {}
+          _pointerSkipped(false), _arraySize(-1) {}
     ASTType(RealType type, const ASTNode* node)
-    	: _type(type), _next(0), _node(node), _pointerSkipped(false) {}
+        : _type(type), _next(0), _node(node), _pointerSkipped(false),
+          _arraySize(-1) {}
+    ASTType(RealType type, const ASTNode* node, int arraySize)
+        : _type(type), _next(0), _node(node), _pointerSkipped(false),
+          _arraySize(arraySize) {}
 
     inline bool isNull() const { return _type == 0; }
     inline RealType type() const { return _type; }
@@ -41,6 +49,8 @@ public:
     inline bool isPointer() const {
         return (_type&(rtFuncPointer|rtPointer|rtArray)) || (_next && _next->isPointer());
     }
+    inline int arraySize() const { return _arraySize; }
+    inline void setArraySize(int size) { _arraySize = size; }
 
     bool equalTo(const ASTType* other) const;
     QString toString() const;
@@ -51,6 +61,7 @@ private:
     QString _identifier;
     const ASTNode* _node;
     bool _pointerSkipped;
+    int _arraySize;
 };
 
 typedef QHash<const ASTNode*, ASTType*> ASTNodeTypeHash;
@@ -123,6 +134,10 @@ protected:
     QString typeChangeInfo(const ASTNode* srcNode, const ASTType* srcType,
             const ASTSymbol* srcSymbol, const ASTNode* targetNode,
             const ASTType* targetType, const ASTNode* rootNode);
+
+    virtual int evaluateExpression(const ASTNode* node, bool* ok = 0);
+
+    int stringLength(const ASTTokenList* list);
 
 private:
     ASTType* copyASTType(const ASTType* src);

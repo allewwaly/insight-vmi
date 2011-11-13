@@ -12,6 +12,7 @@
 #include <genericexception.h>
 
 class SymFactory;
+class ASTExpressionEvaluator;
 
 /**
  * Exception class for KernelSourceTypeEvaluator operations
@@ -50,8 +51,11 @@ protected:
             const QStringList& ctxMembers, const ASTNode* targetNode,
             const ASTType* targetType, const ASTNode* rootNode);
 
+    virtual int evaluateExpression(const ASTNode* node, bool* ok = 0);
+
 private:
     SymFactory* _factory;
+    ASTExpressionEvaluator* _eval;
 };
 
 
