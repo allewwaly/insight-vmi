@@ -8,6 +8,7 @@
 #include "../../symfactory.h"
 #include "../../astexpressionevaluator.h"
 #include "../../kernelsymbolparser.h"
+#include "../../kernelsourcetypeevaluator.h"
 #include "../../shell.h"
 
 #define safe_delete(x) \
@@ -276,7 +277,7 @@ void ASTExpressionEvaluatorTester::init()
 {
     _ast = new AbstractSyntaxTree();
     _builder = new ASTBuilder(_ast);
-    _eval = new ASTTypeEvaluator(_ast, 8);
+    _eval = new KernelSourceTypeEvaluator(_ast, _factory);
     _tester = new ASTExpressionTester(_ast, _factory, _eval);
 }
 
@@ -301,21 +302,29 @@ void ASTExpressionEvaluatorTester::cleanup()
 #define STRING(s) STRING2(s)
 #define LN "line: " STRING(__LINE__)
 
-#define CONSTANT_EXPR(expr) CONSTANT_EXPR2(expr, expr)
-#define CONSTANT_EXPR2(expr, expected) \
+enum ExpectFail {
+    efType =   (1 << 0),
+    efSize =   (1 << 1),
+    efResult = (1 << 2)
+};
+
+#define CONSTANT_EXPR(expr) CONSTANT_EXPR2(expr, expr, 0)
+#define CONSTANT_EXPR_FAIL(expr, fail) CONSTANT_EXPR2(expr, expr, fail)
+#define CONSTANT_EXPR2(expr, expected, fail) \
     do { \
         if (exprSize(expr) & esInteger) \
             QTest::newRow(LN) << "int i = " #expr ";" \
                 << (int)erConstant << (int)exprSize(expr) \
-                << (quint64)((qint64)(expected)) << 0.0f << 0.0d; \
+                << (quint64)((qint64)(expected)) << 0.0f << 0.0d \
+                << (int)(fail); \
         else if (exprSize(expr) & esFloat) \
             QTest::newRow(LN) << "float f = " #expr ";" \
                 << (int)erConstant << (int)exprSize(expr) \
-                << 0ULL << (float)(expected) << 0.0d; \
+                << 0ULL << (float)(expected) << 0.0d << (int)(fail); \
         else  \
             QTest::newRow(LN) << "int i = " #expr ";" \
                 << (int)erConstant << (int)exprSize(expr) \
-                << 0ULL << 0.0f << (double)(expected); \
+                << 0ULL << 0.0f << (double)(expected) << (int)(fail); \
     } while (0)
 
 #define TEST_DATA_COLUMNS \
@@ -324,13 +333,16 @@ void ASTExpressionEvaluatorTester::cleanup()
     QTest::addColumn<int>("resultSize"); \
     QTest::addColumn<quint64>("result"); \
     QTest::addColumn<float>("resultf"); \
-    QTest::addColumn<double>("resultd");
+    QTest::addColumn<double>("resultd"); \
+    QTest::addColumn<int>("expectFail"); \
 
 #define	TEST_FUNCTION(methodName) \
 	void ASTExpressionEvaluatorTester::test_##methodName##_func() \
 	{ \
 		QFETCH(QString, localCode); \
+		QFETCH(int, resultType); \
 		QFETCH(int, resultSize); \
+		QFETCH(int, expectFail); \
 		\
 		_ascii += test_prog_begin; \
 		if (!localCode.isEmpty()) { \
@@ -344,10 +356,16 @@ void ASTExpressionEvaluatorTester::cleanup()
 			QCOMPARE(_builder->buildFrom(_ascii), 0); \
 			QVERIFY(_tester->walkTree() > 0); \
 		\
-			QTEST(_tester->result.resultType, "resultType"); \
+			if (expectFail & efType) \
+				QEXPECT_FAIL("", "Expected wrong type", Continue); \
+			QCOMPARE(_tester->result.resultType, resultType); \
+			if (expectFail & efSize) \
+				QEXPECT_FAIL("", "Expected wrong size", Continue); \
 			QCOMPARE((int)_tester->result.size, resultSize); \
 		\
 			if (_tester->result.resultType == erConstant) { \
+				if (expectFail & efResult) \
+					QEXPECT_FAIL("", "Expected wrong result", Continue); \
 				if (_tester->result.size & esInteger) { \
 					QFETCH(quint64, result); \
 					if (_tester->result.size & es64Bit) \
@@ -1853,6 +1871,169 @@ TEST_FUNCTION(unary)
     CONSTANT_EXPR(!1.0d);
     CONSTANT_EXPR(!-1.0d);
 }
+
+
+TEST_FUNCTION(builtins)
+{
+    TEST_DATA_COLUMNS;
+
+    struct A {
+           long l;
+           short s;
+           int i;
+           char c;
+    };
+
+    struct B {
+           int j;
+           struct A a[4];
+           struct A* pa;
+           struct B* pb;
+    };
+
+    struct A a;
+    struct B b;
+
+    // alignof
+    CONSTANT_EXPR(__alignof__(char));
+    CONSTANT_EXPR(__alignof__(short));
+    CONSTANT_EXPR(__alignof__(int));
+    CONSTANT_EXPR(__alignof__(long));
+
+    CONSTANT_EXPR(__alignof__(unsigned char));
+    CONSTANT_EXPR(__alignof__(unsigned short));
+    CONSTANT_EXPR(__alignof__(unsigned int));
+    CONSTANT_EXPR(__alignof__(unsigned long));
+
+    CONSTANT_EXPR(__alignof__(float));
+    CONSTANT_EXPR(__alignof__(double));
+
+    CONSTANT_EXPR(__alignof__(struct A));
+    CONSTANT_EXPR(__alignof__(struct A*));
+    CONSTANT_EXPR(__alignof__(a));
+    CONSTANT_EXPR(__alignof__(typeof(a)));
+    CONSTANT_EXPR(__alignof__(&a));
+    CONSTANT_EXPR(__alignof__(typeof(&a)));
+    CONSTANT_EXPR(__alignof__(a.l));
+    CONSTANT_EXPR(__alignof__(a.s));
+    CONSTANT_EXPR(__alignof__(a.i));
+    CONSTANT_EXPR(__alignof__(a.c));
+
+    CONSTANT_EXPR(__alignof__(struct B));
+    CONSTANT_EXPR(__alignof__(b));
+    CONSTANT_EXPR(__alignof__(b.j));
+    CONSTANT_EXPR(__alignof__(b.a));
+    CONSTANT_EXPR(__alignof__(b.a[1]));
+    CONSTANT_EXPR(__alignof__(b.a[2].s));
+    CONSTANT_EXPR(__alignof__(b.pa));
+    CONSTANT_EXPR(__alignof__(b.pb->j));
+    CONSTANT_EXPR(__alignof__(b.pb->a));
+    CONSTANT_EXPR(__alignof__(b.pb->a[1]));
+    CONSTANT_EXPR(__alignof__(b.pb->a[2].s));
+    CONSTANT_EXPR(__alignof__("foo"));
+
+    // __builtin_choose_expr only available for C
+//    CONSTANT_EXPR(__builtin_choose_expr(0, 2, 3));
+//    CONSTANT_EXPR(__builtin_choose_expr(1, 2, 3))
+
+    // __builtin_constant_p
+    CONSTANT_EXPR(__builtin_constant_p(0));
+    CONSTANT_EXPR(__builtin_constant_p(1));
+    CONSTANT_EXPR(__builtin_constant_p(-1));
+    CONSTANT_EXPR(__builtin_constant_p('\1'));
+    CONSTANT_EXPR(__builtin_constant_p(1u));
+    CONSTANT_EXPR(__builtin_constant_p(1l));
+    CONSTANT_EXPR(__builtin_constant_p(1ul));
+    CONSTANT_EXPR(__builtin_constant_p(1ll));
+    CONSTANT_EXPR(__builtin_constant_p(1ull));
+    CONSTANT_EXPR(__builtin_constant_p(1.0));
+    CONSTANT_EXPR(__builtin_constant_p(1.0f));
+    CONSTANT_EXPR(__builtin_constant_p(1.0d));
+//    CONSTANT_EXPR(__builtin_constant_p("foo"));
+    CONSTANT_EXPR(__builtin_constant_p(a));
+    CONSTANT_EXPR(__builtin_constant_p(b));
+
+    //__builtin_expect
+    CONSTANT_EXPR_FAIL(__builtin_expect(0, 0), efSize);
+    CONSTANT_EXPR_FAIL(__builtin_expect(1, 0), efSize);
+    CONSTANT_EXPR_FAIL(__builtin_expect(-1, 0), efSize);
+
+    // offsetof
+    CONSTANT_EXPR(__builtin_offsetof(struct A, l));
+    CONSTANT_EXPR(__builtin_offsetof(struct A, s));
+    CONSTANT_EXPR(__builtin_offsetof(struct A, i));
+    CONSTANT_EXPR(__builtin_offsetof(struct A, c));
+    CONSTANT_EXPR(__builtin_offsetof(struct B, j));
+    CONSTANT_EXPR(__builtin_offsetof(struct B, a));
+    CONSTANT_EXPR(__builtin_offsetof(struct B, a[1]));
+    CONSTANT_EXPR(__builtin_offsetof(struct B, a[2].s));
+    CONSTANT_EXPR(__builtin_offsetof(struct B, pa));
+    CONSTANT_EXPR(__builtin_offsetof(struct B, pb));
+//    CONSTANT_EXPR(__builtin_offsetof(typeof(a), c));
+//    CONSTANT_EXPR(__builtin_offsetof(typeof(b), a[2].s));
+
+//    __builtin_object_size
+    CONSTANT_EXPR(__builtin_object_size(b.pa, 0));
+    CONSTANT_EXPR(__builtin_object_size(b.pa, 1));
+    CONSTANT_EXPR(__builtin_object_size(b.pa, 2));
+    CONSTANT_EXPR(__builtin_object_size(b.pa, 3));
+
+    // __builtin_types_compatible_p only available for C
+
+    // sizeof
+    CONSTANT_EXPR(sizeof(char));
+    CONSTANT_EXPR(sizeof(short));
+    CONSTANT_EXPR(sizeof(int));
+    CONSTANT_EXPR(sizeof(long));
+
+    CONSTANT_EXPR(sizeof(unsigned char));
+    CONSTANT_EXPR(sizeof(unsigned short));
+    CONSTANT_EXPR(sizeof(unsigned int));
+    CONSTANT_EXPR(sizeof(unsigned long));
+
+    CONSTANT_EXPR(sizeof(float));
+    CONSTANT_EXPR(sizeof(double));
+
+    CONSTANT_EXPR(sizeof(struct A));
+    CONSTANT_EXPR(sizeof(struct A*));
+    CONSTANT_EXPR(sizeof(a));
+    CONSTANT_EXPR(sizeof(typeof(a)));
+    CONSTANT_EXPR(sizeof(&a));
+    CONSTANT_EXPR(sizeof(typeof(&a)));
+    CONSTANT_EXPR(sizeof(a.l));
+    CONSTANT_EXPR(sizeof(a.s));
+    CONSTANT_EXPR(sizeof(a.i));
+    CONSTANT_EXPR(sizeof(a.c));
+
+    CONSTANT_EXPR(sizeof(struct B));
+    CONSTANT_EXPR(sizeof(b));
+    CONSTANT_EXPR(sizeof(b.j));
+    CONSTANT_EXPR(sizeof(b.a));
+    CONSTANT_EXPR(sizeof(b.a[0]));
+    CONSTANT_EXPR(sizeof(b.a[0].s));
+    CONSTANT_EXPR(sizeof(b.pa));
+    CONSTANT_EXPR(sizeof(b.pb->j));
+    CONSTANT_EXPR(sizeof(b.pb->a));
+    CONSTANT_EXPR(sizeof(b.pb->a[0]));
+    CONSTANT_EXPR(sizeof(b.pb->a[0].s));
+    CONSTANT_EXPR_FAIL(sizeof(typeof(main)), efResult);
+
+    CONSTANT_EXPR(sizeof("foo"));
+    CONSTANT_EXPR(sizeof("foo" "bar"));
+    CONSTANT_EXPR(sizeof(typeof("foo" "bar")));
+    CONSTANT_EXPR(sizeof("\n"));
+    CONSTANT_EXPR(sizeof("\t"));
+    CONSTANT_EXPR(sizeof("\\\"\\\""));
+    CONSTANT_EXPR(sizeof("\0"));
+    CONSTANT_EXPR(sizeof("\377"));
+    CONSTANT_EXPR(sizeof("\377777"));
+    CONSTANT_EXPR(sizeof("\777777"));
+    CONSTANT_EXPR(sizeof("\x0"));
+    CONSTANT_EXPR(sizeof("\xff"));
+    CONSTANT_EXPR(sizeof("\x0foo"));
+    CONSTANT_EXPR(sizeof("\xffffffffffffffff"));
+    CONSTANT_EXPR(sizeof("foo\x0"));
+    CONSTANT_EXPR(sizeof("foo\xff"));}
 
 
 template <class T>
