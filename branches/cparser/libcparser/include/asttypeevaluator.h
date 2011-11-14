@@ -90,6 +90,11 @@ public:
     RealType realTypeOfConstInt(const ASTNode* node, quint64* value = 0) const;
 
 protected:
+    enum EvalPhase {
+        epPointsTo,
+        epUsedAs
+    };
+
     enum EvalResult {
     	erNoPrimaryExpression,
     	erNoIdentifier,
@@ -105,7 +110,8 @@ protected:
 
 //    virtual void beforeChildren(const ASTNode *node, int flags);
     virtual void afterChildren(const ASTNode *node, int flags);
-    EvalResult evaluatePrimaryExpression(const ASTNode *node);
+    void evaluatePrimaryExpressionPointsTo(const ASTNode *node);
+    EvalResult evaluatePrimaryExpressionUsedAs(const ASTNode *node);
 
     /**
      * This function is called during the execution of evaluateTypes() each
@@ -204,6 +210,7 @@ private:
     ASTTypeList _allTypes;
     ASTNodeStack _nodeStack;
     int _sizeofLong;
+    EvalPhase _phase;
 };
 
 
