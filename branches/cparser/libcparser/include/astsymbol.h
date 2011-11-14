@@ -34,7 +34,7 @@ class ASTSymbol
 	QString _name;
 	ASTSymbolType _type;
 	struct ASTNode* _astNode;
-	QList<ASTNode*> _assignedAstNodes;
+	QList<const ASTNode*> _assignedAstNodes;
 
 public:
 	/**
@@ -78,19 +78,19 @@ public:
 	 * @return link to the node that defines this symbol, might be null for
 	 * built-in types
 	 */
-	struct ASTNode* astNode() const;
+	const ASTNode* astNode() const;
 
 	/**
 	 * @return list of nodes that have been assigned to this symbol
 	 */
-	const QList<ASTNode*>& assignedAstNodes() const;
+	const QList<const ASTNode*>& assignedAstNodes() const;
 
 	/**
 	 * Append a new ASTNode that has been assigned to this symbol.
 	 * @param node the node to append
 	 * @return a reference to this object
 	 */
-	void appendAssignedNode(ASTNode* node);
+	void appendAssignedNode(const ASTNode* node);
 
 	/**
 	 * @return the name of the symbol
@@ -143,19 +143,19 @@ inline ASTSymbolType ASTSymbol::type() const
 }
 
 
-inline struct ASTNode* ASTSymbol::astNode() const
+inline const ASTNode* ASTSymbol::astNode() const
 {
     return _astNode;
 }
 
 
-inline const QList<ASTNode *>& ASTSymbol::assignedAstNodes() const
+inline const QList<const ASTNode *>& ASTSymbol::assignedAstNodes() const
 {
     return _assignedAstNodes;
 }
 
 
-inline void ASTSymbol::appendAssignedNode(ASTNode *node)
+inline void ASTSymbol::appendAssignedNode(const ASTNode *node)
 {
     _assignedAstNodes.append(node);
 }
