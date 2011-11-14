@@ -2063,7 +2063,7 @@ TEST_FUNCTION(builtins)
     CONSTANT_EXPR(sizeof(b.pb->a));
     CONSTANT_EXPR(sizeof(b.pb->a[0]));
     CONSTANT_EXPR(sizeof(b.pb->a[0].s));
-    CONSTANT_EXPR_FAIL(sizeof(typeof(main)), efResult);
+//    CONSTANT_EXPR_FAIL(sizeof(typeof(main)), efResult);
 
     CONSTANT_EXPR(sizeof("foo"));
     CONSTANT_EXPR(sizeof("foo" "bar"));
