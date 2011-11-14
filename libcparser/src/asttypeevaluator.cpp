@@ -70,7 +70,7 @@ bool ASTType::equalTo(const ASTType* other, bool exactMatch) const
 
 
 ASTTypeEvaluator::ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong)
-    : ASTWalker(ast), _sizeofLong(sizeofLong)
+    : ASTWalker(ast), _sizeofLong(sizeofLong), _phase(epPointsTo)
 {
 }
 
@@ -87,6 +87,13 @@ ASTTypeEvaluator::~ASTTypeEvaluator()
 bool ASTTypeEvaluator::evaluateTypes()
 {
 	_nodeStack.clear();
+	// Phase one: points-to analysis
+	_phase = epPointsTo;
+	walkTree();
+	if (_stopWalking)
+		return false;
+	// Phase two: used-as analsis
+	_phase = epUsedAs;
 	walkTree();
 	return !_stopWalking;
 }
@@ -2400,22 +2407,141 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
     if (!node || node->type != nt_primary_expression)
     	return;
 
-	evaluatePrimaryExpression(node);
+    // The primary expressions must have an identifier.  If the identifier has a
+    // leading dot, it is used as initializer identifier.
+    if (!node->u.primary_expression.identifier ||
+        node->u.primary_expression.hasDot)
+        return;
+
+    if (_phase == epPointsTo)
+        evaluatePrimaryExpressionPointsTo(node);
+    else
+        evaluatePrimaryExpressionUsedAs(node);
 }
 
 
-ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
+void ASTTypeEvaluator::evaluatePrimaryExpressionPointsTo(const ASTNode *node)
+{
+    // We are only interested in primary expressions
+    if (!node || node->type != nt_primary_expression)
+        return;
+
+    // Is this somewhere in the right-hand of an assignment expression or
+    // of an init declarator?
+    const ASTNode *rNode = node, *root = node->parent,
+            *postExNode = node->parent;
+
+    while (root) {
+        // Find out the situation in which the identifier is used
+        switch (root->type) {
+        case nt_assignment_expression:
+            // Is this in the left-hand of an assignment expression?
+            if (rNode == root->u.assignment_expression.lvalue &&
+                root->u.assignment_expression.assignment_expression)
+            {
+                // Ignore lvalues that have postfix expression suffixes. They
+                // are captured during the used-as analysis.
+                if (postExNode->u.postfix_expression.postfix_expression_suffix_list)
+                    return;
+
+                QString op = antlrTokenToStr(
+                            root->u.assignment_expression.assignment_operator);
+                // Ignore assignment operators other than "="
+                if (op != "=")
+                    return;
+
+                const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
+                // Record assignments for variables and parameters
+                if (sym->type() & (stVariableDef|stFunctionParam))
+                    node->scope->varAssignment(
+                                sym->name(),
+                                root->u.assignment_expression.assignment_expression);
+                return;
+            }
+            // Is this in the right-hand of an assignment expression?
+            else if (root->u.assignment_expression.lvalue &&
+               rNode == root->u.assignment_expression.assignment_expression)
+            {
+                return;
+            }
+            break;
+
+        case nt_builtin_function_choose_expr:
+        case nt_declarator:
+        case nt_direct_declarator:
+            break;
+
+        case nt_init_declarator:
+            // Is this in the left-hand of an init declarator?
+            if (rNode == root->u.init_declarator.declarator &&
+                root->u.init_declarator.initializer)
+            {
+                const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
+                assert(sym != 0);
+                // Record assignments for local variables and parameters
+                if (sym->isLocal() &&
+                    (sym->type() & (stVariableDef|stFunctionParam)))
+                {
+                    node->scope->varAssignment(
+                                sym->name(),
+                                root->u.init_declarator.initializer);
+                    return;
+                }
+            }
+            break;
+
+        case nt_initializer:
+            // Is this an array or struct initializer "struct foo f = {...}" ?
+            if (root->parent && root->parent->type == nt_initializer)
+                return;
+            break;
+
+        case nt_jump_statement_return:
+            // An identifier underneath a return should be the initializer
+            assert(root->u.jump_statement.initializer != 0);
+            // Treat any return statement as an assignment to the function
+            // definition symbol
+            root->scope->varAssignment(embeddingFuncSymbol(root)->name(),
+                                       root->u.jump_statement.initializer);
+            return;
+
+        case nt_lvalue:
+        case nt_postfix_expression:
+        case nt_unary_expression:
+        case nt_unary_expression_builtin:
+            break;
+
+        //----------------------------------------------------------------------
+        // Types for which we know we're done
+        case nt_builtin_function_offsetof:
+        case nt_cast_expression:
+        case nt_declaration:
+        case nt_expression_statement:
+            return;
+
+        default:
+            typeEvaluatorError(QString("Unhandled node type \"%1\" in %2 at "
+                                       "%3:%4:%5")
+                               .arg(ast_node_type_to_str(root))
+                               .arg(__PRETTY_FUNCTION__)
+                               .arg(_ast->fileName())
+                               .arg(root->start->line)
+                               .arg(root->start->charPosition));
+        }
+
+        // Otherwise go up
+        rNode = root;
+        root = root->parent;
+    }
+}
+
+
+ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpressionUsedAs(
         const ASTNode* node)
 {
     // We are only interested in primary expressions
     if (!node || node->type != nt_primary_expression)
     	return erNoPrimaryExpression;
-    // The primary expressions must have an identifier
-    if (!node->u.primary_expression.identifier)
-        return erNoIdentifier;
-    // If the identifier has a leading dot, is it used as initializer identifier
-    if (node->u.primary_expression.hasDot)
-        return erLeftHandSide;
 
 //    debugmsg("Inspecting identifier \""
 //             << antlrTokenToStr(node->u.primary_expression.identifier)
@@ -2429,7 +2555,6 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
     ASTType* lType = 0;
     // No. of de-/references
     int derefs = 0;
-    const ASTSymbol* sym = 0;
 
     while (root) {
         // Find out the situation in which the identifier is used
@@ -2442,22 +2567,8 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
             break;
 
         case nt_assignment_expression:
-            // Is this in the left-hand of an assignment expression?
-            if (rNode == root->u.assignment_expression.lvalue &&
-                root->u.assignment_expression.assignment_expression)
-            {
-                if (!sym)
-                    sym = findSymbolOfPrimaryExpression(node);
-                // Record assignments for local variables and parameters
-                if (sym->isLocal() &&
-                    (sym->type() & (stVariableDef|stFunctionParam)))
-                {
-                    node->scope->varAssignment(sym->name(),
-                                               root->u.assignment_expression.assignment_expression);
-                }
-            }
             // Is this in the right-hand of an assignment expression?
-            else if ((lNode = root->u.assignment_expression.lvalue) &&
+            if ((lNode = root->u.assignment_expression.lvalue) &&
                rNode == root->u.assignment_expression.assignment_expression)
             {
                 lType = typeofNode(lNode);
@@ -2529,22 +2640,8 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
             break;
 
         case nt_init_declarator:
-            // Is this in the left-hand of an init declarator?
-            if (rNode == root->u.init_declarator.declarator &&
-                root->u.init_declarator.initializer)
-            {
-                const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
-                assert(sym != 0);
-                // Record assignments for local variables and parameters
-                if (sym->isLocal() &&
-                    (sym->type() & (stVariableDef|stFunctionParam)))
-                {
-                    node->scope->varAssignment(sym->name(),
-                                               root->u.init_declarator.initializer);
-                }
-            }
             // Is this in the right-hand of an init declarator?
-            else if ((lNode = root->u.init_declarator.declarator) &&
+            if ((lNode = root->u.init_declarator.declarator) &&
                rNode == root->u.init_declarator.initializer)
             {
                 lType = typeofNode(lNode);
@@ -2574,11 +2671,6 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
             assert(root->u.jump_statement.initializer != 0);
             lType = embeddingFuncReturnType(root);
             lNode = lType ? lType->node() : 0;
-
-            // Treat any return statement as an assignment to the function
-            // definition symbol
-            root->scope->varAssignment(embeddingFuncSymbol(root)->name(),
-                                       root->u.jump_statement.initializer);
 
             goto while_exit;
 
@@ -2917,8 +3009,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpression(
                 .arg((quint64)ctxType, 0, 16)
                 .arg((quint64)ctxNode, 0, 16));
 
-    if (!sym)
-        sym = findSymbolOfPrimaryExpression(node);
+    const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
 
     primaryExpressionTypeChange(primExNode, srcType, sym, ctxType, ctxNode,
                                 ctxMembers, lNode, lType, root);
@@ -3203,7 +3294,6 @@ void ASTTypeEvaluator::genDotGraphForNode(const ASTNode *node) const
         }
     }
 }
-
 
 
 int ASTTypeEvaluator::evaluateIntExpression(const ASTNode* /*node*/, bool* ok)
