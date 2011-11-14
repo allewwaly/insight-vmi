@@ -138,7 +138,7 @@ protected:
             const ASTSymbol* srcSymbol, const ASTNode* targetNode,
             const ASTType* targetType, const ASTNode* rootNode);
 
-    virtual int evaluateExpression(const ASTNode* node, bool* ok = 0);
+    virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
 
     int stringLength(const ASTTokenList* list);
 

@@ -53,6 +53,7 @@ bool ASTType::equalTo(const ASTType* other, bool exactMatch) const
         // Consider rtPointer and rtArray to be equal
         if (a->type() != b->type() && ((a->type()|b->type()) != ptrMask)) {
             // For non-exact machtes, consider all integer types to be equal
+            // unless we're having a pointer to an integer type
             if (exactMatch || isPointer ||
                     (!((a->type() & intTypes) && (b->type() & intTypes))))
                 return false;
@@ -2303,7 +2304,7 @@ ASTType* ASTTypeEvaluator::preprendArrays(const ASTNode *dd_dad, ASTType* type)
             type = createASTType(rtArray, ds_ads, type);
             // Evaluate expression in brackets, if possible
             bool ok = false;
-            int size = evaluateExpression(
+            int size = evaluateIntExpression(
                         ds_ads->u.declarator_suffix.constant_expression, &ok);
             if (ok)
                 type->setArraySize(size);
@@ -3205,7 +3206,7 @@ void ASTTypeEvaluator::genDotGraphForNode(const ASTNode *node) const
 
 
 
-int ASTTypeEvaluator::evaluateExpression(const ASTNode* /*node*/, bool* ok)
+int ASTTypeEvaluator::evaluateIntExpression(const ASTNode* /*node*/, bool* ok)
 {
     // The default implementation does nothing.
     if (ok)

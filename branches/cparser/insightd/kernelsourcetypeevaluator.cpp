@@ -108,7 +108,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
 }
 
 
-int KernelSourceTypeEvaluator::evaluateExpression(const ASTNode* node, bool* ok)
+int KernelSourceTypeEvaluator::evaluateIntExpression(const ASTNode* node, bool* ok)
 {
     if (ok)
         *ok = false;
@@ -118,8 +118,9 @@ int KernelSourceTypeEvaluator::evaluateExpression(const ASTNode* node, bool* ok)
         ExpressionResult value = expr->result();
 
         if (value.resultType == erConstant) {
+            // Consider it to be an error if the expression evaluates to float
             if (ok)
-                *ok = true;
+                *ok = (value.size & esInteger);
             return value.value();
         }
     }
