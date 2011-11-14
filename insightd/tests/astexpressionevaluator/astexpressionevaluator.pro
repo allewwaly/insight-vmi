@@ -126,3 +126,5 @@ LIBS += -L../../../libcparser -lcparser \
 	-L../../../libantlr3c -lantlr3c \
 	-L../../../libinsight -linsight \
 	-lreadline
+QMAKE_CXXFLAGS_DEBUG += -w
+QMAKE_CXXFLAGS_RELEASE += -w
