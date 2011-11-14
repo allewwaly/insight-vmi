@@ -120,7 +120,8 @@ CONFIG += qtestlib debug
 INCLUDEPATH += ../../src \
 	../../../libcparser/include \
 	../../../libcparser/antlr_generated \
-	../../../libantlr3c/include
+        ../../../libantlr3c/include \
+        ../../../libinsight/include
 LIBS += -L../../../libcparser -lcparser \
 	-L../../../libantlr3c -lantlr3c \
 	-L../../../libinsight -linsight \
