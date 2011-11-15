@@ -1498,6 +1498,35 @@ ASTType* ASTTypeEvaluator::typeofBuiltinType(const pASTTokenList list,
 }
 
 
+const ASTSymbol* ASTTypeEvaluator::findSymbolOfDirectDeclarator(
+        const ASTNode *node)
+{
+    if (!node)
+        return 0;
+    checkNodeType(node, nt_direct_declarator);
+    if (!node->u.direct_declarator.identifier)
+        typeEvaluatorError(
+                    QString("Direct declarator has no identifier at %1:%2:%3")
+                    .arg(_ast->fileName())
+                    .arg(node->start->line)
+                    .arg(node->start->charPosition));
+
+    QString id = antlrTokenToStr(node->u.direct_declarator.identifier);
+    ASTSymbol* sym = node->scope->find(id);
+
+    if (!sym) {
+        _ast->printScopeRek(node->scope);
+        typeEvaluatorError(
+                    QString("Could not find symbol \"%1\" at %2:%3")
+                    .arg(id)
+                    .arg(_ast->fileName())
+                    .arg(node->start->line));
+    }
+
+    return sym;
+}
+
+
 const ASTSymbol* ASTTypeEvaluator::findSymbolOfPrimaryExpression(const ASTNode *node)
 {
     if (!node)
@@ -1505,9 +1534,10 @@ const ASTSymbol* ASTTypeEvaluator::findSymbolOfPrimaryExpression(const ASTNode *
     checkNodeType(node, nt_primary_expression);
     if (!node->u.primary_expression.identifier)
         typeEvaluatorError(
-                QString("Primary expression has no identifier at %1:%2")
-                .arg(_ast->fileName())
-                .arg(node->start->line));
+                QString("Primary expression has no identifier at %1:%2:%3")
+                    .arg(_ast->fileName())
+                    .arg(node->start->line)
+                    .arg(node->start->charPosition));
 
     QString id = antlrTokenToStr(node->u.primary_expression.identifier);
     ASTSymbol* sym = 0;
@@ -2404,32 +2434,49 @@ typedef QList<ASTType*> TypeChain;
 
 void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
 {
-    if (!node || node->type != nt_primary_expression)
+    if (!node)
     	return;
 
-    // The primary expressions must have an identifier.  If the identifier has a
-    // leading dot, it is used as initializer identifier.
-    if (!node->u.primary_expression.identifier ||
-        node->u.primary_expression.hasDot)
-        return;
+    switch (node->type) {
+    case nt_direct_declarator:
+        // The direct declarator must have an identifier
+        if (_phase == epPointsTo && node->u.direct_declarator.identifier)
+            evaluateIdentifierPointsTo(node);
+        break;
 
-    if (_phase == epPointsTo)
-        evaluatePrimaryExpressionPointsTo(node);
-    else
-        evaluatePrimaryExpressionUsedAs(node);
+    case nt_jump_statement_return:
+        // We are only interested in jump statements that return a value
+        if (_phase == epPointsTo && node->u.jump_statement.initializer)
+            evaluateIdentifierPointsTo(node);
+        break;
+
+    case nt_primary_expression:
+        // The primary expressions must have an identifier.  If the identifier
+        // has a leading dot, it is used as initializer identifier.
+        if (!node->u.primary_expression.identifier ||
+            node->u.primary_expression.hasDot)
+            return;
+
+        if (_phase == epPointsTo)
+            evaluateIdentifierPointsTo(node);
+        else
+            evaluateIdentifierUsedAs(node);
+        break;
+
+    default:
+        break;
+    }
 }
 
 
-void ASTTypeEvaluator::evaluatePrimaryExpressionPointsTo(const ASTNode *node)
+void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
 {
-    // We are only interested in primary expressions
-    if (!node || node->type != nt_primary_expression)
+    if (!node)
         return;
 
     // Is this somewhere in the right-hand of an assignment expression or
     // of an init declarator?
-    const ASTNode *rNode = node, *root = node->parent,
-            *postExNode = node->parent;
+    const ASTNode *rNode = 0, *root = node, *postExNode = 0;
 
     while (root) {
         // Find out the situation in which the identifier is used
@@ -2439,11 +2486,6 @@ void ASTTypeEvaluator::evaluatePrimaryExpressionPointsTo(const ASTNode *node)
             if (rNode == root->u.assignment_expression.lvalue &&
                 root->u.assignment_expression.assignment_expression)
             {
-                // Ignore lvalues that have postfix expression suffixes. They
-                // are captured during the used-as analysis.
-                if (postExNode->u.postfix_expression.postfix_expression_suffix_list)
-                    return;
-
                 QString op = antlrTokenToStr(
                             root->u.assignment_expression.assignment_operator);
                 // Ignore assignment operators other than "="
@@ -2452,7 +2494,7 @@ void ASTTypeEvaluator::evaluatePrimaryExpressionPointsTo(const ASTNode *node)
 
                 const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
                 // Record assignments for variables and parameters
-                if (sym->type() & (stVariableDef|stFunctionParam))
+                if (sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
                     node->scope->varAssignment(
                                 sym->name(),
                                 root->u.assignment_expression.assignment_expression);
@@ -2466,21 +2508,15 @@ void ASTTypeEvaluator::evaluatePrimaryExpressionPointsTo(const ASTNode *node)
             }
             break;
 
-        case nt_builtin_function_choose_expr:
-        case nt_declarator:
-        case nt_direct_declarator:
-            break;
-
         case nt_init_declarator:
             // Is this in the left-hand of an init declarator?
             if (rNode == root->u.init_declarator.declarator &&
                 root->u.init_declarator.initializer)
             {
-                const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
+                const ASTSymbol* sym = findSymbolOfDirectDeclarator(node);
                 assert(sym != 0);
-                // Record assignments for local variables and parameters
-                if (sym->isLocal() &&
-                    (sym->type() & (stVariableDef|stFunctionParam)))
+                // Record assignments for variables and parameters
+                if (sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
                 {
                     node->scope->varAssignment(
                                 sym->name(),
@@ -2505,8 +2541,23 @@ void ASTTypeEvaluator::evaluatePrimaryExpressionPointsTo(const ASTNode *node)
                                        root->u.jump_statement.initializer);
             return;
 
-        case nt_lvalue:
         case nt_postfix_expression:
+            if (root->u.postfix_expression.primary_expression == node) {
+                // Ignore expression that have postfix expression suffixes. They
+                // are captured during the used-as analysis.
+                if (root->u.postfix_expression.postfix_expression_suffix_list)
+                    return;
+
+                postExNode = root;
+            }
+            break;
+
+        // Types we have to skip to come to a decision
+        case nt_builtin_function_choose_expr:
+        case nt_declarator:
+        case nt_direct_declarator:
+        case nt_lvalue:
+        case nt_primary_expression:
         case nt_unary_expression:
         case nt_unary_expression_builtin:
             break;
@@ -2517,6 +2568,9 @@ void ASTTypeEvaluator::evaluatePrimaryExpressionPointsTo(const ASTNode *node)
         case nt_cast_expression:
         case nt_declaration:
         case nt_expression_statement:
+        case nt_function_definition:
+        case nt_parameter_declaration:
+        case nt_struct_declarator:
             return;
 
         default:
@@ -2536,7 +2590,7 @@ void ASTTypeEvaluator::evaluatePrimaryExpressionPointsTo(const ASTNode *node)
 }
 
 
-ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluatePrimaryExpressionUsedAs(
+ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
         const ASTNode* node)
 {
     // We are only interested in primary expressions

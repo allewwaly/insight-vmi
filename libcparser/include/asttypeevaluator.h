@@ -84,6 +84,7 @@ public:
     ASTType* typeofNode(const ASTNode* node);
     int sizeofLong() const;
 
+    const ASTSymbol *findSymbolOfDirectDeclarator(const ASTNode *node);
     const ASTSymbol *findSymbolOfPrimaryExpression(const ASTNode* node);
 
     RealType realTypeOfConstFloat(const ASTNode* node, double* value = 0) const;
@@ -110,8 +111,8 @@ protected:
 
 //    virtual void beforeChildren(const ASTNode *node, int flags);
     virtual void afterChildren(const ASTNode *node, int flags);
-    void evaluatePrimaryExpressionPointsTo(const ASTNode *node);
-    EvalResult evaluatePrimaryExpressionUsedAs(const ASTNode *node);
+    void evaluateIdentifierPointsTo(const ASTNode *node);
+    EvalResult evaluateIdentifierUsedAs(const ASTNode *node);
 
     /**
      * This function is called during the execution of evaluateTypes() each
