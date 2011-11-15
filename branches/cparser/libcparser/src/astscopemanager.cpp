@@ -59,7 +59,7 @@ void ASTScope::varAssignment(const QString &name, const ASTNode *assignedNode)
     for (ASTScope* p = this; p; p = p->_parent) {
         if (p->_symbols.contains(name) &&
             (p->_symbols[name]->type() &
-             (stVariableDef|stFunctionParam|stFunctionDef)))
+             (stVariableDecl|stVariableDef|stFunctionParam|stFunctionDef)))
         {
             p->_symbols[name]->appendAssignedNode(assignedNode);
             return;
