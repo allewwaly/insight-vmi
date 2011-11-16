@@ -13,9 +13,12 @@
 #include <QString>
 #include <QTextStream>
 
+class ASTTypeEvaluator;
+
 class ASTDotGraph: protected ASTWalker
 {
 public:
+    ASTDotGraph(ASTTypeEvaluator *eval);
     ASTDotGraph(AbstractSyntaxTree* ast = 0);
     virtual ~ASTDotGraph();
 
@@ -39,8 +42,10 @@ private:
                              const char* extraStyle = 0);
     void printDotGraphTokenList(pASTTokenList list, const QString& delim,
             const QString& nodeId, const char* extraStyle = 0);
+    void printDotGraphConnection(pANTLR3_COMMON_TOKEN src, const ASTNode *dest);
 
     QTextStream _out;
+    ASTTypeEvaluator* _eval;
 };
 
 #endif /* ASTDOTGRAPH_H_ */
