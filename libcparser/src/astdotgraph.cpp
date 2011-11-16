@@ -8,6 +8,8 @@
 #include <astdotgraph.h>
 #include <abstractsyntaxtree.h>
 #include <astsymbol.h>
+#include <asttypeevaluator.h>
+
 #include <QTextDocument>
 #include <QTextStream>
 #include <QFile>
@@ -30,8 +32,14 @@
 #define TOK_TYPE_SPECIFIER     "fillcolor=\"#AAAACC\""
 
 
+ASTDotGraph::ASTDotGraph(ASTTypeEvaluator *eval)
+    : ASTWalker(eval ? eval->ast() : 0), _eval(eval)
+{
+}
+
+
 ASTDotGraph::ASTDotGraph(AbstractSyntaxTree* ast)
-    : ASTWalker(ast)
+    : ASTWalker(ast), _eval(0)
 {
 }
 
@@ -150,6 +158,19 @@ void ASTDotGraph::printDotGraphTokenList(pASTTokenList list,
 }
 
 
+void ASTDotGraph::printDotGraphConnection(pANTLR3_COMMON_TOKEN src,
+                                     const ASTNode* dest)
+{
+    QString srcId = getTokenId(src);
+    QString destId = getNodeId(dest);
+    _out << QString("\t\ttoken_%1 -> node_%2 [constraint=false style=dotted "
+                    "layer=\"assign\"];")
+            .arg(srcId)
+            .arg(destId)
+         << endl;
+}
+
+
 void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
 {
     Q_UNUSED(flags);
@@ -163,8 +184,7 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
     	break;
     }
 
-    // Handle arguments
-    const QString nodeId = QString::number((quint64)node, 16);
+    QString nodeId = getNodeId(node);
 
     // Do we have a terminal token?
     switch (node->type) {
@@ -455,6 +475,16 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
         if (node->u.primary_expression.hasDot)
             printDotGraphString(".", nodeId);
         printDotGraphToken(node->u.primary_expression.identifier, nodeId, TOK_PRIM_EX_IDENTIFIER);
+        if (_eval && node->u.primary_expression.identifier) {
+            const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);
+            if (sym && !sym->assignedAstNodes().isEmpty()) {
+                for (int i = 0; i < sym->assignedAstNodes().size(); ++i)
+                    printDotGraphConnection(
+                                node->u.primary_expression.identifier,
+                                sym->assignedAstNodes().at(i));
+            }
+        }
+
         break;
     case nt_relational_expression:
         if (node->parent->type == nt_equality_expression &&
@@ -580,7 +610,7 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
 void ASTDotGraph::afterChildren(const ASTNode* node, int flags)
 {
     Q_UNUSED(flags);
-    QString nodeId = QString::number((quint64)node, 16);
+    QString nodeId = getNodeId(node);
 
     // Do we have a terminal token?
     switch (node->type) {
@@ -807,7 +837,9 @@ int ASTDotGraph::writeDotGraph(const QString& fileName)
             << endl
             << "digraph G {" << endl;
     _out << "\tgraph [ordering=out];" << endl;
-    _out << "\tnode [fontname=Helvetica fontsize=" FONT_SIZE "];" << endl
+    _out << "\tlayers = \"ast:assign\";" << endl;
+    _out << "\tedge [layer=\"ast\"];" << endl;
+    _out << "\tnode [fontname=Helvetica fontsize=" FONT_SIZE " layer=\"ast\"];" << endl
         << endl;
 
     if (_ast) {
