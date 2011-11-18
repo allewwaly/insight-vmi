@@ -349,6 +349,15 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
         if (node->u.direct_declarator.declarator) {
             printDotGraphString("(", nodeId);
         }
+//        if (node->u.direct_declarator.identifier) {
+//            const ASTSymbol* sym = _eval->findSymbolOfDirectDeclarator(node);
+//            if (sym && !sym->assignedAstNodes().isEmpty()) {
+//                for (int i = 0; i < sym->assignedAstNodes().size(); ++i)
+//                    printDotGraphConnection(
+//                                node->u.direct_declarator.identifier,
+//                                sym->assignedAstNodes().at(i));
+//            }
+//        }
         break;
     case nt_enum_specifier:
         printDotGraphString("enum", nodeId, TOK_TYPE_SPECIFIER);

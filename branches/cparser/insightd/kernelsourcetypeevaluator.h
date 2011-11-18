@@ -45,11 +45,7 @@ public:
     virtual ~KernelSourceTypeEvaluator();
 
 protected:
-    virtual void primaryExpressionTypeChange(const ASTNode* srcNode,
-            const ASTType* srcType, const ASTSymbol* srcSymbol,
-            const ASTType* ctxType, const ASTNode* ctxNode,
-            const QStringList& ctxMembers, const ASTNode* targetNode,
-            const ASTType* targetType, const ASTNode* rootNode);
+    virtual void primaryExpressionTypeChange(const EvaluationDetails &ed);
 
     virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
 

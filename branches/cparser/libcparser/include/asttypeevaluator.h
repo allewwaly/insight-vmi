@@ -14,6 +14,7 @@
 #include <astsymbol.h>
 #include <QHash>
 #include <QStack>
+#include <QStringList>
 
 
 class ASTType
@@ -68,6 +69,42 @@ typedef QHash<const ASTNode*, ASTType*> ASTNodeTypeHash;
 typedef QList<ASTType*> ASTTypeList;
 typedef QStack<const ASTNode*> ASTNodeStack;
 
+struct EvaluationDetails
+{
+    EvaluationDetails()
+    {
+        clear();
+    }
+
+    void clear()
+    {
+        srcNode = 0;
+        ctxNode = 0;
+        targetNode = 0;
+        rootNode = 0;
+        postExNode = 0;
+        castExNode = 0;
+        srcType = 0;
+        ctxType = 0;
+        targetType = 0;
+        sym = 0;
+        ctxMembers.clear();
+
+    }
+
+    const ASTNode *srcNode;
+    const ASTNode* ctxNode;
+    const ASTNode* targetNode;
+    const ASTNode *rootNode;
+    const ASTNode *postExNode;
+    const ASTNode *castExNode;
+    ASTType* srcType;
+    ASTType* ctxType;
+    ASTType* targetType;
+    QStringList ctxMembers;
+    const ASTSymbol* sym;
+};
+
 
 /**
   This class evaluates the types of primary expressions within the syntax tree
@@ -113,6 +150,9 @@ protected:
     virtual void afterChildren(const ASTNode *node, int flags);
     void evaluateIdentifierPointsTo(const ASTNode *node);
     EvalResult evaluateIdentifierUsedAs(const ASTNode *node);
+    EvalResult evaluateTypeFlow(EvaluationDetails *ed);
+    EvalResult evaluateTypeChanges(EvaluationDetails *ed);
+    void evaluateTypeContext(EvaluationDetails *ed);
 
     /**
      * This function is called during the execution of evaluateTypes() each
@@ -132,18 +172,17 @@ protected:
      * @param rootNode the root note embedding source and target, e.g., an
      * nt_assignment_expression or an nt_init_declarator node.
      */
-    virtual void primaryExpressionTypeChange(const ASTNode* srcNode,
-            const ASTType* srcType, const ASTSymbol* srcSymbol,
-            const ASTType* ctxType, const ASTNode* ctxNode,
-            const QStringList& ctxMembers, const ASTNode* targetNode,
-            const ASTType* targetType, const ASTNode* rootNode);
+//    virtual void primaryExpressionTypeChange(const ASTNode* srcNode,
+//            const ASTType* srcType, const ASTSymbol* srcSymbol,
+//            const ASTType* ctxType, const ASTNode* ctxNode,
+//            const QStringList& ctxMembers, const ASTNode* targetNode,
+//            const ASTType* targetType, const ASTNode* rootNode);
+    virtual void primaryExpressionTypeChange(const EvaluationDetails &ed);
 
     /**
      * @return a string with details about the given type change.
      */
-    QString typeChangeInfo(const ASTNode* srcNode, const ASTType* srcType,
-            const ASTSymbol* srcSymbol, const ASTNode* targetNode,
-            const ASTType* targetType, const ASTNode* rootNode);
+    QString typeChangeInfo(const EvaluationDetails &ed);
 
     virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
 
