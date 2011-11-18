@@ -37,22 +37,13 @@ public:
 	QString targetType;
 
 protected:
-    virtual void primaryExpressionTypeChange(const ASTNode* srcNode,
-            const ASTType* srcType, const ASTSymbol* srcSymbol,
-            const ASTType* ctxType, const ASTNode* ctxNode,
-            const QStringList& ctxMembers, const ASTNode* targetNode,
-            const ASTType* targetType, const ASTNode* rootNode)
+    virtual void primaryExpressionTypeChange(const EvaluationDetails &ed)
     {
-        Q_UNUSED(srcNode);
-        Q_UNUSED(srcType);
-        Q_UNUSED(ctxNode);
-        Q_UNUSED(targetNode);
-        Q_UNUSED(rootNode);
     	this->typeChanged = true;
-        this->symbolName = srcSymbol->name();
-    	this->ctxType = ctxType->toString();
-    	this->ctxMembers = ctxMembers.join(".");
-    	this->targetType = targetType->toString();
+        this->symbolName = ed.sym->name();
+        this->ctxType = ed.ctxType->toString();
+        this->ctxMembers = ed.ctxMembers.join(".");
+        this->targetType = ed.targetType->toString();
     }
 
     int evaluateIntExpression(const ASTNode* /*node*/, bool* ok)
@@ -62,7 +53,6 @@ protected:
             *ok = true;
         return 0;
     }
-
 };
 
 #define safe_delete(x) do { if (x) delete x; (x) = 0; } while (0)

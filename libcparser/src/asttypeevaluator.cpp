@@ -2429,9 +2429,6 @@ QString ASTTypeEvaluator::postfixExpressionToStr(const ASTNode* postfix_exp,
 }
 
 
-typedef QList<ASTType*> TypeChain;
-
-
 void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
 {
     if (!node)
@@ -2590,40 +2587,31 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
 }
 
 
-ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
-        const ASTNode* node)
+ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
+        EvaluationDetails* ed)
 {
-    // We are only interested in primary expressions
-    if (!node || node->type != nt_primary_expression)
-    	return erNoPrimaryExpression;
+    const ASTNode *lNode = 0, *rNode = ed->srcNode;
+    ASTType *lType = 0;
 
-//    debugmsg("Inspecting identifier \""
-//             << antlrTokenToStr(node->u.primary_expression.identifier)
-//             << "\" at " << node->start->line << ":" << node->start->charPosition);
-
-    // Is this somewhere in the right-hand of an assignment expression or
-    // of an init declarator?
-    const ASTNode *lNode = 0, *rNode = node, *root = node->parent,
-            *primExNode = node, *postExNode = node->parent, *castExNode = 0;
-    // Type of left-hand
-    ASTType* lType = 0;
     // No. of de-/references
     int derefs = 0;
 
-    while (root) {
+    // Is this somewhere in the right-hand of an assignment expression or
+    // of an init declarator?
+    while (ed->rootNode) {
         // Find out the situation in which the identifier is used
-        switch (root->type) {
+        switch (ed->rootNode->type) {
         case nt_additive_expression:
             // Ignore numeric types in arithmetic expressions
-            if (root->u.binary_expression.right &&  !castExNode &&
-                (typeofNode(postExNode)->type() & NumericTypes))
+            if (ed->rootNode->u.binary_expression.right &&  !ed->castExNode &&
+                (typeofNode(ed->postExNode)->type() & NumericTypes))
                 return erIntegerArithmetics;
             break;
 
         case nt_assignment_expression:
             // Is this in the right-hand of an assignment expression?
-            if ((lNode = root->u.assignment_expression.lvalue) &&
-               rNode == root->u.assignment_expression.assignment_expression)
+            if ((lNode = ed->rootNode->u.assignment_expression.lvalue) &&
+               rNode == ed->rootNode->u.assignment_expression.assignment_expression)
             {
                 lType = typeofNode(lNode);
                 goto while_exit;
@@ -2654,17 +2642,17 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
         case nt_cast_expression:
             // Save the last actual casting cast expression for later reference,
             // but only if the cast actually changes the type
-            if (root->u.cast_expression.type_name &&
-                rNode == root->u.cast_expression.cast_expression &&
-                !typeofNode(rNode)->equalTo(typeofNode(root->u.cast_expression.type_name)))
-                castExNode = root;
+            if (ed->rootNode->u.cast_expression.type_name &&
+                rNode == ed->rootNode->u.cast_expression.cast_expression &&
+                !typeofNode(rNode)->equalTo(typeofNode(ed->rootNode->u.cast_expression.type_name)))
+                ed->castExNode = ed->rootNode;
             break;
 
         case nt_compound_braces_statement: {
             // If rNode was NOT the last expression within the list, then it's
             // of no interest
             struct ASTNodeList *l =
-                    root->u.compound_braces_statement.declaration_or_statement_list;
+                    ed->rootNode->u.compound_braces_statement.declaration_or_statement_list;
             for (; l; l = l->next)
                 if (l->item == rNode && l->next)
                     return erNoAssignmentUse;
@@ -2676,8 +2664,8 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 
         case nt_conditional_expression:
             // Is this the condition in a conditional expression (.. ? .. : ..) ?
-            if (root->u.conditional_expression.logical_or_expression == rNode &&
-                root->u.conditional_expression.conditional_expression)
+            if (ed->rootNode->u.conditional_expression.logical_or_expression == rNode &&
+                ed->rootNode->u.conditional_expression.conditional_expression)
                 return erNoAssignmentUse;
             break;
 
@@ -2689,14 +2677,14 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
         case nt_expression_statement:
             // Expressions might be the return value fu compound braces
             // statements if the appear last
-            if (root->parent->type != nt_compound_braces_statement)
+            if (ed->rootNode->parent->type != nt_compound_braces_statement)
                 return erNoAssignmentUse;
             break;
 
         case nt_init_declarator:
             // Is this in the right-hand of an init declarator?
-            if ((lNode = root->u.init_declarator.declarator) &&
-               rNode == root->u.init_declarator.initializer)
+            if ((lNode = ed->rootNode->u.init_declarator.declarator) &&
+               rNode == ed->rootNode->u.init_declarator.initializer)
             {
                 lType = typeofNode(lNode);
                 goto while_exit;
@@ -2705,8 +2693,8 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 
         case nt_initializer:
             // Is this an array or struct initializer "struct foo f = {...}" ?
-            if (root->parent && root->parent->type == nt_initializer) {
-                lType = expectedTypeAtInitializerPosition(root);
+            if (ed->rootNode->parent && ed->rootNode->parent->type == nt_initializer) {
+                lType = expectedTypeAtInitializerPosition(ed->rootNode);
                 lNode = lType ? lType->node() : 0;
                 goto while_exit;
             }
@@ -2722,23 +2710,23 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 
         case nt_jump_statement_return:
             // An identifier underneath a return should be the initializer
-            assert(root->u.jump_statement.initializer != 0);
-            lType = embeddingFuncReturnType(root);
+            assert(ed->rootNode->u.jump_statement.initializer != 0);
+            lType = embeddingFuncReturnType(ed->rootNode);
             lNode = lType ? lType->node() : 0;
 
             goto while_exit;
 
         case nt_postfix_expression:
-            if (root->u.postfix_expression.postfix_expression_suffix_list) {
+            if (ed->rootNode->u.postfix_expression.postfix_expression_suffix_list) {
                 // Postfix expression suffixes represent a type usage, so if the
                 // type has already been casted, this is the first effective
                 // type change
-                if (castExNode)
+                if (ed->castExNode)
                     goto cast_expression_type_change;
                 else {
                     // Make a postfix expression with suffixes the new primary expr.
-                    postExNode = root;
-                    primExNode = root->u.postfix_expression.primary_expression;
+                    ed->postExNode = ed->rootNode;
+                    ed->srcNode = ed->rootNode->u.postfix_expression.primary_expression;
                 }
             }
             break;
@@ -2758,7 +2746,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 
         // Unary logical expression
         case nt_unary_expression_op: {
-            QString op = antlrTokenToStr(root->u.unary_expression.unary_operator);
+            QString op = antlrTokenToStr(ed->rootNode->u.unary_expression.unary_operator);
             // The negation operator results in a boolean expression
             if ("!" == op)
                 return erNoAssignmentUse;
@@ -2768,7 +2756,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
             // casted, this is the first effective type change
             else if ("*" == op) {
                 ++derefs;
-                if (castExNode)
+                if (ed->castExNode)
                     goto cast_expression_type_change;
             }
             }
@@ -2780,7 +2768,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
         case nt_logical_or_expression:
         case nt_relational_expression:
             // A binary expression with a right-hand side returns a boolean
-            if (root->u.binary_expression.right)
+            if (ed->rootNode->u.binary_expression.right)
                 return erNoAssignmentUse;
             break;
 
@@ -2789,46 +2777,60 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
         }
 
         // Otherwise go up
-        rNode = root;
-        root = root->parent;
+        rNode = ed->rootNode;
+        ed->rootNode = ed->rootNode->parent;
     }
 
     goto while_exit;
 
     cast_expression_type_change:
-    root = castExNode;
-    lNode = castExNode->u.cast_expression.type_name;
-    rNode = castExNode->u.cast_expression.cast_expression;
+    ed->rootNode = ed->castExNode;
+    lNode = ed->castExNode->u.cast_expression.type_name;
+    rNode = ed->castExNode->u.cast_expression.cast_expression;
     lType = typeofNode(lNode);
 
     while_exit:
 
+//    ed->srcNode = ed->primExNode;
+    ed->targetNode = lNode;
+    ed->targetType = lType;
+
     // No interesting case, so we're done
-    if (!root)
+    if (!ed->rootNode)
         return erNoAssignmentUse;
 
     // Skip if source and target types are equal
-    if (lType->equalTo(typeofNode(postExNode)))
+    if (lType->equalTo(typeofNode(ed->postExNode)))
         return erTypesAreEqual;
 
     // Skip if address of some object is assigned/cast/whatever without being
     // dereferenced again by some postfix expression suffix
-    if ((derefs < 0) && !postExNode)
+    if ((derefs < 0) && !ed->postExNode)
         return erAddressOperation;
 
+    return erTypesAreDifferent;
+}
+
+
+typedef QList<ASTType*> TypeChain;
+
+
+ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
+        EvaluationDetails* ed)
+{
     // Find the chain of changing types up to ae on the right-hand
     TypeChain typeChain;
-    assert(postExNode->type == nt_postfix_expression);
-    typeChain.append(typeofNode(postExNode));
+    assert(ed->postExNode->type == nt_postfix_expression);
+    typeChain.append(typeofNode(ed->postExNode));
     int forcedChanges = 0;
-    for (const ASTNode* p = postExNode; p != root; p = p->parent) {
+    for (const ASTNode* p = ed->postExNode; p != ed->rootNode; p = p->parent) {
         ASTType* t = typeofNode(p);
         assert(t != 0);
 
         if (!t->equalTo(typeChain.last())) {
             // Is this an expected change of types?
             bool forced = true;
-            switch(p->type) {                
+            switch(p->type) {
             case nt_additive_expression:
                 // Type changes through additive expressions are never forced.
                 forced = false;
@@ -2865,8 +2867,8 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 
     // Skip if both sides have the same, single type
     if (forcedChanges == 0) {
-        if (lType->equalTo(typeChain.last()) ||
-            lType->equalTo(typeChain.first()))
+        if (ed->targetType->equalTo(typeChain.last()) ||
+            ed->targetType->equalTo(typeChain.first()))
         {
 //        debugmsg(QString("Line %1: Skipping because types are equal (%1:%2)")
 //                        .arg(node->start->line)
@@ -2874,19 +2876,19 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
             return erTypesAreEqual;
         }
         // Check for pointer arithmetics with += or -= operator
-        else if (root->type == nt_assignment_expression) {
+        else if (ed->rootNode->type == nt_assignment_expression) {
             QString op = antlrTokenToStr(
-                        root->u.assignment_expression.assignment_operator);
+                        ed->rootNode->u.assignment_expression.assignment_operator);
 
             // Treat "+="/"-=" as lvalue = lvalue +/- assignment_expression
             if (op != "=") {
                 ASTType *rType = typeofNode(
-                            root->u.assignment_expression.assignment_expression);
+                            ed->rootNode->u.assignment_expression.assignment_expression);
                 ASTType *resType =  (op == "+=" || op == "-=") ?
-                            typeofAdditiveExpression(lType, rType, op) :
-                            typeofIntegerExpression(lType, rType, op);
+                            typeofAdditiveExpression(ed->targetType, rType, op) :
+                            typeofIntegerExpression(ed->targetType, rType, op);
 
-                if (lType->equalTo(resType)) {
+                if (ed->targetType->equalTo(resType)) {
 //                    debugmsg(QString("Line %1: Skipping because types are equal (%1:%2)")
 //                             .arg(node->start->line)
 //                             .arg(node->start->charPosition));
@@ -2896,11 +2898,11 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
                     typeChain.append(resType);
                     ++forcedChanges;
 //                    debugmsg(QString("Added type %1 (%2)")
-//                             .arg(lType->toString())
-//                             .arg(lNode ?
+//                             .arg(ed->lType->toString())
+//                             .arg(ed->lNode ?
 //                                      QString("%1:%2")
-//                                      .arg(lNode->start->line)
-//                                      .arg(lNode->start->charPosition) :
+//                                      .arg(ed->lNode->start->line)
+//                                      .arg(ed->lNode->start->charPosition) :
 //                                      QString("builtin")));
                 }
             }
@@ -2913,7 +2915,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
         rHasPointer = typeChain[i]->isPointer();
 
     // Skip if neither the left nor the right side involves pointers
-    if (!rHasPointer && !lType->isPointer()) {
+    if (!rHasPointer && !ed->targetType->isPointer()) {
 //        debugmsg(QString("Line %1: Skipping because no pointer "
 //                "assignment (%1:%2)")
 //                .arg(node->start->line)
@@ -2922,33 +2924,38 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
     }
 
     // Add left-hand type, if different
-    if (!lType->equalTo(typeChain.last())) {
-        typeChain.append(lType);
+    if (!ed->targetType->equalTo(typeChain.last())) {
+        typeChain.append(ed->targetType);
         ++forcedChanges;
 //        debugmsg(QString("Added type %1 (%2)")
-//                .arg(lType->toString())
-//                .arg(lNode ?
+//                .arg(ed->lType->toString())
+//                .arg(ed->lNode ?
 //                        QString("%1:%2")
-//                            .arg(lNode->start->line)
-//                            .arg(lNode->start->charPosition) :
+//                            .arg(ed->lNode->start->line)
+//                            .arg(ed->lNode->start->charPosition) :
 //                        QString("builtin")));
     }
 
+    return erTypesAreDifferent;
+}
 
+
+void ASTTypeEvaluator::evaluateTypeContext(EvaluationDetails* ed)
+{
     // Find out the context of type change
-    const ASTNode* ctxNode = primExNode;
+    ed->ctxNode = ed->srcNode;
     ASTNodeStack pesStack;
 
-    for (ASTNodeList* l = postExNode->u.postfix_expression.postfix_expression_suffix_list;
+    for (ASTNodeList* l = ed->postExNode->u.postfix_expression.postfix_expression_suffix_list;
             l; l = l->next)
     {
         pesStack.push(l->item);
     }
 
     // Embedding struct in whose context we see the type change
-    ASTType *ctxType = typeofNode(primExNode), *srcType = typeofNode(postExNode);
+    ed->ctxType = typeofNode(ed->ctxNode);
+    ed->srcType = typeofNode(ed->postExNode);
     // Member chain of embedding struct in whose context we see the type change
-    QStringList ctxMembers;
     // True as long as we see member.sub.subsub expressions
     bool searchMember = true;
     // Operations to be performed on the resulting ctxType
@@ -2962,16 +2969,16 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
             switch(n->type) {
             case nt_postfix_expression_dot:
                 // Prepend name of member
-            	ctxMembers.prepend(
-            			antlrTokenToStr(n->u.postfix_expression_suffix.identifier));
+                ed->ctxMembers.prepend(
+                        antlrTokenToStr(n->u.postfix_expression_suffix.identifier));
                 // Type chages, so clear all type operations
                 ctxTypeOps.clear();
                 break;
 
             case nt_postfix_expression_arrow:
                 // Prepend name of member
-                ctxMembers.prepend(
-                		antlrTokenToStr(n->u.postfix_expression_suffix.identifier));
+                ed->ctxMembers.prepend(
+                        antlrTokenToStr(n->u.postfix_expression_suffix.identifier));
                 // Type changes now, so clear all pending operations
                 ctxTypeOps.clear();
                 // The arrow is by itself a dereference
@@ -2985,7 +2992,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
                 // but for embedded array types we treat it the same way as a
                 // "dot" member access
                 const ASTNode* pred = pesStack.isEmpty() ?
-                            postExNode->u.postfix_expression.primary_expression :
+                            ed->postExNode->u.postfix_expression.primary_expression :
                             pesStack.top();
                 if (typeofNode(pred)->type() == rtArray)
                     ctxTypeOps.push(n->type);
@@ -3011,136 +3018,158 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
         }
         else {
             // This is the node of the embedding struct
-            ctxNode = n;
-            ctxType = typeofNode(ctxNode);
+            ed->ctxNode = n;
+            ed->ctxType = typeofNode(ed->ctxNode);
             break;
         }
     }
 
     // Perform pending operations on the context type
     while (!ctxTypeOps.isEmpty()) {
-    	ASTNodeType type = ctxTypeOps.pop();
-    	switch (type) {
-    	case nt_postfix_expression_arrow:
+        ASTNodeType type = ctxTypeOps.pop();
+        switch (type) {
+        case nt_postfix_expression_arrow:
         case nt_postfix_expression_brackets:
             // Array operator, i.e., dereferencing
-            if (!ctxType || !(ctxType->type() & (rtFuncPointer|rtPointer|rtArray)))
+            if (!ed->ctxType || !(ed->ctxType->type() & (rtFuncPointer|rtPointer|rtArray)))
                 typeEvaluatorError(
                         QString("Expected a pointer or array type here instead of \"%1\" at %2:%3:%4")
-                                .arg(ctxType ? ctxType->toString() : QString())
+                                .arg(ed->ctxType ? ed->ctxType->toString() : QString())
                                 .arg(_ast->fileName())
-                                .arg(ctxNode->start->line)
-                                .arg(ctxNode->start->charPosition));
+                                .arg(ed->ctxNode->start->line)
+                                .arg(ed->ctxNode->start->charPosition));
             // Remove top pointer/array type
-            ctxType = ctxType->next();
+            ed->ctxType = ed->ctxType->next();
             break;
         case nt_postfix_expression_parens:
             // Function operator, i.e., function call
-            if (!ctxType || !(ctxType->type() & (rtFuncPointer)))
+            if (!ed->ctxType || !(ed->ctxType->type() & (rtFuncPointer)))
                 typeEvaluatorError(
                         QString("Expected a function pointer type here instead of \"%1\" at %2:%3:%4")
-                                .arg(ctxType ? ctxType->toString() : QString())
+                                .arg(ed->ctxType ? ed->ctxType->toString() : QString())
                                 .arg(_ast->fileName())
-                                .arg(ctxNode->start->line)
-                                .arg(ctxNode->start->charPosition));
+                                .arg(ed->ctxNode->start->line)
+                                .arg(ed->ctxNode->start->charPosition));
             // Remove top function pointer type
-            ctxType = ctxType->next();
+            ed->ctxType = ed->ctxType->next();
             break;
         default:
-			typeEvaluatorError(
-					QString("Unhandled context type operation: \"%1\" at %2:%3:%4")
-							.arg(ast_node_type_to_str2(type))
-							.arg(_ast->fileName())
-							.arg(ctxNode->start->line)
-							.arg(ctxNode->start->charPosition));
-        	break;
-    	}
+            typeEvaluatorError(
+                    QString("Unhandled context type operation: \"%1\" at %2:%3:%4")
+                            .arg(ast_node_type_to_str2(type))
+                            .arg(_ast->fileName())
+                            .arg(ed->ctxNode->start->line)
+                            .arg(ed->ctxNode->start->charPosition));
+            break;
+        }
     }
 
-    if (!ctxType || !ctxNode)
+    if (!ed->ctxType || !ed->ctxNode)
         typeEvaluatorError(QString("Either context type or context node is "
                 "null: ctxType = 0x%1, ctxNode = 0x%2")
-                .arg((quint64)ctxType, 0, 16)
-                .arg((quint64)ctxNode, 0, 16));
+                .arg((quint64)ed->ctxType, 0, 16)
+                .arg((quint64)ed->ctxNode, 0, 16));
+}
 
-    const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
 
-    primaryExpressionTypeChange(primExNode, srcType, sym, ctxType, ctxNode,
-                                ctxMembers, lNode, lType, root);
+ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
+        const ASTNode* node)
+{
+    // We are only interested in primary expressions
+    if (!node || node->type != nt_primary_expression)
+    	return erNoPrimaryExpression;
+
+//    debugmsg("Inspecting identifier \""
+//             << antlrTokenToStr(node->u.primary_expression.identifier)
+//             << "\" at " << node->start->line << ":" << node->start->charPosition);
+
+    ASTTypeEvaluator::EvalResult ret;
+    EvaluationDetails ed;
+    ed.srcNode = node;
+    ed.rootNode = node->parent;
+    ed.postExNode = node->parent;
+
+    // Evaluate if type changes in this expression
+    ret = evaluateTypeFlow(&ed);
+    if (ret != erTypesAreDifferent)
+        return ret;
+
+    // Evaluate the chain of changing types
+    ret = evaluateTypeChanges(&ed);
+    if (ret != erTypesAreDifferent)
+        return ret;
+
+    // Evaluate the context of type change
+    evaluateTypeContext(&ed);
+
+    ed.sym = findSymbolOfPrimaryExpression(node);
+
+//    primaryExpressionTypeChange(primExNode, srcType, sym, ctxType, ctxNode,
+//                                ctxMembers, lNode, lType, root);
+    primaryExpressionTypeChange(ed);
 
     return erTypesAreDifferent;
 }
 
 
-QString ASTTypeEvaluator::typeChangeInfo(
-        const ASTNode* srcNode, const ASTType* srcType,
-        const ASTSymbol* srcSymbol, const ASTNode* targetNode,
-        const ASTType* targetType, const ASTNode* rootNode)
+QString ASTTypeEvaluator::typeChangeInfo(const EvaluationDetails &ed)
 {
     ASTSourcePrinter printer(_ast);
 #   define INDENT "    "
     QString scope;
-    if (srcSymbol->type() == stVariableDef ||
-         srcSymbol->type() == stVariableDecl)
-        scope = srcSymbol->isGlobal() ? "global " : "local ";
+    if (ed.sym->type() == stVariableDef ||
+         ed.sym->type() == stVariableDecl)
+        scope = ed.sym->isGlobal() ? "global " : "local ";
 
     return QString(INDENT "Symbol: %1 (%2)\n"
                    INDENT "Source: %3 %4\n"
                    INDENT "Target: %5 %6\n"
                    INDENT "Line %7")
-            .arg(srcSymbol->name(), -30)
-            .arg(scope + srcSymbol->typeToString())
-            .arg(printer.toString(srcNode->parent, false).trimmed() + ",", -30)
-            .arg(srcType->toString())
-            .arg(printer.toString(targetNode, false).trimmed() + ",", -30)
-            .arg(targetType->toString())
-            .arg(printer.toString(rootNode, true).trimmed());
+            .arg(ed.sym->name(), -30)
+            .arg(scope + ed.sym->typeToString())
+            .arg(printer.toString(ed.srcNode->parent, false).trimmed() + ",", -30)
+            .arg(ed.srcType->toString())
+            .arg(printer.toString(ed.targetNode, false).trimmed() + ",", -30)
+            .arg(ed.targetType->toString())
+            .arg(printer.toString(ed.rootNode, true).trimmed());
 }
 
 
-void ASTTypeEvaluator::primaryExpressionTypeChange(const ASTNode* srcNode,
-            const ASTType* srcType, const ASTSymbol* srcSymbol,
-            const ASTType* ctxType, const ASTNode* ctxNode,
-    		const QStringList& ctxMembers, const ASTNode* targetNode,
-            const ASTType* targetType, const ASTNode* rootNode)
+void ASTTypeEvaluator::primaryExpressionTypeChange(const EvaluationDetails &ed)
 {
-	Q_UNUSED(targetNode);
-	Q_UNUSED(rootNode);
+	checkNodeType(ed.srcNode, nt_primary_expression);
+	checkNodeType(ed.srcNode->parent, nt_postfix_expression);
 
-	checkNodeType(srcNode, nt_primary_expression);
-	checkNodeType(srcNode->parent, nt_postfix_expression);
-
-    QString symScope = srcSymbol->isLocal() ? "local" : "global";
-    QStringList symType = srcSymbol->typeToString().split(' ');
+    QString symScope = ed.sym->isLocal() ? "local" : "global";
+    QStringList symType = ed.sym->typeToString().split(' ');
     if (symType.last().startsWith('('))
     	symType.pop_back();
 
     ASTSourcePrinter printer(_ast);
-    QString var = (srcNode == ctxNode) ?
-            printer.toString(srcNode).trimmed() :
-            postfixExpressionToStr(srcNode->parent, ctxNode);
+    QString var = (ed.srcNode == ed.ctxNode) ?
+            printer.toString(ed.srcNode).trimmed() :
+            postfixExpressionToStr(ed.srcNode->parent, ed.ctxNode);
 
     std::cout
             << (_ast && !_ast->fileName().isEmpty() ?
                     _ast->fileName() + ":%1:%2: " :
                     QString("Line %1:%2: "))
-                .arg(srcNode->start->line)
-                .arg(srcNode->start->charPosition)
-            << ctxType->toString()
-            << (ctxMembers.isEmpty() ?
+                .arg(ed.srcNode->start->line)
+                .arg(ed.srcNode->start->charPosition)
+            << ed.ctxType->toString()
+            << (ed.ctxMembers.isEmpty() ?
                     QString() :
-                    "." + ctxMembers.join(".") + " of type " +
-                        srcType->toString())
-            << " is used as " << targetType->toString()
+                    "." + ed.ctxMembers.join(".") + " of type " +
+                        ed.srcType->toString())
+            << " is used as " << ed.targetType->toString()
             << " via " << symScope  << " " << symType.join(" ") << " "
-            << "\"" << srcSymbol->name() << "\"";
+            << "\"" << ed.sym->name() << "\"";
 
-    if (srcSymbol->name() != var)
+    if (ed.sym->name() != var)
         std::cout << " in \"" << var << "\"";
 
     std::cout << std::endl
-              << typeChangeInfo(srcNode, srcType, srcSymbol, targetNode,
-                                targetType, rootNode).toStdString()
+              << typeChangeInfo(ed).toStdString()
               << std::endl;
 }
 
