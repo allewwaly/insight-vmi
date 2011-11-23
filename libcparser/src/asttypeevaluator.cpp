@@ -2776,7 +2776,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                 else {
                     // Make a postfix expression with suffixes the new primary expr.
                     ed->postExNode = ed->rootNode;
-                    ed->srcNode = ed->rootNode->u.postfix_expression.primary_expression;
+                    ed->primExNode = ed->rootNode->u.postfix_expression.primary_expression;
                 }
             }
             break;
@@ -3000,7 +3000,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
 void ASTTypeEvaluator::evaluateTypeContext(EvaluationDetails* ed)
 {
     // Find out the context of type change
-    ed->ctxNode = ed->srcNode;
+    ed->ctxNode = ed->primExNode;
     ASTNodeStack pesStack;
 
     for (ASTNodeList* l = ed->postExNode->u.postfix_expression.postfix_expression_suffix_list;
@@ -3142,6 +3142,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 
     EvaluationDetails ed;
     ed.srcNode = node;
+    ed.primExNode = node;
     ed.rootNode = node->parent;
     ed.postExNode = node->parent;
 
@@ -3219,7 +3220,7 @@ QString ASTTypeEvaluator::typeChangeInfo(const EvaluationDetails &ed)
                    INDENT "%8")
             .arg(ed.sym->name(), -30)
             .arg(scope + ed.sym->typeToString())
-            .arg(printer.toString(ed.srcNode->parent, false).trimmed() + ",", -30)
+            .arg(printer.toString(ed.primExNode->parent, false).trimmed() + ",", -30)
             .arg(ed.srcType->toString())
             .arg(printer.toString(ed.targetNode, false).trimmed() + ",", -30)
             .arg(ed.targetType->toString())
@@ -3241,7 +3242,7 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const EvaluationDetails &ed)
     ASTSourcePrinter printer(_ast);
     QString var = (ed.srcNode == ed.ctxNode) ?
             printer.toString(ed.srcNode).trimmed() :
-            postfixExpressionToStr(ed.srcNode->parent, ed.ctxNode);
+            postfixExpressionToStr(ed.primExNode->parent, ed.ctxNode);
 
     std::cout
             << (_ast && !_ast->fileName().isEmpty() ?
