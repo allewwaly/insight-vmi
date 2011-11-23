@@ -194,6 +194,9 @@ void ASTTypeEvaluatorTest::cleanup()
    QTest::addColumn<QString>("targetType"); \
    QTest::addColumn<QString>("exceptionMsg");
 
+#   define TERM_T ""
+#   define TERM_F "" << "" << "" << "" << ""
+
 TEST_FUNCTION(basic)
 {
 	TEST_DATA_COLUMNS;
@@ -681,24 +684,25 @@ TEST_FUNCTION(funcPtrTypdefPtrInvocations)
 TEST_FUNCTION(logicalExpressions)
 {
     TEST_DATA_COLUMNS;
+
     // Usage in logical expressions
-    QTest::newRow("equalityExpr1") << "" << "char *p, *q; int i; i = p == q;" << false;
-    QTest::newRow("equalityExpr2") << "" << "char *p, *q; int i; i = p == i;" << false;
-    QTest::newRow("equalityExpr3") << "" << "char *p, *q; int i = p == q;" << false;
-    QTest::newRow("equalityExpr4") << "" << "char *p, *q; int i = p == i;" << false;
-    QTest::newRow("equalityExpr5") << "" << "char *p, *q; int i; i = p != q;" << false;
-    QTest::newRow("equalityExpr6") << "" << "char *p, *q; int i; i = p != i;" << false;
-    QTest::newRow("equalityExpr7") << "" << "char *p, *q; int i = p != q;" << false;
-    QTest::newRow("equalityExpr8") << "" << "char *p, *q; int i = p != i;" << false;
+    QTest::newRow("equalityExpr1") << "" << "char *p, *q; int i; i = p == q;" << false << TERM_F;
+    QTest::newRow("equalityExpr2") << "" << "char *p, *q; int i; i = p == i;" << false << TERM_F;
+    QTest::newRow("equalityExpr3") << "" << "char *p, *q; int i = p == q;" << false << TERM_F;
+    QTest::newRow("equalityExpr4") << "" << "char *p, *q; int i = p == i;" << false << TERM_F;
+    QTest::newRow("equalityExpr5") << "" << "char *p, *q; int i; i = p != q;" << false << TERM_F;
+    QTest::newRow("equalityExpr6") << "" << "char *p, *q; int i; i = p != i;" << false << TERM_F;
+    QTest::newRow("equalityExpr7") << "" << "char *p, *q; int i = p != q;" << false << TERM_F;
+    QTest::newRow("equalityExpr8") << "" << "char *p, *q; int i = p != i;" << false << TERM_F;
 
-    QTest::newRow("relationalExpr1") << "" << "char *p, *q; int i; i = p < q;" << false;
-    QTest::newRow("relationalExpr2") << "" << "char *p, *q; int i; i = p <= q;" << false;
-    QTest::newRow("relationalExpr3") << "" << "char *p, *q; int i; i = p > q;" << false;
-    QTest::newRow("relationalExpr4") << "" << "char *p, *q; int i; i = p >= q;" << false;
+    QTest::newRow("relationalExpr1") << "" << "char *p, *q; int i; i = p < q;" << false << TERM_F;
+    QTest::newRow("relationalExpr2") << "" << "char *p, *q; int i; i = p <= q;" << false << TERM_F;
+    QTest::newRow("relationalExpr3") << "" << "char *p, *q; int i; i = p > q;" << false << TERM_F;
+    QTest::newRow("relationalExpr4") << "" << "char *p, *q; int i; i = p >= q;" << false << TERM_F;
 
-    QTest::newRow("logicalAndExpr") << "" << "char *p, *q; int i; i = p && q;" << false;
-    QTest::newRow("logicalOrExpr") << "" << "char *p, *q; int i; i = p || q;" << false;
-    QTest::newRow("unaryNotExpr") << "" << "char *p; int i; i = !q;" << false;
+    QTest::newRow("logicalAndExpr") << "" << "char *p, *q; int i; i = p && q;" << false << TERM_F;
+    QTest::newRow("logicalOrExpr") << "" << "char *p, *q; int i; i = p || q;" << false << TERM_F;
+    QTest::newRow("unaryNotExpr") << "" << "char *p; int i; i = !p;" << false << TERM_F;
 }
 
 
@@ -742,7 +746,7 @@ TEST_FUNCTION(castExpressions)
     QTest::newRow("castExpr23") << "" << "void *p; m = (struct module*)((struct list_head*)p)->next;" << true
                                << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
     QTest::newRow("castExpr24") << "" << "m = (struct module*)(h)->next;" << true
-                                << "h" << "Struct(list_head)" << "next" << "Pointer->Struct(module)";
+                                << "h" << "Struct(list_head)" << "next" << "Pointer->Struct(module)" << TERM_T;
 }
 
 

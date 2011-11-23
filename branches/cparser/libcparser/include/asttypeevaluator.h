@@ -84,6 +84,7 @@ struct EvaluationDetails
         ctxNode = 0;
         targetNode = 0;
         rootNode = 0;
+        primExNode = 0;
         postExNode = 0;
         castExNode = 0;
         srcType = 0;
@@ -98,6 +99,7 @@ struct EvaluationDetails
     const ASTNode* ctxNode;
     const ASTNode* targetNode;
     const ASTNode *rootNode;
+    const ASTNode *primExNode;
     const ASTNode *postExNode;
     const ASTNode *castExNode;
     ASTType* srcType;
