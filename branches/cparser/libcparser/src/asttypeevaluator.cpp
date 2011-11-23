@@ -29,6 +29,16 @@
                     .arg(node->start->line)); \
     }
 
+template <class Stack>
+class StackAutoPopper
+{
+    Stack* _stack;
+public:
+    explicit StackAutoPopper(Stack* s, typename Stack::value_type& value)
+        : _stack(s) { _stack->push(value); }
+    ~StackAutoPopper() { _stack->pop(); }
+};
+
 
 QString ASTType::toString() const
 {
@@ -86,13 +96,21 @@ ASTTypeEvaluator::~ASTTypeEvaluator()
 
 bool ASTTypeEvaluator::evaluateTypes()
 {
-	_nodeStack.clear();
+	_typeNodeStack.clear();
+
 	// Phase one: points-to analysis
 	_phase = epPointsTo;
 	walkTree();
 	if (_stopWalking)
 		return false;
-	// Phase two: used-as analsis
+
+	// Phase 2: reverse points-to analysis
+	_phase = epPointsToRev;
+	walkTree();
+	if (_stopWalking)
+		return false;
+
+	// Phase 3: used-as analsis
 	_phase = epUsedAs;
 	walkTree();
 	return !_stopWalking;
@@ -270,19 +288,19 @@ ASTType* ASTTypeEvaluator::typeofNode(const ASTNode *node)
         return _types[node];
     }
 
-    _nodeStack.push(node);
+    _typeNodeStack.push(node);
 
     // Check for loops in recursive evaluation
-    for (int i = 0; i < _nodeStack.size() - 1; ++i) {
-    	if (_nodeStack[i] == node) {
+    for (int i = 0; i < _typeNodeStack.size() - 1; ++i) {
+        if (_typeNodeStack[i] == node) {
     		QString msg("Detected loop in recursive type evaluation:\n");
     		int cnt = 0;
-    		for (int j = _nodeStack.size() - 1; j >= i; --j) {
+            for (int j = _typeNodeStack.size() - 1; j >= i; --j) {
     			msg += QString("%1. 0x%2 %3 at line %4\n")
     					.arg(cnt++, 4)
-    					.arg((quint64)_nodeStack[j], 0, 16)
-    					.arg(ast_node_type_to_str(_nodeStack[j]), -35)
-    					.arg(_nodeStack[j]->start->line);
+                        .arg((quint64)_typeNodeStack[j], 0, 16)
+                        .arg(ast_node_type_to_str(_typeNodeStack[j]), -35)
+                        .arg(_typeNodeStack[j]->start->line);
     		}
 
     		typeEvaluatorError(msg);
@@ -702,7 +720,7 @@ ASTType* ASTTypeEvaluator::typeofNode(const ASTNode *node)
                 .arg(node->start->charPosition));
     }
 
-    _nodeStack.pop();
+    _typeNodeStack.pop();
 
 #   ifdef DEBUG_NODE_EVAL
     debugmsg(indent << "+++ Node " << ast_node_type_to_str(node)
@@ -2456,6 +2474,8 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
 
         if (_phase == epPointsTo)
             evaluateIdentifierPointsTo(node);
+        else if (_phase == epPointsToRev)
+            evaluateIdentifierPointsToRev(node);
         else
             evaluateIdentifierUsedAs(node);
         break;
@@ -2587,6 +2607,22 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
 }
 
 
+void ASTTypeEvaluator::evaluateIdentifierPointsToRev(const ASTNode *node)
+{
+    if (!node)
+        return;
+    checkNodeType(node, nt_primary_expression);
+
+    const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
+    // For every node that has been assigned to sym, we insert an inverse entry
+    // into the hash table
+    for (int i = 0; i < sym->assignedAstNodes().size(); ++i) {
+        const ASTNode *assigned = sym->assignedAstNodes().at(i);
+        _assignedNodesRev.insertMulti(assigned, node);
+    }
+}
+
+
 ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
         EvaluationDetails* ed)
 {
@@ -2596,9 +2632,23 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
     // No. of de-/references
     int derefs = 0;
 
+    ASTNodeNodeHash::const_iterator it, e = _assignedNodesRev.end();
+    EvaluationDetails rek_ed;
+
     // Is this somewhere in the right-hand of an assignment expression or
     // of an init declarator?
     while (ed->rootNode) {
+        // Was this node assigned to other variables?
+        for (it = _assignedNodesRev.find(ed->rootNode);
+             it != e && it.key() == ed->rootNode;
+             ++it)
+        {
+            rek_ed = *ed;
+            rek_ed.rootNode = it.value();
+            rek_ed.interLinks.insert(ed->rootNode, rek_ed.rootNode);
+            evaluateIdentifierUsedAsRek(&rek_ed);
+        }
+
         // Find out the situation in which the identifier is used
         switch (ed->rootNode->type) {
         case nt_additive_expression:
@@ -2823,7 +2873,8 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
     assert(ed->postExNode->type == nt_postfix_expression);
     typeChain.append(typeofNode(ed->postExNode));
     int forcedChanges = 0;
-    for (const ASTNode* p = ed->postExNode; p != ed->rootNode; p = p->parent) {
+    const ASTNode* p = ed->postExNode;
+    while (p != ed->rootNode) {
         ASTType* t = typeofNode(p);
         assert(t != 0);
 
@@ -2863,6 +2914,12 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
             if (forced)
                 ++forcedChanges;
         }
+
+        // Follow the inter-connecting links, if existent, otherwise go up
+        if (ed->interLinks.contains(p))
+            p = ed->interLinks[p];
+        else
+            p = p->parent;
     }
 
     // Skip if both sides have the same, single type
@@ -3083,32 +3140,57 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 //             << antlrTokenToStr(node->u.primary_expression.identifier)
 //             << "\" at " << node->start->line << ":" << node->start->charPosition);
 
-    ASTTypeEvaluator::EvalResult ret;
     EvaluationDetails ed;
     ed.srcNode = node;
     ed.rootNode = node->parent;
     ed.postExNode = node->parent;
 
+    return evaluateIdentifierUsedAsRek(&ed);
+}
+
+
+ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
+        EvaluationDetails *ed)
+{
+    ASTTypeEvaluator::EvalResult ret;
+
+    // Check for endless recursions
+    if (_evalNodeStack.contains(ed->rootNode))
+        return erRecursiveExpression;
+    // Push current root on the recursion tracking stack, gets auto-popped later
+    StackAutoPopper<ASTNodeStack> autoPopper(&_evalNodeStack, ed->rootNode);
+
     // Evaluate if type changes in this expression
-    ret = evaluateTypeFlow(&ed);
+    ret = evaluateTypeFlow(ed);
+
     if (ret != erTypesAreDifferent)
         return ret;
 
     // Evaluate the chain of changing types
-    ret = evaluateTypeChanges(&ed);
+    ret = evaluateTypeChanges(ed);
     if (ret != erTypesAreDifferent)
         return ret;
 
     // Evaluate the context of type change
-    evaluateTypeContext(&ed);
+    evaluateTypeContext(ed);
 
-    ed.sym = findSymbolOfPrimaryExpression(node);
+
+    ed->sym = findSymbolOfPrimaryExpression(ed->srcNode);
 
 //    primaryExpressionTypeChange(primExNode, srcType, sym, ctxType, ctxNode,
 //                                ctxMembers, lNode, lType, root);
-    primaryExpressionTypeChange(ed);
+    primaryExpressionTypeChange(*ed);
 
     return erTypesAreDifferent;
+}
+
+
+inline bool srcLineLessThan(const ASTNode* n1, const ASTNode* n2)
+{
+    if (n1->start->line == n2->start->line)
+        return n1->start->charPosition < n2->start->charPosition;
+    else
+        return n1->start->line < n2->start->line;
 }
 
 
@@ -3121,16 +3203,27 @@ QString ASTTypeEvaluator::typeChangeInfo(const EvaluationDetails &ed)
          ed.sym->type() == stVariableDecl)
         scope = ed.sym->isGlobal() ? "global " : "local ";
 
+    // Print the source of all of all inter-connected code snippets
+    QString conSrc;
+    QList<const ASTNode*> nodes = ed.interLinks.keys();
+    qSort(nodes.begin(), nodes.end(), srcLineLessThan);
+    for (int i = 0; i < nodes.size(); ++i) {
+        conSrc += INDENT;
+        conSrc += printer.toString(nodes[i]->parent, true);
+    }
+
     return QString(INDENT "Symbol: %1 (%2)\n"
                    INDENT "Source: %3 %4\n"
                    INDENT "Target: %5 %6\n"
-                   INDENT "Line %7")
+                   "%7"
+                   INDENT "%8")
             .arg(ed.sym->name(), -30)
             .arg(scope + ed.sym->typeToString())
             .arg(printer.toString(ed.srcNode->parent, false).trimmed() + ",", -30)
             .arg(ed.srcType->toString())
             .arg(printer.toString(ed.targetNode, false).trimmed() + ",", -30)
             .arg(ed.targetType->toString())
+            .arg(conSrc)
             .arg(printer.toString(ed.rootNode, true).trimmed());
 }
 
