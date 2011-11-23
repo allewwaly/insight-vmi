@@ -12,7 +12,7 @@
 #include <astnode.h>
 #include <realtypes.h>
 #include <astsymbol.h>
-#include <QHash>
+#include <QMultiHash>
 #include <QStack>
 #include <QStringList>
 
@@ -66,6 +66,8 @@ private:
 };
 
 typedef QHash<const ASTNode*, ASTType*> ASTNodeTypeHash;
+typedef QHash<const ASTNode*, const ASTNode*> ASTNodeNodeHash;
+typedef QMultiHash<const ASTNode*, const ASTNode*> ASTNodeNodeMHash;
 typedef QList<ASTType*> ASTTypeList;
 typedef QStack<const ASTNode*> ASTNodeStack;
 
@@ -89,7 +91,7 @@ struct EvaluationDetails
         targetType = 0;
         sym = 0;
         ctxMembers.clear();
-
+        interLinks.clear();
     }
 
     const ASTNode *srcNode;
@@ -103,6 +105,7 @@ struct EvaluationDetails
     ASTType* targetType;
     QStringList ctxMembers;
     const ASTSymbol* sym;
+    ASTNodeNodeHash interLinks;
 };
 
 
@@ -130,6 +133,7 @@ public:
 protected:
     enum EvalPhase {
         epPointsTo,
+        epPointsToRev,
         epUsedAs
     };
 
@@ -143,13 +147,16 @@ protected:
     	erTypesAreEqual,
         erTypesAreDifferent,
         erLeftHandSide,
-        erAddressOperation
+        erAddressOperation,
+        erRecursiveExpression
     };
 
 //    virtual void beforeChildren(const ASTNode *node, int flags);
     virtual void afterChildren(const ASTNode *node, int flags);
     void evaluateIdentifierPointsTo(const ASTNode *node);
+    void evaluateIdentifierPointsToRev(const ASTNode *node);
     EvalResult evaluateIdentifierUsedAs(const ASTNode *node);
+    EvalResult evaluateIdentifierUsedAsRek(EvaluationDetails *ed);
     EvalResult evaluateTypeFlow(EvaluationDetails *ed);
     EvalResult evaluateTypeChanges(EvaluationDetails *ed);
     void evaluateTypeContext(EvaluationDetails *ed);
@@ -248,7 +255,9 @@ private:
             const ASTNodeList* initDeclaratorList);
     ASTNodeTypeHash _types;
     ASTTypeList _allTypes;
-    ASTNodeStack _nodeStack;
+    ASTNodeStack _typeNodeStack;
+    ASTNodeStack _evalNodeStack;
+    ASTNodeNodeMHash _assignedNodesRev;
     int _sizeofLong;
     EvalPhase _phase;
 };
