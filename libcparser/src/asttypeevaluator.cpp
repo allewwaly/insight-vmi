@@ -2494,6 +2494,9 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
     // Is this somewhere in the right-hand of an assignment expression or
     // of an init declarator?
     const ASTNode *rNode = 0, *root = node, *postExNode = 0;
+    // Dereference counter
+    int deref = 0;
+    QString op;
 
     while (root) {
         // Find out the situation in which the identifier is used
@@ -2514,7 +2517,8 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
                 if (sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
                     node->scope->varAssignment(
                                 sym->name(),
-                                root->u.assignment_expression.assignment_expression);
+                                root->u.assignment_expression.assignment_expression,
+                                deref);
                 return;
             }
             // Is this in the right-hand of an assignment expression?
@@ -2537,7 +2541,8 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
                 {
                     node->scope->varAssignment(
                                 sym->name(),
-                                root->u.init_declarator.initializer);
+                                root->u.init_declarator.initializer,
+                                deref);
                     return;
                 }
             }
@@ -2555,7 +2560,8 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
             // Treat any return statement as an assignment to the function
             // definition symbol
             root->scope->varAssignment(embeddingFuncSymbol(root)->name(),
-                                       root->u.jump_statement.initializer);
+                                       root->u.jump_statement.initializer,
+                                       deref);
             return;
 
         case nt_postfix_expression:
@@ -2569,8 +2575,19 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
             }
             break;
 
+        case nt_unary_expression_op:
+            op = antlrTokenToStr(root->u.unary_expression.unary_operator);
+            if (op == "*")
+                ++deref;
+            else if (op == "&")
+                --deref;
+            else if (op == "&&")
+                deref -= 2;
+            break;
+
         // Types we have to skip to come to a decision
         case nt_builtin_function_choose_expr:
+        case nt_cast_expression:
         case nt_declarator:
         case nt_direct_declarator:
         case nt_lvalue:
@@ -2582,10 +2599,10 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
         //----------------------------------------------------------------------
         // Types for which we know we're done
         case nt_builtin_function_offsetof:
-        case nt_cast_expression:
         case nt_declaration:
         case nt_expression_statement:
         case nt_function_definition:
+        case nt_multiplicative_expression:
         case nt_parameter_declaration:
         case nt_struct_declarator:
             return;
@@ -2617,8 +2634,10 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRev(const ASTNode *node)
     // For every node that has been assigned to sym, we insert an inverse entry
     // into the hash table
     for (int i = 0; i < sym->assignedAstNodes().size(); ++i) {
-        const ASTNode *assigned = sym->assignedAstNodes().at(i);
-        _assignedNodesRev.insertMulti(assigned, node);
+        AssignedNode assigned = sym->assignedAstNodes().at(i);
+        /// @todo Invert derefCount here???
+        _assignedNodesRev.insertMulti(assigned.node,
+                                      AssignedNode(node, assigned.derefCount));
     }
 }
 
@@ -2632,7 +2651,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
     // No. of de-/references
     int derefs = 0;
 
-    ASTNodeNodeHash::const_iterator it, e = _assignedNodesRev.end();
+    ASTNodeNodeMHash::const_iterator it, e = _assignedNodesRev.end();
     EvaluationDetails rek_ed;
 
     // Is this somewhere in the right-hand of an assignment expression or
@@ -2644,7 +2663,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
              ++it)
         {
             rek_ed = *ed;
-            rek_ed.rootNode = it.value();
+            rek_ed.rootNode = it.value().node; /// @todo check derefCount
             rek_ed.interLinks.insert(ed->rootNode, rek_ed.rootNode);
             evaluateIdentifierUsedAsRek(&rek_ed);
         }
