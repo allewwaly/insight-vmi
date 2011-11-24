@@ -24,6 +24,7 @@ public:
 	void reset()
 	{
 		typeChanged = false;
+		interLinks = 0;
 
 		fSymbolName.clear();
 		fCtxType.clear();
@@ -45,23 +46,25 @@ public:
 	QString lCtxType;
 	QString lCtxMembers;
 	QString lTargetType;
+	int interLinks;
 
 protected:
     virtual void primaryExpressionTypeChange(const EvaluationDetails &ed)
     {
-        // First type change
-        if (!this->typeChanged) {
-            this->typeChanged = true;
-            this->fSymbolName = ed.sym->name();
-            this->fCtxType = ed.ctxType->toString();
-            this->fCtxMembers = ed.ctxMembers.join(".");
-            this->fTargetType = ed.targetType->toString();
+        // First type change, or the one with more interLinks
+        if (!typeChanged || interLinks < ed.interLinks.size()) {
+            typeChanged = true;
+            fSymbolName = ed.sym->name();
+            fCtxType = ed.ctxType->toString();
+            fCtxMembers = ed.ctxMembers.join(".");
+            fTargetType = ed.targetType->toString();
+            interLinks = ed.interLinks.size();
         }
         // Last type change
-        this->lSymbolName = ed.sym->name();
-        this->lCtxType = ed.ctxType->toString();
-        this->lCtxMembers = ed.ctxMembers.join(".");
-        this->lTargetType = ed.targetType->toString();
+        lSymbolName = ed.sym->name();
+        lCtxType = ed.ctxType->toString();
+        lCtxMembers = ed.ctxMembers.join(".");
+        lTargetType = ed.targetType->toString();
     }
 
     int evaluateIntExpression(const ASTNode* /*node*/, bool* ok)
@@ -835,6 +838,69 @@ TEST_FUNCTION(pointerDerefByArrayOperator)
     CHANGE_LAST2("struct foo { struct foo* next; };",
                 "struct foo f[4]; void *p = f[0].next;",
                 "f", "Struct(foo)", "next", "Pointer->Void");
+}
+
+
+TEST_FUNCTION(transitiveEvaluation)
+{
+    TEST_DATA_COLUMNS;
+    // Simple transitive change
+    CHANGE_FIRST("void *p = modules.next; m = p;",
+                "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("void *p = modules.next; m = p;",
+                 "p", "Pointer->Void", "", "Pointer->Struct(module)");
+    // Double indirect change through void
+    CHANGE_FIRST("void *p = modules.next, *q = p; m = q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("void *p = modules.next, *q = p; m = q;",
+                "q", "Pointer->Void", "", "Pointer->Struct(module)");
+    // Indirect change through list_head
+    CHANGE_FIRST("h = modules.next; m = h;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("h = modules.next; m = h;",
+                "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    // Doubly indirect change through list_head and void
+    CHANGE_FIRST("h = modules.next; void* p = h; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("h = modules.next; void* p = h; m = p;",
+                "p", "Pointer->Void", "", "Pointer->Struct(module)");
+    // Indirect change through long
+    CHANGE_FIRST("long i = (long)modules.next; m = (struct modules*)i;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("long i = (long)modules.next; m = (struct modules*)i;",
+                "i", "Int32", "", "Pointer->Struct(module)");
+
+    // Order of statements does not matter
+    CHANGE_FIRST("m = h; h = modules.next;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through function
+    CHANGE_FIRST2("void* getModule() { return modules.next; }",
+                  "m = getModule();",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through two functions
+    CHANGE_FIRST2("void* getModule() { return modules.next; }"
+                  "void* getModule2() { return getModule(); }",
+                  "m = getModule2();",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through function and variable
+    CHANGE_FIRST2("void* getModule() { return modules.next; }",
+                  "long l = getModule(); m = l;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through two functions and variable
+    CHANGE_FIRST2("void* getModule() { return modules.next; }"
+                  "void* getModule2() { return getModule(); }",
+                  "long l = getModule2(); m = l;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through function and variable
+    CHANGE_FIRST2("struct list_head* getModule() { return modules.next; }",
+                  "h = getModule(); m = h;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct list_head* getModule() { return modules.next; }",
+                 "h = getModule(); m = h;",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    NO_CHANGE2("struct list_head* getModule() { return modules.next; }",
+              "h = getModule();");
+
 }
 
 

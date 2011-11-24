@@ -2773,7 +2773,8 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                 // type change
                 if (ed->castExNode)
                     goto cast_expression_type_change;
-                else {
+                // Do not change primEx/postEx accross interLink boundaries
+                else if (ed->interLinks.isEmpty()) {
                     // Make a postfix expression with suffixes the new primary expr.
                     ed->postExNode = ed->rootNode;
                     ed->primExNode = ed->rootNode->u.postfix_expression.primary_expression;
@@ -3178,8 +3179,6 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
 
     ed->sym = findSymbolOfPrimaryExpression(ed->srcNode);
 
-//    primaryExpressionTypeChange(primExNode, srcType, sym, ctxType, ctxNode,
-//                                ctxMembers, lNode, lType, root);
     primaryExpressionTypeChange(*ed);
 
     return erTypesAreDifferent;
