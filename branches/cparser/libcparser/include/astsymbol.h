@@ -26,6 +26,15 @@ extern "C" {
 // forward declaration
 struct ASTNode;
 
+struct AssignedNode {
+    AssignedNode()
+        : node(0), derefCount(0) {}
+    AssignedNode(const ASTNode* node, int derefCount)
+        : node(node), derefCount(derefCount) {}
+    const ASTNode* node;
+    int derefCount;
+};
+
 /**
  * This class represents a symbol parsed from the source code.
  */
@@ -34,7 +43,7 @@ class ASTSymbol
 	QString _name;
 	ASTSymbolType _type;
 	struct ASTNode* _astNode;
-	QList<const ASTNode*> _assignedAstNodes;
+	QList<AssignedNode> _assignedAstNodes;
 
 public:
 	/**
@@ -83,14 +92,15 @@ public:
 	/**
 	 * @return list of nodes that have been assigned to this symbol
 	 */
-	const QList<const ASTNode*>& assignedAstNodes() const;
+	const QList<AssignedNode>& assignedAstNodes() const;
 
 	/**
 	 * Append a new ASTNode that has been assigned to this symbol.
 	 * @param node the node to append
+	 * @param derefCount number of dereferences for this node
 	 * @return a reference to this object
 	 */
-	void appendAssignedNode(const ASTNode* node);
+	void appendAssignedNode(const ASTNode* node, int derefCount);
 
 	/**
 	 * @return the name of the symbol
@@ -149,15 +159,15 @@ inline const ASTNode* ASTSymbol::astNode() const
 }
 
 
-inline const QList<const ASTNode *>& ASTSymbol::assignedAstNodes() const
+inline const QList<AssignedNode> &ASTSymbol::assignedAstNodes() const
 {
     return _assignedAstNodes;
 }
 
 
-inline void ASTSymbol::appendAssignedNode(const ASTNode *node)
+inline void ASTSymbol::appendAssignedNode(const ASTNode *node, int derefCount)
 {
-    _assignedAstNodes.append(node);
+    _assignedAstNodes.append(AssignedNode(node, derefCount));
 }
 
 

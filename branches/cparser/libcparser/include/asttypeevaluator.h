@@ -67,7 +67,7 @@ private:
 
 typedef QHash<const ASTNode*, ASTType*> ASTNodeTypeHash;
 typedef QHash<const ASTNode*, const ASTNode*> ASTNodeNodeHash;
-typedef QMultiHash<const ASTNode*, const ASTNode*> ASTNodeNodeMHash;
+typedef QMultiHash<const ASTNode*, AssignedNode> ASTNodeNodeMHash;
 typedef QList<ASTType*> ASTTypeList;
 typedef QStack<const ASTNode*> ASTNodeStack;
 

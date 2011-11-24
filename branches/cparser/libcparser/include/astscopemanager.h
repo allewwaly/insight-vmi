@@ -50,7 +50,8 @@ public:
 	inline ASTScope* parent() const { return _parent; }
 
 	void add(const QString& name, ASTSymbolType type, struct ASTNode* node);
-	void varAssignment(const QString& name, const ASTNode *assignedNode);
+	void varAssignment(const QString& name, const ASTNode *assignedNode,
+					   int derefCount);
 	ASTSymbol* find(const QString& name, int searchSymbols = ssAnySymbol) const;
 };
 

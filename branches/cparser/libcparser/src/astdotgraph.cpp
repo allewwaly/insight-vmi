@@ -490,7 +490,7 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
                 for (int i = 0; i < sym->assignedAstNodes().size(); ++i)
                     printDotGraphConnection(
                                 node->u.primary_expression.identifier,
-                                sym->assignedAstNodes().at(i));
+                                sym->assignedAstNodes().at(i).node);
             }
         }
 
