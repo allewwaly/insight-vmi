@@ -96,6 +96,9 @@ private slots:
 	void test_pointerDerefByArrayOperator_func();
 	void test_pointerDerefByArrayOperator_func_data();
 
+	void test_transitiveEvaluation_func();
+	void test_transitiveEvaluation_func_data();
+
 private:
 	AbstractSyntaxTree* _ast;
 	ASTBuilder* _builder;
