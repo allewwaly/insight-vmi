@@ -45,7 +45,7 @@ public:
     virtual ~KernelSourceTypeEvaluator();
 
 protected:
-    virtual void primaryExpressionTypeChange(const EvaluationDetails &ed);
+    virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed);
 
     virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
 

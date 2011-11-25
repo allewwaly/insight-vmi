@@ -49,7 +49,7 @@ public:
 	int interLinks;
 
 protected:
-    virtual void primaryExpressionTypeChange(const EvaluationDetails &ed)
+    virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed)
     {
         // First type change, or the one with more interLinks
         if (!typeChanged || interLinks < ed.interLinks.size()) {

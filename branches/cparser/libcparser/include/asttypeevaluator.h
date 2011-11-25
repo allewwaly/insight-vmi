@@ -71,9 +71,26 @@ typedef QMultiHash<const ASTNode*, AssignedNode> ASTNodeNodeMHash;
 typedef QList<ASTType*> ASTTypeList;
 typedef QStack<const ASTNode*> ASTNodeStack;
 
-struct EvaluationDetails
+struct PointsToEvalState
 {
-    EvaluationDetails()
+    PointsToEvalState(const ASTNode* node = 0, const ASTNode* root = 0)
+        : srcNode(node), root(root), rNode(0), postExNode(0), derefCount(0),
+          lastLinkDerefCount(0), validLvalue(true)
+    {}
+    const ASTNode* srcNode;
+    const ASTNode* root;
+    const ASTNode* rNode;
+    const ASTNode* postExNode;
+    int derefCount;
+    int lastLinkDerefCount;
+    bool validLvalue;
+    ASTNodeNodeHash interLinks;
+};
+
+
+struct TypeEvalDetails
+{
+    TypeEvalDetails()
     {
         clear();
     }
@@ -91,6 +108,7 @@ struct EvaluationDetails
         ctxType = 0;
         targetType = 0;
         sym = 0;
+        lastLinkDerefCount = 0;
         ctxMembers.clear();
         interLinks.clear();
     }
@@ -107,6 +125,7 @@ struct EvaluationDetails
     ASTType* targetType;
     QStringList ctxMembers;
     const ASTSymbol* sym;
+    int lastLinkDerefCount;
     ASTNodeNodeHash interLinks;
 };
 
@@ -150,18 +169,20 @@ protected:
         erTypesAreDifferent,
         erLeftHandSide,
         erAddressOperation,
-        erRecursiveExpression
+        erRecursiveExpression,
+        erInvalidTransition
     };
 
 //    virtual void beforeChildren(const ASTNode *node, int flags);
     virtual void afterChildren(const ASTNode *node, int flags);
     void evaluateIdentifierPointsTo(const ASTNode *node);
+    void evaluateIdentifierPointsToRek(PointsToEvalState *es);
     void evaluateIdentifierPointsToRev(const ASTNode *node);
     EvalResult evaluateIdentifierUsedAs(const ASTNode *node);
-    EvalResult evaluateIdentifierUsedAsRek(EvaluationDetails *ed);
-    EvalResult evaluateTypeFlow(EvaluationDetails *ed);
-    EvalResult evaluateTypeChanges(EvaluationDetails *ed);
-    void evaluateTypeContext(EvaluationDetails *ed);
+    EvalResult evaluateIdentifierUsedAsRek(TypeEvalDetails *ed);
+    EvalResult evaluateTypeFlow(TypeEvalDetails *ed);
+    EvalResult evaluateTypeChanges(TypeEvalDetails *ed);
+    void evaluateTypeContext(TypeEvalDetails *ed);
 
     /**
      * This function is called during the execution of evaluateTypes() each
@@ -186,12 +207,12 @@ protected:
 //            const ASTType* ctxType, const ASTNode* ctxNode,
 //            const QStringList& ctxMembers, const ASTNode* targetNode,
 //            const ASTType* targetType, const ASTNode* rootNode);
-    virtual void primaryExpressionTypeChange(const EvaluationDetails &ed);
+    virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed);
 
     /**
      * @return a string with details about the given type change.
      */
-    QString typeChangeInfo(const EvaluationDetails &ed);
+    QString typeChangeInfo(const TypeEvalDetails &ed);
 
     virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
 
@@ -262,6 +283,9 @@ private:
     ASTNodeNodeMHash _assignedNodesRev;
     int _sizeofLong;
     EvalPhase _phase;
+    int _noOfPhase1Runs;
+    int _assignments;
+    int _assignmentsTotal;
 };
 
 

@@ -80,7 +80,8 @@ bool ASTType::equalTo(const ASTType* other, bool exactMatch) const
 
 
 ASTTypeEvaluator::ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong)
-    : ASTWalker(ast), _sizeofLong(sizeofLong), _phase(epPointsTo)
+    : ASTWalker(ast), _sizeofLong(sizeofLong), _phase(epPointsTo),
+      _noOfPhase1Runs(0), _assignmentsTotal(0)
 {
 }
 
@@ -97,16 +98,29 @@ ASTTypeEvaluator::~ASTTypeEvaluator()
 bool ASTTypeEvaluator::evaluateTypes()
 {
 	_typeNodeStack.clear();
+	_evalNodeStack.clear();
+	_noOfPhase1Runs = 0;
 
-	// Phase one: points-to analysis
-	_phase = epPointsTo;
-	walkTree();
-	if (_stopWalking)
-		return false;
+	// Repeat phase 1 and 2 until no more assignments were added
+	do {
+		_assignments = 0;
+		++_noOfPhase1Runs;
+		// Phase one: points-to analysis
+		_phase = epPointsTo;
+		walkTree();
+		_assignmentsTotal += _assignments;
 
-	// Phase 2: reverse points-to analysis
-	_phase = epPointsToRev;
-	walkTree();
+		if (!_stopWalking && _assignments > 0) {
+			// Phase 2: reverse points-to analysis
+			_phase = epPointsToRev;
+			walkTree();
+		}
+
+		debugmsg("Round " << _noOfPhase1Runs << ": " << _assignments
+				 << " assignments, " << _assignmentsTotal << " total");
+//		break;
+	} while (!_stopWalking && _assignments > 0);
+
 	if (_stopWalking)
 		return false;
 
@@ -2491,98 +2505,187 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
     if (!node)
         return;
 
-    // Is this somewhere in the right-hand of an assignment expression or
-    // of an init declarator?
-    const ASTNode *rNode = 0, *root = node, *postExNode = 0;
-    // Dereference counter
-    int deref = 0;
+    PointsToEvalState es(node, node);
+    evaluateIdentifierPointsToRek(&es);
+}
+
+
+void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
+{
+    // Check for endless recursions
+    if (_evalNodeStack.contains(es->root))
+        return;
+    // Push current root on the recursion tracking stack, gets auto-popped later
+    StackAutoPopper<ASTNodeStack> autoPopper(&_evalNodeStack, es->root);
+
     QString op;
 
-    while (root) {
+    ASTNodeNodeMHash::const_iterator it, e = _assignedNodesRev.end();
+    PointsToEvalState rek_es;
+    int localDerefCount = 0;
+
+    while (es->root) {
+        // Was this node assigned to other variables?
+        it = _assignedNodesRev.find(es->root);
+        if (it != e) {
+            if (es->interLinks.isEmpty() || !es->lastLinkDerefCount ||
+                localDerefCount >= es->lastLinkDerefCount)
+            {
+                for (; it != e && it.key() == es->root; ++it) {
+                    rek_es = *es;
+                    rek_es.root = it.value().node;
+                    rek_es.lastLinkDerefCount = it.value().derefCount;
+                    rek_es.interLinks.insert(es->root,  rek_es.root);
+                    evaluateIdentifierPointsToRek(&rek_es);
+                }
+            }
+            // It's not the same pointer of the deref counters don't not match!
+            else {
+                debugmsg(QString("Skipping all links from %1 %2:%3 because "
+                                 "previous deref counter mismatch (%5 < %6)")
+                         .arg(ast_node_type_to_str(es->root))
+                         .arg(es->root->start->line)
+                         .arg(es->root->start->charPosition)
+                         .arg(localDerefCount)
+                         .arg(es->lastLinkDerefCount));
+            }
+        }
+
         // Find out the situation in which the identifier is used
-        switch (root->type) {
+        switch (es->root->type) {
+        case nt_additive_expression:
+        case nt_and_expression:
+        case nt_equality_expression:
+        case nt_exclusive_or_expression:
+        case nt_inclusive_or_expression:
+        case nt_logical_and_expression:
+        case nt_logical_or_expression:
+        case nt_multiplicative_expression:
+        case nt_relational_expression:
+        case nt_shift_expression:
+            // A binary operation with two operands yields no valid lvalue
+            if (es->root->u.binary_expression.left && es->root->u.binary_expression.right)
+                es->validLvalue = false;
+            break;
+
         case nt_assignment_expression:
             // Is this in the left-hand of an assignment expression?
-            if (rNode == root->u.assignment_expression.lvalue &&
-                root->u.assignment_expression.assignment_expression)
+            if (es->rNode == es->root->u.assignment_expression.lvalue &&
+                es->root->u.assignment_expression.assignment_expression)
             {
+                // Must be a valid lvalue
+                if (!es->validLvalue || es->derefCount < 0)
+                    return;
+                // Ignore cases where we have a = b, replaced left-hand a with
+                // right-hand b, leading to b = b.
+                if (es->interLinks.contains(
+                        es->root->u.assignment_expression.assignment_expression))
+                    return;
+
                 QString op = antlrTokenToStr(
-                            root->u.assignment_expression.assignment_operator);
+                            es->root->u.assignment_expression.assignment_operator);
                 // Ignore assignment operators other than "="
                 if (op != "=")
                     return;
 
-                const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
+                const ASTSymbol* sym = findSymbolOfPrimaryExpression(es->srcNode);
                 // Record assignments for variables and parameters
-                if (sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
-                    node->scope->varAssignment(
-                                sym->name(),
-                                root->u.assignment_expression.assignment_expression,
-                                deref);
+                if (sym->type() & (stVariableDecl|stVariableDef|stFunctionParam)) {
+                    if (es->srcNode->scope->varAssignment(
+                            sym->name(),
+                            es->root->u.assignment_expression.assignment_expression,
+                            es->derefCount))
+                    {
+                        ++_assignments;
+                    }
+                }
                 return;
             }
             // Is this in the right-hand of an assignment expression?
-            else if (root->u.assignment_expression.lvalue &&
-               rNode == root->u.assignment_expression.assignment_expression)
+            else if (es->root->u.assignment_expression.lvalue &&
+               es->rNode == es->root->u.assignment_expression.assignment_expression)
             {
                 return;
             }
             break;
 
+        case nt_conditional_expression:
+            // A conditional expression with '?' operator yields no valid lvalue
+            if (es->root->u.conditional_expression.conditional_expression)
+                es->validLvalue = false;
+            break;
+
         case nt_init_declarator:
             // Is this in the left-hand of an init declarator?
-            if (rNode == root->u.init_declarator.declarator &&
-                root->u.init_declarator.initializer)
+            if (es->rNode == es->root->u.init_declarator.declarator &&
+                es->root->u.init_declarator.initializer)
             {
-                const ASTSymbol* sym = findSymbolOfDirectDeclarator(node);
+                // Must be a valid lvalue
+                if (!es->validLvalue || es->derefCount < 0)
+                    return;
+
+                const ASTSymbol* sym = findSymbolOfDirectDeclarator(es->srcNode);
                 assert(sym != 0);
                 // Record assignments for variables and parameters
                 if (sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
                 {
-                    node->scope->varAssignment(
+                    if (es->srcNode->scope->varAssignment(
                                 sym->name(),
-                                root->u.init_declarator.initializer,
-                                deref);
-                    return;
+                                es->root->u.init_declarator.initializer,
+                                es->derefCount))
+                    {
+                        ++_assignments;
+                    }
                 }
             }
             break;
 
         case nt_initializer:
             // Is this an array or struct initializer "struct foo f = {...}" ?
-            if (root->parent && root->parent->type == nt_initializer)
+            if (es->root->parent && es->root->parent->type == nt_initializer)
                 return;
             break;
 
         case nt_jump_statement_return:
             // An identifier underneath a return should be the initializer
-            assert(root->u.jump_statement.initializer != 0);
+            assert(es->root->u.jump_statement.initializer != 0);
             // Treat any return statement as an assignment to the function
             // definition symbol
-            root->scope->varAssignment(embeddingFuncSymbol(root)->name(),
-                                       root->u.jump_statement.initializer,
-                                       deref);
-            return;
+            if (es->root->scope->varAssignment(
+                        embeddingFuncSymbol(es->root)->name(),
+                        es->root->u.jump_statement.initializer,
+                        es->derefCount))
+            {
+                ++_assignments;
+            }
 
         case nt_postfix_expression:
-            if (root->u.postfix_expression.primary_expression == node) {
+            if (es->root->u.postfix_expression.primary_expression == es->srcNode) {
                 // Ignore expression that have postfix expression suffixes. They
                 // are captured during the used-as analysis.
-                if (root->u.postfix_expression.postfix_expression_suffix_list)
-                    return;
+                if (es->root->u.postfix_expression.postfix_expression_suffix_list)
+                    break;
 
-                postExNode = root;
+                es->postExNode = es->root;
             }
             break;
 
         case nt_unary_expression_op:
-            op = antlrTokenToStr(root->u.unary_expression.unary_operator);
-            if (op == "*")
-                ++deref;
-            else if (op == "&")
-                --deref;
-            else if (op == "&&")
-                deref -= 2;
+            op = antlrTokenToStr(es->root->u.unary_expression.unary_operator);
+            if (op == "*") {
+                ++es->derefCount;
+                ++localDerefCount;
+            }
+            else if (op == "&") {
+                --es->derefCount;
+                --localDerefCount;
+            }
+            else if (op == "&&") {
+                es->derefCount -= 2;
+                localDerefCount -= 2;
+            }
+            else
+                es->validLvalue = true;
             break;
 
         // Types we have to skip to come to a decision
@@ -2602,7 +2705,6 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
         case nt_declaration:
         case nt_expression_statement:
         case nt_function_definition:
-        case nt_multiplicative_expression:
         case nt_parameter_declaration:
         case nt_struct_declarator:
             return;
@@ -2610,17 +2712,19 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
         default:
             typeEvaluatorError(QString("Unhandled node type \"%1\" in %2 at "
                                        "%3:%4:%5")
-                               .arg(ast_node_type_to_str(root))
+                               .arg(ast_node_type_to_str(es->root))
                                .arg(__PRETTY_FUNCTION__)
                                .arg(_ast->fileName())
-                               .arg(root->start->line)
-                               .arg(root->start->charPosition));
+                               .arg(es->root->start->line)
+                               .arg(es->root->start->charPosition));
         }
 
         // Otherwise go up
-        rNode = root;
-        root = root->parent;
+        es->rNode = es->root;
+        es->root = es->root->parent;
     }
+
+    return;
 }
 
 
@@ -2646,7 +2750,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRev(const ASTNode *node)
 
 
 ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
-        EvaluationDetails* ed)
+        TypeEvalDetails* ed)
 {
     const ASTNode *lNode = 0, *rNode = ed->srcNode;
     ASTType *lType = 0;
@@ -2655,20 +2759,35 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
     int derefs = 0;
 
     ASTNodeNodeMHash::const_iterator it, e = _assignedNodesRev.end();
-    EvaluationDetails rek_ed;
+    TypeEvalDetails rek_ed;
 
     // Is this somewhere in the right-hand of an assignment expression or
     // of an init declarator?
     while (ed->rootNode) {
         // Was this node assigned to other variables?
-        for (it = _assignedNodesRev.find(ed->rootNode);
-             it != e && it.key() == ed->rootNode;
-             ++it)
-        {
-            rek_ed = *ed;
-            rek_ed.rootNode = it.value().node; /// @todo check derefCount
-            rek_ed.interLinks.insert(ed->rootNode, rek_ed.rootNode);
-            evaluateIdentifierUsedAsRek(&rek_ed);
+        it = _assignedNodesRev.find(ed->rootNode);
+        if (it != e) {
+            if (ed->interLinks.isEmpty() || !ed->lastLinkDerefCount ||
+                derefs >= ed->lastLinkDerefCount)
+            {
+                for (; it != e && it.key() == ed->rootNode; ++it) {
+                    rek_ed = *ed;
+                    rek_ed.rootNode = it.value().node;
+                    rek_ed.lastLinkDerefCount = it.value().derefCount;
+                    rek_ed.interLinks.insert(ed->rootNode, rek_ed.rootNode);
+                    evaluateIdentifierUsedAsRek(&rek_ed);
+                }
+            }
+            // It's not the same pointer of the deref counters don't not match!
+            else {
+                debugmsg(QString("Skipping all links from %1 %2:%3 because "
+                                 "previous deref counter mismatch (%5 < %6)")
+                         .arg(ast_node_type_to_str(ed->rootNode))
+                         .arg(ed->rootNode->start->line)
+                         .arg(ed->rootNode->start->charPosition)
+                         .arg(derefs)
+                         .arg(ed->lastLinkDerefCount));
+            }
         }
 
         // Find out the situation in which the identifier is used
@@ -2825,6 +2944,8 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                 return erNoAssignmentUse;
             if ("&" == op)
                 --derefs;
+            else if ("&&" == op)
+                derefs -= 2;
             // Dereferencing is a type usage, so if the type has already been
             // casted, this is the first effective type change
             else if ("*" == op) {
@@ -2864,6 +2985,21 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
 
     while_exit:
 
+    // It's not the same pointer of the deref counters don't not match!
+    if (!ed->interLinks.isEmpty() && ed->lastLinkDerefCount
+        && derefs < ed->lastLinkDerefCount)
+    {
+        debugmsg(QString("Skipping change in %1 %2:%3 because previous deref "
+                         "counter mismatch (%4 < %5)")
+                 .arg(ast_node_type_to_str(ed->rootNode))
+                 .arg(ed->rootNode->start->line)
+                 .arg(ed->rootNode->start->charPosition)
+                 .arg(derefs)
+                 .arg(ed->lastLinkDerefCount));
+        return erInvalidTransition;
+    }
+
+
 //    ed->srcNode = ed->primExNode;
     ed->targetNode = lNode;
     ed->targetType = lType;
@@ -2889,7 +3025,7 @@ typedef QList<ASTType*> TypeChain;
 
 
 ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
-        EvaluationDetails* ed)
+        TypeEvalDetails* ed)
 {
     // Find the chain of changing types up to ae on the right-hand
     TypeChain typeChain;
@@ -2939,9 +3075,9 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
         }
 
         // Follow the inter-connecting links, if existent, otherwise go up
-        if (ed->interLinks.contains(p))
-            p = ed->interLinks[p];
-        else
+//        if (ed->interLinks.contains(p))
+//            p = ed->interLinks[p];
+//        else
             p = p->parent;
     }
 
@@ -3020,7 +3156,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
 }
 
 
-void ASTTypeEvaluator::evaluateTypeContext(EvaluationDetails* ed)
+void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
 {
     // Find out the context of type change
     ed->ctxNode = ed->primExNode;
@@ -3163,7 +3299,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 //             << antlrTokenToStr(node->u.primary_expression.identifier)
 //             << "\" at " << node->start->line << ":" << node->start->charPosition);
 
-    EvaluationDetails ed;
+    TypeEvalDetails ed;
     ed.srcNode = node;
     ed.primExNode = node;
     ed.rootNode = node->parent;
@@ -3174,7 +3310,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 
 
 ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
-        EvaluationDetails *ed)
+        TypeEvalDetails *ed)
 {
     ASTTypeEvaluator::EvalResult ret;
 
@@ -3216,7 +3352,7 @@ inline bool srcLineLessThan(const ASTNode* n1, const ASTNode* n2)
 }
 
 
-QString ASTTypeEvaluator::typeChangeInfo(const EvaluationDetails &ed)
+QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed)
 {
     ASTSourcePrinter printer(_ast);
 #   define INDENT "    "
@@ -3250,7 +3386,7 @@ QString ASTTypeEvaluator::typeChangeInfo(const EvaluationDetails &ed)
 }
 
 
-void ASTTypeEvaluator::primaryExpressionTypeChange(const EvaluationDetails &ed)
+void ASTTypeEvaluator::primaryExpressionTypeChange(const TypeEvalDetails &ed)
 {
 	checkNodeType(ed.srcNode, nt_primary_expression);
 	checkNodeType(ed.srcNode->parent, nt_postfix_expression);
