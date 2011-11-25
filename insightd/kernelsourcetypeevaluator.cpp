@@ -35,7 +35,7 @@ KernelSourceTypeEvaluator::~KernelSourceTypeEvaluator()
 
 
 void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
-        const EvaluationDetails &ed)
+        const TypeEvalDetails &ed)
 {
     // Ignore all usages of a pointer as an integer, we cannot learn anything
     // from that

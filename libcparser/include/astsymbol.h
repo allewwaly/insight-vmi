@@ -32,6 +32,7 @@ struct AssignedNode {
         : node(0), derefCount(0) {}
     AssignedNode(const ASTNode* node, int derefCount)
         : node(node), derefCount(derefCount) {}
+
     const ASTNode* node;
     int derefCount;
 
