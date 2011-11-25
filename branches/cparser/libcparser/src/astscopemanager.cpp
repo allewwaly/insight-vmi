@@ -53,7 +53,7 @@ void ASTScope::add(const QString& name, ASTSymbolType type, struct ASTNode* node
 }
 
 
-void ASTScope::varAssignment(const QString &name, const ASTNode *assignedNode,
+bool ASTScope::varAssignment(const QString &name, const ASTNode *assignedNode,
                              int derefCount)
 {
     // Search for variables, parameters and functions with given name
@@ -62,12 +62,13 @@ void ASTScope::varAssignment(const QString &name, const ASTNode *assignedNode,
             (p->_symbols[name]->type() &
              (stVariableDecl|stVariableDef|stFunctionParam|stFunctionDef)))
         {
-            p->_symbols[name]->appendAssignedNode(assignedNode, derefCount);
-            return;
+            return p->_symbols[name]->appendAssignedNode(assignedNode,
+                                                         derefCount);
         }
     }
     // We should never come here
     debugerr("Could not find variable with name \"" << name << "\" in scope!");
+    return false;
 }
 
 

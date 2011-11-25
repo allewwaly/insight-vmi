@@ -159,14 +159,26 @@ void ASTDotGraph::printDotGraphTokenList(pASTTokenList list,
 
 
 void ASTDotGraph::printDotGraphConnection(pANTLR3_COMMON_TOKEN src,
-                                     const ASTNode* dest)
+                                          const ASTNode* dest, int derefCount)
 {
     QString srcId = getTokenId(src);
     QString destId = getNodeId(dest);
+    QString label;
+    if (derefCount) {
+        if (derefCount < 0)
+            label.fill(QChar('&'), -derefCount);
+        else
+            label.fill(QChar('*'), derefCount);
+
+        label = QString(" taillabel=< <FONT " FONT_DEF_STR ">%1</FONT> > "
+                        "labelfloat=true labelangle=-45 labeldistance=2")
+                    .arg(label);
+    }
     _out << QString("\t\ttoken_%1 -> node_%2 [constraint=false style=dotted "
-                    "layer=\"assign\"];")
+                    "layer=\"assign\"%3];")
             .arg(srcId)
             .arg(destId)
+            .arg(label)
          << endl;
 }
 
@@ -487,10 +499,15 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
         if (_eval && node->u.primary_expression.identifier) {
             const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);
             if (sym && !sym->assignedAstNodes().isEmpty()) {
-                for (int i = 0; i < sym->assignedAstNodes().size(); ++i)
+                for (AssignedNodeSet::const_iterator it =
+                        sym->assignedAstNodes().begin(),
+                     e = sym->assignedAstNodes().end(); it != e; ++it)
+                {
                     printDotGraphConnection(
                                 node->u.primary_expression.identifier,
-                                sym->assignedAstNodes().at(i).node);
+                                it->node,
+                                it->derefCount);
+                }
             }
         }
 
@@ -847,7 +864,7 @@ int ASTDotGraph::writeDotGraph(const QString& fileName)
             << "digraph G {" << endl;
     _out << "\tgraph [ordering=out];" << endl;
     _out << "\tlayers = \"ast:assign\";" << endl;
-    _out << "\tedge [layer=\"ast\"];" << endl;
+    _out << "\tedge [fontname=Helvetica fontsize=" FONT_SIZE " layer=\"ast\"];" << endl;
     _out << "\tnode [fontname=Helvetica fontsize=" FONT_SIZE " layer=\"ast\"];" << endl
         << endl;
 

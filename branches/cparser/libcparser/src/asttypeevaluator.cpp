@@ -2633,11 +2633,14 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRev(const ASTNode *node)
     const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
     // For every node that has been assigned to sym, we insert an inverse entry
     // into the hash table
-    for (int i = 0; i < sym->assignedAstNodes().size(); ++i) {
-        AssignedNode assigned = sym->assignedAstNodes().at(i);
+    for (AssignedNodeSet::const_iterator it =
+            sym->assignedAstNodes().begin(),
+            e = sym->assignedAstNodes().end();
+         it != e; ++it)
+    {
         /// @todo Invert derefCount here???
-        _assignedNodesRev.insertMulti(assigned.node,
-                                      AssignedNode(node, assigned.derefCount));
+        _assignedNodesRev.insertMulti(it->node,
+                                      AssignedNode(node, it->derefCount));
     }
 }
 

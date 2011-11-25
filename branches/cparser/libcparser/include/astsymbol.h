@@ -22,6 +22,7 @@ extern "C" {
 #include <astsymboltypes.h>
 #include <QString>
 #include <QList>
+#include <QSet>
 
 // forward declaration
 struct ASTNode;
@@ -33,7 +34,19 @@ struct AssignedNode {
         : node(node), derefCount(derefCount) {}
     const ASTNode* node;
     int derefCount;
+
+    inline bool operator==(const AssignedNode& other) const
+    {
+        return node == other.node && derefCount == other.derefCount;
+    }
 };
+
+inline uint qHash(const AssignedNode& an)
+{
+    return qHash(an.node) ^ qHash(an.derefCount);
+}
+
+typedef QSet<AssignedNode> AssignedNodeSet;
 
 /**
  * This class represents a symbol parsed from the source code.
@@ -43,7 +56,7 @@ class ASTSymbol
 	QString _name;
 	ASTSymbolType _type;
 	struct ASTNode* _astNode;
-	QList<AssignedNode> _assignedAstNodes;
+	AssignedNodeSet _assignedAstNodes;
 
 public:
 	/**
@@ -92,15 +105,15 @@ public:
 	/**
 	 * @return list of nodes that have been assigned to this symbol
 	 */
-	const QList<AssignedNode>& assignedAstNodes() const;
+	const AssignedNodeSet& assignedAstNodes() const;
 
 	/**
 	 * Append a new ASTNode that has been assigned to this symbol.
 	 * @param node the node to append
 	 * @param derefCount number of dereferences for this node
-	 * @return a reference to this object
+	 * @return \c true if element did not already exist, \c false otherwise
 	 */
-	void appendAssignedNode(const ASTNode* node, int derefCount);
+	bool appendAssignedNode(const ASTNode* node, int derefCount);
 
 	/**
 	 * @return the name of the symbol
@@ -159,15 +172,20 @@ inline const ASTNode* ASTSymbol::astNode() const
 }
 
 
-inline const QList<AssignedNode> &ASTSymbol::assignedAstNodes() const
+inline const AssignedNodeSet &ASTSymbol::assignedAstNodes() const
 {
     return _assignedAstNodes;
 }
 
 
-inline void ASTSymbol::appendAssignedNode(const ASTNode *node, int derefCount)
+inline bool ASTSymbol::appendAssignedNode(const ASTNode *node, int derefCount)
 {
-    _assignedAstNodes.append(AssignedNode(node, derefCount));
+    AssignedNode an(node, derefCount);
+    if (!_assignedAstNodes.contains(an)) {
+        _assignedAstNodes.insert(an);
+        return true;
+    }
+    return false;
 }
 
 
