@@ -172,7 +172,7 @@ void ASTDotGraph::printDotGraphConnection(pANTLR3_COMMON_TOKEN src,
 
         label = QString(" taillabel=< <FONT " FONT_DEF_STR ">%1</FONT> > "
                         "labelfloat=true labelangle=-45 labeldistance=2")
-                    .arg(label);
+                    .arg(dotEscape(label));
     }
     _out << QString("\t\ttoken_%1 -> node_%2 [constraint=false style=dotted "
                     "layer=\"assign\"%3];")
