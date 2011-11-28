@@ -19,6 +19,11 @@
 #include <sys/wait.h>
 #include <astsourceprinter.h>
 
+#ifdef DEBUG
+#define DEBUG_POINTS_TO 1
+#define DEBUG_USED_AS 1
+#endif
+
 #define checkNodeType(node, expected_type) \
     if ((node)->type != (expected_type)) { \
             typeEvaluatorError( \
@@ -116,8 +121,9 @@ bool ASTTypeEvaluator::evaluateTypes()
 			walkTree();
 		}
 
-		debugmsg("Round " << _noOfPhase1Runs << ": " << _assignments
-				 << " assignments, " << _assignmentsTotal << " total");
+		debugmsg("********** Round " << _noOfPhase1Runs << ": " << _assignments
+				 << " assignments, " << _assignmentsTotal << " total **********");
+//		debugmsg("Forced loop exit");
 //		break;
 	} while (!_stopWalking && _assignments > 0);
 
@@ -2506,6 +2512,23 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
         return;
 
     PointsToEvalState es(node, node);
+
+    // Find symbol of source node
+    switch (node->type) {
+    case nt_direct_declarator:
+        es.sym = findSymbolOfDirectDeclarator(node);
+        break;
+    case nt_primary_expression:
+        es.sym = findSymbolOfPrimaryExpression(node);
+        break;
+    case nt_jump_statement_return:
+        es.sym = embeddingFuncSymbol(node);
+        break;
+    default:
+        typeEvaluatorError(QString("Unexpected node type: %1")
+                           .arg(ast_node_type_to_str(node)));
+    }
+
     evaluateIdentifierPointsToRek(&es);
 }
 
@@ -2517,6 +2540,32 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
         return;
     // Push current root on the recursion tracking stack, gets auto-popped later
     StackAutoPopper<ASTNodeStack> autoPopper(&_evalNodeStack, es->root);
+
+#ifdef DEBUG_POINTS_TO
+    QString s;
+    for (ASTNodeNodeHash::const_iterator it = es->interLinks.begin();
+         it != es->interLinks.end(); ++it)
+    {
+        s += QString("\n    %1:%2:%3 => %4:%5:%6")
+                .arg(ast_node_type_to_str(it.key()))
+                .arg(it.key()->start->line)
+                .arg(it.key()->start->charPosition)
+                .arg(ast_node_type_to_str(it.value()))
+                .arg(it.value()->start->line)
+                .arg(it.value()->start->charPosition);
+        if (it.value()->type == nt_primary_expression) {
+            s += QString(" (%1)").arg(
+                        findSymbolOfPrimaryExpression(it.value())->name());
+        }
+    }
+
+    debugmsg(QString("Evaluating points-to for \"%1\" at %2:%3%4")
+             .arg(es->sym->name())
+             .arg(es->srcNode->start->line)
+             .arg(es->srcNode->start->charPosition)
+             .arg(s));
+#endif
+
 
     QString op;
 
@@ -2532,6 +2581,13 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 localDerefCount >= es->lastLinkDerefCount)
             {
                 for (; it != e && it.key() == es->root; ++it) {
+//                    // Skip all inter-links that lead back to the source node
+//                    if (it.value().node == es->srcNode)
+//                        continue;
+//                    // Skip all targets that are already targets of this symbol
+//                    if (es->sym->assignedAstNodes().contains(it.value()))
+//                        continue;
+
                     rek_es = *es;
                     rek_es.root = it.value().node;
                     rek_es.lastLinkDerefCount = it.value().derefCount;
@@ -2539,6 +2595,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                     evaluateIdentifierPointsToRek(&rek_es);
                 }
             }
+#ifdef DEBUG_POINTS_TO
             // It's not the same pointer of the deref counters don't not match!
             else {
                 debugmsg(QString("Skipping all links from %1 %2:%3 because "
@@ -2549,6 +2606,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                          .arg(localDerefCount)
                          .arg(es->lastLinkDerefCount));
             }
+#endif
         }
 
         // Find out the situation in which the identifier is used
@@ -2581,6 +2639,16 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 if (es->interLinks.contains(
                         es->root->u.assignment_expression.assignment_expression))
                     return;
+                // No. of dereferences must match
+                if (!es->interLinks.isEmpty() &&
+                    es->derefCount &&
+                    localDerefCount != es->lastLinkDerefCount)
+                {
+                    debugmsg(QString("derefCount does not match (%1 != %2)")
+                             .arg(localDerefCount)
+                             .arg(es->lastLinkDerefCount));
+                    return;
+                }
 
                 QString op = antlrTokenToStr(
                             es->root->u.assignment_expression.assignment_operator);
@@ -2588,14 +2656,25 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 if (op != "=")
                     return;
 
-                const ASTSymbol* sym = findSymbolOfPrimaryExpression(es->srcNode);
                 // Record assignments for variables and parameters
-                if (sym->type() & (stVariableDecl|stVariableDef|stFunctionParam)) {
+                if (es->sym->type() & (stVariableDecl|stVariableDef|stFunctionParam)) {
                     if (es->srcNode->scope->varAssignment(
-                            sym->name(),
+                            es->sym->name(),
                             es->root->u.assignment_expression.assignment_expression,
                             es->derefCount))
                     {
+#ifdef DEBUG_POINTS_TO
+                        const ASTNode* n =
+                                es->root->u.assignment_expression.assignment_expression;
+                        debugmsg(QString("Symbol \"%1\" at %2:%3 points to %4:%5:%6 (deref %7)")
+                                 .arg(es->sym->name())
+                                 .arg(es->srcNode->start->line)
+                                 .arg(es->srcNode->start->charPosition)
+                                 .arg(ast_node_type_to_str(n))
+                                 .arg(n->start->line)
+                                 .arg(n->start->charPosition)
+                                 .arg(es->derefCount));
+#endif
                         ++_assignments;
                     }
                 }
@@ -2623,17 +2702,31 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 // Must be a valid lvalue
                 if (!es->validLvalue || es->derefCount < 0)
                     return;
+                // No. of dereferences must match
+                /// @todo check if this is correct!
+                if (localDerefCount != es->lastLinkDerefCount)
+                    return;
 
-                const ASTSymbol* sym = findSymbolOfDirectDeclarator(es->srcNode);
-                assert(sym != 0);
                 // Record assignments for variables and parameters
-                if (sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
+                if (es->sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
                 {
                     if (es->srcNode->scope->varAssignment(
-                                sym->name(),
+                                es->sym->name(),
                                 es->root->u.init_declarator.initializer,
                                 es->derefCount))
                     {
+#ifdef DEBUG_POINTS_TO
+                        const ASTNode* n =
+                                es->root->u.init_declarator.initializer;
+                        debugmsg(QString("Symbol \"%1\" at %2:%3 points to %4:%5:%6 (deref %7)")
+                                 .arg(es->sym->name())
+                                 .arg(es->srcNode->start->line)
+                                 .arg(es->srcNode->start->charPosition)
+                                 .arg(ast_node_type_to_str(n))
+                                 .arg(n->start->line)
+                                 .arg(n->start->charPosition)
+                                 .arg(es->derefCount));
+#endif
                         ++_assignments;
                     }
                 }
@@ -2656,6 +2749,18 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                         es->root->u.jump_statement.initializer,
                         es->derefCount))
             {
+#ifdef DEBUG_POINTS_TO
+                const ASTNode* n =
+                        es->root->u.jump_statement.initializer;
+                debugmsg(QString("Symbol \"%1\" at %2:%3 points to %4:%5:%6 (deref %7)")
+                         .arg(es->sym->name())
+                         .arg(es->srcNode->start->line)
+                         .arg(es->srcNode->start->charPosition)
+                         .arg(ast_node_type_to_str(n))
+                         .arg(n->start->line)
+                         .arg(n->start->charPosition)
+                         .arg(es->derefCount));
+#endif
                 ++_assignments;
             }
 
@@ -2771,6 +2876,13 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                 derefs >= ed->lastLinkDerefCount)
             {
                 for (; it != e && it.key() == ed->rootNode; ++it) {
+                    // Skipp all inter-links that lead back to the source node
+                    if (it.value().node == ed->srcNode)
+                        continue;
+                    // Skip all targets that are target of this symbol anyway
+                    if (ed->sym->assignedAstNodes().contains(it.value()))
+                            continue;
+
                     rek_ed = *ed;
                     rek_ed.rootNode = it.value().node;
                     rek_ed.lastLinkDerefCount = it.value().derefCount;
@@ -2866,7 +2978,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
             return erNoAssignmentUse;
 
         case nt_expression_statement:
-            // Expressions might be the return value fu compound braces
+            // Expressions might be the return value of compound braces
             // statements if the appear last
             if (ed->rootNode->parent->type != nt_compound_braces_statement)
                 return erNoAssignmentUse;
@@ -3033,6 +3145,8 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
     typeChain.append(typeofNode(ed->postExNode));
     int forcedChanges = 0;
     const ASTNode* p = ed->postExNode;
+    ASTNodeNodeHash interLinks = ed->interLinks;
+
     while (p != ed->rootNode) {
         ASTType* t = typeofNode(p);
         assert(t != 0);
@@ -3075,9 +3189,26 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
         }
 
         // Follow the inter-connecting links, if existent, otherwise go up
-//        if (ed->interLinks.contains(p))
-//            p = ed->interLinks[p];
-//        else
+        if (interLinks.contains(p)) {
+#ifdef DEBUG_USED_AS
+            QString s = QString("Following inter-link %1:%2:%3 => %4:%5:%6")
+                    .arg(ast_node_type_to_str(p))
+                    .arg(p->start->line)
+                    .arg(p->start->charPosition)
+                    .arg(ast_node_type_to_str(ed->interLinks[p]))
+                    .arg(ed->interLinks[p]->start->line)
+                    .arg(ed->interLinks[p]->start->charPosition);
+            if (ed->interLinks[p]->type == nt_primary_expression)
+                s += QString(" (%1)").arg(
+                            findSymbolOfPrimaryExpression(ed->interLinks[p])->name());
+            debugmsg(s);
+#endif
+            const ASTNode* tmp = p;
+            p = interLinks[p];
+            // Follow every inter-link at most once
+            interLinks.remove(tmp);
+        }
+        else
             p = p->parent;
     }
 
@@ -3300,10 +3431,12 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 //             << "\" at " << node->start->line << ":" << node->start->charPosition);
 
     TypeEvalDetails ed;
+    ed.sym = findSymbolOfPrimaryExpression(node);
     ed.srcNode = node;
     ed.primExNode = node;
     ed.rootNode = node->parent;
     ed.postExNode = node->parent;
+
 
     return evaluateIdentifierUsedAsRek(&ed);
 }
@@ -3312,6 +3445,31 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
         TypeEvalDetails *ed)
 {
+#ifdef DEBUG_USED_AS
+    QString s;
+    for (ASTNodeNodeHash::const_iterator it = ed->interLinks.begin();
+         it != ed->interLinks.end(); ++it)
+    {
+        s += QString("\n    %1:%2:%3 => %4:%5:%6")
+                .arg(ast_node_type_to_str(it.key()))
+                .arg(it.key()->start->line)
+                .arg(it.key()->start->charPosition)
+                .arg(ast_node_type_to_str(it.value()))
+                .arg(it.value()->start->line)
+                .arg(it.value()->start->charPosition);
+        if (it.value()->type == nt_primary_expression) {
+            s += QString(" (%1)").arg(
+                        findSymbolOfPrimaryExpression(it.value())->name());
+        }
+    }
+
+    debugmsg(QString("Evaluating used-as for \"%1\" at %2:%3%4")
+             .arg(findSymbolOfPrimaryExpression(ed->srcNode)->name())
+             .arg(ed->srcNode->start->line)
+             .arg(ed->srcNode->start->charPosition)
+             .arg(s));
+#endif
+
     ASTTypeEvaluator::EvalResult ret;
 
     // Check for endless recursions
@@ -3334,8 +3492,6 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
     // Evaluate the context of type change
     evaluateTypeContext(ed);
 
-
-    ed->sym = findSymbolOfPrimaryExpression(ed->srcNode);
 
     primaryExpressionTypeChange(*ed);
 
