@@ -74,9 +74,10 @@ typedef QStack<const ASTNode*> ASTNodeStack;
 struct PointsToEvalState
 {
     PointsToEvalState(const ASTNode* node = 0, const ASTNode* root = 0)
-        : srcNode(node), root(root), rNode(0), postExNode(0), derefCount(0),
-          lastLinkDerefCount(0), validLvalue(true)
+        : sym(0), srcNode(node), root(root), rNode(0), postExNode(0),
+          derefCount(0), lastLinkDerefCount(0), validLvalue(true)
     {}
+    const ASTSymbol* sym;
     const ASTNode* srcNode;
     const ASTNode* root;
     const ASTNode* rNode;
