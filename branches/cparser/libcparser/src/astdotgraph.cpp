@@ -104,11 +104,13 @@ inline void ASTDotGraph::printDotGraphTokenLabel(pANTLR3_COMMON_TOKEN token,
     if (!token)
         return;
 
-    _out << QString("\ttoken_%1 [label=< <FONT " FONT_DEF_STR ">%2</FONT> >,style=filled%3];")
-            .arg(getTokenId(token))
-            .arg(dotEscape((const char*)token->getText(token)->chars))
-            .arg(extraStyle ? QString(",%1").arg(extraStyle) : QString())
-        << endl;
+    _out << "\ttoken_" << getTokenId(token)
+         << " [label=< <FONT " FONT_DEF_STR ">"
+         << dotEscape((const char*)token->getText(token)->chars)
+         << "</FONT> >,style=filled";
+    if (extraStyle)
+        _out << "," << extraStyle;
+    _out << "];" << endl;
 }
 
 
@@ -132,11 +134,13 @@ void ASTDotGraph::printDotGraphString(const QString& s,
     static int stringId = 0;
     int id = stringId++;
 
-    _out << QString("\tstring_%1 [label=< <FONT " FONT_DEF_STR ">%2</FONT> >,style=filled%3];")
-            .arg(id)
-            .arg(dotEscape(s))
-            .arg(extraStyle ? QString(",%1").arg(extraStyle) : QString())
-        << endl;
+    _out << "\tstring_" << id << " [label=< <FONT " FONT_DEF_STR ">"
+            << dotEscape(s)
+            << "</FONT> >,style=filled";
+    if (extraStyle)
+        _out << "," << extraStyle;
+    _out << "];" << endl;
+
     _out << QString("\t\tnode_%1 -> string_%2;")
             .arg(parentNodeId)
             .arg(id)
