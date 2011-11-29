@@ -148,8 +148,10 @@ public:
     ASTType* typeofNode(const ASTNode* node);
     int sizeofLong() const;
 
-    const ASTSymbol *findSymbolOfDirectDeclarator(const ASTNode *node);
-    const ASTSymbol *findSymbolOfPrimaryExpression(const ASTNode* node);
+    const ASTSymbol *findSymbolOfDirectDeclarator(const ASTNode *node,
+                                                  bool enableExcpetions = true);
+    const ASTSymbol *findSymbolOfPrimaryExpression(const ASTNode* node,
+                                                   bool enableExcpetions = true);
 
     RealType realTypeOfConstFloat(const ASTNode* node, double* value = 0) const;
     RealType realTypeOfConstInt(const ASTNode* node, quint64* value = 0) const;
