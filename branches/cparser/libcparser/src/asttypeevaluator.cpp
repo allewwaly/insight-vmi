@@ -20,8 +20,8 @@
 #include <astsourceprinter.h>
 
 #ifdef DEBUG
-#define DEBUG_POINTS_TO 1
-#define DEBUG_USED_AS 1
+//#define DEBUG_POINTS_TO 1
+//#define DEBUG_USED_AS 1
 #endif
 
 #define checkNodeType(node, expected_type) \
@@ -120,9 +120,10 @@ bool ASTTypeEvaluator::evaluateTypes()
 			_phase = epPointsToRev;
 			walkTree();
 		}
-
+#ifdef DEBUG_POINTS_TO
 		debugmsg("********** Round " << _noOfPhase1Runs << ": " << _assignments
 				 << " assignments, " << _assignmentsTotal << " total **********");
+#endif
 //		debugmsg("Forced loop exit");
 //		break;
 	} while (!_stopWalking && _assignments > 0);
@@ -2581,13 +2582,6 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 localDerefCount >= es->lastLinkDerefCount)
             {
                 for (; it != e && it.key() == es->root; ++it) {
-//                    // Skip all inter-links that lead back to the source node
-//                    if (it.value().node == es->srcNode)
-//                        continue;
-//                    // Skip all targets that are already targets of this symbol
-//                    if (es->sym->assignedAstNodes().contains(it.value()))
-//                        continue;
-
                     rek_es = *es;
                     rek_es.root = it.value().node;
                     rek_es.lastLinkDerefCount = it.value().derefCount;
@@ -2634,20 +2628,50 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 // Must be a valid lvalue
                 if (!es->validLvalue || es->derefCount < 0)
                     return;
-                // Ignore cases where we have a = b, replaced left-hand a with
-                // right-hand b, leading to b = b.
-                if (es->interLinks.contains(
-                        es->root->u.assignment_expression.assignment_expression))
-                    return;
-                // No. of dereferences must match
-                if (!es->interLinks.isEmpty() &&
-                    es->derefCount &&
-                    localDerefCount != es->lastLinkDerefCount)
-                {
-                    debugmsg(QString("derefCount does not match (%1 != %2)")
-                             .arg(localDerefCount)
-                             .arg(es->lastLinkDerefCount));
-                    return;
+
+                if (!es->interLinks.isEmpty()) {
+                    // Ignore cases where we have a = b, replaced left-hand a with
+                    // right-hand b, leading to b = b.
+                    if (es->interLinks.contains(
+                            es->root->u.assignment_expression.assignment_expression))
+                        return;
+                    // If the lvalue does not include a dereferenced pointer
+                    // after following a link, we shouldn't have followed the
+                    // link, e.g.:
+                    //
+                    // void *p, **q, *r;
+                    // q = &p;    // last link deref = 0
+                    // q = r;     // local deref = 0
+                    if (localDerefCount <= 0) {
+#ifdef DEBUG_POINTS_TO
+                        debugmsg("No dereference of left-hand side after "
+                                 "following an inter-link");
+#endif
+                        return;
+                    }
+                    // If there's an equal no. of dereferences, then the
+                    // contents of the original pointer location is overwritten,
+                    // e.g.:
+                    //
+                    // void *p, **q, *r;
+                    // *q = p;    // last link deref = 1
+                    // *q = r;    // local deref = 1
+                    if (localDerefCount == es->lastLinkDerefCount) {
+#ifdef DEBUG_POINTS_TO
+                        debugmsg(QString("Local deref count is equal to last "
+                                         "link's deref count, so the target "
+                                         "location is overwritten: (%1 == %2)")
+                                 .arg(localDerefCount)
+                                 .arg(es->lastLinkDerefCount));
+#endif
+                        return;
+                    }
+                    // Only if the last link's dereference count is truely lower
+                    // than the local, the link was followed correctly, e.g.:
+                    //
+                    // void *p, **q, *r;
+                    // q = &p;    // last link deref = 0
+                    // *q = r;    // local deref = 1
                 }
 
                 QString op = antlrTokenToStr(
@@ -2807,6 +2831,9 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
         //----------------------------------------------------------------------
         // Types for which we know we're done
         case nt_builtin_function_offsetof:
+        case nt_builtin_function_sizeof:
+        case nt_compound_statement:
+        case nt_constant_expression:
         case nt_declaration:
         case nt_expression_statement:
         case nt_function_definition:
@@ -2847,7 +2874,6 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRev(const ASTNode *node)
             e = sym->assignedAstNodes().end();
          it != e; ++it)
     {
-        /// @todo Invert derefCount here???
         _assignedNodesRev.insertMulti(it->node,
                                       AssignedNode(node, it->derefCount));
     }
@@ -2876,7 +2902,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                 derefs >= ed->lastLinkDerefCount)
             {
                 for (; it != e && it.key() == ed->rootNode; ++it) {
-                    // Skipp all inter-links that lead back to the source node
+                    // Skip all inter-links that lead back to the source node
                     if (it.value().node == ed->srcNode)
                         continue;
                     // Skip all targets that are target of this symbol anyway
@@ -2890,6 +2916,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                     evaluateIdentifierUsedAsRek(&rek_ed);
                 }
             }
+#ifdef DEBUG_USED_AS
             // It's not the same pointer of the deref counters don't not match!
             else {
                 debugmsg(QString("Skipping all links from %1 %2:%3 because "
@@ -2900,6 +2927,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                          .arg(derefs)
                          .arg(ed->lastLinkDerefCount));
             }
+#endif
         }
 
         // Find out the situation in which the identifier is used
@@ -3054,14 +3082,19 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
             // The negation operator results in a boolean expression
             if ("!" == op)
                 return erNoAssignmentUse;
-            if ("&" == op)
+            if ("&" == op) {
                 --derefs;
-            else if ("&&" == op)
+                --ed->derefCount;
+            }
+            else if ("&&" == op) {
                 derefs -= 2;
+                ed->derefCount -= 2;
+            }
             // Dereferencing is a type usage, so if the type has already been
             // casted, this is the first effective type change
             else if ("*" == op) {
                 ++derefs;
+                ++ed->derefCount;
                 if (ed->castExNode)
                     goto cast_expression_type_change;
             }
@@ -3098,9 +3131,12 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
     while_exit:
 
     // It's not the same pointer of the deref counters don't not match!
-    if (!ed->interLinks.isEmpty() && ed->lastLinkDerefCount
-        && derefs < ed->lastLinkDerefCount)
+    // Also, a negative deref counter means a net address operator for which
+    // we cannot record the type changes
+    if (derefs < 0 || ed->derefCount < 0 || (!ed->interLinks.isEmpty() && ed->lastLinkDerefCount
+        && derefs < ed->lastLinkDerefCount))
     {
+#ifdef DEBUG_USED_AS
         debugmsg(QString("Skipping change in %1 %2:%3 because previous deref "
                          "counter mismatch (%4 < %5)")
                  .arg(ast_node_type_to_str(ed->rootNode))
@@ -3108,6 +3144,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                  .arg(ed->rootNode->start->charPosition)
                  .arg(derefs)
                  .arg(ed->lastLinkDerefCount));
+#endif
         return erInvalidTransition;
     }
 
