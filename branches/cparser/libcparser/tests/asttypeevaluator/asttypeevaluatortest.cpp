@@ -841,6 +841,16 @@ TEST_FUNCTION(pointerDerefByArrayOperator)
 }
 
 
+TEST_FUNCTION(compoundBraces)
+{
+    TEST_DATA_COLUMNS;
+    NO_CHANGE("modules.next = ({ int i = 0, j = 1; i += j; h->next; });");
+    CHANGE_LAST("modules.next = ({ void *p; p; });",
+                "p", "Pointer->Void", "", "Pointer->Struct(list_head)");
+
+}
+
+
 TEST_FUNCTION(transitiveEvaluation)
 {
     TEST_DATA_COLUMNS;
@@ -869,7 +879,6 @@ TEST_FUNCTION(transitiveEvaluation)
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
     CHANGE_LAST("long i = (long)modules.next; m = (struct modules*)i;",
                 "i", "Int32", "", "Pointer->Struct(module)");
-
     // Order of statements does not matter
     CHANGE_FIRST("m = h; h = modules.next;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
@@ -900,7 +909,40 @@ TEST_FUNCTION(transitiveEvaluation)
                  "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
     NO_CHANGE2("struct list_head* getModule() { return modules.next; }",
               "h = getModule();");
+    // Transitivity through 1 indirect pointer
+    CHANGE_FIRST("void *p, **q; q = &p; p = modules.next; m = p;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q; q = &p; p = modules.next; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q; q = &p; *q = modules.next; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q; q = &p; *q = modules.next; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
 
+    CHANGE_FIRST("void *p = modules.next, **q = &p; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p = modules.next, **q = &p; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q = &p; *q  = modules.next; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q = &p; *q  = modules.next; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through 2 indirect pointers
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; p = modules.next; m = *q;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; p = modules.next; m = **r;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; *q = modules.next; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; *q = modules.next; m = **r;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; **r = modules.next; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; **r = modules.next; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through 1 direct pointer
+    CHANGE_FIRST("void *p, **q; p = modules.next; *q = p; m = *q;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
 }
 
 
