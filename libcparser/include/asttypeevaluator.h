@@ -109,6 +109,7 @@ struct TypeEvalDetails
         ctxType = 0;
         targetType = 0;
         sym = 0;
+        derefCount = 0;
         lastLinkDerefCount = 0;
         ctxMembers.clear();
         interLinks.clear();
@@ -126,6 +127,7 @@ struct TypeEvalDetails
     ASTType* targetType;
     QStringList ctxMembers;
     const ASTSymbol* sym;
+    int derefCount;
     int lastLinkDerefCount;
     ASTNodeNodeHash interLinks;
 };
