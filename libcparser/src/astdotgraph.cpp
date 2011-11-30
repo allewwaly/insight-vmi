@@ -163,23 +163,25 @@ void ASTDotGraph::printDotGraphTokenList(pASTTokenList list,
 
 
 void ASTDotGraph::printDotGraphConnection(pANTLR3_COMMON_TOKEN src,
-                                          const ASTNode* dest, int derefCount)
+                                          const ASTNode* dest, int derefCount,
+                                          int round)
 {
     QString srcId = getTokenId(src);
     QString destId = getNodeId(dest);
-    QString label;
-    if (derefCount) {
-        if (derefCount < 0)
-            label.fill(QChar('&'), -derefCount);
-        else
-            label.fill(QChar('*'), derefCount);
+    QString label = QString("(%1)").arg(round);
 
-        label = QString(" taillabel=< <FONT " FONT_DEF_STR ">%1</FONT> > "
-                        "labelfloat=true labelangle=-45 labeldistance=2")
-                    .arg(dotEscape(label));
+    if (derefCount) {
+        QString s;
+        if (derefCount < 0)
+            s.fill(QChar('&'), -derefCount);
+        else
+            s.fill(QChar('*'), derefCount);
+
+        label += QString(" <FONT " FONT_DEF_STR ">%1</FONT>").arg(dotEscape(s));
     }
     _out << QString("\t\ttoken_%1 -> node_%2 [constraint=false style=dotted "
-                    "layer=\"assign\"%3];")
+                    "layer=\"assign\" taillabel=< %3 > labelfloat=true "
+                    "labelangle=-45 labeldistance=2];")
             .arg(srcId)
             .arg(destId)
             .arg(label)
@@ -510,7 +512,8 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
                     printDotGraphConnection(
                                 node->u.primary_expression.identifier,
                                 it->node,
-                                it->derefCount);
+                                it->derefCount,
+                                it->addedInRound);
                 }
             }
         }

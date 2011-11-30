@@ -43,7 +43,7 @@ private:
     void printDotGraphTokenList(pASTTokenList list, const QString& delim,
             const QString& nodeId, const char* extraStyle = 0);
     void printDotGraphConnection(pANTLR3_COMMON_TOKEN src, const ASTNode *dest,
-                                 int derefCount);
+                                 int derefCount, int round);
 
     QTextStream _out;
     ASTTypeEvaluator* _eval;
