@@ -70,6 +70,25 @@ typedef QHash<const ASTNode*, const ASTNode*> ASTNodeNodeHash;
 typedef QMultiHash<const ASTNode*, AssignedNode> ASTNodeNodeMHash;
 typedef QList<ASTType*> ASTTypeList;
 typedef QStack<const ASTNode*> ASTNodeStack;
+typedef QSet<const ASTSymbol*> ASTSymbolSet;
+typedef QHash<const ASTNode*, const ASTSymbol*> ASTNodeSymHash;
+typedef QHash<const ASTNode*, ASTSymbolSet> ASTNodeHashSymSet;
+
+struct FollowedSymbol {
+    FollowedSymbol() : sym(0), derefCount(0) {}
+    FollowedSymbol(const ASTSymbol *sym, int derefCount)
+        : sym(sym), derefCount(derefCount) {}
+    const ASTSymbol *sym;
+    int derefCount;
+
+    bool operator==(const FollowedSymbol& other) const
+    {
+        return sym == other.sym && derefCount == other.derefCount;
+    }
+};
+
+typedef QStack<FollowedSymbol> ASTFollowedSymStack;
+
 
 struct PointsToEvalState
 {
@@ -158,9 +177,10 @@ public:
 
 protected:
     enum EvalPhase {
-        epPointsTo,
-        epPointsToRev,
-        epUsedAs
+        epFindSymbols = (1 << 0),
+        epPointsTo    = (1 << 1),
+        epPointsToRev = (1 << 2),
+        epUsedAs      = (1 << 3)
     };
 
     enum EvalResult {
@@ -180,6 +200,7 @@ protected:
 
 //    virtual void beforeChildren(const ASTNode *node, int flags);
     virtual void afterChildren(const ASTNode *node, int flags);
+    void collectSymbols(const ASTNode *node);
     void evaluateIdentifierPointsTo(const ASTNode *node);
     void evaluateIdentifierPointsToRek(PointsToEvalState *es);
     void evaluateIdentifierPointsToRev(const ASTNode *node);
@@ -285,10 +306,13 @@ private:
     ASTTypeList _allTypes;
     ASTNodeStack _typeNodeStack;
     ASTNodeStack _evalNodeStack;
+    ASTFollowedSymStack _followedSymStack;
     ASTNodeNodeMHash _assignedNodesRev;
+    ASTNodeHashSymSet _symbolsBelowNode;
+    ASTNodeSymHash _symbolOfNode;
     int _sizeofLong;
     EvalPhase _phase;
-    int _noOfPhase1Runs;
+    int _pointsToRound;
     int _assignments;
     int _assignmentsTotal;
 };

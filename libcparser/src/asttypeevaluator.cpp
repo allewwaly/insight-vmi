@@ -13,7 +13,6 @@
 #include <astscopemanager.h>
 #include <realtypes.h>
 #include <debug.h>
-#include <astnodecounter.h>
 #include <QStringList>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -85,8 +84,8 @@ bool ASTType::equalTo(const ASTType* other, bool exactMatch) const
 
 
 ASTTypeEvaluator::ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong)
-    : ASTWalker(ast), _sizeofLong(sizeofLong), _phase(epPointsTo),
-      _noOfPhase1Runs(0), _assignmentsTotal(0)
+    : ASTWalker(ast), _sizeofLong(sizeofLong), _phase(epFindSymbols),
+      _pointsToRound(0), _assignmentsTotal(0)
 {
 }
 
@@ -104,28 +103,34 @@ bool ASTTypeEvaluator::evaluateTypes()
 {
 	_typeNodeStack.clear();
 	_evalNodeStack.clear();
-	_noOfPhase1Runs = 0;
+	_pointsToRound = 0;
 
-	// Repeat phase 1 and 2 until no more assignments were added
+	// Phase 1: find symbols in AST
+	_phase = epFindSymbols;
+	walkTree();
+	if (_stopWalking)
+		return false;
+
+	// Repeat phase 2 and 3 until no more assignments were added
 	do {
 		_assignments = 0;
-		++_noOfPhase1Runs;
-		// Phase one: points-to analysis
+		++_pointsToRound;
+		// Phase 2: points-to analysis
 		_phase = epPointsTo;
 		walkTree();
 		_assignmentsTotal += _assignments;
 
 		if (!_stopWalking && _assignments > 0) {
-			// Phase 2: reverse points-to analysis
+			// Phase 3: reverse points-to analysis
 			_phase = epPointsToRev;
 			walkTree();
 		}
 //#ifdef DEBUG_POINTS_TO
-		debugmsg("********** Round " << _noOfPhase1Runs << ": " << _assignments
+		debugmsg("********** Round " << _pointsToRound << ": " << _assignments
 				 << " assignments, " << _assignmentsTotal << " total **********");
 //#endif
-		debugmsg("Forced loop exit");
-		break;
+//		debugmsg("Forced loop exit");
+//		break;
 	} while (!_stopWalking && _assignments > 0);
 
 	if (_stopWalking)
@@ -905,6 +910,10 @@ ASTType* ASTTypeEvaluator::embeddingFuncReturnType(const ASTNode *node)
  */
 const ASTSymbol* ASTTypeEvaluator::embeddingFuncSymbol(const ASTNode *node)
 {
+    // Did we evaluate this symbol before?
+    if (_symbolOfNode.contains(node))
+        return _symbolOfNode[node];
+
     while (node && node->type != nt_function_definition)
         node = node->parent;
 
@@ -916,6 +925,8 @@ const ASTSymbol* ASTTypeEvaluator::embeddingFuncSymbol(const ASTNode *node)
 
     const ASTSymbol* sym = node->scope->find(name, ASTScope::ssSymbols);
     assert(sym && sym->type() == stFunctionDef);
+
+    _symbolOfNode.insert(node, sym);
     return sym;
 }
 
@@ -1547,21 +1558,30 @@ const ASTSymbol* ASTTypeEvaluator::findSymbolOfDirectDeclarator(
     if (!node)
         return 0;
     checkNodeType(node, nt_direct_declarator);
-    if (!node->u.direct_declarator.identifier)
-        typeEvaluatorError(
-                    QString("Direct declarator has no identifier at %1:%2:%3")
-                    .arg(_ast->fileName())
-                    .arg(node->start->line)
-                    .arg(node->start->charPosition));
 
-    QString id = antlrTokenToStr(node->u.direct_declarator.identifier);
-    ASTSymbol* sym = node->scope->find(id);
+    const ASTSymbol* sym = 0;
+
+    // Did we evaluate this symbol before?
+    if (_symbolOfNode.contains(node))
+        sym = _symbolOfNode[node];
+    else {
+        if (!node->u.direct_declarator.identifier)
+            typeEvaluatorError(
+                        QString("Direct declarator has no identifier at %1:%2:%3")
+                        .arg(_ast->fileName())
+                        .arg(node->start->line)
+                        .arg(node->start->charPosition));
+
+        QString id = antlrTokenToStr(node->u.direct_declarator.identifier);
+        sym = node->scope->find(id);
+        _symbolOfNode.insert(node, sym);
+    }
 
     if (!sym && enableExcpetions) {
         _ast->printScopeRek(node->scope);
         typeEvaluatorError(
                     QString("Could not find symbol \"%1\" at %2:%3:4")
-                    .arg(id)
+                    .arg(antlrTokenToStr(node->u.direct_declarator.identifier))
                     .arg(_ast->fileName())
                     .arg(node->start->line)
                     .arg(node->start->charPosition));
@@ -1577,79 +1597,86 @@ const ASTSymbol* ASTTypeEvaluator::findSymbolOfPrimaryExpression(
     if (!node)
         return 0;
     checkNodeType(node, nt_primary_expression);
-    if (!node->u.primary_expression.identifier)
-        typeEvaluatorError(
-                QString("Primary expression has no identifier at %1:%2:%3")
-                    .arg(_ast->fileName())
-                    .arg(node->start->line)
-                    .arg(node->start->charPosition));
 
-    QString id = antlrTokenToStr(node->u.primary_expression.identifier);
-    ASTSymbol* sym = 0;
+    const ASTSymbol* sym = 0;
     ASTType* t = 0;
 
-    // Is this a struct initializer or an initializer-like struct member
-    // assignment?
-    if (node->u.primary_expression.hasDot) {
-        // Find enclosing initializer node
-        const ASTNode* initializer = node->parent;
-        while (initializer) {
-            if (initializer->type == nt_initializer &&
-                !initializer->u.initializer.assignment_expression)
-                break;
-            initializer = initializer->parent;
-        }
-
-        if (initializer) {
-            t = typeofNode(initializer);
-
-//              if (initializer->type == nt_cast_expression)
-//                  t = typeofNode(initializer->u.cast_expression.type_name);
-//              else if (initializer->type == nt_init_declarator) {
-//                  assert(initializer->parent->type == nt_declaration);
-//                  t = typeofNode(initializer->parent->u.declaration.declaration_specifier);
-//              }
-        }
-    }
+    // Did we evaluate this symbol before?
+    if (_symbolOfNode.contains(node))
+        sym = _symbolOfNode[node];
     else {
-        // Are we a direct child of a __builtin_offsetof node?
-        const ASTNode* offsetofNode = node->parent;
-        bool found = false;
-        while (offsetofNode && !found) {
-            switch (offsetofNode->type) {
-            case nt_builtin_function_offsetof:
-                found = true;
-                break;
-            case nt_typeof_specification:
-                // Nested typeof(), so we break here
-                offsetofNode = 0;
-                break;
-            default:
-                offsetofNode = offsetofNode->parent;
-                break;
+        if (!node->u.primary_expression.identifier)
+            typeEvaluatorError(
+                        QString("Primary expression has no identifier at %1:%2:%3")
+                        .arg(_ast->fileName())
+                        .arg(node->start->line)
+                        .arg(node->start->charPosition));
+
+        QString id = antlrTokenToStr(node->u.primary_expression.identifier);
+
+        // Is this a struct initializer or an initializer-like struct member
+        // assignment?
+        if (node->u.primary_expression.hasDot) {
+            // Find enclosing initializer node
+            const ASTNode* initializer = node->parent;
+            while (initializer) {
+                if (initializer->type == nt_initializer &&
+                    !initializer->u.initializer.assignment_expression)
+                    break;
+                initializer = initializer->parent;
+            }
+
+            if (initializer) {
+                t = typeofNode(initializer);
+//                if (initializer->type == nt_cast_expression)
+//                    t = typeofNode(initializer->u.cast_expression.type_name);
+//                else if (initializer->type == nt_init_declarator) {
+//                    assert(initializer->parent->type == nt_declaration);
+//                    t = typeofNode(initializer->parent->u.declaration.declaration_specifier);
+//                }
             }
         }
+        else {
+            // Are we a direct child of a __builtin_offsetof node?
+            const ASTNode* offsetofNode = node->parent;
+            bool found = false;
+            while (offsetofNode && !found) {
+                switch (offsetofNode->type) {
+                case nt_builtin_function_offsetof:
+                    found = true;
+                    break;
+                case nt_typeof_specification:
+                    // Nested typeof(), so we break here
+                    offsetofNode = 0;
+                    break;
+                default:
+                    offsetofNode = offsetofNode->parent;
+                    break;
+                }
+            }
 
-        // If this is a child of a __builtin_offsetof, then find
-        // struct/union definition of type
-        if (offsetofNode)
-            t = typeofNode(offsetofNode->u.builtin_function_offsetof.type_name);
-        // Otherwise do a normal resolution of symbol in scope of node
-        else
-            sym = node->scope->find(id);
+            // If this is a child of a __builtin_offsetof, then find
+            // struct/union definition of type
+            if (offsetofNode)
+                t = typeofNode(offsetofNode->u.builtin_function_offsetof.type_name);
+            // Otherwise do a normal resolution of symbol in scope of node
+            else
+                sym = node->scope->find(id);
+        }
+
+        // If we have an ASTType node, try to find most inner struct/union
+        while (t && !(t->type() & StructOrUnion))
+            t = t->next();
+        if (t)
+            sym = t->node()->childrenScope->find(id);
+        _symbolOfNode.insert(node, sym);
     }
-
-    // If we have an ASTType node, try to find most inner struct/union
-    while (t && !(t->type() & StructOrUnion))
-        t = t->next();
-    if (t)
-        sym = t->node()->childrenScope->find(id);
 
     if (!sym && enableExcpetions) {
         _ast->printScopeRek(t ? t->node()->childrenScope : node->scope);
         typeEvaluatorError(
                 QString("Could not find symbol \"%1\" at %2:%3:%4")
-                    .arg(id)
+                    .arg(antlrTokenToStr(node->u.primary_expression.identifier))
                     .arg(_ast->fileName())
                     .arg(node->start->line)
                     .arg(node->start->charPosition));
@@ -2493,13 +2520,21 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
     switch (node->type) {
     case nt_direct_declarator:
         // The direct declarator must have an identifier
-        if (_phase == epPointsTo && node->u.direct_declarator.identifier)
+        if (!node->u.direct_declarator.identifier)
+            return;
+
+        if (_phase == epFindSymbols)
+            collectSymbols(node);
+        else if (_phase == epPointsTo)
             evaluateIdentifierPointsTo(node);
         break;
 
     case nt_jump_statement_return:
         // We are only interested in jump statements that return a value
-        if (_phase == epPointsTo && node->u.jump_statement.initializer)
+        if (!node->u.jump_statement.initializer)
+            return;
+
+        if (_phase == epPointsTo)
             evaluateIdentifierPointsTo(node);
         break;
 
@@ -2510,7 +2545,9 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
             node->u.primary_expression.hasDot)
             return;
 
-        if (_phase == epPointsTo)
+        if (_phase == epFindSymbols)
+            collectSymbols(node);
+        else if (_phase == epPointsTo)
             evaluateIdentifierPointsTo(node);
         else if (_phase == epPointsToRev)
             evaluateIdentifierPointsToRev(node);
@@ -2520,6 +2557,72 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
 
     default:
         break;
+    }
+}
+
+
+void ASTTypeEvaluator::collectSymbols(const ASTNode *node)
+{
+    if (!node)
+        return;
+
+    const ASTSymbol* sym = 0;
+
+    // Find symbol of source node
+    switch (node->type) {
+    case nt_direct_declarator:
+        sym = findSymbolOfDirectDeclarator(node, false);
+        break;
+    case nt_primary_expression:
+        sym = findSymbolOfPrimaryExpression(node, false);
+        break;
+    default:
+        typeEvaluatorError(QString("Unexpected node type: %1")
+                           .arg(ast_node_type_to_str(node)));
+    }
+
+    // No symbols are created for non-interesting identifiers such as
+    // parameter declarations of function declarations or goto labels
+    if (!sym)
+        return;
+
+    const ASTNode* root = node->parent, *rNode = node;
+
+    // Climb up the tree until the symbol goes out of scope
+    while (root && root->scope != sym->astNode()->scope->parent()) {
+        // Find out the situation in which the identifier is used
+        switch (root->type) {
+        case nt_assignment_expression:
+            // Is this in the right-hand of an assignment expression?
+            if (root->u.assignment_expression.lvalue &&
+               rNode == root->u.assignment_expression.assignment_expression)
+            {
+                _symbolsBelowNode[rNode].insert(sym);
+            }
+            break;
+
+        case nt_init_declarator:
+            // Is this in the right-hand side of an init declarator?
+            if (rNode == root->u.init_declarator.initializer &&
+                root->u.init_declarator.declarator)
+            {
+                _symbolsBelowNode[rNode].insert(sym);
+            }
+            break;
+
+        case nt_jump_statement_return:
+            // An identifier underneath a return should be the initializer
+            assert(rNode == root->u.jump_statement.initializer);
+            _symbolsBelowNode[rNode].insert(sym);
+            break;
+
+        default:
+            break;
+        }
+
+        // Otherwise go up
+        rNode = root;
+        root = root->parent;
     }
 }
 
@@ -2551,6 +2654,9 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
     // parameter declarations of function declarations or goto labels
     if (!es.sym)
         return;
+
+    _followedSymStack.clear();
+    _followedSymStack.push(FollowedSymbol(es.sym, 0));
 
     evaluateIdentifierPointsToRek(&es);
 }
@@ -2589,12 +2695,12 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
              .arg(s));
 #endif
 
-
     QString op;
 
     ASTNodeNodeMHash::const_iterator it, e = _assignedNodesRev.end();
     PointsToEvalState rek_es;
     int localDerefCount = 0;
+    const ASTNode* assigned = 0;
 
     while (es->root) {
         // Was this node assigned to other variables?
@@ -2604,6 +2710,12 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 localDerefCount >= es->lastLinkDerefCount)
             {
                 for (; it != e && it.key() == es->root; ++it) {
+                    // Start only with links that were added last round
+                    if (es->interLinks.isEmpty() &&
+                        it.value().addedInRound != _pointsToRound - 1)
+                        continue;
+                    /// @todo Do not follow any symbol twice
+
                     rek_es = *es;
                     rek_es.root = it.value().node;
                     rek_es.lastLinkDerefCount = it.value().derefCount;
@@ -2645,17 +2757,21 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
         case nt_assignment_expression:
             // Is this in the left-hand of an assignment expression?
             if (es->rNode == es->root->u.assignment_expression.lvalue &&
-                es->root->u.assignment_expression.assignment_expression)
+                (assigned = es->root->u.assignment_expression.assignment_expression))
             {
                 // Must be a valid lvalue
                 if (!es->validLvalue || es->derefCount < 0)
                     return;
 
+                // Do not insert links for recursive expressions, we cannot
+                // resolve them anyway.
+                if (_symbolsBelowNode[assigned].contains(es->sym))
+                    return;
+
                 if (!es->interLinks.isEmpty()) {
                     // Ignore cases where we have a = b, replaced left-hand a with
                     // right-hand b, leading to b = b.
-                    if (es->interLinks.contains(
-                            es->root->u.assignment_expression.assignment_expression))
+                    if (es->interLinks.contains(assigned))
                         return;
                     // If the lvalue does not include a dereferenced pointer
                     // after following a link, we shouldn't have followed the
@@ -2703,16 +2819,16 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                     return;
 
                 // Record assignments for variables and parameters
-                if (es->sym->type() & (stVariableDecl|stVariableDef|stFunctionParam)) {
+                if (es->sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
+                {
                     if (es->srcNode->scope->varAssignment(
-                            es->sym->name(),
-                            es->root->u.assignment_expression.assignment_expression,
-                            es->derefCount))
+                            es->sym->name(), assigned, es->derefCount, _pointsToRound))
                     {
 #ifdef DEBUG_POINTS_TO
                         const ASTNode* n =
                                 es->root->u.assignment_expression.assignment_expression;
-                        debugmsg(QString("Symbol \"%1\" at %2:%3 points to %4:%5:%6 (deref %7)")
+                        debugmsg(QString("Symbol \"%1\" at %2:%3 points to "
+                                         "%4:%5:%6 (deref %7)")
                                  .arg(es->sym->name())
                                  .arg(es->srcNode->start->line)
                                  .arg(es->srcNode->start->charPosition)
@@ -2743,11 +2859,17 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
         case nt_init_declarator:
             // Is this in the left-hand of an init declarator?
             if (es->rNode == es->root->u.init_declarator.declarator &&
-                es->root->u.init_declarator.initializer)
+                (assigned = es->root->u.init_declarator.initializer))
             {
                 // Must be a valid lvalue
                 if (!es->validLvalue || es->derefCount < 0)
                     return;
+
+                // Do not insert links for recursive expressions, we cannot
+                // resolve them anyway.
+                if (_symbolsBelowNode[assigned].contains(es->sym))
+                    return;
+
                 // No. of dereferences must match
                 /// @todo check if this is correct!
                 if (localDerefCount != es->lastLinkDerefCount)
@@ -2757,20 +2879,17 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 if (es->sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
                 {
                     if (es->srcNode->scope->varAssignment(
-                                es->sym->name(),
-                                es->root->u.init_declarator.initializer,
-                                es->derefCount))
+                                es->sym->name(), assigned, es->derefCount, _pointsToRound))
                     {
 #ifdef DEBUG_POINTS_TO
-                        const ASTNode* n =
-                                es->root->u.init_declarator.initializer;
-                        debugmsg(QString("Symbol \"%1\" at %2:%3 points to %4:%5:%6 (deref %7)")
+                        debugmsg(QString("Symbol \"%1\" at %2:%3 points to "
+                                         "%4:%5:%6 (deref %7)")
                                  .arg(es->sym->name())
                                  .arg(es->srcNode->start->line)
                                  .arg(es->srcNode->start->charPosition)
-                                 .arg(ast_node_type_to_str(n))
-                                 .arg(n->start->line)
-                                 .arg(n->start->charPosition)
+                                 .arg(ast_node_type_to_str(assigned))
+                                 .arg(assigned->start->line)
+                                 .arg(assigned->start->charPosition)
                                  .arg(es->derefCount));
 #endif
                         ++_assignments;
@@ -2785,30 +2904,35 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 return;
             break;
 
-        case nt_jump_statement_return:
+        case nt_jump_statement_return: {
             // An identifier underneath a return should be the initializer
-            assert(es->root->u.jump_statement.initializer != 0);
+            assert((assigned = es->root->u.jump_statement.initializer) != 0);
+
+            const ASTSymbol* funcSym = embeddingFuncSymbol(es->root);
+            // Do not insert links for recursive expressions, we cannot
+            // resolve them anyway.
+            if (_symbolsBelowNode[assigned].contains(funcSym))
+                return;
+
             // Treat any return statement as an assignment to the function
             // definition symbol
             if (es->root->scope->varAssignment(
-                        embeddingFuncSymbol(es->root)->name(),
-                        es->root->u.jump_statement.initializer,
-                        es->derefCount))
+                        funcSym->name(), assigned, es->derefCount, _pointsToRound))
             {
 #ifdef DEBUG_POINTS_TO
-                const ASTNode* n =
-                        es->root->u.jump_statement.initializer;
                 debugmsg(QString("Symbol \"%1\" at %2:%3 points to %4:%5:%6 (deref %7)")
                          .arg(es->sym->name())
                          .arg(es->srcNode->start->line)
                          .arg(es->srcNode->start->charPosition)
-                         .arg(ast_node_type_to_str(n))
-                         .arg(n->start->line)
-                         .arg(n->start->charPosition)
+                         .arg(ast_node_type_to_str(assigned))
+                         .arg(assigned->start->line)
+                         .arg(assigned->start->charPosition)
                          .arg(es->derefCount));
 #endif
                 ++_assignments;
             }
+            }
+            break;
 
         case nt_postfix_expression:
             if (es->root->u.postfix_expression.primary_expression == es->srcNode) {
@@ -2929,8 +3053,10 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRev(const ASTNode *node)
             e = sym->assignedAstNodes().end();
          it != e; ++it)
     {
-        _assignedNodesRev.insertMulti(it->node,
-                                      AssignedNode(node, it->derefCount));
+        // Only consider newly added links
+        if (it->addedInRound == _pointsToRound)
+            _assignedNodesRev.insertMulti(
+                        it->node, AssignedNode(node, it->derefCount, _pointsToRound));
     }
 }
 

@@ -51,7 +51,7 @@ public:
 
 	void add(const QString& name, ASTSymbolType type, struct ASTNode* node);
 	bool varAssignment(const QString& name, const ASTNode *assignedNode,
-					   int derefCount);
+					   int derefCount, int round);
 	ASTSymbol* find(const QString& name, int searchSymbols = ssAnySymbol) const;
 };
 
