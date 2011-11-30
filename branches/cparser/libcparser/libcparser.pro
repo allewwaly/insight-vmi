@@ -10,7 +10,6 @@ QMAKE_CXXFLAGS_RELEASE += -O3
 QT += core
 HEADERS += include/ast_interface.h \
     include/astscopemanager.h \
-    include/astnodecounter.h \
     include/genericexception.h \
     include/astsymbol.h \
     include/realtypes.h \
@@ -35,7 +34,6 @@ SOURCES += src/astscopemanager.cpp \
     src/astbuilder.cpp \
     src/astdotgraph.cpp \
     src/astnode.cpp \
-    src/astnodecounter.cpp \
     src/asttypeevaluator.cpp \
     src/astwalker.cpp \
     src/debug.cpp \

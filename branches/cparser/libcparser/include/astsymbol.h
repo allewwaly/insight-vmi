@@ -29,12 +29,13 @@ struct ASTNode;
 
 struct AssignedNode {
     AssignedNode()
-        : node(0), derefCount(0) {}
-    AssignedNode(const ASTNode* node, int derefCount)
-        : node(node), derefCount(derefCount) {}
+        : node(0), derefCount(0), addedInRound(0) {}
+    AssignedNode(const ASTNode* node, int derefCount, int round)
+        : node(node), derefCount(derefCount), addedInRound(round) {}
 
     const ASTNode* node;
     int derefCount;
+    int addedInRound;
 
     inline bool operator==(const AssignedNode& other) const
     {
@@ -112,9 +113,10 @@ public:
 	 * Append a new ASTNode that has been assigned to this symbol.
 	 * @param node the node to append
 	 * @param derefCount number of dereferences for this node
+	 * @param round the round this node was added
 	 * @return \c true if element did not already exist, \c false otherwise
 	 */
-	bool appendAssignedNode(const ASTNode* node, int derefCount);
+	bool appendAssignedNode(const ASTNode* node, int derefCount, int round);
 
 	/**
 	 * @return the name of the symbol
@@ -179,9 +181,10 @@ inline const AssignedNodeSet &ASTSymbol::assignedAstNodes() const
 }
 
 
-inline bool ASTSymbol::appendAssignedNode(const ASTNode *node, int derefCount)
+inline bool ASTSymbol::appendAssignedNode(const ASTNode *node, int derefCount,
+                                          int round)
 {
-    AssignedNode an(node, derefCount);
+    AssignedNode an(node, derefCount, round);
     if (!_assignedAstNodes.contains(an)) {
         _assignedAstNodes.insert(an);
         return true;
