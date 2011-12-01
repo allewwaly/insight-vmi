@@ -90,6 +90,7 @@ void SymFactory::clear()
 	_equivalentTypes.clear();
 	_typesByName.clear();
 	_typesByHash.clear();
+	_enumsByName.clear();
 	_postponedTypes.clear();
 	_usedByRefTypes.clear();
 	_usedByVars.clear();
@@ -556,8 +557,10 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
         // Add this type into the name relation table
         if (!new_name.isEmpty())
             _typesByName.insertMulti(new_name, target);
-        // Add referencing types into the used-by hash tables
+
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(target);
+        Enum* en = 0;
+        // Add referencing types into the used-by hash tables
         if (rbt) {
             insertUsedBy(rbt);
             // Also add function (type) parameters
@@ -565,6 +568,29 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
                 FuncPointer* fp = dynamic_cast<FuncPointer*>(rbt);
                 for (int i = 0; i < fp->params().size(); ++i)
                     insertUsedBy(fp->params().at(i));
+            }
+        }
+        // Add enumeration values into name-indexed hash
+        else if ( (en = dynamic_cast<Enum*>(target)) ) {
+            for (Enum::EnumHash::const_iterator it = en->enumValues().begin();
+                 it != en->enumValues().end(); ++it)
+            {
+//                if (_enumsByName.contains(it.value())) {
+//                    debugerr("Multiple enumerators with the same name:");
+//                    for (EnumStringHash::const_iterator eit =
+//                         _enumsByName.find(it.value());
+//                         eit != _enumsByName.end() && eit.key() == it.value();
+//                         ++eit)
+//                        debugerr(QString("type 0x%1: %2 = %3")
+//                                 .arg(eit.value().second->id(), 0, 16)
+//                                 .arg(eit.key())
+//                                 .arg(eit.value().first));
+//                    debugerr(QString("type 0x%1: %2 = %3")
+//                             .arg(en->id(), 0, 16)
+//                             .arg(it.value())
+//                             .arg(it.key()));
+//                }
+                _enumsByName.insertMulti(it.value(), IntEnumPair(it.key(), en));
             }
         }
     }
