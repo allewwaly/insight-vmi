@@ -106,11 +106,25 @@ int KernelSourceTypeEvaluator::evaluateIntExpression(const ASTNode* node, bool* 
         ASTExpression* expr = _eval->exprOfNode(node);
         ExpressionResult value = expr->result();
 
+        // Return constant value
         if (value.resultType == erConstant) {
             // Consider it to be an error if the expression evaluates to float
             if (ok)
                 *ok = (value.size & esInteger);
             return value.value();
+        }
+        // A constant value may still be undefined for missing type information.
+        // We should be able to evaluate all other constant expressions!
+        else if (value.resultType != erUndefined) {
+            ASTSourcePrinter printer(_ast);
+            typeEvaluatorError(
+                        QString("Failed to evaluate constant expression "
+                                "\"%1\" at %2:%3:%4")
+                        .arg(printer.toString(node)
+                             .trimmed())
+                        .arg(_ast ? _ast->fileName() : QString("-"))
+                        .arg(node->start->line)
+                        .arg(node->start->charPosition));
         }
     }
 

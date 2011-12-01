@@ -789,6 +789,10 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *no
         }
     }
 
+    // If we did not find that type, create an invalid expression
+    if (!ret)
+        ret = createExprNode<ASTUndefinedExpression>();
+
     return ret;
 }
 
@@ -1002,7 +1006,11 @@ ASTExpression* ASTExpressionEvaluator::exprOfPostfixExpr(const ASTNode *node)
         return exprOfNode(node->u.postfix_expression.primary_expression);
     else
         // Keep it simple for now
-        exprEvalError("We do not hande postfix expressions properly!");
+        exprEvalError(QString("We do not hande postfix expressions properly "
+                              "at %1:%2:%3")
+                      .arg(_ast ? _ast->fileName() : QString("-"))
+                      .arg(node->start->line)
+                      .arg(node->start->charPosition));
 }
 
 
