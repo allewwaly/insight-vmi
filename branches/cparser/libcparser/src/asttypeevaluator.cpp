@@ -19,7 +19,7 @@
 #include <astsourceprinter.h>
 
 #ifdef DEBUG
-#define DEBUG_POINTS_TO 1
+//#define DEBUG_POINTS_TO 1
 //#define DEBUG_USED_AS 1
 #endif
 
@@ -126,6 +126,8 @@ bool ASTTypeEvaluator::evaluateTypes()
 			walkTree();
 		}
 //#ifdef DEBUG_POINTS_TO
+		if (_pointsToRound == 1)
+			std::cout << std::endl;
 		debugmsg("********** Round " << _pointsToRound << ": " << _assignments
 				 << " assignments, " << _assignmentsTotal << " total **********");
 //#endif
@@ -2714,8 +2716,27 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                     if (es->interLinks.isEmpty() &&
                         it.value().addedInRound != _pointsToRound - 1)
                         continue;
-                    /// @todo Do not follow any symbol twice
 
+                    // Find symbol of node the inter-link points to
+                    const ASTSymbol* sym = 0;
+                    if (it.value().node->type == nt_primary_expression)
+                        sym = findSymbolOfPrimaryExpression(it.value().node);
+                    else if (it.value().node->type == nt_direct_declarator)
+                        sym = findSymbolOfDirectDeclarator(it.value().node);
+                    else
+                        typeEvaluatorError(
+                                    QString("Unexpected node type: %1")
+                                        .arg(ast_node_type_to_str(it.value().node)));
+                    // Do not follow any symbol twice
+                    FollowedSymbol fs(sym, it.value().derefCount);
+                    if (_followedSymStack.contains(fs))
+                        continue;
+
+                    // Push this symbol onto the stack
+                    StackAutoPopper<ASTFollowedSymStack> fsap(
+                                &_followedSymStack, fs);
+
+                    // Recurive points-to analysis
                     rek_es = *es;
                     rek_es.root = it.value().node;
                     rek_es.lastLinkDerefCount = it.value().derefCount;
@@ -3708,7 +3729,10 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 //             << "\" at " << node->start->line << ":" << node->start->charPosition);
 
     TypeEvalDetails ed;
-    ed.sym = findSymbolOfPrimaryExpression(node);
+    // Skip non-variable expressions
+    if ( !(ed.sym = findSymbolOfPrimaryExpression(node, false)) )
+        return erNoPrimaryExpression;
+
     ed.srcNode = node;
     ed.primExNode = node;
     ed.rootNode = node->parent;
