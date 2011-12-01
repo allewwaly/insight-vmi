@@ -1868,6 +1868,7 @@ int Shell::cmdShow(QStringList args)
 
     const BaseType* bt = 0;
     const Variable * var = 0;
+    QList<IntEnumPair> enums;
 
     // Did we parse an ID?
     if (ok) {
@@ -1886,7 +1887,8 @@ int Shell::cmdShow(QStringList args)
         s = expr.front();
     	QList<BaseType*> types = _sym.factory().typesByName().values(s);
     	QList<Variable*> vars = _sym.factory().varsByName().values(s);
-    	if (types.size() + vars.size() > 1) {
+        enums = _sym.factory().enumsByName().values(s);
+        if (types.size() + vars.size() > 1) {
     		_out << "The name \"" << s << "\" is ambiguous:" << endl << endl;
 
     		if (!types.isEmpty()) {
@@ -1899,7 +1901,14 @@ int Shell::cmdShow(QStringList args)
     		return 1;
     	}
 
-    	if (!types.isEmpty()) {
+        for (int i = 0; i < enums.size(); ++i) {
+            if (i > 0)
+                _out << endl;
+            _out << "Found enumerator with name " << s << ":" << endl;
+            cmdShowBaseType(enums[i].second);
+        }
+
+        if (!types.isEmpty()) {
             _out << "Found type with name " << s;
             bt = types.first();
     	}
@@ -1951,6 +1960,8 @@ int Shell::cmdShow(QStringList args)
             _out << ":" << endl;
         return cmdShowBaseType(bt);
     }
+    else if (!enums.isEmpty())
+        return 0;
 
 	// If we came here, we were not successful
 	_out << "No type or variable by name or ID \"" << s << "\" found." << endl;
