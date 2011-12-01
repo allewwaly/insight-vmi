@@ -115,11 +115,11 @@ void KernelSourceParser::parse()
                      shell->out() << "\r" << flush;
                      shell->err() << "WARNING: " << e.message << endl << flush;
                  }
-                 catch (TypeEvaluatorException& e) {
-                     shell->out() << "\r" << flush;
-                     shell->err() << "WARNING: At " << e.file << ":" << e.line
-                             << ": " << e.message << endl << flush;
-                 }
+//                 catch (TypeEvaluatorException& e) {
+//                     shell->out() << "\r" << flush;
+//                     shell->err() << "WARNING: At " << e.file << ":" << e.line
+//                             << ": " << e.message << endl << flush;
+//                 }
              }
              ++it;
          }
