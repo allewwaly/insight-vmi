@@ -9,6 +9,7 @@ const char* expressionTypeToString(ExpressionType type)
     case etVoid:                return "etVoid";
     case etRuntimeDependent:    return "etRuntimeDependent";
     case etLiteralConstant:     return "etLiteralConstant";
+    case etEnumerator:          return "etEnumerator";
     case etVariable:            return "etVariable";
     case etLogicalOr:           return "etLogicalOr";
     case etLogicalAnd:          return "etLogicalAnd";

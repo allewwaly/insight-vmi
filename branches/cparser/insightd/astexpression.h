@@ -10,6 +10,7 @@ enum ExpressionType {
     etVoid,
     etRuntimeDependent,
     etLiteralConstant,
+    etEnumerator,
     etVariable,
     etLogicalOr,
     etLogicalAnd,
@@ -246,8 +247,42 @@ public:
         _value.result.d = value;
     }
 
-private:
+protected:
     ExpressionResult _value;
+};
+
+/**
+ * This expression represents an enumeration value.
+ */
+class ASTEnumeratorExpression: public ASTConstantExpression
+{
+public:
+    ASTEnumeratorExpression() : _symbol(0) {}
+    ASTEnumeratorExpression(qint32 value, const ASTSymbol* symbol)
+        : _symbol(symbol)
+    {
+        _value.resultType = resultType();
+        _value.size = esInt32;
+        _value.result.i32 = value;
+    }
+
+    inline virtual ExpressionType type() const
+    {
+        return etEnumerator;
+    }
+
+    inline virtual int resultType() const
+    {
+        return _symbol ? erConstant : erUndefined;
+    }
+
+    const ASTSymbol* symbol() const
+    {
+        return _symbol;
+    }
+
+protected:
+    const ASTSymbol* _symbol;
 };
 
 /**
