@@ -157,6 +157,28 @@ protected:
 };
 
 /**
+ * This expression returns cannot be evaluated and returns an undefined result.
+ */
+class ASTUndefinedExpression: public ASTExpression
+{
+public:
+    inline virtual ExpressionType type() const
+    {
+        return etVoid;
+    }
+
+    inline virtual int resultType() const
+    {
+        return erUndefined;
+    }
+
+    inline virtual ExpressionResult result() const
+    {
+        return ExpressionResult(resultType(), esInt32, 0ULL);
+    }
+};
+
+/**
  * This expression returns nothing and cannot be evaluated.
  */
 class ASTVoidExpression: public ASTExpression
