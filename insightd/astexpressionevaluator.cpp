@@ -1018,6 +1018,18 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(const ASTNode *node)
              !node->u.primary_expression.hasDot)
     {
         const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);
+        // Return a constant expression for an enumerator
+        if (sym->type() == stEnumerator) {
+            if (!_factory->enumsByName().contains(sym->name()))
+                exprEvalError(QString("Cannot find enumerator \"%1\" at %2:%3:%4")
+                              .arg(sym->name())
+                              .arg(_ast->fileName())
+                              .arg(node ? node->start->line : 0)
+                              .arg(node ? node->start->charPosition : 0));
+            IntEnumPair iep = _factory->enumsByName().value(sym->name());
+            return createExprNode<ASTEnumeratorExpression>(iep.first, sym);
+        }
+        // Otherwise retun a variable
         return createExprNode<ASTVariableExpression>(sym);
     }
     else if (node->u.primary_expression.constant)
