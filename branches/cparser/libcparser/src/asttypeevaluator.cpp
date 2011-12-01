@@ -2430,20 +2430,6 @@ ASTType* ASTTypeEvaluator::preprendArrays(const ASTNode *dd_dad, ASTType* type)
                         ds_ads->u.declarator_suffix.constant_expression, &ok);
             if (ok)
                 type->setArraySize(size);
-            // We should be able to evaluate all expressions!
-            else if (ds_ads->u.declarator_suffix.constant_expression) {
-                ASTSourcePrinter printer(_ast);
-                typeEvaluatorError(
-                            QString("Failed to evaluate constant expression "
-                                    "\"%1\" at %2:%3:%4")
-                            .arg(printer.toString(
-                                     ds_ads
-                                     ->u.declarator_suffix.constant_expression)
-                                 .trimmed())
-                            .arg(_ast->fileName())
-                            .arg(ds_ads->start->line)
-                            .arg(ds_ads->start->charPosition));
-            }
         }
         // Parens lead to a function pointer type
         else if (ds_ads->type == nt_declarator_suffix_parens ||
@@ -3097,40 +3083,49 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
     // Is this somewhere in the right-hand of an assignment expression or
     // of an init declarator?
     while (ed->rootNode) {
-        // Was this node assigned to other variables?
-        it = _assignedNodesRev.find(ed->rootNode);
-        if (it != e) {
-            if (ed->interLinks.isEmpty() || !ed->lastLinkDerefCount ||
-                derefs >= ed->lastLinkDerefCount)
-            {
-                for (; it != e && it.key() == ed->rootNode; ++it) {
-                    // Skip all inter-links that lead back to the source node
-                    if (it.value().node == ed->srcNode)
-                        continue;
-                    // Skip all targets that are target of this symbol anyway
-                    if (ed->sym->assignedAstNodes().contains(it.value()))
-                            continue;
 
-                    rek_ed = *ed;
-                    rek_ed.rootNode = it.value().node;
-                    rek_ed.lastLinkDerefCount = it.value().derefCount;
-                    rek_ed.interLinks.insert(ed->rootNode, rek_ed.rootNode);
-                    evaluateIdentifierUsedAsRek(&rek_ed);
-                }
+        it = _assignedNodesRev.find(ed->rootNode);
+        if ( // Was this node assigned to other variables?
+            (it != e) &&
+            // Limit recursion level
+            (ed->interLinks.size() < 4) &&
+             // Does the local derference counter match the last link's one?
+            (ed->interLinks.isEmpty() || !ed->lastLinkDerefCount ||
+             derefs >= ed->lastLinkDerefCount) &&
+            // As ed->primExNode and ed->postExNode are not changed
+            // across inter-link boundaries, do not recurse for plain local
+            // variables without context (i.e., postfix expression suffixes)
+            (ed->sym->isGlobal() || ed->srcNode != ed->primExNode ||
+             ed->postExNode->u.postfix_expression.postfix_expression_suffix_list)
+           )
+        {
+            for (; it != e && it.key() == ed->rootNode; ++it) {
+                // Skip all inter-links that lead back to the source node
+                if (it.value().node == ed->srcNode)
+                    continue;
+                // Skip all targets that are target of this symbol anyway
+                if (ed->sym->assignedAstNodes().contains(it.value()))
+                    continue;
+
+                rek_ed = *ed;
+                rek_ed.rootNode = it.value().node;
+                rek_ed.lastLinkDerefCount = it.value().derefCount;
+                rek_ed.interLinks.insert(ed->rootNode, rek_ed.rootNode);
+                evaluateIdentifierUsedAsRek(&rek_ed);
             }
-#ifdef DEBUG_USED_AS
-            // It's not the same pointer of the deref counters don't not match!
-            else {
-                debugmsg(QString("Skipping all links from %1 %2:%3 because "
-                                 "previous deref counter mismatch (%5 < %6)")
-                         .arg(ast_node_type_to_str(ed->rootNode))
-                         .arg(ed->rootNode->start->line)
-                         .arg(ed->rootNode->start->charPosition)
-                         .arg(derefs)
-                         .arg(ed->lastLinkDerefCount));
-            }
-#endif
         }
+#ifdef DEBUG_USED_AS
+        // It's not the same pointer of the deref counters don't not match!
+        else {
+            debugmsg(QString("Skipping all links from %1 %2:%3 because "
+                             "previous deref counter mismatch (%5 < %6)")
+                     .arg(ast_node_type_to_str(ed->rootNode))
+                     .arg(ed->rootNode->start->line)
+                     .arg(ed->rootNode->start->charPosition)
+                     .arg(derefs)
+                     .arg(ed->lastLinkDerefCount));
+        }
+#endif
 
         // Find out the situation in which the identifier is used
         switch (ed->rootNode->type) {
