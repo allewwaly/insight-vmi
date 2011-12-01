@@ -23,6 +23,7 @@ class ReferencingType;
 class RefBaseType;
 class CompileUnit;
 class Variable;
+class Enum;
 class ASTType;
 class ASTTypeEvaluator;
 
@@ -111,6 +112,8 @@ typedef QMultiHash<int, FuncParam*> FuncParamMultiHash;
 
 typedef QPair<const ASTType*, BaseTypeList> AstBaseTypeList;
 
+typedef QPair<qint32, const Enum*> IntEnumPair;
+typedef QHash<QString, IntEnumPair> EnumStringHash;
 
 #define SYMFACTORY_DEFINED 1
 
@@ -237,7 +240,7 @@ public:
 	}
 
 	/**
-	 * @return the hash of all types by there ID
+	 * @return the hash of all types by their ID
 	 */
     inline const BaseTypeIntHash& typesById() const
     {
@@ -245,7 +248,7 @@ public:
     }
 
     /**
-     * @return the hash of all types by there name
+     * @return the hash of all types by their name
      */
     inline const BaseTypeStringHash& typesByName() const
     {
@@ -253,7 +256,7 @@ public:
     }
 
     /**
-     * @return the hash of all compile units by there ID
+     * @return the hash of all compile units by their ID
      */
 	inline const CompileUnitIntHash& sources() const
 	{
@@ -269,7 +272,7 @@ public:
 	}
 
 	/**
-	 * @return the hash of all variables by there name
+	 * @return the hash of all variables by their name
 	 */
 	inline const VariableStringHash& varsByName() const
 	{
@@ -277,11 +280,19 @@ public:
 	}
 
     /**
-     * @return the hash of all variables by there ID
+     * @return the hash of all variables by their ID
      */
     inline const VariableIntHash& varsById() const
     {
         return _varsById;
+    }
+
+    /**
+     * @return the hash of all enumerators by their name
+     */
+    inline const EnumStringHash& enumsByName() const
+    {
+        return _enumsByName;
     }
 
 	/**
@@ -624,6 +635,7 @@ private:
 	VariableList _externalVars;       ///< Holds all external Variable declarations
 	VariableStringHash _varsByName;   ///< Holds all Variable objects, indexed by name
 	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
+	EnumStringHash _enumsByName;         ///< Holds all enumerator values, indexed by name
 	BaseTypeList _types;              ///< Holds all BaseType objects which were parsed or read from symbol files
     BaseTypeList _customTypes;        ///< Holds all BaseType objects which were internally created
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
