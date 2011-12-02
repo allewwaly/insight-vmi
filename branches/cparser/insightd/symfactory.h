@@ -26,6 +26,7 @@ class Variable;
 class Enum;
 class ASTType;
 class ASTTypeEvaluator;
+class TypeEvalDetails;
 
 #include "numeric.h"
 #include "typeinfo.h"
@@ -339,26 +340,19 @@ public:
     QList<RefBaseType*> typesUsingId(int id) const;
 
 
-	void typeAlternateUsage(const ASTSymbol* srcSymbol,
-							const ASTType* srcType,
-							const ASTType* ctxType,
-							const QStringList& ctxMembers,
-							const ASTType* targetType,
-							ASTTypeEvaluator* eval);
+    void typeAlternateUsage(const TypeEvalDetails *ed, ASTTypeEvaluator* eval);
 
     AstBaseTypeList findBaseTypesForAstType(const ASTType* astType,
                                             ASTTypeEvaluator *eval);
 
 protected:
-	void typeAlternateUsageStructMember(const ASTType* ctxType,
-										const QStringList& ctxMembers,
-										BaseType* targetBaseType,
-										ASTTypeEvaluator* eval);
+	void typeAlternateUsageStructMember(const TypeEvalDetails *ed,
+										const BaseType *targetBaseType,
+										ASTTypeEvaluator *eval);
 
-	void typeAlternateUsageVar(const ASTType* ctxType,
-							   const ASTSymbol* srcSymbol,
-							   BaseType* targetBaseType,
-							   ASTTypeEvaluator* eval);
+	void typeAlternateUsageVar(const TypeEvalDetails *ed,
+							   const BaseType *targetBaseType,
+							   const ASTTypeEvaluator *eval);
 
 
 	/**

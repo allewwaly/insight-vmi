@@ -1934,15 +1934,11 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
 }
 
 
-void SymFactory::typeAlternateUsage(const ASTSymbol* srcSymbol,
-                                    const ASTType* srcType,
-                                    const ASTType* ctxType,
-                                    const QStringList& ctxMembers,
-                                    const ASTType* targetType,
+void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
                                     ASTTypeEvaluator *eval)
 {
     // Find the source base type
-    AstBaseTypeList srcTypeRet = findBaseTypesForAstType(srcType, eval);
+    AstBaseTypeList srcTypeRet = findBaseTypesForAstType(ed->srcType, eval);
 //    const ASTType* srcTypeNonPtr = targetTypeRet.first;
     BaseType* srcBaseType = 0;
     if (srcTypeRet.second.isEmpty())
@@ -1951,19 +1947,19 @@ void SymFactory::typeAlternateUsage(const ASTSymbol* srcSymbol,
         srcBaseType = srcTypeRet.second.first();
 
     // Find the target base types
-    AstBaseTypeList targetTypeRet = findBaseTypesForAstType(targetType, eval);
+    AstBaseTypeList targetTypeRet = findBaseTypesForAstType(ed->targetType, eval);
     const ASTType* targetTypeNonPtr = targetTypeRet.first;
     BaseTypeList targetBaseTypes = targetTypeRet.second;
 
     // Create a list of pointer/array types preceeding targetTypeNonPtr
     QList<const ASTType*> targetPointers;
-    for (const ASTType* t = targetType; t != targetTypeNonPtr; t = t->next())
+    for (const ASTType* t = ed->targetType; t != targetTypeNonPtr; t = t->next())
         targetPointers.append(t);
 
     BaseType* targetBaseType = 0;
 
     // Now go through the targetBaseTypes and find its usages as pointers or
-    // arrays as in targetType    
+    // arrays as in ed->targetType
     for (int i = 0; i < targetBaseTypes.size(); ++i) {
         BaseTypeList candidates;
         candidates += targetBaseTypes[i];
@@ -2041,52 +2037,51 @@ void SymFactory::typeAlternateUsage(const ASTSymbol* srcSymbol,
             // It can happen that GCC excludes unused symbols from the debugging
             // symbols, so don't fail if we don't find the target base type
             debugerr("Could not find target BaseType: "
-                     << targetType->toString());
+                     << ed->targetType->toString());
             return;
         }
     }
 
     // Compare source and target type
     if (compareConflictingTypes(srcBaseType, targetBaseType) == tcIgnore) {
-        debugmsg("Ignoring change from " << srcType->toString() << " to "
-                 << targetType->toString());
+        debugmsg("Ignoring change from " << ed->srcType->toString() << " to "
+                 << ed->targetType->toString());
         return;
     }
 
-    switch (srcSymbol->type()) {
+    switch (ed->sym->type()) {
     case stVariableDecl:
     case stVariableDef:
         // Only change global variables
-        if (srcSymbol->isGlobal())
-            typeAlternateUsageVar(ctxType, srcSymbol, targetBaseType, eval);
+        if (ed->sym->isGlobal())
+            typeAlternateUsageVar(ed, targetBaseType, eval);
         else
-            debugmsg("Ignoring local variable " << srcSymbol->name());
+            debugmsg("Ignoring local variable " << ed->sym->name());
         break;
 
     case stFunctionParam:
     case stStructMember:
-        typeAlternateUsageStructMember(ctxType, ctxMembers, targetBaseType, eval);
+        typeAlternateUsageStructMember(ed, targetBaseType, eval);
         break;
 
     case stEnumerator:
         // Enum values are no referencing types, so ignore such changes
-        debugmsg("Ignoring type change of enum value " << srcSymbol->name());
+        debugmsg("Ignoring type change of enum value " << ed->sym->name());
         break;
 
     default:
-        factoryError("Source symbol " + srcSymbol->name() + " is of type " +
-                     srcSymbol->typeToString());
+        factoryError("Source symbol " + ed->sym->name() + " is of type " +
+                     ed->sym->typeToString());
     }
 }
 
 
-void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
-												const QStringList& ctxMembers,
-												BaseType* targetBaseType,
+void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
+												const BaseType *targetBaseType,
 												ASTTypeEvaluator *eval)
 {
     // Find context base types
-    AstBaseTypeList ctxTypeRet = findBaseTypesForAstType(ctxType, eval);
+    AstBaseTypeList ctxTypeRet = findBaseTypesForAstType(ed->ctxType, eval);
     BaseTypeList ctxBaseTypes = ctxTypeRet.second;
 
     int membersFound = 0, membersChanged = 0;
@@ -2096,13 +2091,13 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
         StructuredMember *member = 0, *nestingMember = 0;
 
         // Find the correct member of the struct or union
-        for (int j = 0; j < ctxMembers.size(); ++j) {
+        for (int j = 0; j < ed->ctxMembers.size(); ++j) {
             // Dereference static arrays
             while (t && t->type() == rtArray)
                 t = dynamic_cast<Array*>(t)->refTypeDeep(BaseType::trLexicalAndArrays);
             Structured* s =  dynamic_cast<Structured*>(t);
             nestingMember = member; // previous struct for nested structs
-            if ( s && (member = s->findMember(ctxMembers[j])) ) {
+            if ( s && (member = s->findMember(ed->ctxMembers[j])) ) {
                 t = member->refTypeDeep(BaseType::trLexicalAndArrays);
             }
             else {
@@ -2140,7 +2135,7 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
                         t = typeCopy->dereferencedBaseType(BaseType::trLexicalAndArrays);
                         Structured* s = dynamic_cast<Structured*>(t);
                         assert(s != 0);
-                        member = s->findMember(ctxMembers.last());
+                        member = s->findMember(ed->ctxMembers.last());
                         assert(member != 0);
                         debugmsg(QString("Created copy (0x%1 -> 0x%2) of "
                                          "embedding member %3 in %4 (0x%5).")
@@ -2182,13 +2177,11 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 }
 
 
-void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
-                                       const ASTSymbol* srcSymbol,
-                                       BaseType* targetBaseType,
-                                       ASTTypeEvaluator * /*eval*/)
+void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
+                                       const BaseType* targetBaseType,
+                                       const ASTTypeEvaluator * /*eval*/)
 {
-    Q_UNUSED(ctxType);
-    VariableList vars = _varsByName.values(srcSymbol->name());
+    VariableList vars = _varsByName.values(ed->sym->name());
     int varsFound = 0;
 
     // Find the variable(s) using the targetBaseType
