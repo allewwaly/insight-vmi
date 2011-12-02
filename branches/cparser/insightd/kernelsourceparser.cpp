@@ -83,8 +83,8 @@ void KernelSourceParser::parse()
     // Make sure the source directoy exists
     if (!_srcDir.exists()) {
         shell->err() << "Source directory \"" << _srcDir.absolutePath()
-                << "\" does not exist."
-            << endl;
+                     << "\" does not exist."
+                     << endl;
         return;
     }
 
@@ -92,51 +92,52 @@ void KernelSourceParser::parse()
 
     operationStarted();
 
-     try {
-         CompileUnitIntHash::const_iterator it = _factory->sources().begin();
-         while (it != _factory->sources().end() && !shell->interrupted()) {
-             const CompileUnit* unit = it.value();
-             ++_filesDone;
+    try {
+        CompileUnitIntHash::const_iterator it = _factory->sources().begin();
+        while (it != _factory->sources().end() && !shell->interrupted()) {
+            const CompileUnit* unit = it.value();
+            ++_filesDone;
 
-             // Skip assembly files
-             if (!unit->name().endsWith(".S") /* && _filesDone >= 440 */) {
-                 _currentFile = unit->name() + ".i";
+            // Skip assembly files
+            if (!unit->name().endsWith(".S") && _filesDone >= 323) {
+                _currentFile = unit->name() + ".i";
 
-                 checkOperationProgress();
+                checkOperationProgress();
 
-                 try {
-                     parseFile(_currentFile);
-                 }
-//                 catch (SourceParserException& e) {
-//                     shell->out() << "\r" << flush;
-//                     shell->err() << "WARNING: " << e.message << endl << flush;
-//                 }
-                 catch (FileNotFoundException& e) {
-                     shell->out() << "\r" << flush;
-                     shell->err() << "WARNING: " << e.message << endl << flush;
-                 }
-//                 catch (TypeEvaluatorException& e) {
-//                     shell->out() << "\r" << flush;
-//                     shell->err() << "WARNING: At " << e.file << ":" << e.line
-//                             << ": " << e.message << endl << flush;
-//                 }
-             }
-             ++it;
-         }
-     }
-     catch (...) {
-         // Exceptional cleanup
-         operationStopped();
-         shell->out() << endl;
-         throw;
-     }
+                try {
+                    parseFile(_currentFile);
+                }
+//                catch (SourceParserException& e) {
+//                    shell->out() << "\r" << flush;
+//                    shell->err() << "WARNING: " << e.message << endl << flush;
+//                }
+                catch (FileNotFoundException& e) {
+                    shell->out() << "\r" << flush;
+                    shell->err() << "WARNING: " << e.message << endl << flush;
+                }
+//                catch (TypeEvaluatorException& e) {
+//                    shell->out() << "\r" << flush;
+//                    shell->err() << "WARNING: At " << e.file << ":" << e.line
+//                                 << ": " << e.message << endl << flush;
+//                }
+            }
+            ++it;
+        }
+    }
+    catch (...) {
+        // Exceptional cleanup
+        operationProgress();
+        operationStopped();
+        shell->out() << endl;
+        throw;
+    }
 
-     operationStopped();
+    operationStopped();
 
-     shell->out() << "\rParsed " << _filesDone << " files in " << elapsedTime()
-             << endl;
+    shell->out() << "\rParsed " << _filesDone << " files in " << elapsedTime()
+                 << endl;
 
-     _factory->sourceParcingFinished();
+    _factory->sourceParcingFinished();
 }
 
 
