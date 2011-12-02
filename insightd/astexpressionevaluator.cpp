@@ -1004,19 +1004,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfPostfixExpr(const ASTNode *node)
 
     if (!node->u.postfix_expression.postfix_expression_suffix_list)
         return exprOfNode(node->u.postfix_expression.primary_expression);
-    else {
-        const ASTNodeList* list =
-                node->u.postfix_expression.postfix_expression_suffix_list;
-        const ASTNode* pes = list->item;
-        /// @todo Continue
-
-        // Keep it simple for now
-        exprEvalError(QString("We do not hande postfix expressions properly "
-                              "at %1:%2:%3")
-                      .arg(_ast ? _ast->fileName() : QString("-"))
-                      .arg(node->start->line)
-                      .arg(node->start->charPosition));
-    }
+    else
+        return createExprNode<ASTRuntimeExpression>();
 }
 
 
