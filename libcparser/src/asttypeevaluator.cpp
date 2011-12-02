@@ -3083,6 +3083,9 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
     // Is this somewhere in the right-hand of an assignment expression or
     // of an init declarator?
     while (ed->rootNode) {
+        // Beware of recursions
+        if (ed->interLinks.contains(ed->rootNode))
+            return erRecursiveExpression;
 
         it = _assignedNodesRev.find(ed->rootNode);
         if ( // Was this node assigned to other variables?
