@@ -8,6 +8,7 @@
 /// Different types of expressions
 enum ExpressionType {
     etVoid,
+    etUndefined,
     etRuntimeDependent,
     etLiteralConstant,
     etEnumerator,
@@ -164,7 +165,7 @@ class ASTUndefinedExpression: public ASTExpression
 public:
     inline virtual ExpressionType type() const
     {
-        return etVoid;
+        return etUndefined;
     }
 
     inline virtual int resultType() const
