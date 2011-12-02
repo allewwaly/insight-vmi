@@ -37,8 +37,10 @@ uint Enum::hash(bool* isValid) const
         // Extend the hash to all enumeration values
         EnumHash::const_iterator it = _enumValues.constBegin();
         while (it != _enumValues.constEnd()) {
-            _hash ^= rotl32(it.key(), rot) ^ qHash(it.value());
-            rot = (rot + 4) % 32;
+            _hash ^= rotl32(it.key(), rot);
+            rot = (rot + 3) % 32;
+            _hash ^= rotl32(qHash(it.value()), rot);
+            rot = (rot + 3) % 32;
             ++it;
         }
     }

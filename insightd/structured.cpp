@@ -41,13 +41,16 @@ uint Structured::hash(bool* isValid) const
         _hash = BaseType::hash(0);
         qsrand(_hash ^ _members.size());
         _hash ^= qHash(qrand());
+
         // To place the member hashes at different bit positions
         uint rot = 0;
         // Hash all members (don't recurse!!!)
         for (int i = 0; i < _members.size(); i++) {
             const StructuredMember* member = _members[i];
-            _hash ^= rotl32(member->offset(), rot) ^ qHash(member->name());
-            rot = (rot + 4) % 32;
+            _hash ^= rotl32(member->offset(), rot);
+            rot = (rot + 3) % 32;
+            _hash ^= rotl32(qHash(member->name()), rot);
+            rot = (rot + 3) % 32;
         }
     }
     if (isValid)
