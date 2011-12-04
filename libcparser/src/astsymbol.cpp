@@ -69,20 +69,3 @@ QString ASTSymbol::typeToString(ASTSymbolType type)
 	return "null";
 }
 
-
-QString antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok)
-{
-    if (!tok)
-        return QString();
-    return antlrStringToStr(tok->getText(tok));
-}
-
-
-QString antlrStringToStr(const pANTLR3_STRING s)
-{
-    if (!s)
-        return QString();
-    return QString::fromAscii((const char*)s->chars, s->len);
-}
-
-

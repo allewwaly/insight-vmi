@@ -98,7 +98,7 @@ void scopeAddSymbol(pASTBuilder builder, pANTLR3_STRING name, enum ASTSymbolType
 void scopeAddSymbol2(pASTBuilder builder, pANTLR3_STRING name,
 		enum ASTSymbolType type, pASTNode node, pASTScope scope)
 {
-	QString s = antlrStringToStr(name);
+//	QString s = antlrStringToStr(name);
 
 //	int line = node ?  node->start->line : 0;
 //
@@ -143,7 +143,7 @@ void scopeAddSymbol2(pASTBuilder builder, pANTLR3_STRING name,
 //		break;
 //	}
 
-	builder->addSymbol(s, type, node, scope);
+	builder->addSymbol(name, type, node, scope);
 }
 
 
@@ -155,8 +155,7 @@ pASTScope scopeCurrent(pASTBuilder builder)
 
 ANTLR3_BOOLEAN isTypeName(pASTBuilder builder, pANTLR3_STRING name)
 {
-	QString s = antlrStringToStr(name);
-	if (builder->isTypeName(s)) {
+	if (builder->isTypeName(name)) {
 //	    debugmsg("\"" << name->chars << "\" is a defined type");
 		return ANTLR3_TRUE;
 	}
@@ -167,8 +166,7 @@ ANTLR3_BOOLEAN isTypeName(pASTBuilder builder, pANTLR3_STRING name)
 
 ANTLR3_BOOLEAN isSymbolName(pASTBuilder builder, pANTLR3_STRING name)
 {
-	QString s = antlrStringToStr(name);
-	if (builder->isSymbolName(s)) {
+	if (builder->isSymbolName(name)) {
 //	    debugmsg("\"" << name->chars << "\" is a symbol");
 		return ANTLR3_TRUE;
 	}
