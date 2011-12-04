@@ -908,10 +908,10 @@ ASTExpression* ASTExpressionEvaluator::exprOfConditionalExpr(const ASTNode *node
             // Otherwise add both possibilities as alternatives
             else {
                 tmp = exprOfNodeList(node->u.conditional_expression.expression);
-                setExprOrAddAlternative(ret, tmp);
+                ret = setExprOrAddAlternative(ret, tmp);
                 tmp = exprOfNode(
                             node->u.conditional_expression.conditional_expression);
-                setExprOrAddAlternative(ret, tmp);
+                ret = setExprOrAddAlternative(ret, tmp);
             }
         }
 
