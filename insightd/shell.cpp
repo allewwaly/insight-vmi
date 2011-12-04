@@ -2051,14 +2051,17 @@ int Shell::cmdShowBaseType(const BaseType* t)
 	if (e) {
         _out << "  Enumerators:    " << e->enumValues().size() << endl;
 
-        QList<Enum::EnumHash::key_type> keys = e->enumValues().keys();
+        QList<Enum::EnumHash::key_type> keys = e->enumValues().uniqueKeys();
         qSort(keys);
 
         for (int i = 0; i < keys.size(); i++) {
-            _out << "    "
-                    << qSetFieldWidth(30) << left << e->enumValues().value(keys[i])
-                    << qSetFieldWidth(0) << " = " << keys[i]
-                    << endl;
+            for (Enum::EnumHash::const_iterator it = e->enumValues().find(keys[i]);
+                 it != e->enumValues().end() && it.key() == keys[i]; ++it) {
+                _out << "    "
+                     << qSetFieldWidth(30) << left << it.value()
+                     << qSetFieldWidth(0) << " = " << it.key()
+                     << endl;
+            }
         }
 	}
 

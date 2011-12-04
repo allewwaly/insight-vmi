@@ -310,7 +310,7 @@ const TypeInfo::EnumHash& TypeInfo::enumValues() const
 
 void TypeInfo::addEnumValue(const QString& name, qint32 value)
 {
-	_enumValues.insert(value, name);
+	_enumValues.insertMulti(value, name);
 }
 
 
@@ -374,12 +374,18 @@ QString TypeInfo::dump() const
 	if (_sibling >= 0)          ret += QString("  sibling:       %1\n").arg(_sibling);
 	if (!_enumValues.isEmpty()) {
 	  ret +=                           QString("  enumValues:    ");
-	  QList<qint32> keys = _enumValues.keys();
+	  QList<qint32> keys = _enumValues.uniqueKeys();
 	  qSort(keys);
-	  for (int i = 0; i < keys.size(); i++) {
-        ret += _enumValues[keys[i]];
-        if (i + 1 < keys.size())
-            ret += ", ";
+	  bool first = true;
+	  for (int i = 0; i < keys.size(); ++i) {
+		  for (EnumHash::const_iterator it = _enumValues.find(keys[i]);
+			   it != _enumValues.end() && it.key() == keys[i]; ++it) {
+			  if (first)
+				  first = false;
+			  else
+				  ret += ", ";
+			  ret += it.value();
+		  }
 	  }
 	  ret += "\n";
 	}
