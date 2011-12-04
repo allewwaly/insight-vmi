@@ -74,8 +74,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
     try {
         debugmsg("Passing the following type change to SymFactory:\n" +
                  typeChangeInfo(ed));
-        _factory->typeAlternateUsage(ed.sym, ed.srcType, ed.ctxType, ed.ctxMembers,
-                                     ed.targetType, this);
+        _factory->typeAlternateUsage(&ed, this);
     }
     catch (FactoryException& e) {
         // Print the source of the embedding external declaration
@@ -114,8 +113,10 @@ int KernelSourceTypeEvaluator::evaluateIntExpression(const ASTNode* node, bool* 
             return value.value();
         }
         // A constant value may still be undefined for missing type information.
-        // We should be able to evaluate all other constant expressions!
-        else if (value.resultType != erUndefined) {
+        // We should be able to evaluate all other constant expressions that
+        // don't have runtime dependencies!
+        else if (! (value.resultType & (erRuntime|erUndefined|erGlobalVar|erLocalVar)) )
+        {
             ASTSourcePrinter printer(_ast);
             typeEvaluatorError(
                         QString("Failed to evaluate constant expression "
