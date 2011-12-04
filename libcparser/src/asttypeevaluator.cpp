@@ -2642,6 +2642,9 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
     // parameter declarations of function declarations or goto labels
     if (!es.sym)
         return;
+    // Ignore enumerator symbols, they are constant values
+    if (es.sym->type() == stEnumerator)
+        return;
 
     _followedSymStack.clear();
     _followedSymStack.push(FollowedSymbol(es.sym, 0));
@@ -3731,11 +3734,14 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
     if ( !(ed.sym = findSymbolOfPrimaryExpression(node, false)) )
         return erNoPrimaryExpression;
 
+    // Ignore enumerator symbols, they are constant values
+    if (ed.sym->type() == stEnumerator)
+        return erNoPointerAssignment;
+
     ed.srcNode = node;
     ed.primExNode = node;
     ed.rootNode = node->parent;
     ed.postExNode = node->parent;
-
 
     return evaluateIdentifierUsedAsRek(&ed);
 }
