@@ -9,7 +9,7 @@
 #define TYPEINFO_H_
 
 #include <QString>
-#include <QHash>
+#include <QMultiHash>
 #include <QVariant>
 #include <sys/types.h>
 
@@ -192,7 +192,7 @@ typedef QList<FuncParam*> ParamList;
 class TypeInfo
 {
 public:
-	typedef QHash<qint32, QString> EnumHash;
+	typedef QMultiHash<qint32, QString> EnumHash;
 
 	/**
 	 * Constructor
@@ -300,7 +300,7 @@ private:
 	size_t _pcLow;           ///< low program counter of a function
 	size_t _pcHigh;          ///< high program counter of a function
 	QVariant _constValue;    ///< holds the value of an enumerator symbol
-	QHash<qint32, QString> _enumValues; ///< holds the enumeration values, if this symbol is an enumeration
+	EnumHash _enumValues; ///< holds the enumeration values, if this symbol is an enumeration
 	HdrSymbolType _symType;  ///< holds the type of this symbol
 	DataEncoding _enc;       ///< holds the data encoding of this symbol
 	MemberList _members;     ///< holds all members of a union or struct

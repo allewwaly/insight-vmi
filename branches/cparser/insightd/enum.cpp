@@ -72,7 +72,7 @@ void Enum::readFrom(QDataStream& in)
     in >> enumCnt;
     for (int i = 0; i < enumCnt; i++) {
         in >> key >> value;
-        _enumValues.insert(key, value);
+        _enumValues.insertMulti(key, value);
     }
 }
 
