@@ -31,6 +31,21 @@ public:
     ASTExpression* exprOfNode(const ASTNode *node);
     static ExpressionResultSize realTypeToResultSize(RealType type);
 
+protected:
+    /**
+     * Converts a pANTLR3_COMMON_TOKEN to a QString.
+     * @param tok the ANTLR3 token to convert to a QString
+     * @return the token \a tok as a QString
+     */
+    QString antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok) const;
+
+    /**
+     * Converts a pANTLR3_STRING to a QString.
+     * @param s the ANTLR3 string to convert to a QString
+     * @return the string \a s as a QString
+     */
+    QString antlrStringToStr(const pANTLR3_STRING s) const;
+
 private:
     template<class T> T* createExprNode();
     template<class T, class PT> T* createExprNode(PT param);

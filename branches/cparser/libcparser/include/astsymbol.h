@@ -136,20 +136,6 @@ public:
 	static QString typeToString(ASTSymbolType type);
 };
 
-/**
- * Converts a pANTLR3_COMMON_TOKEN to a QString.
- * @param tok the ANTLR3 token to convert to a QString
- * @return the token \a tok as a QString
- */
-QString antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok);
-
-/**
- * Converts a pANTLR3_STRING to a QString.
- * @param s the ANTLR3 string to convert to a QString
- * @return the string \a s as a QString
- */
-QString antlrStringToStr(const pANTLR3_STRING s);
-
 
 inline bool ASTSymbol::isNull() const
 {

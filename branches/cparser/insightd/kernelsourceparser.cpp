@@ -99,7 +99,7 @@ void KernelSourceParser::parse()
             ++_filesDone;
 
             // Skip assembly files
-            if (!unit->name().endsWith(".S") && _filesDone >= 323) {
+            if (!unit->name().endsWith(".S") && _filesDone >= 471) {
                 _currentFile = unit->name() + ".i";
 
                 checkOperationProgress();

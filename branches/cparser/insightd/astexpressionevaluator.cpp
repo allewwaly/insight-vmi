@@ -35,6 +35,29 @@ ASTExpressionEvaluator::~ASTExpressionEvaluator()
 }
 
 
+QString ASTExpressionEvaluator::antlrTokenToStr(
+        const pANTLR3_COMMON_TOKEN tok) const
+{
+    // Use the AST cached version, if available
+    if (_ast)
+        return _ast->antlrTokenToStr(tok);
+    // Otherwise use the non-caching version
+    else
+        return antlrStringToStr(tok->getText(tok));
+}
+
+
+QString ASTExpressionEvaluator::antlrStringToStr(const pANTLR3_STRING s) const
+{
+    // Use the AST cached version, if available
+    if (_ast)
+        return _ast->antlrStringToStr(s);
+    // Otherwise use the non-caching version
+    else
+        return QString::fromAscii((const char*)s->chars, s->len);
+}
+
+
 template<class T>
 T* ASTExpressionEvaluator::createExprNode()
 {

@@ -1775,7 +1775,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
                         ->u.init_declarator.declarator
                         ->u.declarator.direct_declarator
                         ->u.direct_declarator.identifier;
-                QString id = antlrTokenToStr(tok);
+                QString id = eval->antlrTokenToStr(tok);
                 // Distinguish between typedef and variable
                 if (dec->u.declaration.isTypedef) {
                     BaseTypeList temp;
@@ -1815,7 +1815,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
                         ->u.struct_declarator.declarator
                         ->u.declarator.direct_declarator
                         ->u.direct_declarator.identifier;
-                QString id = antlrTokenToStr(tok);
+                QString id = eval->antlrTokenToStr(tok);
 
                 // Get the BaseType of the embedding struct
                 const ASTNode* structSpecifier = astTypeNonPtr->node()->parent;
@@ -1861,7 +1861,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
             assert(dd != 0);
             assert(dd->u.direct_declarator.identifier != 0);
         }
-        QString name = antlrTokenToStr(dd->u.direct_declarator.identifier);
+        QString name = eval->antlrTokenToStr(dd->u.direct_declarator.identifier);
         // If the name appears in a nested direct_declarator, we have to check
         // whether it appears in a struct definition. In this case we won't find
         // the identifer in _typesByName, we have to find it over its struct!

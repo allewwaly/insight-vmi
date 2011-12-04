@@ -209,3 +209,29 @@ quint32 AbstractSyntaxTree::errorCount() const
 {
     return _psr ? _psr->pParser->rec->errorCount : 0;
 }
+
+
+QString AbstractSyntaxTree::antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok)
+{
+    if (!tok)
+        return QString();
+    if (!_antlrStringCache.contains(tok)) {
+        pANTLR3_STRING s = tok->getText(tok);
+        _antlrStringCache.insert(
+                    tok, QString::fromAscii((const char*)s->chars, s->len));
+    }
+    return _antlrStringCache[tok];
+}
+
+
+QString AbstractSyntaxTree::antlrStringToStr(const pANTLR3_STRING s)
+{
+    if (!s)
+        return QString();
+    if (!_antlrStringCache.contains(s)) {
+        _antlrStringCache.insert(
+                    s, QString::fromAscii((const char*)s->chars, s->len));
+    }
+    return _antlrStringCache[s];
+}
+
