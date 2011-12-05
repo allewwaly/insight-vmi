@@ -163,25 +163,55 @@ void ASTDotGraph::printDotGraphTokenList(pASTTokenList list,
 
 
 void ASTDotGraph::printDotGraphConnection(pANTLR3_COMMON_TOKEN src,
-                                          const ASTNode* dest, int derefCount,
-                                          int round)
+                                          const AssignedNode *an)
 {
     QString srcId = getTokenId(src);
-    QString destId = getNodeId(dest);
-    QString label = QString("(%1)").arg(round);
+    QString destId = getNodeId(an->node);
+    QString label = QString("(%1)").arg(an->addedInRound);
 
-    if (derefCount) {
-        QString s;
-        if (derefCount < 0)
-            s.fill(QChar('&'), -derefCount);
+
+    QString s;
+    if (an->derefCount) {
+        if (an->derefCount < 0)
+            s.fill(QChar('&'), -an->derefCount);
         else
-            s.fill(QChar('*'), derefCount);
-
-        label += QString(" <FONT " FONT_DEF_STR ">%1</FONT>").arg(dotEscape(s));
+            s.fill(QChar('*'), an->derefCount);
+        s = dotEscape(s);
     }
+    if (an->postExprSuffixes) {
+        for (const ASTNodeList* l = an->postExprSuffixes; l; l = l->next) {
+            s += "<BR/>";
+            switch (l->item->type) {
+            case nt_postfix_expression_arrow:
+                s += dotEscape("->" + antlrTokenToStr(l->item->u.postfix_expression_suffix.identifier));
+                break;
+            case nt_postfix_expression_brackets:
+                s += dotEscape("[]");
+                break;
+            case nt_postfix_expression_dec:
+                s += dotEscape("--");
+                break;
+            case nt_postfix_expression_dot:
+                s += dotEscape("." + antlrTokenToStr(l->item->u.postfix_expression_suffix.identifier));
+                break;
+            case nt_postfix_expression_inc:
+                s += dotEscape("++");
+                break;
+            case nt_postfix_expression_parens:
+                s += dotEscape("()");
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    if (!s.isEmpty())
+        label += QString(" <FONT " FONT_DEF_STR ">%1</FONT>").arg(s);
+
     _out << QString("\t\ttoken_%1 -> node_%2 [constraint=false style=dotted "
                     "layer=\"assign\" taillabel=< %3 > labelfloat=true "
-                    "labelangle=-45 labeldistance=2];")
+                    "labelangle=-45 labeldistance=3];")
             .arg(srcId)
             .arg(destId)
             .arg(label)
@@ -510,10 +540,7 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
                      e = sym->assignedAstNodes().end(); it != e; ++it)
                 {
                     printDotGraphConnection(
-                                node->u.primary_expression.identifier,
-                                it->node,
-                                it->derefCount,
-                                it->addedInRound);
+                                node->u.primary_expression.identifier, &(*it));
                 }
             }
         }

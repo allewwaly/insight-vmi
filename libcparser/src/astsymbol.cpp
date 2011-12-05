@@ -9,6 +9,47 @@
 #include <astsymbol.h>
 #include <astnode.h>
 #include <astscopemanager.h>
+#include <abstractsyntaxtree.h>
+#include <bitop.h>
+
+uint AssignedNode::hashPostExprSuffixes() const
+{
+	return hashPostExprSuffixes(postExprSuffixes, sym->ast());
+}
+
+
+uint AssignedNode::hashPostExprSuffixes(const ASTNodeList *pesl,
+										const AbstractSyntaxTree *ast)
+{
+	if (!pesl)
+		return 0;
+
+	uint hash = 0;
+	int rot = 0;
+	QString id;
+	// Hash the postfix expressions
+	for (const ASTNodeList* list = pesl; list; list = list->next)
+	{
+		const ASTNode* node = list->item;
+		hash ^= rotl32(node->type, rot);
+		rot = (rot + 3) % 32;
+
+		switch (node->type) {
+		case nt_postfix_expression_arrow:
+		case nt_postfix_expression_dot:
+			id = ast->antlrTokenToStr(
+						node->u.postfix_expression_suffix.identifier);
+			hash ^= rotl32(qHash(id), rot);
+			rot = (rot + 3) % 32;
+			break;
+		default:
+			break;
+		}
+	}
+
+	return hash;
+}
+
 
 ASTSymbol::ASTSymbol()
 	: _type(stNull), _astNode(0)
@@ -16,8 +57,9 @@ ASTSymbol::ASTSymbol()
 }
 
 
-ASTSymbol::ASTSymbol(const QString& name, ASTSymbolType type, struct ASTNode* astNode)
-	: _name(name), _type(type), _astNode(astNode)
+ASTSymbol::ASTSymbol(const AbstractSyntaxTree* ast, const QString &name,
+					 ASTSymbolType type, ASTNode *astNode)
+	: _name(name), _type(type), _astNode(astNode), _ast(ast)
 {
 }
 

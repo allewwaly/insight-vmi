@@ -8,6 +8,7 @@
 #ifndef NUMERICTYPE_H_
 #define NUMERICTYPE_H_
 
+#include <bitop.h>
 #include "basetype.h"
 #include "debug.h"
 

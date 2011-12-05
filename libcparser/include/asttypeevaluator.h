@@ -94,7 +94,8 @@ struct PointsToEvalState
 {
     PointsToEvalState(const ASTNode* node = 0, const ASTNode* root = 0)
         : sym(0), srcNode(node), root(root), rNode(0), postExNode(0),
-          derefCount(0), lastLinkDerefCount(0), validLvalue(true)
+          derefCount(0), lastLinkDerefCount(0), lastLinkSuffixHash(0),
+          validLvalue(true)
     {}
     const ASTSymbol* sym;
     const ASTNode* srcNode;
@@ -103,6 +104,7 @@ struct PointsToEvalState
     const ASTNode* postExNode;
     int derefCount;
     int lastLinkDerefCount;
+    uint lastLinkSuffixHash;
     bool validLvalue;
     ASTNodeNodeHash interLinks;
 };
@@ -130,6 +132,7 @@ struct TypeEvalDetails
         sym = 0;
         derefCount = 0;
         lastLinkDerefCount = 0;
+        lastLinkSuffixHash = 0;
         ctxMembers.clear();
         interLinks.clear();
     }
@@ -148,6 +151,7 @@ struct TypeEvalDetails
     const ASTSymbol* sym;
     int derefCount;
     int lastLinkDerefCount;
+    uint lastLinkSuffixHash;
     ASTNodeNodeHash interLinks;
 };
 
