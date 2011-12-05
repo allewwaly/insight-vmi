@@ -25,7 +25,7 @@ ASTScope::~ASTScope()
 }
 
 
-void ASTScope::add(const QString& name, ASTSymbolType type, struct ASTNode* node)
+void ASTScope::add(const QString &name, ASTSymbolType type, ASTNode *node)
 {
 	switch (type) {
 	case stNull:
@@ -54,6 +54,7 @@ void ASTScope::add(const QString& name, ASTSymbolType type, struct ASTNode* node
 
 
 bool ASTScope::varAssignment(const QString &name, const ASTNode *assignedNode,
+                             const ASTNodeList* postExprSuffixes,
                              int derefCount, int round)
 {
     // Search for variables, parameters and functions with given name
@@ -63,6 +64,7 @@ bool ASTScope::varAssignment(const QString &name, const ASTNode *assignedNode,
              (stVariableDecl|stVariableDef|stFunctionParam|stFunctionDef)))
         {
             return p->_symbols[name]->appendAssignedNode(assignedNode,
+                                                         postExprSuffixes,
                                                          derefCount, round);
         }
     }
@@ -72,8 +74,8 @@ bool ASTScope::varAssignment(const QString &name, const ASTNode *assignedNode,
 }
 
 
-void ASTScope::addSymbol(const QString& name, ASTSymbolType type,
-		struct ASTNode* node)
+void ASTScope::addSymbol(const QString &name, ASTSymbolType type,
+						 ASTNode *node)
 {
 	if (_symbols.contains(name)) {
 		bool warn = true;
@@ -129,7 +131,7 @@ void ASTScope::addSymbol(const QString& name, ASTSymbolType type,
 		delete _symbols[name];
 	}
 
-	_symbols.insert(name, new ASTSymbol(name, type, node));
+	_symbols.insert(name, new ASTSymbol(_ast, name, type, node));
 }
 
 
@@ -179,7 +181,7 @@ void ASTScope::addCompoundType(const QString& name, ASTSymbolType type,
 		delete _compoundTypes[name];
 	}
 
-	_compoundTypes.insert(name, new ASTSymbol(name, type, node));
+	_compoundTypes.insert(name, new ASTSymbol(_ast, name, type, node));
 }
 
 
@@ -201,7 +203,7 @@ void ASTScope::addTypedef(const QString& name, ASTSymbolType type,
 		delete _typedefs[name];
 	}
 
-	_typedefs.insert(name, new ASTSymbol(name, type, node));
+	_typedefs.insert(name, new ASTSymbol(_ast, name, type, node));
 }
 
 
@@ -294,8 +296,8 @@ ASTSymbol* ASTScope::find(const QString& name, int searchSymbols) const
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-ASTScopeManager::ASTScopeManager()
-	: _currentScope(0)
+ASTScopeManager::ASTScopeManager(const AbstractSyntaxTree *ast)
+	: _currentScope(0), _ast(ast)
 {
 }
 
@@ -319,7 +321,7 @@ void ASTScopeManager::clear()
 void ASTScopeManager::pushScope(struct ASTNode* astNode)
 {
 	// Create new scope object
-	_currentScope = new ASTScope(astNode, _currentScope);
+	_currentScope = new ASTScope(_ast, astNode, _currentScope);
 	_scopes.append(_currentScope);
 	if (astNode)
 	    astNode->childrenScope = _currentScope;

@@ -14,6 +14,7 @@
 #include <QTextStream>
 
 class ASTTypeEvaluator;
+class AssignedNode;
 
 class ASTDotGraph: protected ASTWalker
 {
@@ -42,8 +43,8 @@ private:
                              const char* extraStyle = 0);
     void printDotGraphTokenList(pASTTokenList list, const QString& delim,
             const QString& nodeId, const char* extraStyle = 0);
-    void printDotGraphConnection(pANTLR3_COMMON_TOKEN src, const ASTNode *dest,
-                                 int derefCount, int round);
+    void printDotGraphConnection(pANTLR3_COMMON_TOKEN src,
+                                 const AssignedNode* an);
 
     QTextStream _out;
     ASTTypeEvaluator* _eval;

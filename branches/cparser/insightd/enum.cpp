@@ -5,6 +5,7 @@
  *      Author: chrschn
  */
 
+#include <bitop.h>
 #include "enum.h"
 #include "debug.h"
 

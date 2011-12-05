@@ -26,27 +26,59 @@ extern "C" {
 
 // forward declaration
 struct ASTNode;
+struct ASTNodeList;
+class AbstractSyntaxTree;
+class ASTSymbol;
 
 struct AssignedNode {
     AssignedNode()
-        : node(0), derefCount(0), addedInRound(0) {}
-    AssignedNode(const ASTNode* node, int derefCount, int round)
-        : node(node), derefCount(derefCount), addedInRound(round) {}
+        : sym(0), node(0), postExprSuffixes(0), derefCount(0), addedInRound(0) {}
+    AssignedNode(const ASTSymbol* sym, const ASTNode* node,
+                 const ASTNodeList* postExprSuffixes, int derefCount, int round)
+        : sym(sym), node(node), postExprSuffixes(postExprSuffixes),
+          derefCount(derefCount), addedInRound(round) {}
 
+    /// The Symbol this assigned node belongs to
+    const ASTSymbol* sym;
+    /// The node that was assigned to this symbol
     const ASTNode* node;
+    /// The postfix expression suffixes of the assignment's lvalue
+    const ASTNodeList* postExprSuffixes;
+    /// No. of (de)references of assignment's lvalue
     int derefCount;
+    /// The round in the points-to analysis this link was added
     int addedInRound;
 
+    /// Comparison operator
     inline bool operator==(const AssignedNode& other) const
     {
-        return node == other.node && derefCount == other.derefCount;
+        bool ret = (node == other.node && derefCount == other.derefCount);
+        if (ret && postExprSuffixes)
+            ret = (hashPostExprSuffixes() == other.hashPostExprSuffixes());
+        return ret;
     }
+
+    /**
+     * @return hash value of the suffixes in postExprSuffixes
+     */
+    uint hashPostExprSuffixes() const;
+
+    /**
+     * @return hash value of the suffixes in \a pesl
+     */
+    static uint hashPostExprSuffixes(const ASTNodeList* pesl,
+                                     const AbstractSyntaxTree* ast);
 };
+
 
 inline uint qHash(const AssignedNode& an)
 {
-    return qHash(an.node) ^ qHash(an.derefCount);
+    uint hash = qHash(an.node) ^ qHash(an.derefCount);
+    if (an.postExprSuffixes)
+        hash ^= an.hashPostExprSuffixes();
+    return hash;
 }
+
 
 typedef QSet<AssignedNode> AssignedNodeSet;
 
@@ -59,6 +91,7 @@ class ASTSymbol
 	ASTSymbolType _type;
 	struct ASTNode* _astNode;
 	AssignedNodeSet _assignedAstNodes;
+	const AbstractSyntaxTree* _ast;
 
 public:
 	/**
@@ -68,11 +101,13 @@ public:
 
 	/**
 	 * Constructor
+	 * @param ast the AbstractSyntaxTree this symbol belongs to
 	 * @param name the name of the symbol
 	 * @param type of the symbol, e.g., a variable, a function or a type name
 	 * @param astNode link to the node that defines this symbol
 	 */
-	ASTSymbol(const QString& name, ASTSymbolType type, struct ASTNode* astNode);
+	ASTSymbol(const AbstractSyntaxTree* ast, const QString& name, ASTSymbolType type,
+			  struct ASTNode* astNode);
 
 	/**
 	 * @return \c true if this symbol is \c null, \c false otherwise
@@ -94,6 +129,11 @@ public:
 	bool isGlobal() const;
 
 	/**
+	 * @return the AbstractSyntaxTree object this symbol belongs to
+	 */
+	const AbstractSyntaxTree* ast() const;
+
+	/**
 	 * @return the symbol type, e.g., a variable, a function or a type name
 	 */
 	ASTSymbolType type() const;
@@ -112,11 +152,14 @@ public:
 	/**
 	 * Append a new ASTNode that has been assigned to this symbol.
 	 * @param node the node to append
+	 * @param postExprSuffixes the suffixes to which \a node was assigned
 	 * @param derefCount number of dereferences for this node
 	 * @param round the round this node was added
 	 * @return \c true if element did not already exist, \c false otherwise
 	 */
-	bool appendAssignedNode(const ASTNode* node, int derefCount, int round);
+	bool appendAssignedNode(const ASTNode* node,
+							const ASTNodeList* postExprSuffixes, int derefCount,
+							int round);
 
 	/**
 	 * @return the name of the symbol
@@ -155,6 +198,12 @@ inline ASTSymbolType ASTSymbol::type() const
 }
 
 
+inline const AbstractSyntaxTree* ASTSymbol::ast() const
+{
+    return _ast;
+}
+
+
 inline const ASTNode* ASTSymbol::astNode() const
 {
     return _astNode;
@@ -167,10 +216,11 @@ inline const AssignedNodeSet &ASTSymbol::assignedAstNodes() const
 }
 
 
-inline bool ASTSymbol::appendAssignedNode(const ASTNode *node, int derefCount,
-                                          int round)
+inline bool ASTSymbol::appendAssignedNode(
+        const ASTNode *node, const ASTNodeList* postExprSuffixes,
+        int derefCount, int round)
 {
-    AssignedNode an(node, derefCount, round);
+    AssignedNode an(this, node, postExprSuffixes, derefCount, round);
     if (!_assignedAstNodes.contains(an)) {
         _assignedAstNodes.insert(an);
         return true;

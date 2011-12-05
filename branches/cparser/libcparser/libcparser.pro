@@ -25,7 +25,8 @@ HEADERS += include/ast_interface.h \
     src/C.h \
     antlr_generated/CLexer.h \
     antlr_generated/CParser.h \
-    include/astsourceprinter.h
+    include/astsourceprinter.h \
+    include/bitop.h
 SOURCES += src/astscopemanager.cpp \
     src/astsymbol.cpp \
     src/realtypes.cpp \

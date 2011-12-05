@@ -19,8 +19,8 @@
 #include <astsourceprinter.h>
 
 #ifdef DEBUG
-//#define DEBUG_POINTS_TO 1
-//#define DEBUG_USED_AS 1
+#define DEBUG_POINTS_TO 1
+#define DEBUG_USED_AS 1
 #endif
 
 #define checkNodeType(node, expected_type) \
@@ -2692,13 +2692,23 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
     PointsToEvalState rek_es;
     int localDerefCount = 0;
     const ASTNode* assigned = 0;
+    const ASTNode* localPostEx = 0;
 
     while (es->root) {
         // Was this node assigned to other variables?
         it = _assignedNodesRev.find(es->root);
         if (it != e) {
-            if (es->interLinks.isEmpty() || !es->lastLinkDerefCount ||
-                localDerefCount >= es->lastLinkDerefCount)
+            const ASTNodeList* pesl = localPostEx ?
+                        localPostEx->u.postfix_expression.postfix_expression_suffix_list :
+                        0;
+            if (// Follow inter-links if no links have been followed yet
+                es->interLinks.isEmpty() ||
+                // Follow inter-links if last link did not involve (de)references
+                ((!es->lastLinkDerefCount ||
+                  // If (de)references were involved, they must match
+                  localDerefCount >= es->lastLinkDerefCount) &&
+                 // Hash of postfix expression suffixes must always match
+                 es->lastLinkSuffixHash == AssignedNode::hashPostExprSuffixes(pesl, _ast)))
             {
                 for (; it != e && it.key() == es->root; ++it) {
                     // Start only with links that were added last round
@@ -2729,6 +2739,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                     rek_es = *es;
                     rek_es.root = it.value().node;
                     rek_es.lastLinkDerefCount = it.value().derefCount;
+                    rek_es.lastLinkSuffixHash = it.value().hashPostExprSuffixes();
                     rek_es.interLinks.insert(es->root,  rek_es.root);
                     evaluateIdentifierPointsToRek(&rek_es);
                 }
@@ -2736,13 +2747,23 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
 #ifdef DEBUG_POINTS_TO
             // It's not the same pointer of the deref counters don't not match!
             else {
-                debugmsg(QString("Skipping all links from %1 %2:%3 because "
-                                 "previous deref counter mismatch (%5 < %6)")
+                QString reason;
+                if (es->lastLinkDerefCount && localDerefCount < es->lastLinkDerefCount)
+                    reason = QString("previous deref counter mismatch (%1 < %2)")
+                            .arg(localDerefCount)
+                            .arg(es->lastLinkDerefCount);
+                else if (es->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast))
+                    reason = QString("suffix hashes do not match (%1 != %2)")
+                            .arg(es->lastLinkSuffixHash, 0, 16)
+                            .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16);
+                else
+                    reason = "of unknown reason";
+
+                debugmsg(QString("Skipping all links from %1 %2:%3 because %4")
                          .arg(ast_node_type_to_str(es->root))
                          .arg(es->root->start->line)
                          .arg(es->root->start->charPosition)
-                         .arg(localDerefCount)
-                         .arg(es->lastLinkDerefCount));
+                         .arg(reason));
             }
 #endif
         }
@@ -2820,6 +2841,27 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                     // void *p, **q, *r;
                     // q = &p;    // last link deref = 0
                     // *q = r;    // local deref = 1
+
+
+                    // Check if hash of postfix expression suffixes match
+                    const ASTNodeList* pesl = localPostEx ?
+                                localPostEx->u.postfix_expression.postfix_expression_suffix_list :
+                                0;
+                    if (es->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast)) {
+#ifdef DEBUG_POINTS_TO
+                        debugmsg(QString("Symbol \"%1\" at %2:%3 has wrong suffix "
+                                         "hash (%4 != %5) at %6:%7:%8")
+                                 .arg(es->sym->name())
+                                 .arg(es->srcNode->start->line)
+                                 .arg(es->srcNode->start->charPosition)
+                                 .arg(es->lastLinkSuffixHash, 0, 16)
+                                 .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16)
+                                 .arg(_ast ? _ast->fileName() : QString("-"))
+                                 .arg(es->root->start->line)
+                                 .arg(es->root->start->charPosition));
+#endif
+                        return;
+                    }
                 }
 
                 QString op = antlrTokenToStr(
@@ -2831,8 +2873,12 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 // Record assignments for variables and parameters
                 if (es->sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
                 {
+                    const ASTNodeList *pesl = localPostEx ?
+                                localPostEx->u.postfix_expression.postfix_expression_suffix_list :
+                                0;
                     if (es->srcNode->scope->varAssignment(
-                            es->sym->name(), assigned, es->derefCount, _pointsToRound))
+                            es->sym->name(), assigned, pesl, es->derefCount,
+                            _pointsToRound))
                     {
 #ifdef DEBUG_POINTS_TO
                         const ASTNode* n =
@@ -2881,15 +2927,38 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                     return;
 
                 // No. of dereferences must match
-                /// @todo check if this is correct!
                 if (localDerefCount != es->lastLinkDerefCount)
                     return;
+
+                // Check if hash of postfix expression suffixes match
+                const ASTNodeList* pesl = localPostEx ?
+                            localPostEx->u.postfix_expression.postfix_expression_suffix_list :
+                            0;
+                if (es->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast)) {
+#ifdef DEBUG_POINTS_TO
+                    debugmsg(QString("Symbol \"%1\" at %2:%3 has wrong suffix "
+                                     "hash (%4 != %5) at %6:%7:%8")
+                             .arg(es->sym->name())
+                             .arg(es->srcNode->start->line)
+                             .arg(es->srcNode->start->charPosition)
+                             .arg(es->lastLinkSuffixHash, 0, 16)
+                             .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16)
+                             .arg(_ast ? _ast->fileName() : QString("-"))
+                             .arg(es->root->start->line)
+                             .arg(es->root->start->charPosition));
+#endif
+                    return;
+                }
 
                 // Record assignments for variables and parameters
                 if (es->sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
                 {
+                    const ASTNodeList *pesl = localPostEx ?
+                                localPostEx->u.postfix_expression.postfix_expression_suffix_list :
+                                0;
                     if (es->srcNode->scope->varAssignment(
-                                es->sym->name(), assigned, es->derefCount, _pointsToRound))
+                            es->sym->name(), assigned, pesl, es->derefCount,
+                            _pointsToRound))
                     {
 #ifdef DEBUG_POINTS_TO
                         debugmsg(QString("Symbol \"%1\" at %2:%3 points to "
@@ -2918,6 +2987,26 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
             // An identifier underneath a return should be the initializer
             assert((assigned = es->root->u.jump_statement.initializer) != 0);
 
+            // Check if hash of postfix expression suffixes match
+            const ASTNodeList* pesl = localPostEx ?
+                        localPostEx->u.postfix_expression.postfix_expression_suffix_list :
+                        0;
+            if (es->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast)) {
+#ifdef DEBUG_POINTS_TO
+                debugmsg(QString("Symbol \"%1\" at %2:%3 has wrong suffix "
+                                 "hash (%4 != %5) at %6:%7:%8")
+                         .arg(es->sym->name())
+                         .arg(es->srcNode->start->line)
+                         .arg(es->srcNode->start->charPosition)
+                         .arg(es->lastLinkSuffixHash, 0, 16)
+                         .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16)
+                         .arg(_ast ? _ast->fileName() : QString("-"))
+                         .arg(es->root->start->line)
+                         .arg(es->root->start->charPosition));
+#endif
+                return;
+            }
+
             const ASTSymbol* funcSym = embeddingFuncSymbol(es->root);
             // Do not insert links for recursive expressions, we cannot
             // resolve them anyway.
@@ -2927,7 +3016,8 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
             // Treat any return statement as an assignment to the function
             // definition symbol
             if (es->root->scope->varAssignment(
-                        funcSym->name(), assigned, es->derefCount, _pointsToRound))
+                    funcSym->name(), assigned, pesl, es->derefCount,
+                    _pointsToRound))
             {
 #ifdef DEBUG_POINTS_TO
                 debugmsg(QString("Symbol \"%1\" at %2:%3 points to %4:%5:%6 (deref %7)")
@@ -2946,12 +3036,28 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
 
         case nt_postfix_expression:
             if (es->root->u.postfix_expression.primary_expression == es->srcNode) {
-                // Ignore expression that have postfix expression suffixes. They
-                // are captured during the used-as analysis.
-                if (es->root->u.postfix_expression.postfix_expression_suffix_list)
-                    break;
+//                // Ignore expression that have postfix expression suffixes. They
+//                // are captured during the used-as analysis.
+//                if (es->root->u.postfix_expression.postfix_expression_suffix_list)
+//                    break;
 
-                es->postExNode = es->root;
+                // Capture postfix expression such as "a->b" or "(a)->b", but
+                // not (*a)->b
+                if (!es->postExNode ||
+                    (!es->derefCount &&
+                     es->root->u.postfix_expression.postfix_expression_suffix_list &&
+                     !es->postExNode->u.postfix_expression.postfix_expression_suffix_list))
+                {
+                    es->postExNode = es->root;
+                }
+                // Do the same locally
+                if (!localPostEx ||
+                    (!localDerefCount &&
+                     es->root->u.postfix_expression.postfix_expression_suffix_list &&
+                     !localPostEx->u.postfix_expression.postfix_expression_suffix_list))
+                {
+                    localPostEx = es->root;
+                }
             }
             break;
 
@@ -3066,7 +3172,9 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRev(const ASTNode *node)
         // Only consider newly added links
         if (it->addedInRound == _pointsToRound)
             _assignedNodesRev.insertMulti(
-                        it->node, AssignedNode(node, it->derefCount, _pointsToRound));
+                        it->node,
+                        AssignedNode(sym, node, it->postExprSuffixes,
+                                     it->derefCount, _pointsToRound));
     }
 }
 
@@ -3074,7 +3182,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRev(const ASTNode *node)
 ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
         TypeEvalDetails* ed)
 {
-    const ASTNode *lNode = 0, *rNode = ed->srcNode;
+    const ASTNode *lNode = 0, *rNode = ed->srcNode, *localPostEx = 0;
     ASTType *lType = 0;
 
     // No. of de-/references
@@ -3091,47 +3199,72 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
             return erRecursiveExpression;
 
         it = _assignedNodesRev.find(ed->rootNode);
-        if ( // Was this node assigned to other variables?
-            (it != e) &&
-            // Limit recursion level
-            (ed->interLinks.size() < 4) &&
-             // Does the local derference counter match the last link's one?
-            (ed->interLinks.isEmpty() || !ed->lastLinkDerefCount ||
-             derefs >= ed->lastLinkDerefCount) &&
-            // As ed->primExNode and ed->postExNode are not changed
-            // across inter-link boundaries, do not recurse for plain local
-            // variables without context (i.e., postfix expression suffixes)
-            (ed->sym->isGlobal() || ed->srcNode != ed->primExNode ||
-             ed->postExNode->u.postfix_expression.postfix_expression_suffix_list)
-           )
-        {
-            for (; it != e && it.key() == ed->rootNode; ++it) {
-                // Skip all inter-links that lead back to the source node
-                if (it.value().node == ed->srcNode)
-                    continue;
-                // Skip all targets that are target of this symbol anyway
-                if (ed->sym->assignedAstNodes().contains(it.value()))
-                    continue;
+        // Was this node assigned to other variables?
+        if (it != e) {
+            const ASTNodeList* pesl = localPostEx ?
+                        localPostEx->u.postfix_expression.postfix_expression_suffix_list :
+                        0;
+            if (// Limit recursion level
+                (ed->interLinks.size() < 4) &&
+                // Does the local derference counter match the last link's one?
+                (ed->interLinks.isEmpty() || !ed->lastLinkDerefCount ||
+                 derefs >= ed->lastLinkDerefCount) &&
+                // As ed->primExNode and ed->postExNode are not changed
+                // across inter-link boundaries, do not recurse for plain local
+                // variables without context (i.e., postfix expression suffixes)
+                (ed->sym->isGlobal() || ed->srcNode != ed->primExNode ||
+                 ed->postExNode->u.postfix_expression.postfix_expression_suffix_list) &&
+                // Check if hash of postfix expression suffixes match
+                (ed->lastLinkSuffixHash == AssignedNode::hashPostExprSuffixes(pesl, _ast))
+               )
+            {
 
-                rek_ed = *ed;
-                rek_ed.rootNode = it.value().node;
-                rek_ed.lastLinkDerefCount = it.value().derefCount;
-                rek_ed.interLinks.insert(ed->rootNode, rek_ed.rootNode);
-                evaluateIdentifierUsedAsRek(&rek_ed);
+                for (; it != e && it.key() == ed->rootNode; ++it) {
+                    // Skip all inter-links that lead back to the source node
+                    if (it.value().node == ed->srcNode)
+                        continue;
+                    // Skip all targets that are target of this symbol anyway
+                    if (ed->sym->assignedAstNodes().contains(it.value()))
+                        continue;
+
+                    rek_ed = *ed;
+                    rek_ed.rootNode = it.value().node;
+                    rek_ed.lastLinkDerefCount = it.value().derefCount;
+                    rek_ed.lastLinkSuffixHash = it.value().hashPostExprSuffixes();
+                    rek_ed.interLinks.insert(ed->rootNode, rek_ed.rootNode);
+                    evaluateIdentifierUsedAsRek(&rek_ed);
+                }
             }
-        }
 #ifdef DEBUG_USED_AS
-        // It's not the same pointer of the deref counters don't not match!
-        else {
-            debugmsg(QString("Skipping all links from %1 %2:%3 because "
-                             "previous deref counter mismatch (%5 < %6)")
-                     .arg(ast_node_type_to_str(ed->rootNode))
-                     .arg(ed->rootNode->start->line)
-                     .arg(ed->rootNode->start->charPosition)
-                     .arg(derefs)
-                     .arg(ed->lastLinkDerefCount));
-        }
+            // It's not the same pointer of the deref counters don't not match!
+            else {
+                QString reason;
+                if (ed->interLinks.size() >= 4)
+                    reason = QString("recursion level limit (%1) was reached ")
+                            .arg(ed->interLinks.size());
+                else if (ed->lastLinkDerefCount && derefs < ed->lastLinkDerefCount)
+                    reason = QString("previous deref counter mismatch (%1 < %2)")
+                            .arg(derefs)
+                            .arg(ed->lastLinkDerefCount);
+                else if (!ed->sym->isGlobal() && ed->srcNode == ed->primExNode &&
+                         !ed->postExNode->u.postfix_expression.postfix_expression_suffix_list)
+                    reason = QString("source symbol \"%1\" is local variable without suffixes")
+                            .arg(ed->sym->name());
+                else if (ed->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast))
+                    reason = QString("suffix hashes do not match (%1 != %2)")
+                            .arg(ed->lastLinkSuffixHash, 0, 16)
+                            .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16);
+                else
+                    reason = "of unknown reason";
+
+                debugmsg(QString("Skipping all links from %1 %2:%3 because %4")
+                         .arg(ast_node_type_to_str(ed->rootNode))
+                         .arg(ed->rootNode->start->line)
+                         .arg(ed->rootNode->start->charPosition)
+                         .arg(reason));
+            }
 #endif
+        }
 
         // Find out the situation in which the identifier is used
         switch (ed->rootNode->type) {
@@ -3258,10 +3391,13 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                 if (ed->castExNode)
                     goto cast_expression_type_change;
                 // Do not change primEx/postEx accross interLink boundaries
-                else if (ed->interLinks.isEmpty()) {
-                    // Make a postfix expression with suffixes the new primary expr.
-                    ed->postExNode = ed->rootNode;
-                    ed->primExNode = ed->rootNode->u.postfix_expression.primary_expression;
+                else {
+                    localPostEx = ed->postExNode;
+                    if (ed->interLinks.isEmpty()) {
+                        // Make a postfix expression with suffixes the new primary expr.
+                        ed->postExNode = ed->rootNode;
+                        ed->primExNode = ed->rootNode->u.postfix_expression.primary_expression;
+                    }
                 }
             }
             break;

@@ -14,7 +14,7 @@
 AbstractSyntaxTree::AbstractSyntaxTree()
     : _scopeMgr(0), _rootNodes(0), _input(0), _lxr(0), _tstream(0), _psr(0)
 {
-    _scopeMgr = new ASTScopeManager();
+    _scopeMgr = new ASTScopeManager(this);
 }
 
 
@@ -211,7 +211,7 @@ quint32 AbstractSyntaxTree::errorCount() const
 }
 
 
-QString AbstractSyntaxTree::antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok)
+QString AbstractSyntaxTree::antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok) const
 {
     if (!tok)
         return QString();
@@ -224,7 +224,7 @@ QString AbstractSyntaxTree::antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok)
 }
 
 
-QString AbstractSyntaxTree::antlrStringToStr(const pANTLR3_STRING s)
+QString AbstractSyntaxTree::antlrStringToStr(const pANTLR3_STRING s) const
 {
     if (!s)
         return QString();
