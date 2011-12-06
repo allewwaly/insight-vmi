@@ -19,8 +19,8 @@
 #include <astsourceprinter.h>
 
 #ifdef DEBUG
-#define DEBUG_POINTS_TO 1
-#define DEBUG_USED_AS 1
+//#define DEBUG_POINTS_TO 1
+//#define DEBUG_USED_AS 1
 #endif
 
 #define checkNodeType(node, expected_type) \
@@ -125,12 +125,12 @@ bool ASTTypeEvaluator::evaluateTypes()
 			_phase = epPointsToRev;
 			walkTree();
 		}
-//#ifdef DEBUG_POINTS_TO
+#ifdef DEBUG_POINTS_TO
 		if (_pointsToRound == 1)
 			std::cout << std::endl;
 		debugmsg("********** Round " << _pointsToRound << ": " << _assignments
 				 << " assignments, " << _assignmentsTotal << " total **********");
-//#endif
+#endif
 //		debugmsg("Forced loop exit");
 //		break;
 	} while (!_stopWalking && _assignments > 0);
@@ -3035,6 +3035,21 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
             break;
 
         case nt_postfix_expression:
+            // Capture postfix expression such as "a->b" or "(a)->b", but
+            // not (*a)->b
+            if (es->root->u.postfix_expression.postfix_expression_suffix_list &&
+                localDerefCount == es->lastLinkDerefCount)
+            {
+                // Find local postfix expression in current AST branch
+                if (!localPostEx)
+                    localPostEx = es->root;
+
+                // Find postfix expression only in original AST branch
+                if (es->interLinks.isEmpty() && !es->postExNode)
+                    es->postExNode = es->root;
+            }
+
+
             if (es->root->u.postfix_expression.primary_expression == es->srcNode) {
 //                // Ignore expression that have postfix expression suffixes. They
 //                // are captured during the used-as analysis.
@@ -3050,14 +3065,14 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 {
                     es->postExNode = es->root;
                 }
-                // Do the same locally
-                if (!localPostEx ||
-                    (!localDerefCount &&
-                     es->root->u.postfix_expression.postfix_expression_suffix_list &&
-                     !localPostEx->u.postfix_expression.postfix_expression_suffix_list))
-                {
-                    localPostEx = es->root;
-                }
+            }
+            // Find local postfix expression in current AST branch
+            if (!localPostEx ||
+                (!localDerefCount &&
+                 es->root->u.postfix_expression.postfix_expression_suffix_list &&
+                 !localPostEx->u.postfix_expression.postfix_expression_suffix_list))
+            {
+                localPostEx = es->root;
             }
             break;
 
@@ -3206,17 +3221,18 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                         0;
             if (// Limit recursion level
                 (ed->interLinks.size() < 4) &&
-                // Does the local derference counter match the last link's one?
-                (ed->interLinks.isEmpty() || !ed->lastLinkDerefCount ||
-                 derefs >= ed->lastLinkDerefCount) &&
+                // Follow inter-links if no link has been followed so far
+                (ed->interLinks.isEmpty() ||
+                 // Does the local derference counter match the last link's one?
+                 ((!ed->lastLinkDerefCount || derefs >= ed->lastLinkDerefCount) &&
+                  // Check if hash of postfix expression suffixes match
+                  (ed->lastLinkSuffixHash == AssignedNode::hashPostExprSuffixes(pesl, _ast)))) &&
                 // As ed->primExNode and ed->postExNode are not changed
                 // across inter-link boundaries, do not recurse for plain local
                 // variables without context (i.e., postfix expression suffixes)
                 (ed->sym->isGlobal() || ed->srcNode != ed->primExNode ||
-                 ed->postExNode->u.postfix_expression.postfix_expression_suffix_list) &&
-                // Check if hash of postfix expression suffixes match
-                (ed->lastLinkSuffixHash == AssignedNode::hashPostExprSuffixes(pesl, _ast))
-               )
+                 ed->postExNode->u.postfix_expression.postfix_expression_suffix_list)
+                )
             {
 
                 for (; it != e && it.key() == ed->rootNode; ++it) {
@@ -3392,7 +3408,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                     goto cast_expression_type_change;
                 // Do not change primEx/postEx accross interLink boundaries
                 else {
-                    localPostEx = ed->postExNode;
+                    localPostEx = ed->rootNode;
                     if (ed->interLinks.isEmpty()) {
                         // Make a postfix expression with suffixes the new primary expr.
                         ed->postExNode = ed->rootNode;
@@ -3487,6 +3503,25 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
         return erInvalidTransition;
     }
 
+    if (!ed->interLinks.isEmpty()) {
+        // Check if the postfix expression suffixes match
+        const ASTNodeList* pesl = localPostEx ?
+                    localPostEx->u.postfix_expression.postfix_expression_suffix_list :
+                    0;
+        if (ed->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast))
+        {
+#ifdef DEBUG_USED_AS
+            debugmsg(QString("Skipping change in %1 %2:%3 because suffix "
+                             "hashes do not match (%4 != %5)")
+                     .arg(ast_node_type_to_str(ed->rootNode))
+                     .arg(ed->rootNode->start->line)
+                     .arg(ed->rootNode->start->charPosition)
+                     .arg(ed->lastLinkSuffixHash, 0, 16)
+                     .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16));
+#endif
+            return erNoAssignmentUse;
+        }
+    }
 
 //    ed->srcNode = ed->primExNode;
     ed->targetNode = lNode;
