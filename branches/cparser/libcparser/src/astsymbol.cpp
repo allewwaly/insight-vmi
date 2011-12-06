@@ -31,8 +31,6 @@ uint AssignedNode::hashPostExprSuffixes(const ASTNodeList *pesl,
 	for (const ASTNodeList* list = pesl; list; list = list->next)
 	{
 		const ASTNode* node = list->item;
-		hash ^= rotl32(node->type, rot);
-		rot = (rot + 3) % 32;
 
 		switch (node->type) {
 		case nt_postfix_expression_arrow:
@@ -42,9 +40,15 @@ uint AssignedNode::hashPostExprSuffixes(const ASTNodeList *pesl,
 			hash ^= rotl32(qHash(id), rot);
 			rot = (rot + 3) % 32;
 			break;
+		case nt_postfix_expression_parens:
+			// ignore these
+			continue;
 		default:
 			break;
 		}
+
+		hash ^= rotl32(node->type, rot);
+		rot = (rot + 3) % 32;
 	}
 
 	return hash;
