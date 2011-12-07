@@ -337,7 +337,7 @@ public:
      */
     QList<int> equivalentTypes(int id) const;
 
-    QList<RefBaseType*> typesUsingId(int id) const;
+    QList<BaseType *> typesUsingId(int id) const;
 
 
     void typeAlternateUsage(const TypeEvalDetails *ed, ASTTypeEvaluator* eval);
@@ -631,7 +631,6 @@ private:
 	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
 	EnumStringHash _enumsByName;         ///< Holds all enumerator values, indexed by name
 	BaseTypeList _types;              ///< Holds all BaseType objects which were parsed or read from symbol files
-    BaseTypeList _customTypes;        ///< Holds all BaseType objects which were internally created
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	IntIntMultiHash _equivalentTypes; ///< Holds all type IDs of equivalent types
