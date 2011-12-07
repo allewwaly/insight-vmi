@@ -8,6 +8,6 @@ We plan to add new features to !InSight in future versions. If you would like to
 The following list contains the planned enhancements in the order of their priority:
 
 || *#* || *Feature* || *Description* || *Status* ||
-|| 1   || C Parser  || Parsing the Linux source code to automatically infer the types of untyped, ambiguous, or "kernel magical" pointers (such as those of `struct list_head` and `struct hlist_node`) || Parser complete, integration into !InSight still missing ||
+|| 1   || C Parser  || Parsing the Linux source code to automatically infer the types of untyped, ambiguous, or "kernel magical" pointers (such as those of `struct list_head` and `struct hlist_node`) || almost done ||
 || 2   || Windows host support || Porting !InSight to Windows (should be fairly easy thanks to Qt libs and little Linux specific code) || not started ||
 || 3   || Windows guest support || Using the [http://msdn.microsoft.com/en-us/windows/hardware/gg463009.aspx Microsoft Debugging Tools] to retrieve Windows debugging symbols, parsing these symbols [http://support.microsoft.com/kb/121366/en-us in PDB format] || not started ||
