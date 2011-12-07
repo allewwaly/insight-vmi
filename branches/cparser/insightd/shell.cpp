@@ -1009,7 +1009,7 @@ int Shell::cmdListTypes(QStringList args)
                 name = name.left(w_name - 3) + "...";
         }
 
-        _out << qSetFieldWidth(w_id)  << right << hex << type->id()
+        _out << qSetFieldWidth(w_id)  << right << hex << (uint) type->id()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(w_name) << name
@@ -1033,7 +1033,7 @@ int Shell::cmdListTypes(QStringList args)
 }
 
 
-bool cmpIdLessThan(const RefBaseType* t1, const RefBaseType* t2)
+bool cmpIdLessThan(const BaseType* t1, const BaseType* t2)
 {
     return t1->id() < t2->id();
 }
@@ -1051,14 +1051,14 @@ int Shell::cmdListTypesUsing(QStringList args)
     if (s.startsWith("0x"))
         s = s.right(s.size() - 2);
     bool ok = false;
-    int id = s.toInt(&ok, 16);
+    int id = (int)s.toUInt(&ok, 16);
 
     if (!ok) {
         _err << "Invalid type ID given." << endl;
         return ecInvalidId;
     }
 
-    QList<RefBaseType*> types = _sym.factory().typesUsingId(id);
+    QList<BaseType*> types = _sym.factory().typesUsingId(id);
 
     if (types.isEmpty()) {
         if (_sym.factory().equivalentTypes(id).isEmpty()) {
@@ -1075,16 +1075,13 @@ int Shell::cmdListTypesUsing(QStringList args)
 
     // Find out required field width (the types are sorted by ascending ID)
     const int w_id = getFieldWidth(types.last()->id());
-    const int w_refTypeId = w_id <= 7 ? 7 : w_id;
     const int w_type = 12;
     const int w_name = 24;
     const int w_size = 5;
     const int w_colsep = 2;
-    const int w_total = w_id + w_refTypeId + w_type + w_name + w_size + 3*w_colsep;
+    const int w_total = w_id + w_type + w_name + w_size + 2*w_colsep;
 
     _out << qSetFieldWidth(w_id)  << right << "ID"
-         << qSetFieldWidth(w_colsep) << " "
-         << qSetFieldWidth(w_refTypeId) << "RefType"
          << qSetFieldWidth(w_colsep) << " "
          << qSetFieldWidth(w_type) << left << "Type"
          << qSetFieldWidth(w_name) << "Name"
@@ -1095,10 +1092,8 @@ int Shell::cmdListTypesUsing(QStringList args)
     hline(w_total);
 
     for (int i = 0; i < types.size(); i++) {
-        RefBaseType* type = types[i];
+        BaseType* type = types[i];
         _out << qSetFieldWidth(w_id)  << right << hex << (uint)type->id()
-             << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_refTypeId) << (uint)type->refTypeId()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
@@ -1109,7 +1104,7 @@ int Shell::cmdListTypesUsing(QStringList args)
 
     hline(w_total);
     _out << "Total types using type " << args.front() << ": "
-         << dec << _sym.factory()._typesById.size() << endl;
+         << dec << types.size() << endl;
 
     return ecOk;
 }
@@ -1874,10 +1869,10 @@ int Shell::cmdShow(QStringList args)
     if (ok) {
     	// Try to find this ID in types and variables
     	if ( (bt = _sym.factory().findBaseTypeById(id)) ) {
-            _out << "Found type with ID 0x" << hex << id << dec;
+            _out << "Found type with ID 0x" << hex << (uint)id << dec;
     	}
     	else if ( (var = _sym.factory().findVarById(id)) ) {
-            _out << "Found variable with ID 0x" << hex << id << dec;
+            _out << "Found variable with ID 0x" << hex << (uint)id << dec;
     	}
     }
 
