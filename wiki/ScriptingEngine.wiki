@@ -30,9 +30,9 @@ The `Instance` objects provide various functions to inspect the properties of th
 <code language="js">
 // Retrieve information about the kernel object
 print("init.Address() = 0x" + init.Address());
-print("init.!FullName() = " + init.!FullName());
-print("init.!Type() = " + init.Type());
-print("init.!TypeName() = " + init.!TypeName());
+print("init.FullName() = " + init.FullName());
+print("init.Type() = " + init.Type());
+print("init.TypeName() = " + init.TypeName());
 print("init.Size() = " + init.Size());</code>
 
 == Accessing Members ==
@@ -43,11 +43,11 @@ If an `Instance` represents a structure or a union, its members can be accessed 
 // Iterate over all members using an array of Instance objects
 var members = init.Members();
 for (var i = 0; i < members.length; ++i) {
-    var offset = init.!MemberOffset(members`[`i`]`.Name());
+    var offset = init.MemberOffset(members`[`i`]`.Name());
     print ((i+1) +
             ". 0x" + offset.toString(16) + " " +
             members`[`i`]`.Name() + ": " +
-            members`[`i`]`.!TypeName() +
+            members`[`i`]`.TypeName() +
             " @ 0x" + members`[`i`]`.Address());
 }</code>
 
