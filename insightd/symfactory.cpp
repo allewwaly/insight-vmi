@@ -77,14 +77,6 @@ void SymFactory::clear()
 	}
 	_types.clear();
 
-    // Delete all custom types
-    for (BaseTypeList::iterator it = _customTypes.begin();
-            it != _customTypes.end(); ++it)
-    {
-        delete *it;
-    }
-	_customTypes.clear();
-
 	// Clear all further hashes and lists
 	_typesById.clear();
 	_equivalentTypes.clear();
@@ -436,8 +428,7 @@ bool SymFactory::isStructListHead(const BaseType* type) const
     // Check the members
     const StructuredMember* next = s->members().at(0);
     const StructuredMember* prev = s->members().at(1);
-    return s->id() == siListHead ||
-           (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
+    return (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
             next->name() == "next" &&
             (!next->refType() ||
              next->refType()->type() == rtPointer) &&
@@ -461,8 +452,7 @@ bool SymFactory::isStructHListNode(const BaseType* type) const
     // Check the members
     const StructuredMember* next = s->members().at(0);
     const StructuredMember* prev = s->members().at(1);
-    return s->id() == siHListNode ||
-           (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
+    return (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
             next->name() == "next" &&
             (!next->refType() ||
              next->refType()->type() == rtPointer) &&
@@ -507,17 +497,23 @@ QList<int> SymFactory::equivalentTypes(int id) const
 }
 
 
-QList<RefBaseType*> SymFactory::typesUsingId(int id) const
+QList<BaseType*> SymFactory::typesUsingId(int id) const
 {
     QList<int> typeIds = equivalentTypes(id);
-    QList<RefBaseType*> ret;
-
     if (typeIds.isEmpty())
-        ret = _usedByRefTypes.values(id);
-    else {
-        for (int i = 0; i < typeIds.size(); ++i)
-            ret += _usedByRefTypes.values(typeIds[i]);
+        typeIds += id;
+    QList<BaseType*> ret;
+
+    for (int i = 0; i < typeIds.size(); ++i) {
+        for (RefBaseTypeMultiHash::const_iterator it = _usedByRefTypes.find(typeIds[i]);
+             it != _usedByRefTypes.end() && it.key() == typeIds[i]; ++i)
+            ret += it.value();
+
+        for (StructMemberMultiHash::const_iterator it = _usedByStructMembers.find(typeIds[i]);
+             it != _usedByStructMembers.end() && it.key() == typeIds[i]; ++it)
+            ret += it.value()->belongsTo();
     }
+
     return ret;
 }
 
@@ -1012,14 +1008,12 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
 {
     assert(member != 0);
 
+    Structured* parent = member->belongsTo();
     // Create a new struct a special ID. This way, the type will be recognized
     // as "struct list_head" when the symbols are stored and loaded again.
     Struct* ret = new Struct(this);
-    _customTypes.append(ret);
-    Structured* parent = member->belongsTo();
-
+    ret->setId(getUniqueTypeId());
     ret->setName("list_head");
-    ret->setId(siListHead);
     ret->setSize(2 * _memSpecs.sizeofUnsignedLong);
 
     // Which macro offset should be used? In the kernel, the "childen" list_head
@@ -1034,29 +1028,37 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
 
     // Create "next" pointer
     Pointer* nextPtr = new Pointer(this);
-    _customTypes.append(nextPtr);
-    nextPtr->setId(0);
+    nextPtr->setId(getUniqueTypeId());
     nextPtr->setRefTypeId(parent->id());
     nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
     // To dereference this pointer, the member's offset has to be subtracted
     nextPtr->setMacroExtraOffset(extraOffset);
 
     StructuredMember* next = new StructuredMember(this); // deleted by ~Structured()
-    next->setId(0);
+    next->setId(getUniqueTypeId());
     next->setName("next");
     next->setOffset(0);
     next->setRefTypeId(nextPtr->id());
     ret->addMember(next);
 
-    //Create "prev" pointer
+    // Create "prev" pointer
     Pointer* prevPtr = new Pointer(*nextPtr);
-    _customTypes.append(prevPtr);
+    prevPtr->setId(getUniqueTypeId());
     StructuredMember* prev = new StructuredMember(this); // deleted by ~Structured()
-    prev->setId(0);
+    prev->setId(getUniqueTypeId());
     prev->setName("prev");
     prev->setOffset(_memSpecs.sizeofUnsignedLong);
     prev->setRefTypeId(prevPtr->id());
     ret->addMember(prev);
+
+    addSymbol(nextPtr);
+    addSymbol(prevPtr);
+    addSymbol(ret);
+
+    insertUsedBy(nextPtr);
+    insertUsedBy(next);
+    insertUsedBy(prevPtr);
+    insertUsedBy(prev);
 
     return ret;
 }
@@ -1069,19 +1071,18 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     // Create a new struct a special ID. This way, the type will be recognized
     // as "struct list_head" when the symbols are stored and loaded again.
     Struct* ret = new Struct(this);
-    _customTypes.append(ret);
+    ret->setId(getUniqueTypeId());
+
     Structured* parent = member->belongsTo();
 
     ret->setName("hlist_node");
-    ret->setId(siHListNode);
     ret->setSize(2 * _memSpecs.sizeofUnsignedLong);
 
     int extraOffset = -member->offset();
 
     // Create "next" pointer
     Pointer* nextPtr = new Pointer(this);
-    _customTypes.append(nextPtr);
-    nextPtr->setId(0);
+    nextPtr->setId(getUniqueTypeId());
     nextPtr->setRefTypeId(parent->id());
     nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
     insertUsedBy(nextPtr);
@@ -1089,31 +1090,39 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     nextPtr->setMacroExtraOffset(extraOffset);
 
     StructuredMember* next = new StructuredMember(this); // deleted by ~Structured()
-    next->setId(0);
+    next->setId(getUniqueTypeId());
     next->setName("next");
     next->setOffset(0);
     next->setRefTypeId(nextPtr->id());
-    insertUsedBy(next);
     ret->addMember(next);
 
     // Create "prev" pointer from the next pointer
     Pointer* prevPtr = new Pointer(*nextPtr);
-    _customTypes.append(prevPtr);
+    prevPtr->setId(getUniqueTypeId());
 
     // Create the "pprev" pointer which points to the "prev" pointer
     Pointer* pprevPtr = new Pointer(this);
-    _customTypes.append(pprevPtr);
-    pprevPtr->setId(0);
+    pprevPtr->setId(getUniqueTypeId());
     pprevPtr->setSize(_memSpecs.sizeofUnsignedLong);
-    insertUsedBy(pprevPtr);
+    pprevPtr->setRefTypeId(prevPtr->id());
 
     StructuredMember* pprev = new StructuredMember(this); // deleted by ~Structured()
-    pprev->setId(0);
+    pprev->setId(getUniqueTypeId());
     pprev->setName("pprev");
     pprev->setOffset(_memSpecs.sizeofUnsignedLong);
     pprev->setRefTypeId(pprevPtr->id());
-    insertUsedBy(pprev);
     ret->addMember(pprev);
+
+    addSymbol(nextPtr);
+    addSymbol(pprevPtr);
+    addSymbol(prevPtr);
+    addSymbol(ret);
+
+    insertUsedBy(nextPtr);
+    insertUsedBy(next);
+    insertUsedBy(prevPtr);
+    insertUsedBy(pprevPtr);
+    insertUsedBy(pprev);
 
     return ret;
 }
@@ -1199,23 +1208,20 @@ bool SymFactory::resolveReference(StructuredMember* member)
 {
     assert(member != 0);
 
-    // Don't resolve already resolved types
-    if (member->refType())
-        return true;
     // Don't try to resolve types without valid ID
-    else if (member->refTypeId() == 0)
+    if (member->refTypeId() == 0)
         return false;
 
     BaseType* base = member->refType();
 
-    if (member->refTypeId() == siListHead || isStructListHead(base)) {
+    if (base && member->refTypeId() > 0 && isStructListHead(base)) {
         Struct* list_head = makeStructListHead(member);
         member->setRefTypeId(list_head->id());
         insertUsedBy(member);
         _structListHeadCount++;
         return true;
     }
-    else if (member->refTypeId() == siHListNode || isStructHListNode(base)) {
+    else if (base && member->refTypeId() > 0 && isStructHListNode(base)) {
         Struct* hlist_node = makeStructHListNode(member);
         member->setRefTypeId(hlist_node->id());
         insertUsedBy(member);
@@ -1282,7 +1288,6 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
     }
 
     _types.removeAll(oldType);
-    _customTypes.removeAll(oldType);
 
     // Update all old equivalent types as well
     QList<int> equiv = equivalentTypes(oldType->id());
@@ -1588,7 +1593,7 @@ QString SymFactory::postponedTypesStats() const
             else if (v)
                 ret += QString("0x%1").arg(v->id(), 0, 16);
             else if (m)
-                ret += QString("0x%1").arg(m->id(), 0, 16);
+                ret += QString("0x%1").arg(m->belongsTo()->id(), 0, 16);
             ++pit;
         }
         if (pit != _postponedTypes.end() && pit.key() == it.value())
@@ -1970,7 +1975,7 @@ void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
             for (int k = 0; k < candidates.size(); ++k) {
                 BaseType* candidate = candidates[k];
                 // Get all types that use the current candidate
-                QList<RefBaseType*> typesUsingSrc =
+                QList<BaseType*> typesUsingSrc =
                         typesUsingId(candidate ? candidate->id() : 0);
 
                 // Next candidates are all that use the type in the way
