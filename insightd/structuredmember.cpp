@@ -9,7 +9,6 @@
 #include "refbasetype.h"
 #include "virtualmemory.h"
 #include "pointer.h"
-#include "funcpointer.h"
 #include "debug.h"
 
 StructuredMember::StructuredMember(SymFactory* factory)
@@ -49,10 +48,7 @@ Structured* StructuredMember::belongsTo() const
 QString StructuredMember::prettyName() const
 {
     const BaseType* t = refType();
-    const FuncPointer *fp = dynamic_cast<const FuncPointer*>(t);
-    if (fp)
-        return fp->prettyName(_name);
-    else if (t)
+    if (t)
         return QString("%1 %2").arg(t->prettyName(), _name);
     else
         return QString("(unresolved type 0x%1) %2").arg(_refTypeId, 0, 16).arg(_name);

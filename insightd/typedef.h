@@ -30,13 +30,6 @@ public:
 	 @return the actual type of that polimorphic variable
 	 */
 	virtual RealType type() const;
-
-
-    /**
-     * This gives a pretty name of this typedef in a C-style definition.
-     * @return the pretty name of this type
-     */
-    virtual QString prettyName() const;
 };
 
 

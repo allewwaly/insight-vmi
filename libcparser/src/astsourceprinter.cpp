@@ -46,7 +46,6 @@ inline QString ASTSourcePrinter::tokenListToString(pASTTokenList list,
     return ret;
 }
 
-
 inline void ASTSourcePrinter::newlineIncIndent()
 {
     ++_indent;
@@ -81,7 +80,7 @@ inline QString ASTSourcePrinter::lineIndent() const
 }
 
 
-void ASTSourcePrinter::beforeChildren(const ASTNode *node, int flags)
+void ASTSourcePrinter::beforeChildren(pASTNode node, int flags)
 {
     Q_UNUSED(flags);    
     _currNode = node;
@@ -348,7 +347,7 @@ void ASTSourcePrinter::beforeChildren(const ASTNode *node, int flags)
 }
 
 
-void ASTSourcePrinter::beforeChild(const ASTNode *node, const ASTNode *childNode)
+void ASTSourcePrinter::beforeChild(pASTNode node, pASTNode childNode)
 {
     switch (node->type) {
     case nt_abstract_declarator:
@@ -539,7 +538,7 @@ void ASTSourcePrinter::beforeChild(const ASTNode *node, const ASTNode *childNode
 }
 
 
-void ASTSourcePrinter::afterChild(const ASTNode *node, const ASTNode *childNode)
+void ASTSourcePrinter::afterChild(pASTNode node, pASTNode childNode)
 {
     switch (node->type) {
     case nt_builtin_function_expect:
@@ -632,7 +631,7 @@ void ASTSourcePrinter::afterChild(const ASTNode *node, const ASTNode *childNode)
 }
 
 
-void ASTSourcePrinter::afterChildren(const ASTNode *node, int flags)
+void ASTSourcePrinter::afterChildren(pASTNode node, int flags)
 {
     Q_UNUSED(flags);
     QString nodeId = QString::number((quint64)node, 16);
@@ -770,6 +769,12 @@ QString ASTSourcePrinter::toString(bool lineNo)
 
 
 QString ASTSourcePrinter::toString(const ASTNode* node, bool lineNo)
+{
+    return toString(const_cast<ASTNode*>(node), lineNo);
+}
+
+
+QString ASTSourcePrinter::toString(ASTNode* node, bool lineNo)
 {
     _line.clear();
     _out.clear();

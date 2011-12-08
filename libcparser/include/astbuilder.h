@@ -25,8 +25,8 @@ public:
     int buildFrom(const QString& fileName);
     int buildFrom(const QByteArray& asciiText);
 
-    bool isTypeName(pANTLR3_STRING name) const;
-    bool isSymbolName(pANTLR3_STRING name) const;
+    bool isTypeName(const QString& name) const;
+    bool isSymbolName(const QString& name) const;
 
     void pushScope(struct ASTNode* astNode);
     void popScope();
@@ -36,8 +36,8 @@ public:
     void popParentNode();
     pASTNode parentNode();
 
-    void addSymbol(pANTLR3_STRING name, ASTSymbolType type, struct ASTNode* node);
-    void addSymbol(pANTLR3_STRING name, ASTSymbolType type, struct ASTNode* node,
+    void addSymbol(const QString& name, ASTSymbolType type, struct ASTNode* node);
+    void addSymbol(const QString& name, ASTSymbolType type, struct ASTNode* node,
             ASTScope* scope);
 
     pASTNode newASTNode();

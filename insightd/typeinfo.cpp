@@ -7,7 +7,6 @@
 
 #include "typeinfo.h"
 #include "structuredmember.h"
-#include "funcparam.h"
 #include <QtAlgorithms>
 
 TypeInfo::TypeInfo()
@@ -18,7 +17,6 @@ TypeInfo::TypeInfo()
 
 void TypeInfo::clear()
 {
-	_isRelevant = false;
 	_enc = eUndef;
 	_name.clear();
 	_id = _refTypeId = 0;
@@ -27,11 +25,7 @@ void TypeInfo::clear()
 	_location = 0;
 	_dataMemberLoc = -1;
 	_upperBound = -1;
-	_external = 0;
 	_sibling = -1;
-	_inlined = false;
-	_pcLow = 0;
-	_pcHigh = 0;
 	_constValue = -1;
 	_symType = hsUnknownSymbol;
 	_srcDir.clear();
@@ -39,27 +33,6 @@ void TypeInfo::clear()
 	_srcLine = -1;
 	_enumValues.clear();
 	_members.clear();
-	_params.clear();
-}
-
-
-void TypeInfo::deleteParams()
-{
-	for (int i = 0; i < _params.size(); ++i)
-		delete _params[i];
-	_params.clear();
-}
-
-
-bool TypeInfo::isRelevant() const
-{
-	return _isRelevant;
-}
-
-
-void TypeInfo::setIsRelevant(bool value)
-{
-	_isRelevant = value;
 }
 
 
@@ -229,64 +202,14 @@ void TypeInfo::setUpperBound(qint32 bound)
 	_upperBound = bound;
 }
 
-
-int TypeInfo::external() const
-{
-	return _external;
-}
-
-
-void TypeInfo::setExternal(int value)
-{
-	_external = value;
-}
-
-
 qint32 TypeInfo::sibling() const
 {
 	return _sibling;
 }
 
-
 void TypeInfo::setSibling(qint32 sibling)
 {
 	_sibling = sibling;
-}
-
-
-bool TypeInfo::inlined() const
-{
-	return _inlined;
-}
-
-
-void TypeInfo::setInlined(bool value)
-{
-	_inlined = value;
-}
-
-
-size_t TypeInfo::pcLow() const
-{
-	return _pcLow;
-}
-
-
-void TypeInfo::setPcLow(size_t pc)
-{
-	_pcLow = pc;
-}
-
-
-size_t TypeInfo::pcHigh() const
-{
-	return _pcHigh;
-}
-
-
-void TypeInfo::setPcHigh(size_t pc)
-{
-	_pcHigh = pc;
 }
 
 // TODO: Currently QVariant is returned
@@ -310,7 +233,7 @@ const TypeInfo::EnumHash& TypeInfo::enumValues() const
 
 void TypeInfo::addEnumValue(const QString& name, qint32 value)
 {
-	_enumValues.insertMulti(value, name);
+	_enumValues.insert(value, name);
 }
 
 
@@ -323,18 +246,6 @@ MemberList& TypeInfo::members()
 const MemberList& TypeInfo::members() const
 {
     return _members;
-}
-
-
-ParamList& TypeInfo::params()
-{
-    return _params;
-}
-
-
-const ParamList& TypeInfo::params() const
-{
-    return _params;
 }
 
 
@@ -364,28 +275,18 @@ QString TypeInfo::dump() const
 	if (_dataMemberLoc >= 0)    ret += QString("  dataMemberLoc: %1\n").arg(_dataMemberLoc);
 	if (_refTypeId != 0)        ret += QString("  refTypeId:     0x%1\n").arg(_refTypeId, 0, 16);
 	if (_upperBound >= 0)       ret += QString("  upperBound:    %1\n").arg(_upperBound);
-	if (_external)              ret += QString("  external:      %1\n").arg(_external);
-	if (_inlined)               ret += QString("  inlined:       %1\n").arg(_inlined);
-	if (_pcLow)                 ret += QString("  pcLow:         %1\n").arg(_pcLow);
-	if (_pcHigh)                ret += QString("  pcHigh:        %1\n").arg(_pcHigh);
-	if (!_srcDir.isEmpty())     ret += QString("  srcDir:        %1\n").arg(_srcDir);
+	if (!_srcDir.isEmpty()   )  ret += QString("  srcDir:        %1\n").arg(_srcDir);
 	if (_srcFileId != 0)        ret += QString("  srcFile:       %1\n").arg(_srcFileId);
 	if (_srcLine >= 0)          ret += QString("  srcLine:       %1\n").arg(_srcLine);
 	if (_sibling >= 0)          ret += QString("  sibling:       %1\n").arg(_sibling);
 	if (!_enumValues.isEmpty()) {
 	  ret +=                           QString("  enumValues:    ");
-	  QList<qint32> keys = _enumValues.uniqueKeys();
+	  QList<qint32> keys = _enumValues.keys();
 	  qSort(keys);
-	  bool first = true;
-	  for (int i = 0; i < keys.size(); ++i) {
-		  for (EnumHash::const_iterator it = _enumValues.find(keys[i]);
-			   it != _enumValues.end() && it.key() == keys[i]; ++it) {
-			  if (first)
-				  first = false;
-			  else
-				  ret += ", ";
-			  ret += it.value();
-		  }
+	  for (int i = 0; i < keys.size(); i++) {
+        ret += _enumValues[keys[i]];
+        if (i + 1 < keys.size())
+            ret += ", ";
 	  }
 	  ret += "\n";
 	}

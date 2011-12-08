@@ -52,12 +52,6 @@ public:
      * BaseType::TypeResolution
      * @return the type this and all chained referencing types point to
      */
-    BaseType* refTypeDeep(int resolveTypes);
-
-    /**
-     * Overloaded member function, const version.
-     * \sa refTypeDeep()
-     */
     const BaseType* refTypeDeep(int resolveTypes) const;
 
     /**
@@ -212,7 +206,7 @@ inline void ReferencingType::setRefTypeId(int id)
 inline void ReferencingType::addAltRefTypeId(int id)
 {
     if (!_altRefTypeIds.contains(id))
-        _altRefTypeIds.prepend(id);
+        _altRefTypeIds.append(id);
 }
 
 

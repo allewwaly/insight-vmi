@@ -29,44 +29,24 @@ public:
     virtual ~ASTWalker();
 
     int walkTree();
-    AbstractSyntaxTree* ast();
-    const AbstractSyntaxTree* ast() const;
-
-    /**
-     * Converts a pANTLR3_COMMON_TOKEN to a QString.
-     * @param tok the ANTLR3 token to convert to a QString
-     * @return the token \a tok as a QString
-     */
-    QString antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok) const;
-
-    /**
-     * Converts a pANTLR3_STRING to a QString.
-     * @param s the ANTLR3 string to convert to a QString
-     * @return the string \a s as a QString
-     */
-    QString antlrStringToStr(const pANTLR3_STRING s) const;
 
 protected:
-    int walkTree(const ASTNodeList *head);
-    int walkTree(const ASTNode *node, int flags = 0);
+    int walkTree(pASTNodeList head);
+    int walkTree(pASTNode node, int flags = 0);
 
-    virtual void beforeChildren(const ASTNode *node, int flags);
-    virtual void beforeChild(const ASTNode *node, const ASTNode *childNode);
-    virtual void afterChild(const ASTNode *node, const ASTNode *childNode);
-    virtual void afterChildren(const ASTNode *node, int flags);
+    virtual void beforeChildren(pASTNode node, int flags);
+    virtual void beforeChild(pASTNode node, pASTNode childNode);
+    virtual void afterChild(pASTNode node, pASTNode childNode);
+    virtual void afterChildren(pASTNode node, int flags);
 
     AbstractSyntaxTree* _ast;
     bool _stopWalking;
 };
 
 
-inline void ASTWalker::beforeChildren(const ASTNode * /*node*/, int /*flags*/) {}
-inline void ASTWalker::beforeChild(const ASTNode * /*node*/,
-                                   const ASTNode * /*childNode*/) {}
-inline void ASTWalker::afterChild(const ASTNode * /*node*/,
-                                  const ASTNode * /*childNode*/) {}
-inline void ASTWalker::afterChildren(const ASTNode * /*node*/, int /*flags*/) {}
-inline const AbstractSyntaxTree* ASTWalker::ast() const { return _ast; }
-inline AbstractSyntaxTree* ASTWalker::ast() { return _ast; }
+inline void ASTWalker::beforeChildren(pASTNode /*node*/, int /*flags*/) {}
+inline void ASTWalker::beforeChild(pASTNode /*node*/, pASTNode /*childNode*/) {}
+inline void ASTWalker::afterChild(pASTNode /*node*/, pASTNode /*childNode*/) {}
+inline void ASTWalker::afterChildren(pASTNode /*node*/, int /*flags*/) {}
 
 #endif /* ASTWALKER_H_ */

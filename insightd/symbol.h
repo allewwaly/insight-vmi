@@ -15,6 +15,17 @@
 class SymFactory;
 
 /**
+ * Special IDs for special symbol types
+ */
+enum SpecialIds {
+    siCreatred       = 0x7FFFFFFC,  ///< an artificially created
+    siCopy           = 0x7FFFFFFD,  ///< a copy of another type
+    siHListNode      = 0x7FFFFFFE,  ///< kernel hash chain list (<tt>struct hlist_node</tt>)
+    siListHead       = 0x7FFFFFFF   ///< kernel linked list (<tt>struct list_head</tt>)
+};
+
+
+/**
  * This class represents a generic debugging symbol read from the objdump output.
  */
 class Symbol

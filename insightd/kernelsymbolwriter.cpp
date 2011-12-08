@@ -13,7 +13,6 @@
 #ifdef WRITE_ASCII_FILE
 #include <QFile>
 #include <QTextStream>
-#include "refbasetype.h"
 #endif
 #include <QSet>
 #include "kernelsymbolconsts.h"
@@ -112,12 +111,10 @@ void KernelSymbolWriter::write()
         }
 
         // Write list of types
-        const int types_to_write = _factory->types().size();
-        out << (qint32) types_to_write;
-
+        out << (qint32) _factory->types().size();
 #ifdef WRITE_ASCII_FILE
         dout << endl << "# Types" << endl
-             << dec << types_to_write << endl;
+             << dec << _factory->types().size() << endl;
 #endif
 
         // Make three rounds: first write elementary types, then the
@@ -132,7 +129,6 @@ void KernelSymbolWriter::write()
             for (int i = 0; i < _factory->types().size(); i++) {
                 BaseType* t = _factory->types().at(i);
                 if (t->type() & mask) {
-
                     out << (qint32) t->type();
                     out << *t;
 
@@ -154,25 +150,18 @@ void KernelSymbolWriter::write()
         }
 
         assert(_factory->types().size() == written_types.size());
-        assert(types_to_write == written_types.size());
 
         // Write list of missing types by ID
-        const int ids_to_write =
-                _factory->typesById().size() - _factory->types().size() -
-                _factory->artificialTypes().size();
-        out << (qint32)ids_to_write;
+        out << _factory->typesById().size() - _factory->types().size();
 #ifdef WRITE_ASCII_FILE
         dout << endl << "# Further type relations" << endl
-             << dec << ids_to_write
+             << dec << _factory->typesById().size() - _factory->types().size()
              << endl;
 #endif
         BaseTypeIntHash::const_iterator bt_id_it = _factory->typesById().constBegin();
         int written = 0;
         while (bt_id_it != _factory->typesById().constEnd()) {
-            if (!written_types.contains(bt_id_it.key()) &&
-                    ((bt_id_it.key() > 0 ||
-                      !_factory->artificialTypeIds().contains(bt_id_it.key()))))
-            {
+            if (!written_types.contains(bt_id_it.key())) {
                 out << (qint32) bt_id_it.key() << (qint32) bt_id_it.value()->id();
 #ifdef WRITE_ASCII_FILE
                 dout << hex << "0x" << bt_id_it.key() << " -> 0x"
@@ -184,9 +173,7 @@ void KernelSymbolWriter::write()
             checkOperationProgress();
         }
 
-        assert(written == ids_to_write);
-        assert(_factory->artificialTypeIds().size() + written_types.size() +
-               written == _factory->typesById().size());
+        assert(written_types.size() + written == _factory->typesById().size());
 
         // Write list of variables
         out << (qint32) _factory->vars().size();

@@ -7,7 +7,6 @@
 
 #include "variable.h"
 #include "basetype.h"
-#include "funcpointer.h"
 
 #include <assert.h>
 
@@ -27,11 +26,7 @@ QString Variable::prettyName() const
 {
     QString s_typename;
     const BaseType* t = refType();
-    const FuncPointer *fp = dynamic_cast<const FuncPointer*>(t);
-
-    if (fp)
-        return fp->prettyName(_name);
-    else if (t) {
+    if (t) {
         if (t->prettyName().isEmpty())
             s_typename = "(anonymous type)";
         else

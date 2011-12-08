@@ -5,7 +5,6 @@
  *      Author: chrschn
  */
 
-#include <bitop.h>
 #include "enum.h"
 #include "debug.h"
 
@@ -30,7 +29,7 @@ RealType Enum::type() const
 uint Enum::hash(bool* isValid) const
 {
     if (!_hashValid) {
-        _hash = BaseType::hash(0);
+        _hash = BaseType::hash(&_hashValid);
         qsrand(_hash ^ _enumValues.size());
         _hash ^= qHash(qrand());
         // To place the enum values at different bit positions
@@ -38,10 +37,8 @@ uint Enum::hash(bool* isValid) const
         // Extend the hash to all enumeration values
         EnumHash::const_iterator it = _enumValues.constBegin();
         while (it != _enumValues.constEnd()) {
-            _hash ^= rotl32(it.key(), rot);
-            rot = (rot + 3) % 32;
-            _hash ^= rotl32(qHash(it.value()), rot);
-            rot = (rot + 3) % 32;
+            _hash ^= rotl32(it.key(), rot) ^ qHash(it.value());
+            rot = (rot + 4) % 32;
             ++it;
         }
     }
@@ -73,7 +70,7 @@ void Enum::readFrom(QDataStream& in)
     in >> enumCnt;
     for (int i = 0; i < enumCnt; i++) {
         in >> key >> value;
-        _enumValues.insertMulti(key, value);
+        _enumValues.insert(key, value);
     }
 }
 

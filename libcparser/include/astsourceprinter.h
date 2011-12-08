@@ -21,12 +21,13 @@ public:
 
     QString toString(bool lineNo = false);
     QString toString(const ASTNode* node, bool lineNo = false);
+    QString toString(ASTNode* node, bool lineNo = false);
 
 protected:
-    virtual void beforeChildren(const ASTNode *node, int flags);
-    virtual void beforeChild(const ASTNode *node, const ASTNode *childNode);
-    virtual void afterChild(const ASTNode *node, const ASTNode *childNode);
-    virtual void afterChildren(const ASTNode *node, int flags);
+    virtual void beforeChildren(pASTNode node, int flags);
+    virtual void beforeChild(pASTNode node, pASTNode childNode);
+    virtual void afterChild(pASTNode node, pASTNode childNode);
+    virtual void afterChildren(pASTNode node, int flags);
 
 private:
     QString lineIndent() const;
@@ -40,7 +41,7 @@ private:
     QString _out;
     int _indent;
     int _lineIndent;
-    const ASTNode *_currNode;
+    pASTNode _currNode;
     bool _prefixLineNo;
 };
 

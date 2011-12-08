@@ -14,8 +14,7 @@
 #include <QString>
 
 struct ASTNode;
-typedef QHash<QString, ASTSymbol*> ASTSymbolHash;
-class AbstractSyntaxTree;
+typedef QHash<QString, ASTSymbol> ASTSymbolHash;
 
 
 class ASTScope
@@ -25,13 +24,10 @@ class ASTScope
 	ASTSymbolHash _typedefs;
 	struct ASTNode* _astNode;
 	ASTScope* _parent;
-	const AbstractSyntaxTree* _ast;
 
-	void addSymbol(const QString &name, ASTSymbolType type, ASTNode *node);
-	void addCompoundType(const QString& name, ASTSymbolType type,
-						 struct ASTNode* node);
-	void addTypedef(const QString& name, ASTSymbolType type,
-					struct ASTNode* node);
+	void addSymbol(const QString& name, ASTSymbolType type, struct ASTNode* node);
+	void addCompoundType(const QString& name, ASTSymbolType type, struct ASTNode* node);
+	void addTypedef(const QString& name, ASTSymbolType type, struct ASTNode* node);
 
 public:
 	enum SearchSymbols {
@@ -42,11 +38,8 @@ public:
 		ssAnySymbol     = ssSymbols|ssCompoundTypes|ssTypedefs
 	};
 
-	ASTScope(const AbstractSyntaxTree* ast, struct ASTNode* astNode,
-			 ASTScope* parent = 0)
-		: _astNode(astNode), _parent(parent), _ast(ast) {}
-
-	~ASTScope();
+	ASTScope(struct ASTNode* astNode, ASTScope* parent = 0)
+		: _astNode(astNode), _parent(parent) {}
 
 	inline ASTSymbolHash& symbols() { return _symbols; }
 	inline ASTSymbolHash& compoundTypes() { return _compoundTypes; }
@@ -54,11 +47,8 @@ public:
 	inline struct ASTNode* astNode() const { return _astNode; }
 	inline ASTScope* parent() const { return _parent; }
 
-	void add(const QString &name, ASTSymbolType type, ASTNode *node);
-	bool varAssignment(const QString& name, const ASTNode *assignedNode,
-					   const ASTNodeList *postExprSuffixes, int derefCount,
-					   int round);
-	ASTSymbol* find(const QString& name, int searchSymbols = ssAnySymbol) const;
+	void add(const QString& name, ASTSymbolType type, struct ASTNode* node);
+	ASTSymbol find(const QString& name, int searchSymbols = ssAnySymbol) const;
 };
 
 
@@ -70,10 +60,9 @@ class ASTScopeManager
 {
 	ASTScopeList _scopes;
 	ASTScope* _currentScope;
-	const AbstractSyntaxTree* _ast;
 
 public:
-	ASTScopeManager(const AbstractSyntaxTree* ast);
+	ASTScopeManager();
 	virtual ~ASTScopeManager();
 
 	void clear();

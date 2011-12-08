@@ -243,8 +243,6 @@ private:
 
     void printTimeStamp(const QTime& time);
     void prepare();
-    void prepareReadline();
-    void saveShellHistory();
     void cleanupPipedProcs();
     QStringList splitIntoPipes(QString command) const;
     QStringList splitIntoWords(QString command) const;

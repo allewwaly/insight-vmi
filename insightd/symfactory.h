@@ -23,10 +23,7 @@ class ReferencingType;
 class RefBaseType;
 class CompileUnit;
 class Variable;
-class Enum;
 class ASTType;
-class ASTTypeEvaluator;
-class TypeEvalDetails;
 
 #include "numeric.h"
 #include "typeinfo.h"
@@ -75,17 +72,14 @@ typedef QList<Structured*> StructuredList;
 /// Key for hashing elements of BaseType based on their name and size
 typedef QPair<QString, quint32> BaseTypeHashKey;
 
+// /// Hash table for BaseType pointers
+// typedef QMultiHash<BaseTypeHashKey, BaseType*> BaseTypeKeyHash;
+
 /// Hash table for BaseType pointers
 typedef QMultiHash<QString, BaseType*> BaseTypeStringHash;
 
 /// Hash table for Variable pointers
 typedef QMultiHash<QString, Variable*> VariableStringHash;
-
-/// Set of type IDs
-typedef QSet<int> IntSet;
-
-/// Hash table to find replaced types
-typedef QHash<int, int> IntIntHash;
 
 /// Hash table to find all equivalent types
 typedef QMultiHash<int, int> IntIntMultiHash;
@@ -114,13 +108,11 @@ typedef QMultiHash<int, Variable*> VarMultiHash;
 /// Hash table to find all StructuredMember's that use a particular type
 typedef QMultiHash<int, StructuredMember*> StructMemberMultiHash;
 
-/// Hash table to find all FuncParam's that use a particular type
-typedef QMultiHash<int, FuncParam*> FuncParamMultiHash;
-
 typedef QPair<const ASTType*, BaseTypeList> AstBaseTypeList;
 
-typedef QPair<qint32, const Enum*> IntEnumPair;
-typedef QHash<QString, IntEnumPair> EnumStringHash;
+
+// /// This function is required to use pointer to BaseType as a key in a QHash
+// uint qHash(const BaseType* key);
 
 #define SYMFACTORY_DEFINED 1
 
@@ -246,16 +238,8 @@ public:
 		return _types;
 	}
 
-    /**
-     * @return the list of all artificial types created by this factory
-     */
-    inline const BaseTypeList& artificialTypes() const
-    {
-        return _artificialTypes;
-    }
-
 	/**
-	 * @return the hash of all types by their ID
+	 * @return the hash of all types by there ID
 	 */
     inline const BaseTypeIntHash& typesById() const
     {
@@ -263,7 +247,7 @@ public:
     }
 
     /**
-     * @return the hash of all types by their name
+     * @return the hash of all types by there name
      */
     inline const BaseTypeStringHash& typesByName() const
     {
@@ -271,7 +255,7 @@ public:
     }
 
     /**
-     * @return the hash of all compile units by their ID
+     * @return the hash of all compile units by there ID
      */
 	inline const CompileUnitIntHash& sources() const
 	{
@@ -287,7 +271,7 @@ public:
 	}
 
 	/**
-	 * @return the hash of all variables by their name
+	 * @return the hash of all variables by there name
 	 */
 	inline const VariableStringHash& varsByName() const
 	{
@@ -295,36 +279,11 @@ public:
 	}
 
     /**
-     * @return the hash of all variables by their ID
+     * @return the hash of all variables by there ID
      */
     inline const VariableIntHash& varsById() const
     {
         return _varsById;
-    }
-
-    /**
-     * @return the hash of all enumerators by their name
-     */
-    inline const EnumStringHash& enumsByName() const
-    {
-        return _enumsByName;
-    }
-
-    /**
-     * @return the hash of struct members with artificial types
-     */
-    inline const IntIntHash& replacedMemberTypes() const
-    {
-        return _replacedMemberTypes;
-    }
-
-    /**
-     * @return IDs of artificilly created types that should not be ignored by
-     * class KernelSymbolWriter
-     */
-    inline const IntSet& artificialTypeIds() const
-    {
-        return _artificialTypeIds;
     }
 
 	/**
@@ -368,38 +327,23 @@ public:
      */
     QList<int> equivalentTypes(int id) const;
 
-    QList<BaseType*> typesUsingId(int id) const;
-
-    /**
-     * Checks if \a type represents the special type <tt>struct list_head</tt>.
-     * @param type the type to check
-     * @return \c true if \a type is <tt>struct list_head</tt>, or \c false
-     * otherwise
-     */
-    bool isStructListHead(const BaseType* type) const;
-
-    /**
-     * Checks if \a type represents the special type <tt>struct hlist_node</tt>.
-     * @param type the type to check
-     * @return \c true if \a type is <tt>struct hlist_node</tt>, or \c false
-     * otherwise
-     */
-    bool isStructHListNode(const BaseType* type) const;
+    QList<RefBaseType*> typesUsingId(int id) const;
 
 
-    void typeAlternateUsage(const TypeEvalDetails *ed, ASTTypeEvaluator* eval);
-
-    AstBaseTypeList findBaseTypesForAstType(const ASTType* astType,
-                                            ASTTypeEvaluator *eval);
+	void typeAlternateUsage(const ASTSymbol& srcSymbol,
+							const ASTType* srcType,
+							const ASTType* ctxType,
+							const QStringList& ctxMembers,
+							const ASTType* targetType);
 
 protected:
-	void typeAlternateUsageStructMember(const TypeEvalDetails *ed,
-										const BaseType *targetBaseType,
-										ASTTypeEvaluator *eval);
+	void typeAlternateUsageStructMember(const ASTType* ctxType,
+										const QStringList& ctxMembers,
+										BaseType* targetBaseType);
 
-	void typeAlternateUsageVar(const TypeEvalDetails *ed,
-							   const BaseType *targetBaseType,
-							   const ASTTypeEvaluator *eval);
+	void typeAlternateUsageVar(const ASTType* ctxType,
+							   const ASTSymbol& srcSymbol,
+							   BaseType* targetBaseType);
 
 
 	/**
@@ -450,6 +394,22 @@ protected:
     bool isNewType(const int new_id, BaseType* type) const;
 
     /**
+     * Checks if \a type represents the special type <tt>struct list_head</tt>.
+     * @param type the type to check
+     * @return \c true if \a type is <tt>struct list_head</tt>, or \c false
+     * otherwise
+     */
+    bool isStructListHead(const BaseType* type) const;
+
+    /**
+     * Checks if \a type represents the special type <tt>struct hlist_node</tt>.
+     * @param type the type to check
+     * @return \c true if \a type is <tt>struct hlist_node</tt>, or \c false
+     * otherwise
+     */
+    bool isStructHListNode(const BaseType* type) const;
+
+    /**
      * This is an overloaded convenience function.
      * Updates the different relations that exist for the types (e.g. typesById).
      * During this progress postponed types will be updated as well.
@@ -469,6 +429,7 @@ protected:
      *   for types referencing \a new_id
      * @param forceInsert insert this type into lists even if its hash is
      *   invalid
+     * information, or the equivalent type found by the type hash.
      */
     void updateTypeRelations(const int new_id, const QString& new_name,
                              BaseType* target, bool checkPostponed = true,
@@ -481,7 +442,6 @@ protected:
      * @param removeFromPostponedTypes set to \c true to have \a rt removed from
      * the _postponedTypes hash if the referencing type of \a rt could be
      * resolved
-     * @return \c true if \a rt could be resolved, \c false otherwise
      */
     bool postponedTypeResolved(ReferencingType* rt,
                                bool removeFromPostponedTypes);
@@ -555,16 +515,13 @@ private:
     Struct* makeStructHListNode(StructuredMember* member);
 
     /**
-     * Creates a deep copy of the given type \a source and returns it. The
-     * copy will have a unique ID < 0 to be distinguishable from the original.
-     * The copy is deep for "real" referencing types such as typedefs and
-     * pointers but does not duplicate function parameters or struct members.
-     * \note The type will be automatically added to the factory with a call to
-     * addSymbol().
+     * Creates a shallow copy of the given type \a source and returns it. The
+     * copy will have an ID of siCopy to be distinguishable from the original.
      * @param source the source type
-     * @return a shallow copy of \a source with a new, unique ID
+     * @return a shallow copy of \a source with an ID of siCopy.
+     * \sa SpecialIds
      */
-    BaseType* makeDeepTypeCopy(BaseType* source);
+    Structured* makeStructCopy(Structured* source);
 
 	/**
      * Tries to resolve the type reference of a ReferencingType object \a ref.
@@ -598,13 +555,23 @@ private:
      */
     bool resolveReferences(Structured* s);
 
+//    /**
+//     * Removes a value in a QMultiHash at given at index \a old_key, if present,
+//     * and adds or re-adds it at index \a new_key.
+//     * @param old_key the old index at which \a value can be found
+//     * @param new_key the new index at which \a value should be inserted
+//     * @param value the value to be relocated
+//     * @param hash the QMultiHash to perform this operation on
+//     */
+//    template<class T_key, class T_val>
+//    void relocateHashEntry(const T_key& old_key, const T_key& new_key,
+//            T_val* value, QMultiHash<T_key, T_val*>* hash);
+
     void insertUsedBy(ReferencingType* ref);
     void insertUsedBy(RefBaseType* rbt);
     void insertUsedBy(Variable* var);
     void insertUsedBy(StructuredMember* m);
-    void insertUsedBy(FuncParam* fp);
-    void insertPostponed(ReferencingType* ref);
-    void removePostponed(ReferencingType* ref);
+    AstBaseTypeList findBaseTypesForAstType(const ASTType* astType);
 
     enum TypeConflicts {
         tcNoConflict,
@@ -614,14 +581,9 @@ private:
     };
 
     TypeConflicts compareConflictingTypes(const BaseType* oldType,
-                                          const BaseType* newType) const;
-
-    bool typeChangeDecision(const ReferencingType* r,
-                            const BaseType* targetBaseType);
+                                          const BaseType* newType);
 
     BaseTypeList typedefsOfType(BaseType* type);
-
-    int getUniqueTypeId();
 
     /**
      * Goes to the list of zero-sized structs/unions and tries to find the
@@ -639,13 +601,6 @@ private:
     void replaceType(BaseType* oldType, BaseType* newType);
 
     /**
-     * Inserts all external variable declarations into the factory's symbols
-     * for which we do not have a declaration. Afterwards all remaining
-     * external variables are deleted and the _externalVars list is cleared.
-     */
-    void insertNewExternalVars();
-
-    /**
      * Tries to find a type equal to \a t based on its hash and the comparison
      * operator.
      * \note This function will \b not return \a t itself, only another type
@@ -657,24 +612,19 @@ private:
 
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
-	VariableList _externalVars;       ///< Holds all external Variable declarations
 	VariableStringHash _varsByName;   ///< Holds all Variable objects, indexed by name
 	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
-	EnumStringHash _enumsByName;         ///< Holds all enumerator values, indexed by name
 	BaseTypeList _types;              ///< Holds all BaseType objects which were parsed or read from symbol files
-	BaseTypeList _artificialTypes;    ///< Holds all BaseType objects which were created artificially
+    BaseTypeList _customTypes;        ///< Holds all BaseType objects which were internally created
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	IntIntMultiHash _equivalentTypes; ///< Holds all type IDs of equivalent types
-	IntIntHash _replacedMemberTypes;  ///< Holds all member IDs whose ref. type had been replaced
-	IntSet _artificialTypeIds;		  ///< Holds the IDs of all artificial types that should not be saved
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
 	StructuredList _zeroSizeStructs;  ///< Holds all structs or unions with a size of zero
 	RefBaseTypeMultiHash _usedByRefTypes;///< Holds all RefBaseType objects that hold a reference to another type
 	VarMultiHash _usedByVars;         ///< Holds all Variable objects that hold a reference to another type
 	StructMemberMultiHash _usedByStructMembers;///< Holds all StructuredMember objects that hold a reference to another type
-	FuncParamMultiHash _usedByFuncParams;///< Holds all FuncParam objects that hold a reference to another type
 	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
 
 	int _typeFoundByHash;
@@ -682,10 +632,8 @@ private:
 	int _structHListNodeCount;
 	int _uniqeTypesChanged;
 	int _totalTypesChanged;
-	int _typesCopied;
-	int _varTypeChanges;
+	int _typesReplaced;
 	int _conflictingTypeChanges;
-	int _artificialTypeId;
 	quint32 _maxTypeSize;
 };
 

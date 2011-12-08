@@ -3,8 +3,6 @@ TARGET = insight
 VERSION = 1.0.0
 DEFINES += LIBINSIGHT_LIBRARY
 CONFIG += debug_and_release
-QMAKE_CFLAGS_RELEASE += -O3
-QMAKE_CXXFLAGS_RELEASE += -O3
 QT += core \
     network
 QT -= gui

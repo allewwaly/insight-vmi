@@ -309,23 +309,30 @@ init_declarator returns [pASTNode node]
             $node->u.init_declarator.declarator = $d.node;
             $node->u.init_declarator.initializer  = $i.node;
 
+//            if ($di.token) {
+//                id = $di.token->getText($di.token);
+//                id_line = $di.token->line;
+//                $node->u.direct_declarator.identifier = $di.token;                
+//            }
+//            $node->u.direct_declarator.declarator = $de.node;
+//            $node->u.direct_declarator.declarator_suffix_list = $dsl.list;
+            
             // See if we have to add this as a variable definition to the scope
             if ($i.node && 
                 $node->parent->type == nt_declaration &&
-                (!SCOPE_TOP(declaration) || !$declaration::isTypedef) &&
-                (d_decl = $d.node->u.declarator.direct_declarator))
+                (d_decl = $d.node->u.declarator.direct_declarator) &&
+                (id = d_decl->u.direct_declarator.identifier))
             {
-                if (!d_decl->u.direct_declarator.identifier &&
-                    d_decl->u.direct_declarator.declarator) {
-                    d_decl = d_decl->u.direct_declarator.declarator
-                                    ->u.declarator.direct_declarator;
-                }
-                id = d_decl ? d_decl->u.direct_declarator.identifier : 0;
-
-                if (id) {
-                    // This is a variable definition
-                    scopeAddSymbol2(BUILDER, id->getText(id), stVariableDef,
-                        d_decl, $node->parent->scope);
+                if (!SCOPE_TOP(declaration) || !$declaration::isTypedef) {
+	                // Find end of the list
+	                for (l = d_decl->u.direct_declarator.declarator_suffix_list; 
+	                   l && l->next; l = l->next);
+	                // Do we have a declarator suffix with parens?
+	                if (!l || l->item->type != nt_declarator_suffix_parens) {
+	                    // This is a variable definition                            
+                        scopeAddSymbol2(BUILDER, id->getText(id), stVariableDef, 
+                            d_decl, $node->parent->scope);                            
+                    }
                 }
             }
         }

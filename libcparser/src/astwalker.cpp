@@ -28,10 +28,10 @@ int ASTWalker::walkTree()
 }
 
 
-int ASTWalker::walkTree(const ASTNodeList *head)
+int ASTWalker::walkTree(pASTNodeList head)
 {
 	int visits = 0;
-	for (const ASTNodeList *p = head; p && !_stopWalking; p = p->next) {
+    for (pASTNodeList p = head; p && !_stopWalking; p = p->next) {
         // List flags of current item
         int flags = wfIsList;
         if (p == head)
@@ -45,7 +45,7 @@ int ASTWalker::walkTree(const ASTNodeList *head)
 }
 
 
-int ASTWalker::walkTree(const ASTNode *node, int flags)
+int ASTWalker::walkTree(pASTNode node, int flags)
 {
     if (!node || _stopWalking)
         return 0;
@@ -243,6 +243,7 @@ int ASTWalker::walkTree(const ASTNode *node, int flags)
     case nt_function_definition: {
         visits += walkTree(node->u.function_definition.declaration_specifier);
         visits += walkTree(node->u.function_definition.declarator);
+        visits += walkTree(node->u.function_definition.declaration_list);
         visits += walkTree(node->u.function_definition.compound_statement);
         break;
     }
@@ -420,28 +421,6 @@ int ASTWalker::walkTree(const ASTNode *node, int flags)
         afterChild(node->parent, node);
 
     return visits;
-}
-
-
-QString ASTWalker::antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok) const
-{
-    // Use the AST cached version, if available
-    if (_ast)
-        return _ast->antlrTokenToStr(tok);
-    // Otherwise use the non-caching version
-    else
-        return antlrStringToStr(tok->getText(tok));
-}
-
-
-QString ASTWalker::antlrStringToStr(const pANTLR3_STRING s) const
-{
-    // Use the AST cached version, if available
-    if (_ast)
-        return _ast->antlrStringToStr(s);
-    // Otherwise use the non-caching version
-    else
-        return QString::fromAscii((const char*)s->chars, s->len);
 }
 
 

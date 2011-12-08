@@ -47,22 +47,6 @@ const BaseType* ReferencingType::refTypeDeep(int resolveTypes) const
 }
 
 
-BaseType* ReferencingType::refTypeDeep(int resolveTypes)
-{
-    BaseType* t = refType();
-    if ( !t || !(t->type() & resolveTypes) )
-        return t;
-
-    ReferencingType* prev = this;
-    RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
-    while (rbt && (rbt->type() & resolveTypes)) {
-        prev = rbt;
-        rbt = dynamic_cast<RefBaseType*>(rbt->refType());
-    }
-    return prev->refType();
-}
-
-
 void ReferencingType::readFrom(QDataStream& in)
 {
     in >> _refTypeId >> _altRefTypeIds;
