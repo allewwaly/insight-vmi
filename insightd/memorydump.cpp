@@ -345,12 +345,14 @@ QString MemoryDump::query(const int queryId) const
 
     QString s = QString("0x%1: ").arg(queryId, 0, 16);
     if (instance.isValid()) {
-        s += QString("%1 (ID 0x%2)").arg(instance.typeName()).arg(instance.type()->id(), 0, 16);
+        s += QString("%1 (ID 0x%2)")
+                .arg(instance.typeName()).arg((uint)instance.type()->id(), 0, 16);
         ret = instance.toString();
     }
     else
         s += "(unresolved type)";
-    s += QString(" @ 0x%1\n").arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'));
+    s += QString(" @ 0x%1\n")
+            .arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'));
 
     ret = s + ret;
 
@@ -376,7 +378,9 @@ QString MemoryDump::query(const QString& queryString) const
 
         QString s = QString("%1: ").arg(queryString);
         if (instance.isValid()) {
-            s += QString("%1 (ID 0x%2)").arg(instance.typeName()).arg(instance.type()->id(), 0, 16);
+            s += QString("%1 (ID 0x%2)")
+                    .arg(instance.typeName())
+                    .arg((uint)instance.type()->id(), 0, 16);
             ret = instance.toString();
         }
         else
@@ -427,8 +431,10 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 			components.pop_front();
 		}
 			
-		return QString("%1 (ID 0x%2) @ %3\n").arg(result.typeName()).arg(result.type()->id(), 0, 16).arg(result.address(), 0, 16) + 
-				result.toString();
+		return QString("%1 (ID 0x%2) @ %3\n")
+					.arg(result.typeName())
+					.arg((uint)result.type()->id(), 0, 16)
+					.arg(result.address(), 0, 16) + result.toString();
 	}
 
     queryError3("Unknown type: " + type,
