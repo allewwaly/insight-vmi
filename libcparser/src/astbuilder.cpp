@@ -35,19 +35,21 @@ int ASTBuilder::buildFrom(const QString& fileName)
 }
 
 
-bool ASTBuilder::isTypeName(const QString& name) const
+bool ASTBuilder::isTypeName(pANTLR3_STRING name) const
 {
+    QString s = _ast->antlrStringToStr(name);
     return _ast->_scopeMgr->currentScope() &&
-           !_ast->_scopeMgr->currentScope()
-               ->find(name, ASTScope::ssTypedefs).isNull();
+           _ast->_scopeMgr->currentScope()
+               ->find(s, ASTScope::ssTypedefs);
 }
 
 
-bool ASTBuilder::isSymbolName(const QString& name) const
+bool ASTBuilder::isSymbolName(pANTLR3_STRING name) const
 {
+    QString s = _ast->antlrStringToStr(name);
     return _ast->_scopeMgr->currentScope() &&
            !_ast->_scopeMgr->currentScope()
-               ->find(name, ASTScope::ssSymbols).isNull();
+               ->find(s, ASTScope::ssSymbols);
 }
 
 
@@ -63,17 +65,19 @@ void ASTBuilder::popScope()
 }
 
 
-void ASTBuilder::addSymbol(const QString& name, ASTSymbolType type,
+void ASTBuilder::addSymbol(pANTLR3_STRING name, ASTSymbolType type,
         struct ASTNode* node)
 {
-    _ast->_scopeMgr->addSymbol(name, type, node);
+    QString s = _ast->antlrStringToStr(name);
+    _ast->_scopeMgr->addSymbol(s, type, node);
 }
 
 
-void ASTBuilder::addSymbol(const QString& name, ASTSymbolType type,
+void ASTBuilder::addSymbol(pANTLR3_STRING name, ASTSymbolType type,
         struct ASTNode* node, ASTScope* scope)
 {
-    _ast->_scopeMgr->addSymbol(name, type, node, scope);
+    QString s = _ast->antlrStringToStr(name);
+    _ast->_scopeMgr->addSymbol(s, type, node, scope);
 }
 
 

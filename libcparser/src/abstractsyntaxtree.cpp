@@ -14,7 +14,7 @@
 AbstractSyntaxTree::AbstractSyntaxTree()
     : _scopeMgr(0), _rootNodes(0), _input(0), _lxr(0), _tstream(0), _psr(0)
 {
-    _scopeMgr = new ASTScopeManager();
+    _scopeMgr = new ASTScopeManager(this);
 }
 
 
@@ -169,31 +169,31 @@ void AbstractSyntaxTree::printScopeRek(ASTScope* sc)
 						"=================================")
 						.arg((quint64)scope, 0, 16));
 
-		QMultiHash<quint64, ASTSymbol> symByLine;
+		QMultiHash<quint64, const ASTSymbol*> symByLine;
 		for (ASTSymbolHash::iterator it = scope->symbols().begin();
 				it != scope->symbols().end(); ++it)
 		{
 			symByLine.insertMulti(
-					it.value().astNode()->start->line,
+					it.value()->astNode()->start->line,
 					it.value());
 		}
 		for (ASTSymbolHash::iterator it = scope->compoundTypes().begin();
 				it != scope->compoundTypes().end(); ++it)
 		{
 			symByLine.insertMulti(
-					it.value().astNode()->start->line,
+					it.value()->astNode()->start->line,
 					it.value());
 		}
 		QList<quint64> keys = symByLine.keys();
 		qSort(keys);
 		for (int i = 0; i < keys.size(); ++i) {
-			QList<ASTSymbol> syms = symByLine.values(keys[i]);
+			QList<const ASTSymbol*> syms = symByLine.values(keys[i]);
 			for (int j = 0; j < syms.size(); ++j)
 				debugmsg(
 						QString("  Line %1: %2 (%3)")
-						.arg(syms[j].astNode()->start->line, 5)
-						.arg(syms[j].name(), -40)
-						.arg(ASTSymbol::typeToString(syms[j].type())));
+						.arg(syms[j]->astNode()->start->line, 5)
+						.arg(syms[j]->name(), -40)
+						.arg(ASTSymbol::typeToString(syms[j]->type())));
 		}
 	}
 
@@ -209,3 +209,29 @@ quint32 AbstractSyntaxTree::errorCount() const
 {
     return _psr ? _psr->pParser->rec->errorCount : 0;
 }
+
+
+QString AbstractSyntaxTree::antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok) const
+{
+    if (!tok)
+        return QString();
+    if (!_antlrStringCache.contains(tok)) {
+        pANTLR3_STRING s = tok->getText(tok);
+        _antlrStringCache.insert(
+                    tok, QString::fromAscii((const char*)s->chars, s->len));
+    }
+    return _antlrStringCache[tok];
+}
+
+
+QString AbstractSyntaxTree::antlrStringToStr(const pANTLR3_STRING s) const
+{
+    if (!s)
+        return QString();
+    if (!_antlrStringCache.contains(s)) {
+        _antlrStringCache.insert(
+                    s, QString::fromAscii((const char*)s->chars, s->len));
+    }
+    return _antlrStringCache[s];
+}
+

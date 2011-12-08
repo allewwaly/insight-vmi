@@ -8,6 +8,8 @@
 #include <astdotgraph.h>
 #include <abstractsyntaxtree.h>
 #include <astsymbol.h>
+#include <asttypeevaluator.h>
+
 #include <QTextDocument>
 #include <QTextStream>
 #include <QFile>
@@ -23,11 +25,21 @@
 #define FONT_FACE_STR " FACE=\"Courier\" "
 #define FONT_DEF_STR FONT_FACE_STR
 
-#define NODE_NEW_SCOPE_BG "fillcolor=\"#FFFF99\""
+#define NODE_NEW_SCOPE_BG      "fillcolor=\"#FFFF99\""
+#define TOK_PRIM_EX_IDENTIFIER "fillcolor=\"#99FF99\""
+#define TOK_POSTFIX_EX         "fillcolor=\"#AACCAA\""
+#define TOK_DIR_DECL           "fillcolor=\"#FF9999\""
+#define TOK_TYPE_SPECIFIER     "fillcolor=\"#AAAACC\""
+
+
+ASTDotGraph::ASTDotGraph(ASTTypeEvaluator *eval)
+    : ASTWalker(eval ? eval->ast() : 0), _eval(eval)
+{
+}
 
 
 ASTDotGraph::ASTDotGraph(AbstractSyntaxTree* ast)
-    : ASTWalker(ast)
+    : ASTWalker(ast), _eval(0)
 {
 }
 
@@ -43,7 +55,7 @@ inline QString ASTDotGraph::dotEscape(const QString& s) const
 }
 
 
-inline QString ASTDotGraph::getNodeId(pASTNode node) const
+inline QString ASTDotGraph::getNodeId(const ASTNode *node) const
 {
     return QString::number((quint64)node, 16);
 }
@@ -55,7 +67,7 @@ inline QString ASTDotGraph::getTokenId(pANTLR3_COMMON_TOKEN token) const
 }
 
 
-inline void ASTDotGraph::printDotGraphNodeLabel(pASTNode node)
+inline void ASTDotGraph::printDotGraphNodeLabel(const ASTNode *node)
 {
     if (!node)
         return;
@@ -86,25 +98,29 @@ inline void ASTDotGraph::printDotGraphNodeLabel(pASTNode node)
 }
 
 
-inline void ASTDotGraph::printDotGraphTokenLabel(pANTLR3_COMMON_TOKEN token)
+inline void ASTDotGraph::printDotGraphTokenLabel(pANTLR3_COMMON_TOKEN token,
+                                                 const char* extraStyle)
 {
     if (!token)
         return;
 
-    _out << QString("\ttoken_%1 [label=< <FONT " FONT_DEF_STR ">%2</FONT> >,style=filled];")
-            .arg(getTokenId(token))
-            .arg(dotEscape((const char*)token->getText(token)->chars))
-        << endl;
+    _out << "\ttoken_" << getTokenId(token)
+         << " [label=< <FONT " FONT_DEF_STR ">"
+         << dotEscape((const char*)token->getText(token)->chars)
+         << "</FONT> >,style=filled";
+    if (extraStyle)
+        _out << "," << extraStyle;
+    _out << "];" << endl;
 }
 
 
 void ASTDotGraph::printDotGraphToken(pANTLR3_COMMON_TOKEN token,
-        const QString& parentNodeId)
+        const QString& parentNodeId, const char* extraStyle)
 {
     if (!token)
         return;
 
-    printDotGraphTokenLabel(token);
+    printDotGraphTokenLabel(token, extraStyle);
     _out << QString("\t\tnode_%1 -> token_%2;")
             .arg(parentNodeId)
             .arg(getTokenId(token))
@@ -113,15 +129,18 @@ void ASTDotGraph::printDotGraphToken(pANTLR3_COMMON_TOKEN token,
 
 
 void ASTDotGraph::printDotGraphString(const QString& s,
-        const QString& parentNodeId)
+        const QString& parentNodeId, const char* extraStyle)
 {
     static int stringId = 0;
     int id = stringId++;
 
-    _out << QString("\tstring_%1 [label=< <FONT " FONT_DEF_STR ">%2</FONT> >,style=filled];")
-            .arg(id)
-            .arg(dotEscape(s))
-        << endl;
+    _out << "\tstring_" << id << " [label=< <FONT " FONT_DEF_STR ">"
+            << dotEscape(s)
+            << "</FONT> >,style=filled";
+    if (extraStyle)
+        _out << "," << extraStyle;
+    _out << "];" << endl;
+
     _out << QString("\t\tnode_%1 -> string_%2;")
             .arg(parentNodeId)
             .arg(id)
@@ -130,20 +149,77 @@ void ASTDotGraph::printDotGraphString(const QString& s,
 
 
 void ASTDotGraph::printDotGraphTokenList(pASTTokenList list,
-        const QString& delim, const QString& nodeId)
+        const QString& delim, const QString& nodeId, const char* extraStyle)
 {
     if (!list)
         return;
 
     for (pASTTokenList p = list; p; p = p->next) {
-        printDotGraphToken(p->item, nodeId);
+        printDotGraphToken(p->item, nodeId, extraStyle);
         if (p->next && !delim.isEmpty())
             printDotGraphString(delim, nodeId);
     }
 }
 
 
-void ASTDotGraph::beforeChildren(pASTNode node, int flags)
+void ASTDotGraph::printDotGraphConnection(pANTLR3_COMMON_TOKEN src,
+                                          const AssignedNode *an)
+{
+    QString srcId = getTokenId(src);
+    QString destId = getNodeId(an->node);
+    QString label = QString("(%1)").arg(an->addedInRound);
+
+
+    QString s;
+    if (an->derefCount) {
+        if (an->derefCount < 0)
+            s.fill(QChar('&'), -an->derefCount);
+        else
+            s.fill(QChar('*'), an->derefCount);
+        s = dotEscape(s);
+    }
+    if (an->postExprSuffixes) {
+        for (const ASTNodeList* l = an->postExprSuffixes; l; l = l->next) {
+            s += "<BR/>";
+            switch (l->item->type) {
+            case nt_postfix_expression_arrow:
+                s += dotEscape("->" + antlrTokenToStr(l->item->u.postfix_expression_suffix.identifier));
+                break;
+            case nt_postfix_expression_brackets:
+                s += dotEscape("[]");
+                break;
+            case nt_postfix_expression_dec:
+                s += dotEscape("--");
+                break;
+            case nt_postfix_expression_dot:
+                s += dotEscape("." + antlrTokenToStr(l->item->u.postfix_expression_suffix.identifier));
+                break;
+            case nt_postfix_expression_inc:
+                s += dotEscape("++");
+                break;
+            case nt_postfix_expression_parens:
+                s += dotEscape("()");
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    if (!s.isEmpty())
+        label += QString(" <FONT " FONT_DEF_STR ">%1</FONT>").arg(s);
+
+    _out << QString("\t\ttoken_%1 -> node_%2 [constraint=false style=dotted "
+                    "layer=\"assign\" taillabel=< %3 > labelfloat=true "
+                    "labelangle=-45 labeldistance=3];")
+            .arg(srcId)
+            .arg(destId)
+            .arg(label)
+         << endl;
+}
+
+
+void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
 {
     Q_UNUSED(flags);
 
@@ -156,8 +232,7 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
     	break;
     }
 
-    // Handle arguments
-    const QString nodeId = QString::number((quint64)node, 16);
+    QString nodeId = getNodeId(node);
 
     // Do we have a terminal token?
     switch (node->type) {
@@ -317,14 +392,24 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
     case nt_direct_abstract_declarator:
         break;
     case nt_direct_declarator:
-        printDotGraphToken(node->u.direct_declarator.identifier, nodeId);
+        printDotGraphToken(node->u.direct_declarator.identifier, nodeId,
+                           TOK_DIR_DECL);
         if (node->u.direct_declarator.declarator) {
             printDotGraphString("(", nodeId);
         }
+//        if (node->u.direct_declarator.identifier) {
+//            const ASTSymbol* sym = _eval->findSymbolOfDirectDeclarator(node);
+//            if (sym && !sym->assignedAstNodes().isEmpty()) {
+//                for (int i = 0; i < sym->assignedAstNodes().size(); ++i)
+//                    printDotGraphConnection(
+//                                node->u.direct_declarator.identifier,
+//                                sym->assignedAstNodes().at(i));
+//            }
+//        }
         break;
     case nt_enum_specifier:
-        printDotGraphString("enum", nodeId);
-        printDotGraphToken(node->u.enum_specifier.identifier, nodeId);
+        printDotGraphString("enum", nodeId, TOK_TYPE_SPECIFIER);
+        printDotGraphToken(node->u.enum_specifier.identifier, nodeId, TOK_TYPE_SPECIFIER);
         break;
     case nt_enumerator:
         if (flags & wfFirstInList)
@@ -407,9 +492,17 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
                 node->parent->u.binary_expression.right == node)
             printDotGraphToken(node->parent->u.binary_expression.op, getNodeId(node->parent));
         break;
-    case nt_pointer:
-        printDotGraphString("*", nodeId);
+    case nt_pointer: {
+        // Is this within a declaration?
+        const ASTNode* p = node->parent;
+        while (p && p->type != nt_declarator)
+            p = p->parent;
+        if (p)
+            printDotGraphString("*", nodeId, TOK_DIR_DECL);
+        else
+            printDotGraphString("*", nodeId);
         printDotGraphTokenList(node->u.pointer.type_qualifier_list, "", nodeId);
+    }
         break;
     case nt_postfix_expression:
         break;
@@ -420,12 +513,12 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
         printDotGraphString("(", nodeId);
         break;
     case nt_postfix_expression_dot:
-        printDotGraphString(".", nodeId);
-        printDotGraphToken(node->u.postfix_expression_suffix.identifier, nodeId);
+        printDotGraphString(".", nodeId, TOK_POSTFIX_EX);
+        printDotGraphToken(node->u.postfix_expression_suffix.identifier, nodeId, TOK_POSTFIX_EX);
         break;
     case nt_postfix_expression_arrow:
-        printDotGraphString("->", nodeId);
-        printDotGraphToken(node->u.postfix_expression_suffix.identifier, nodeId);
+        printDotGraphString("->", nodeId, TOK_POSTFIX_EX);
+        printDotGraphToken(node->u.postfix_expression_suffix.identifier, nodeId, TOK_POSTFIX_EX);
         break;
     case nt_postfix_expression_inc:
         printDotGraphString("++", nodeId);
@@ -438,7 +531,20 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
             printDotGraphString("(", nodeId);
         if (node->u.primary_expression.hasDot)
             printDotGraphString(".", nodeId);
-        printDotGraphToken(node->u.primary_expression.identifier, nodeId);
+        printDotGraphToken(node->u.primary_expression.identifier, nodeId, TOK_PRIM_EX_IDENTIFIER);
+        if (_eval && node->u.primary_expression.identifier) {
+            const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);
+            if (sym && !sym->assignedAstNodes().isEmpty()) {
+                for (AssignedNodeSet::const_iterator it =
+                        sym->assignedAstNodes().begin(),
+                     e = sym->assignedAstNodes().end(); it != e; ++it)
+                {
+                    printDotGraphConnection(
+                                node->u.primary_expression.identifier, &(*it));
+                }
+            }
+        }
+
         break;
     case nt_relational_expression:
         if (node->parent->type == nt_equality_expression &&
@@ -467,22 +573,22 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
         break;
     case nt_struct_or_union_specifier:
         if (node->u.struct_or_union_specifier.struct_or_union) {
-            pASTNode sou = node->u.struct_or_union_specifier.struct_or_union;
+            const ASTNode* sou = node->u.struct_or_union_specifier.struct_or_union;
             if (sou->type == nt_struct_or_union_struct)
-                printDotGraphString("struct", nodeId);
+                printDotGraphString("struct", nodeId, TOK_TYPE_SPECIFIER);
             else
-                printDotGraphString("union", nodeId);
+                printDotGraphString("union", nodeId, TOK_TYPE_SPECIFIER);
         }
-        printDotGraphToken(node->u.struct_or_union_specifier.identifier, nodeId);
+        printDotGraphToken(node->u.struct_or_union_specifier.identifier, nodeId, TOK_TYPE_SPECIFIER);
         break;
     case nt_type_id:
-        printDotGraphToken(node->u.type_id.identifier, nodeId);
+        printDotGraphToken(node->u.type_id.identifier, nodeId, TOK_TYPE_SPECIFIER);
         break;
     case nt_type_qualifier:
         printDotGraphToken(node->u.type_qualifier.token, nodeId);
         break;
     case nt_type_specifier:
-        printDotGraphTokenList(node->u.type_specifier.builtin_type_list, QString(), nodeId);
+        printDotGraphTokenList(node->u.type_specifier.builtin_type_list, QString(), nodeId, TOK_TYPE_SPECIFIER);
         break;
     case nt_typeof_specification:
         printDotGraphString("typeof", nodeId);
@@ -561,10 +667,10 @@ void ASTDotGraph::beforeChildren(pASTNode node, int flags)
 }
 
 
-void ASTDotGraph::afterChildren(pASTNode node, int flags)
+void ASTDotGraph::afterChildren(const ASTNode* node, int flags)
 {
     Q_UNUSED(flags);
-    QString nodeId = QString::number((quint64)node, 16);
+    QString nodeId = getNodeId(node);
 
     // Do we have a terminal token?
     switch (node->type) {
@@ -791,7 +897,9 @@ int ASTDotGraph::writeDotGraph(const QString& fileName)
             << endl
             << "digraph G {" << endl;
     _out << "\tgraph [ordering=out];" << endl;
-    _out << "\tnode [fontname=Helvetica fontsize=" FONT_SIZE "];" << endl
+    _out << "\tlayers = \"ast:assign\";" << endl;
+    _out << "\tedge [fontname=Helvetica fontsize=" FONT_SIZE " layer=\"ast\"];" << endl;
+    _out << "\tnode [fontname=Helvetica fontsize=" FONT_SIZE " layer=\"ast\"];" << endl
         << endl;
 
     if (_ast) {
@@ -801,7 +909,7 @@ int ASTDotGraph::writeDotGraph(const QString& fileName)
                 .arg("translation_unit")
             << endl;
 
-        for (pASTNodeList p = _ast->rootNodes(); p; p = p->next) {
+        for (const ASTNodeList* p = _ast->rootNodes(); p; p = p->next) {
             if (!p->item)
                 continue;
             _out << QString("\t\tnode_%1 -> node_%2;")
@@ -822,7 +930,7 @@ int ASTDotGraph::writeDotGraph(const QString& fileName)
 }
 
 
-int ASTDotGraph::writeDotGraph(pASTNode node, const QString& fileName)
+int ASTDotGraph::writeDotGraph(const ASTNode* node, const QString& fileName)
 {
     QFile file(fileName);
     if (!file.open(QIODevice::WriteOnly|QIODevice::Truncate)) {
@@ -843,7 +951,7 @@ int ASTDotGraph::writeDotGraph(pASTNode node, const QString& fileName)
 
     if (node) {
         // Work our way up from node to the first parent
-        pASTNode child = node, par = node->parent;
+        const ASTNode *child = node, *par = node->parent;
         while (par) {
             // Parent's label
             printDotGraphNodeLabel(par);

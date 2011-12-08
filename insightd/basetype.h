@@ -65,6 +65,7 @@ public:
     enum TypeResolution {
         trNone = 0,                                 ///< no resolution is performed
         trLexical = rtConst|rtVolatile|rtTypedef,   ///< resolve rtConst, rtVolatile, rtTypedef only
+        trLexicalAndArrays = trLexical|rtArray,     ///< resolve as for trLexical plus rtArray
         trLexicalAndPointers = trLexical|rtPointer, ///< resolve as for trLexical plus rtPointer
         trPointersAndArrays = rtPointer|rtArray,    ///< resolve rtPointer and rtArray
         trLexicalPointersArrays = trLexicalAndPointers|rtArray, ///< resolve as for trLexicalAndPointers plus rtArray
@@ -418,20 +419,6 @@ protected:
         }
     }
 };
-
-
-/**
- * Cyclic rotate a 32 bit integer bitwise to the left
- * @param i value to rotate bitwise
- * @param rot_amount the number of bits to rotate
- * @return the value of \a i cyclicly rotated y \a rot_amount bits
- */
-inline uint rotl32(uint i, uint rot_amount)
-{
-    rot_amount %= 32;
-    uint mask = (1 << rot_amount) - 1;
-    return (i << rot_amount) | ((i >> (32 - rot_amount)) & mask);
-}
 
 
 /**

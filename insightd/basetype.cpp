@@ -127,6 +127,7 @@ bool BaseType::operator==(const BaseType& other) const
 {
     return type() == other.type() &&
             size() == other.size() &&
+            name() == other.name() &&
             hash() == hash() &&
             hashIsValid() && other.hashIsValid();
 }

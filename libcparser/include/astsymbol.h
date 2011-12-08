@@ -21,9 +21,66 @@ extern "C" {
 
 #include <astsymboltypes.h>
 #include <QString>
+#include <QList>
+#include <QSet>
 
 // forward declaration
 struct ASTNode;
+struct ASTNodeList;
+class AbstractSyntaxTree;
+class ASTSymbol;
+
+struct AssignedNode {
+    AssignedNode()
+        : sym(0), node(0), postExprSuffixes(0), derefCount(0), addedInRound(0) {}
+    AssignedNode(const ASTSymbol* sym, const ASTNode* node,
+                 const ASTNodeList* postExprSuffixes, int derefCount, int round)
+        : sym(sym), node(node), postExprSuffixes(postExprSuffixes),
+          derefCount(derefCount), addedInRound(round) {}
+
+    /// The Symbol this assigned node belongs to
+    const ASTSymbol* sym;
+    /// The node that was assigned to this symbol
+    const ASTNode* node;
+    /// The postfix expression suffixes of the assignment's lvalue
+    const ASTNodeList* postExprSuffixes;
+    /// No. of (de)references of assignment's lvalue
+    int derefCount;
+    /// The round in the points-to analysis this link was added
+    int addedInRound;
+
+    /// Comparison operator
+    inline bool operator==(const AssignedNode& other) const
+    {
+        bool ret = (node == other.node && derefCount == other.derefCount);
+        if (ret && postExprSuffixes)
+            ret = (hashPostExprSuffixes() == other.hashPostExprSuffixes());
+        return ret;
+    }
+
+    /**
+     * @return hash value of the suffixes in postExprSuffixes
+     */
+    uint hashPostExprSuffixes() const;
+
+    /**
+     * @return hash value of the suffixes in \a pesl
+     */
+    static uint hashPostExprSuffixes(const ASTNodeList* pesl,
+                                     const AbstractSyntaxTree* ast);
+};
+
+
+inline uint qHash(const AssignedNode& an)
+{
+    uint hash = qHash(an.node) ^ qHash(an.derefCount);
+    if (an.postExprSuffixes)
+        hash ^= an.hashPostExprSuffixes();
+    return hash;
+}
+
+
+typedef QSet<AssignedNode> AssignedNodeSet;
 
 /**
  * This class represents a symbol parsed from the source code.
@@ -33,6 +90,8 @@ class ASTSymbol
 	QString _name;
 	ASTSymbolType _type;
 	struct ASTNode* _astNode;
+	AssignedNodeSet _assignedAstNodes;
+	const AbstractSyntaxTree* _ast;
 
 public:
 	/**
@@ -42,11 +101,13 @@ public:
 
 	/**
 	 * Constructor
+	 * @param ast the AbstractSyntaxTree this symbol belongs to
 	 * @param name the name of the symbol
 	 * @param type of the symbol, e.g., a variable, a function or a type name
 	 * @param astNode link to the node that defines this symbol
 	 */
-	ASTSymbol(const QString& name, ASTSymbolType type, struct ASTNode* astNode);
+	ASTSymbol(const AbstractSyntaxTree* ast, const QString& name, ASTSymbolType type,
+			  struct ASTNode* astNode);
 
 	/**
 	 * @return \c true if this symbol is \c null, \c false otherwise
@@ -68,6 +129,11 @@ public:
 	bool isGlobal() const;
 
 	/**
+	 * @return the AbstractSyntaxTree object this symbol belongs to
+	 */
+	const AbstractSyntaxTree* ast() const;
+
+	/**
 	 * @return the symbol type, e.g., a variable, a function or a type name
 	 */
 	ASTSymbolType type() const;
@@ -76,7 +142,24 @@ public:
 	 * @return link to the node that defines this symbol, might be null for
 	 * built-in types
 	 */
-	struct ASTNode* astNode() const;
+	const ASTNode* astNode() const;
+
+	/**
+	 * @return list of nodes that have been assigned to this symbol
+	 */
+	const AssignedNodeSet& assignedAstNodes() const;
+
+	/**
+	 * Append a new ASTNode that has been assigned to this symbol.
+	 * @param node the node to append
+	 * @param postExprSuffixes the suffixes to which \a node was assigned
+	 * @param derefCount number of dereferences for this node
+	 * @param round the round this node was added
+	 * @return \c true if element did not already exist, \c false otherwise
+	 */
+	bool appendAssignedNode(const ASTNode* node,
+							const ASTNodeList* postExprSuffixes, int derefCount,
+							int round);
 
 	/**
 	 * @return the name of the symbol
@@ -95,20 +178,6 @@ public:
 	 */
 	static QString typeToString(ASTSymbolType type);
 };
-
-/**
- * Converts a pANTLR3_COMMON_TOKEN to a QString.
- * @param tok the ANTLR3 token to convert to a QString
- * @return the token \a tok as a QString
- */
-QString antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok);
-
-/**
- * Converts a pANTLR3_STRING to a QString.
- * @param s the ANTLR3 string to convert to a QString
- * @return the string \a s as a QString
- */
-QString antlrStringToStr(const pANTLR3_STRING s);
 
 
 inline bool ASTSymbol::isNull() const
@@ -129,9 +198,34 @@ inline ASTSymbolType ASTSymbol::type() const
 }
 
 
-inline struct ASTNode* ASTSymbol::astNode() const
+inline const AbstractSyntaxTree* ASTSymbol::ast() const
+{
+    return _ast;
+}
+
+
+inline const ASTNode* ASTSymbol::astNode() const
 {
     return _astNode;
+}
+
+
+inline const AssignedNodeSet &ASTSymbol::assignedAstNodes() const
+{
+    return _assignedAstNodes;
+}
+
+
+inline bool ASTSymbol::appendAssignedNode(
+        const ASTNode *node, const ASTNodeList* postExprSuffixes,
+        int derefCount, int round)
+{
+    AssignedNode an(this, node, postExprSuffixes, derefCount, round);
+    if (!_assignedAstNodes.contains(an)) {
+        _assignedAstNodes.insert(an);
+        return true;
+    }
+    return false;
 }
 
 

@@ -170,6 +170,9 @@ bool Instance::equals(const Instance& other) const
     case rtFuncPointer:
         return address() == other.address();
 
+    case rtFunction:
+        return true;
+
     case rtArray: {
         const Array* a1 = dynamic_cast<const Array*>(type());
         const Array* a2 = dynamic_cast<const Array*>(other.type());

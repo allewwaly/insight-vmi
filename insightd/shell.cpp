@@ -10,15 +10,12 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <readline/readline.h>
-#include <readline/history.h>
 #include <insight/constdefs.h>
 #include <insight/devicemuxer.h>
 #include <insight/insight.h>
 #include <QtAlgorithms>
 #include <QProcess>
 #include <QCoreApplication>
-#include <QDir>
 #include <QLocalSocket>
 #include <QLocalServer>
 #include <QMutexLocker>
@@ -40,10 +37,11 @@
 #include "basetype.h"
 #include "scriptengine.h"
 #include "kernelsourceparser.h"
+#include "function.h"
 
 // Register socket enums for the Qt meta type system
-Q_DECLARE_METATYPE(QAbstractSocket::SocketState);
-Q_DECLARE_METATYPE(QAbstractSocket::SocketError);
+Q_DECLARE_METATYPE(QAbstractSocket::SocketState)
+Q_DECLARE_METATYPE(QAbstractSocket::SocketError)
 
 #define safe_delete(x) do { if ( (x) ) { delete x; x = 0; } } while (0)
 
@@ -260,17 +258,7 @@ void Shell::prepare()
         _retChan->open(QIODevice::WriteOnly);
     }
     else {
-        // Enable readline history
-        using_history();
-
-        // Load the readline history
-        QString histFile = QDir::home().absoluteFilePath(mt_history_file);
-        if (QFile::exists(histFile)) {
-            int ret = read_history(histFile.toLocal8Bit().constData());
-            if (ret)
-                debugerr("Error #" << ret << " occured when trying to read the "
-                        "history data from \"" << histFile << "\"");
-        }
+        prepareReadline();
     }
 
     // Open the console devices
@@ -301,15 +289,8 @@ Shell::~Shell()
     }
     else {
         // Only save history for interactive sessions
-        if (!_listenOnSocket) {
-            // Save the history for the next launch
-            QString histFile = QDir::home().absoluteFilePath(mt_history_file);
-            QByteArray ba = histFile.toLocal8Bit();
-            int ret = write_history(ba.constData());
-            if (ret)
-                debugerr("Error #" << ret << " occured when trying to save the "
-                        "history data to \"" << histFile << "\"");
-        }
+        if (!_listenOnSocket)
+            saveShellHistory();
     }
 
     safe_delete(_clSocket);
@@ -358,46 +339,6 @@ bool Shell::interactive() const
 int Shell::lastStatus() const
 {
     return _lastStatus;
-}
-
-
-QString Shell::readLine(const QString& prompt)
-{
-    QString ret;
-    QString p = prompt.isEmpty() ? QString(">>> ") : prompt;
-
-    // Read input from stdin or from socket?
-    if (_listenOnSocket) {
-        // Print prompt in interactive mode
-        if (_interactive)
-            _out << p << flush;
-        // Wait until a complete line is readable
-        _sockSem.acquire(1);
-        // The socket might already be null if we received a kill signal
-        if (_clSocket) {
-            // Read input from socket
-            ret = QString::fromLocal8Bit(_clSocket->readLine().data()).trimmed();
-        }
-    }
-    else {
-        // Read input from stdin
-        char* line = readline(p.toLocal8Bit().constData());
-
-        // If line is NULL, the user wants to exit.
-        if (!line) {
-            _finished = true;
-            return QString();
-        }
-
-        // Add the line to the history in interactive sessions
-        if (strlen(line) > 0)
-            add_history(line);
-
-        ret = QString::fromLocal8Bit(line, strlen(line)).trimmed();
-        free(line);
-    }
-
-    return ret;
 }
 
 
@@ -952,7 +893,7 @@ int Shell::cmdListSources(QStringList /*args*/)
     }
 
     hline();
-    _out << "Total source files: " << keys.size() << endl;
+    _out << "Total source files: " << dec << keys.size() << endl;
 
     return ecOk;
 }
@@ -960,7 +901,7 @@ int Shell::cmdListSources(QStringList /*args*/)
 
 int Shell::cmdListTypes(QStringList args)
 {
-    const BaseTypeList& types = _sym.factory().types();
+    const BaseTypeList* types = &_sym.factory().types();
     CompileUnit* unit = 0;
 
     // Expect at most one parameter
@@ -969,13 +910,13 @@ int Shell::cmdListTypes(QStringList args)
         return 1;
     }
 
-    if (types.isEmpty()) {
+    if (types->isEmpty()) {
         _out << "There are no type references.\n";
         return ecOk;
     }
 
     // Find out required field width (the types are sorted by ascending ID)
-    const int w_id = getFieldWidth(types.last()->id());
+    const int w_id = getFieldWidth(types->last()->id());
     const int w_type = 12;
     const int w_name = 30;
     const int w_size = 5;
@@ -990,60 +931,100 @@ int Shell::cmdListTypes(QStringList args)
     QRegExp rxFilter(args.isEmpty() ? QString() : args.first(),
     		Qt::CaseSensitive, QRegExp::WildcardUnix);
 
-    QString src, srcLine;
-    for (int i = 0; i < types.size(); i++) {
-        BaseType* type = types[i];
+    QString src, srcLine, name;
+    for (int round = 1; round <= 2; ++round) {
 
-        // Apply name filter, if requested
-        if (applyFilter && !rxFilter.exactMatch(type->name()))
-        	continue;
+        for (int i = 0; i < types->size(); i++) {
+            BaseType* type = types->at(i);
 
-        // Print header if not yet done
-        if (!headerPrinted) {
-    	    _out << qSetFieldWidth(w_id)  << right << "ID"
-    	         << qSetFieldWidth(w_colsep) << " "
-    	         << qSetFieldWidth(w_type) << left << "Type"
-    	         << qSetFieldWidth(w_name) << "Name"
-    	         << qSetFieldWidth(w_size)  << right << "Size"
-    	         << qSetFieldWidth(w_colsep) << " "
-    	         << qSetFieldWidth(w_src) << left << "Source"
-    	         << qSetFieldWidth(w_line) << right << "Line"
-    	         << qSetFieldWidth(0)  << endl;
+            // Apply name filter, if requested
+            if (applyFilter && !rxFilter.exactMatch(type->name()))
+                continue;
 
-    	    hline(w_total);
-    	    headerPrinted = true;
-       }
+            // Print header if not yet done
+            if (!headerPrinted) {
+                _out << qSetFieldWidth(w_id)  << right << "ID"
+                     << qSetFieldWidth(w_colsep) << " "
+                     << qSetFieldWidth(w_type) << left << "Type"
+                     << qSetFieldWidth(w_name) << "Name"
+                     << qSetFieldWidth(w_size)  << right << "Size"
+                     << qSetFieldWidth(w_colsep) << " "
+                     << qSetFieldWidth(w_src) << left << "Source"
+                     << qSetFieldWidth(w_line) << right << "Line"
+                     << qSetFieldWidth(0)  << endl;
 
-        // Construct name and line of the source file
-        if (type->srcFile() > 0) {
-            if (!unit || unit->id() != type->srcFile())
-                unit = _sym.factory().sources().value(type->srcFile());
-            if (!unit)
-                src = QString("(unknown id: %1)").arg(type->srcFile());
+                hline(w_total);
+                headerPrinted = true;
+            }
+
+            // Construct name and line of the source file
+            if (type->srcFile() > 0) {
+                if (!unit || unit->id() != type->srcFile())
+                    unit = _sym.factory().sources().value(type->srcFile());
+                if (!unit)
+                    src = QString("(unknown id: %1)").arg(type->srcFile());
+                else
+                    src = QString("%1").arg(unit->name());
+                if (src.size() > w_src)
+                    src = "..." + src.right(w_src - 3);
+            }
             else
-                src = QString("%1").arg(unit->name());
-            if (src.size() > w_src)
-            	src = "..." + src.right(w_src - 3);
+                src = "--";
+
+            if (type->srcLine() > 0)
+                srcLine = QString::number(type->srcLine());
+            else
+                srcLine = "--";
+
+            // Get the pretty name
+            name = type->prettyName();
+            if (name.isEmpty())
+                name = "(none)";
+            // Shorten name, if necessary
+            else if (name.size() > w_name) {
+                if (type->type() & FunctionTypes) {
+                    const FuncPointer* fp = dynamic_cast<FuncPointer*>(type);
+                    if (!fp->refTypeId())
+                        name = "void";
+                    else if (fp->refType())
+                        name = fp->refType()->prettyName();
+                    else
+                        name = QString("(unresolved 0x%1)")
+                                .arg(fp->refTypeId(), 0, 16);
+                    if (!fp->name().isEmpty())
+                        name += " " + fp->name();
+
+                    QString params;
+                    for (int i = 0; i < fp->params().size(); ++i) {
+                        if (i > 0)
+                            params += ", ";
+                        params += fp->params().at(i)->prettyName();
+                    }
+
+                    if (name.size() + params.size() + 2 <= w_name)
+                        name += "(" + params + ")";
+                    else
+                        name += "(" + params.left(w_name - name.size() - 5) + "...)";
+                }
+
+                if (name.size() > w_name)
+                    name = name.left(w_name - 3) + "...";
+            }
+
+            _out << qSetFieldWidth(w_id)  << right << hex << (uint) type->id()
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
+                 << qSetFieldWidth(w_name) << name
+                 << qSetFieldWidth(w_size) << right << dec << type->size()
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_src) << left << src
+                 << qSetFieldWidth(w_line) << right << srcLine
+                 << qSetFieldWidth(0) << endl;
+
+            ++typeCount;
         }
-        else
-            src = "--";
 
-        if (type->srcLine() > 0)
-            srcLine = QString::number(type->srcLine());
-        else
-            srcLine = "--";
-
-        _out << qSetFieldWidth(w_id)  << right << hex << type->id()
-             << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
-             << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
-             << qSetFieldWidth(w_size) << right << dec << type->size()
-             << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_src) << left << src
-             << qSetFieldWidth(w_line) << right << srcLine
-             << qSetFieldWidth(0) << endl;
-
-        ++typeCount;
+        types = &_sym.factory().artificialTypes();
     }
 
     if (headerPrinted) {
@@ -1057,9 +1038,9 @@ int Shell::cmdListTypes(QStringList args)
 }
 
 
-bool cmpIdLessThan(const RefBaseType* t1, const RefBaseType* t2)
+bool cmpIdLessThan(const BaseType* t1, const BaseType* t2)
 {
-    return t1->id() < t2->id();
+    return ((uint)t1->id()) < ((uint)t2->id());
 }
 
 
@@ -1075,17 +1056,14 @@ int Shell::cmdListTypesUsing(QStringList args)
     if (s.startsWith("0x"))
         s = s.right(s.size() - 2);
     bool ok = false;
-    int id = s.toInt(&ok, 16);
+    int id = (int)s.toUInt(&ok, 16);
 
     if (!ok) {
         _err << "Invalid type ID given." << endl;
         return ecInvalidId;
     }
 
-
-
-
-    QList<RefBaseType*> types = _sym.factory().typesUsingId(id);
+    QList<BaseType*> types = _sym.factory().typesUsingId(id);
 
     if (types.isEmpty()) {
         if (_sym.factory().equivalentTypes(id).isEmpty()) {
@@ -1102,16 +1080,13 @@ int Shell::cmdListTypesUsing(QStringList args)
 
     // Find out required field width (the types are sorted by ascending ID)
     const int w_id = getFieldWidth(types.last()->id());
-    const int w_refTypeId = w_id <= 7 ? 7 : w_id;
     const int w_type = 12;
     const int w_name = 24;
     const int w_size = 5;
     const int w_colsep = 2;
-    const int w_total = w_id + w_refTypeId + w_type + w_name + w_size + 3*w_colsep;
+    const int w_total = w_id + w_type + w_name + w_size + 2*w_colsep;
 
     _out << qSetFieldWidth(w_id)  << right << "ID"
-         << qSetFieldWidth(w_colsep) << " "
-         << qSetFieldWidth(w_refTypeId) << "RefType"
          << qSetFieldWidth(w_colsep) << " "
          << qSetFieldWidth(w_type) << left << "Type"
          << qSetFieldWidth(w_name) << "Name"
@@ -1122,10 +1097,8 @@ int Shell::cmdListTypesUsing(QStringList args)
     hline(w_total);
 
     for (int i = 0; i < types.size(); i++) {
-        RefBaseType* type = types[i];
-        _out << qSetFieldWidth(w_id)  << right << hex << type->id()
-             << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_refTypeId) << type->refTypeId()
+        BaseType* type = types[i];
+        _out << qSetFieldWidth(w_id)  << right << hex << (uint)type->id()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
@@ -1136,7 +1109,7 @@ int Shell::cmdListTypesUsing(QStringList args)
 
     hline(w_total);
     _out << "Total types using type " << args.front() << ": "
-         << dec << _sym.factory()._typesById.size() << endl;
+         << dec << types.size() << endl;
 
     return ecOk;
 }
@@ -1177,9 +1150,9 @@ int Shell::cmdListTypesById(QStringList /*args*/)
     for (int i = 0; i < ids.size(); i++) {
         BaseType* type = _sym.factory()._typesById.value(ids[i]);
         // Construct name and line of the source file
-        _out << qSetFieldWidth(w_id)  << right << hex << ids[i]
+        _out << qSetFieldWidth(w_id)  << right << hex << (uint)ids[i]
              << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_realId) << type->id()
+             << qSetFieldWidth(w_realId) << (uint)type->id()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
@@ -1227,7 +1200,7 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
     for (int i = 0; i < names.size(); i++) {
         BaseType* type = _sym.factory()._typesByName.value(names[i]);
         // Construct name and line of the source file
-        _out << qSetFieldWidth(w_id)  << right << hex << type->id()
+        _out << qSetFieldWidth(w_id)  << right << hex << (uint)type->id()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(w_name) << names[i]
@@ -1322,17 +1295,16 @@ int Shell::cmdListVars(QStringList args)
         else
             s_src = "--";
 
-        assert(var->refType() != 0);
-
         // Find out the basic data type of this variable
-        const BaseType* base = var->refType();
-        while ( dynamic_cast<const RefBaseType*>(base) )
-            base = dynamic_cast<const RefBaseType*>(base)->refType();
+        const BaseType* base = var->refTypeDeep(BaseType::trLexical);
         QString s_datatype = base ? realTypeToStr(base->type()) : "(undef)";
 
         // Shorten the type name, if required
-        QString s_typename = var->refType()->name().isEmpty() ?
-                "(anonymous type)" : var->refType()->name();
+        QString s_typename = var->refType() ?
+                    (var->refType()->name().isEmpty() ?
+                         var->refType()->prettyName() :
+                         var->refType()->name()) :
+                    "void";
         if (s_typename.length() > w_typename)
             s_typename = s_typename.left(w_typename - 3) + "...";
 
@@ -1340,8 +1312,12 @@ int Shell::cmdListVars(QStringList args)
         if (s_name.length() > w_name)
             s_name = s_name.left(w_name - 3) + "...";
 
+        QString s_size = var->refType() ?
+                    QString::number(var->refType()->size()) :
+                    QString("n/a");
+
         _out
-            << qSetFieldWidth(w_id)  << right << hex << var->id()
+            << qSetFieldWidth(w_id)  << right << hex << (uint)var->id()
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(w_datatype) << left << s_datatype
             << qSetFieldWidth(w_colsep) << " "
@@ -1349,7 +1325,7 @@ int Shell::cmdListVars(QStringList args)
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(w_name) << s_name
             << qSetFieldWidth(w_colsep) << " "
-            << qSetFieldWidth(w_size)  << right << right << var->refType()->size()
+            << qSetFieldWidth(w_size)  << right << right << s_size
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(w_src) << left << s_src
             << qSetFieldWidth(w_colsep) << " "
@@ -1888,19 +1864,20 @@ int Shell::cmdShow(QStringList args)
     if (s.startsWith("0x"))
     	s = s.right(s.size() - 2);
     bool ok = false;
-    int id = s.toInt(&ok, 16);
+    int id = (int)s.toUInt(&ok, 16);
 
     const BaseType* bt = 0;
     const Variable * var = 0;
+    QList<IntEnumPair> enums;
 
     // Did we parse an ID?
     if (ok) {
     	// Try to find this ID in types and variables
     	if ( (bt = _sym.factory().findBaseTypeById(id)) ) {
-            _out << "Found type with ID 0x" << hex << id << dec;
+            _out << "Found type with ID 0x" << hex << (uint)id << dec;
     	}
     	else if ( (var = _sym.factory().findVarById(id)) ) {
-            _out << "Found variable with ID 0x" << hex << id << dec;
+            _out << "Found variable with ID 0x" << hex << (uint)id << dec;
     	}
     }
 
@@ -1910,7 +1887,8 @@ int Shell::cmdShow(QStringList args)
         s = expr.front();
     	QList<BaseType*> types = _sym.factory().typesByName().values(s);
     	QList<Variable*> vars = _sym.factory().varsByName().values(s);
-    	if (types.size() + vars.size() > 1) {
+        enums = _sym.factory().enumsByName().values(s);
+        if (types.size() + vars.size() > 1) {
     		_out << "The name \"" << s << "\" is ambiguous:" << endl << endl;
 
     		if (!types.isEmpty()) {
@@ -1923,7 +1901,14 @@ int Shell::cmdShow(QStringList args)
     		return 1;
     	}
 
-    	if (!types.isEmpty()) {
+        for (int i = 0; i < enums.size(); ++i) {
+            if (i > 0)
+                _out << endl;
+            _out << "Found enumerator with name " << s << ":" << endl;
+            cmdShowBaseType(enums[i].second);
+        }
+
+        if (!types.isEmpty()) {
             _out << "Found type with name " << s;
             bt = types.first();
     	}
@@ -1936,8 +1921,10 @@ int Shell::cmdShow(QStringList args)
 		}
     }
 
-    if (var)
+    if (var) {
+        _out << ":" << endl;
         return cmdShowVariable(var);
+    }
     else if (bt) {
         if (expr.size() > 1) {
             _out << ", showing " << expr.join(".") << ":" << endl;
@@ -1967,11 +1954,14 @@ int Shell::cmdShow(QStringList args)
                     return ecInvalidExpression;
                 }
             }
+            bt = bt->dereferencedBaseType(BaseType::trLexical);
         }
         else
             _out << ":" << endl;
         return cmdShowBaseType(bt);
     }
+    else if (!enums.isEmpty())
+        return 0;
 
 	// If we came here, we were not successful
 	_out << "No type or variable by name or ID \"" << s << "\" found." << endl;
@@ -1982,20 +1972,29 @@ int Shell::cmdShow(QStringList args)
 
 int Shell::cmdShowBaseType(const BaseType* t)
 {
-	_out << "  ID:             " << "0x" << hex << t->id() << dec << endl;
+	_out << "  ID:             " << "0x" << hex << (uint)t->id() << dec << endl;
 	_out << "  Name:           " << (t->prettyName().isEmpty() ? QString("(unnamed)") : t->prettyName()) << endl;
 	_out << "  Type:           " << realTypeToStr(t->type()) << endl;
 	_out << "  Size:           " << t->size() << endl;
+	_out << "  Hash:           " << "0x" << hex << t->hash() << dec << endl;
 
     const RefBaseType* r = dynamic_cast<const RefBaseType*>(t);
     if (r) {
-        QString id = r->refTypeId() == 0 ?
-                QString::number(r->refTypeId()) :
-                QString("0x%1").arg(r->refTypeId(), 0, 16);
-        _out << "  Ref. type ID:   " << id << endl;
+        _out << "  Ref. type ID:   " << "0x" << hex << (uint)r->refTypeId() << dec << endl;
         _out << "  Ref. type:      "
-            <<  (r->refType() ? r->refType()->prettyName() : QString("(unresolved)"))
+             <<  (r->refType() ? r->refType()->prettyName() :
+                                 QString(r->refTypeId() ? "(unresolved)" : "void"))
             << endl;
+        if (r->hasAltRefTypes()) {
+            _out << "  Alt. ref. type: ";
+            for (int i = 0; i < r->altRefTypeCount(); ++i) {
+                if (i > 0)
+                    _out << ", ";
+                const BaseType* t = r->altRefType(i);
+                _out << "0x" << hex << (uint)t->id() << dec << t->prettyName();
+            }
+            _out << endl;
+        }
     }
 
 	if (t->srcFile() >= 0 && _sym.factory().sources().contains(t->srcFile())) {
@@ -2006,6 +2005,10 @@ int Shell::cmdShowBaseType(const BaseType* t)
 	const Structured* s = dynamic_cast<const Structured*>(t);
 	if (s) {
 		_out << "  Members:        " << s->members().size() << endl;
+		// Find out required ID width for members
+		int id_width = 2;
+		for (uint i = t->id(); i > 0; i >>= 4)
+			id_width++;
 
 		for (int i = 0; i < s->members().size(); i++) {
 			StructuredMember* m = s->members().at(i);
@@ -2016,7 +2019,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 			QString pretty = rt ?
 						rt->prettyName() :
 						QString("(unresolved type, 0x%1)")
-							.arg(m->refTypeId(), 0, 16);
+							.arg((uint)m->refTypeId(), 0, 16);
 
 			if (m->altRefTypeCount() == 1)
 				pretty = "<" + pretty + ">";
@@ -2037,7 +2040,8 @@ int Shell::cmdShowBaseType(const BaseType* t)
                     << QString("0x%1").arg(m->offset(), 4, 16, QChar('0'))
                     << "  "
                     << qSetFieldWidth(20) << left << (m->name() + ": ")
-					<< qSetFieldWidth(0)
+                    << qSetFieldWidth(id_width) << left << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
+                    << qSetFieldWidth(0) << " "
 					<< pretty
 					<< endl;
 		}
@@ -2047,16 +2051,81 @@ int Shell::cmdShowBaseType(const BaseType* t)
 	if (e) {
         _out << "  Enumerators:    " << e->enumValues().size() << endl;
 
-        QList<Enum::EnumHash::key_type> keys = e->enumValues().keys();
+        QList<Enum::EnumHash::key_type> keys = e->enumValues().uniqueKeys();
         qSort(keys);
 
         for (int i = 0; i < keys.size(); i++) {
-            _out << "    "
-                    << qSetFieldWidth(30) << left << e->enumValues().value(keys[i])
-                    << qSetFieldWidth(0) << " = " << keys[i]
-                    << endl;
+            for (Enum::EnumHash::const_iterator it = e->enumValues().find(keys[i]);
+                 it != e->enumValues().end() && it.key() == keys[i]; ++it) {
+                _out << "    "
+                     << qSetFieldWidth(30) << left << it.value()
+                     << qSetFieldWidth(0) << " = " << it.key()
+                     << endl;
+            }
         }
 	}
+
+	const FuncPointer* fp = dynamic_cast<const FuncPointer*>(t);
+	if (fp) {
+		const Function* func = dynamic_cast<const Function*>(fp);
+		if (func) {
+			_out << "  Inlined:        " << func->inlined() << endl;
+			_out << "  PC low:         "
+				 << QString("0x%1")
+					.arg(func->pcLow(),
+						 _sym.memSpecs().sizeofUnsignedLong << 1,
+						 16,
+						 QChar('0'))
+				 << endl;
+			_out << "  PC high:        "
+				 << QString("0x%1")
+					.arg(func->pcHigh(),
+						 _sym.memSpecs().sizeofUnsignedLong << 1,
+						 16,
+						 QChar('0'))
+				 << endl;
+		}
+
+		_out << "  Parameters:     " << fp->params().size() << endl;
+
+		for (int i = 0; i < fp->params().size(); i++) {
+			FuncParam* param = fp->params().at(i);
+			const BaseType* rt = (param->altRefTypeCount() == 1) ?
+						param->altRefType() :
+						param->refType();
+
+			QString pretty = rt ?
+						rt->prettyName() :
+						QString("(unresolved type, 0x%1)")
+							.arg((uint)param->refTypeId(), 0, 16);
+
+			if (param->altRefTypeCount() == 1)
+				pretty = "<" + pretty + ">";
+			else if (param->altRefTypeCount() > 1) {
+				BaseType* tmp;
+				pretty += " <";
+				for (int j = 0; j < param->altRefTypeCount(); ++j) {
+					if (! (tmp = param->altRefType(j)))
+						continue;
+					if (j > 0)
+						pretty += ", ";
+					pretty += tmp->prettyName();
+				}
+				pretty += ">";
+			}
+
+			_out << "    "
+				 << (i + 1)
+					<< ". "
+					<< qSetFieldWidth(16) << left << (param->name() + ": ")
+					<< qSetFieldWidth(12)
+					<< QString("0x%1, ").arg((uint)param->refTypeId(), 0, 16)
+					<< qSetFieldWidth(0)
+					<< pretty
+					<< endl;
+		}
+	}
+
 
 	return ecOk;
 }
@@ -2066,9 +2135,26 @@ int Shell::cmdShowVariable(const Variable* v)
 {
 	assert(v != 0);
 
-	_out << "  ID:             " << "0x" << hex << v->id() << dec << endl;
+	_out << "  ID:             " << "0x" << hex << (uint)v->id() << dec << endl;
 	_out << "  Name:           " << v->name() << endl;
 	_out << "  Location:       " << "0x" << hex << v->offset() << dec << endl;
+
+    _out << "  Ref. type ID:   " << "0x" << hex << (uint)v->refTypeId() << dec << endl;
+    _out << "  Ref. type:      "
+         <<  (v->refType() ? v->refType()->prettyName() :
+                             QString(v->refTypeId() ? "(unresolved)" : "void"))
+         << endl;
+    if (v->hasAltRefTypes()) {
+        _out << "  Alt. ref. type: ";
+        for (int i = 0; i < v->altRefTypeCount(); ++i) {
+            if (i > 0)
+                _out << ", ";
+            const BaseType* t = v->altRefType(i);
+            _out << "0x" << hex << (uint)t->id() << dec << t->prettyName();
+        }
+        _out << endl;
+    }
+
 	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {
 		_out << "  Source file:    " << _sym.factory().sources().value(v->srcFile())->name()
 			<< ":" << v->srcLine() << endl;
