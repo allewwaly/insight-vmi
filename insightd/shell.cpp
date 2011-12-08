@@ -901,7 +901,7 @@ int Shell::cmdListSources(QStringList /*args*/)
 
 int Shell::cmdListTypes(QStringList args)
 {
-    const BaseTypeList& types = _sym.factory().types();
+    const BaseTypeList* types = &_sym.factory().types();
     CompileUnit* unit = 0;
 
     // Expect at most one parameter
@@ -910,13 +910,13 @@ int Shell::cmdListTypes(QStringList args)
         return 1;
     }
 
-    if (types.isEmpty()) {
+    if (types->isEmpty()) {
         _out << "There are no type references.\n";
         return ecOk;
     }
 
     // Find out required field width (the types are sorted by ascending ID)
-    const int w_id = getFieldWidth(types.last()->id());
+    const int w_id = getFieldWidth(types->last()->id());
     const int w_type = 12;
     const int w_name = 30;
     const int w_size = 5;
@@ -932,94 +932,99 @@ int Shell::cmdListTypes(QStringList args)
     		Qt::CaseSensitive, QRegExp::WildcardUnix);
 
     QString src, srcLine, name;
-    for (int i = 0; i < types.size(); i++) {
-        BaseType* type = types[i];
+    for (int round = 1; round <= 2; ++round) {
 
-        // Apply name filter, if requested
-        if (applyFilter && !rxFilter.exactMatch(type->name()))
-        	continue;
+        for (int i = 0; i < types->size(); i++) {
+            BaseType* type = types->at(i);
 
-        // Print header if not yet done
-        if (!headerPrinted) {
-    	    _out << qSetFieldWidth(w_id)  << right << "ID"
-    	         << qSetFieldWidth(w_colsep) << " "
-    	         << qSetFieldWidth(w_type) << left << "Type"
-    	         << qSetFieldWidth(w_name) << "Name"
-    	         << qSetFieldWidth(w_size)  << right << "Size"
-    	         << qSetFieldWidth(w_colsep) << " "
-    	         << qSetFieldWidth(w_src) << left << "Source"
-    	         << qSetFieldWidth(w_line) << right << "Line"
-    	         << qSetFieldWidth(0)  << endl;
+            // Apply name filter, if requested
+            if (applyFilter && !rxFilter.exactMatch(type->name()))
+                continue;
 
-    	    hline(w_total);
-    	    headerPrinted = true;
-       }
+            // Print header if not yet done
+            if (!headerPrinted) {
+                _out << qSetFieldWidth(w_id)  << right << "ID"
+                     << qSetFieldWidth(w_colsep) << " "
+                     << qSetFieldWidth(w_type) << left << "Type"
+                     << qSetFieldWidth(w_name) << "Name"
+                     << qSetFieldWidth(w_size)  << right << "Size"
+                     << qSetFieldWidth(w_colsep) << " "
+                     << qSetFieldWidth(w_src) << left << "Source"
+                     << qSetFieldWidth(w_line) << right << "Line"
+                     << qSetFieldWidth(0)  << endl;
 
-        // Construct name and line of the source file
-        if (type->srcFile() > 0) {
-            if (!unit || unit->id() != type->srcFile())
-                unit = _sym.factory().sources().value(type->srcFile());
-            if (!unit)
-                src = QString("(unknown id: %1)").arg(type->srcFile());
-            else
-                src = QString("%1").arg(unit->name());
-            if (src.size() > w_src)
-            	src = "..." + src.right(w_src - 3);
-        }
-        else
-            src = "--";
-
-        if (type->srcLine() > 0)
-            srcLine = QString::number(type->srcLine());
-        else
-            srcLine = "--";
-
-        // Get the pretty name
-        name = type->prettyName();
-        if (name.isEmpty())
-            name = "(none)";
-        // Shorten name, if necessary
-        else if (name.size() > w_name) {
-            if (type->type() & FunctionTypes) {
-                const FuncPointer* fp = dynamic_cast<FuncPointer*>(type);
-                if (!fp->refTypeId())
-                    name = "void";
-                else if (fp->refType())
-                    name = fp->refType()->prettyName();
-                else
-                    name = QString("(unresolved 0x%1)")
-                            .arg(fp->refTypeId(), 0, 16);
-                if (!fp->name().isEmpty())
-                    name += " " + fp->name();
-
-                QString params;
-                for (int i = 0; i < fp->params().size(); ++i) {
-                    if (i > 0)
-                        params += ", ";
-                    params += fp->params().at(i)->prettyName();
-                }
-
-                if (name.size() + params.size() + 2 <= w_name)
-                    name += "(" + params + ")";
-                else
-                    name += "(" + params.left(w_name - name.size() - 5) + "...)";
+                hline(w_total);
+                headerPrinted = true;
             }
 
-            if (name.size() > w_name)
-                name = name.left(w_name - 3) + "...";
+            // Construct name and line of the source file
+            if (type->srcFile() > 0) {
+                if (!unit || unit->id() != type->srcFile())
+                    unit = _sym.factory().sources().value(type->srcFile());
+                if (!unit)
+                    src = QString("(unknown id: %1)").arg(type->srcFile());
+                else
+                    src = QString("%1").arg(unit->name());
+                if (src.size() > w_src)
+                    src = "..." + src.right(w_src - 3);
+            }
+            else
+                src = "--";
+
+            if (type->srcLine() > 0)
+                srcLine = QString::number(type->srcLine());
+            else
+                srcLine = "--";
+
+            // Get the pretty name
+            name = type->prettyName();
+            if (name.isEmpty())
+                name = "(none)";
+            // Shorten name, if necessary
+            else if (name.size() > w_name) {
+                if (type->type() & FunctionTypes) {
+                    const FuncPointer* fp = dynamic_cast<FuncPointer*>(type);
+                    if (!fp->refTypeId())
+                        name = "void";
+                    else if (fp->refType())
+                        name = fp->refType()->prettyName();
+                    else
+                        name = QString("(unresolved 0x%1)")
+                                .arg(fp->refTypeId(), 0, 16);
+                    if (!fp->name().isEmpty())
+                        name += " " + fp->name();
+
+                    QString params;
+                    for (int i = 0; i < fp->params().size(); ++i) {
+                        if (i > 0)
+                            params += ", ";
+                        params += fp->params().at(i)->prettyName();
+                    }
+
+                    if (name.size() + params.size() + 2 <= w_name)
+                        name += "(" + params + ")";
+                    else
+                        name += "(" + params.left(w_name - name.size() - 5) + "...)";
+                }
+
+                if (name.size() > w_name)
+                    name = name.left(w_name - 3) + "...";
+            }
+
+            _out << qSetFieldWidth(w_id)  << right << hex << (uint) type->id()
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
+                 << qSetFieldWidth(w_name) << name
+                 << qSetFieldWidth(w_size) << right << dec << type->size()
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_src) << left << src
+                 << qSetFieldWidth(w_line) << right << srcLine
+                 << qSetFieldWidth(0) << endl;
+
+            ++typeCount;
         }
 
-        _out << qSetFieldWidth(w_id)  << right << hex << (uint) type->id()
-             << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
-             << qSetFieldWidth(w_name) << name
-             << qSetFieldWidth(w_size) << right << dec << type->size()
-             << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_src) << left << src
-             << qSetFieldWidth(w_line) << right << srcLine
-             << qSetFieldWidth(0) << endl;
-
-        ++typeCount;
+        types = &_sym.factory().artificialTypes();
     }
 
     if (headerPrinted) {
@@ -1035,7 +1040,7 @@ int Shell::cmdListTypes(QStringList args)
 
 bool cmpIdLessThan(const BaseType* t1, const BaseType* t2)
 {
-    return t1->id() < t2->id();
+    return ((uint)t1->id()) < ((uint)t2->id());
 }
 
 
@@ -1145,9 +1150,9 @@ int Shell::cmdListTypesById(QStringList /*args*/)
     for (int i = 0; i < ids.size(); i++) {
         BaseType* type = _sym.factory()._typesById.value(ids[i]);
         // Construct name and line of the source file
-        _out << qSetFieldWidth(w_id)  << right << hex << ids[i]
+        _out << qSetFieldWidth(w_id)  << right << hex << (uint)ids[i]
              << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_realId) << type->id()
+             << qSetFieldWidth(w_realId) << (uint)type->id()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
@@ -1195,7 +1200,7 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
     for (int i = 0; i < names.size(); i++) {
         BaseType* type = _sym.factory()._typesByName.value(names[i]);
         // Construct name and line of the source file
-        _out << qSetFieldWidth(w_id)  << right << hex << type->id()
+        _out << qSetFieldWidth(w_id)  << right << hex << (uint)type->id()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(w_name) << names[i]
@@ -1312,7 +1317,7 @@ int Shell::cmdListVars(QStringList args)
                     QString("n/a");
 
         _out
-            << qSetFieldWidth(w_id)  << right << hex << var->id()
+            << qSetFieldWidth(w_id)  << right << hex << (uint)var->id()
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(w_datatype) << left << s_datatype
             << qSetFieldWidth(w_colsep) << " "
@@ -2002,7 +2007,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 		_out << "  Members:        " << s->members().size() << endl;
 		// Find out required ID width for members
 		int id_width = 2;
-		for (int i = t->id(); i > 0; i >>= 4)
+		for (uint i = t->id(); i > 0; i >>= 4)
 			id_width++;
 
 		for (int i = 0; i < s->members().size(); i++) {
@@ -2145,7 +2150,7 @@ int Shell::cmdShowVariable(const Variable* v)
             if (i > 0)
                 _out << ", ";
             const BaseType* t = v->altRefType(i);
-            _out << "0x" << hex << t->id() << dec << t->prettyName();
+            _out << "0x" << hex << (uint)t->id() << dec << t->prettyName();
         }
         _out << endl;
     }

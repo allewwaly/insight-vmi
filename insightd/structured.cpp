@@ -146,8 +146,24 @@ void Structured::writeTo(QDataStream& out) const
     BaseType::writeTo(out);
 
     out << (qint32) _members.size();
+    int refTypeId;
     for (qint32 i = 0; i < _members.size(); i++) {
+        refTypeId = 0;
+        // Reset ID to original for members with artificial IDs
+        if (_factory &&
+                _factory->replacedMemberTypes().contains(_members[i]->id()))
+        {
+            refTypeId = _members[i]->refTypeId();
+            _members[i]->setRefTypeId(
+                        _factory->replacedMemberTypes().value(_members[i]->id()));
+        }
+
+        // Write out member
         out << *_members[i];
+
+        // Undo ID changes again
+        if (refTypeId)
+            _members[i]->setRefTypeId(refTypeId);
     }
 }
 

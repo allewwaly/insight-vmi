@@ -77,8 +77,18 @@ void SymFactory::clear()
 	}
 	_types.clear();
 
+	// Delete all aritifical types
+	for (BaseTypeList::iterator it = _artificialTypes.begin();
+		 it != _artificialTypes.end(); ++it)
+	{
+		delete *it;
+	}
+	_artificialTypes.clear();
+
 	// Clear all further hashes and lists
 	_typesById.clear();
+	_replacedMemberTypes.clear();
+	_artificialTypeIds.clear();
 	_equivalentTypes.clear();
 	_typesByName.clear();
 	_typesByHash.clear();
@@ -544,12 +554,17 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
 
     // Perform certain actions for new types
     if (isNewType(new_id, target)) {
-        _types.append(target);
-        if (target->hashIsValid())
-            _typesByHash.insertMulti(target->hash(), target);
-        else if (!forceInsert)
-            factoryError(QString("Hash for type 0x%1 is not valid!")
-                         .arg(target->id(), 0, 16));
+        if (target->id() < 0 && _artificialTypeIds.contains(target->id()))
+            // Don't add artificial types to _types or _typesByHash
+            _artificialTypes.append(target);
+        else {
+            _types.append(target);
+            if (target->hashIsValid())
+                _typesByHash.insertMulti(target->hash(), target);
+            else if (!forceInsert)
+                factoryError(QString("Hash for type 0x%1 is not valid!")
+                             .arg(target->id(), 0, 16));
+        }
         // Add this type into the name relation table
         if (!new_name.isEmpty())
             _typesByName.insertMulti(new_name, target);
@@ -662,7 +677,8 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
 
             // Check if this is dublicated type
             BaseType* t = findTypeByHash(rbt);
-            if (t) {
+            if (t && (rbt->id() > 0 || !_artificialTypeIds.contains(rbt->id())))
+            {
                 // Update type relations with equivalent type
                 updateTypeRelations(rbt->id(), rbt->name(), t);
 //                debugmsg(QString("\nDeleting      %2 (id 0x%3) @ 0x%4,\n"
@@ -973,7 +989,7 @@ void SymFactory::insertPostponed(ReferencingType* ref)
 
 void SymFactory::removePostponed(ReferencingType* ref)
 {
-    // Add this type into the waiting queue
+    // Remove this type from the waiting queue
     _postponedTypes.remove(ref->refTypeId(), ref);
 
     FuncPointer* fp = dynamic_cast<FuncPointer*>(ref);
@@ -1051,14 +1067,14 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
     prev->setRefTypeId(prevPtr->id());
     ret->addMember(prev);
 
+    // IDs have to be added to artificial types set before addSymbol()
+    _artificialTypeIds.insert(nextPtr->id());
+    _artificialTypeIds.insert(prevPtr->id());
+    _artificialTypeIds.insert(ret->id());
+
     addSymbol(nextPtr);
     addSymbol(prevPtr);
     addSymbol(ret);
-
-    insertUsedBy(nextPtr);
-    insertUsedBy(next);
-    insertUsedBy(prevPtr);
-    insertUsedBy(prev);
 
     return ret;
 }
@@ -1113,16 +1129,16 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     pprev->setRefTypeId(pprevPtr->id());
     ret->addMember(pprev);
 
+    // IDs have to be added to artificial types set before addSymbol()
+    _artificialTypeIds.insert(nextPtr->id());
+    _artificialTypeIds.insert(prevPtr->id());
+    _artificialTypeIds.insert(pprevPtr->id());
+    _artificialTypeIds.insert(ret->id());
+
     addSymbol(nextPtr);
     addSymbol(pprevPtr);
     addSymbol(prevPtr);
     addSymbol(ret);
-
-    insertUsedBy(nextPtr);
-    insertUsedBy(next);
-    insertUsedBy(prevPtr);
-    insertUsedBy(pprevPtr);
-    insertUsedBy(pprev);
 
     return ret;
 }
@@ -1215,6 +1231,10 @@ bool SymFactory::resolveReference(StructuredMember* member)
     BaseType* base = member->refType();
 
     if (base && member->refTypeId() > 0 && isStructListHead(base)) {
+        removePostponed(member);
+        // Save the original refTypeId
+        _replacedMemberTypes[member->id()] = member->refTypeId();
+        // Replace member's type with artificial type
         Struct* list_head = makeStructListHead(member);
         member->setRefTypeId(list_head->id());
         insertUsedBy(member);
@@ -1222,6 +1242,10 @@ bool SymFactory::resolveReference(StructuredMember* member)
         return true;
     }
     else if (base && member->refTypeId() > 0 && isStructHListNode(base)) {
+        removePostponed(member);
+        // Save the original refTypeId
+        _replacedMemberTypes[member->id()] = member->refTypeId();
+        // Replace member's type with artificial type
         Struct* hlist_node = makeStructHListNode(member);
         member->setRefTypeId(hlist_node->id());
         insertUsedBy(member);
@@ -1314,9 +1338,12 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
 
                 // Is this a dublicated type?
                 BaseType* other = findTypeByHash(refTypes[j]);
-                if (other) {
+                if (other && (refTypes[j]->id() > 0 ||
+                              !_artificialTypeIds.contains(refTypes[j]->id())))
+                {
                     replaceType(refTypes[j], other);
                     delete refTypes[j];
+                    _typeFoundByHash++;
                 }
                 else
                     _typesByHash.insertMulti(refTypes[j]->hash(), refTypes[j]);
@@ -1338,9 +1365,12 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
 
                 // Is this a dublicated type?
                 BaseType* other = findTypeByHash(fp);
-                if (other) {
+                if (other && (fp->id() > 0 ||
+                              !_artificialTypeIds.contains(fp->id())))
+                {
                     replaceType(fp, other);
                     delete fp;
+                    _typeFoundByHash++;
                 }
                 else
                     _typesByHash.insertMulti(fp->hash(), fp);
@@ -1481,9 +1511,9 @@ void SymFactory::symbolsFinished(RestoreType rt)
 
     shell->out() << qSetFieldWidth(10) << right;
 
-    shell->out() << "  | No. of types:              " << _types.size() << endl;
+    shell->out() << "  | No. of types:              " << (_types.size() + _artificialTypes.size()) << endl;
     shell->out() << "  | No. of types by name:      " << _typesByName.size() << endl;
-    shell->out() << "  | No. of types by ID:        " << _typesById.size() << endl;
+    shell->out() << "  | No. of types by ID:        " << (_typesById.size() + _artificialTypeIds.size()) << endl;
     shell->out() << "  | No. of types by hash:      " << _typesByHash.size() << endl;
 //    shell->out() << "  | Types found by hash:       " << _typeFoundByHash << endl;
     shell->out() << "  | No of \"struct list_head\":  " << _structListHeadCount << endl;
@@ -1525,7 +1555,8 @@ void SymFactory::symbolsFinished(RestoreType rt)
     assert(_typesById.size() >= _typesByHash.size());
     assert(_typesByHash.size() == _types.size());
     if (rt == rtParsing)
-        assert(_types.size() + _typeFoundByHash == _typesById.size());
+        assert(_types.size() + _artificialTypes.size() + _typeFoundByHash ==
+               _typesById.size());
 }
 
 
