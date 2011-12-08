@@ -46,6 +46,14 @@ public:
     virtual QString toString(QIODevice* mem, size_t offset) const;
 
     /**
+     * Create a hash of that type based on BaseType::hash() and refType()
+     * @param isValid indicates if the hash is valid, for example, if all
+     * referencing types could be resolved
+     * @return a hash value of this type
+     */
+    virtual uint hash(bool* isValid = 0) const;
+
+    /**
      * This returns the additional offset to consider when de-referencing this
      * pointer.
      * \sa setMacroOffset()
