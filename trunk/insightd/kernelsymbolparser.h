@@ -10,6 +10,7 @@
 
 #include "typeinfo.h"
 #include "longoperation.h"
+#include <QStack>
 
 // forward declarations
 class QIODevice;
@@ -28,6 +29,11 @@ public:
      * @param factory the SymFactory to use for symbol creation
      */
     KernelSymbolParser(QIODevice* from, SymFactory* factory);
+
+    /**
+     * Destructor
+     */
+    virtual ~KernelSymbolParser();
 
     /**
      * Starts the parsing process
@@ -53,11 +59,13 @@ private:
     SymFactory* _factory;
     quint64 _line;
     qint64 _bytesRead;
-    TypeInfo _info, _subInfo;  // Holds the main type and sub-type information
-    TypeInfo* _pInfo; // Points to the type that is acutally parsed: info or subInfo
+    QStack<TypeInfo*> _infos;
+    TypeInfo* _info;
+    TypeInfo* _parentInfo;
     HdrSymbolType _hdrSym;
     bool _isRelevant;
     int _curSrcID;
+    qint32 _nextId;
 };
 
 #endif /* KERNELSYMBOLPARSER_H_ */

@@ -21,6 +21,8 @@
 #include "variable.h"
 #include "shell.h"
 #include "debug.h"
+#include "function.h"
+#include "kernelsourcetypeevaluator.h"
 #include <string.h>
 #include <asttypeevaluator.h>
 #include <astnode.h>
@@ -34,7 +36,7 @@
 
 SymFactory::SymFactory(const MemSpecs& memSpecs)
 	: _memSpecs(memSpecs), _typeFoundByHash(0), _structListHeadCount(0),
-	  _structHListNodeCount(0), _maxTypeSize(0)
+	  _structHListNodeCount(0), _artificialTypeId(-1), _maxTypeSize(0)
 {
 }
 
@@ -61,29 +63,41 @@ void SymFactory::clear()
 	}
 	_vars.clear();
 
+	// Delete all external variables
+	for (VariableList::iterator it = _externalVars.begin();
+		 it != _externalVars.end(); ++it)
+	{
+		delete *it;
+	}
+	_externalVars.clear();
+
 	// Delete all types
 	for (BaseTypeList::iterator it = _types.begin(); it != _types.end(); ++it) {
 		delete *it;
 	}
 	_types.clear();
 
-    // Delete all custom types
-    for (BaseTypeList::iterator it = _customTypes.begin();
-            it != _customTypes.end(); ++it)
-    {
-        delete *it;
-    }
-	_customTypes.clear();
+	// Delete all aritifical types
+	for (BaseTypeList::iterator it = _artificialTypes.begin();
+		 it != _artificialTypes.end(); ++it)
+	{
+		delete *it;
+	}
+	_artificialTypes.clear();
 
 	// Clear all further hashes and lists
 	_typesById.clear();
+	_replacedMemberTypes.clear();
+	_artificialTypeIds.clear();
 	_equivalentTypes.clear();
 	_typesByName.clear();
 	_typesByHash.clear();
+	_enumsByName.clear();
 	_postponedTypes.clear();
 	_usedByRefTypes.clear();
 	_usedByVars.clear();
 	_usedByStructMembers.clear();
+	_usedByFuncParams.clear();
 	_zeroSizeStructs.clear();
 	_varsByName.clear();
 	_varsById.clear();
@@ -95,8 +109,10 @@ void SymFactory::clear()
 	_maxTypeSize = 0;
 	_uniqeTypesChanged = 0;
 	_totalTypesChanged = 0;
-	_typesReplaced = 0;
+	_varTypeChanges = 0;
+	_typesCopied = 0;
 	_conflictingTypeChanges = 0;
+	_artificialTypeId = -1;
 }
 
 
@@ -195,6 +211,10 @@ BaseType* SymFactory::createEmptyType(RealType type)
 
     case rtFuncPointer:
         t = new FuncPointer(this);
+        break;
+
+    case rtFunction:
+        t = new Function(this);
         break;
 
     default:
@@ -348,8 +368,15 @@ BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 Variable* SymFactory::getVarInstance(const TypeInfo& info)
 {
 	Variable* var = new Variable(this, info);
-	insert(var);
-	return var;
+	// Do not add external declarations to the global lists
+	if (info.location() <= 0 && info.external()) {
+		_externalVars.append(var);
+		return 0;
+	}
+	else {
+		insert(var);
+		return var;
+	}
 }
 
 
@@ -411,8 +438,7 @@ bool SymFactory::isStructListHead(const BaseType* type) const
     // Check the members
     const StructuredMember* next = s->members().at(0);
     const StructuredMember* prev = s->members().at(1);
-    return s->id() == siListHead ||
-           (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
+    return (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
             next->name() == "next" &&
             (!next->refType() ||
              next->refType()->type() == rtPointer) &&
@@ -436,8 +462,7 @@ bool SymFactory::isStructHListNode(const BaseType* type) const
     // Check the members
     const StructuredMember* next = s->members().at(0);
     const StructuredMember* prev = s->members().at(1);
-    return s->id() == siHListNode ||
-           (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
+    return (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
             next->name() == "next" &&
             (!next->refType() ||
              next->refType()->type() == rtPointer) &&
@@ -482,17 +507,23 @@ QList<int> SymFactory::equivalentTypes(int id) const
 }
 
 
-QList<RefBaseType*> SymFactory::typesUsingId(int id) const
+QList<BaseType*> SymFactory::typesUsingId(int id) const
 {
     QList<int> typeIds = equivalentTypes(id);
-    QList<RefBaseType*> ret;
-
     if (typeIds.isEmpty())
-        ret = _usedByRefTypes.values(id);
-    else {
-        for (int i = 0; i < typeIds.size(); ++i)
-            ret += _usedByRefTypes.values(typeIds[i]);
+        typeIds += id;
+    QList<BaseType*> ret;
+
+    for (int i = 0; i < typeIds.size(); ++i) {
+        for (RefBaseTypeMultiHash::const_iterator it = _usedByRefTypes.find(typeIds[i]);
+             it != _usedByRefTypes.end() && it.key() == typeIds[i]; ++i)
+            ret += it.value();
+
+        for (StructMemberMultiHash::const_iterator it = _usedByStructMembers.find(typeIds[i]);
+             it != _usedByStructMembers.end() && it.key() == typeIds[i]; ++it)
+            ret += it.value()->belongsTo();
     }
+
     return ret;
 }
 
@@ -512,7 +543,7 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
 
     if (!target->hashIsValid() && !forceInsert) {
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(target);
-        _postponedTypes.insertMulti(rbt->refTypeId(), rbt);
+        insertPostponed(rbt);
         return;
     }
 
@@ -523,46 +554,74 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
 
     // Perform certain actions for new types
     if (isNewType(new_id, target)) {
-        _types.append(target);
-        if (target->hashIsValid())
-            _typesByHash.insertMulti(target->hash(), target);
+        if (target->id() < 0 && _artificialTypeIds.contains(target->id()))
+            // Don't add artificial types to _types or _typesByHash
+            _artificialTypes.append(target);
+        else {
+            _types.append(target);
+            if (target->hashIsValid())
+                _typesByHash.insertMulti(target->hash(), target);
+            else if (!forceInsert)
+                factoryError(QString("Hash for type 0x%1 is not valid!")
+                             .arg(target->id(), 0, 16));
+        }
         // Add this type into the name relation table
         if (!new_name.isEmpty())
             _typesByName.insertMulti(new_name, target);
-        // Add referencing types into the used-by hash tables
+
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(target);
-        if (rbt)
+        Enum* en = 0;
+        // Add referencing types into the used-by hash tables
+        if (rbt) {
             insertUsedBy(rbt);
+            // Also add function (type) parameters
+            if (rbt->type() & FunctionTypes) {
+                FuncPointer* fp = dynamic_cast<FuncPointer*>(rbt);
+                for (int i = 0; i < fp->params().size(); ++i)
+                    insertUsedBy(fp->params().at(i));
+            }
+        }
+        // Add enumeration values into name-indexed hash
+        else if ( (en = dynamic_cast<Enum*>(target)) ) {
+            for (Enum::EnumHash::const_iterator it = en->enumValues().begin();
+                 it != en->enumValues().end(); ++it)
+            {
+//                if (_enumsByName.contains(it.value())) {
+//                    debugerr("Multiple enumerators with the same name:");
+//                    for (EnumStringHash::const_iterator eit =
+//                         _enumsByName.find(it.value());
+//                         eit != _enumsByName.end() && eit.key() == it.value();
+//                         ++eit)
+//                        debugerr(QString("type 0x%1: %2 = %3")
+//                                 .arg(eit.value().second->id(), 0, 16)
+//                                 .arg(eit.key())
+//                                 .arg(eit.value().first));
+//                    debugerr(QString("type 0x%1: %2 = %3")
+//                             .arg(en->id(), 0, 16)
+//                             .arg(it.value())
+//                             .arg(it.key()));
+//                }
+                _enumsByName.insertMulti(it.value(), IntEnumPair(it.key(), en));
+            }
+        }
     }
 
     // See if we have types with missing references to the given type
     if (checkPostponed && _postponedTypes.contains(new_id)) {
-        QList<ReferencingType*> list = _postponedTypes.values(new_id);
-
-        int changes = 0;
-
-        QList<ReferencingType*>::iterator it = list.begin();
-        while (it != list.end())
+        RefTypeMultiHash::iterator it = _postponedTypes.find(new_id);
+        int pt_size = _postponedTypes.size();
+        while (it != _postponedTypes.end() && it.key() == new_id)
         {
-            if (postponedTypeResolved(*it, true))
-                ++changes;
-            ++it;
+            postponedTypeResolved(*it, true);
+            // More types might have been changed, iterator might not be
+            // valid anymore, so start over
+            if (pt_size != _postponedTypes.size()) {
+                it = _postponedTypes.find(new_id);
+                pt_size = _postponedTypes.size();
+            }
+            else
+                ++it;
         }
-
-//        // As long as we still can resolve new types, go through whole list
-//        // again and again. This will resolve all chained types.
-//        while (changes) {
-//            changes = 0;
-//            RefTypeMultiHash::iterator it = _postponedTypes.begin();
-//            while (it != _postponedTypes.end()) {
-//                if (postponedTypeResolved(*it, false)) {
-//                    ++changes;
-//                    it = _postponedTypes.erase(it);
-//                }
-//                else
-//                    ++it;
-//            }
-//        }
     }
 }
 
@@ -596,7 +655,7 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
         if (resolveReference(m)) {
             // Delete the entry from the hash
             if (removeFromPostponedTypes)
-                _postponedTypes.remove(rt->refTypeId(), rt);
+                removePostponed(rt);
         }
         else
             return false;
@@ -605,7 +664,8 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
     else if (v && v->refType()) {
         // Delete the entry from the hash
         if (removeFromPostponedTypes)
-            _postponedTypes.remove(rt->refTypeId(), rt);
+            removePostponed(rt);
+        return true;
     }
     else {
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(rt);
@@ -613,13 +673,21 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
         if (rbt && rbt->hashIsValid()) {
             // Delete the entry from the hash
             if (removeFromPostponedTypes)
-                _postponedTypes.remove(rt->refTypeId(), rt);
+                removePostponed(rt);
 
             // Check if this is dublicated type
             BaseType* t = findTypeByHash(rbt);
-            if (t) {
+            if (t && (rbt->id() > 0 || !_artificialTypeIds.contains(rbt->id())))
+            {
                 // Update type relations with equivalent type
                 updateTypeRelations(rbt->id(), rbt->name(), t);
+//                debugmsg(QString("\nDeleting      %2 (id 0x%3) @ 0x%4,\n"
+//                                 "other type is %5 (id 0x%6)")
+//                         .arg(rbt->prettyName())
+//                         .arg(rbt->id(), 0, 16)
+//                         .arg((quint64)rbt, 0, 16)
+//                         .arg(t->prettyName())
+//                         .arg(t->id(), 0, 16));
                 delete rbt;
             }
             else
@@ -656,33 +724,32 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 {
 	switch (info.symType()) {
 	case hsArrayType:
-		return info.id() != 0 && info.refTypeId() != 0 /*&& info.upperBound() != -1*/;
+		return info.id() != 0 && info.refTypeId() != 0;
 	case hsBaseType:
 		return info.id() != 0 && info.byteSize() > 0 && info.enc() != eUndef;
 	case hsCompileUnit:
 		return info.id() != 0 && !info.name().isEmpty() && !info.srcDir().isEmpty();
 	case hsConstType:
-		return info.id() != 0 /*&& info.refTypeId() != 0*/;
+		return info.id() != 0;
 	case hsEnumerationType:
-		// TODO: Check if this is correct
-		// It seems like it is possible to have an enum without any enumvalues.
-		// return info.id() != 0 && !info.enumValues().isEmpty();
 		return info.id() != 0;
 	case hsSubroutineType:
 		return info.id() != 0;
+	case hsSubprogram:
+		return info.id() != 0 && !info.name().isEmpty();
 	case hsMember:
-		return info.id() != 0 && info.refTypeId() != 0 /*&& info.dataMemberLocation() != -1*/; // location not required
+		return info.id() != 0 && info.refTypeId() != 0;
 	case hsPointerType:
 		return info.id() != 0 && info.byteSize() > 0;
-	case hsUnionType:
 	case hsStructureType:
-		return info.id() != 0 /*&& info.byteSize() > 0*/; // name not required
+	case hsUnionType:
+		return info.id() != 0;
 	case hsTypedef:
 		return info.id() != 0 && info.refTypeId() != 0 && !info.name().isEmpty();
 	case hsVariable:
-		return info.id() != 0 /*&& info.refTypeId() != 0*/ && info.location() > 0 /*&& !info.name().isEmpty()*/;
+		return info.id() != 0 && (info.location() > 0 || info.external());
 	case hsVolatileType:
-		return info.id() != 0 /*&& info.refTypeId() != 0*/;
+		return info.id() != 0;
 	default:
 		return false;
 	}
@@ -730,6 +797,10 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	case hsSubroutineType: {
 	    getTypeInstance<FuncPointer>(info);
 	    break;
+	}
+	case hsSubprogram: {
+		getTypeInstance<Function>(info);
+		break;
 	}
 	case hsTypedef: {
         ref = getTypeInstance<Typedef>(info);
@@ -807,7 +878,7 @@ void SymFactory::addSymbol(BaseType* type)
 
 BaseType* SymFactory::getNumericInstance(const ASTType* astType)
 {
-    if (! (astType->type() & ((~rtEnum) & IntegerTypes)) ) {
+    if (! (astType->type() & ((~rtEnum) & NumericTypes)) ) {
         factoryError("Expected a numeric type, but given type is " +
                      realTypeToStr(astType->type()));
     }
@@ -887,6 +958,51 @@ BaseType* SymFactory::getNumericInstance(const ASTType* astType)
 }
 
 
+void SymFactory::insertPostponed(ReferencingType* ref)
+{
+    // Add this type into the waiting queue
+    if (!_postponedTypes.contains(ref->refTypeId(), ref)) {
+        FuncPointer* fp = dynamic_cast<FuncPointer*>(ref);
+        // Do not add types waiting for "void"
+        if (ref->refTypeId())
+            _postponedTypes.insertMulti(ref->refTypeId(), ref);
+        // Only function (pointers) may refer to "void" and be added here
+        else
+            assert(fp != 0);
+
+        if (fp) {
+            // For FuncPointer types, add this type to the list for every
+            // missing parameter as well
+            for (int i = 0; i < fp->params().size(); ++i) {
+                FuncParam* param = fp->params().at(i);
+                if (param->refTypeId() && !param->refType() &&
+                    !_postponedTypes.contains(param->refTypeId(), ref))
+                {
+                    _postponedTypes.insertMulti(param->refTypeId(), ref);
+                }
+            }
+        }
+
+    }
+}
+
+
+void SymFactory::removePostponed(ReferencingType* ref)
+{
+    // Remove this type from the waiting queue
+    _postponedTypes.remove(ref->refTypeId(), ref);
+
+    FuncPointer* fp = dynamic_cast<FuncPointer*>(ref);
+    if (fp) {
+        // For FuncPointer types, remove this type from everywhere
+        for (int i = 0; i < fp->params().size(); ++i) {
+            FuncParam* param = fp->params().at(i);
+            _postponedTypes.remove(param->refTypeId(), ref);
+        }
+    }
+}
+
+
 bool SymFactory::resolveReference(ReferencingType* ref)
 {
     assert(ref != 0);
@@ -894,8 +1010,7 @@ bool SymFactory::resolveReference(ReferencingType* ref)
     // Don't resolve already resolved types
     if (ref->refTypeId() != 0 && !ref->refType()) {
         // Add this type into the waiting queue
-        if (!_postponedTypes.contains(ref->refTypeId(), ref))
-            _postponedTypes.insertMulti(ref->refTypeId(), ref);
+        insertPostponed(ref);
         return false;
     }
     else {
@@ -909,14 +1024,12 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
 {
     assert(member != 0);
 
+    Structured* parent = member->belongsTo();
     // Create a new struct a special ID. This way, the type will be recognized
     // as "struct list_head" when the symbols are stored and loaded again.
     Struct* ret = new Struct(this);
-    _customTypes.append(ret);
-    Structured* parent = member->belongsTo();
-
+    ret->setId(getUniqueTypeId());
     ret->setName("list_head");
-    ret->setId(siListHead);
     ret->setSize(2 * _memSpecs.sizeofUnsignedLong);
 
     // Which macro offset should be used? In the kernel, the "childen" list_head
@@ -931,29 +1044,37 @@ Struct* SymFactory::makeStructListHead(StructuredMember* member)
 
     // Create "next" pointer
     Pointer* nextPtr = new Pointer(this);
-    _customTypes.append(nextPtr);
-    nextPtr->setId(0);
+    nextPtr->setId(getUniqueTypeId());
     nextPtr->setRefTypeId(parent->id());
     nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
     // To dereference this pointer, the member's offset has to be subtracted
     nextPtr->setMacroExtraOffset(extraOffset);
 
     StructuredMember* next = new StructuredMember(this); // deleted by ~Structured()
-    next->setId(0);
+    next->setId(getUniqueTypeId());
     next->setName("next");
     next->setOffset(0);
     next->setRefTypeId(nextPtr->id());
     ret->addMember(next);
 
-    //Create "prev" pointer
+    // Create "prev" pointer
     Pointer* prevPtr = new Pointer(*nextPtr);
-    _customTypes.append(prevPtr);
+    prevPtr->setId(getUniqueTypeId());
     StructuredMember* prev = new StructuredMember(this); // deleted by ~Structured()
-    prev->setId(0);
+    prev->setId(getUniqueTypeId());
     prev->setName("prev");
     prev->setOffset(_memSpecs.sizeofUnsignedLong);
     prev->setRefTypeId(prevPtr->id());
     ret->addMember(prev);
+
+    // IDs have to be added to artificial types set before addSymbol()
+    _artificialTypeIds.insert(nextPtr->id());
+    _artificialTypeIds.insert(prevPtr->id());
+    _artificialTypeIds.insert(ret->id());
+
+    addSymbol(nextPtr);
+    addSymbol(prevPtr);
+    addSymbol(ret);
 
     return ret;
 }
@@ -966,19 +1087,18 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     // Create a new struct a special ID. This way, the type will be recognized
     // as "struct list_head" when the symbols are stored and loaded again.
     Struct* ret = new Struct(this);
-    _customTypes.append(ret);
+    ret->setId(getUniqueTypeId());
+
     Structured* parent = member->belongsTo();
 
     ret->setName("hlist_node");
-    ret->setId(siHListNode);
     ret->setSize(2 * _memSpecs.sizeofUnsignedLong);
 
     int extraOffset = -member->offset();
 
     // Create "next" pointer
     Pointer* nextPtr = new Pointer(this);
-    _customTypes.append(nextPtr);
-    nextPtr->setId(0);
+    nextPtr->setId(getUniqueTypeId());
     nextPtr->setRefTypeId(parent->id());
     nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
     insertUsedBy(nextPtr);
@@ -986,45 +1106,91 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
     nextPtr->setMacroExtraOffset(extraOffset);
 
     StructuredMember* next = new StructuredMember(this); // deleted by ~Structured()
-    next->setId(0);
+    next->setId(getUniqueTypeId());
     next->setName("next");
     next->setOffset(0);
     next->setRefTypeId(nextPtr->id());
-    insertUsedBy(next);
     ret->addMember(next);
 
     // Create "prev" pointer from the next pointer
     Pointer* prevPtr = new Pointer(*nextPtr);
-    _customTypes.append(prevPtr);
+    prevPtr->setId(getUniqueTypeId());
 
     // Create the "pprev" pointer which points to the "prev" pointer
     Pointer* pprevPtr = new Pointer(this);
-    _customTypes.append(pprevPtr);
-    pprevPtr->setId(0);
+    pprevPtr->setId(getUniqueTypeId());
     pprevPtr->setSize(_memSpecs.sizeofUnsignedLong);
-    insertUsedBy(pprevPtr);
+    pprevPtr->setRefTypeId(prevPtr->id());
 
     StructuredMember* pprev = new StructuredMember(this); // deleted by ~Structured()
-    pprev->setId(0);
+    pprev->setId(getUniqueTypeId());
     pprev->setName("pprev");
     pprev->setOffset(_memSpecs.sizeofUnsignedLong);
     pprev->setRefTypeId(pprevPtr->id());
-    insertUsedBy(pprev);
     ret->addMember(pprev);
+
+    // IDs have to be added to artificial types set before addSymbol()
+    _artificialTypeIds.insert(nextPtr->id());
+    _artificialTypeIds.insert(prevPtr->id());
+    _artificialTypeIds.insert(pprevPtr->id());
+    _artificialTypeIds.insert(ret->id());
+
+    addSymbol(nextPtr);
+    addSymbol(pprevPtr);
+    addSymbol(prevPtr);
+    addSymbol(ret);
 
     return ret;
 }
 
 
-Structured* SymFactory::makeStructCopy(Structured* source)
+BaseType* SymFactory::makeDeepTypeCopy(BaseType* source)
 {
     if (!source)
         return 0;
 
-    Structured* dest = (source->type() == rtStruct) ?
-                (Structured*)new Struct(this) :
-                (Structured*)new Union(this);
-    _customTypes.append(dest);
+    BaseType* dest;
+    switch (source->type()) {
+    case rtArray:
+        dest = new Array(this);
+        break;
+
+    case rtPointer:
+        dest = new Pointer(this);
+        break;
+
+    case rtStruct:
+        dest = new Struct(this);
+        break;
+
+    case rtUnion:
+        dest = new Union(this);
+        break;
+
+    case rtConst:
+        dest = new ConstType(this);
+        break;
+
+    case rtVolatile:
+        dest = new VolatileType(this);
+        break;
+
+    case rtTypedef:
+        dest = new Typedef(this);
+        break;
+
+    case rtFuncPointer:
+        dest = new FuncPointer(this);
+        break;
+
+    case rtFunction:
+        dest = new Function(this);
+        break;
+
+    default:
+        factoryError("Don't know how to copy type "
+                     + realTypeToStr(source->type()));
+    }
 
     // Use the symbol r/w mechanism to create the copy
     QByteArray ba;
@@ -1035,7 +1201,21 @@ Structured* SymFactory::makeStructCopy(Structured* source)
     dest->readFrom(data);
 
     // Set the special ID
-    dest->setId(siCopy);
+    dest->setId(getUniqueTypeId());
+
+    // Recurse for referencing types
+    RefBaseType *rbt;
+    if ( (rbt = dynamic_cast<RefBaseType*>(dest)) ) {
+        // We create copies of all referencing types and structs/unions
+        BaseType* t = rbt->refType();
+        if (t && t->type() & ReferencingTypes) {
+            t = makeDeepTypeCopy(t);
+            rbt->setRefTypeId(t->id());
+        }
+    }
+
+    addSymbol(dest);
+
     return dest;
 }
 
@@ -1044,23 +1224,28 @@ bool SymFactory::resolveReference(StructuredMember* member)
 {
     assert(member != 0);
 
-    // Don't resolve already resolved types
-    if (member->refType())
-        return true;
     // Don't try to resolve types without valid ID
-    else if (member->refTypeId() == 0)
+    if (member->refTypeId() == 0)
         return false;
 
     BaseType* base = member->refType();
 
-    if (member->refTypeId() == siListHead || isStructListHead(base)) {
+    if (base && member->refTypeId() > 0 && isStructListHead(base)) {
+        removePostponed(member);
+        // Save the original refTypeId
+        _replacedMemberTypes[member->id()] = member->refTypeId();
+        // Replace member's type with artificial type
         Struct* list_head = makeStructListHead(member);
         member->setRefTypeId(list_head->id());
         insertUsedBy(member);
         _structListHeadCount++;
         return true;
     }
-    else if (member->refTypeId() == siHListNode || isStructHListNode(base)) {
+    else if (base && member->refTypeId() > 0 && isStructHListNode(base)) {
+        removePostponed(member);
+        // Save the original refTypeId
+        _replacedMemberTypes[member->id()] = member->refTypeId();
+        // Replace member's type with artificial type
         Struct* hlist_node = makeStructHListNode(member);
         member->setRefTypeId(hlist_node->id());
         insertUsedBy(member);
@@ -1089,25 +1274,30 @@ bool SymFactory::resolveReferences(Structured* s)
     return ret;
 }
 
+
 void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
 {
     assert(oldType != 0);
 
     if (!oldType->name().isEmpty())
         _typesByName.remove(oldType->name(), oldType);
-    if (_typesById.contains(oldType->id())) {
-        _equivalentTypes.remove(_typesById[oldType->id()]->id(), oldType->id());
-//        _typesById.remove(oldType->id());
-    }
     if (oldType->hashIsValid())
         _typesByHash.remove(oldType->hash(), oldType);
 
     RefBaseType* rbt = dynamic_cast<RefBaseType*>(oldType);
     if (rbt) {
         if (rbt->refTypeId() && !rbt->refType())
-            _postponedTypes.remove(rbt->refTypeId(), (ReferencingType*)rbt);
-        if (rbt->refTypeId())
-            _usedByRefTypes.remove(rbt->refTypeId(), rbt);
+            removePostponed(rbt);
+        _usedByRefTypes.remove(rbt->refTypeId(), rbt);
+
+        FuncPointer* fp = dynamic_cast<FuncPointer*>(rbt);
+        if (fp) {
+            for (int i = 0; i < fp->params().size(); ++i) {
+                FuncParam* param = fp->params().at(i);
+                if (param->refTypeId())
+                    _usedByFuncParams.remove(param->refTypeId(), param);
+            }
+        }
     }
 
     Structured* s = dynamic_cast<Structured*>(oldType);
@@ -1122,22 +1312,24 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
     }
 
     _types.removeAll(oldType);
-    _customTypes.removeAll(oldType);
-
-    _equivalentTypes.insertMulti(_typesById[newType->id()]->id(), oldType->id());
 
     // Update all old equivalent types as well
     QList<int> equiv = equivalentTypes(oldType->id());
     equiv += oldType->id();
+    _equivalentTypes.remove(oldType->id());
     for (int i = 0; i < equiv.size(); ++i) {
-        assert(_typesById.value(equiv[i]) == oldType);
+//        assert(_typesById.value(equiv[i]) == oldType);
         // Save the hashes of all types referencing the old type
         QList<RefBaseType*> refTypes = _usedByRefTypes.values(equiv[i]);
         QList<uint> refTypeHashes;
         for (int j = 0; j < refTypes.size(); ++j)
             refTypeHashes += refTypes[j]->hash();
+
         // Apply the change
         _typesById[equiv[i]] = newType;
+        if (!_equivalentTypes.contains(newType->id(), equiv[i]))
+            _equivalentTypes.insertMulti(newType->id(), equiv[i]);
+
         // Re-hash all referencing types
         for (int j = 0; j < refTypes.size(); ++j) {
             refTypes[j]->rehash();
@@ -1146,12 +1338,49 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
 
                 // Is this a dublicated type?
                 BaseType* other = findTypeByHash(refTypes[j]);
-                if (other) {
+                if (other && (refTypes[j]->id() > 0 ||
+                              !_artificialTypeIds.contains(refTypes[j]->id())))
+                {
                     replaceType(refTypes[j], other);
                     delete refTypes[j];
+                    _typeFoundByHash++;
                 }
                 else
                     _typesByHash.insertMulti(refTypes[j]->hash(), refTypes[j]);
+            }
+        }
+
+        // Handle all function parameters referencing this type
+        int params_size = _usedByFuncParams.size();
+        FuncParamMultiHash::iterator it = _usedByFuncParams.find(equiv[i]);
+        while (it != _usedByFuncParams.end() && it.key() == equiv[i]) {
+            FuncParam* param = it.value();
+            FuncPointer* fp = it.value()->belongsTo();
+            uint old_hash = fp->hash();
+            if (param->refType())
+                param->refType()->rehash();
+            fp->rehash();
+            if (old_hash != fp->hash()) {
+                _typesByHash.remove(old_hash, fp);
+
+                // Is this a dublicated type?
+                BaseType* other = findTypeByHash(fp);
+                if (other && (fp->id() > 0 ||
+                              !_artificialTypeIds.contains(fp->id())))
+                {
+                    replaceType(fp, other);
+                    delete fp;
+                    _typeFoundByHash++;
+                }
+                else
+                    _typesByHash.insertMulti(fp->hash(), fp);
+            }
+            // Iterator might be invalid now
+            if (params_size == _usedByFuncParams.size())
+                ++it;
+            else {
+                it = _usedByFuncParams.find(equiv[i]);
+                params_size = _usedByFuncParams.size();
             }
         }
     }
@@ -1207,6 +1436,32 @@ inline bool idLessThan(const BaseType* t1, const BaseType* t2)
 }
 
 
+void SymFactory::insertNewExternalVars()
+{
+    for (int i = 0; i < _externalVars.size(); ++i) {
+        Variable* v = _externalVars[i];
+        bool found = false;
+        if (!v->name().isEmpty()) {
+            VariableStringHash::const_iterator it = _varsByName.find(v->name());
+            for (; it != _varsByName.end() && it.key() == v->name(); ++it) {
+                Variable* other = it.value();
+                if (v->refType() && other->refType() &&
+                    *v->refType() == *other->refType())
+                {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (found)
+            delete v;
+        else
+            insert(v);
+    }
+    _externalVars.clear();
+}
+
+
 void SymFactory::symbolsFinished(RestoreType rt)
 {
     // Replace all zero-sized structs
@@ -1220,9 +1475,15 @@ void SymFactory::symbolsFinished(RestoreType rt)
         changes = 0;
         RefTypeMultiHash::iterator it = _postponedTypes.begin();
         while (it != _postponedTypes.end()) {
-            if (postponedTypeResolved(*it, false)) {
+            int pt_size = _postponedTypes.size();
+            if (postponedTypeResolved(*it, true)) {
                 ++changes;
-                it = _postponedTypes.erase(it);
+            }
+
+            // Iterator might not be valid anymore, start over again
+            if (pt_size != _postponedTypes.size()) {
+                it = _postponedTypes.begin();
+                pt_size = _postponedTypes.size();
             }
             else
                 ++it;
@@ -1239,6 +1500,10 @@ void SymFactory::symbolsFinished(RestoreType rt)
         ++it;
     }
 
+    // Add all external variable declarations for which we don't have a
+    // definition
+    insertNewExternalVars();
+
     // Sort the types by ID
     qSort(_types.begin(), _types.end(), idLessThan);
 
@@ -1246,9 +1511,9 @@ void SymFactory::symbolsFinished(RestoreType rt)
 
     shell->out() << qSetFieldWidth(10) << right;
 
-    shell->out() << "  | No. of types:              " << _types.size() << endl;
+    shell->out() << "  | No. of types:              " << (_types.size() + _artificialTypes.size()) << endl;
     shell->out() << "  | No. of types by name:      " << _typesByName.size() << endl;
-    shell->out() << "  | No. of types by ID:        " << _typesById.size() << endl;
+    shell->out() << "  | No. of types by ID:        " << (_typesById.size() + _artificialTypeIds.size()) << endl;
     shell->out() << "  | No. of types by hash:      " << _typesByHash.size() << endl;
 //    shell->out() << "  | Types found by hash:       " << _typeFoundByHash << endl;
     shell->out() << "  | No of \"struct list_head\":  " << _structListHeadCount << endl;
@@ -1290,7 +1555,8 @@ void SymFactory::symbolsFinished(RestoreType rt)
     assert(_typesById.size() >= _typesByHash.size());
     assert(_typesByHash.size() == _types.size());
     if (rt == rtParsing)
-        assert(_types.size() + _typeFoundByHash == _typesById.size());
+        assert(_types.size() + _artificialTypes.size() + _typeFoundByHash ==
+               _typesById.size());
 }
 
 
@@ -1298,10 +1564,11 @@ void SymFactory::sourceParcingFinished()
 {
     shell->out() << "Statistics:" << endl;
     shell->out() << qSetFieldWidth(10) << right;
-    shell->out() << "  | Unique type changes:   " << _uniqeTypesChanged << endl;
-    shell->out() << "  | Replaced type changes: " << _typesReplaced << endl;
-    shell->out() << "  | Total type changes:    " << _totalTypesChanged << endl;
-    shell->out() << "  | Type conflicts:        " << _conflictingTypeChanges << endl;
+    shell->out() << "  | Unique type changes:        " << _uniqeTypesChanged << endl;
+    shell->out() << "  | Type changes of variables:  " << _varTypeChanges << endl;
+    shell->out() << "  | Types copied:               " << _typesCopied << endl;
+    shell->out() << "  | Total type changes:         " << _totalTypesChanged << endl;
+    shell->out() << "  | Type conflicts:             " << _conflictingTypeChanges << endl;
     shell->out() << "  `-------------------------------------------" << endl;
     shell->out() << qSetFieldWidth(0) << left;
 }
@@ -1357,7 +1624,7 @@ QString SymFactory::postponedTypesStats() const
             else if (v)
                 ret += QString("0x%1").arg(v->id(), 0, 16);
             else if (m)
-                ret += QString("0x%1").arg(m->id(), 0, 16);
+                ret += QString("0x%1").arg(m->belongsTo()->id(), 0, 16);
             ++pit;
         }
         if (pit != _postponedTypes.end() && pit.key() == it.value())
@@ -1444,6 +1711,7 @@ void SymFactory::insertUsedBy(ReferencingType* ref)
     RefBaseType* rbt = 0;
     Variable* var = 0;
     StructuredMember* m = 0;
+    FuncParam* p = 0;
 
     // Add type into the used-by hash tables
     if ( (rbt = dynamic_cast<RefBaseType*>(ref)) )
@@ -1452,6 +1720,8 @@ void SymFactory::insertUsedBy(ReferencingType* ref)
         insertUsedBy(var);
     else if ( (m = dynamic_cast<StructuredMember*>(ref)) )
         insertUsedBy(m);
+    else if ( (p = dynamic_cast<FuncParam*>(ref)) )
+        insertUsedBy(p);
 }
 
 
@@ -1479,6 +1749,14 @@ void SymFactory::insertUsedBy(StructuredMember* m)
 }
 
 
+void SymFactory::insertUsedBy(FuncParam* param)
+{
+    if (!param || _usedByFuncParams.contains(param->refTypeId(), param))
+        return;
+    _usedByFuncParams.insertMulti(param->refTypeId(), param);
+}
+
+
 BaseTypeList SymFactory::typedefsOfType(BaseType* type)
 {
     BaseTypeList ret, temp;
@@ -1501,7 +1779,8 @@ BaseTypeList SymFactory::typedefsOfType(BaseType* type)
 }
 
 
-AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
+AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
+                                                    ASTTypeEvaluator* eval)
 {
     // Find the first non-pointer ASTType
     const ASTType* astTypeNonPtr = astType;
@@ -1517,44 +1796,139 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
     if (astTypeNonPtr->type() & (StructOrUnion|rtEnum)) {
         if (astTypeNonPtr->identifier().isEmpty()) {
             assert(astTypeNonPtr->node() != 0);
-            // See if this struct appears in a typedef
-            pASTNode dec_spec = astTypeNonPtr->node()->parent->parent;
-            pASTNode dec = dec_spec->parent;
-            // Did we find the typedef declaration?
+            // See if this struct appears in a typedef or a variable definition
+            const ASTNode *dec_spec = astTypeNonPtr->node()->parent->parent;
+            const ASTNode *dec = dec_spec->parent;
+            // Did we find a declaration?
             if (dec_spec->type == nt_declaration_specifier &&
                 dec->type == nt_declaration &&
-                dec->u.declaration.isTypedef &&
                 dec->u.declaration.declaration_specifier == dec_spec)
             {
-                // Take the first declarator from thie list and resolve it
+                // Take the first declarator from the list and resolve it
                 pANTLR3_COMMON_TOKEN tok = dec
                         ->u.declaration.init_declarator_list
                         ->item
                         ->u.init_declarator.declarator
                         ->u.declarator.direct_declarator
                         ->u.direct_declarator.identifier;
-                QString id = antlrTokenToStr(tok);
-                BaseTypeList temp;
-                baseTypes = _typesByName.values(id);
-                for (int i = baseTypes.size() - 1; i >= 0; --i) {
-                    // Dereference any pointers or typedefs
-                    baseTypes[i] = baseTypes[i]->dereferencedBaseType();
-                    // See if the type matches
-                    if (baseTypes[i]->type() == astTypeNonPtr->type())
-                        // Add all typedefs of that type to a separate list
-                        temp += typedefsOfType(baseTypes[i]);
-                    // Remove non-matching types
-                    else
-                        baseTypes.removeAt(i);
+                QString id = eval->antlrTokenToStr(tok);
+                // Distinguish between typedef and variable
+                if (dec->u.declaration.isTypedef) {
+                    BaseTypeList temp;
+                    baseTypes = _typesByName.values(id);
+                    for (int i = baseTypes.size() - 1; i >= 0; --i) {
+                        // Dereference any pointers or typedefs
+                        baseTypes[i] = baseTypes[i]->dereferencedBaseType();
+                        // See if the type matches
+                        if (baseTypes[i]->type() == astTypeNonPtr->type())
+                            // Add all typedefs of that type to a separate list
+                            temp += typedefsOfType(baseTypes[i]);
+                        // Remove non-matching types
+                        else
+                            baseTypes.removeAt(i);
+                    }
+                    // Join the lists
+                    baseTypes += temp;
                 }
-                // Join the lists
-                baseTypes += temp;
+                else {
+                    VariableList vars = _varsByName.values(id);
+                    for (int i = 0; i < vars.size(); ++i) {
+                        // Dereference any pointers, arrays or typedefs
+                        BaseType* t = vars[i]->refTypeDeep(
+                                    BaseType::trLexicalPointersArrays);
+                        // See if the type matches
+                        if (t->type() == astTypeNonPtr->type())
+                            baseTypes += t;
+                    }
+                }
+            }
+            // Did we find a nested struct or union declaration?
+            else if (dec_spec->type == nt_struct_declaration) {
+                // Take the first declarator from the list and resolve it
+                pANTLR3_COMMON_TOKEN tok = dec_spec
+                        ->u.struct_declaration.struct_declarator_list
+                        ->item
+                        ->u.struct_declarator.declarator
+                        ->u.declarator.direct_declarator
+                        ->u.direct_declarator.identifier;
+                QString id = eval->antlrTokenToStr(tok);
+
+                // Get the BaseType of the embedding struct
+                const ASTNode* structSpecifier = astTypeNonPtr->node()->parent;
+                while (structSpecifier) {
+                    if (structSpecifier->type == nt_struct_or_union_specifier) {
+                        // Get the ASTType for the struct, and from there the BaseType
+                        ASTType* structAstType = eval->typeofNode(structSpecifier);
+                        BaseTypeList candidates = findBaseTypesForAstType(structAstType, eval).second;
+                        for (int i = 0; i < candidates.size(); ++i) {
+                            // Now find the member of that struct by name
+                            Structured* s = dynamic_cast<Structured*>(candidates[i]);
+                            if (s && s->memberExists(id)) {
+                                baseTypes += s->findMember(id)->refType();
+                                // Exit the outer loop
+                                structSpecifier = 0;
+                            }
+                        }
+                    }
+                    if (structSpecifier)
+                        structSpecifier = structSpecifier->parent;
+                }
             }
             else
                 debugmsg("The context type has no identifier.");
         }
         else {
             baseTypes = _typesByName.values(astTypeNonPtr->identifier());
+        }
+    }
+    else if (astTypeNonPtr->type() & FunctionTypes) {
+        assert(astTypeNonPtr->node() != 0);
+        if (astTypeNonPtr->node()->type != nt_declarator_suffix_parens)
+            factoryError(QString("Expected type nt_declarator_suffix_parens "
+                                 "but got %1")
+                         .arg(ast_node_type_to_str(astTypeNonPtr->node())));
+        const ASTNode* dd = astTypeNonPtr->node()->parent;
+        bool nameInNestedDeclarator = false;
+        if (!dd->u.direct_declarator.identifier) {
+            nameInNestedDeclarator = true;
+            const ASTNode* dclr = dd->u.direct_declarator.declarator;
+            assert(dclr != 0);
+            dd = dclr->u.declarator.direct_declarator;
+            assert(dd != 0);
+            assert(dd->u.direct_declarator.identifier != 0);
+        }
+        QString name = eval->antlrTokenToStr(dd->u.direct_declarator.identifier);
+        // If the name appears in a nested direct_declarator, we have to check
+        // whether it appears in a struct definition. In this case we won't find
+        // the identifer in _typesByName, we have to find it over its struct!
+        if (nameInNestedDeclarator &&
+            astTypeNonPtr->node()->parent->parent->parent->type == nt_struct_declarator)
+        {
+            // Get the BaseType of the embedding struct
+            const ASTNode* structSpecifier = astTypeNonPtr->node()->parent;
+            while (structSpecifier) {
+                if (structSpecifier->type == nt_struct_or_union_specifier) {
+                    // Get the ASTType for the struct, and from there the BaseType
+                    ASTType* structAstType = eval->typeofNode(structSpecifier);
+                    BaseTypeList candidates = findBaseTypesForAstType(structAstType, eval).second;
+                    for (int i = 0; i < candidates.size(); ++i) {
+                        // Now find the member of that struct by name
+                        Structured* s = dynamic_cast<Structured*>(candidates[i]);
+                        if (s && s->memberExists(name)) {
+                            baseTypes += s->findMember(name)->refType();
+                            // Exit the outer loop
+                            structSpecifier = 0;
+                        }
+                    }
+                }
+                if (structSpecifier)
+                    structSpecifier = structSpecifier->parent;
+            }
+        }
+        else {
+            baseTypes = _typesByName.values(name);
+            if (baseTypes.isEmpty())
+                debugerr("No type with name " << name << " found!");
         }
     }
     // Is the source a numeric type?
@@ -1596,14 +1970,11 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType)
 }
 
 
-void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
-                                    const ASTType* srcType,
-                                    const ASTType* ctxType,
-                                    const QStringList& ctxMembers,
-                                    const ASTType* targetType)
+void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
+                                    ASTTypeEvaluator *eval)
 {
     // Find the source base type
-    AstBaseTypeList srcTypeRet = findBaseTypesForAstType(srcType);
+    AstBaseTypeList srcTypeRet = findBaseTypesForAstType(ed->srcType, eval);
 //    const ASTType* srcTypeNonPtr = targetTypeRet.first;
     BaseType* srcBaseType = 0;
     if (srcTypeRet.second.isEmpty())
@@ -1612,19 +1983,19 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
         srcBaseType = srcTypeRet.second.first();
 
     // Find the target base types
-    AstBaseTypeList targetTypeRet = findBaseTypesForAstType(targetType);
+    AstBaseTypeList targetTypeRet = findBaseTypesForAstType(ed->targetType, eval);
     const ASTType* targetTypeNonPtr = targetTypeRet.first;
     BaseTypeList targetBaseTypes = targetTypeRet.second;
 
     // Create a list of pointer/array types preceeding targetTypeNonPtr
     QList<const ASTType*> targetPointers;
-    for (const ASTType* t = targetType; t != targetTypeNonPtr; t = t->next())
+    for (const ASTType* t = ed->targetType; t != targetTypeNonPtr; t = t->next())
         targetPointers.append(t);
 
     BaseType* targetBaseType = 0;
 
     // Now go through the targetBaseTypes and find its usages as pointers or
-    // arrays as in targetType    
+    // arrays as in ed->targetType
     for (int i = 0; i < targetBaseTypes.size(); ++i) {
         BaseTypeList candidates;
         candidates += targetBaseTypes[i];
@@ -1635,13 +2006,25 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
             for (int k = 0; k < candidates.size(); ++k) {
                 BaseType* candidate = candidates[k];
                 // Get all types that use the current candidate
-                QList<RefBaseType*> typesUsingSrc =
+                QList<BaseType*> typesUsingSrc =
                         typesUsingId(candidate ? candidate->id() : 0);
 
                 // Next candidates are all that use the type in the way
                 // defined by targetPointers[j]
                 for (int l = 0; l < typesUsingSrc.size(); ++l) {
                     if (typesUsingSrc[l]->type() == targetPointers[j]->type()) {
+                        // Match the array size, if given
+                        if (targetPointers[j]->type() == rtArray &&
+                                targetPointers[j]->arraySize() >= 0)
+                        {
+                            const Array* a =
+                                    dynamic_cast<Array*>(typesUsingSrc[l]);
+                            // In case the array has a specified length and it
+                            // does not match the expected length, then skip it.
+                            if (a->length() >= 0 &&
+                                    a->length() != targetPointers[j]->arraySize())
+                                continue;
+                        }
                         nextCandidates.append(typesUsingSrc[l]);
                         // Additonally add all typedefs for that type
                         nextCandidates.append(typedefsOfType(typesUsingSrc[l]));
@@ -1667,61 +2050,74 @@ void SymFactory::typeAlternateUsage(const ASTSymbol& srcSymbol,
             for (int j = targetPointers.size() - 1; j >= 0; --j) {
                 // Create "next" pointer
                 Pointer* ptr = 0;
+                Array* a = 0;
                 switch (targetPointers[j]->type()) {
-                case rtArray: ptr = new Array(this); break;
+                case rtArray: ptr = a = new Array(this); break;
                 case rtPointer: ptr = new Pointer(this); break;
                 default: factoryError("Unexpected type: " +
                                       realTypeToStr(targetPointers[j]->type()));
                 }
-                _customTypes.append(ptr);
-                ptr->setId(siCreatred);
+                ptr->setId(getUniqueTypeId());
                 // For void pointers, targetBaseType is null
                 if (targetBaseType)
                     ptr->setRefTypeId(targetBaseType->id());
                 ptr->setSize(_memSpecs.sizeofUnsignedLong);
-                insertUsedBy(ptr);
+                // For arrays, set their length
+                if (a)
+                    a->setLength(targetPointers[j]->arraySize());
+                addSymbol(ptr);
                 targetBaseType = ptr;
             }
         }
-        else
-            factoryError("Could not find target BaseType.");
+        else {
+            // It can happen that GCC excludes unused symbols from the debugging
+            // symbols, so don't fail if we don't find the target base type
+            debugerr("Could not find target BaseType: "
+                     << ed->targetType->toString());
+            return;
+        }
     }
 
     // Compare source and target type
     if (compareConflictingTypes(srcBaseType, targetBaseType) == tcIgnore) {
-        debugmsg("Ignoring change from " << srcType->toString() << " to "
-                 << targetType->toString());
+        debugmsg("Ignoring change from " << ed->srcType->toString() << " to "
+                 << ed->targetType->toString());
         return;
     }
 
-    switch (srcSymbol.type()) {
+    switch (ed->sym->type()) {
     case stVariableDecl:
     case stVariableDef:
         // Only change global variables
-        if (srcSymbol.isGlobal())
-            typeAlternateUsageVar(ctxType, srcSymbol, targetBaseType);
+        if (ed->sym->isGlobal())
+            typeAlternateUsageVar(ed, targetBaseType, eval);
         else
-            debugmsg("Ignoring local variable " << srcSymbol.name());
+            debugmsg("Ignoring local variable " << ed->sym->name());
         break;
 
     case stFunctionParam:
     case stStructMember:
-        typeAlternateUsageStructMember(ctxType, ctxMembers, targetBaseType);
+        typeAlternateUsageStructMember(ed, targetBaseType, eval);
+        break;
+
+    case stEnumerator:
+        // Enum values are no referencing types, so ignore such changes
+        debugmsg("Ignoring type change of enum value " << ed->sym->name());
         break;
 
     default:
-        factoryError("Symbol " + srcSymbol.name() + " is of type " +
-                     srcSymbol.typeToString());
+        factoryError("Source symbol " + ed->sym->name() + " is of type " +
+                     ed->sym->typeToString());
     }
 }
 
 
-void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
-												const QStringList& ctxMembers,
-												BaseType* targetBaseType)
+void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
+												const BaseType *targetBaseType,
+												ASTTypeEvaluator *eval)
 {
     // Find context base types
-    AstBaseTypeList ctxTypeRet = findBaseTypesForAstType(ctxType);
+    AstBaseTypeList ctxTypeRet = findBaseTypesForAstType(ed->ctxType, eval);
     BaseTypeList ctxBaseTypes = ctxTypeRet.second;
 
     int membersFound = 0, membersChanged = 0;
@@ -1731,11 +2127,14 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
         StructuredMember *member = 0, *nestingMember = 0;
 
         // Find the correct member of the struct or union
-        for (int j = 0; j < ctxMembers.size(); ++j) {
-            Structured* s = dynamic_cast<Structured*>(t);
+        for (int j = 0; j < ed->ctxMembers.size(); ++j) {
+            // Dereference static arrays
+            while (t && t->type() == rtArray)
+                t = dynamic_cast<Array*>(t)->refTypeDeep(BaseType::trLexicalAndArrays);
+            Structured* s =  dynamic_cast<Structured*>(t);
             nestingMember = member; // previous struct for nested structs
-            if ( s && (member = s->findMember(ctxMembers[j])) ) {
-                t = member->refType();
+            if ( s && (member = s->findMember(ed->ctxMembers[j])) ) {
+                t = member->refTypeDeep(BaseType::trLexicalAndArrays);
             }
             else {
                 nestingMember = member = 0;
@@ -1743,92 +2142,59 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
             }
         }
 
-        // Is the source type a member of a struct embedded in the context type?
-        if (nestingMember) {
-            // Was the embedding member already manipulated?
-            if (nestingMember->refTypeId() == siCopy) {
-                debugmsg(QString("Member %1 %2 is already a type copy.")
-                         .arg(nestingMember->prettyName())
-                         .arg(nestingMember->name()));
-            }
-            else {
-                // Create a copy of the embedding struct before manipulation
-                /// @todo What happens hier if member is inside an anonymous struct?
-                Structured* s = dynamic_cast<Structured*>(nestingMember->refType());
-                assert(s != 0);
-                Structured* refTypeCopy = makeStructCopy(s);
-                nestingMember->setRefTypeId(refTypeCopy->id());
-                member = refTypeCopy->findMember(ctxMembers.last());
-                assert(member != 0);
-                debugmsg(QString("Created copy of embedding member %1 %2.")
-                         .arg(nestingMember->prettyName())
-                         .arg(nestingMember->name()));
-            }
-        }
         // If we have a member here, it is the one whose reference is to be replaced
         if (member) {
             ++membersFound;
-            bool changeType = true;
-            // Was the member already manipulated?
-            if (member->hasAltRefTypes()) {
-                // Do we have conflicting target types?
-                switch (compareConflictingTypes(member->altRefType(), targetBaseType)) {
-                case tcNoConflict:
-                    changeType = false;
-                    t = member->refType();
-                    debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\"")
-                             .arg(member->name())
-                             .arg(member->belongsTo()->prettyName())
-                             .arg(member->belongsTo()->id(), 0, 16)
-                             .arg(t ? t->prettyName() : QString("???"))
-                             .arg(member->altRefType()->prettyName()));
-                    break;
-
-                case tcIgnore:
-                    changeType = false;
-                    debugmsg(QString("Not changing \"%0\" of %1 (0x%2) from \"%3\" to \"%4\"")
-                             .arg(member->name())
-                             .arg(member->belongsTo()->prettyName())
-                             .arg(member->belongsTo()->id(), 0, 16)
-                             .arg(member->refType() ?
-                                      member->refType()->prettyName() :
-                                      QString("???"))
-                             .arg(targetBaseType->prettyName()));
-                    break;
-
-                case tcConflict:
-                    changeType = false;
-                    ++_conflictingTypeChanges;
-                    member->addAltRefTypeId(targetBaseType->id());
-                    debugerr(QString("Conflicting target types in 0x%0: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
-                             .arg(member->belongsTo()->id(), 0, 16)
-                             .arg(member->refType() ?
-                                      member->refType()->prettyName() :
-                                      QString("???"))
-                             .arg(member->refTypeId(), 0, 16)
-                             .arg(targetBaseType->prettyName())
-                             .arg(targetBaseType->id(), 0, 16));
-                    break;
-
-                case tcReplace:
-                    changeType = true;
-                    ++_typesReplaced;
-                    break;
-                }
-            }
-
             // Apply new type, if applicable
-            if (changeType) {
+            if (typeChangeDecision(member, targetBaseType)) {
+                // If the the source type is a member of a struct embedded in
+                // the context type, we create a copy before any manipulations
+                if (nestingMember) {
+                    // Was the embedding member already copied?
+                    if (nestingMember->refTypeId() < 0) {
+                        debugmsg(QString("Member %1 %2 is already a type copy.")
+                                 .arg(nestingMember->prettyName())
+                                 .arg(nestingMember->name()));
+                    }
+                    // Create a copy of the embedding struct
+                    else {
+                        ++_typesCopied;
+                        /// @todo What happens here if member is inside an anonymous struct?
+                        int origRefTypeId = nestingMember->refTypeId();
+                        BaseType* typeCopy =
+                                makeDeepTypeCopy(nestingMember->refType());
+                        // Update the type relations
+                        _usedByStructMembers.remove(nestingMember->refTypeId(), nestingMember);
+                        nestingMember->setRefTypeId(typeCopy->id());
+                        insertUsedBy(nestingMember);
+                        // Find the member within the copied type
+                        t = typeCopy->dereferencedBaseType(BaseType::trLexicalAndArrays);
+                        Structured* s = dynamic_cast<Structured*>(t);
+                        assert(s != 0);
+                        member = s->findMember(ed->ctxMembers.last());
+                        assert(member != 0);
+                        debugmsg(QString("Created copy (0x%1 -> 0x%2) of "
+                                         "embedding member %3 in %4 (0x%5).")
+                                 .arg((uint)origRefTypeId, 0, 16)
+                                 .arg((uint)typeCopy->id(), 0, 16)
+                                 .arg(nestingMember->prettyName())
+                                 .arg(nestingMember->belongsTo()->prettyName())
+                                 .arg((uint)nestingMember->belongsTo()->id(), 0, 16));
+                    }
+                }
+
                 /// @todo may need to adjust member->memberOffset() somehow
                 ++membersChanged;
                 ++_totalTypesChanged;
+                if (member->altRefTypeCount() > 0)
+                    ++_conflictingTypeChanges;
                 /// @todo replace member->altRefType() with target
                 member->addAltRefTypeId(targetBaseType->id());
             }
         }
     }
 
-    if (!membersFound)
+    if (!ctxBaseTypes.isEmpty() && !membersFound)
         factoryError("Did not find any members to adjust!");
     else if (membersChanged) {
         ++_uniqeTypesChanged;
@@ -1847,38 +2213,147 @@ void SymFactory::typeAlternateUsageStructMember(const ASTType* ctxType,
 }
 
 
-void SymFactory::typeAlternateUsageVar(const ASTType* ctxType,
-                                       const ASTSymbol& srcSymbol,
-                                       BaseType* targetBaseType)
+void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
+                                       const BaseType* targetBaseType,
+                                       const ASTTypeEvaluator * /*eval*/)
 {
-    Q_UNUSED(ctxType);
-    VariableList vars = _varsByName.values(srcSymbol.name());
+    VariableList vars = _varsByName.values(ed->sym->name());
     int varsFound = 0;
 
     // Find the variable(s) using the targetBaseType
     for (int i = 0; i < vars.size(); ++i) {
-        Variable* v = vars[i];
-        if (v->refType() && v->refType()->hash() == targetBaseType->hash()) {
-            ++varsFound;
-            v->addAltRefTypeId(targetBaseType->id());
+        ++varsFound;
+        // Apply new type, if applicable
+        if (typeChangeDecision(vars[i], targetBaseType)) {
+            ++_totalTypesChanged;
+            ++_varTypeChanges;
+            if (vars[i]->altRefTypeCount() > 0)
+                ++_conflictingTypeChanges;
+            /// @todo replace v->altRefType() with target
+            vars[i]->addAltRefTypeId(targetBaseType->id());
         }
     }
 
-    if (!varsFound)
-        factoryError("Did not find any variables to adjust!");
-    else
-        debugmsg("Adjusted " << varsFound << " variables.");
+    if (!varsFound) {
+//        factoryError("Did not find any variables to adjust!");
+
+        // Rarely happens, but sometimes we find references to externally
+        // declared variables that are not in the debugging symbols.
+        debugerr("Did not find any variables to adjust!");
+    }
+    else {
+        QStringList varIds;
+        for (int i = 0; i < vars.size(); ++i)
+                varIds += QString("0x%1").arg(vars[i]->id(), 0, 16);
+        debugmsg(QString("Changed %1 type%2 of variable%3 %4 to target type 0x%5: %6")
+                 .arg(varsFound)
+                 .arg(varsFound == 1 ? "" : "s")
+                 .arg(varIds.size() > 1 ? "s" : "")
+                 .arg(varIds.join(", "))
+                 .arg(targetBaseType->id(), 0, 16)
+                 .arg(targetBaseType->prettyName()));
+    }
+}
+
+
+bool SymFactory::typeChangeDecision(const ReferencingType* r,
+                                    const BaseType* targetBaseType)
+{
+    bool changeType = true;
+    // Was the member already manipulated?
+    if (r->hasAltRefTypes()) {
+        TypeConflicts ret = tcNoConflict;
+        const BaseType* cmpType = 0;
+        // Compare to ALL alternative types
+        for (int i = 0; i < r->altRefTypeCount(); ++i) {
+            const BaseType* t = r->altRefType(i);
+            switch (compareConflictingTypes(t, targetBaseType)) {
+            // If we found the same type, we take this as the final decision
+            case tcNoConflict:
+                ret = tcNoConflict;
+                cmpType = t;
+                goto for_end;
+            // Ignore overrides conflicts
+            case tcIgnore:
+                ret = tcIgnore;
+                cmpType = t;
+                break;
+            // Conflict overrides replace
+            case tcConflict:
+                if (ret != tcIgnore) {
+                    ret = tcConflict;
+                    cmpType = t;
+                }
+                break;
+            // Replace only if no other decision was already made
+            case tcReplace:
+                if (ret != tcIgnore && ret != tcConflict) {
+                    ret = tcReplace;
+                    cmpType = t;
+                }
+                break;
+            }
+        }
+
+        for_end:
+
+        const StructuredMember* m = dynamic_cast<const StructuredMember*>(r);
+        const Variable* v = dynamic_cast<const Variable*>(r);
+
+        // Do we have conflicting target types?
+        switch (ret) {
+        case tcNoConflict:
+            changeType = false;
+            debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\"")
+                     .arg(m ? m->name() : v->name())
+                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
+                     .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
+                     .arg(r->refType() ?
+                              r->refType()->prettyName() :
+                              QString("???"))
+                     .arg(targetBaseType->prettyName()));
+            break;
+
+        case tcIgnore:
+            changeType = false;
+            debugmsg(QString("Not changing \"%0\" of %1 (0x%2) from \"%3\" to \"%4\"")
+                     .arg(m ? m->name() : v->name())
+                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
+                     .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
+                     .arg(r->refType() ?
+                              r->refType()->prettyName() :
+                              QString("???"))
+                     .arg(targetBaseType->prettyName()));
+            break;
+
+        case tcConflict:
+            debugerr(QString("Conflicting target types in 0x%0: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
+                     .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
+                     .arg(r->refType() ?
+                              r->refType()->prettyName() :
+                              QString("???"))
+                     .arg(r->refTypeId(), 0, 16)
+                     .arg(targetBaseType->prettyName())
+                     .arg(targetBaseType->id(), 0, 16));
+            break;
+
+        case tcReplace:
+            break;
+        }
+    }
+
+    return changeType;
 }
 
 
 SymFactory::TypeConflicts SymFactory::compareConflictingTypes(
-        const BaseType* oldType, const BaseType* newType)
+        const BaseType* oldType, const BaseType* newType) const
 {
     int oldTypeId = oldType ? oldType->id() : 0;
     int newTypeId = newType ? newType->id() : 0;
 
     // Do we have conflicting target types?
-    if (oldTypeId == newTypeId && oldTypeId != siCreatred)
+    if (oldTypeId == newTypeId)
         return tcNoConflict;
 
     // Compare the conflicting types
@@ -1932,6 +2407,15 @@ SymFactory::TypeConflicts SymFactory::compareConflictingTypes(
     }
     // This is a conflict
     return tcConflict;
+}
+
+
+int SymFactory::getUniqueTypeId()
+{
+    while (_typesById.contains(_artificialTypeId))
+        --_artificialTypeId;
+
+    return _artificialTypeId--;
 }
 
 

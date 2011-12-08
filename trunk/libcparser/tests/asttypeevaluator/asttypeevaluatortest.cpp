@@ -24,35 +24,55 @@ public:
 	void reset()
 	{
 		typeChanged = false;
-		symbolName.clear();
-		ctxType.clear();
-		ctxMembers.clear();
-		targetType.clear();
+		interLinks = 0;
+
+		fSymbolName.clear();
+		fCtxType.clear();
+		fCtxMembers.clear();
+		fTargetType.clear();
+
+		lSymbolName.clear();
+		lCtxType.clear();
+		lCtxMembers.clear();
+		lTargetType.clear();
 	}
 
 	bool typeChanged;
-	QString symbolName;
-	QString ctxType;
-	QString ctxMembers;
-	QString targetType;
+	QString fSymbolName;
+	QString fCtxType;
+	QString fCtxMembers;
+	QString fTargetType;
+	QString lSymbolName;
+	QString lCtxType;
+	QString lCtxMembers;
+	QString lTargetType;
+	int interLinks;
 
 protected:
-    virtual void primaryExpressionTypeChange(const ASTNode* srcNode,
-            const ASTType* srcType, const ASTSymbol& srcSymbol,
-            const ASTType* ctxType, const ASTNode* ctxNode,
-            const QStringList& ctxMembers, const ASTNode* targetNode,
-            const ASTType* targetType, const ASTNode* rootNode)
+    virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed)
     {
-        Q_UNUSED(srcNode);
-        Q_UNUSED(srcType);
-        Q_UNUSED(ctxNode);
-        Q_UNUSED(targetNode);
-        Q_UNUSED(rootNode);
-    	this->typeChanged = true;
-        this->symbolName = srcSymbol.name();
-    	this->ctxType = ctxType->toString();
-    	this->ctxMembers = ctxMembers.join(".");
-    	this->targetType = targetType->toString();
+        // First type change, or the one with more interLinks
+        if (!typeChanged || interLinks < ed.interLinks.size()) {
+            typeChanged = true;
+            fSymbolName = ed.sym->name();
+            fCtxType = ed.ctxType->toString();
+            fCtxMembers = ed.ctxMembers.join(".");
+            fTargetType = ed.targetType->toString();
+            interLinks = ed.interLinks.size();
+        }
+        // Last type change
+        lSymbolName = ed.sym->name();
+        lCtxType = ed.ctxType->toString();
+        lCtxMembers = ed.ctxMembers.join(".");
+        lTargetType = ed.targetType->toString();
+    }
+
+    int evaluateIntExpression(const ASTNode* /*node*/, bool* ok)
+    {
+        // Always return ok and zero, the value does not matter for these tests.
+        if (ok)
+            *ok = true;
+        return 0;
     }
 };
 
@@ -131,11 +151,59 @@ void ASTTypeEvaluatorTest::cleanup()
 
 #define DEF_HEADER DEF_LIST_HEAD DEF_MODULES DEF_FUNCS DEF_HEADS
 
+#define STRING2(s) #s
+#define STRING(s) STRING2(s)
+#define LN "line: " STRING(__LINE__)
+
+
+#define TEST_DATA_COLUMNS \
+   QTest::addColumn<QString>("globalCode"); \
+   QTest::addColumn<QString>("localCode"); \
+   QTest::addColumn<int>("typeChanged"); \
+   QTest::addColumn<QString>("symbolName"); \
+   QTest::addColumn<QString>("ctxType"); \
+   QTest::addColumn<QString>("ctxMembers"); \
+   QTest::addColumn<QString>("targetType"); \
+   QTest::addColumn<QString>("exceptionMsg");
+
+#define NO_CHANGE(local_src) \
+    NO_CHANGE2("", (local_src))
+#define NO_CHANGE2(global_src, local_src) \
+    TEST_CASE((global_src), (local_src), 0, "", "", "", "", "")
+
+#define CHANGE_FIRST(local_src, sym_name, ctx_type, ctx_mem, target_type) \
+    CHANGE_FIRST2("", (local_src), (sym_name), (ctx_type), (ctx_mem), (target_type))
+#define CHANGE_FIRST2(global_src, local_src, sym_name, ctx_type, ctx_mem, target_type) \
+    TEST_CASE((global_src), (local_src), 1, (sym_name), (ctx_type), (ctx_mem), (target_type), "")
+
+#define CHANGE_LAST(local_src, sym_name, ctx_type, ctx_mem, target_type) \
+    CHANGE_LAST2("", (local_src), (sym_name), (ctx_type), (ctx_mem), (target_type))
+#define CHANGE_LAST2(global_src, local_src, sym_name, ctx_type, ctx_mem, target_type) \
+    TEST_CASE((global_src), (local_src), -1, (sym_name), (ctx_type), (ctx_mem), (target_type), "")
+
+#define EXCEPTIONAL(global_src, local_src, except_msg) \
+    TEST_CASE((global_src), (local_src), 0, "", "", "", "", (except_msg))
+
+#define TEST_CASE(global_src, local_src, which_changed, sym_name, ctx_type, ctx_mem, target_type, except_msg) \
+    do { \
+        QTest::newRow(LN) \
+            << (global_src) \
+            << (local_src) \
+            << (which_changed) \
+            << (sym_name) \
+            << (ctx_type) \
+            << (ctx_mem) \
+            << (target_type) \
+            << (except_msg); \
+    } while (0)
+
+
 #define	TEST_FUNCTION(methodName) \
 	void ASTTypeEvaluatorTest::test_##methodName##_func() \
 	{ \
 		QFETCH(QString, globalCode); \
 		QFETCH(QString, localCode); \
+		QFETCH(int, typeChanged); \
 	\
 		_ascii += DEF_HEADER; \
 		if (!globalCode.isEmpty()){ \
@@ -154,13 +222,22 @@ void ASTTypeEvaluatorTest::cleanup()
 			QCOMPARE(_builder->buildFrom(_ascii), 0); \
 			QCOMPARE(_tester->evaluateTypes(), true); \
 	\
-			QTEST(_tester->typeChanged, "typeChanged"); \
-	\
-			if (_tester->typeChanged){ \
-				QTEST(_tester->symbolName, "symbolName"); \
-				QTEST(_tester->ctxType, "ctxType"); \
-				QTEST(_tester->ctxMembers, "ctxMembers"); \
-				QTEST(_tester->targetType, "targetType"); \
+			if (!typeChanged) \
+				QCOMPARE(_tester->typeChanged, false); \
+			else  {\
+				QCOMPARE(_tester->typeChanged, true); \
+				if (typeChanged > 0) { \
+					QTEST(_tester->fSymbolName, "symbolName"); \
+					QTEST(_tester->fCtxType, "ctxType"); \
+					QTEST(_tester->fCtxMembers, "ctxMembers"); \
+					QTEST(_tester->fTargetType, "targetType"); \
+				} \
+				else if (typeChanged < 0) { \
+					QTEST(_tester->lSymbolName, "symbolName"); \
+					QTEST(_tester->lCtxType, "ctxType"); \
+					QTEST(_tester->lCtxMembers, "ctxMembers"); \
+					QTEST(_tester->lTargetType, "targetType"); \
+				} \
 			} \
 		} \
 		catch (GenericException& e) { \
@@ -185,66 +262,49 @@ void ASTTypeEvaluatorTest::cleanup()
 	\
    void ASTTypeEvaluatorTest::test_##methodName##_func_data()
 
-#define TEST_DATA_COLUMNS \
-   QTest::addColumn<QString>("globalCode"); \
-   QTest::addColumn<QString>("localCode"); \
-   QTest::addColumn<bool>("typeChanged"); \
-   QTest::addColumn<QString>("symbolName"); \
-   QTest::addColumn<QString>("ctxType"); \
-   QTest::addColumn<QString>("ctxMembers"); \
-   QTest::addColumn<QString>("targetType"); \
-   QTest::addColumn<QString>("exceptionMsg");
 
 TEST_FUNCTION(basic)
 {
 	TEST_DATA_COLUMNS;
 
 	// Very basic type equalities and changes
-	QTest::newRow("basicInitiEqual1") << "" << "void* q; void *p = q;" << false;
-	QTest::newRow("basicInitiEqual2") << "" << "int i; int j = i;" << false;
-	QTest::newRow("basicInitiEqual3") << "" << "int i; char j = i;" << false;
-	QTest::newRow("basicInitiEqual4") << "" << "int i; char* p; p = p + i;" << false;
-	QTest::newRow("basicInitiEqual5") << "" << "int i; char* p; p = p - i;" << false;
-	QTest::newRow("basicAssignmentEqual1") << "" << "void* q, *p; p = q;" << false;
-	QTest::newRow("basicAssignmentEqual2") << "" << "int i, j; i = j;" << false;
-	QTest::newRow("basicAssignmentEqual3") << "" << "int i; char j; i = j;" << false;
-	QTest::newRow("basicAssignmentEqual4") << "" << "int i; char j; j = i;" << false;
-	QTest::newRow("basicAssignmentEqual5") << "" << "int i; char j; i += j;" << false;
-	QTest::newRow("basicAssignmentEqual6") << "" << "int i; char j; i -= j;" << false;
-	QTest::newRow("basicAssignmentEqual7") << "" << "int i; char j; i *= j;" << false;
-	QTest::newRow("basicAssignmentEqual8") << "" << "int i; char j; i /= j;" << false;
-	QTest::newRow("basicAssignmentEqual9") << "" << "int i; char j; i %= j;" << false;
-	QTest::newRow("basicAssignmentEqual10") << "" << "int i; char j; i <<= j;" << false;
-	QTest::newRow("basicAssignmentEqual11") << "" << "int i; char j; i >>= j;" << false;
-	QTest::newRow("basicInitNoIdentifier") << "" << "void* q = (1+2)*3;" << false;
-	QTest::newRow("basicInitChange1") << "" << "int i; void *p = i;" << true
-		<< "i" << "Int32" << "" << "Pointer->Void";
-	QTest::newRow("basicInitChange2") << "" << "void *p; int i = p;" << true
-		<< "p" << "Pointer->Void" << "" << "Int32";
-	QTest::newRow("basicInitChange3") << "" << "int *i; char *j = i;" << true
-		<< "i" << "Pointer->Int32" << "" << "Pointer->Int8";
-	QTest::newRow("basicAssignmentChange1") << "" << "int i; void *p; p = i;" << true
-		<< "i" << "Int32" << "" << "Pointer->Void";
-	QTest::newRow("basicAssignmentChange2") << "" << "void *p; int i; i = p;" << true
-		<< "p" << "Pointer->Void" << "" << "Int32";
-	QTest::newRow("basicAssignmentChange3") << "" << "int *i; char *j; i = j;" << true
-		<< "j" << "Pointer->Int8" << "" << "Pointer->Int32";
-	QTest::newRow("basicAssignmentChange4") << "" << "int *i; char *j; j = i;" << true
-		<< "i" << "Pointer->Int32" << "" << "Pointer->Int8";
-	QTest::newRow("basicAssignmentPlusEqual") << "" << "int i; char* p; p += i;" << false;
-	QTest::newRow("basicAssignmentMinusEqual") << "" << "int i; char* p; p -= i;" << false;
-	QTest::newRow("basicAssignmentPlusEqualEx") << "" << "int *i; char* p; p += i;" << false
-		<< "" << "" << "" << ""
-		<< "Cannot determine resulting type of \"Pointer += Pointer\" at lines 23 and 23";
-	QTest::newRow("basicAssignmentMinusEqualEx") << "" << "int *i; char* p; p -= i;" << false
-		<< "" << "" << "" << ""
-		<< "Cannot determine resulting type of \"Pointer -= Pointer\" at lines 23 and 23";
-	QTest::newRow("basicAssignmentTimesEqualEx") << "" << "int *i; char* p; p *= i;" << false
-		<< "" << "" << "" << ""
-		<< "Cannot determine resulting type of \"Pointer *= Pointer\" at lines 23 and 23";
-	QTest::newRow("basicAssignmentShiftEqualEx") << "" << "int *i; char* p; p >>= i;" << false
-		<< "" << "" << "" << ""
-		<< "Cannot determine resulting type of \"Pointer >>= Pointer\" at lines 23 and 23";
+	NO_CHANGE("void* q; void *p = q;");
+	NO_CHANGE("int i; int j = i;");
+	NO_CHANGE("int i; char j = i;");
+	NO_CHANGE("int i; char* p; p = p + i;");
+	NO_CHANGE("int i; char* p; p = p - i;");
+	NO_CHANGE("void* q, *p; p = q;");
+	NO_CHANGE("int i, j; i = j;");
+	NO_CHANGE("int i; char j; i = j;");
+	NO_CHANGE("int i; char j; j = i;");
+	NO_CHANGE("int i; char j; i += j;");
+	NO_CHANGE("int i; char j; i -= j;");
+	NO_CHANGE("int i; char j; i *= j;");
+	NO_CHANGE("int i; char j; i /= j;");
+	NO_CHANGE("int i; char j; i %= j;");
+	NO_CHANGE("int i; char j; i <<= j;");
+	NO_CHANGE("int i; char j; i >>= j;");
+	NO_CHANGE("void* q = (1+2)*3;");
+	CHANGE_LAST("int i; void *p = i;",
+		"i", "Int32", "", "Pointer->Void");
+	CHANGE_LAST("void *p; int i = p;",
+		"p", "Pointer->Void", "", "Int32");
+	CHANGE_LAST("int *i; char *j = i;",
+		"i", "Pointer->Int32", "", "Pointer->Int8");
+	CHANGE_LAST("int i; void *p; p = i;",
+		"i", "Int32", "", "Pointer->Void");
+	CHANGE_LAST("void *p; int i; i = p;",
+		"p", "Pointer->Void", "", "Int32");
+	CHANGE_LAST("int *i; char *j; i = j;",
+		"j", "Pointer->Int8", "", "Pointer->Int32");
+	CHANGE_LAST("int *i; char *j; j = i;",
+		"i", "Pointer->Int32", "", "Pointer->Int8");
+	NO_CHANGE("int i; char* p; p += i;");
+	NO_CHANGE("int i; char* p; p -= i;");
+	EXCEPTIONAL("", "int *i; char* p; p += i;", "Cannot determine resulting type of \"Pointer += Pointer\" at lines 23 and 23");
+	EXCEPTIONAL("", "int *i; char* p; p -= i;", "Cannot determine resulting type of \"Pointer -= Pointer\" at lines 23 and 23");
+	EXCEPTIONAL("", "int *i; char* p; p *= i;", "Cannot determine resulting type of \"Pointer *= Pointer\" at lines 23 and 23");
+	EXCEPTIONAL("", "int *i; char* p; p >>= i;", "Cannot determine resulting type of \"Pointer >>= Pointer\" at lines 23 and 23");
 }
 
 
@@ -253,13 +313,13 @@ TEST_FUNCTION(listHeadEqual)
 	TEST_DATA_COLUMNS;
 
 	// Various equality checks for list_head
-    QTest::newRow("listHeadEqual1") << "" << "h = heads[0];" << false;
-    QTest::newRow("listHeadEqual2") << "" << "heads[0] = h;" << false;
-    QTest::newRow("listHeadEqual3") << "" << "h = *heads;" << false;
-    QTest::newRow("listHeadEqual4") << "" << "*heads = h;" << false;
-    QTest::newRow("listHeadEqual5") << "" << "heads = &h;" << false;
-    QTest::newRow("listHeadEqual6") << "" << "m->list.next = h;" << false;
-    QTest::newRow("listHeadEqual7") << "" << "h = m->list.next;" << false;
+	NO_CHANGE("h = heads[0];");
+	NO_CHANGE("heads[0] = h;");
+	NO_CHANGE("h = *heads;");
+	NO_CHANGE("*heads = h;");
+	NO_CHANGE("heads = &h;");
+	NO_CHANGE("m->list.next = h;");
+	NO_CHANGE("h = m->list.next;");
 }
 
 
@@ -268,32 +328,32 @@ TEST_FUNCTION(postfixOperators)
 	TEST_DATA_COLUMNS;
 
     // Array, arrow and star operator, all in the mix
-    QTest::newRow("arrayArrowStar1") << "" << "h = m->plist->next;" << false;
-    QTest::newRow("arrayArrowStar2") << "" << "h = m[0].plist->next;" << false;
-    QTest::newRow("arrayArrowStar3") << "" << "h = m->plist[0].next;" << false;
-    QTest::newRow("arrayArrowStar4") << "" << "h = m[0].plist[0].next;" << false;
-    QTest::newRow("arrayArrowStar5") << "" << "h = (*m).plist->next;" << false;
-    QTest::newRow("arrayArrowStar6") << "" << "h = (*m->plist).next;" << false;
-    QTest::newRow("arrayArrowStar7") << "" << "h = (*m).plist[0].next;" << false;
-    QTest::newRow("arrayArrowStar8") << "" << "h = (*m[0].plist).next;" << false;
+    NO_CHANGE("h = m->plist->next;");
+    NO_CHANGE("h = m[0].plist->next;");
+    NO_CHANGE("h = m->plist[0].next;");
+    NO_CHANGE("h = m[0].plist[0].next;");
+    NO_CHANGE("h = (*m).plist->next;");
+    NO_CHANGE("h = (*m->plist).next;");
+    NO_CHANGE("h = (*m).plist[0].next;");
+    NO_CHANGE("h = (*m[0].plist).next;");
 
-    QTest::newRow("arrayArrowStar9") << "" << "*h = *m->plist->next;" << false;
-    QTest::newRow("arrayArrowStar10") << "" << "*h = *m[0].plist->next;" << false;
-    QTest::newRow("arrayArrowStar11") << "" << "*h = *m->plist[0].next;" << false;
-    QTest::newRow("arrayArrowStar12") << "" << "*h = *m[0].plist[0].next;" << false;
-    QTest::newRow("arrayArrowStar13") << "" << "*h = *(*m).plist->next;" << false;
-    QTest::newRow("arrayArrowStar14") << "" << "*h = *(*m->plist).next;" << false;
-    QTest::newRow("arrayArrowStar15") << "" << "*h = *(*m).plist[0].next;" << false;
-    QTest::newRow("arrayArrowStar16") << "" << "*h = *(*m[0].plist).next;" << false;
+    NO_CHANGE("*h = *m->plist->next;");
+    NO_CHANGE("*h = *m[0].plist->next;");
+    NO_CHANGE("*h = *m->plist[0].next;");
+    NO_CHANGE("*h = *m[0].plist[0].next;");
+    NO_CHANGE("*h = *(*m).plist->next;");
+    NO_CHANGE("*h = *(*m->plist).next;");
+    NO_CHANGE("*h = *(*m).plist[0].next;");
+    NO_CHANGE("*h = *(*m[0].plist).next;");
 
-    QTest::newRow("arrayArrowStar17") << "" << "*h = m->plist->next[0];" << false;
-    QTest::newRow("arrayArrowStar18") << "" << "*h = m[0].plist->next[0];" << false;
-    QTest::newRow("arrayArrowStar19") << "" << "*h = m->plist[0].next[0];" << false;
-    QTest::newRow("arrayArrowStar20") << "" << "*h = m[0].plist[0].next[0];" << false;
-    QTest::newRow("arrayArrowStar21") << "" << "*h = (*m).plist->next[0];" << false;
-    QTest::newRow("arrayArrowStar22") << "" << "*h = (*m->plist).next[0];" << false;
-    QTest::newRow("arrayArrowStar23") << "" << "*h = (*m).plist[0].next[0];" << false;
-    QTest::newRow("arrayArrowStar24") << "" << "*h = (*m[0].plist).next[0];" << false;
+    NO_CHANGE("*h = m->plist->next[0];");
+    NO_CHANGE("*h = m[0].plist->next[0];");
+    NO_CHANGE("*h = m->plist[0].next[0];");
+    NO_CHANGE("*h = m[0].plist[0].next[0];");
+    NO_CHANGE("*h = (*m).plist->next[0];");
+    NO_CHANGE("*h = (*m->plist).next[0];");
+    NO_CHANGE("*h = (*m).plist[0].next[0];");
+    NO_CHANGE("*h = (*m[0].plist).next[0];");
 }
 
 
@@ -302,9 +362,9 @@ TEST_FUNCTION(basicTypeCasts)
     TEST_DATA_COLUMNS;
 
     // Type casts that lead to equal types
-    QTest::newRow("castingEqual1") << "" << "h = (struct list_head*)m->list.next;" << false;
-    QTest::newRow("castingEqual2") << "" << "h = (struct list_head*)((struct module*)m)->list.next;" << false;
-    QTest::newRow("castingEqual3") << "" << "h = (struct list_head*)(*((struct module*)m)).list.next;" << false;
+    NO_CHANGE("h = (struct list_head*)m->list.next;");
+    NO_CHANGE("h = (struct list_head*)((struct module*)m)->list.next;");
+    NO_CHANGE("h = (struct list_head*)(*((struct module*)m)).list.next;");
 }
 
 
@@ -313,10 +373,10 @@ TEST_FUNCTION(functionCalls)
     TEST_DATA_COLUMNS;
 
     // Function calls
-    QTest::newRow("funcCalls1") << "" << "h = func();" << false;
-    QTest::newRow("funcCalls2") << "" << "*h = *func();" << false;
-    QTest::newRow("funcCalls3") << "" << "h = func_ptr();" << false;
-    QTest::newRow("funcCalls4") << "" << "*h = *func_ptr();" << false;
+    NO_CHANGE("h = func();");
+    NO_CHANGE("*h = *func();");
+    NO_CHANGE("h = func_ptr();");
+    NO_CHANGE("*h = *func_ptr();");
 }
 
 
@@ -325,14 +385,14 @@ TEST_FUNCTION(basicTypeChanges)
     TEST_DATA_COLUMNS;
 
     // Basic type changes
-    QTest::newRow("basicChanges1") << "" << "h = m;" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("basicChanges2") << "" << "m = h;" << true
-        << "h" << "Pointer->Struct(list_head)" << "" << "Pointer->Struct(module)";
-    QTest::newRow("basicChanges2") << "" << "m = h->next;" << true
-        << "h" << "Struct(list_head)" << "next" << "Pointer->Struct(module)";
-    QTest::newRow("basicChanges3") << "" << "m = h->next->prev;" << true
-        << "h" << "Struct(list_head)" << "prev" << "Pointer->Struct(module)";
+    CHANGE_LAST("h = m;",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("m = h;",
+        "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_LAST("m = h->next;",
+        "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("m = h->next->prev;",
+        "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
 }
 
 
@@ -341,16 +401,16 @@ TEST_FUNCTION(basicCastingChanges)
     TEST_DATA_COLUMNS;
 
     // Casting changes
-    QTest::newRow("castingChanges1") << "" << "m = (struct module*)h->next;" << true
-        << "h" << "Struct(list_head)" << "next" << "Pointer->Struct(module)";
-    QTest::newRow("castingChanges2") << "" << "m = (struct list_head*)h->next;" << true
-        << "h" << "Struct(list_head)" << "next" << "Pointer->Struct(module)";
-    QTest::newRow("castingChanges3") << "" << "m = (void*)h->next;" << true
-        << "h" << "Struct(list_head)" << "next" << "Pointer->Struct(module)";
+    CHANGE_LAST("m = (struct module*)h->next;",
+        "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("m = (struct list_head*)h->next;",
+        "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("m = (void*)h->next;",
+        "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
 
     // list_head-like casting changes
-    QTest::newRow("listHeadCasts1") << "" << "m = (struct module*)(((char*)modules.next) - __builtin_offsetof(struct module, list));" << true
-        << "modules" << "Struct(list_head)" << "next" << "Pointer->Struct(module)";
+    CHANGE_LAST("m = (struct module*)(((char*)modules.next) - __builtin_offsetof(struct module, list));",
+        "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
 }
 
 
@@ -359,9 +419,9 @@ TEST_FUNCTION(ignoredTypeChanges)
 	TEST_DATA_COLUMNS;
 
     // Ignore type changes in certain cases
-    QTest::newRow("ignoreCastInBuiltin") << "" << "int i = sizeof((void*)m);" << false;
-    QTest::newRow("ignoreNoAssignment") << "" << "(void*)m;" << false;
-    QTest::newRow("ignoreNoIdentifier") << "" << "h = (void*)(1+2);" << false;
+    NO_CHANGE("int i = sizeof((void*)m);");
+    NO_CHANGE("(void*)m;");
+    NO_CHANGE("h = (void*)(1+2);");
 }
 
 
@@ -370,38 +430,38 @@ TEST_FUNCTION(structInitializers)
 {
     TEST_DATA_COLUMNS;
     // Struct initializers
-    QTest::newRow("structInitEqual1") << "" << "struct list_head foo = { h->next, h->prev };" << false;
-    QTest::newRow("structInitEqual2") << "" << "struct list_head foo = { m->list.next, m->list.prev };" << false;
-    QTest::newRow("structInitEqual3") << "" << "struct list_head foo = { .prev = h, .next = h };" << false;
-    QTest::newRow("structInitEqual4") << "" << "struct list_head foo = { &m->list, &m->list };" << false;
-    QTest::newRow("structInitEqual5") << "" << "struct module foo = { .foo = 0, .list = { h, h } };" << false;
-    QTest::newRow("structInitEqual6") << "" << "struct module foo = { .foo = 0 };" << false;
-    QTest::newRow("structInitEqual7") << "" << "struct module foo = { .list = { h, h } };" << false;
-    QTest::newRow("structInitEqual8") << "" << "struct module foo = { 0, { h, h } };" << false;
+    NO_CHANGE("struct list_head foo = { h->next, h->prev };");
+    NO_CHANGE("struct list_head foo = { m->list.next, m->list.prev };");
+    NO_CHANGE("struct list_head foo = { .prev = h, .next = h };");
+    NO_CHANGE("struct list_head foo = { &m->list, &m->list };");
+    NO_CHANGE("struct module foo = { .foo = 0, .list = { h, h } };");
+    NO_CHANGE("struct module foo = { .foo = 0 };");
+    NO_CHANGE("struct module foo = { .list = { h, h } };");
+    NO_CHANGE("struct module foo = { 0, { h, h } };");
 
-    QTest::newRow("structInitChanges1") << "" << "struct list_head foo = { .prev = m, .next = h };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("structInitChanges2") << "" << "struct list_head foo = { .prev = (struct list_head*)m, .next = h };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("structInitChanges3") << "" << "struct list_head foo = { .prev = (struct list_head*)m->foo, .next = h };" << true
-        << "m" << "Struct(module)" << "foo" << "Pointer->Struct(list_head)";
-    QTest::newRow("structInitChanges4") << "" << "struct module foo = { m, { h, h } };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Int32";
-    QTest::newRow("structInitChanges5") << "" << "struct module foo = { 0, { m, h } };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("structInitChanges6") << "" << "struct module foo = { .foo = m, .list = { h, h } };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Int32";
-    QTest::newRow("structInitChanges7") << "" << "struct module foo = { .foo = 0, .list = { m, h } };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("structInitChanges8") << "" << "struct module foo = { .foo = m };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Int32";
-    QTest::newRow("structInitChanges9") << "" << "struct module foo = { .list = { m, h } };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("structInitChanges10") << "" << "struct module foo = { .list = { h, m } };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("structInitChanges11") << "struct bar { int i; int (*func)(); };\nint ifunc() { return 0; }" << "struct bar foo = { .func = m };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "FuncPointer->Int32";
-    QTest::newRow("structInitChanges12") << "struct bar { int i; int (*func)(); };\nint ifunc() { return 0; }" << "struct bar foo = { .func = ifunc };" << false;
+    CHANGE_LAST("struct list_head foo = { .prev = m, .next = h };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("struct list_head foo = { .prev = (struct list_head*)m, .next = h };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("struct list_head foo = { .prev = (struct list_head*)m->foo, .next = h };",
+        "m", "Struct(module)", "foo", "Pointer->Struct(list_head)");
+    CHANGE_LAST("struct module foo = { m, { h, h } };",
+        "m", "Pointer->Struct(module)", "", "Int32");
+    CHANGE_LAST("struct module foo = { 0, { m, h } };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("struct module foo = { .foo = m, .list = { h, h } };",
+        "m", "Pointer->Struct(module)", "", "Int32");
+    CHANGE_LAST("struct module foo = { .foo = 0, .list = { m, h } };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("struct module foo = { .foo = m };",
+        "m", "Pointer->Struct(module)", "", "Int32");
+    CHANGE_LAST("struct module foo = { .list = { m, h } };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("struct module foo = { .list = { h, m } };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST2("struct bar { int i; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo = { .func = m };",
+        "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+    NO_CHANGE2("struct bar { int i; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo = { .func = ifunc };");
 }
 
 
@@ -409,31 +469,31 @@ TEST_FUNCTION(designatedInitializers)
 {
 	TEST_DATA_COLUMNS;
 	// Designated struct initializers
-    QTest::newRow("designatedInitEqual1") << "struct list_head foo;\n" << "foo = (struct list_head){ h->next, h->prev };" << false;
-    QTest::newRow("designatedInitEqual2") << "struct list_head foo;\n" << "foo = (struct list_head){ m->list.next, m->list.prev };" << false;
-    QTest::newRow("designatedInitEqual3") << "struct list_head foo;\n" << "foo = (struct list_head){ .prev = h, .next = h };" << false;
-    QTest::newRow("designatedInitEqual4") << "struct list_head foo;\n" << "foo = (struct list_head){ &m->list, &m->list };" << false;
-    QTest::newRow("designatedInitEqual5") << "struct module foo;\n" << "foo = (struct module){ .foo = 0, .list = { h, h } };" << false;
-    QTest::newRow("designatedInitEqual6") << "struct module foo;\n" << "foo = (struct module){ 0, { h, h } };" << false;
+	NO_CHANGE2("struct list_head foo;\n", "foo = (struct list_head){ h->next, h->prev };");
+	NO_CHANGE2("struct list_head foo;\n", "foo = (struct list_head){ m->list.next, m->list.prev };");
+	NO_CHANGE2("struct list_head foo;\n", "foo = (struct list_head){ .prev = h, .next = h };");
+	NO_CHANGE2("struct list_head foo;\n", "foo = (struct list_head){ &m->list, &m->list };");
+	NO_CHANGE2("struct module foo;\n", "foo = (struct module){ .foo = 0, .list = { h, h } };");
+	NO_CHANGE2("struct module foo;\n", "foo = (struct module){ 0, { h, h } };");
 
-    QTest::newRow("designatedInitChanges1") << "struct list_head foo;\n" << "struct list_head foo = { .prev = m, .next = h };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("designatedInitChanges2") << "struct list_head foo;\n" << "struct list_head foo = { .prev = (struct list_head*)m, .next = h };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("designatedInitChanges3") << "struct list_head foo;\n" << "struct list_head foo = { .prev = (struct list_head*)m->foo, .next = h };" << true
-        << "m" << "Struct(module)" << "foo" << "Pointer->Struct(list_head)";
-    QTest::newRow("designatedInitChanges4") << "struct module foo;\n" << "foo = (struct module){ m, { h, h } };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Int32";
-    QTest::newRow("designatedInitChanges5") << "struct module foo;\n" << "foo = (struct module){ 0, { m, h } };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("designatedInitChanges6") << "struct module foo;\n" << "foo = (struct module){ h, { 0, 0 } };" << true
-        << "h" << "Pointer->Struct(list_head)" << "" << "Int32";
-    QTest::newRow("designatedInitChanges7") << "struct module foo;\n" << "foo = (struct module){ .foo = m, .list = { h, h } };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Int32";
-    QTest::newRow("designatedInitChanges8") << "struct module foo;\n" << "foo = (struct module){ .foo = 0, .list = { m, h } };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("designatedInitChanges9") << "struct module foo;\n" << "foo = (struct module){ .foo = h, .list = { 0, 0 } };" << true
-        << "h" << "Pointer->Struct(list_head)" << "" << "Int32";
+    CHANGE_LAST2("struct list_head foo;\n", "struct list_head foo = { .prev = m, .next = h };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST2("struct list_head foo;\n", "struct list_head foo = { .prev = (struct list_head*)m, .next = h };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST2("struct list_head foo;\n", "struct list_head foo = { .prev = (struct list_head*)m->foo, .next = h };",
+        "m", "Struct(module)", "foo", "Pointer->Struct(list_head)");
+    CHANGE_LAST2("struct module foo;\n", "foo = (struct module){ m, { h, h } };",
+        "m", "Pointer->Struct(module)", "", "Int32");
+    CHANGE_LAST2("struct module foo;\n", "foo = (struct module){ 0, { m, h } };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST2("struct module foo;\n", "foo = (struct module){ h, { 0, 0 } };",
+        "h", "Pointer->Struct(list_head)", "", "Int32");
+    CHANGE_LAST2("struct module foo;\n", "foo = (struct module){ .foo = m, .list = { h, h } };",
+        "m", "Pointer->Struct(module)", "", "Int32");
+    CHANGE_LAST2("struct module foo;\n", "foo = (struct module){ .foo = 0, .list = { m, h } };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST2("struct module foo;\n", "foo = (struct module){ .foo = h, .list = { 0, 0 } };",
+        "h", "Pointer->Struct(list_head)", "", "Int32");
 }
 
 
@@ -441,26 +501,29 @@ TEST_FUNCTION(arrayInitializers)
 {
     TEST_DATA_COLUMNS;
     // Array initializers
-    QTest::newRow("arrayInitEqual1") << "" << "struct list_head a[2] = { {h, h}, {h, h} };" << false;
-    QTest::newRow("arrayInitEqual2") << "" << "struct list_head a[2] = { [0] = {h, h} };" << false;
-    QTest::newRow("arrayInitEqual3") << "" << "struct list_head a[2] = { [0] = { .prev = h, .next = h } };" << false;
-    QTest::newRow("arrayInitEqual4") << "" << "struct module* a[2] = { m, m };" << false;
-    QTest::newRow("arrayInitEqual5") << "" << "struct module* a[2] = { [0] = m };" << false;
+    NO_CHANGE("struct list_head a[2] = { {h, h}, {h, h} };");
+    NO_CHANGE("struct list_head a[2] = { [0] = {h, h} };");
+    NO_CHANGE("struct list_head a[2] = { [0] = { .prev = h, .next = h } };");
+    NO_CHANGE("struct module* a[2] = { m, m };");
+    NO_CHANGE("struct module* a[2] = { [0] = m };");
+    NO_CHANGE2("enum en { enVal1, enVal2, enSize };",
+              "int array[enSize][enSize] = { [enVal1] = { 0, 1 }, [enVal2] = { 2, 3 } };");
 
-    QTest::newRow("arrayInitChange1") << "" << "struct list_head a[2] = { {h, m}, {h, h} };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("arrayInitChange2") << "" << "struct list_head a[2] = { {h, h}, {h, m} };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("arrayInitChange3") << "" << "struct list_head a[2] = { [0] = {h, m} };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("arrayInitChange4") << "" << "struct list_head a[2] = { [0] = { .prev = m, .next = h} };" << true
-        << "m" << "Pointer->Struct(module)" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("arrayInitChange5") << "" << "struct module* a[2] = { h->next, m };" << true
-        << "h" << "Struct(list_head)" << "next" << "Pointer->Struct(module)";
-    QTest::newRow("arrayInitChange6") << "" << "struct module* a[2] = { h->prev, m };" << true
-        << "h" << "Struct(list_head)" << "prev" << "Pointer->Struct(module)";
-    QTest::newRow("arrayInitChange7") << "" << "struct module* a[2] = { [0] = h->prev };" << true
-        << "h" << "Struct(list_head)" << "prev" << "Pointer->Struct(module)";
+    CHANGE_LAST("struct list_head a[2] = { {h, m}, {h, h} };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("struct list_head a[2] = { {h, h}, {h, m} };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("struct list_head a[2] = { [0] = {h, m} };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("struct list_head a[2] = { [0] = { .prev = m, .next = h} };",
+        "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("struct module* a[2] = { h->next, m };",
+        "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("struct module* a[2] = { h->prev, m };",
+        "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+    CHANGE_LAST("struct module* a[2] = { [0] = h->prev };",
+        "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+
 }
 
 
@@ -468,13 +531,13 @@ TEST_FUNCTION(returnValues)
 {
     TEST_DATA_COLUMNS;
     // Return values
-    QTest::newRow("returnNoValue") << "struct module* foo() { return; }" << "" << false;
-    QTest::newRow("returnNullValue") << "struct module* foo() { return 0; }" << "" << false;
-    QTest::newRow("returnSameValue") << "struct module* foo(struct module* p) { return p; }" << "" << false;
-    QTest::newRow("returnDifferentValue") << "struct module* foo(void* p) { return p; }" << "" << true
-        << "p" << "Pointer->Void" << "" << "Pointer->Struct(module)";
-    QTest::newRow("returnDifferentValue") << "struct module* foo(long i) { return i; }" << "" << true
-        << "i" << "Int32" << "" << "Pointer->Struct(module)";
+    NO_CHANGE2("struct module* foo() { return; }", "");
+    NO_CHANGE2("struct module* foo() { return 0; }", "");
+    NO_CHANGE2("struct module* foo(struct module* p) { return p; }", "");
+    CHANGE_LAST2("struct module* foo(void* p) { return p; }", "",
+        "p", "Pointer->Void", "", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct module* foo(long i) { return i; }", "",
+        "i", "Int32", "", "Pointer->Struct(module)");
 }
 
 
@@ -482,20 +545,20 @@ TEST_FUNCTION(functionDefsDecls)
 {
     TEST_DATA_COLUMNS;
     // Function definitions
-    QTest::newRow("funcPtr1") << "int foo() { return 0; }" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr2") << "int* foo() { return 0; }" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr3") << "int** foo() { return 0; }" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    CHANGE_LAST2("int foo() { return 0; }", "void* p = foo;",
+        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int* foo() { return 0; }", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int** foo() { return 0; }", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 
     // Function declarations
-    QTest::newRow("funcPtr4") << "int foo();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr5") << "int* foo();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr6") << "int** foo();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    CHANGE_LAST2("int foo();", "void* p = foo;",
+        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int* foo();", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int** foo();", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 }
 
 
@@ -503,24 +566,24 @@ TEST_FUNCTION(functionPointers)
 {
     TEST_DATA_COLUMNS;
     // Function pointers
-    QTest::newRow("funcPtr7") << "int   (  foo)();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr8") << "int*  (  foo)();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr9") << "int** (  foo)();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr10") << "int   (* foo)();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr11") << "int*  (* foo)();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr12") << "int** (* foo)();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr13") << "int   (**foo)();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr14") << "int*  (**foo)();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr15") << "int** (**foo)();" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    CHANGE_LAST2("int   (  foo)();", "void* p = foo;",
+        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int*  (  foo)();", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int** (  foo)();", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int   (* foo)();", "void* p = foo;",
+        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int*  (* foo)();", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int** (* foo)();", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int   (**foo)();", "void* p = foo;",
+        "foo", "FuncPointer->FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int*  (**foo)();", "void* p = foo;",
+        "foo", "FuncPointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int** (**foo)();", "void* p = foo;",
+        "foo", "FuncPointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 }
 
 
@@ -528,24 +591,24 @@ TEST_FUNCTION(functionPointerTypedefs)
 {
     TEST_DATA_COLUMNS;
     // Function pointer typedefs
-    QTest::newRow("funcPtr16") << "typedef int   (  foodef)(); foodef foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr17") << "typedef int*  (  foodef)(); foodef foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr18") << "typedef int** (  foodef)(); foodef foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr19") << "typedef int   (* foodef)(); foodef foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr20") << "typedef int*  (* foodef)(); foodef foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr21") << "typedef int** (* foodef)(); foodef foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr22") << "typedef int   (**foodef)(); foodef foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr23") << "typedef int*  (**foodef)(); foodef foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr24") << "typedef int** (**foodef)(); foodef foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    CHANGE_LAST2("typedef int   (  foodef)(); foodef foo;", "void* p = foo;",
+        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (  foodef)(); foodef foo;", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (  foodef)(); foodef foo;", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int   (* foodef)(); foodef foo;", "void* p = foo;",
+        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (* foodef)(); foodef foo;", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (* foodef)(); foodef foo;", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int   (**foodef)(); foodef foo;", "void* p = foo;",
+        "foo", "FuncPointer->FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (**foodef)(); foodef foo;", "void* p = foo;",
+        "foo", "FuncPointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (**foodef)(); foodef foo;", "void* p = foo;",
+        "foo", "FuncPointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 }
 
 
@@ -553,24 +616,24 @@ TEST_FUNCTION(functionPointerParams)
 {
     TEST_DATA_COLUMNS;
     // Function pointer parameters
-    QTest::newRow("funcPtr25") << "void func(int   (  foo)()) { void* p = foo; }" << "" << true
-        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr26") << "void func(int*  (  foo)()) { void* p = foo; }" << "" << true
-        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr27") << "void func(int** (  foo)()) { void* p = foo; }" << "" << true
-        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr28") << "void func(int   (* foo)()) { void* p = foo; }" << "" << true
-        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr29") << "void func(int*  (* foo)()) { void* p = foo; }" << "" << true
-        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr30") << "void func(int** (* foo)()) { void* p = foo; }" << "" << true
-        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr31") << "void func(int   (**foo)()) { void* p = foo; }" << "" << true
-        << "foo" << "FuncPointer->FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr32") << "void func(int*  (**foo)()) { void* p = foo; }" << "" << true
-        << "foo" << "FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr33") << "void func(int** (**foo)()) { void* p = foo; }" << "" << true
-        << "foo" << "FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    CHANGE_LAST2("void func(int   (  foo)()) { void* p = foo; }", "",
+        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("void func(int*  (  foo)()) { void* p = foo; }", "",
+        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("void func(int** (  foo)()) { void* p = foo; }", "",
+        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("void func(int   (* foo)()) { void* p = foo; }", "",
+        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("void func(int*  (* foo)()) { void* p = foo; }", "",
+        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("void func(int** (* foo)()) { void* p = foo; }", "",
+        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("void func(int   (**foo)()) { void* p = foo; }", "",
+        "foo", "FuncPointer->FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("void func(int*  (**foo)()) { void* p = foo; }", "",
+        "foo", "FuncPointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("void func(int** (**foo)()) { void* p = foo; }", "",
+        "foo", "FuncPointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 }
 
 
@@ -578,24 +641,24 @@ TEST_FUNCTION(functionPointerInvocations)
 {
     TEST_DATA_COLUMNS;
     // Function pointer invocations
-    QTest::newRow("funcPtr34") << "int   (  foo)();" << "void* p = foo();" << true
-        << "foo" << "Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr35") << "int*  (  foo)();" << "void* p = foo();" << true
-        << "foo" << "Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr36") << "int** (  foo)();" << "void* p = foo();" << true
-        << "foo" << "Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr37") << "int   (* foo)();" << "void* p = foo();" << true
-        << "foo" << "Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr38") << "int*  (* foo)();" << "void* p = foo();" << true
-        << "foo" << "Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr39") << "int** (* foo)();" << "void* p = foo();" << true
-        << "foo" << "Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr40") << "int   (**foo)();" << "void* p = foo();" << true
-        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr41") << "int*  (**foo)();" << "void* p = foo();" << true
-        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr42") << "int** (**foo)();" << "void* p = foo();" << true
-        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    CHANGE_LAST2("int   (  foo)();", "void* p = foo();",
+        "foo", "Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int*  (  foo)();", "void* p = foo();",
+        "foo", "Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int** (  foo)();", "void* p = foo();",
+        "foo", "Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int   (* foo)();", "void* p = foo();",
+        "foo", "Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int*  (* foo)();", "void* p = foo();",
+        "foo", "Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int** (* foo)();", "void* p = foo();",
+        "foo", "Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int   (**foo)();", "void* p = foo();",
+        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int*  (**foo)();", "void* p = foo();",
+        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("int** (**foo)();", "void* p = foo();",
+        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 }
 
 
@@ -603,43 +666,43 @@ TEST_FUNCTION(funcPtrTypdefPtrs)
 {
     TEST_DATA_COLUMNS;
     // Pointers of function pointer typedefs
-    QTest::newRow("funcPtr43") << "typedef int   (  foodef)(); foodef *foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr44") << "typedef int*  (  foodef)(); foodef *foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr45") << "typedef int** (  foodef)(); foodef *foo;" << "void* p = foo;" << true
-        << "foo" << "FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr46") << "typedef int   (* foodef)(); foodef *foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr47") << "typedef int*  (* foodef)(); foodef *foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr48") << "typedef int** (* foodef)(); foodef *foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr49") << "typedef int   (**foodef)(); foodef *foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->FuncPointer->FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr50") << "typedef int*  (**foodef)(); foodef *foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr51") << "typedef int** (**foodef)(); foodef *foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    CHANGE_LAST2("typedef int   (  foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (  foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (  foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int   (* foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (* foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (* foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int   (**foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "Pointer->FuncPointer->FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (**foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "Pointer->FuncPointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (**foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 
-    QTest::newRow("funcPtr52") << "typedef int   (  foodef)(); foodef **foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr53") << "typedef int*  (  foodef)(); foodef **foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr54") << "typedef int** (  foodef)(); foodef **foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr55") << "typedef int   (* foodef)(); foodef **foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->Pointer->FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr56") << "typedef int*  (* foodef)(); foodef **foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->Pointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr57") << "typedef int** (* foodef)(); foodef **foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr58") << "typedef int   (**foodef)(); foodef **foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->Pointer->FuncPointer->FuncPointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr59") << "typedef int*  (**foodef)(); foodef **foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->Pointer->FuncPointer->FuncPointer->Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr60") << "typedef int** (**foodef)(); foodef **foo;" << "void* p = foo;" << true
-        << "foo" << "Pointer->Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    CHANGE_LAST2("typedef int   (  foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (  foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (  foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int   (* foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (* foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (* foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int   (**foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->FuncPointer->FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (**foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->FuncPointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (**foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 }
 
 
@@ -647,56 +710,51 @@ TEST_FUNCTION(funcPtrTypdefPtrInvocations)
 {
     TEST_DATA_COLUMNS;
     // Invocation of pointers of function pointer typedefs
-    QTest::newRow("funcPtr61") << "typedef int   (  foodef)(); foodef *foo;" << "void* p = foo();" << true
-        << "foo" << "Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr62") << "typedef int*  (  foodef)(); foodef *foo;" << "void* p = foo();" << true
-        << "foo" << "Pointer->Int32" << "" << "Pointer->Void";
-    QTest::newRow("funcPtr63") << "typedef int** (  foodef)(); foodef *foo;" << "void* p = foo();" << true
-        << "foo" << "Pointer->Pointer->Int32" << "" << "Pointer->Void";
+    CHANGE_LAST2("typedef int   (  foodef)(); foodef *foo;", "void* p = foo();",
+        "foo", "Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (  foodef)(); foodef *foo;", "void* p = foo();",
+        "foo", "Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (  foodef)(); foodef *foo;", "void* p = foo();",
+        "foo", "Pointer->Pointer->Int32", "", "Pointer->Void");
 
     // Illegal invocation of pointers of function pointer typedefs
-    QTest::newRow("funcPtr64") << "typedef int   (* foodef)(); foodef *foo;" << "void* p = foo();" << true
-        << "" << "" << "" << ""
-        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->Int32\" at :25:17";
-    QTest::newRow("funcPtr65") << "typedef int*  (* foodef)(); foodef *foo;" << "void* p = foo();" << true
-        << "" << "" << "" << ""
-        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->Pointer->Int32\" at :25:17";
-    QTest::newRow("funcPtr66") << "typedef int** (* foodef)(); foodef *foo;" << "void* p = foo();" << true
-        << "" << "" << "" << ""
-        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17";
-    QTest::newRow("funcPtr67") << "typedef int   (**foodef)(); foodef *foo;" << "void* p = foo();" << true
-        << "" << "" << "" << ""
-        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Int32\" at :25:17";
-    QTest::newRow("funcPtr68") << "typedef int*  (**foodef)(); foodef *foo;" << "void* p = foo();" << true
-        << "" << "" << "" << ""
-        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Pointer->Int32\" at :25:17";
-    QTest::newRow("funcPtr69") << "typedef int** (**foodef)(); foodef *foo;" << "void* p = foo();" << true
-        << "" << "" << "" << ""
-        << "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17";
+    EXCEPTIONAL("typedef int   (* foodef)(); foodef *foo;", "void* p = foo();",
+        "Expected a function pointer type here instead of \"Pointer->FuncPointer->Int32\" at :25:17");
+    EXCEPTIONAL("typedef int*  (* foodef)(); foodef *foo;", "void* p = foo();",
+        "Expected a function pointer type here instead of \"Pointer->FuncPointer->Pointer->Int32\" at :25:17");
+    EXCEPTIONAL("typedef int** (* foodef)(); foodef *foo;", "void* p = foo();",
+        "Expected a function pointer type here instead of \"Pointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17");
+    EXCEPTIONAL("typedef int   (**foodef)(); foodef *foo;", "void* p = foo();",
+        "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Int32\" at :25:17");
+    EXCEPTIONAL("typedef int*  (**foodef)(); foodef *foo;", "void* p = foo();",
+        "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Pointer->Int32\" at :25:17");
+    EXCEPTIONAL("typedef int** (**foodef)(); foodef *foo;", "void* p = foo();",
+        "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17");
 }
 
 
 TEST_FUNCTION(logicalExpressions)
 {
     TEST_DATA_COLUMNS;
+
     // Usage in logical expressions
-    QTest::newRow("equalityExpr1") << "" << "char *p, *q; int i; i = p == q;" << false;
-    QTest::newRow("equalityExpr2") << "" << "char *p, *q; int i; i = p == i;" << false;
-    QTest::newRow("equalityExpr3") << "" << "char *p, *q; int i = p == q;" << false;
-    QTest::newRow("equalityExpr4") << "" << "char *p, *q; int i = p == i;" << false;
-    QTest::newRow("equalityExpr5") << "" << "char *p, *q; int i; i = p != q;" << false;
-    QTest::newRow("equalityExpr6") << "" << "char *p, *q; int i; i = p != i;" << false;
-    QTest::newRow("equalityExpr7") << "" << "char *p, *q; int i = p != q;" << false;
-    QTest::newRow("equalityExpr8") << "" << "char *p, *q; int i = p != i;" << false;
+    NO_CHANGE("char *p, *q; int i; i = p == q;");
+    NO_CHANGE("char *p, *q; int i; i = p == i;");
+    NO_CHANGE("char *p, *q; int i = p == q;");
+    NO_CHANGE("char *p, *q; int i = p == i;");
+    NO_CHANGE("char *p, *q; int i; i = p != q;");
+    NO_CHANGE("char *p, *q; int i; i = p != i;");
+    NO_CHANGE("char *p, *q; int i = p != q;");
+    NO_CHANGE("char *p, *q; int i = p != i;");
 
-    QTest::newRow("relationalExpr1") << "" << "char *p, *q; int i; i = p < q;" << false;
-    QTest::newRow("relationalExpr2") << "" << "char *p, *q; int i; i = p <= q;" << false;
-    QTest::newRow("relationalExpr3") << "" << "char *p, *q; int i; i = p > q;" << false;
-    QTest::newRow("relationalExpr4") << "" << "char *p, *q; int i; i = p >= q;" << false;
+    NO_CHANGE("char *p, *q; int i; i = p < q;");
+    NO_CHANGE("char *p, *q; int i; i = p <= q;");
+    NO_CHANGE("char *p, *q; int i; i = p > q;");
+    NO_CHANGE("char *p, *q; int i; i = p >= q;");
 
-    QTest::newRow("logicalAndExpr") << "" << "char *p, *q; int i; i = p && q;" << false;
-    QTest::newRow("logicalOrExpr") << "" << "char *p, *q; int i; i = p || q;" << false;
-    QTest::newRow("unaryNotExpr") << "" << "char *p; int i; i = !q;" << false;
+    NO_CHANGE("char *p, *q; int i; i = p && q;");
+    NO_CHANGE("char *p, *q; int i; i = p || q;");
+    NO_CHANGE("char *p; int i; i = !p;");
 }
 
 
@@ -704,43 +762,243 @@ TEST_FUNCTION(castExpressions)
 {
     TEST_DATA_COLUMNS;
     // Cast expressions
-    QTest::newRow("castExpr1") << "" << "char *p, *q; p = (char*)q;" << false;
-    QTest::newRow("castExpr2") << "" << "char *p; int i; p = (char*)i;" << true
-        << "i" << "Int32" << "" << "Pointer->Int8";
-    QTest::newRow("castExpr3") << "" << "char *p ,*q; int i; p = (char*)(q + i);" << false;
-    QTest::newRow("castExpr4") << "" << "void *p; int i; p = (void*)((char*)p + i);" << false;
-    QTest::newRow("castExpr5") << "" << "char *p; int i; p = (void*)((char*)p + i);" << false;
-    QTest::newRow("castExpr6") << "" << "void *p; char* q; int i; p = (void*)((char*)q + i);" << true
-        << "q" << "Pointer->Int8" << "" << "Pointer->Void";
-    QTest::newRow("castExpr7") << "" << "void *p; char* q; int i; p = (void*)(q + i);" << true
-        << "q" << "Pointer->Int8" << "" << "Pointer->Void";
-    QTest::newRow("castExpr8") << "" << "void *p; char* q; int i; q = (void*)((char*)p + i);" << true
-        << "p" << "Pointer->Void" << "" << "Pointer->Int8";
-    QTest::newRow("castExpr9") << "" << "void *p; char* q; int i; q = ((char*)p + i);" << true
-        << "p" << "Pointer->Void" << "" << "Pointer->Int8";
-    QTest::newRow("castExpr10") << "" << "int *p; int i; i = *p;" << false;
-    QTest::newRow("castExpr11") << "" << "void *p; int i; i = *((char*)p);" << true
-        << "p" << "Pointer->Void" << "" << "Pointer->Int8";
-    QTest::newRow("castExpr12") << "" << "void *p; int i; i = ((char*)p);" << true
-        << "p" << "Pointer->Void" << "" << "Int32";
-    QTest::newRow("castExpr13") << "" << "modules.next = (h)->next;" << false;
-    QTest::newRow("castExpr14") << "" << "modules.next = ((struct list_head *)h)->next;" << false;
-    QTest::newRow("castExpr15") << "" << "modules.next = ((h))->next;" << false;
-    QTest::newRow("castExpr16") << "" << "modules.next = (((struct list_head *)h))->next;" << false;
-    QTest::newRow("castExpr17") << "" << "modules.next = ((struct list_head *)(h))->next;" << false;
-    QTest::newRow("castExpr18") << "" << "modules.next = (struct list_head *)(h)->next;" << false;
-    QTest::newRow("castExpr19") << "" << "modules.next = (struct list_head *)h->next;" << false;
-    QTest::newRow("castExpr20") << "" << "void *p; modules.next = ((struct list_head *)p)->next;" << true
-                                << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("castExpr21") << "" << "void *p; modules.next = (((struct list_head *)p))->next;" << true
-                                << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("castExpr22") << "" << "void *p; modules.next = ((struct list_head *)(p))->next;" << true
-                                << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
+    NO_CHANGE("char *p, *q; p = (char*)q;");
+    CHANGE_LAST("char *p; int i; p = (char*)i;",
+        "i", "Int32", "", "Pointer->Int8");
+    NO_CHANGE("char *p ,*q; int i; p = (char*)(q + i);");
+    NO_CHANGE("void *p; int i; p = (void*)((char*)p + i);");
+    NO_CHANGE("char *p; int i; p = (void*)((char*)p + i);");
+    CHANGE_LAST("void *p; char* q; int i; p = (void*)((char*)q + i);",
+        "q", "Pointer->Int8", "", "Pointer->Void");
+    CHANGE_LAST("void *p; char* q; int i; p = (void*)(q + i);",
+        "q", "Pointer->Int8", "", "Pointer->Void");
+    CHANGE_LAST("void *p; char* q; int i; q = (void*)((char*)p + i);",
+        "p", "Pointer->Void", "", "Pointer->Int8");
+    CHANGE_LAST("void *p; char* q; int i; q = ((char*)p + i);",
+        "p", "Pointer->Void", "", "Pointer->Int8");
+    NO_CHANGE("int *p; int i; i = *p;");
+    CHANGE_LAST("void *p; int i; i = *((char*)p);",
+        "p", "Pointer->Void", "", "Pointer->Int8");
+    CHANGE_LAST("void *p; int i; i = ((char*)p);",
+        "p", "Pointer->Void", "", "Int32");
+    NO_CHANGE("modules.next = (h)->next;");
+    NO_CHANGE("modules.next = ((struct list_head *)h)->next;");
+    NO_CHANGE("modules.next = ((h))->next;");
+    NO_CHANGE("modules.next = (((struct list_head *)h))->next;");
+    NO_CHANGE("modules.next = ((struct list_head *)(h))->next;");
+    NO_CHANGE("modules.next = (struct list_head *)(h)->next;");
+    NO_CHANGE("modules.next = (struct list_head *)h->next;");
+    CHANGE_LAST("void *p; modules.next = ((struct list_head *)p)->next;",
+                "p", "Pointer->Void", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("void *p; modules.next = (((struct list_head *)p))->next;",
+                "p", "Pointer->Void", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("void *p; modules.next = ((struct list_head *)(p))->next;",
+                "p", "Pointer->Void", "", "Pointer->Struct(list_head)");
 
-    QTest::newRow("castExpr23") << "" << "void *p; m = (struct module*)((struct list_head*)p)->next;" << true
-                               << "p" << "Pointer->Void" << "" << "Pointer->Struct(list_head)";
-    QTest::newRow("castExpr24") << "" << "m = (struct module*)(h)->next;" << true
-                                << "h" << "Struct(list_head)" << "next" << "Pointer->Struct(module)";
+    CHANGE_LAST("void *p; m = (struct module*)((struct list_head*)p)->next;",
+                "p", "Pointer->Void", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST("m = (struct module*)(h)->next;",
+                "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+}
+
+
+TEST_FUNCTION(conditionalExpressions)
+{
+    TEST_DATA_COLUMNS;
+    // Cast expressions
+    NO_CHANGE2("struct bus_type { char* name; }; "
+              "struct dev_type { struct bus_type* bus; }; "
+              "char* f(struct dev_type* dev) { return dev->bus ? dev->bus->name : \"\"; }", "");
+    CHANGE_LAST2("struct bus_type { char* name; }; "
+                "struct dev_type { struct bus_type* bus; }; "
+                "void* f(struct dev_type* dev) { return dev->bus ? dev->bus->name : \"\"; }",
+                "",
+                "dev", "Struct(bus_type)", "name", "Pointer->Void");
+}
+
+
+TEST_FUNCTION(pointerDerefByArrayOperator)
+{
+    TEST_DATA_COLUMNS;
+    // For pointers dereferenced by an array operator, the context type is the
+    // type embedding the pointer member, in this case "struct foo"
+    CHANGE_LAST2("struct foo { struct foo* next; }; struct bar { struct foo *f; };",
+                "struct bar b; void *p = b.f[0].next;",
+                "b", "Struct(foo)", "next", "Pointer->Void");
+    // For arrays dereferenced by an array operator, the context type is the
+    // type embedding the array, in this case "struct bar"
+    CHANGE_LAST2("struct foo { struct foo* next; }; struct bar { struct foo f[4]; };",
+                "struct bar b; void *p = b.f[0].next;",
+                "b", "Struct(bar)", "f.next", "Pointer->Void");
+    // If the source symbol is dereferenced, there is no difference in whether
+    // it was defined as an array or as a pointer.
+    CHANGE_LAST2("struct foo { struct foo* next; };",
+                "struct foo *f; void *p = f[0].next;",
+                "f", "Struct(foo)", "next", "Pointer->Void");
+    CHANGE_LAST2("struct foo { struct foo* next; };",
+                "struct foo f[4]; void *p = f[0].next;",
+                "f", "Struct(foo)", "next", "Pointer->Void");
+}
+
+
+TEST_FUNCTION(compoundBraces)
+{
+    TEST_DATA_COLUMNS;
+    NO_CHANGE("modules.next = ({ int i = 0, j = 1; i += j; h->next; });");
+    CHANGE_LAST("modules.next = ({ void *p; p; });",
+                "p", "Pointer->Void", "", "Pointer->Struct(list_head)");
+
+}
+
+
+TEST_FUNCTION(transitiveEvaluation)
+{
+    TEST_DATA_COLUMNS;
+    // Simple transitive change
+    CHANGE_FIRST("void *p = modules.next; m = p;",
+                "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("void *p = modules.next; m = p;",
+                 "p", "Pointer->Void", "", "Pointer->Struct(module)");
+    // Double indirect change through void
+    CHANGE_FIRST("void *p = modules.next, *q = p; m = q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("void *p = modules.next, *q = p; m = q;",
+                "q", "Pointer->Void", "", "Pointer->Struct(module)");
+    // Indirect change through list_head
+    CHANGE_FIRST("h = modules.next; m = h;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("h = modules.next; m = h;",
+                "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    // Doubly indirect change through list_head and void
+    CHANGE_FIRST("h = modules.next; void* p = h; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("h = modules.next; void* p = h; m = p;",
+                "p", "Pointer->Void", "", "Pointer->Struct(module)");
+    // Indirect change through long
+    CHANGE_FIRST("long i = (long)modules.next; m = (struct modules*)i;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("long i = (long)modules.next; m = (struct modules*)i;",
+                "i", "Int32", "", "Pointer->Struct(module)");
+    // Order of statements does not matter
+    CHANGE_FIRST("m = h; h = modules.next;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through function
+    CHANGE_FIRST2("void* getModule() { return modules.next; }",
+                  "m = getModule();",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through two functions
+    CHANGE_FIRST2("void* getModule() { return modules.next; }"
+                  "void* getModule2() { return getModule(); }",
+                  "m = getModule2();",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through function and variable
+    CHANGE_FIRST2("void* getModule() { return modules.next; }",
+                  "long l = getModule(); m = l;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through two functions and variable
+    CHANGE_FIRST2("void* getModule() { return modules.next; }"
+                  "void* getModule2() { return getModule(); }",
+                  "long l = getModule2(); m = l;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through function and variable
+    CHANGE_FIRST2("struct list_head* getModule() { return modules.next; }",
+                  "h = getModule(); m = h;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct list_head* getModule() { return modules.next; }",
+                 "h = getModule(); m = h;",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    NO_CHANGE2("struct list_head* getModule() { return modules.next; }",
+              "h = getModule();");
+    // Transitivity through 1 indirect pointer
+    CHANGE_FIRST("void *p, **q; q = &p; p = modules.next; m = p;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q; q = &p; p = modules.next; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q; q = &p; *q = modules.next; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q; q = &p; *q = modules.next; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+
+    CHANGE_FIRST("void *p = modules.next, **q = &p; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p = modules.next, **q = &p; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q = &p; *q  = modules.next; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q = &p; *q  = modules.next; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through 2 indirect pointers
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; p = modules.next; m = *q;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; p = modules.next; m = **r;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; *q = modules.next; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; *q = modules.next; m = **r;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; **r = modules.next; m = p;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; **r = modules.next; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    // Transitivity through 1 direct pointer
+    CHANGE_FIRST("void *p, **q; p = modules.next; *q = p; m = *q;",
+                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+
+    // Pointer sensitivity
+    CHANGE_FIRST("struct list_head **q; *q = modules.next; m = q;",
+                 "q", "Pointer->Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_FIRST("struct list_head **q; *q = modules.next; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("struct list_head **q; q = modules.next; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("struct list_head *p, **q; q = &p; p = modules.next; m = q;",
+                 "q", "Pointer->Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_FIRST("struct list_head *p, **q; q = &p; p = modules.next; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("struct list_head *p, **q; p = modules.next; *q = p; m = *q;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+
+    // Field sensitivity of assignments
+    CHANGE_FIRST("h->prev = modules.next; m = h->prev;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("h->prev->prev = modules.next; m = h->prev->prev;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("h->prev->next = modules.next; m = h->prev->next;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("h->prev = modules.next; m = h->prev->prev;",
+                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+    CHANGE_FIRST("h->prev->prev = modules.next; m = h->prev;",
+                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+    CHANGE_FIRST("h->next = modules.next; m = h->prev;",
+                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+    CHANGE_FIRST("h = modules.next; m = h->prev;",
+                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+    CHANGE_FIRST("h->next = modules.next; m = h;",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+
+    // Combination of bracket and arrow expressions
+    CHANGE_FIRST("struct list_head **ph; ph[0]->prev = modules.next; m = ph[0]->prev;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("struct list_head **ph; ph[0]->prev = modules.next; m = ph[1]->prev;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("struct list_head **ph; ph[0]->prev = modules.next; m = ph[0]->next;",
+                 "ph", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("struct list_head **ph; ph[0]->prev = modules.next; m = ph[0];",
+                 "ph", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+
+    // Nested expressions that work
+    CHANGE_FIRST("(h)->prev = modules.next; m = h->prev;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("h->prev = modules.next; m = (h)->prev;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+
+    // Nested expressions that are two different pointers to us, even though
+    // they are semantically the same
+    CHANGE_FIRST("(*h).prev = modules.next; m = h->prev;",
+                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+    CHANGE_FIRST("h->prev = modules.next; m = (*h).prev;",
+                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+
 }
 
 

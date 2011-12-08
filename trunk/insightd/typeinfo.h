@@ -9,7 +9,7 @@
 #define TYPEINFO_H_
 
 #include <QString>
-#include <QHash>
+#include <QMultiHash>
 #include <QVariant>
 #include <sys/types.h>
 
@@ -112,7 +112,7 @@ QHash<typename T::mapped_type, typename T::key_type> invertHash(T hash)
 }
 
 
-static const quint32 relevantHdr =
+static const quint32 RelevantHdr =
 	hsArrayType |
 	hsBaseType |
 	hsCompileUnit |
@@ -126,7 +126,7 @@ static const quint32 relevantHdr =
 	hsMember |
 	hsPointerType |
 	hsStructureType |
-//	hsSubprogram |
+	hsSubprogram |
 	hsSubrangeType |
 	hsSubroutineType |
 	hsTypedef |
@@ -135,8 +135,16 @@ static const quint32 relevantHdr =
 	hsVariable |
 	hsVolatileType;
 
-static const quint32 relevantParam =
-//	psAbstractOrigin |
+
+static const quint32 SubHdrTypes =
+    hsSubrangeType |
+    hsEnumerator |
+    hsMember |
+    hsFormalParameter;
+
+
+static const quint32 RelevantParam =
+	psAbstractOrigin |
 //	psArtificial |
 	psBitOffset |
 	psBitSize |
@@ -151,13 +159,13 @@ static const quint32 relevantParam =
 	psDeclLine |
 	psEncoding |
 //	psEntryPc |
-//	psExternal |
+	psExternal |
 //	psFrameBase |
-//	psHighPc |
-//	psInline |
+	psHighPc |
+	psInline |
 //	psLanguage |
 	psLocation |
-//	psLowPc |
+	psLowPc |
 	psName |
 //	psProducer |
 //	psPrototyped |
@@ -169,9 +177,13 @@ static const quint32 relevantParam =
 
 // forward declaration
 class StructuredMember;
+class FuncParam;
 
 /// A list of StructuredMember objects
 typedef QList<StructuredMember*> MemberList;
+
+/// A list of FuncParam objects
+typedef QList<FuncParam*> ParamList;
 
 /**
  * Holds all information about a parsed debugging symbol. Its main purpose is
@@ -180,7 +192,7 @@ typedef QList<StructuredMember*> MemberList;
 class TypeInfo
 {
 public:
-	typedef QHash<qint32, QString> EnumHash;
+	typedef QMultiHash<qint32, QString> EnumHash;
 
 	/**
 	 * Constructor
@@ -191,6 +203,11 @@ public:
 	 * Resets all data to their default (empty) values
 	 */
 	void clear();
+
+	void deleteParams();
+
+	bool isRelevant() const;
+	void setIsRelevant(bool value);
 
     const QString& name() const;
     void setName(QString name);
@@ -234,8 +251,20 @@ public:
     qint32 upperBound() const;
     void setUpperBound(qint32 bound);
 
+    int external() const;
+    void setExternal(int value);
+
     qint32 sibling() const;
     void setSibling(qint32 sibling);
+
+    bool inlined() const;
+    void setInlined(bool value);
+
+    size_t pcLow() const;
+    void setPcLow(size_t pc);
+
+    size_t pcHigh() const;
+    void setPcHigh(size_t pc);
 
     QVariant constValue() const;
     void setConstValue(QVariant value);
@@ -246,9 +275,13 @@ public:
     MemberList& members();
     const MemberList& members() const;
 
+    ParamList& params();
+    const ParamList& params() const;
+
     QString dump() const;
 
 private:
+	bool _isRelevant;
 	QString _name;           ///< holds the name of this symbol
 	QString _srcDir;         ///< holds the directory of the compile unit
 	int _srcFileId;          ///< holds the ID of the source file
@@ -259,14 +292,19 @@ private:
 	int _bitSize;            ///< holds the number of bits for a bit-split struct
 	int _bitOffset;          ///< holds the bit offset for a bit-split struct
 	size_t _location;        ///< holds the absolute offset offset of this symbol
+	int _external;			 ///< holds whether this is an external symbol
 	qint32 _dataMemberLoc;   ///< holds the offset relative offset of this symbol
 	qint32 _upperBound;      ///< holds the upper bound for an integer type symbol
 	qint32 _sibling;         ///< holds the sibling for a subprogram type symbol
+	bool _inlined;           ///< was the function inlined?
+	size_t _pcLow;           ///< low program counter of a function
+	size_t _pcHigh;          ///< high program counter of a function
 	QVariant _constValue;    ///< holds the value of an enumerator symbol
-	QHash<qint32, QString> _enumValues; ///< holds the enumeration values, if this symbol is an enumeration
+	EnumHash _enumValues; ///< holds the enumeration values, if this symbol is an enumeration
 	HdrSymbolType _symType;  ///< holds the type of this symbol
 	DataEncoding _enc;       ///< holds the data encoding of this symbol
 	MemberList _members;     ///< holds all members of a union or struct
+	ParamList _params;       ///< holds all parameters of a function (pointer)
 };
 
 

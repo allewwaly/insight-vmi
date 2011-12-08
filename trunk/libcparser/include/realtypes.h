@@ -40,9 +40,10 @@ enum RealType
 	rtVolatile    = (1 << 20),  //!< rtVolatile
 	rtTypedef     = (1 << 21),  //!< rtTypedef
 	rtFuncPointer = (1 << 22),  //!< rtFuncPointer
-	rtVoid		  = (1 << 23),  //!< rtVoid
-	rtVaList	  = (1 << 24)   //!< rtVaList
-//	rtFuncCall    = (1 << 25)
+	rtFunction    = (1 << 23),  //!< rtFunction
+	rtVoid		  = (1 << 24),  //!< rtVoid
+	rtVaList	  = (1 << 25)   //!< rtVaList
+//	rtFuncCall    = (1 << 26)
 };
 
 /// Bitmask with all signed integer-based RealType's
@@ -83,8 +84,14 @@ static const int NumericTypes =
     IntegerTypes |
     FloatingTypes;
 
+/// Bitmask with function types
+static const int FunctionTypes =
+    rtFuncPointer |
+    rtFunction;
+
 /// These types need further resolution
 static const int ReferencingTypes =
+    FunctionTypes |
     rtPointer     |
     rtArray       |
     rtConst       |
@@ -95,8 +102,7 @@ static const int ReferencingTypes =
 
 /// These types cannot be resolved anymore
 static const int ElementaryTypes =
-    NumericTypes |
-    rtFuncPointer;
+    NumericTypes;
 
 /// Structured types
 static const int StructOrUnion =

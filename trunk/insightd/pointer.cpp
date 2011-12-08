@@ -85,6 +85,20 @@ QString Pointer::toString(QIODevice* mem, size_t offset) const
 }
 
 
+uint Pointer::hash(bool* isValid) const
+{
+    if (!_hashValid || _hashRefTypeId != _refTypeId) {
+        bool valid = false;
+        RefBaseType::hash(&valid);
+        _hash ^= _macroExtraOffset;
+        _hashValid = valid;
+    }
+    if (isValid)
+        *isValid = _hashValid;
+    return _hash;
+}
+
+
 QString Pointer::readString(QIODevice* mem, size_t offset, const int len, QString* errMsg) const
 {
     // Setup a buffer, at most 1024 bytes long

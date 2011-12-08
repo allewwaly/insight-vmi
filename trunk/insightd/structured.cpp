@@ -38,16 +38,19 @@ Structured::~Structured()
 uint Structured::hash(bool* isValid) const
 {
     if (!_hashValid) {
-        _hash = BaseType::hash(&_hashValid);
+        _hash = BaseType::hash(0);
         qsrand(_hash ^ _members.size());
         _hash ^= qHash(qrand());
+
         // To place the member hashes at different bit positions
         uint rot = 0;
         // Hash all members (don't recurse!!!)
         for (int i = 0; i < _members.size(); i++) {
             const StructuredMember* member = _members[i];
-            _hash ^= rotl32(member->offset(), rot) ^ qHash(member->name());
-            rot = (rot + 4) % 32;
+            _hash ^= rotl32(member->offset(), rot);
+            rot = (rot + 3) % 32;
+            _hash ^= rotl32(qHash(member->name()), rot);
+            rot = (rot + 3) % 32;
         }
     }
     if (isValid)
@@ -68,7 +71,7 @@ void Structured::addMember(StructuredMember* member)
 
 bool Structured::memberExists(const QString& memberName, bool recursive) const
 {
-	return findMember(memberName) != 0;
+	return findMember(memberName, recursive) != 0;
 }
 
 
@@ -143,8 +146,24 @@ void Structured::writeTo(QDataStream& out) const
     BaseType::writeTo(out);
 
     out << (qint32) _members.size();
+    int refTypeId;
     for (qint32 i = 0; i < _members.size(); i++) {
+        refTypeId = 0;
+        // Reset ID to original for members with artificial IDs
+        if (_factory &&
+                _factory->replacedMemberTypes().contains(_members[i]->id()))
+        {
+            refTypeId = _members[i]->refTypeId();
+            _members[i]->setRefTypeId(
+                        _factory->replacedMemberTypes().value(_members[i]->id()));
+        }
+
+        // Write out member
         out << *_members[i];
+
+        // Undo ID changes again
+        if (refTypeId)
+            _members[i]->setRefTypeId(refTypeId);
     }
 }
 
@@ -244,7 +263,7 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
                     .arg(m->offset(), offset_len, 16, QChar('0'))
                     .arg(m->name(), -name_len)
                     .arg(m->refType()->prettyName(), -type_len)
-                    .arg(m->refTypeId(), 0, 16);
+                    .arg((uint)m->refTypeId(), 0, 16);
         }
     }
 
@@ -273,7 +292,8 @@ RealType Struct::type() const
 
 QString Struct::prettyName() const
 {
-    return _name.isEmpty() ? QString("struct") : QString("struct %1").arg(_name);
+    return _name.isEmpty() ?
+                QString("struct (anon.)") : QString("struct %1").arg(_name);
 }
 
 
@@ -298,7 +318,8 @@ RealType Union::type() const
 
 QString Union::prettyName() const
 {
-    return _name.isEmpty() ? QString("union") : QString("union %1").arg(_name);
+    return _name.isEmpty() ?
+                QString("union (anon.)") : QString("union %1").arg(_name);
 }
 
 

@@ -10,6 +10,7 @@
 
 #include <QList>
 #include <QString>
+#include <QHash>
 #include <astnode.h>
 
 // forward declarations
@@ -40,6 +41,20 @@ public:
     inline const QString& fileName() const { return _fileName; }
     inline pASTNodeList rootNodes() { return _rootNodes; }
 
+    /**
+     * Converts a pANTLR3_COMMON_TOKEN to a QString.
+     * @param tok the ANTLR3 token to convert to a QString
+     * @return the token \a tok as a QString
+     */
+    QString antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok) const;
+
+    /**
+     * Converts a pANTLR3_STRING to a QString.
+     * @param s the ANTLR3 string to convert to a QString
+     * @return the string \a s as a QString
+     */
+    QString antlrStringToStr(const pANTLR3_STRING s) const;
+
 private:
     int parse(const QString& fileName, ASTBuilder* builder);
     int parse(const QByteArray& asciiText, ASTBuilder* builder);
@@ -55,6 +70,7 @@ private:
     struct CLexer_Ctx_struct* _lxr;
     pANTLR3_COMMON_TOKEN_STREAM _tstream;
     struct CParser_Ctx_struct* _psr;
+    mutable QHash<void*, QString> _antlrStringCache;
 };
 
 #endif /* ABSTRACTSYNTAXTREE_H_ */

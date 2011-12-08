@@ -2,6 +2,9 @@ TEMPLATE = lib
 TARGET = antlr3c
 VERSION = 3.0.1
 CONFIG += debug_and_release staticlib create_prl
+QMAKE_CFLAGS_DEBUG += -w
+QMAKE_CFLAGS_RELEASE += -O3 -w
+QMAKE_CXXFLAGS_RELEASE += -O3
 SOURCES = src/antlr3baserecognizer.c \
     src/antlr3basetree.c \
     src/antlr3basetreeadaptor.c \
@@ -55,3 +58,4 @@ HEADERS = include/antlr3.h \
     include/antlr3tokenstream.h \
     include/antlr3treeparser.h
 INCLUDEPATH += ./include
+
