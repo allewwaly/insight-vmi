@@ -81,6 +81,12 @@ typedef QMultiHash<QString, BaseType*> BaseTypeStringHash;
 /// Hash table for Variable pointers
 typedef QMultiHash<QString, Variable*> VariableStringHash;
 
+/// Set of type IDs
+typedef QSet<int> IntSet;
+
+/// Hash table to find replaced types
+typedef QHash<int, int> IntIntHash;
+
 /// Hash table to find all equivalent types
 typedef QMultiHash<int, int> IntIntMultiHash;
 
@@ -240,6 +246,14 @@ public:
 		return _types;
 	}
 
+    /**
+     * @return the list of all artificial types created by this factory
+     */
+    inline const BaseTypeList& artificialTypes() const
+    {
+        return _artificialTypes;
+    }
+
 	/**
 	 * @return the hash of all types by their ID
 	 */
@@ -296,6 +310,23 @@ public:
         return _enumsByName;
     }
 
+    /**
+     * @return the hash of struct members with artificial types
+     */
+    inline const IntIntHash& replacedMemberTypes() const
+    {
+        return _replacedMemberTypes;
+    }
+
+    /**
+     * @return IDs of artificilly created types that should not be ignored by
+     * class KernelSymbolWriter
+     */
+    inline const IntSet& artificialTypeIds() const
+    {
+        return _artificialTypeIds;
+    }
+
 	/**
 	 * This function should be called after the last symbol has been added to
 	 * the factory, either after parsing or reading a custom symbol file is
@@ -337,7 +368,23 @@ public:
      */
     QList<int> equivalentTypes(int id) const;
 
-    QList<BaseType *> typesUsingId(int id) const;
+    QList<BaseType*> typesUsingId(int id) const;
+
+    /**
+     * Checks if \a type represents the special type <tt>struct list_head</tt>.
+     * @param type the type to check
+     * @return \c true if \a type is <tt>struct list_head</tt>, or \c false
+     * otherwise
+     */
+    bool isStructListHead(const BaseType* type) const;
+
+    /**
+     * Checks if \a type represents the special type <tt>struct hlist_node</tt>.
+     * @param type the type to check
+     * @return \c true if \a type is <tt>struct hlist_node</tt>, or \c false
+     * otherwise
+     */
+    bool isStructHListNode(const BaseType* type) const;
 
 
     void typeAlternateUsage(const TypeEvalDetails *ed, ASTTypeEvaluator* eval);
@@ -401,22 +448,6 @@ protected:
      * @return \c true if the IDs are different, \c false if the IDs are the same
      */
     bool isNewType(const int new_id, BaseType* type) const;
-
-    /**
-     * Checks if \a type represents the special type <tt>struct list_head</tt>.
-     * @param type the type to check
-     * @return \c true if \a type is <tt>struct list_head</tt>, or \c false
-     * otherwise
-     */
-    bool isStructListHead(const BaseType* type) const;
-
-    /**
-     * Checks if \a type represents the special type <tt>struct hlist_node</tt>.
-     * @param type the type to check
-     * @return \c true if \a type is <tt>struct hlist_node</tt>, or \c false
-     * otherwise
-     */
-    bool isStructHListNode(const BaseType* type) const;
 
     /**
      * This is an overloaded convenience function.
@@ -631,9 +662,12 @@ private:
 	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
 	EnumStringHash _enumsByName;         ///< Holds all enumerator values, indexed by name
 	BaseTypeList _types;              ///< Holds all BaseType objects which were parsed or read from symbol files
+	BaseTypeList _artificialTypes;    ///< Holds all BaseType objects which were created artificially
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	IntIntMultiHash _equivalentTypes; ///< Holds all type IDs of equivalent types
+	IntIntHash _replacedMemberTypes;  ///< Holds all member IDs whose ref. type had been replaced
+	IntSet _artificialTypeIds;		  ///< Holds the IDs of all artificial types that should not be saved
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
 	StructuredList _zeroSizeStructs;  ///< Holds all structs or unions with a size of zero
