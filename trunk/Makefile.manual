@@ -33,12 +33,12 @@ install:
 	@ln -sv ./libinsight.so.1.0.0   $(LIB)/libinsight.so
 	@ln -sv ./libinsight.so.1.0.0   $(LIB)/libinsight.so.1
 	@ln -sv ./libinsight.so.1.0.0   $(LIB)/libinsight.so.1.0
-	@install -v -d $(INCLUDE)/
-	@svn export --force libinsight/include/insight     $(INCLUDE)/insight > /dev/null
+	@install -v -d $(INCLUDE)/insight
+	@install -v -Dp libinsight/include/insight/*.h     $(INCLUDE)/insight
 	@##insightd
 	@install -v -Dp insightd/insightd  $(BIN)/insightd
-	@install -v -d $(SHARE)/insight
-	@svn export --force insightd/scripts   $(SHARE)/insight/scripts > /dev/null
+	@install -v -d $(SHARE)/insight/scripts
+	@install -v -Dp insightd/scripts/*.js   $(SHARE)/insight/scripts
 	@##insight
 	@install -v -Dp insight/insight    $(BIN)/insight
 

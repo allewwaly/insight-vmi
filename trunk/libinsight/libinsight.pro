@@ -1,5 +1,17 @@
 TEMPLATE = lib
 TARGET = insight
+
+# Set PREFIX, if not set
+isEmpty(PREFIX):PREFIX = /usr/local
+
+# Path for target
+target.path += $$PREFIX/lib
+
+# Extra target for headers
+headers.files = include/insight/*.h
+headers.path += $$PREFIX/include/insight
+
+INSTALLS += target headers
 VERSION = 1.0.0
 DEFINES += LIBINSIGHT_LIBRARY
 CONFIG += debug_and_release
