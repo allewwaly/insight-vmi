@@ -1,3 +1,13 @@
+insight (0.3) unstable; urgency=low
+
+  * Resolved another type ambiguity with very similar structs
+  * Allow to search for enumerator values by name
+  * Improved listing of types using other types
+  * Fixed handling of "struct list_head" and "struct hlist_node" pointer magic
+  * Various other bugfixes
+
+ -- Christian Schneider <chrschn@sec.in.tum.de>  Thu, 08 Dec 2011 18:06:51 +0100
+
 insight (0.2) unstable; urgency=low
 
   * Sanitized parsing of the debugging symbols
