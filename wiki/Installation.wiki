@@ -73,9 +73,9 @@ The source code comes with all required control files to create packages for Deb
 
 Now instead of the `make` utility issue the following command in the source directory:
 
-<code language="sh">dpkg-buildpackage</code>
+<code language="sh">dpkg-buildpackage -us -uc -b</code>
 
-This will compile the source and create packages `deb` in the directory one level above the current (the actual file names might differ depending on version and architecture):
+This will compile the source and create `deb` packages in the directory one level above the current (the actual file names might differ depending on version and architecture):
 
 <pre>
 ../insight_0.3_amd64.deb
