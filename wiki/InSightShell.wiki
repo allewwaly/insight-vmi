@@ -445,37 +445,21 @@ https://insight-vmi.googlecode.com/svn/wiki/images/linked_list_head.png
 
 In all of these cases, the user has to specify the types and offsets manually. We are currently working on a new solution to automatically handle these cases in the future, see RoadMap for further details.
 
-=== Retrieving Kernel Objects from User-Defined Locations ===
+=== Kernel Objects Type Casts and Custom Offsets ===
 
-In special cases as [#Imitation_of_Kernel_Pointer_Magic explained before] or for general debugging, the user can request objects of arbitrary types and at any readable location. This is achieved with the command `memory dump` which adheres to the following general syntax:
+In special cases as [#Imitation_of_Kernel_Pointer_Magic explained before], the user can cast the type of kernel objects and subtract a custom offset as follows.
 
-`memory dump [index] <char|int|long|type-name|type-id>(.<member>)* @ <address>`
+For example, we know that the global variable `modules` of type `list_head` is in fact the head to a list of `struct module` objects. This is one of the cases !InSight cannot automatically handle [RoadMap yet]. We can still access the modules by casting the type to `struct module` and correcting its address by the offset of member `list` within `struct module`. The syntax for this output is:
 
-This can be used as follows. For example, we know that the global variable `modules` of type `list_head` is in fact the head to a list of `struct module` objects. This is one of the cases !InSight cannot automatically handle [RoadMap yet]. We can still access the modules by calculating the correct address and requesting an object of type `struct module` at this address
+`memory query (<type> [- <member-of-type>|<int>]]) object`
 
-First, we inspect `struct module` with the command: 
+This will cast `object` to type `<type>` (specified by its name or ID), optionally subtracting the specified offset from `object`'s address. If the offset is specified as `<member-of-type>`, !InSight will subtract the offset of the given member name within `<type>` from the address. If the offset is specified as `<int>`, that value will be subtracted.
 
-{{{
->>> show module | grep list_head
-    0x0008  list:                 0xfffffdf3 struct list_head
-    0x0178  bug_list:             0xfffffdf8 struct list_head
-    0x0208  modules_which_use_me: 0xfffffdfd struct list_head
-}}}
-
-This reveals that the `list` member at offset `0x8` most likely is the member that links to the next object. Next, we need to find the address of the first `module` object. We therefore query the global variable `modules`:
+To continue our example, we want to cast `modules.next` to type `struct module` and subtract the offset of `module`'s member `list` from the resulting address. This can be expressed as follows:
 
 {{{
->>> memory query modules
-modules: struct list_head (ID 0x2b5a) @ 0xffffffff814575a0
-0.  0x00  next : struct list_head * = ... @ 0xffffffffa02261e8
-1.  0x08  prev : struct list_head * = ... @ 0xffffffffa0000918
-}}}
-
-We see that the `next` pointer points to address `0xffffffffa02261e8`, however we assume that this is the address of member `list` _within_ the `module` object. Consequently, the first object is located at address `0xffffffffa02261e8 - 0x8 = 0xffffffffa02261e0`. So we request an object of type `module` at this address:
-
-{{{
->>> mem dump module @ 0xffffffffa02261e0
-struct module (ID 0xbeea) @ ffffffffa02261e0
+>>> memory query modules.(module - list)next
+modules.(module - list)next: struct module (ID 0xbeea) @ 0xffffffffa02261e0
  0.  0x000  state                   : module_state                   = MODULE_STATE_LIVE (0)
  1.  0x008  list                    : struct list_head               = ...
  2.  0x018  name                    : char[56]                       = "fuse"
@@ -537,6 +521,60 @@ struct module (ID 0xbeea) @ ffffffffa02261e0
 58.  0x228  refptr                  : char *                         = 0x00000000000161c0 (Error reading from virtual address 0x00000000000161c0: address below linear offsets, seems to be user-land memory)
 59.  0x230  ctors                   : ctor_fn_t *                    = NULL
 60.  0x238  num_ctors               : unsigned int                   = 0
+}}}
+
+As before, we can follow further members of the cast object using the notation `.member`:
+
+{{{
+>>> memory query modules.(module - list)next.name
+modules.(module - list)next.name: char[56] (ID 0xf7ec) @ 0xffffffffa02261f8
+"fuse"
+}}}
+
+Since we know that `list` is located at offset 8 within `struct module`, we can also use that offset directly to achieve the same result:
+
+{{{
+>>> memory query modules.(module - 8)next.name
+modules.(module - list)next.name: char[56] (ID 0xf7ec) @ 0xffffffffa02261f8
+"fuse"
+}}}
+
+=== Retrieving Kernel Objects from Arbitrary Locations ===
+
+For general debugging, the user can request objects of arbitrary types and at any readable location. This is achieved with the command `memory dump` which adheres to the following general syntax:
+
+`memory dump [index] <char|int|long|type-name|type-id>(.<member>)* @ <address>`
+
+This can be used as follows. We again use the example of the global variable `modules` of type `list_head`. Recall that this serves as head to a list of `struct module` objects. We access the modules by manually calculating the correct address and requesting an object of type `struct module` at this address.
+
+First, we inspect `struct module` with the command: 
+
+{{{
+>>> show module | grep list_head
+    0x0008  list:                 0xfffffdf3 struct list_head
+    0x0178  bug_list:             0xfffffdf8 struct list_head
+    0x0208  modules_which_use_me: 0xfffffdfd struct list_head
+}}}
+
+This reveals that the `list` member at offset `0x8` most likely is the member that links to the next object. Next, we need to find the address of the first `module` object. We therefore query the global variable `modules`:
+
+{{{
+>>> memory query modules
+modules: struct list_head (ID 0x2b5a) @ 0xffffffff814575a0
+0.  0x00  next : struct list_head * = ... @ 0xffffffffa02261e8
+1.  0x08  prev : struct list_head * = ... @ 0xffffffffa0000918
+}}}
+
+We see that the `next` pointer points to address `0xffffffffa02261e8`, however we assume that this is the address of member `list` _within_ the `module` object. Consequently, the first object is located at address `0xffffffffa02261e8 - 0x8 = 0xffffffffa02261e0`. So we request an object of type `module` at this address:
+
+{{{
+>>> mem dump module @ 0xffffffffa02261e0
+struct module (ID 0xbeea) @ ffffffffa02261e0
+ 0.  0x000  state                   : module_state                   = MODULE_STATE_LIVE (0)
+ 1.  0x008  list                    : struct list_head               = ...
+ 2.  0x018  name                    : char[56]                       = "fuse"
+ 3.  0x050  mkobj                   : struct module_kobject          = ...
+[...]
 }}}
 
 We also could have used the type ID `0xbeea` instead of the name `module`. As the resulting object links to further objects through its `list` member of type `struct list_head`, we can now request further members using the syntax `object.member` as we already did before. No further user intervention is required:
