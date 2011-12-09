@@ -1,5 +1,8 @@
 TEMPLATE = app
 TARGET = insight
+isEmpty(PREFIX):PREFIX = /usr/local
+target.path += $$PREFIX/bin
+INSTALLS += target
 QT += core network
 CONFIG += debug_and_release
 HEADERS += debug.h \
