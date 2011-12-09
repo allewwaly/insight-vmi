@@ -474,25 +474,8 @@ modules: struct list_head (ID 0x2b5a) @ 0xffffffff814575a0
 We see that the `next` pointer points to address `0xffffffffa02261e8`, however we assume that this is the address of member `list` _within_ the `module` object. Consequently, the first object is located at address `0xffffffffa02261e8 - 0x8 = 0xffffffffa02261e0`. So we request an object of type `module` at this address:
 
 {{{
->>> memory dump module @ 0xffffffffa02261e0
-Found multiple types for "module".
-Select a type by its ID from the following list:
-
-     ID  Type        Name                           Size  Source               Line
------------------------------------------------------------------------------------
- 899e4a  Const       const struct module             576  --                     --
-   2348  Struct      struct module                     0  --                     --
-   bef3  Struct      struct module                   576  ...ernel/init_task.c   60
-1c519ec  Struct      struct module                   576  ...onsole/dummycon.c   22
------------------------------------------------------------------------------------
-Total types: 4
-}}}
-
-We receive an error message because !InSight knows several types with name `module`. To disambiguate the type, we inspect all suggested types using their ID with the `show` command and find the first one to be the correct one. So we re-try our query:
-
-{{{
->>> mem dump 0x1c519ec @ 0xffffffffa02261e0
-struct module (ID 0x1c519ec) @ ffffffffa02261e0
+>>> mem dump module @ 0xffffffffa02261e0
+struct module (ID 0xbeea) @ ffffffffa02261e0
  0.  0x000  state                   : module_state                   = MODULE_STATE_LIVE (0)
  1.  0x008  list                    : struct list_head               = ...
  2.  0x018  name                    : char[56]                       = "fuse"
@@ -520,7 +503,7 @@ struct module (ID 0x1c519ec) @ ffffffffa02261e0
 24.  0x138  num_gpl_future_syms     : unsigned int                   = 0
 25.  0x13c  num_exentries           : unsigned int                   = 0
 26.  0x140  extable                 : struct exception_table_entry * = NULL
-27.  0x148  init                    : void (*)() *                   = 0xffffffffa022b059
+27.  0x148  init                    : int (*)() *                    = 0xffffffffa022b059
 28.  0x150  module_init             : void *                         = NULL
 29.  0x158  module_core             : void *                         = 0xffffffffa021c000
 30.  0x160  init_size               : unsigned int                   = 0
@@ -556,17 +539,17 @@ struct module (ID 0x1c519ec) @ ffffffffa02261e0
 60.  0x238  num_ctors               : unsigned int                   = 0
 }}}
 
-This time the command succeeded. As the resulting object links to further objects through its `list` member of type `struct list_head`, we can now request further members using the syntax `object.member` as we already did before. No further user intervention is required:
+We also could have used the type ID `0xbeea` instead of the name `module`. As the resulting object links to further objects through its `list` member of type `struct list_head`, we can now request further members using the syntax `object.member` as we already did before. No further user intervention is required:
 
 {{{
->>> mem dump 0x1c519ec.name @ 0xffffffffa02261e0
-char[56] (ID 0xf7f5) @ ffffffffa02261f8
+>>> mem dump module.name @ 0xffffffffa02261e0
+char[56] (ID 0xf7ec) @ ffffffffa02261f8
 "fuse"
->>> mem dump 0x1c519ec.list.next.name @ 0xffffffffa02261e0
-char[56] (ID 0xf7f5) @ ffffffffa0215748
+>>> mem dump module.list.next.name @ 0xffffffffa02261e0
+char[56] (ID module) @ ffffffffa0215748
 "loop"
->>> mem dump 0x1c519ec.list.next.list.next.name @ 0xffffffffa02261e0
-char[56] (ID 0xf7f5) @ ffffffffa01fc408
+>>> mem dump module.list.next.list.next.name @ 0xffffffffa02261e0
+char[56] (ID module) @ ffffffffa01fc408
 "snd_pcm"
 }}}
 
