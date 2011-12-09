@@ -1,3 +1,16 @@
+# Set PREFIX, if not set
+isEmpty(PREFIX):PREFIX = /usr/local
+
+# Path for target
+target.path += $$PREFIX/bin
+
+# Extra target for scripts
+scripts.files = scripts/*.js
+scripts.path += $$PREFIX/share/insight
+
+# What to install
+INSTALLS += target scripts
+
 SOURCES += kernelsourcetypeevaluator.cpp \
     kernelsourceparser.cpp \
     memorydumpsclass.cpp \
