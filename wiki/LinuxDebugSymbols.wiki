@@ -169,22 +169,23 @@ depending on the available data.
 While the symbols are being processed, the progress is being displayed. At the end of the operation, you will see a short statistic about the resulting type database:
 
 {{{
->>> symbols parse /mnt/usr/src/linux-2.6.38
-Successfully parsed the memory specifications in 4 sec
-Parsing 41294701 lines (2218604348 bytes) finished.
+>>> symbols parse /mnt/vdisk/usr/src/linux-2.6-2.6.32/
+Successfully parsed the memory specifications in 3 sec
+Parsing 24778305 lines (1338583706 bytes) finished.
 Statistics:
-  | No. of types:                  171654         
-  | No. of types by name:           35166         
-  | No. of types by ID:           2082826         
-  | No. of types by hash:          171654         
-  | No of "struct list_head":         781         
-  | No of "struct hlist_node":         63         
-  | No. of variables:               31761         
-  | No. of variables by ID:         31761         
-  | No. of variables by name:       31761         
-  | There are 175 referencing types still waiting for 131 missing types.
+  | No. of types:                   41786         
+  | No. of types by name:           32298         
+  | No. of types by ID:           1370492         
+  | No. of types by hash:           40150         
+  | No of "struct list_head":         484         
+  | No of "struct hlist_node":         46         
+  | No. of variables:               24508         
+  | No. of variables by ID:         24508         
+  | No. of variables by name:       24508         
+  | Empty structs replaced:           186         
+  | Empty structs remaining:           94         
   `-------------------------------------------
-Parsing finish in 11 min 55 sec (57746 lines per second).
+Parsing finish in 5 min 22 sec (76809 lines per second).
 }}}
 
 == Storing Symbols Database ==
@@ -196,7 +197,7 @@ Parsing finish in 11 min 55 sec (57746 lines per second).
 For example:
 
 {{{
->>> symbols store insight-2.6.38-10-generic-dbg.ksym
+>>> symbols store insight-2.6-2.6.32.ksym
 Writing symbols finished (18948166 bytes written).
 Writing of 18948166 bytes finished in 4 sec (3982380 byte/s).
 }}}
