@@ -32,6 +32,7 @@ The following represents a complete list of valid commands:
   memory      Load or unload a memory dump
   script      Executes a QtScript script file
   show        Shows information about a symbol given by name or ID
+  stats       Shows various statistics.
   symbols     Allows to load, store or parse the kernel symbols
 }}}
 
@@ -61,21 +62,21 @@ Before any memory dump can be loaded, the corresponding debugging symbols have t
 The debugging symbols to be loaded can be specified from [RunningInSight#Command_Line_Parameters_for_insightd command line] or within the shell using the `symbols load` command. The given file can have an absolute path or a path relative to the current working directory. After successfully loading the symbols, some statistics about the types is displayed:
 
 {{{
->>> symbols load /path/to/insight-2.6.38-10-generic-dbg.ksym
-Reading symbols finished (16476592 bytes read).
+>>> symbols load /path/to/insight-2.6-2.6.32.ksym
+Reading symbols finished (18621244 bytes read).
 Statistics:
-  | No. of types:                  171654         
-  | No. of types by name:           35166         
-  | No. of types by ID:           2082826         
-  | No. of types by hash:          171654         
-  | No of "struct list_head":         781         
-  | No of "struct hlist_node":         63         
-  | No. of variables:               31761         
-  | No. of variables by ID:         31761         
-  | No. of variables by name:       31761         
-  | There are 175 referencing types still waiting for 131 missing types.
+  | No. of types:                   41786         
+  | No. of types by name:           32298         
+  | No. of types by ID:           1370492         
+  | No. of types by hash:           40150         
+  | No of "struct list_head":         484         
+  | No of "struct hlist_node":         46         
+  | No. of variables:               24508         
+  | No. of variables by ID:         24508         
+  | No. of variables by name:       24508         
+  | Empty structs remaining:           94         
   `-------------------------------------------
-Reading of 16476592 bytes finished in 3 sec (4125336 byte/s).
+Reading of 18621244 bytes finished in 3 sec (4853073 byte/s).
 }}}
 
 *Note:* Only one set of debugging symbols can be loaded at a time.
@@ -137,6 +138,7 @@ Description: This command lists various types of read symbols.
   list sources              List all source files
   list types [<glob>]       List all types, optionally filtered by a
                             wildcard expression <glob>
+  list types-using <id>     List the types using type <id>
   list types-by-id          List the types-by-ID hash
   list types-by-name        List the types-by-name hash
   list variables [<glob>]   List all variables, optionally filtered by
@@ -157,19 +159,22 @@ In addition, the `show` command can be used to display details about a type or v
 {{{
 >>> show modules
 Found variable with name modules:
-  ID:             0x8a14ef
+  ID:             0x8a149e
   Name:           modules
   Location:       0xffffffff814575a0
+  Ref. type ID:   0x891103
+  Ref. type:      struct list_head
   Source file:    kernel/module.c:81
 Corresponding type information:
-  ID:             0x2b5a
+  ID:             0x2b51
   Name:           struct list_head
   Type:           Struct
   Size:           16
+  Hash:           0x757f0ca5
   Source file:    arch/x86/kernel/head64.c:19
   Members:        2
-    0x0000  next:               struct list_head *
-    0x0008  prev:               struct list_head *
+    0x0000  next:               0x2b7a struct list_head *
+    0x0008  prev:               0x2b7a struct list_head *
 }}}
 
 The following example shows how to resolve chained type definitions to the built-in base type:
@@ -177,28 +182,31 @@ The following example shows how to resolve chained type definitions to the built
 {{{
 >>> show pid_t
 Found type with name pid_t:
-  ID:             0x23a
+  ID:             0x231
   Name:           pid_t
   Type:           Typedef
   Size:           4
-  Ref. type ID:   0x1b6
+  Hash:           0xef4a5f0
+  Ref. type ID:   0x1ad
   Ref. type:      __kernel_pid_t
   Source file:    arch/x86/kernel/head64.c:26
->>> show 0x1b6
-Found type with ID 0x1b6:
-  ID:             0x1b6
+>>> show 0x1ad
+Found type with ID 0x1ad:
+  ID:             0x1ad
   Name:           __kernel_pid_t
   Type:           Typedef
   Size:           4
-  Ref. type ID:   0xd1
+  Hash:           0x269b758b
+  Ref. type ID:   0xc8
   Ref. type:      int
   Source file:    arch/x86/kernel/head64.c:14
->>> show 0xd1
-Found type with ID 0xd1:
-  ID:             0xd1
+>>> show 0xc8
+Found type with ID 0xc8:
+  ID:             0xc8
   Name:           int
   Type:           Int32
   Size:           4
+  Hash:           0xadc342a
 }}}
 
 == Memory Analysis ==
@@ -449,9 +457,9 @@ First, we inspect `struct module` with the command:
 
 {{{
 >>> show module | grep list_head
-    0x0008  list:               struct list_head
-    0x0178  bug_list:           struct list_head
-    0x0208  modules_which_use_me: struct list_head
+    0x0008  list:                 0xfffffdf3 struct list_head
+    0x0178  bug_list:             0xfffffdf8 struct list_head
+    0x0208  modules_which_use_me: 0xfffffdfd struct list_head
 }}}
 
 This reveals that the `list` member at offset `0x8` most likely is the member that links to the next object. Next, we need to find the address of the first `module` object. We therefore query the global variable `modules`:
