@@ -1,9 +1,21 @@
 #!/bin/bash
+#
+# This script uses the Debian kernel package tools to re-compile the currenlty
+# running kernel with debugging flags enabled and creates a package for it.
+#
+# Written 2011 by Christian Schneider <chrschn@sec.in.tum.de>
+#
 
 # How to name the debug version based on the running kernel?
 APPEND=-dbg
-VER=$(uname -r)
-MINOR_VER=$(echo $VER | sed 's/^\([0-9]\.[0-9]\+\(\.[0-9]\+\)*\).*$/\1/')
+
+if [ -n "$1" ]; then
+	VER="$1"
+else
+	VER=$(uname -r)
+fi
+
+MINOR_VER=$(echo $VER | sed 's/^\([0-9]\.[0-9]\+\(\.[0-9]\+\)\?\).*$/\1/')
 APPEND_VER=${VER#$MINOR_VER}${APPEND}
 
 # Make sure we can execute apt-get
@@ -32,9 +44,25 @@ sed \
         -e 's@^\(AFLAGS_KERNEL\s*=\)@\1 -gdwarf-2 @' \
         Makefile.orig > Makefile
 
+
+# Use gcc_pp, if available
+EXEC_DIR="$PWD"
+for GCC_PP in "$EXEC_DIR/gcc_pp" "$(dirname $0)/gcc_pp" "$(which gcc_pp)"; do
+	if [ -x "$GCC_PP" ]; then
+		sed -i "s@^\(CC\\s*=\).*gcc\\s*\$@\1 $GCC_PP@" Makefile
+		echo "Using $GCC_PP as compiler"
+		break
+	fi
+done
+
+if ! [ -x "$GCC_PP" ]; then
+        echo "WARNING: gcc_pp script not found." >&2
+fi
+
+
 # Run parallel jobs when compiling the source
 if [ -z "$CONCURRENCY_LEVEL" ]; then
-       	export CONCURRENCY_LEVEL=$(( `grep -c '^processor' /proc/cpuinfo` + 1))
+       	export CONCURRENCY_LEVEL=$(( `grep  -c '^processor' /proc/cpuinfo` + 1))
 fi
 
 # Compile source and create package
