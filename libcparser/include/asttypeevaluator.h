@@ -169,6 +169,7 @@ public:
 
     bool evaluateTypes();
     ASTType* typeofNode(const ASTNode* node);
+    ASTType* typeofSymbol(const ASTSymbol* sym);
     int sizeofLong() const;
 
     const ASTSymbol *findSymbolOfDirectDeclarator(const ASTNode *node,
@@ -273,7 +274,6 @@ private:
     ASTType* typeofNumericExpression(ASTType* lt, ASTType* rt, const QString& op) const;
     ASTType* typeofAdditiveExpression(ASTType* lt, ASTType* rt, const QString& op);
     ASTType* typeofBooleanExpression(ASTType* lt, ASTType* rt);
-    ASTType* typeofSymbol(const ASTSymbol* sym);
     ASTType* typeofSymbolDeclaration(const ASTSymbol* sym);
     ASTType* typeofSymbolFunctionDef(const ASTSymbol* sym);
     ASTType* typeofSymbolFunctionParam(const ASTSymbol* sym);

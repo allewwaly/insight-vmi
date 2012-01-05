@@ -5,6 +5,8 @@
 #include <astsymbol.h>
 #include <debug.h>
 
+class BaseType;
+
 /// Different types of expressions
 enum ExpressionType {
     etVoid,
@@ -315,7 +317,26 @@ protected:
 class ASTVariableExpression: public ASTExpression
 {
 public:
-    ASTVariableExpression(const ASTSymbol* symbol = 0) : _symbol(symbol) {}
+    enum PostfixExpressionType {
+        ptDot,
+        ptArrow,
+        ptBrackets
+    };
+
+    struct PostfixExpression {
+        PostfixExpression(PostfixExpressionType type, const QString& member)
+            : type(type), member(member), arrayIndex(-1) {}
+        PostfixExpression(int arrayIndex)
+            : type(ptBrackets), arrayIndex(arrayIndex) {}
+        PostfixExpressionType type;
+        QString member;
+        int arrayIndex;
+    };
+
+    typedef QList<PostfixExpression> PostfixExpressionList;
+
+    ASTVariableExpression(const BaseType* type = 0, bool global = false)
+        : _baseType(type), _global(global) {}
 
     inline virtual ExpressionType type() const
     {
@@ -324,9 +345,9 @@ public:
 
     inline virtual int resultType() const
     {
-        if (!_symbol)
+        if (!_baseType)
             return erUndefined;
-        return _symbol->isGlobal() ? erGlobalVar : erLocalVar;
+        return _global ? erGlobalVar : erLocalVar;
     }
 
     virtual ExpressionResult result() const
@@ -335,13 +356,20 @@ public:
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 
-    const ASTSymbol* symbol() const
+    const BaseType* baseType() const
     {
-        return _symbol;
+        return _baseType;
+    }
+
+    void appendPostfixExpression(PostfixExpression pe)
+    {
+        _pel.append(pe);
     }
 
 protected:
-    const ASTSymbol* _symbol;
+    const BaseType* _baseType;
+    bool _global;
+    PostfixExpressionList _pel;
 };
 
 /**

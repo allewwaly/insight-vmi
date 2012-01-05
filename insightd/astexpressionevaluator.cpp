@@ -1025,10 +1025,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfPostfixExpr(const ASTNode *node)
         return 0;
     checkNodeType(node, nt_postfix_expression);
 
-    if (!node->u.postfix_expression.postfix_expression_suffix_list)
-        return exprOfNode(node->u.postfix_expression.primary_expression);
-    else
-        return createExprNode<ASTRuntimeExpression>();
+    return exprOfNode(node->u.postfix_expression.primary_expression);
 }
 
 
@@ -1055,8 +1052,59 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(const ASTNode *node)
             IntEnumPair iep = _factory->enumsByName().value(sym->name());
             return createExprNode<ASTEnumeratorExpression>(iep.first, sym);
         }
-        // Otherwise retun a variable
-        return createExprNode<ASTVariableExpression>(sym);
+        // Otherwise return a variable
+        const ASTType* type = _eval->typeofSymbol(sym);
+        AstBaseTypeList typeList = _factory->findBaseTypesForAstType(type, _eval);
+        const BaseType* bt = typeList.second.isEmpty() ?
+                    0 : typeList.second.first();
+        ASTVariableExpression* expr = createExprNode<ASTVariableExpression>(bt);
+
+        // Append all postfix expressions
+        for (const ASTNodeList* list =
+                node->parent->u.postfix_expression.postfix_expression_suffix_list;
+             list;
+             list = list->next)
+        {
+            const ASTNode* p = list->item;
+            switch(p->type) {
+            case nt_postfix_expression_arrow:
+                expr->appendPostfixExpression(
+                            ASTVariableExpression::PostfixExpression(
+                                ASTVariableExpression::ptArrow,
+                                antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
+                break;
+
+            case nt_postfix_expression_dot:
+                expr->appendPostfixExpression(
+                            ASTVariableExpression::PostfixExpression(
+                                ASTVariableExpression::ptDot,
+                                antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
+                break;
+
+            case nt_postfix_expression_brackets: {
+                // We expect array indices to be constant
+                const ASTNode* e = p->u.postfix_expression_suffix.expression ?
+                            p->u.postfix_expression_suffix.expression->item : 0;
+                ASTExpression* index = exprOfNode(e);
+                ExpressionResult result = index ?
+                            index->result() : ExpressionResult();
+                if (result.resultType == erConstant)
+                    expr->appendPostfixExpression(
+                                ASTVariableExpression::PostfixExpression(
+                                    result.value(esInt32)));
+                // Seems to be a runtime dependent expresssion
+                else
+                    return createExprNode<ASTRuntimeExpression>();
+                }
+                break;
+
+            // Any other type cannot be resolved
+            default:
+                return createExprNode<ASTRuntimeExpression>();
+            }
+        }
+
+        return expr;
     }
     else if (node->u.primary_expression.constant)
         return exprOfNode(node->u.primary_expression.constant);
