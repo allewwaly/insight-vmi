@@ -304,11 +304,19 @@ public:
     	// We have to consider the size of the pointer
     	if (_size == 4) {
     		quint32 p = toUInt32(mem, offset);
+#ifdef __x86_64__
+            return (void*)(quint64)p;
+#else
     		return (void*)p;
+#endif
     	}
     	else if (_size == 8) {
     		quint64 p = toUInt64(mem, offset);
-    		return (void*)p;
+#ifdef __x86_64__
+            return (void*)p;
+#else
+            return (void*)(quint32)p;
+#endif
     	}
     	else {
     		throw BaseTypeException(
