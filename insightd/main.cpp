@@ -217,7 +217,7 @@ void init_daemon()
 	QDir home = QDir::home();
 
 	// Change running directory to home
-	chdir((char*) home.absolutePath().toAscii().data());
+	assert(chdir((char*) home.absolutePath().toAscii().data()) == 0);
 
 	// Create a lock file
 	QByteArray lockFile = home.absoluteFilePath(mt_lock_file).toLocal8Bit();
@@ -254,7 +254,7 @@ void init_daemon()
 
 	// Write PID to lock file
 	QByteArray myPid = QString("%1\n").arg(getpid()).toLocal8Bit();
-	write(lock_fd, myPid.data(), myPid.size());
+	assert(write(lock_fd, myPid.data(), myPid.size()) == myPid.size());
 
 	// Detach background daemon from stdin, stdout and stderr
     if (! (programOptions.activeOptions() & opForeground) ) {
@@ -266,7 +266,7 @@ void init_daemon()
 
         // Use /dev/null for stdin and, stdout
         int fd = open("/dev/null", O_RDWR);
-        dup(fd);
+        assert(dup(fd) != -1);
         // Use log file for stderr
         QByteArray logFile = home.absoluteFilePath(mt_log_file).toLocal8Bit();
         open(logFile.data(), O_CREAT|O_APPEND|O_WRONLY, 0640);
