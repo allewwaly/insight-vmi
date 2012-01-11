@@ -1,11 +1,15 @@
 #ifndef ASTEXPRESSION_H
 #define ASTEXPRESSION_H
 
-#include <QtGlobal>
+#include <QList>
 #include <astsymbol.h>
 #include <debug.h>
 
 class BaseType;
+class ASTExpression;
+
+typedef QList<ASTExpression*> ASTExpressionList;
+
 
 /// Different types of expressions
 enum ExpressionType {
@@ -133,6 +137,7 @@ public:
     virtual ExpressionType type() const = 0;
     virtual int resultType() const = 0;
     virtual ExpressionResult result() const = 0;
+    virtual ASTExpression* clone(ASTExpressionList& list) const = 0;
 
     inline bool hasAlternative() const
     {
@@ -155,7 +160,19 @@ public:
             _alternative = alt;
     }
 
+
 protected:
+    template<class T>
+    T* cloneTempl(ASTExpressionList& list) const
+    {
+        T* expr = new T(*dynamic_cast<const T*>(this));
+        list.append(expr);
+        if (_alternative)
+            expr->_alternative = _alternative->clone(list);
+        return expr;
+    }
+
+
     ASTExpression* _alternative;
 };
 
@@ -179,6 +196,11 @@ public:
     {
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
+
+    virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        return cloneTempl<ASTUndefinedExpression>(list);
+    }
 };
 
 /**
@@ -201,6 +223,11 @@ public:
     {
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
+
+    virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        return cloneTempl<ASTVoidExpression>(list);
+    }
 };
 
 /**
@@ -222,6 +249,11 @@ public:
     inline virtual ExpressionResult result() const
     {
         return ExpressionResult(resultType(), esInt32, 0ULL);
+    }
+
+    virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        return cloneTempl<ASTRuntimeExpression>(list);
     }
 };
 
@@ -254,6 +286,11 @@ public:
         return _value;
     }
 
+    virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        return cloneTempl<ASTConstantExpression>(list);
+    }
+
     inline void setValue(ExpressionResultSize size, quint64 value)
     {
         _value.size = size;
@@ -282,9 +319,9 @@ protected:
 class ASTEnumeratorExpression: public ASTConstantExpression
 {
 public:
-    ASTEnumeratorExpression() : _symbol(0) {}
+    ASTEnumeratorExpression() : _symbol(0), _valueSet(false) {}
     ASTEnumeratorExpression(qint32 value, const ASTSymbol* symbol)
-        : _symbol(symbol)
+        : _symbol(symbol), _valueSet(true)
     {
         _value.resultType = resultType();
         _value.size = esInt32;
@@ -298,7 +335,15 @@ public:
 
     inline virtual int resultType() const
     {
-        return _symbol ? erConstant : erUndefined;
+        return _valueSet ? erConstant : erUndefined;
+    }
+
+    virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        ASTEnumeratorExpression* expr =
+                cloneTempl<ASTEnumeratorExpression>(list);
+        expr->_symbol = 0;
+        return expr;
     }
 
     const ASTSymbol* symbol() const
@@ -308,6 +353,7 @@ public:
 
 protected:
     const ASTSymbol* _symbol;
+    bool _valueSet;
 };
 
 /**
@@ -354,6 +400,11 @@ public:
     {
         /// @todo Fixme
         return ExpressionResult(resultType(), esInt32, 0ULL);
+    }
+
+    virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        return cloneTempl<ASTVariableExpression>(list);
     }
 
     const BaseType* baseType() const
@@ -416,6 +467,17 @@ public:
 
     virtual ExpressionResult result() const;
 
+    virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        ASTBinaryExpression* expr = cloneTempl<ASTBinaryExpression>(list);
+        if (_left)
+            expr->_left = _left->clone(list);
+        if (_right)
+            expr->_right = _right->clone(list);
+        return expr;
+    }
+
+
     static ExpressionResultSize binaryExprSize(const ExpressionResult& r1,
                                                const ExpressionResult& r2);
 
@@ -456,6 +518,14 @@ public:
     }
 
     virtual ExpressionResult result() const;
+
+    virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        ASTUnaryExpression* expr = cloneTempl<ASTUnaryExpression>(list);
+        if (_child)
+            expr->_child = _child->clone(list);
+        return expr;
+    }
 
 protected:
     ExpressionType _type;

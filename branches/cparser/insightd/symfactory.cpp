@@ -23,6 +23,7 @@
 #include "debug.h"
 #include "function.h"
 #include "kernelsourcetypeevaluator.h"
+#include "astexpressionevaluator.h"
 #include <string.h>
 #include <asttypeevaluator.h>
 #include <astnode.h>
@@ -84,6 +85,14 @@ void SymFactory::clear()
 		delete *it;
 	}
 	_artificialTypes.clear();
+
+	// Delete all expressions
+	for (ASTExpressionList::iterator it = _expressions.begin();
+		 it != _expressions.end(); ++it)
+	{
+		delete *it;
+	}
+	_expressions.clear();
 
 	// Clear all further hashes and lists
 	_typesById.clear();
@@ -2121,6 +2130,7 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
     BaseTypeList ctxBaseTypes = ctxTypeRet.second;
 
     int membersFound = 0, membersChanged = 0;
+    KernelSourceTypeEvaluator srcEval();
 
     for (int i = 0; i < ctxBaseTypes.size(); ++i) {
         BaseType* t = ctxBaseTypes[i];
@@ -2183,13 +2193,25 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
                     }
                 }
 
-                /// @todo may need to adjust member->memberOffset() somehow
                 ++membersChanged;
                 ++_totalTypesChanged;
                 if (member->altRefTypeCount() > 0)
                     ++_conflictingTypeChanges;
-                /// @todo replace member->altRefType() with target
-                member->addAltRefTypeId(targetBaseType->id());
+
+
+                assert(dynamic_cast<KernelSourceTypeEvaluator*>(eval) != 0);
+                ASTExpressionEvaluator* exprEval =
+                        dynamic_cast<KernelSourceTypeEvaluator*>(eval)->exprEvaluator();
+
+                // Find top-level node of right-hand side for expression
+                const ASTNode* right = ed->srcNode;
+                while (right && right->parent != ed->rootNode)
+                    right = right->parent;
+
+                ASTExpression* expr = exprEval->exprOfNode(right);
+                expr = expr->clone(_expressions);
+
+                member->addAltRefType(targetBaseType->id(), expr);
             }
         }
     }
@@ -2215,10 +2237,14 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
 
 void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
                                        const BaseType* targetBaseType,
-                                       const ASTTypeEvaluator * /*eval*/)
+                                       ASTTypeEvaluator * eval)
 {
     VariableList vars = _varsByName.values(ed->sym->name());
     int varsFound = 0;
+
+    assert(dynamic_cast<KernelSourceTypeEvaluator*>(eval) != 0);
+    ASTExpressionEvaluator* exprEval =
+            dynamic_cast<KernelSourceTypeEvaluator*>(eval)->exprEvaluator();
 
     // Find the variable(s) using the targetBaseType
     for (int i = 0; i < vars.size(); ++i) {
@@ -2229,8 +2255,17 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
             ++_varTypeChanges;
             if (vars[i]->altRefTypeCount() > 0)
                 ++_conflictingTypeChanges;
+
+            // Find top-level node of right-hand side for expression
+            const ASTNode* right = ed->srcNode;
+            while (right && right->parent != ed->rootNode)
+                right = right->parent;
+
+            ASTExpression* expr = exprEval->exprOfNode(right);
+            expr = expr->clone(_expressions);
+
             /// @todo replace v->altRefType() with target
-            vars[i]->addAltRefTypeId(targetBaseType->id());
+            vars[i]->addAltRefType(targetBaseType->id(), expr);
         }
     }
 
@@ -2266,7 +2301,7 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
         const BaseType* cmpType = 0;
         // Compare to ALL alternative types
         for (int i = 0; i < r->altRefTypeCount(); ++i) {
-            const BaseType* t = r->altRefType(i);
+            const BaseType* t = findBaseTypeById(r->altRefType(i).id);
             switch (compareConflictingTypes(t, targetBaseType)) {
             // If we found the same type, we take this as the final decision
             case tcNoConflict:
