@@ -33,6 +33,7 @@ class TypeEvalDetails;
 #include "genericexception.h"
 #include "structured.h"
 #include "memspecs.h"
+#include "astexpression.h"
 #include <astsymbol.h>
 
 
@@ -399,7 +400,7 @@ protected:
 
 	void typeAlternateUsageVar(const TypeEvalDetails *ed,
 							   const BaseType *targetBaseType,
-							   const ASTTypeEvaluator *eval);
+							   ASTTypeEvaluator *eval);
 
 
 	/**
@@ -676,6 +677,7 @@ private:
 	StructMemberMultiHash _usedByStructMembers;///< Holds all StructuredMember objects that hold a reference to another type
 	FuncParamMultiHash _usedByFuncParams;///< Holds all FuncParam objects that hold a reference to another type
 	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
+	ASTExpressionList _expressions;
 
 	int _typeFoundByHash;
 	int _structListHeadCount;

@@ -1990,7 +1990,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
             for (int i = 0; i < r->altRefTypeCount(); ++i) {
                 if (i > 0)
                     _out << ", ";
-                const BaseType* t = r->altRefType(i);
+                const BaseType* t = r->altRefBaseType(i);
                 _out << "0x" << hex << (uint)t->id() << dec << t->prettyName();
             }
             _out << endl;
@@ -2013,7 +2013,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 		for (int i = 0; i < s->members().size(); i++) {
 			StructuredMember* m = s->members().at(i);
 			const BaseType* rt = (m->altRefTypeCount() == 1) ?
-						m->altRefType() :
+						m->altRefBaseType() :
 						m->refType();
 
 			QString pretty = rt ?
@@ -2027,7 +2027,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 				BaseType* tmp;
 				pretty += " <";
 				for (int j = 0; j < m->altRefTypeCount(); ++j) {
-					if (! (tmp = m->altRefType(j)))
+					if (! (tmp = m->altRefBaseType(j)))
 						continue;
 					if (j > 0)
 						pretty += ", ";
@@ -2091,7 +2091,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 		for (int i = 0; i < fp->params().size(); i++) {
 			FuncParam* param = fp->params().at(i);
 			const BaseType* rt = (param->altRefTypeCount() == 1) ?
-						param->altRefType() :
+						param->altRefBaseType() :
 						param->refType();
 
 			QString pretty = rt ?
@@ -2105,7 +2105,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 				BaseType* tmp;
 				pretty += " <";
 				for (int j = 0; j < param->altRefTypeCount(); ++j) {
-					if (! (tmp = param->altRefType(j)))
+					if (! (tmp = param->altRefBaseType(j)))
 						continue;
 					if (j > 0)
 						pretty += ", ";
@@ -2149,7 +2149,7 @@ int Shell::cmdShowVariable(const Variable* v)
         for (int i = 0; i < v->altRefTypeCount(); ++i) {
             if (i > 0)
                 _out << ", ";
-            const BaseType* t = v->altRefType(i);
+            const BaseType* t = v->altRefBaseType(i);
             _out << "0x" << hex << (uint)t->id() << dec << t->prettyName();
         }
         _out << endl;

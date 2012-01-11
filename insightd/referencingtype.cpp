@@ -14,6 +14,10 @@
 #include "genericexception.h"
 #include <assert.h>
 
+// static variable
+const ReferencingType::AltRefType ReferencingType::_emptyRefType;
+
+
 ReferencingType::ReferencingType()
     : _refTypeId(0)
 {
@@ -65,13 +69,20 @@ BaseType* ReferencingType::refTypeDeep(int resolveTypes)
 
 void ReferencingType::readFrom(QDataStream& in)
 {
-    in >> _refTypeId >> _altRefTypeIds;
+    QList<int> altRefTypeIds;
+    in >> _refTypeId >> altRefTypeIds;
+
+    for (int i = 0; i < altRefTypeIds.size(); ++i)
+        _altRefTypes.append(AltRefType(altRefTypeIds[i]));
 }
 
 
 void ReferencingType::writeTo(QDataStream& out) const
 {
-    out << _refTypeId << _altRefTypeIds;
+    QList<int> altRefTypeIds;
+    for (int i = 0; i < _altRefTypes.size(); ++i)
+        altRefTypeIds.append(_altRefTypes[i].id);
+    out << _refTypeId << altRefTypeIds;
 }
 
 
@@ -172,3 +183,75 @@ inline Instance ReferencingType::createRefInstance(size_t address,
     return Instance(addr, b, name, parentNames, vmem, id);
 }
 
+
+void ReferencingType::addAltRefType(int id, const ASTExpression* expr)
+{
+    // Does entry already exist?
+    for (int i = 0; i < _altRefTypes.size(); ++i) {
+        if (_altRefTypes[i].id == id && _altRefTypes[i].expr == expr)
+            return;
+    }
+
+    _altRefTypes.prepend(AltRefType(id, expr));
+}
+
+
+const BaseType* ReferencingType::altRefBaseType(int index) const
+{
+    const SymFactory* f;
+    return (f = fac()) ? f->findBaseTypeById(altRefType(index).id) : 0;
+}
+
+
+BaseType* ReferencingType::altRefBaseType(int index)
+{
+    const SymFactory* f;
+    return (f = fac()) ? f->findBaseTypeById(altRefType(index).id) : 0;
+}
+
+
+const ReferencingType::AltRefType& ReferencingType::altRefType(
+        int index) const
+{
+    if (_altRefTypes.isEmpty() || index >= _altRefTypes.size() || !fac())
+        return _emptyRefType;
+    if (index >= 0)
+        return _altRefTypes[index];
+
+    // No index given, find the most usable type
+
+    // If we have only one alternative, the job is easy
+    if (_altRefTypes.size() == 1)
+        return _altRefTypes.first();
+    else {
+        RealType useType = rtUndefined;
+        int useIndex = -1;
+        const BaseType* t = 0;
+        for (int i = 0; i < _altRefTypes.size(); ++i) {
+            if (!(t = altRefBaseType(i)))
+                continue;
+            RealType curType = t->dereferencedType();
+            // Init variables
+            if (useIndex < 0) {
+                useType = curType;
+                useIndex = i;
+            }
+            // Compare types
+            else {
+                // Prefer structs/unions, followed by function pointers,
+                // followed by pointers
+                if ((curType & StructOrUnion) ||
+                    (((useType & (NumericTypes|rtPointer)) && curType == rtFuncPointer)) ||
+                    ((useType & NumericTypes) && curType == rtPointer))
+                {
+                    useType = curType;
+                    useIndex = i;
+                }
+            }
+            if (useType & StructOrUnion)
+                break;
+        }
+
+        return _altRefTypes[useIndex];
+    }
+}
