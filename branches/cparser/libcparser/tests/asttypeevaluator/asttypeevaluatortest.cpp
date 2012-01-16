@@ -859,11 +859,21 @@ TEST_FUNCTION(transitiveEvaluation)
                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
     CHANGE_LAST("void *p = modules.next; m = p;",
                  "p", "Pointer->Void", "", "Pointer->Struct(module)");
+    // Simple transitive change through long
+    CHANGE_FIRST("long i = modules.next; m = i;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("long i = modules.next; m = i;",
+                 "i", "Int32", "", "Pointer->Struct(module)");
     // Double indirect change through void
     CHANGE_FIRST("void *p = modules.next, *q = p; m = q;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
     CHANGE_LAST("void *p = modules.next, *q = p; m = q;",
                 "q", "Pointer->Void", "", "Pointer->Struct(module)");
+    // Double indirect change through void and long
+    CHANGE_FIRST("void *p = modules.next; long i = p; m = i;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("void *p = modules.next; long i = p; m = i;",
+                "i", "Int32", "", "Pointer->Struct(module)");
     // Indirect change through list_head
     CHANGE_FIRST("h = modules.next; m = h;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
