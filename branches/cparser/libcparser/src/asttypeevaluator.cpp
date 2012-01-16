@@ -2745,7 +2745,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 }
             }
 #ifdef DEBUG_POINTS_TO
-            // It's not the same pointer of the deref counters don't not match!
+            // It's not the same pointer if the deref counters don't not match!
             else {
                 QString reason;
                 if (es->lastLinkDerefCount && localDerefCount < es->lastLinkDerefCount)
