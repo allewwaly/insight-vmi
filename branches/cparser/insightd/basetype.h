@@ -361,14 +361,17 @@ public:
      * @param parentNames the names of the parent, i.e., nesting struct
      * @param resolveTypes which types to automatically resolve, see
      * TypeResolution
-     * @param derefCount pointer to a counter variable for how many types have
-     * been followed to create the instance
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
+     * @param derefCount pointer to a counter variable for how many pointers
+     * have been dereferenced to create the instance
      * @return an Instance object for the dereferenced type
      * \sa BaseType::TypeResolution
      */
     virtual Instance toInstance(size_t address, VirtualMemory* vmem,
             const QString& name, const QStringList& parentNames,
-            int resolveTypes = trLexical, int* derefCount = 0) const;
+            int resolveTypes = trLexical, int maxPtrDeref = -1,
+            int* derefCount = 0) const;
 
     /**
      * This operator considers two types to be equal if their following data

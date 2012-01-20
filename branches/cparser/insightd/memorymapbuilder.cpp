@@ -119,7 +119,7 @@ void MemoryMapBuilder::run()
                 shared->pointersToLock.unlock();
                 // Add dereferenced type to the stack, if not already visited
                 int cnt = 0;
-                inst = inst.dereference(BaseType::trLexicalAndPointers, &cnt);
+                inst = inst.dereference(BaseType::trLexicalAndPointers, -1, &cnt);
 //                inst = inst.dereference(BaseType::trLexical, &cnt);
                 if (cnt && _map->addressIsWellFormed(inst))
                     _map->addChildIfNotExistend(inst, node, _index);

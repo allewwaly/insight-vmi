@@ -1,6 +1,7 @@
 
 #include "astexpression.h"
 #include "expressionevalexception.h"
+#include "instance.h"
 
 
 const char* expressionTypeToString(ExpressionType type)
@@ -157,13 +158,56 @@ double ExpressionResult::dvalue() const
 }
 
 
-ExpressionResult ASTBinaryExpression::result() const
+ExpressionResult ASTVariableExpression::result(const Instance *inst) const
+{
+    // Make sure we got a valid instance and type
+    if (!inst || !_baseType)
+        return ExpressionResult(erUndefined);
+    // Make sure the type of the instance matches our type
+    if (inst->type()->id() != _baseType->id()) {
+        exprEvalError(QString("Type ID of instance (0x%1) is different from ours (0x%2)")
+                      .arg(inst->type()->id(), 0, 16)
+                      .arg(_baseType->id(), 0, 16));
+        return ExpressionResult(erInvalid);
+    }
+
+    if (_pel.isEmpty())
+        return inst->toExpressionResult();
+
+    // Apply the postfix expressions
+    Instance tmp(*inst);
+    int cnt = 0;
+    for (int i = 0; i < _pel.size() && tmp.isValid(); ++i) {
+        switch (_pel[i].type) {
+        case ptArrow:
+            // Dereference the instance exactly once
+            tmp = tmp.dereference(BaseType::trLexicalAndPointers, 1, &cnt);
+            // Make sure we succeeded in dereferencing the pointer
+            if (cnt != 1 || !tmp.isValid())
+                return ExpressionResult(erInvalid);
+            // no break
+
+        case ptDot:
+            tmp = tmp.findMember(_pel[i].member, BaseType::trLexical);
+            break;
+
+        case ptBrackets:
+            tmp = tmp.arrayElem(_pel[i].arrayIndex);
+            break;
+        }
+    }
+
+    return tmp.toExpressionResult();
+}
+
+
+ExpressionResult ASTBinaryExpression::result(const Instance *inst) const
 {
     if (!_left || !_right)
         return ExpressionResult();
 
-    ExpressionResult lr = _left->result();
-    ExpressionResult rr = _right->result();
+    ExpressionResult lr = _left->result(inst);
+    ExpressionResult rr = _right->result(inst);
     ExpressionResult ret(lr.resultType | rr.resultType);
     ExpressionResultSize target = ret.size = binaryExprSize(lr, rr);
     // Is the expression decidable?
@@ -439,12 +483,12 @@ ExpressionResultSize ASTBinaryExpression::binaryExprSize(
 }
 
 
-ExpressionResult ASTUnaryExpression::result() const
+ExpressionResult ASTUnaryExpression::result(const Instance *inst) const
 {
     if (!_child)
         return ExpressionResult();
 
-    ExpressionResult res = _child->result();
+    ExpressionResult res = _child->result(inst);
     // Is the expression decidable?
     if (res.resultType != erConstant) {
         /// @todo constants cannot be incremented, that makes no sense at all!
@@ -540,3 +584,4 @@ ExpressionResult ASTUnaryExpression::result() const
 
     return res;
 }
+

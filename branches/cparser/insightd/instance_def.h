@@ -12,10 +12,12 @@
 #include <QStringList>
 
 #include "instancedata.h"
+#include "astexpressionresult.h"
 
 class BaseType;
 class VirtualMemory;
 class Instance;
+class StructuredMember;
 
 /// A list of Instance objects
 typedef QList<Instance> InstanceList;
@@ -180,7 +182,7 @@ public:
     bool isNull() const;
 
     /**
-     * Checks if this instance has type.
+     * Checks if this instance has a type.
      * @return \c true if this object has a type, \c false otherwise
      * \warning This does \e not check if the address is null or not!
      * \sa isNull()
@@ -259,12 +261,15 @@ public:
      * Dereferences this instance as far as possible.
      * @param resolveTypes which types to automatically resolve, see
      * BaseType::TypeResolution
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
      * @param derefCount pointer to a counter variable for how many types have
      * been followed to create the instance
      * @return a dereferenced version of this instance
      * \sa BaseType::TypeResolution
      */
-    Instance dereference(int resolveTypes, int* derefCount = 0) const;
+    Instance dereference(int resolveTypes, int maxPtrDeref = -1,
+                         int* derefCount = 0) const;
 
     /**
      * @return the number of members, if this is a struct, \c 0 otherwise
@@ -362,6 +367,47 @@ public:
     int typeIdOfMember(const QString& name) const;
 
     /**
+     * Returns the number of candidate types for a particular member.
+     * @param name the name of the member
+     * @return 0 if only the originally declared type is available, otherwise
+     * the number of alternative candidate types
+     */
+    int memberCandidatesCount(const QString& name) const;
+
+    /**
+     * Returns the number of candidate types for a particular member.
+     * @param index index of the member
+     * @return 0 if only the originally declared type is available, otherwise
+     * the number of alternative candidate types
+     */
+    int memberCandidatesCount(int index) const;
+
+    /**
+     * Retrieves the candidate type no. \a cndtIndex for member with index
+     * \a mbrIndex. You can check for the number of members with MemberCount()
+     * and the number of candidate types for a particular member with
+     * MemberCandidatesCount().
+     * @param mbrIndex index of the member
+     * @param cndtIndex index of the candidate type for that member
+     * @return a new Instance object for the member with the selected candidate
+     * type, if such a member and candiate exists, or an empty object otherwise
+     * \sa MemberCount(), MemberCandidatesCount()
+     */
+    Instance memberCandidate(int mbrIndex, int cndtIndex) const;
+
+    /**
+     * Retrieves the candidate type no. \a cndtIndex for member \a name.
+     * You can check for the number of candidate types for a particular member
+     * with MemberCandidatesCount().
+     * @param name the name of the member
+     * @param cndtIndex index of the candidate type for that member
+     * @return a new Instance object if the member \a name with the selected
+     * candidate type exists, or an empty object otherwise
+     * \sa MemberCount(), MemberCandidatesCount()
+     */
+    Instance memberCandidate(const QString& name, int cndtIndex) const;
+
+    /**
      * Explicit representation of this instance as qint8.
      * @return the value of this type as a qint8
      */
@@ -431,6 +477,18 @@ public:
     void* toPointer() const;
 
     /**
+     * Explicit representation of this instance as an ExpressionResult struct.
+     * Depending on the BaseType of this instance, the result is converted into
+     * a numeric representation. Lexical types are automatically dereferenced.
+     * Pointer values will be converted to an unsigned 32 bit or 64 bit integer,
+     * depending the memory specifications. Any other type will result in an
+     * invalid value (erInvalid).
+     * @return a numeric representation of this instance
+     * \sa pointerSize()
+     */
+    ExpressionResult toExpressionResult() const;
+
+    /**
      * Explicit representation of this instance as QVariant.
      * @return the value of this type as a variant
      */
@@ -469,6 +527,9 @@ private:
     void differencesRek(const Instance& other, const QString& relParent,
             bool includeNestedStructs, QStringList& result,
             VisitedSet& visited) const;
+
+	Instance memberCandidate(const StructuredMember* m,
+							 int cndtIndex) const;
 
     InstanceData _d;
 };

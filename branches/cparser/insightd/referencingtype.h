@@ -158,13 +158,15 @@ protected:
      * variable instance)
      * @param resolveTypes bitwise or'ed BaseType::RealType's that should
      * be resolved
-     * @param derefCount pointer to a counter variable for how many types have
-     * been followed to create the instance
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
+     * @param derefCount pointer to a counter variable for how many pointers
+     * have been dereferenced to create the instance
      * @return an Instance object for this member
      */
     Instance createRefInstance(size_t address, VirtualMemory* vmem,
             const QString& name, const QStringList& parentNames,
-            int resolveTypes, int* derefCount = 0) const;
+            int resolveTypes, int maxPtrDeref = -1, int *derefCount = 0) const;
 
     /**
      * Creates an Instance object of a Variable object.
@@ -174,13 +176,15 @@ protected:
      * @param id the id of the variable
      * @param resolveTypes bitwise or'ed BaseType::RealType's that should
      * be resolved
-     * @param derefCount pointer to a counter variable for how many types have
-     * been followed to create the instance
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
+     * @param derefCount pointer to a counter variable for how many pointers
+     * have been dereferenced to create the instance
      * @return an Instance object for this member
      */
     Instance createRefInstance(size_t address, VirtualMemory* vmem,
             const QString& name, int id, int resolveTypes,
-            int* derefCount = 0) const;
+            int maxPtrDeref = -1, int* derefCount = 0) const;
 
     /**
      * Access function to the factory this symbol belongs to.
@@ -208,13 +212,13 @@ private:
      * @param id the id of the instance (if it is a variable instance)
      * @param resolveTypes bitwise or'ed BaseType::RealType's that should
      * be resolved
-     * @param derefCount pointer to a counter variable for how many types have
-     * been followed to create the instance
+     * @param derefCount pointer to a counter variable for how many pointers
+     * have been dereferenced to create the instance
      * @return an Instance object for this member
      */
     inline Instance createRefInstance(size_t address, VirtualMemory* vmem,
             const QString& name, const QStringList& parentNames, int id,
-            int resolveTypes, int* derefCount) const;
+            int resolveTypes, int maxPtrDeref, int* derefCount) const;
 };
 
 

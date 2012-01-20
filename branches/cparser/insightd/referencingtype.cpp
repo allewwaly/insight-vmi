@@ -88,26 +88,26 @@ void ReferencingType::writeTo(QDataStream& out) const
 
 Instance ReferencingType::createRefInstance(size_t address,
         VirtualMemory* vmem, const QString& name, const QStringList& parentNames,
-        int resolveTypes, int* derefCount) const
+        int resolveTypes, int maxPtrDeref, int *derefCount) const
 {
     return createRefInstance(address, vmem, name, parentNames, -1,
-            resolveTypes, derefCount);
+            resolveTypes, maxPtrDeref, derefCount);
 }
 
 
 Instance ReferencingType::createRefInstance(size_t address,
         VirtualMemory* vmem, const QString& name, int id, int resolveTypes,
-        int* derefCount) const
+        int maxPtrDeref, int* derefCount) const
 {
     return createRefInstance(address, vmem, name, QStringList(), id,
-            resolveTypes, derefCount);
+            resolveTypes, maxPtrDeref, derefCount);
 }
 
 
 inline Instance ReferencingType::createRefInstance(size_t address,
 		VirtualMemory* vmem, const QString& name,
 		const QStringList& parentNames, int id, int resolveTypes,
-		int* derefCount) const
+		int maxPtrDeref, int *derefCount) const
 {
     if (derefCount)
         *derefCount = 0;
@@ -127,20 +127,22 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 #endif
 
     const RefBaseType* rbt = 0;
-    if (derefCount)
-        (*derefCount)++;
     bool done = false;
 
     // If this is a pointer, we already have to dereference the initial address
     const Pointer* p = dynamic_cast<const Pointer*>(this);
     if (p) {
-        if (vmem->safeSeek(addr)) {
+        if (maxPtrDeref != 0 && vmem->safeSeek(addr)) {
             size_t derefAddr = (size_t)p->toPointer(vmem, addr);
            	// Don't taint NULL pointers by adding some artificial offsets!
             addr = derefAddr ? derefAddr + p->macroExtraOffset() : derefAddr;
+            if (derefCount)
+                (*derefCount)++;
         }
         else
             done = true;
+        if (maxPtrDeref > 0)
+            --maxPtrDeref;
     }
 
     while ( !done && (b->type() & resolveTypes) &&
@@ -165,19 +167,22 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 			    break;
 			// Otherwise resolve pointer reference, if this is a pointer
 			if ( (p = dynamic_cast<const Pointer*>(rbt)) ) {
-			    // If we cannot dereference the pointer, we have to stop here
-			    if (vmem->safeSeek(addr)) {
-		            size_t derefAddr = (size_t)p->toPointer(vmem, addr);
+				// If we already hit the maximum allowed dereference level or
+				// we cannot dereference the pointer, we have to stop here
+				if (maxPtrDeref != 0 && vmem->safeSeek(addr)) {
+					size_t derefAddr = (size_t)p->toPointer(vmem, addr);
 	            	// Don't taint NULL pointers by adding some artificial offsets!
 	                addr = derefAddr ? derefAddr + p->macroExtraOffset() : derefAddr;
-			    }
+					if (derefCount)
+						(*derefCount)++;
+				}
 			    else
 			        break;
+				if (maxPtrDeref > 0)
+					--maxPtrDeref;
 			}
 		}
 		b = rbt->refType();
-	    if (derefCount)
-	        (*derefCount)++;
     }
 
     return Instance(addr, b, name, parentNames, vmem, id);

@@ -238,7 +238,7 @@ public slots:
     QStringList MemberNames() const;
 
     /**
-     * Gives access to the names of all members if this instance.
+     * Gives access to all members if this instance.
      * @return a list of instances of all members
      * \sa MemberNames(), FindMember()
      */
@@ -318,6 +318,23 @@ public slots:
     int MemberOffset(const QString& name) const;
 
     /**
+     * Retrieves the number of members of this instance.
+     * @return the number of members of this instance.
+     */
+    int MemberCount() const;
+
+    /**
+     * Retrieves the member at index \a index of this Instance, if it exists.
+     * You can check for the number of members with MemberCount().
+     *
+     * @param index the index of the member
+     * @return a new Instance object if the member exists, or an empty
+     * object otherwise
+     * \sa MemberCount()
+     */
+    Instance Member(int index) const;
+
+    /**
      * Retrieves a member of this Instance, if it exists. You can check their
      * existence with MemberExists() or by iterating over the names returned by
      * MemberNames().
@@ -338,6 +355,47 @@ public slots:
      * @return the ID of the type, if that member exists, \c 0 otherwise.
      */
     int TypeIdOfMember(const QString& name) const;
+
+    /**
+     * Returns the number of candidate types for a particular member.
+     * @param name the name of the member
+     * @return 0 if only the originally declared type is available, otherwise
+     * the number of alternative candidate types
+     */
+    int MemberCandidatesCount(const QString& name) const;
+
+    /**
+     * Returns the number of candidate types for a particular member.
+     * @param index the index of the member
+     * @return 0 if only the originally declared type is available, otherwise
+     * the number of alternative candidate types
+     */
+    int MemberCandidatesCount(int index) const;
+
+    /**
+     * Retrieves the candidate type no. \a cndtIndex for member with index
+     * \a mbrIndex. You can check for the number of members with MemberCount()
+     * and the number of candidate types for a particular member with
+     * MemberCandidatesCount().
+     * @param mbrIndex index of the member
+     * @param cndtIndex index of the candidate type for that member
+     * @return a new Instance object for the member with the selected candidate
+     * type, if such a member and candiate exists, or an empty object otherwise
+     * \sa MemberCount(), MemberCandidatesCount()
+     */
+    Instance MemberCandidate(int mbrIndex, int cndtIndex) const;
+
+    /**
+     * Retrieves the candidate type no. \a cndtIndex for member \a name.
+     * You can check for the number of candidate types for a particular member
+     * with MemberCandidatesCount().
+     * @param name the name of the member
+     * @param cndtIndex index of the candidate type for that member
+     * @return a new Instance object if the member \a name with the selected
+     * candidate type exists, or an empty object otherwise
+     * \sa MemberCount(), MemberCandidatesCount()
+     */
+    Instance MemberCandidate(const QString& name, int cndtIndex) const;
 
     /**
      * This method always returns 4 on 32-bit kernels and 8 on 64-bit kernels.

@@ -117,7 +117,7 @@ void BaseType::setSize(quint32 size)
 
 Instance BaseType::toInstance(size_t address, VirtualMemory* vmem,
         const QString& name, const QStringList& parentNames,
-        int /*resolveTypes*/, int* /*derefCount*/) const
+        int /*resolveTypes*/, int /*maxPtrDeref*/, int* /*derefCount*/) const
 {
     return Instance(address, this, name, parentNames, vmem, -1);
 }
