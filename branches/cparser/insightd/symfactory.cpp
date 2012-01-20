@@ -2298,7 +2298,6 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
     // Was the member already manipulated?
     if (r->hasAltRefTypes()) {
         TypeConflicts ret = tcNoConflict;
-        const BaseType* cmpType = 0;
         // Compare to ALL alternative types
         for (int i = 0; i < r->altRefTypeCount(); ++i) {
             const BaseType* t = findBaseTypeById(r->altRefType(i).id);
@@ -2306,25 +2305,21 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
             // If we found the same type, we take this as the final decision
             case tcNoConflict:
                 ret = tcNoConflict;
-                cmpType = t;
                 goto for_end;
             // Ignore overrides conflicts
             case tcIgnore:
                 ret = tcIgnore;
-                cmpType = t;
                 break;
             // Conflict overrides replace
             case tcConflict:
                 if (ret != tcIgnore) {
                     ret = tcConflict;
-                    cmpType = t;
                 }
                 break;
             // Replace only if no other decision was already made
             case tcReplace:
                 if (ret != tcIgnore && ret != tcConflict) {
                     ret = tcReplace;
-                    cmpType = t;
                 }
                 break;
             }
