@@ -13,6 +13,7 @@
 #include "virtualmemory.h"
 #include "debug.h"
 #include "array.h"
+#include "astexpression.h"
 #include <QScriptEngine>
 #include <QSharedData>
 
@@ -223,8 +224,8 @@ bool Instance::equals(const Instance& other) const
     case rtTypedef:
     case rtVolatile: {
         int cnt1, cnt2;
-        Instance inst1 = dereference(BaseType::trAny, &cnt1);
-        Instance inst2 = other.dereference(BaseType::trAny, &cnt2);
+        Instance inst1 = dereference(BaseType::trAny, -1, &cnt1);
+        Instance inst2 = other.dereference(BaseType::trAny, -1, &cnt2);
 
         if (cnt1 != cnt2)
             return false;
@@ -337,8 +338,8 @@ void Instance::differencesRek(const Instance& other,
     case rtTypedef:
     case rtVolatile: {
         int cnt1, cnt2;
-        Instance inst1 = dereference(BaseType::trAny, &cnt1);
-        Instance inst2 = other.dereference(BaseType::trAny, &cnt2);
+        Instance inst1 = dereference(BaseType::trAny, -1, &cnt1);
+        Instance inst2 = other.dereference(BaseType::trAny, -1, &cnt2);
 
         if (cnt1 != cnt2)
             result.append(relParent);
@@ -376,14 +377,14 @@ Instance Instance::arrayElem(int index) const
 }
 
 
-Instance Instance::dereference(int resolveTypes, int* derefCount) const
+Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCount) const
 {
     if (isNull())
         return *this;
 
     if (resolveTypes && _d.type)
         return _d.type->toInstance(_d.address, _d.vmem, _d.name,
-                _d.parentNames, resolveTypes, derefCount);
+                _d.parentNames, resolveTypes, maxPtrDeref, derefCount);
 
     if (derefCount)
         *derefCount = 0;
@@ -468,4 +469,121 @@ int Instance::typeIdOfMember(const QString& name) const
 		return 0;
 	else
 		return m->refTypeId();
+}
+
+
+int Instance::memberCandidatesCount(const QString &name) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	const StructuredMember* m = 0;
+	if ( !s || !(m = s->findMember(name)) )
+		return -1;
+
+	return m->altRefTypeCount();
+}
+
+
+int Instance::memberCandidatesCount(int index) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s && index >= 0 && index < s->members().size()) {
+		return s->members().at(index)->altRefTypeCount();
+	}
+	return -1;
+}
+
+
+Instance Instance::memberCandidate(int mbrIndex, int cndtIndex) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s && mbrIndex >= 0 && mbrIndex < s->members().size())
+		return memberCandidate(s->members().at(mbrIndex), cndtIndex);
+
+	return Instance();
+}
+
+
+Instance Instance::memberCandidate(const QString &name, int cndtIndex) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s)
+		return memberCandidate(s->findMember(name, true), cndtIndex);
+
+	return Instance();
+}
+
+
+Instance Instance::memberCandidate(const StructuredMember* m,
+								   int cndtIndex) const
+{
+	if (!m)
+		return Instance();
+
+	if (cndtIndex < 0 || cndtIndex >= m->altRefTypeCount())
+		return Instance();
+
+	ReferencingType::AltRefType alt = m->altRefType(cndtIndex);
+	// Evaluate pointer arithmetic for new address
+	ExpressionResult result = alt.expr->result();
+	if (result.resultType == erUndefined || (result.resultType & erInvalid))
+		return Instance();
+
+	quint64 newAddr = result.uvalue(esUInt64);
+	// Retrieve new type
+	const BaseType* newType = (_d.type && _d.type->factory()) ?
+				_d.type->factory()->findBaseTypeById(alt.id) : 0;
+	assert(newType != 0);
+	// Create instance with new type at new address
+	return newType->toInstance(newAddr, _d.vmem, m->name(), _d.parentNames,
+							   BaseType::trLexical);
+}
+
+
+ExpressionResult Instance::toExpressionResult() const
+{
+	if (_d.isNull)
+		return ExpressionResult(erInvalid);
+
+	const BaseType* t = _d.type->dereferencedBaseType(BaseType::trLexical);
+	ExpressionResultType ert = (_d.id > 0) ? erGlobalVar : erLocalVar;
+
+	switch (t->type()) {
+	case rtInt8:
+		return ExpressionResult(ert, esInt8,
+								(quint64)t->toInt8(_d.vmem, _d.address));
+	case rtUInt8:
+		return ExpressionResult(ert, esUInt8,
+								(quint64)t->toUInt8(_d.vmem, _d.address));
+	case rtInt16:
+		return ExpressionResult(ert, esInt16,
+								(quint64)t->toInt16(_d.vmem, _d.address));
+	case rtUInt16:
+		return ExpressionResult(ert, esUInt16,
+								(quint64)t->toUInt16(_d.vmem, _d.address));
+	case rtInt32:
+		return ExpressionResult(ert, esInt32,
+								(quint64)t->toInt32(_d.vmem, _d.address));
+	case rtUInt32:
+		return ExpressionResult(ert, esUInt32,
+								(quint64)t->toUInt32(_d.vmem, _d.address));
+	case rtInt64:
+		return ExpressionResult(ert, esInt64,
+								(quint64)t->toInt64(_d.vmem, _d.address));
+	case rtUInt64:
+		return ExpressionResult(ert, esUInt64,
+								(quint64)t->toUInt64(_d.vmem, _d.address));
+	case rtFloat:
+		return ExpressionResult(ert, esFloat, t->toFloat(_d.vmem, _d.address));
+	case rtDouble:
+		return ExpressionResult(ert, esDouble, t->toDouble(_d.vmem, _d.address));
+	case rtFuncPointer:
+	case rtPointer:
+		return pointerSize() == 4 ?
+					ExpressionResult(ert, esUInt32,
+									 (quint64)t->toUInt32(_d.vmem, _d.address)) :
+					ExpressionResult(ert, esUInt64,
+									 (quint64)t->toUInt64(_d.vmem, _d.address));
+	default:
+		return ExpressionResult(erInvalid);
+	}
 }

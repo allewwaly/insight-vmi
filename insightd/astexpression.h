@@ -4,9 +4,11 @@
 #include <QList>
 #include <astsymbol.h>
 #include <debug.h>
+#include "astexpressionresult.h"
 
 class BaseType;
 class ASTExpression;
+class Instance;
 
 typedef QList<ASTExpression*> ASTExpressionList;
 
@@ -46,85 +48,6 @@ enum ExpressionType {
     etUnaryNot
 };
 
-/**
- The type of an epxression result, which may be a bit-wise combination of the
- following enumeration values.
- */
-enum ExpressionResultType {
-    erUndefined = 0,         ///< Result is undefined
-    erConstant  = (1 << 0),  ///< Expression is compile-time constant
-    erGlobalVar = (1 << 1),  ///< Expression involves global variable
-    erLocalVar  = (1 << 2),  ///< Expression involves local variable
-    erParameter = (1 << 3),  ///< Expression involves function parameters
-    erRuntime   = (1 << 4),  ///< Expression involves run-time dependencies
-    erInvalid   = (1 << 5),  ///< Expression result cannot be determined
-    erVoid      = (1 << 6)   ///< Expression result is void
-};
-
-enum ExpressionResultSize {
-    esUndefined = 0,
-    es8Bit      = (1 << 1),
-    es16Bit     = (1 << 2),
-    es32Bit     = (1 << 3),
-    es64Bit     = (1 << 4),
-    esUnsigned  = (1 << 5),
-    esFloat     = (1 << 6),
-    esDouble    = (1 << 7),
-    esInt8      = es8Bit,
-    esUInt8     = es8Bit|esUnsigned,
-    esInt16     = es16Bit,
-    esUInt16    = es16Bit|esUnsigned,
-    esInt32     = es32Bit,
-    esUInt32    = es32Bit|esUnsigned,
-    esInt64     = es64Bit,
-    esUInt64    = es64Bit|esUnsigned,
-    esInteger   = es8Bit|es16Bit|es32Bit|es64Bit,
-    esReal      = esFloat|esDouble
-};
-
-
-/// The result of an expression
-struct ExpressionResult
-{
-    /// Constructor
-    ExpressionResult() : resultType(erUndefined), size(esInt32) { this->result.i64 = 0; }
-    ExpressionResult(int resultType)
-        : resultType(resultType), size(esInt32) { this->result.i64 = 0; }
-    ExpressionResult(int resultType, ExpressionResultSize size, quint64 result)
-        : resultType(resultType), size(size) { this->result.ui64 = result; }
-    ExpressionResult(int resultType, ExpressionResultSize size, float result)
-        : resultType(resultType), size(size) { this->result.f = result; }
-    ExpressionResult(int resultType, ExpressionResultSize size, double result)
-        : resultType(resultType), size(size) { this->result.d = result; }
-
-    /// ORed combination of ExpressionResultType values
-    int resultType;
-
-    /// size of result of expression. \sa ExpressionResultSize
-    ExpressionResultSize size;
-
-    /// Expression result, if valid
-    union Result {
-        quint64 ui64;
-        qint64 i64;
-        quint32 ui32;
-        qint32 i32;
-        quint16 ui16;
-        qint16 i16;
-        quint8 ui8;
-        qint8 i8;
-        float f;
-        double d;
-    } result;
-
-    qint64 value(ExpressionResultSize target = esUndefined) const;
-
-    quint64 uvalue(ExpressionResultSize target = esUndefined) const;
-
-    float fvalue() const;
-
-    double dvalue() const;
-};
 
 /**
  * Abstract base class for a syntax tree expression.
@@ -136,7 +59,7 @@ public:
 
     virtual ExpressionType type() const = 0;
     virtual int resultType() const = 0;
-    virtual ExpressionResult result() const = 0;
+    virtual ExpressionResult result(const Instance* inst = 0) const = 0;
     virtual ASTExpression* clone(ASTExpressionList& list) const = 0;
 
     inline bool hasAlternative() const
@@ -192,8 +115,9 @@ public:
         return erUndefined;
     }
 
-    inline virtual ExpressionResult result() const
+    inline virtual ExpressionResult result(const Instance* inst = 0) const
     {
+        Q_UNUSED(inst);
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 
@@ -219,8 +143,9 @@ public:
         return erInvalid|erRuntime;
     }
 
-    inline virtual ExpressionResult result() const
+    inline virtual ExpressionResult result(const Instance* inst = 0) const
     {
+        Q_UNUSED(inst);
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 
@@ -246,8 +171,9 @@ public:
         return erRuntime;
     }
 
-    inline virtual ExpressionResult result() const
+    inline virtual ExpressionResult result(const Instance* inst = 0) const
     {
+        Q_UNUSED(inst);
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 
@@ -281,8 +207,9 @@ public:
         return erConstant;
     }
 
-    inline virtual ExpressionResult result() const
+    inline virtual ExpressionResult result(const Instance* inst = 0) const
     {
+        Q_UNUSED(inst);
         return _value;
     }
 
@@ -396,11 +323,7 @@ public:
         return _global ? erGlobalVar : erLocalVar;
     }
 
-    virtual ExpressionResult result() const
-    {
-        /// @todo Fixme
-        return ExpressionResult(resultType(), esInt32, 0ULL);
-    }
+    virtual ExpressionResult result(const Instance* inst = 0) const;
 
     virtual ASTExpression* clone(ASTExpressionList& list) const
     {
@@ -465,7 +388,7 @@ public:
                     erUndefined;
     }
 
-    virtual ExpressionResult result() const;
+    virtual ExpressionResult result(const Instance* inst = 0) const;
 
     virtual ASTExpression* clone(ASTExpressionList& list) const
     {
@@ -517,7 +440,7 @@ public:
         return _child ? _child->resultType() : erUndefined;
     }
 
-    virtual ExpressionResult result() const;
+    virtual ExpressionResult result(const Instance* inst = 0) const;
 
     virtual ASTExpression* clone(ASTExpressionList& list) const
     {

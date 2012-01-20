@@ -125,7 +125,8 @@ HEADERS += kernelsourcetypeevaluator.h \
     function.h \
     astexpressionevaluator.h \
     astexpression.h \
-    expressionevalexception.h
+    expressionevalexception.h \
+    expressionresult.h
 CONFIG += console \
     debug_and_release
 QMAKE_CFLAGS_RELEASE += -O3

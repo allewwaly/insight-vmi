@@ -262,7 +262,14 @@ bool InstancePrototype::MemberExists(const QString& name) const
 int InstancePrototype::MemberOffset(const QString& name) const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->memberOffset(name) : 0;
+	return ((inst = thisInstance())) ? inst->memberOffset(name) : 0;
+}
+
+
+int InstancePrototype::MemberCount() const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ? inst->memberCount() : 0;
 }
 
 
@@ -274,10 +281,48 @@ Instance InstancePrototype::FindMember(const QString& name) const
 }
 
 
+Instance InstancePrototype::Member(int index) const
+{
+    Instance* inst;
+    return ((inst = thisInstance())) ?
+                inst->member(index, BaseType::trAny) : Instance();
+}
+
+
 int InstancePrototype::TypeIdOfMember(const QString& name) const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->typeIdOfMember(name) : -1;
+	return ((inst = thisInstance())) ? inst->typeIdOfMember(name) : -1;
+}
+
+
+int InstancePrototype::MemberCandidatesCount(const QString &name) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ? inst->memberCandidatesCount(name) : 0;
+}
+
+
+int InstancePrototype::MemberCandidatesCount(int index) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ? inst->memberCandidatesCount(index) : 0;
+}
+
+
+Instance InstancePrototype::MemberCandidate(int mbrIndex, int cndtIndex) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ?
+				inst->memberCandidate(mbrIndex, cndtIndex) : Instance();
+}
+
+
+Instance InstancePrototype::MemberCandidate(const QString &name, int cndtIndex) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ?
+				inst->memberCandidate(name, cndtIndex) : Instance();
 }
 
 
