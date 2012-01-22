@@ -86,11 +86,11 @@ struct MemSpecs
 {
     /// Architecture variants: i386 or x86_64
     enum Architecture {
-        undefined    = 0,        ///< architecture is not set
-        i386         = (1 << 0), ///< architecture is i386 with extended paging
-        x86_64       = (1 << 1), ///< architecture is AMD64
-        pae_enabled  = (1 << 2), ///< flag that indicates if PAE is enabled in i386 mode
-        i386_pae     = i386 & pae_enabled ///< architecture is i386 with PAE enabled
+        ar_undefined    = 0,        ///< architecture is not set
+        ar_i386         = (1 << 0), ///< architecture is i386 with extended paging
+        ar_x86_64       = (1 << 1), ///< architecture is AMD64
+        ar_pae_enabled  = (1 << 2), ///< flag that indicates if PAE is enabled in i386 mode
+        ar_i386_pae     = ar_i386 & ar_pae_enabled ///< architecture is i386 with PAE enabled
     };
 
     /// Constructor
@@ -109,7 +109,7 @@ struct MemSpecs
         highMemory(0),
         vmallocEarlyreserve(0),
         sizeofUnsignedLong(sizeof(unsigned long)),
-        arch(undefined),
+        arch(ar_undefined),
         initialized(false)
     {}
 
@@ -170,14 +170,14 @@ struct MemSpecs
 
 inline quint64 MemSpecs::vaddrSpaceEnd() const
 {
-    return (arch & x86_64) ? VADDR_SPACE_X86_64 : VADDR_SPACE_X86;
+    return (arch & ar_x86_64) ? VADDR_SPACE_X86_64 : VADDR_SPACE_X86;
 }
 
 
 inline quint64 MemSpecs::realVmallocStart() const
 {
     assert(initialized == true);
-    if (arch & i386)
+    if (arch & ar_i386)
         return (vmallocStart + highMemory + vmallocEarlyreserve) &
                 ~(vmallocOffset - 1);
     else
