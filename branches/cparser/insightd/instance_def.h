@@ -12,7 +12,7 @@
 #include <QStringList>
 
 #include "instancedata.h"
-#include "astexpressionresult.h"
+#include "expressionresult.h"
 
 class BaseType;
 class VirtualMemory;
