@@ -123,7 +123,7 @@ VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
       _userland(false), _userPGD(0), _userlandMutex(QMutex::Recursive)
 {
     // Make sure the architecture is set
-    if ( !_specs.arch & (MemSpecs::i386|MemSpecs::x86_64) )
+    if ( !_specs.arch & (MemSpecs::ar_i386|MemSpecs::ar_x86_64) )
         virtualMemoryError("No architecture set in memory specifications");
 
 }
@@ -256,9 +256,9 @@ bool VirtualMemory::safeSeek(qint64 pos)
 
 qint64 VirtualMemory::size() const
 {
-    if (_specs.arch & MemSpecs::i386)
+    if (_specs.arch & MemSpecs::ar_i386)
         return VADDR_SPACE_X86;
-    else if (_specs.arch & MemSpecs::x86_64)
+    else if (_specs.arch & MemSpecs::ar_x86_64)
         return VADDR_SPACE_X86_64;
     // Fallback
     return 0;
@@ -449,7 +449,7 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
     }
 
     // Now we have to split up PAE and non-PAE address translation
-    if (_specs.arch & MemSpecs::pae_enabled) {
+    if (_specs.arch & MemSpecs::ar_pae_enabled) {
         pgd_addr &= PHYSICAL_PAGE_MASK_X86_PAE;
 
         // Lookup address for the pgd page directory. The size of one page table
@@ -696,7 +696,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
         bool enableExceptions)
 {
-    quint64 physAddr = (_specs.arch & MemSpecs::i386) ?
+    quint64 physAddr = (_specs.arch & MemSpecs::ar_i386) ?
             virtualToPhysical32(vaddr, pageSize, enableExceptions) :
             virtualToPhysical64(vaddr, pageSize, enableExceptions);
 
@@ -722,7 +722,7 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
 	}
 
 	// Make sure the address is within a valid range
-    if ((_specs.arch & MemSpecs::i386) && (vaddr >= (1UL << 32)))
+    if ((_specs.arch & MemSpecs::ar_i386) && (vaddr >= (1UL << 32)))
         virtualMemoryOtherError(
                 QString("Virtual address 0x%1 exceeds 32 bit address space")
                         .arg(vaddr, 0, 16),

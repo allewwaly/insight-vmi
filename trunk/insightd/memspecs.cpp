@@ -100,9 +100,9 @@ bool MemSpecs::setFromKeyValue(const QString& key, const QString& value)
         sizeofUnsignedLong = value.toInt(&ok);
     else if (key == "ARCHITECTURE") {
         if (value == "i386")
-            arch |= i386;
+            arch |= ar_i386;
         else if (value == "x86_64")
-            arch |= x86_64;
+            arch |= ar_x86_64;
         else
             ok = false;
     }
@@ -118,9 +118,9 @@ QString MemSpecs::toString() const
     QString ret;
     int key_w = -21;
     int val_w = sizeofUnsignedLong << 1;
-    QString pae = arch & pae_enabled ? " (PAE enabled)" : (arch & i386 ? " (PAE disabled)" : "");
+    QString pae = arch & ar_pae_enabled ? " (PAE enabled)" : (arch & ar_i386 ? " (PAE disabled)" : "");
 
-    ret += QString("%1 = %2%3\n").arg("ARCHITECTURE", key_w).arg(arch & i386 ? "i386" : "x86_64").arg(pae);
+    ret += QString("%1 = %2%3\n").arg("ARCHITECTURE", key_w).arg(arch & ar_i386 ? "i386" : "x86_64").arg(pae);
     ret += QString("%1 = %2\n").arg("sizeof(unsigned long)", key_w).arg(sizeofUnsignedLong);
     ret += QString("%1 = 0x%2\n").arg("PAGE_OFFSET", key_w).arg(pageOffset, val_w, 16, QChar('0'));
     if (vmallocStart > 0)

@@ -274,7 +274,7 @@ void MemSpecParser::buildHelperProg(const MemSpecs& specs)
 {
     QProcess proc;
     QStringList cmdlines;
-    QString arch = (specs.arch & MemSpecs::x86_64) ? "x86_64" : "i386";
+    QString arch = (specs.arch & MemSpecs::ar_x86_64) ? "x86_64" : "i386";
 
     cmdlines += QString("make KDIR=%1 ARCH=%2")
             .arg(QDir::current().absoluteFilePath(_kernelSrcDir))
@@ -364,8 +364,8 @@ void MemSpecParser::parseSystemMap(MemSpecs* specs)
     sysMap.close();
 
     // We expect to parse exactly one of them
-    if ( ((specs->arch & MemSpecs::x86_64) && !lvl4_ok) ||
-    	 ((specs->arch & MemSpecs::i386) && !swp_ok)) {
+    if ( ((specs->arch & MemSpecs::ar_x86_64) && !lvl4_ok) ||
+         ((specs->arch & MemSpecs::ar_i386) && !swp_ok)) {
         memSpecParserError(QString("Could not parse one of the required values "
                 "\"init_level4_pgt\" or \"swapper_pg_dir\" from file \"%1\"")
                 .arg(_systemMapFile));
@@ -384,11 +384,11 @@ void MemSpecParser::parseKernelConfig(MemSpecs* specs)
 	const int bufsize = 1024;
 	char buf[1024];
 
-	QString i386  = "CONFIG_X86_32=";
-	QString x8664 = "CONFIG_X86_64=";
-    QString pae   = "CONFIG_X86_PAE=";
+	QString s_i386  = "CONFIG_X86_32=";
+	QString s_x8664 = "CONFIG_X86_64=";
+	QString s_pae   = "CONFIG_X86_PAE=";
 
-	specs->arch = MemSpecs::undefined;
+	specs->arch = MemSpecs::ar_undefined;
 
 	while (!config.atEnd()) {
 		config.readLine(buf, bufsize);
@@ -396,19 +396,19 @@ void MemSpecParser::parseKernelConfig(MemSpecs* specs)
 		if (line.startsWith(QChar('#')))
 			continue;
 
-		if (line.startsWith(i386)) {
-			specs->arch |= MemSpecs::i386;
+		if (line.startsWith(s_i386)) {
+			specs->arch |= MemSpecs::ar_i386;
 		}
-		else if (line.startsWith(x8664)) {
-			specs->arch |= MemSpecs::x86_64;
+		else if (line.startsWith(s_x8664)) {
+			specs->arch |= MemSpecs::ar_x86_64;
 		}
-        else if (line.startsWith(pae)) {
-            specs->arch |= MemSpecs::pae_enabled;
+		else if (line.startsWith(s_pae)) {
+			specs->arch |= MemSpecs::ar_pae_enabled;
         }
 	}
 
 	// Make sure we found the architecture
-	if (specs->arch == MemSpecs::undefined)
+	if (specs->arch == MemSpecs::ar_undefined)
         memSpecParserError(QString("Could not determine configured target architecture"
                 "from file \"%1\"").arg(config.fileName()));
 }
