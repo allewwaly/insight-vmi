@@ -4,7 +4,7 @@
 #include <QList>
 #include <astsymbol.h>
 #include <debug.h>
-#include "astexpressionresult.h"
+#include "expressionresult.h"
 
 class BaseType;
 class ASTExpression;
