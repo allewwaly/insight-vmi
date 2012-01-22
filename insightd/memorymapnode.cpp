@@ -19,7 +19,7 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
 	  _name(MemoryMap::insertName(name)), _address(address), _type(type),
 	  _id(id), _probability(1.0)
 {
-    if (_belongsTo && (_belongsTo->vmem()->memSpecs().arch & MemSpecs::i386))
+    if (_belongsTo && (_belongsTo->vmem()->memSpecs().arch & MemSpecs::ar_i386))
         if (_address >= (1UL << 32))
             genericError(QString("Address 0x%1 exceeds 32 bit address space")
                     .arg(_address, 0, 16));

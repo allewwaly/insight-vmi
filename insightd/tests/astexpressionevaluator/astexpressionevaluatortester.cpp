@@ -250,7 +250,7 @@ ASTExpressionEvaluatorTester::ASTExpressionEvaluatorTester(QObject *parent) :
 void ASTExpressionEvaluatorTester::initTestCase()
 {
     _specs = new MemSpecs();
-    _specs->arch = MemSpecs::x86_64;
+    _specs->arch = MemSpecs::ar_x86_64;
     _specs->sizeofUnsignedLong = 8;
 
     _factory = new SymFactory(*_specs);

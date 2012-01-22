@@ -90,7 +90,7 @@ void MemoryMap::clearDiff()
 
 bool MemoryMap::fitsInVmem(quint64 addr, quint64 size) const
 {
-    if (_vmem->memSpecs().arch == MemSpecs::x86_64)
+    if (_vmem->memSpecs().arch == MemSpecs::ar_x86_64)
         return addr + size > addr;
     else
         return addr + size <= (1UL << 32);
@@ -436,7 +436,7 @@ void MemoryMap::build(float minProbability)
 bool MemoryMap::addressIsWellFormed(quint64 address) const
 {
     // Make sure the address is within the virtual address space
-    if ((_vmem->memSpecs().arch & MemSpecs::i386) &&
+    if ((_vmem->memSpecs().arch & MemSpecs::ar_i386) &&
         address > VADDR_SPACE_X86)
         return false;
     else {
