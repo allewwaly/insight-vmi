@@ -102,7 +102,7 @@ int KernelSourceTypeEvaluator::evaluateIntExpression(const ASTNode* node, bool* 
         *ok = false;
 
     if (node) {
-        ASTExpression* expr = _eval->exprOfNode(node);
+        ASTExpression* expr = _eval->exprOfNode(node, ASTNodeNodeHash());
         ExpressionResult value = expr->result();
 
         // Return constant value
