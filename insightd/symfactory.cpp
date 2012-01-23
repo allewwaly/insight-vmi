@@ -525,7 +525,7 @@ QList<BaseType*> SymFactory::typesUsingId(int id) const
 
     for (int i = 0; i < typeIds.size(); ++i) {
         for (RefBaseTypeMultiHash::const_iterator it = _usedByRefTypes.find(typeIds[i]);
-             it != _usedByRefTypes.end() && it.key() == typeIds[i]; ++i)
+             it != _usedByRefTypes.end() && it.key() == typeIds[i]; ++it)
             ret += it.value();
 
         for (StructMemberMultiHash::const_iterator it = _usedByStructMembers.find(typeIds[i]);
@@ -2205,8 +2205,16 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
 
                 // Find top-level node of right-hand side for expression
                 const ASTNode* right = ed->srcNode;
-                while (right && right->parent != ed->rootNode)
-                    right = right->parent;
+                while (right && right->parent != ed->rootNode) {
+                    if (ed->interLinks.contains(right))
+                        right = ed->interLinks[right];
+                    else
+                        right = right->parent;
+                }
+
+                if (!right)
+                    factoryError(QString("Could not find top-level node for "
+                                         "right-hand side of expression"));
 
                 // Inter-links hash contains links from assignment expressions
                 // to primary expressions (for walking AST up), so we need to
@@ -2262,8 +2270,16 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
 
             // Find top-level node of right-hand side for expression
             const ASTNode* right = ed->srcNode;
-            while (right && right->parent != ed->rootNode)
-                right = right->parent;
+            while (right && right->parent != ed->rootNode) {
+                if (ed->interLinks.contains(right))
+                    right = ed->interLinks[right];
+                else
+                    right = right->parent;
+            }
+
+            if (!right)
+                factoryError(QString("Could not find top-level node for "
+                                     "right-hand side of expression"));
 
             // Inter-links hash contains links from assignment expressions
             // to primary expressions (for walking AST up), so we need to
