@@ -102,12 +102,14 @@ DataEncMap getDataEncMap();
  * @return an inverted version of @a hash
  */
 template<class T>
-QHash<typename T::mapped_type, typename T::key_type> invertHash(T hash)
+QHash<typename T::mapped_type, typename T::key_type> invertHash(const T& hash)
 {
     QHash<typename T::mapped_type, typename T::key_type> ret;
-    typename T::iterator it;
-    for (it = hash.begin(); it != hash.end(); ++it)
+    for (typename T::const_iterator it = hash.begin(), e = hash.end();
+         it != e; ++it)
+    {
         ret.insert(it.value(), it.key());
+    }
     return ret;
 }
 
