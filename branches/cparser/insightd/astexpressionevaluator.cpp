@@ -219,6 +219,26 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(
         expr = exprOfConstant(node, ptsTo);
         break;
 
+    case nt_expression_statement:
+        if (node->u.expression_statement.expression) {
+            // Find last expression
+            const ASTNodeList* list = node->u.expression_statement.expression;
+            while (list && list->next)
+                list = list->next;
+            expr = exprOfNode(list->item, ptsTo);
+        }
+        break;
+
+    case nt_initializer:
+        if (node->u.initializer.assignment_expression)
+            expr = exprOfNode(node->u.initializer.assignment_expression, ptsTo);
+        break;
+
+    case nt_jump_statement_return:
+        if (node->u.jump_statement.initializer)
+            expr = exprOfNode(node->u.jump_statement.initializer, ptsTo);
+        break;
+
     case nt_lvalue:
         // Could be an lvalue cast
         if (node->u.lvalue.lvalue)
@@ -1134,6 +1154,15 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
     }
     else if (node->u.primary_expression.constant)
         return exprOfNode(node->u.primary_expression.constant, ptsTo);
+    else if (node->u.primary_expression.compound_braces_statement) {
+        // The last expression is the result
+        const ASTNode* cbs = node->u.primary_expression.compound_braces_statement;
+        const ASTNodeList* statements =
+                cbs->u.compound_braces_statement.declaration_or_statement_list;
+        while (statements && statements->next)
+            statements = statements->next;
+        return exprOfNode(statements->item, ptsTo);
+    }
     else
         exprEvalError(QString("Unexpected primary expression at %2:%3:%4")
                       .arg(_ast->fileName())
