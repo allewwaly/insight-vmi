@@ -2100,6 +2100,8 @@ void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
         // Only change global variables
         if (ed->sym->isGlobal())
             typeAlternateUsageVar(ed, targetBaseType, eval);
+        else if (!ed->ctxMembers.isEmpty())
+            typeAlternateUsageStructMember(ed, targetBaseType, eval);
         else
             debugmsg("Ignoring local variable " << ed->sym->name());
         break;
