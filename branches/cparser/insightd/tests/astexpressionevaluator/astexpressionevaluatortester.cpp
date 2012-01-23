@@ -219,15 +219,18 @@ protected:
     {
         Q_UNUSED(flags);
         ASTExpression *e = 0;
+        ASTNodeNodeHash ptsTo;
 
         if (node && node->type == nt_assignment_expression &&
             node->u.assignment_expression.assignment_expression)
             e = _expr.exprOfNode(
-                        node->u.assignment_expression.assignment_expression);
+                        node->u.assignment_expression.assignment_expression,
+                        ptsTo);
         else if (node && node->type == nt_initializer &&
                  node->u.initializer.assignment_expression)
             e = _expr.exprOfNode(
-                        node->u.initializer.assignment_expression);
+                        node->u.initializer.assignment_expression,
+                        ptsTo);
 
         if (e)
             result = e->result();

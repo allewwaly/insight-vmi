@@ -2208,7 +2208,11 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
                 while (right && right->parent != ed->rootNode)
                     right = right->parent;
 
-                ASTExpression* expr = exprEval->exprOfNode(right);
+                // Inter-links hash contains links from assignment expressions
+                // to primary expressions (for walking AST up), so we need to
+                // invert the links for walking the AST down
+                ASTNodeNodeHash ptsTo = invertHash(ed->interLinks);
+                ASTExpression* expr = exprEval->exprOfNode(right, ptsTo);
                 expr = expr->clone(_expressions);
 
                 member->addAltRefType(targetBaseType->id(), expr);
@@ -2261,7 +2265,12 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
             while (right && right->parent != ed->rootNode)
                 right = right->parent;
 
-            ASTExpression* expr = exprEval->exprOfNode(right);
+            // Inter-links hash contains links from assignment expressions
+            // to primary expressions (for walking AST up), so we need to
+            // invert the links for walking the AST down
+            ASTNodeNodeHash ptsTo = invertHash(ed->interLinks);
+
+            ASTExpression* expr = exprEval->exprOfNode(right, ptsTo);
             expr = expr->clone(_expressions);
 
             /// @todo replace v->altRefType() with target
