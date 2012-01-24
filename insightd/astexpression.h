@@ -61,6 +61,7 @@ public:
     virtual int resultType() const = 0;
     virtual ExpressionResult result(const Instance* inst = 0) const = 0;
     virtual ASTExpression* clone(ASTExpressionList& list) const = 0;
+    virtual QString toString(bool compact = false) const = 0;
 
     inline bool hasAlternative() const
     {
@@ -95,7 +96,6 @@ protected:
         return expr;
     }
 
-
     ASTExpression* _alternative;
 };
 
@@ -121,9 +121,15 @@ public:
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 
-    virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
     {
         return cloneTempl<ASTUndefinedExpression>(list);
+    }
+
+    inline virtual QString toString(bool compact = false) const
+    {
+        Q_UNUSED(compact);
+        return "(undefined expr.)";
     }
 };
 
@@ -140,7 +146,7 @@ public:
 
     inline virtual int resultType() const
     {
-        return erInvalid|erRuntime;
+        return erInvalid;
     }
 
     inline virtual ExpressionResult result(const Instance* inst = 0) const
@@ -149,9 +155,15 @@ public:
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 
-    virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
     {
         return cloneTempl<ASTVoidExpression>(list);
+    }
+
+    inline virtual QString toString(bool compact = false) const
+    {
+        Q_UNUSED(compact);
+        return "(void)";
     }
 };
 
@@ -177,9 +189,15 @@ public:
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 
-    virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
     {
         return cloneTempl<ASTRuntimeExpression>(list);
+    }
+
+    inline virtual QString toString(bool compact = false) const
+    {
+        Q_UNUSED(compact);
+        return "(runtime expr.)";
     }
 };
 
@@ -213,9 +231,15 @@ public:
         return _value;
     }
 
-    virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
     {
         return cloneTempl<ASTConstantExpression>(list);
+    }
+
+    inline virtual QString toString(bool compact = false) const
+    {
+        Q_UNUSED(compact);
+        return _value.toString();
     }
 
     inline void setValue(ExpressionResultSize size, quint64 value)
@@ -265,7 +289,7 @@ public:
         return _valueSet ? erConstant : erUndefined;
     }
 
-    virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
     {
         ASTEnumeratorExpression* expr =
                 cloneTempl<ASTEnumeratorExpression>(list);
@@ -319,13 +343,15 @@ public:
     inline virtual int resultType() const
     {
         if (!_baseType)
-            return erUndefined;
+            return erInvalid;
         return _global ? erGlobalVar : erLocalVar;
     }
 
+    virtual QString toString(bool compact = false) const;
+
     virtual ExpressionResult result(const Instance* inst = 0) const;
 
-    virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
     {
         return cloneTempl<ASTVariableExpression>(list);
     }
@@ -390,7 +416,7 @@ public:
 
     virtual ExpressionResult result(const Instance* inst = 0) const;
 
-    virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
     {
         ASTBinaryExpression* expr = cloneTempl<ASTBinaryExpression>(list);
         if (_left)
@@ -400,11 +426,14 @@ public:
         return expr;
     }
 
+    virtual QString toString(bool compact) const;
 
     static ExpressionResultSize binaryExprSize(const ExpressionResult& r1,
                                                const ExpressionResult& r2);
 
 protected:
+    QString operatorToString() const;
+
     ExpressionType _type;
     ASTExpression* _left;
     ASTExpression* _right;
@@ -442,7 +471,7 @@ public:
 
     virtual ExpressionResult result(const Instance* inst = 0) const;
 
-    virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
     {
         ASTUnaryExpression* expr = cloneTempl<ASTUnaryExpression>(list);
         if (_child)
@@ -450,7 +479,11 @@ public:
         return expr;
     }
 
+    virtual QString toString(bool compact) const;
+
 protected:
+    QString operatorToString() const;
+
     ExpressionType _type;
     ASTExpression* _child;
 };

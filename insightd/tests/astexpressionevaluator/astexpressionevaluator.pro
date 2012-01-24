@@ -57,7 +57,8 @@ HEADERS += astexpressionevaluatortester.h \
     ../../memorymaprangetree.h \
     ../../memorymapwidget.h \
     ../../memorymapwindow.h \
-    ../../memoryrangetree.h
+    ../../memoryrangetree.h \
+    ../../expressionresult.h
 SOURCES += astexpressionevaluatortester.cpp \
     ../../array.cpp \
     ../../volatiletype.cpp \
@@ -110,7 +111,8 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../memorymapnode.cpp \
     ../../memorymaprangetree.cpp \
     ../../memorymapwidget.cpp \
-    ../../memorymapwindow.cpp
+    ../../memorymapwindow.cpp \
+    ../../expressionresult.cpp
 QT += core \
     script \
     network \

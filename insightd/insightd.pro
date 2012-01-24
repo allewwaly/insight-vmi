@@ -63,7 +63,8 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     function.cpp \
     shell_readline.cpp \
     astexpressionevaluator.cpp \
-    astexpression.cpp
+    astexpression.cpp \
+    expressionresult.cpp
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
     memorydumpsclass.h \

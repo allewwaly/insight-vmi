@@ -43,118 +43,22 @@ const char* expressionTypeToString(ExpressionType type)
 }
 
 
-qint64 ExpressionResult::value(ExpressionResultSize target) const
+QString ASTVariableExpression::toString(bool /*compact*/) const
 {
-    qint64 ret;
+    if (!_baseType)
+        return "(undefined var. expr.)";
 
-    // Is either the target or this value unsigned?
-    if (target && ((target | size) & esUnsigned)) {
-        // If the target is unsigned, return the unsigned  value instead.
-        // If this value is unsigned, do not extend the sign!
-        ret = uvalue((ExpressionResultSize)(target | esUnsigned));
-    }
-    // No target specified, or both target and this value are signed, so
-    // extend this value's sign to 64 bit
-    else {
-        ret = (size & es64Bit) ?
-                    result.i64 :
-                    (size & es32Bit) ?
-                        (qint64) result.i32 :
-                        (size & es16Bit) ?
-                            (qint64) result.i16 :
-                            (qint64) result.i8;
-    }
-//        debugmsg(QString("Returning 0x%1").arg(ret, 16, 16, QChar('0')));
-    return ret;
-}
+    QString s = QString("(%1)").arg(_baseType->prettyName());
 
-
-quint64 ExpressionResult::uvalue(ExpressionResultSize target) const
-{
-    quint64 ret;
-
-    // Is either the target or this value unsigned?
-    if (target && !(target & size & esUnsigned)) {
-        // If the target is signed, return the signed value instead
-        if (!(target & esUnsigned))
-            ret = value(target);
-        // If this is a signed value and the target is unsigned, extend the
-        // sign up to target size before converting to unsigned
-        else {
-            switch (target & (es64Bit|es32Bit|es16Bit|es8Bit)) {
-            case es64Bit:
-                ret = (size & es64Bit) ?
-                            result.i64 :
-                            (size & es32Bit) ?
-                                (quint64) result.i32 :
-                                (size & es16Bit) ?
-                                    (quint64) result.i16 :
-                                    (quint64) result.i8;
-                break;
-
-            case es32Bit:
-                ret = (size & (es64Bit|es32Bit)) ?
-                            result.ui32 :
-                            (size & es16Bit) ?
-                                (quint32) result.i16 :
-                                (quint32) result.i8;
-                break;
-
-            case es16Bit:
-                ret = (size & (es64Bit|es32Bit|es16Bit)) ?
-                            result.ui16 :
-                            (quint16) result.i8;
-                break;
-
-            case es8Bit:
-                ret = result.ui8;
-                break;
-
-            default:
-                exprEvalError(QString("Invalid target size: %1").arg(target));
-                break;
-            }
+    for (int i = 0; i < _pel.size(); ++i) {
+        switch (_pel[i].type) {
+        case ptDot:      s += "." + _pel[i].member;
+        case ptArrow:    s += "->" + _pel[i].member;
+        case ptBrackets: s += QString("[%1]").arg(_pel[i].arrayIndex);
         }
     }
-    else {
-        ret = (size & es64Bit) ?
-                result.ui64 :
-                (size & es32Bit) ?
-                    (quint64) result.ui32 :
-                    (size & es16Bit) ?
-                        (quint64) result.ui16 :
-                        (quint64) result.ui8;
-    }
-//        debugmsg(QString("Returning 0x%1").arg(ret, 16, 16, QChar('0')));
-    return ret;
-}
 
-
-float ExpressionResult::fvalue() const
-{
-    // Convert any value to float
-    if (size & esDouble)
-        return result.d;
-    else if (size & esFloat)
-        return result.f;
-    else if (size & esUnsigned)
-        return uvalue();
-    else
-        return value();
-}
-
-
-double ExpressionResult::dvalue() const
-{
-    // Convert any value to double
-    if (size & esDouble)
-        return result.d;
-    else if (size & esFloat)
-        return result.f;
-    else if (size & esUnsigned)
-        return uvalue();
-    else
-        return value();
+    return s;
 }
 
 
@@ -162,7 +66,7 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 {
     // Make sure we got a valid instance and type
     if (!inst || !_baseType)
-        return ExpressionResult(erUndefined);
+        return ExpressionResult(erInvalid);
     // Make sure the type of the instance matches our type
     if (inst->type()->id() != _baseType->id()) {
         exprEvalError(QString("Type ID of instance (0x%1) is different from ours (0x%2)")
@@ -416,6 +320,49 @@ ExpressionResult ASTBinaryExpression::result(const Instance *inst) const
 }
 
 
+
+QString ASTBinaryExpression::operatorToString() const
+{
+    switch (_type) {
+    case etLogicalOr:           return "||";
+    case etLogicalAnd:          return "&&";
+    case etInclusiveOr:         return "|";
+    case etExclusiveOr:         return "^";
+    case etAnd:                 return "&";
+    case etEquality:            return "==";
+    case etUnequality:          return "!=";
+    case etRelationalGE:        return ">=";
+    case etRelationalGT:        return ">";
+    case etRelationalLE:        return "<=";
+    case etRelationalLT:        return "<";
+    case etShiftLeft:           return "<<";
+    case etShiftRight:          return ">>";
+    case etAdditivePlus:        return "+";
+    case etAdditiveMinus:       return "-";
+    case etMultiplicativeMult:  return "*";
+    case etMultiplicativeDiv:   return "/";
+    case etMultiplicativeMod:   return "%";
+    default:                    return "??";
+    }
+}
+
+
+QString ASTBinaryExpression::toString(bool compact) const
+{
+    if (compact) {
+        ExpressionResult res = result();
+        // Does the expression evaluate to a constant value?
+        if (!(res.resultType & (erRuntime|erUndefined|erGlobalVar|erLocalVar)))
+            return res.toString();
+    }
+
+    QString left = _left ? _left->toString(compact) : QString("(left unset)");
+    QString right = _right ? _right->toString(compact) : QString("(right unset)");
+
+    return QString("(%1 %2 %3)").arg(left).arg(operatorToString()).arg(right);
+}
+
+
 ExpressionResultSize ASTBinaryExpression::binaryExprSize(
         const ExpressionResult& r1, const ExpressionResult& r2)
 {
@@ -583,5 +530,33 @@ ExpressionResult ASTUnaryExpression::result(const Instance *inst) const
     }
 
     return res;
+}
+
+
+QString ASTUnaryExpression::toString(bool compact) const
+{
+    if (compact) {
+        ExpressionResult res = result();
+        // Does the expression evaluate to a constant value?
+        if (!(res.resultType & (erRuntime|erUndefined|erGlobalVar|erLocalVar)))
+            return res.toString();
+    }
+
+    QString child = _child ? _child->toString(compact) : QString("(child unset)");
+
+    return QString("%1%2").arg(operatorToString()).arg(child);
+}
+
+
+QString ASTUnaryExpression::operatorToString() const
+{
+    switch (_type) {
+    case etUnaryInc:   return "++";
+    case etUnaryDec:   return "--";
+    case etUnaryMinus: return "-";
+    case etUnaryInv:   return "~";
+    case etUnaryNot:   return "!";
+    default:           return "??";
+    }
 }
 

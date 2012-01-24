@@ -1,6 +1,8 @@
 #ifndef ASTEXPRESSIONRESULT_H
 #define ASTEXPRESSIONRESULT_H
 
+#include <QString>
+
 /**
  The type of an epxression result, which may be a bit-wise combination of the
  following enumeration values.
@@ -80,6 +82,8 @@ struct ExpressionResult
     float fvalue() const;
 
     double dvalue() const;
+
+    QString toString() const;
 };
 
 #endif // ASTEXPRESSIONRESULT_H
