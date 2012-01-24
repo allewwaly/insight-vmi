@@ -1972,28 +1972,32 @@ int Shell::cmdShow(QStringList args)
 
 int Shell::cmdShowBaseType(const BaseType* t)
 {
-	_out << "  ID:             " << "0x" << hex << (uint)t->id() << dec << endl;
-	_out << "  Name:           " << (t->prettyName().isEmpty() ? QString("(unnamed)") : t->prettyName()) << endl;
-	_out << "  Type:           " << realTypeToStr(t->type()) << endl;
-	_out << "  Size:           " << t->size() << endl;
-	_out << "  Hash:           " << "0x" << hex << t->hash() << dec << endl;
+	_out << "  ID:              " << "0x" << hex << (uint)t->id() << dec << endl;
+	_out << "  Name:            " << (t->prettyName().isEmpty() ? QString("(unnamed)") : t->prettyName()) << endl;
+	_out << "  Type:            " << realTypeToStr(t->type()) << endl;
+	_out << "  Size:            " << t->size() << endl;
+	_out << "  Hash:            " << "0x" << hex << t->hash() << dec << endl;
 
     const RefBaseType* r = dynamic_cast<const RefBaseType*>(t);
     if (r) {
-        _out << "  Ref. type ID:   " << "0x" << hex << (uint)r->refTypeId() << dec << endl;
-        _out << "  Ref. type:      "
+        _out << "  Ref. type ID:    " << "0x" << hex << (uint)r->refTypeId() << dec << endl;
+        _out << "  Ref. type:       "
              <<  (r->refType() ? r->refType()->prettyName() :
                                  QString(r->refTypeId() ? "(unresolved)" : "void"))
             << endl;
         if (r->hasAltRefTypes()) {
-            _out << "  Alt. ref. type: ";
+            if (r->altRefTypeCount() == 1)
+                _out << "  Alt. ref. type:  ";
+            else
+                _out << "  Alt. ref. types: ";
             for (int i = 0; i < r->altRefTypeCount(); ++i) {
                 if (i > 0)
-                    _out << ", ";
+                    _out << "                   ";
                 const BaseType* t = r->altRefBaseType(i);
-                _out << "0x" << hex << (uint)t->id() << dec << t->prettyName();
+                _out << "0x" << hex << (uint)t->id() << dec << " "
+                     << t->prettyName() << ": "
+                     << r->altRefType(i).expr->toString(true) << endl;
             }
-            _out << endl;
         }
     }
 
@@ -2012,38 +2016,37 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
 		for (int i = 0; i < s->members().size(); i++) {
 			StructuredMember* m = s->members().at(i);
-			const BaseType* rt = (m->altRefTypeCount() == 1) ?
-						m->altRefBaseType() :
-						m->refType();
+			const BaseType* rt = m->refType();
 
 			QString pretty = rt ?
 						rt->prettyName() :
 						QString("(unresolved type, 0x%1)")
 							.arg((uint)m->refTypeId(), 0, 16);
 
-			if (m->altRefTypeCount() == 1)
-				pretty = "<" + pretty + ">";
-			else if (m->altRefTypeCount() > 1) {
-				BaseType* tmp;
-				pretty += " <";
-				for (int j = 0; j < m->altRefTypeCount(); ++j) {
-					if (! (tmp = m->altRefBaseType(j)))
-						continue;
-					if (j > 0)
-						pretty += ", ";
-					pretty += tmp->prettyName();
-				}
-				pretty += ">";
-			}
+            _out << "    "
+                 << QString("0x%1").arg(m->offset(), 4, 16, QChar('0'))
+                 << "  "
+                 << qSetFieldWidth(20) << left << (m->name() + ": ")
+                 << qSetFieldWidth(id_width) << left
+                 << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
+                 << qSetFieldWidth(0) << " "
+                 << pretty
+                 << endl;
 
-			_out << "    "
-                    << QString("0x%1").arg(m->offset(), 4, 16, QChar('0'))
-                    << "  "
-                    << qSetFieldWidth(20) << left << (m->name() + ": ")
-                    << qSetFieldWidth(id_width) << left << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
-                    << qSetFieldWidth(0) << " "
-					<< pretty
-					<< endl;
+
+			for (int j = 0; j < m->altRefTypeCount(); ++j) {
+				if (! (rt = m->altRefBaseType(j)))
+					continue;
+				_out << qSetFieldWidth(4+6+2+20) << " "
+					 << qSetFieldWidth(id_width) << left
+					 << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
+					 << qSetFieldWidth(0) << " "
+					 << (rt ? rt->prettyName() :
+							 QString("(unresolved type, 0x%1)")
+								.arg((uint)m->altRefType(j).id, 0, 16))
+					 << ": " << m->altRefType(j).expr->toString(true)
+					 << endl;
+			}
 		}
 	}
 
@@ -2144,15 +2147,20 @@ int Shell::cmdShowVariable(const Variable* v)
          <<  (v->refType() ? v->refType()->prettyName() :
                              QString(v->refTypeId() ? "(unresolved)" : "void"))
          << endl;
+
     if (v->hasAltRefTypes()) {
-        _out << "  Alt. ref. type: ";
+        if (v->altRefTypeCount() == 1)
+            _out << "  Alt. ref. type:  ";
+        else
+            _out << "  Alt. ref. types: ";
         for (int i = 0; i < v->altRefTypeCount(); ++i) {
             if (i > 0)
-                _out << ", ";
+                _out << "                  ";
             const BaseType* t = v->altRefBaseType(i);
-            _out << "0x" << hex << (uint)t->id() << dec << t->prettyName();
+            _out << "0x" << hex << (uint)t->id() << dec << " "
+                 << t->prettyName() << ": "
+                 << v->altRefType(i).expr->toString(true) << endl;
         }
-        _out << endl;
     }
 
 	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {
