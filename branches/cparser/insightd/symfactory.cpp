@@ -1236,7 +1236,7 @@ bool SymFactory::resolveReference(StructuredMember* member)
     // Don't try to resolve types without valid ID
     if (member->refTypeId() == 0)
         return false;
-
+/*
     BaseType* base = member->refType();
 
     if (base && member->refTypeId() > 0 && isStructListHead(base)) {
@@ -1262,6 +1262,7 @@ bool SymFactory::resolveReference(StructuredMember* member)
         return true;
     }
     else
+*/
         // Fall back to the generic resolver
         return resolveReference((ReferencingType*)member);
 }
@@ -2132,7 +2133,23 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
     BaseTypeList ctxBaseTypes = ctxTypeRet.second;
 
     int membersFound = 0, membersChanged = 0;
-    KernelSourceTypeEvaluator srcEval();
+
+    assert(dynamic_cast<KernelSourceTypeEvaluator*>(eval) != 0);
+    ASTExpressionEvaluator* exprEval =
+            dynamic_cast<KernelSourceTypeEvaluator*>(eval)->exprEvaluator();
+
+    // Find top-level node of right-hand side for expression
+    const ASTNode* right = ed->srcNode;
+    while (right && right->parent != ed->rootNode) {
+        if (ed->interLinks.contains(right))
+            right = ed->interLinks[right];
+        else
+            right = right->parent;
+    }
+
+    if (!right)
+        factoryError(QString("Could not find top-level node for "
+                             "right-hand side of expression"));
 
     for (int i = 0; i < ctxBaseTypes.size(); ++i) {
         BaseType* t = ctxBaseTypes[i];
@@ -2157,8 +2174,15 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
         // If we have a member here, it is the one whose reference is to be replaced
         if (member) {
             ++membersFound;
+
+            // Inter-links hash contains links from assignment expressions
+            // to primary expressions (for walking AST up), so we need to
+            // invert the links for walking the AST down
+            ASTNodeNodeHash ptsTo = invertHash(ed->interLinks);
+            ASTExpression* expr = exprEval->exprOfNode(right, ptsTo);
+
             // Apply new type, if applicable
-            if (typeChangeDecision(member, targetBaseType)) {
+            if (typeChangeDecision(member, targetBaseType, expr)) {
                 // If the the source type is a member of a struct embedded in
                 // the context type, we create a copy before any manipulations
                 if (nestingMember) {
@@ -2200,32 +2224,8 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
                 if (member->altRefTypeCount() > 0)
                     ++_conflictingTypeChanges;
 
-
-                assert(dynamic_cast<KernelSourceTypeEvaluator*>(eval) != 0);
-                ASTExpressionEvaluator* exprEval =
-                        dynamic_cast<KernelSourceTypeEvaluator*>(eval)->exprEvaluator();
-
-                // Find top-level node of right-hand side for expression
-                const ASTNode* right = ed->srcNode;
-                while (right && right->parent != ed->rootNode) {
-                    if (ed->interLinks.contains(right))
-                        right = ed->interLinks[right];
-                    else
-                        right = right->parent;
-                }
-
-                if (!right)
-                    factoryError(QString("Could not find top-level node for "
-                                         "right-hand side of expression"));
-
-                // Inter-links hash contains links from assignment expressions
-                // to primary expressions (for walking AST up), so we need to
-                // invert the links for walking the AST down
-                ASTNodeNodeHash ptsTo = invertHash(ed->interLinks);
-                ASTExpression* expr = exprEval->exprOfNode(right, ptsTo);
-                expr = expr->clone(_expressions);
-
-                member->addAltRefType(targetBaseType->id(), expr);
+                member->addAltRefType(targetBaseType->id(),
+                                      expr->clone(_expressions));
             }
         }
     }
@@ -2260,39 +2260,37 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
     ASTExpressionEvaluator* exprEval =
             dynamic_cast<KernelSourceTypeEvaluator*>(eval)->exprEvaluator();
 
+    // Find top-level node of right-hand side for expression
+    const ASTNode* right = ed->srcNode;
+    while (right && right->parent != ed->rootNode) {
+        if (ed->interLinks.contains(right))
+            right = ed->interLinks[right];
+        else
+            right = right->parent;
+    }
+
+    if (!right)
+        factoryError(QString("Could not find top-level node for "
+                             "right-hand side of expression"));
+
     // Find the variable(s) using the targetBaseType
     for (int i = 0; i < vars.size(); ++i) {
         ++varsFound;
+        // Inter-links hash contains links from assignment expressions
+        // to primary expressions (for walking AST up), so we need to
+        // invert the links for walking the AST down
+        ASTNodeNodeHash ptsTo = invertHash(ed->interLinks);
+        ASTExpression* expr = exprEval->exprOfNode(right, ptsTo);
+
         // Apply new type, if applicable
-        if (typeChangeDecision(vars[i], targetBaseType)) {
+        if (typeChangeDecision(vars[i], targetBaseType, expr)) {
             ++_totalTypesChanged;
             ++_varTypeChanges;
             if (vars[i]->altRefTypeCount() > 0)
                 ++_conflictingTypeChanges;
 
-            // Find top-level node of right-hand side for expression
-            const ASTNode* right = ed->srcNode;
-            while (right && right->parent != ed->rootNode) {
-                if (ed->interLinks.contains(right))
-                    right = ed->interLinks[right];
-                else
-                    right = right->parent;
-            }
-
-            if (!right)
-                factoryError(QString("Could not find top-level node for "
-                                     "right-hand side of expression"));
-
-            // Inter-links hash contains links from assignment expressions
-            // to primary expressions (for walking AST up), so we need to
-            // invert the links for walking the AST down
-            ASTNodeNodeHash ptsTo = invertHash(ed->interLinks);
-
-            ASTExpression* expr = exprEval->exprOfNode(right, ptsTo);
-            expr = expr->clone(_expressions);
-
-            /// @todo replace v->altRefType() with target
-            vars[i]->addAltRefType(targetBaseType->id(), expr);
+            vars[i]->addAltRefType(targetBaseType->id(),
+                                   expr->clone(_expressions));
         }
     }
 
@@ -2319,9 +2317,30 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
 
 
 bool SymFactory::typeChangeDecision(const ReferencingType* r,
-                                    const BaseType* targetBaseType)
+                                    const BaseType* targetBaseType,
+                                    const ASTExpression* expr)
 {
+    // Make sure we only have one variable in the expression
+    ASTConstExpressionList vars = expr->findExpressions(etVariable);
+    if (vars.size() > 1) {
+        const ASTVariableExpression* v =
+                dynamic_cast<const ASTVariableExpression*>(vars[0]);
+        assert(v != 0);
+        const BaseType* bt = v->baseType();
+        for (int i = 1; i < vars.size(); ++i) {
+            v = dynamic_cast<const ASTVariableExpression*>(vars[i]);
+            assert(v != 0);
+            if (bt != v->baseType())
+                return false;
+        }
+    }
+
+    // Do we have runtime, invalid or other expressions that we cannot evaluate?
+    if (expr->resultType() & (erRuntime|erUndefined))
+        return false;
+
     bool changeType = true;
+
     // Was the member already manipulated?
     if (r->hasAltRefTypes()) {
         TypeConflicts ret = tcNoConflict;
@@ -2331,23 +2350,26 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
             switch (compareConflictingTypes(t, targetBaseType)) {
             // If we found the same type, we take this as the final decision
             case tcNoConflict:
-                ret = tcNoConflict;
-                goto for_end;
+                if (r->altRefType(i).expr->equals(expr)) {
+                    ret = tcNoConflict;
+                    goto for_end;
+                }
+                if (ret != tcIgnore)
+                    ret = tcConflict;
+                break;
             // Ignore overrides conflicts
             case tcIgnore:
                 ret = tcIgnore;
                 break;
             // Conflict overrides replace
             case tcConflict:
-                if (ret != tcIgnore) {
+                if (ret != tcIgnore)
                     ret = tcConflict;
-                }
                 break;
             // Replace only if no other decision was already made
             case tcReplace:
-                if (ret != tcIgnore && ret != tcConflict) {
+                if (ret != tcIgnore && ret != tcConflict)
                     ret = tcReplace;
-                }
                 break;
             }
         }
@@ -2361,14 +2383,15 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
         switch (ret) {
         case tcNoConflict:
             changeType = false;
-            debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\"")
+            debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\" with \"%5\"")
                      .arg(m ? m->name() : v->name())
                      .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
                      .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
                      .arg(r->refType() ?
                               r->refType()->prettyName() :
                               QString("???"))
-                     .arg(targetBaseType->prettyName()));
+                     .arg(targetBaseType->prettyName())
+                     .arg(expr->toString()));
             break;
 
         case tcIgnore:

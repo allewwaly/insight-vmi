@@ -120,14 +120,10 @@ double ExpressionResult::dvalue() const
 
 QString ExpressionResult::toString() const
 {
-    if (resultType == erUndefined)
+    if (resultType & erUndefined)
         return "(undefined value)";
     else if (resultType & erRuntime)
         return "(runtime expression)";
-    else if (resultType & erInvalid)
-        return "(invalid value)";
-    else if (resultType & erVoid)
-        return "(void)";
 
     switch (size) {
     case esUndefined: return "(undefined value)";

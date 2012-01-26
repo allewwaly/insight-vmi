@@ -52,9 +52,15 @@ QString ASTVariableExpression::toString(bool /*compact*/) const
 
     for (int i = 0; i < _pel.size(); ++i) {
         switch (_pel[i].type) {
-        case ptDot:      s += "." + _pel[i].member;
-        case ptArrow:    s += "->" + _pel[i].member;
-        case ptBrackets: s += QString("[%1]").arg(_pel[i].arrayIndex);
+        case ptDot:
+            s += "." + _pel[i].member;
+            break;
+        case ptArrow:
+            s += "->" + _pel[i].member;
+            break;
+        case ptBrackets:
+            s += QString("[%1]").arg(_pel[i].arrayIndex);
+            break;
         }
     }
 
@@ -62,17 +68,38 @@ QString ASTVariableExpression::toString(bool /*compact*/) const
 }
 
 
+bool ASTVariableExpression::equals(const ASTExpression *other) const
+{
+    if (!ASTExpression::equals(other))
+        return false;
+    const ASTVariableExpression* v =
+            dynamic_cast<const ASTVariableExpression*>(other);
+    // Compare base type
+    if (!v || _baseType != v->_baseType || _pel.size() != v->_pel.size())
+        return false;
+    // Compare postfix expressions
+    for (int i = 0; i < _pel.size(); ++i) {
+        if (_pel[i].type != v->_pel[i].type ||
+            _pel[i].arrayIndex != v->_pel[i].arrayIndex ||
+            _pel[i].member != v->_pel[i].member)
+            return false;
+    }
+
+    return true;
+}
+
+
 ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 {
     // Make sure we got a valid instance and type
     if (!inst || !_baseType)
-        return ExpressionResult(erInvalid);
+        return ExpressionResult(erUndefined);
     // Make sure the type of the instance matches our type
     if (inst->type()->id() != _baseType->id()) {
         exprEvalError(QString("Type ID of instance (0x%1) is different from ours (0x%2)")
                       .arg(inst->type()->id(), 0, 16)
                       .arg(_baseType->id(), 0, 16));
-        return ExpressionResult(erInvalid);
+        return ExpressionResult(erUndefined);
     }
 
     if (_pel.isEmpty())
@@ -88,7 +115,7 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
             tmp = tmp.dereference(BaseType::trLexicalAndPointers, 1, &cnt);
             // Make sure we succeeded in dereferencing the pointer
             if (cnt != 1 || !tmp.isValid())
-                return ExpressionResult(erInvalid);
+                return ExpressionResult(erUndefined);
             // no break
 
         case ptDot:
@@ -437,10 +464,10 @@ ExpressionResult ASTUnaryExpression::result(const Instance *inst) const
 
     ExpressionResult res = _child->result(inst);
     // Is the expression decidable?
-    if (res.resultType != erConstant) {
+    if (res.resultType & (erUndefined|erRuntime)) {
         /// @todo constants cannot be incremented, that makes no sense at all!
         // Undecidable, so return the correct result type
-        res.resultType |= erInvalid;
+        res.resultType |= erUndefined;
         return res;
     }
 
@@ -556,6 +583,8 @@ QString ASTUnaryExpression::operatorToString() const
     case etUnaryMinus: return "-";
     case etUnaryInv:   return "~";
     case etUnaryNot:   return "!";
+    case etUnaryStar:  return "*";
+    case etUnaryAmp:   return "&";
     default:           return "??";
     }
 }

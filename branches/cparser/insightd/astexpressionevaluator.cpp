@@ -1081,8 +1081,10 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
         return 0;
     checkNodeType(node, nt_primary_expression);
 
+    ASTExpression* expr = 0;
+
     if (node->u.primary_expression.expression)
-        return exprOfNode(node->u.primary_expression.expression->item, ptsTo);
+        expr = exprOfNode(node->u.primary_expression.expression->item, ptsTo);
     else if (node->u.primary_expression.identifier &&
              !node->u.primary_expression.hasDot)
     {
@@ -1103,9 +1105,29 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
         AstBaseTypeList typeList = _factory->findBaseTypesForAstType(type, _eval);
         const BaseType* bt = typeList.second.isEmpty() ?
                     0 : typeList.second.first();
-        ASTVariableExpression* expr = createExprNode<ASTVariableExpression>(bt);
+        expr = createExprNode<ASTVariableExpression>(bt);
+    }
+    else if (node->u.primary_expression.constant)
+        expr = exprOfNode(node->u.primary_expression.constant, ptsTo);
+    else if (node->u.primary_expression.compound_braces_statement) {
+        // The last expression is the result
+        const ASTNode* cbs = node->u.primary_expression.compound_braces_statement;
+        const ASTNodeList* statements =
+                cbs->u.compound_braces_statement.declaration_or_statement_list;
+        while (statements && statements->next)
+            statements = statements->next;
+        expr = exprOfNode(statements->item, ptsTo);
+    }
+    else
+        exprEvalError(QString("Unexpected primary expression at %2:%3:%4")
+                      .arg(_ast->fileName())
+                      .arg(node ? node->start->line : 0)
+                      .arg(node ? node->start->charPosition : 0));
 
-        // Append all postfix expressions
+    if (expr && expr->type() == etVariable) {
+        ASTVariableExpression* varExpr =
+                dynamic_cast<ASTVariableExpression*>(expr);
+        // Append all postfix expression suffixes
         for (const ASTNodeList* list =
                 node->parent->u.postfix_expression.postfix_expression_suffix_list;
              list;
@@ -1114,14 +1136,14 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
             const ASTNode* p = list->item;
             switch(p->type) {
             case nt_postfix_expression_arrow:
-                expr->appendPostfixExpression(
+                varExpr->appendPostfixExpression(
                             ASTVariableExpression::PostfixExpression(
                                 ASTVariableExpression::ptArrow,
                                 antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
                 break;
 
             case nt_postfix_expression_dot:
-                expr->appendPostfixExpression(
+                varExpr->appendPostfixExpression(
                             ASTVariableExpression::PostfixExpression(
                                 ASTVariableExpression::ptDot,
                                 antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
@@ -1135,7 +1157,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
                 ExpressionResult result = index ?
                             index->result() : ExpressionResult();
                 if (result.resultType == erConstant)
-                    expr->appendPostfixExpression(
+                    varExpr->appendPostfixExpression(
                                 ASTVariableExpression::PostfixExpression(
                                     result.value(esInt32)));
                 // Seems to be a runtime dependent expresssion
@@ -1149,25 +1171,15 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
                 return createExprNode<ASTRuntimeExpression>();
             }
         }
-
-        return expr;
     }
-    else if (node->u.primary_expression.constant)
-        return exprOfNode(node->u.primary_expression.constant, ptsTo);
-    else if (node->u.primary_expression.compound_braces_statement) {
-        // The last expression is the result
-        const ASTNode* cbs = node->u.primary_expression.compound_braces_statement;
-        const ASTNodeList* statements =
-                cbs->u.compound_braces_statement.declaration_or_statement_list;
-        while (statements && statements->next)
-            statements = statements->next;
-        return exprOfNode(statements->item, ptsTo);
-    }
-    else
-        exprEvalError(QString("Unexpected primary expression at %2:%3:%4")
+    else if (node->parent->u.postfix_expression.postfix_expression_suffix_list)
+        exprEvalError(QString("We are missing some postfix expression suffixes "
+                              "at %2:%3:%4")
                       .arg(_ast->fileName())
                       .arg(node ? node->start->line : 0)
                       .arg(node ? node->start->charPosition : 0));
+
+    return expr;
 }
 
 
@@ -1198,19 +1210,27 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(
 
     case nt_unary_expression_op: {
         QString op = antlrTokenToStr(node->u.unary_expression.unary_operator);
+        ASTExpression* child =
+                exprOfNode(node->u.unary_expression.cast_expression, ptsTo);
+
         if (op == "&")
             ue = createExprNode<ASTUnaryExpression>(etUnaryAmp);
         else if (op == "&&") {
             // Double ampersand operator
             ASTUnaryExpression* ue2 =
                     createExprNode<ASTUnaryExpression>(etUnaryAmp);
-            ue2->setChild(exprOfNode(node->u.unary_expression.cast_expression, ptsTo));
+            ue2->setChild(child);
             ue = createExprNode<ASTUnaryExpression>(etUnaryAmp);
             ue->setChild(ue2);
             return ue;
         }
-        else if (op == "*")
-            ue = createExprNode<ASTUnaryExpression>(etUnaryStar);
+        else if (op == "*") {
+            // The address operator "&" cancels out the dereference "*"
+            if (child->type() == etUnaryAmp)
+                return dynamic_cast<ASTUnaryExpression*>(child)->child();
+            else
+                ue = createExprNode<ASTUnaryExpression>(etUnaryStar);
+        }
         else if (op == "+")
             return exprOfNode(node->u.unary_expression.cast_expression, ptsTo);
         else if (op == "-")
@@ -1226,7 +1246,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(
                     .arg(node->start->line)
                     .arg(node->start->charPosition));
 
-        ue->setChild(exprOfNode(node->u.unary_expression.cast_expression, ptsTo));
+        ue->setChild(child);
         break;
     }
 
