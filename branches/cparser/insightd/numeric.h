@@ -49,6 +49,35 @@ public:
         return _type;
     }
 
+    /**
+     * This gives a pretty name of that type which may involve referencing
+     * types.
+     * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
+     */
+    virtual QString prettyName() const
+    {
+        if (!_name.isEmpty())
+            return BaseType::prettyName();
+
+        switch (realType) {
+        case rtInt8:   return "int8";
+        case rtUInt8:  return "uint8";
+        case rtBool8:  return "bool8";
+        case rtInt16:  return "int16";
+        case rtUInt16: return "uint16";
+        case rtBool16: return "bool16";
+        case rtInt32:  return "int32";
+        case rtUInt32: return "uint32";
+        case rtBool32: return "bool32";
+        case rtInt64:  return "int64";
+        case rtUInt64: return "uint64";
+        case rtBool64: return "bool64";
+        case rtFloat:  return "float";
+        case rtDouble: return "double";
+        default:       return QString();
+        }
+    }
+
 protected:
     const RealType _type;
 };
