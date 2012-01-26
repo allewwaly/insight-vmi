@@ -618,7 +618,8 @@ private:
                                           const BaseType* newType) const;
 
     bool typeChangeDecision(const ReferencingType* r,
-                            const BaseType* targetBaseType);
+                            const BaseType* targetBaseType,
+                            const ASTExpression *expr);
 
     BaseTypeList typedefsOfType(BaseType* type);
 

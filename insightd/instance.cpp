@@ -524,8 +524,8 @@ Instance Instance::memberCandidate(const StructuredMember* m,
 
 	ReferencingType::AltRefType alt = m->altRefType(cndtIndex);
 	// Evaluate pointer arithmetic for new address
-	ExpressionResult result = alt.expr->result();
-	if (result.resultType == erUndefined || (result.resultType & erInvalid))
+	ExpressionResult result = alt.expr->result(this);
+	if (result.resultType & erUndefined)
 		return Instance();
 
 	quint64 newAddr = result.uvalue(esUInt64);
@@ -542,7 +542,7 @@ Instance Instance::memberCandidate(const StructuredMember* m,
 ExpressionResult Instance::toExpressionResult() const
 {
 	if (_d.isNull)
-		return ExpressionResult(erInvalid);
+		return ExpressionResult(erUndefined);
 
 	const BaseType* t = _d.type->dereferencedBaseType(BaseType::trLexical);
 	ExpressionResultType ert = (_d.id > 0) ? erGlobalVar : erLocalVar;
@@ -584,6 +584,6 @@ ExpressionResult Instance::toExpressionResult() const
 					ExpressionResult(ert, esUInt64,
 									 (quint64)t->toUInt64(_d.vmem, _d.address));
 	default:
-		return ExpressionResult(erInvalid);
+		return ExpressionResult(erUndefined);
 	}
 }

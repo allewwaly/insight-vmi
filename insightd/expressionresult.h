@@ -8,14 +8,14 @@
  following enumeration values.
  */
 enum ExpressionResultType {
-    erUndefined = 0,         ///< Result is undefined
+    erNotSet    = 0,         ///< Result is not set
     erConstant  = (1 << 0),  ///< Expression is compile-time constant
     erGlobalVar = (1 << 1),  ///< Expression involves global variable
     erLocalVar  = (1 << 2),  ///< Expression involves local variable
     erParameter = (1 << 3),  ///< Expression involves function parameters
     erRuntime   = (1 << 4),  ///< Expression involves run-time dependencies
-    erInvalid   = (1 << 5),  ///< Expression result cannot be determined
-    erVoid      = (1 << 6)   ///< Expression result is void
+//    erInvalid   = (1 << 5),  ///< Expression result cannot be determined
+    erUndefined = (1 << 5)
 };
 
 /// The size and type of an ExpressionResult

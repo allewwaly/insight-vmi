@@ -11,6 +11,7 @@ class ASTExpression;
 class Instance;
 
 typedef QList<ASTExpression*> ASTExpressionList;
+typedef QList<const ASTExpression*> ASTConstExpressionList;
 
 
 /// Different types of expressions
@@ -62,6 +63,28 @@ public:
     virtual ExpressionResult result(const Instance* inst = 0) const = 0;
     virtual ASTExpression* clone(ASTExpressionList& list) const = 0;
     virtual QString toString(bool compact = false) const = 0;
+
+    inline virtual bool equals(const ASTExpression* other) const
+    {
+        return other && other->type();
+    }
+
+    inline virtual ASTExpressionList findExpressions(ExpressionType type)
+    {
+        ASTExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        return list;
+    }
+
+    inline virtual ASTConstExpressionList findExpressions(ExpressionType type)
+        const
+    {
+        ASTConstExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        return list;
+    }
 
     inline bool hasAlternative() const
     {
@@ -146,7 +169,7 @@ public:
 
     inline virtual int resultType() const
     {
-        return erInvalid;
+        return etUndefined;
     }
 
     inline virtual ExpressionResult result(const Instance* inst = 0) const
@@ -240,6 +263,15 @@ public:
     {
         Q_UNUSED(compact);
         return _value.toString();
+    }
+
+    virtual bool equals(const ASTExpression* other) const
+    {
+        if (!ASTExpression::equals(other))
+            return false;
+        const ASTConstantExpression* c =
+                dynamic_cast<const ASTConstantExpression*>(other);
+        return c && _value.uvalue() == c->_value.uvalue();
     }
 
     inline void setValue(ExpressionResultSize size, quint64 value)
@@ -343,11 +375,13 @@ public:
     inline virtual int resultType() const
     {
         if (!_baseType)
-            return erInvalid;
+            return etUndefined;
         return _global ? erGlobalVar : erLocalVar;
     }
 
     virtual QString toString(bool compact = false) const;
+
+    virtual bool equals(const ASTExpression* other) const;
 
     virtual ExpressionResult result(const Instance* inst = 0) const;
 
@@ -428,6 +462,43 @@ public:
 
     virtual QString toString(bool compact) const;
 
+    virtual bool equals(const ASTExpression* other) const
+    {
+        if (!ASTExpression::equals(other))
+            return false;
+        const ASTBinaryExpression* b =
+                dynamic_cast<const ASTBinaryExpression*>(other);
+        // Compare childen to each other
+        return b && ((!_left && !b->_left) || _left->equals(b->_left)) &&
+                ((!_right && !b->_right) || _right->equals(b->_right));
+    }
+
+    inline virtual ASTExpressionList findExpressions(ExpressionType type)
+    {
+        ASTExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        if (_left)
+            list.append(_left->findExpressions(type));
+        if (_right)
+            list.append(_right->findExpressions(type));
+        return list;
+    }
+
+
+    inline virtual ASTConstExpressionList findExpressions(ExpressionType type)
+        const
+    {
+        ASTConstExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        if (_left)
+            list.append(((const ASTExpression*)_left)->findExpressions(type));
+        if (_right)
+            list.append(((const ASTExpression*)_right)->findExpressions(type));
+        return list;
+    }
+
     static ExpressionResultSize binaryExprSize(const ExpressionResult& r1,
                                                const ExpressionResult& r2);
 
@@ -480,6 +551,38 @@ public:
     }
 
     virtual QString toString(bool compact) const;
+
+    virtual bool equals(const ASTExpression* other) const
+    {
+        if (!ASTExpression::equals(other))
+            return false;
+        const ASTUnaryExpression* u =
+                dynamic_cast<const ASTUnaryExpression*>(other);
+        // Compare childen to each other
+        return u && ((!_child && !u->_child) || _child->equals(u->_child));
+    }
+
+    inline virtual ASTExpressionList findExpressions(ExpressionType type)
+    {
+        ASTExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        if (_child)
+            list.append(_child->findExpressions(type));
+        return list;
+    }
+
+    inline virtual ASTConstExpressionList findExpressions(ExpressionType type)
+        const
+    {
+        ASTConstExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        if (_child)
+            list.append(((const ASTExpression*)_child)->findExpressions(type));
+        return list;
+    }
+
 
 protected:
     QString operatorToString() const;
