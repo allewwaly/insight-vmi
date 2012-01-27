@@ -2036,7 +2036,8 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
 			for (int j = 0; j < m->altRefTypeCount(); ++j) {
 				rt = m->altRefBaseType(j);
-				_out << qSetFieldWidth(4+6+2+20) << " "
+				_out << qSetFieldWidth(4+6+2+20)
+					 << right << QString("<%1> ").arg(j+1)
 					 << qSetFieldWidth(id_width) << left
 					 << QString("0x%1")
 							.arg((uint)(rt ? rt->id() : m->altRefType(j).id), 0, 16)

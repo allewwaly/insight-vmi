@@ -166,21 +166,25 @@ Instance MemoryDump::getInstanceAt(const QString& type, const size_t address,
 Instance MemoryDump::getNextInstance(const QString& component, const Instance& instance) const
 {
 	Instance result;
-	QString typeString;
-	QString symbol;
-	QString offsetString;
-	QString arrayIndexString;
-	quint32 offset = 0;
-	quint32 arrayIndex = 0;
+	QString typeString, symbol, offsetString, candidate, arrayIndexString;
 	size_t address;
 	bool okay;
-	BaseType* type = 0;
-	Structured* structd = 0;
-	StructuredMember* structdMember = 0;
-//	Pointer* pointer;
 
-	// A component should have the form (<symbol>(-offset)?)?<symbol>([index])?
-	QRegExp re("^\\s*(\\(\\s*([A-Za-z0-9_]+)(\\s*-\\s*([A-Za-z0-9_]+))?\\s*\\))?\\s*([A-Za-z0-9_]+)(\\[(\\d+)\\])?\\s*");
+	// A component should have the form (symbol(-offset)?)?symbol(<candidate>)?([index])?
+#define SYMBOL "[A-Za-z0-9_]+"
+#define NUMBER "\\d+"
+	QRegExp re(
+				"^\\s*(?:"
+					"\\(\\s*"
+						"(" SYMBOL ")"
+						"(?:"
+							"\\s*-\\s*(" SYMBOL ")"
+						")?"
+					"\\s*\\)"
+				")?"
+				"\\s*(" SYMBOL ")\\s*"
+				"(?:<\\s*(" NUMBER ")\\s*>\\s*)?"
+				"(?:\\[\\s*(" NUMBER ")\\s*\\])?\\s*");
 	 
 	if (!re.exactMatch(component)) {
 		queryError(QString("Could not parse a part of the query string: %1")
@@ -188,12 +192,20 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
     }
 	
 	// Set variables according to the matching
-	typeString = re.cap(2);
-	offsetString = re.cap(4).trimmed();
-	symbol = re.cap(5);
-	arrayIndexString = re.cap(7);
-	
-	// debugmsg(QString("2: %1, 3: %2, 4: %3, 5: %4, 6: %5, 7: %6").arg(re.cap(2)).arg(re.cap(3)).arg(re.cap(4)).arg(re.cap(5)).arg(re.cap(6)).arg(re.cap(7)));
+	typeString = re.cap(1);
+	offsetString = re.cap(2).trimmed();
+	symbol = re.cap(3);
+	candidate = re.cap(4);
+	arrayIndexString = re.cap(5);
+
+	int candidateIndex = candidate.isEmpty() ? -1 : candidate.toInt();
+
+//	debugmsg(QString("1: %1, 2: %2, 3: %3, 4: %4, 5: %5")
+//			 .arg(re.cap(1))
+//			 .arg(re.cap(2))
+//			 .arg(re.cap(3))
+//			 .arg(re.cap(4))
+//			 .arg(re.cap(5)));
 
 	// If the given instance is Null, we interpret this as the first component
 	// in the query string and will therefore try to resolve the variable.
@@ -203,6 +215,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		if (!v)
 			queryError(QString("Variable does not exist: %1").arg(symbol));
 
+		/// @todo honor the candidate index appropriately
 		result = v->toInstance(_vmem, BaseType::trLexicalAndPointers);
 	}
 	else {
@@ -211,18 +224,35 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
             queryError(QString("Member \"%1\" is not a struct or union")
                         .arg(instance.fullName()));
 
-        result = instance.findMember(symbol, BaseType::trLexicalAndPointers);
+        if (!instance.memberExists(symbol))
+            queryError(QString("Struct \"%1\" has no member named \"%2\"")
+                        .arg(instance.typeName())
+                        .arg(symbol));
+
+        // Do we have a candidate index?
+        if (candidateIndex > 0) {
+            if (instance.memberCandidatesCount(symbol) < candidateIndex)
+                queryError(QString("Member \"%1\" does not have a candidate "
+                                   "with index %2")
+                            .arg(symbol)
+                            .arg(candidateIndex));
+            result = instance.memberCandidate(symbol, candidateIndex - 1);
+        }
+        else
+            result = instance.findMember(symbol, BaseType::trLexicalAndPointers);
+
         if (!result.isValid()) {
-            if (!instance.memberExists(symbol))
-                queryError(QString("Struct \"%1\" has no member named \"%2\"")
-                            .arg(instance.typeName())
-                            .arg(symbol));
-            else if (!result.type())
+            if (!result.type())
                 queryError(QString("The type 0x%3 of member \"%1.%2\" is "
                             "unresolved")
                             .arg(instance.fullName())
                             .arg(symbol)
                             .arg(instance.typeIdOfMember(symbol), 0, 16));
+            else if (candidateIndex > 0)
+                queryError(QString("The member candidate \"%1.%2<%3>\" is invalid")
+                            .arg(instance.fullName())
+                            .arg(symbol)
+                            .arg(candidateIndex));
             else
                 queryError(QString("The member \"%1.%2\" is invalid")
                             .arg(instance.fullName())
@@ -232,6 +262,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	
 	// Cast the instance if necessary
 	if (!typeString.isEmpty()) {
+		quint32 offset = 0;
 		// Is a offset given?
 		if (!offsetString.isEmpty()) {
 			// Is the offset given as string or as int?
@@ -239,7 +270,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 			
 			if (!okay) {
 				// String.
-				type = getType(typeString);
+				BaseType* type = getType(typeString);
 				
 				if (!type ||
 					!(type->type() & StructOrUnion))
@@ -247,7 +278,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 					            "or union and therefore has no offset")
 					            .arg(typeString));
 				
-				structd = dynamic_cast<Structured *>(type);
+				Structured* structd = dynamic_cast<Structured *>(type);
 				
 				if (!structd->memberExists(offsetString)) {
 					queryError(QString("Struct of type \"%1\" has no member "
@@ -256,7 +287,8 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 								.arg(offsetString));
 				}
 				else {
-					structdMember = structd->findMember(offsetString);
+					StructuredMember* structdMember =
+							structd->findMember(offsetString);
 					offset = structdMember->offset();
 				}
 			}
@@ -281,7 +313,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	
 	// Add array index
 	if (arrayIndexString != "") {
-		arrayIndex = arrayIndexString.toUInt(&okay, 10);
+		quint32 arrayIndex = arrayIndexString.toUInt(&okay, 10);
 		
 		if (okay) {
 		    // Is this a pointer or an array type?
