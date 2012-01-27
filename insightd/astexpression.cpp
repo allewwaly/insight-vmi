@@ -2,6 +2,7 @@
 #include "astexpression.h"
 #include "expressionevalexception.h"
 #include "instance.h"
+#include "structured.h"
 
 
 const char* expressionTypeToString(ExpressionType type)
@@ -96,10 +97,36 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         return ExpressionResult(erUndefined);
     // Make sure the type of the instance matches our type
     if (inst->type()->id() != _baseType->id()) {
-        exprEvalError(QString("Type ID of instance (0x%1) is different from ours (0x%2)")
-                      .arg(inst->type()->id(), 0, 16)
-                      .arg(_baseType->id(), 0, 16));
-        return ExpressionResult(erUndefined);
+        // Try to match all postfix expression suffixes
+        bool match = false;
+        const BaseType* bt = _baseType->dereferencedBaseType();
+        QString prettyType = bt ? bt->prettyName() : QString("(undefined");
+        for (int i = 0; bt && i < _pel.size(); ++i) {
+            if (_pel[i].type == ptArrow || _pel[i].type == ptDot) {
+                prettyType += "." + _pel[i].member;
+                const Structured* s = dynamic_cast<const Structured*>(bt);
+                if (!s)
+                    exprEvalError(QString("Type %1 (0x%2) is not a structured "
+                                          "type")
+                                  .arg(prettyType)
+                                  .arg((uint)bt->id(), 0, 16));
+                if (!s->memberExists(_pel[i].member))
+                    exprEvalError(QString("Type %1 has no member \"%2\"")
+                                  .arg(prettyType)
+                                  .arg(_pel[i].member));
+                const StructuredMember* m = s->findMember(_pel[i].member);
+                bt = m ? m->refTypeDeep(BaseType::trLexicalAndPointers) : 0;
+            }
+        }
+
+
+        if (!match) {
+            exprEvalError(QString("Type ID of instance (0x%1) is different "
+                                  "from ours (0x%2)")
+                          .arg((uint)inst->type()->id(), 0, 16)
+                          .arg((uint)_baseType->id(), 0, 16));
+            return ExpressionResult(erUndefined);
+        }
     }
 
     if (_pel.isEmpty())
