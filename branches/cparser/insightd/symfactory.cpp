@@ -2441,10 +2441,12 @@ SymFactory::TypeConflicts SymFactory::compareConflictingTypes(
     if (oldType)
         oldType = oldType->dereferencedBaseType(
                     BaseType::trLexicalPointersArrays,
+                    -1,
                     &ctr_old);
     if (newType)
         newType = newType->dereferencedBaseType(
                     BaseType::trLexicalPointersArrays,
+                    -1,
                     &ctr_new);
 
     RealType old_rt = oldType ? oldType->type() : rtVoid;
