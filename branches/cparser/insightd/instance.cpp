@@ -379,15 +379,16 @@ Instance Instance::arrayElem(int index) const
 
 Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCount) const
 {
+    if (derefCount)
+        *derefCount = 0;
+
     if (isNull())
         return *this;
 
-    if (resolveTypes && _d.type)
+    if (_d.type && (_d.type->type() & resolveTypes))
         return _d.type->toInstance(_d.address, _d.vmem, _d.name,
                 _d.parentNames, resolveTypes, maxPtrDeref, derefCount);
 
-    if (derefCount)
-        *derefCount = 0;
     return *this;
 }
 
@@ -525,7 +526,7 @@ Instance Instance::memberCandidate(const StructuredMember* m,
 	ReferencingType::AltRefType alt = m->altRefType(cndtIndex);
 	// Evaluate pointer arithmetic for new address
 	ExpressionResult result = alt.expr->result(this);
-	if (result.resultType & erUndefined)
+	if (result.resultType & (erUndefined|erRuntime))
 		return Instance();
 
 	quint64 newAddr = result.uvalue(esUInt64);
@@ -533,6 +534,11 @@ Instance Instance::memberCandidate(const StructuredMember* m,
 	const BaseType* newType = (_d.type && _d.type->factory()) ?
 				_d.type->factory()->findBaseTypeById(alt.id) : 0;
 	assert(newType != 0);
+	// Calculating the new address already corresponds to a dereference, so
+	// get rid of one pointer instance
+	assert(newType->type() & (rtPointer|rtArray));
+	newType = dynamic_cast<const Pointer*>(newType)->refType();
+
 	// Create instance with new type at new address
 	return newType->toInstance(newAddr, _d.vmem, m->name(), _d.parentNames,
 							   BaseType::trLexical);

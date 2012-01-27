@@ -95,62 +95,95 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
     // Make sure we got a valid instance and type
     if (!inst || !_baseType)
         return ExpressionResult(erUndefined);
-    // Make sure the type of the instance matches our type
-    if (inst->type()->id() != _baseType->id()) {
-        // Try to match all postfix expression suffixes
-        bool match = false;
-        const BaseType* bt = _baseType->dereferencedBaseType();
-        QString prettyType = bt ? bt->prettyName() : QString("(undefined");
-        for (int i = 0; bt && i < _pel.size(); ++i) {
-            if (_pel[i].type == ptArrow || _pel[i].type == ptDot) {
-                prettyType += "." + _pel[i].member;
-                const Structured* s = dynamic_cast<const Structured*>(bt);
-                if (!s)
-                    exprEvalError(QString("Type %1 (0x%2) is not a structured "
-                                          "type")
-                                  .arg(prettyType)
-                                  .arg((uint)bt->id(), 0, 16));
-                if (!s->memberExists(_pel[i].member))
-                    exprEvalError(QString("Type %1 has no member \"%2\"")
-                                  .arg(prettyType)
-                                  .arg(_pel[i].member));
-                const StructuredMember* m = s->findMember(_pel[i].member);
-                bt = m ? m->refTypeDeep(BaseType::trLexicalAndPointers) : 0;
-            }
-        }
 
-
-        if (!match) {
+    if (_pel.isEmpty()) {
+        // Check if the type IDs match.
+        if (inst->type()->id() == _baseType->id() ||
+            inst->type()->id() ==
+                _baseType->dereferencedBaseType(BaseType::trLexical)->id())
+            return inst->toExpressionResult();
+        else
             exprEvalError(QString("Type ID of instance (0x%1) is different "
                                   "from ours (0x%2)")
                           .arg((uint)inst->type()->id(), 0, 16)
                           .arg((uint)_baseType->id(), 0, 16));
-            return ExpressionResult(erUndefined);
+    }
+
+    const BaseType* bt = _baseType;
+    QString prettyType = QString("(%1)").arg(bt->prettyName());
+    int i = 0, cnt = 0;
+
+    // Skip the suffixes starting from our _baseType until we find the matching
+    // type ID
+    for (; bt && bt->id() != inst->type()->id() && i < _pel.size(); ++i) {
+        // Did we find the instance's ID? Or can we dereference the type?
+        if (bt->id() != inst->type()->id() &&
+            (bt->type() & BaseType::trLexical))
+            bt = bt->dereferencedBaseType(BaseType::trLexical);
+        // Check once more
+        if (bt->id() == inst->type()->id())
+            break;
+
+        switch (_pel[i].type) {
+        case ptBrackets:
+        case ptArrow:
+            bt = bt->dereferencedBaseType(BaseType::trAny, 1, &cnt);
+            // Make sure we followed a pointer, but don't be fuzzy for the first
+            // type as the context type normally is not a pointer type anyway
+            if (i > 0 && cnt != 1)
+                exprEvalError(QString("Type \"%1\" (0x%2) is not pointer.")
+                              .arg(prettyType)
+                              .arg((uint)bt->id(), 0, 16));
+            // Only break for bracket expressions
+            if (_pel[i].type == ptBrackets)
+                break;
+            // no break
+
+        case ptDot: {
+            const Structured* s = dynamic_cast<const Structured*>(bt);
+            if (!s)
+                exprEvalError(QString("Type \"%1\" (0x%2) is not a structured "
+                                      "type")
+                              .arg(prettyType)
+                              .arg((uint)bt->id(), 0, 16));
+            const StructuredMember* m = s->findMember(_pel[i].member);
+            if (!m)
+                exprEvalError(QString("Type \"%1\" has no member \"%2\"")
+                              .arg(prettyType)
+                              .arg(_pel[i].member));
+            bt = m->refType();
+            prettyType += "." + _pel[i].member;
+        }
         }
     }
 
-    if (_pel.isEmpty())
-        return inst->toExpressionResult();
+    if (!bt || bt->id() != inst->type()->id()) {
+        exprEvalError(QString("Type ID of instance (0x%1) is different "
+                              "from \"%2\" (0x%3)")
+                      .arg((uint)inst->type()->id(), 0, 16)
+                      .arg(prettyType)
+                      .arg((uint)(bt ? bt->id() : 0), 0, 16));
+    }
 
-    // Apply the postfix expressions
+    // Apply remaining suffixes
     Instance tmp(*inst);
-    int cnt = 0;
-    for (int i = 0; i < _pel.size() && tmp.isValid(); ++i) {
-        switch (_pel[i].type) {
+    for (int j = i; j < _pel.size() && tmp.isValid(); ++j) {
+        switch (_pel[j].type) {
         case ptArrow:
             // Dereference the instance exactly once
             tmp = tmp.dereference(BaseType::trLexicalAndPointers, 1, &cnt);
-            // Make sure we succeeded in dereferencing the pointer
-            if (cnt != 1 || !tmp.isValid())
+            // Make sure we followed a pointer, but don't be fuzzy for the first
+            // type as the context type normally is not a pointer type anyway
+            if ((j > 0 && cnt != 1) || !tmp.isValid())
                 return ExpressionResult(erUndefined);
             // no break
 
         case ptDot:
-            tmp = tmp.findMember(_pel[i].member, BaseType::trLexical);
+            tmp = tmp.findMember(_pel[j].member, BaseType::trLexical);
             break;
 
         case ptBrackets:
-            tmp = tmp.arrayElem(_pel[i].arrayIndex);
+            tmp = tmp.arrayElem(_pel[j].arrayIndex);
             break;
         }
     }
@@ -169,8 +202,9 @@ ExpressionResult ASTBinaryExpression::result(const Instance *inst) const
     ExpressionResult ret(lr.resultType | rr.resultType);
     ExpressionResultSize target = ret.size = binaryExprSize(lr, rr);
     // Is the expression decidable?
-    if (lr.resultType != erConstant || rr.resultType != erConstant) {
+    if (ret.resultType & (erRuntime|erUndefined)) {
         // Undecidable, so return the combined result type
+        ret.resultType |= erUndefined;
         return ret;
     }
 
@@ -493,7 +527,7 @@ ExpressionResult ASTUnaryExpression::result(const Instance *inst) const
     // Is the expression decidable?
     if (res.resultType & (erUndefined|erRuntime)) {
         /// @todo constants cannot be incremented, that makes no sense at all!
-        // Undecidable, so return the correct result type
+        // Undecidable, so return the combined result type
         res.resultType |= erUndefined;
         return res;
     }
