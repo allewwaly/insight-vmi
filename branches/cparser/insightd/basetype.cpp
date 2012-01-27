@@ -22,14 +22,16 @@ BaseType::~BaseType()
 }
 
 
-RealType BaseType::dereferencedType(int resolveTypes, int *depth) const
+RealType BaseType::dereferencedType(int resolveTypes, int maxPtrDeref,
+                                    int *depth) const
 {
-    const BaseType* b = dereferencedBaseType(resolveTypes, depth);
+    const BaseType* b = dereferencedBaseType(resolveTypes, maxPtrDeref, depth);
     return b ? b->type() : type();
 }
 
 
-BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth)
+BaseType* BaseType::dereferencedBaseType(int resolveTypes, int maxPtrDeref,
+                                         int *depth)
 {
     if (depth)
         *depth = 0;
@@ -39,16 +41,26 @@ BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth)
     BaseType* prev = this;
     RefBaseType* curr = dynamic_cast<RefBaseType*>(prev);
     while (curr && curr->refType() && (curr->type() & resolveTypes) ) {
+        if (curr->type() & (rtPointer|rtArray)) {
+            // Count down pointer dereferences
+            if (maxPtrDeref > 0)
+                --maxPtrDeref;
+            // Stop when we would exceed the allowed pointer limit
+            else if (maxPtrDeref == 0)
+                break;
+            // Only count pointer dereferences
+            if (depth)
+                *depth += 1;
+        }
         prev = curr->refType();
         curr = dynamic_cast<RefBaseType*>(prev);
-        if (depth)
-            *depth += 1;
     }
     return prev;
 }
 
 
-const BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth) const
+const BaseType* BaseType::dereferencedBaseType(
+        int resolveTypes, int maxPtrDeref, int *depth) const
 {
     if (depth)
         *depth = 0;
@@ -58,10 +70,19 @@ const BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth) con
     const BaseType* prev = this;
     const RefBaseType* curr = dynamic_cast<const RefBaseType*>(prev);
     while (curr && curr->refType() && (curr->type() & resolveTypes) ) {
+        if (curr->type() & (rtPointer|rtArray)) {
+            // Count down pointer dereferences
+            if (maxPtrDeref > 0)
+                --maxPtrDeref;
+            // Stop when we would exceed the allowed pointer limit
+            else if (maxPtrDeref == 0)
+                break;
+            // Only count pointer dereferences
+            if (depth)
+                *depth += 1;
+        }
         prev = curr->refType();
         curr = dynamic_cast<const RefBaseType*>(prev);
-        if (depth)
-            *depth += 1;
     }
     return prev;
 }
