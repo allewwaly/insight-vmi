@@ -2067,7 +2067,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
                      << endl;
             }
         }
-	}
+    }
 
 	const FuncPointer* fp = dynamic_cast<const FuncPointer*>(t);
 	if (fp) {
@@ -2150,15 +2150,10 @@ int Shell::cmdShowVariable(const Variable* v)
          << endl;
 
     if (v->hasAltRefTypes()) {
-        if (v->altRefTypeCount() == 1)
-            _out << "  Alt. ref. type:  ";
-        else
-            _out << "  Alt. ref. types: ";
         for (int i = 0; i < v->altRefTypeCount(); ++i) {
-            if (i > 0)
-                _out << "                  ";
             const BaseType* t = v->altRefBaseType(i);
-            _out << "0x" << hex << (uint)t->id() << dec << " "
+            _out << "              <" << (i+1) << "> "
+                 << "0x" << hex << (uint)t->id() << dec << " "
                  << t->prettyName() << ": "
                  << v->altRefType(i).expr->toString(true) << endl;
         }
