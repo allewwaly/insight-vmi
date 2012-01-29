@@ -99,6 +99,12 @@ public:
     int altRefTypeCount() const;
 
     /**
+     * Gives direct access to the alterantive referencing types
+     * @return reference to the list of alternative types
+     */
+    QList<AltRefType>& altRefTypes();
+
+    /**
      * When this symbol has alternative referencing type IDs and \a index is -1,
      * this function returns the most useful type, e. g., a struct or union, if
      * possible, or an otherwise typed pointer. If multiple such potential
@@ -243,6 +249,12 @@ inline bool ReferencingType::hasAltRefTypes() const
 inline int ReferencingType::altRefTypeCount() const
 {
     return _altRefTypes.size();
+}
+
+
+inline QList<ReferencingType::AltRefType>& ReferencingType::altRefTypes()
+{
+    return _altRefTypes;
 }
 
 #endif /* REFERENCINGTYPE_H_ */
