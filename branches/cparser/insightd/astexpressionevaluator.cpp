@@ -1172,7 +1172,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
             }
         }
     }
-    else if (node->parent->u.postfix_expression.postfix_expression_suffix_list)
+    else if (!expr &&
+             node->parent->u.postfix_expression.postfix_expression_suffix_list)
         exprEvalError(QString("We are missing some postfix expression suffixes "
                               "at %2:%3:%4")
                       .arg(_ast->fileName())
