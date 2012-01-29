@@ -3406,13 +3406,35 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                 // type change
                 if (ed->castExNode)
                     goto cast_expression_type_change;
-                // Do not change primEx/postEx accross interLink boundaries
                 else {
                     localPostEx = ed->rootNode;
+                    // Do not change primEx/postEx accross interLink boundaries
                     if (ed->interLinks.isEmpty()) {
                         // Make a postfix expression with suffixes the new primary expr.
                         ed->postExNode = ed->rootNode;
                         ed->primExNode = ed->rootNode->u.postfix_expression.primary_expression;
+                    }
+                    // Check for bracket and arrow operators that dereference a
+                    // pointer
+                    const ASTNodeList* list =
+                            ed->rootNode->u.postfix_expression.postfix_expression_suffix_list;
+                    while (list) {
+                        const ASTNode* pes = list->item;
+                        list = list->next;
+                        switch (pes->type) {
+                        // There may be multiple brackets
+                        case nt_postfix_expression_brackets:
+                            ++derefs;
+                            ++ed->derefCount;
+                            break;
+                        // No further relevant postfixes after arrow operator
+                        case nt_postfix_expression_arrow:
+                            ++derefs;
+                            ++ed->derefCount;
+                            // no break
+                        default:
+                            list = 0; // exit loop
+                        }
                     }
                 }
             }
