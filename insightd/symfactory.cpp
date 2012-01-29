@@ -1223,6 +1223,23 @@ BaseType* SymFactory::makeDeepTypeCopy(BaseType* source)
         }
     }
 
+    // Hack for now: Copy a struct's members alternative types by hand
+    Structured *src_s, *dst_s;
+    if ( (src_s = dynamic_cast<Structured*>(source)) ) {
+        dst_s = dynamic_cast<Structured*>(dest);
+        for (int i = 0; i < src_s->members().size(); ++i) {
+            StructuredMember* src_m = src_s->members().at(i);
+            StructuredMember* dst_m = dst_s->members().at(i);
+            for (int j = 0; j < src_m->altRefTypeCount(); ++j) {
+                if (dst_m->altRefTypes().size() <= j)
+                    dst_m->addAltRefType(src_m->altRefType(j).id,
+                                         src_m->altRefType(j).expr);
+                else
+                    dst_m->altRefTypes()[j] = src_m->altRefType(j);
+            }
+        }
+    }
+
     addSymbol(dest);
 
     return dest;
