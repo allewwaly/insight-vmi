@@ -354,6 +354,10 @@ TEST_FUNCTION(postfixOperators)
     NO_CHANGE("*h = (*m->plist).next[0];");
     NO_CHANGE("*h = (*m).plist[0].next[0];");
     NO_CHANGE("*h = (*m[0].plist).next[0];");
+
+    // Dereference after address operator
+    NO_CHANGE("h = (*(&m))->plist->next;");
+    NO_CHANGE("h = (&m)[0]->plist->next;");
 }
 
 
@@ -393,6 +397,14 @@ TEST_FUNCTION(basicTypeChanges)
         "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
     CHANGE_LAST("m = h->next->prev;",
         "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+
+    // Dereference after address operator
+    CHANGE_LAST("m = (*(&modules)).next;",
+                "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("m = (&modules)->next;",
+        "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("m = (&modules)[0].next;",
+                "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
 }
 
 
