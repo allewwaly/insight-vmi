@@ -2149,11 +2149,13 @@ int Shell::cmdShowVariable(const Variable* v)
                              QString(v->refTypeId() ? "(unresolved)" : "void"))
          << endl;
 
-    if (v->hasAltRefTypes()) {
+    if (v->hasAltRefTypes()) {        
         for (int i = 0; i < v->altRefTypeCount(); ++i) {
             const BaseType* t = v->altRefBaseType(i);
-            _out << "              <" << (i+1) << "> "
-                 << "0x" << hex << (uint)t->id() << dec << " "
+            _out << "  <" << (i+1) << "> "
+                 << qSetFieldWidth(11) << left
+                 << QString("0x%1").arg((uint)t->id(), 0, 16)
+                 << qSetFieldWidth(0) << " "
                  << t->prettyName() << ": "
                  << v->altRefType(i).expr->toString(true) << endl;
         }
