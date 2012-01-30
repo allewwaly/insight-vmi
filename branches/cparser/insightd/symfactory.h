@@ -398,6 +398,11 @@ protected:
 										const BaseType *targetBaseType,
 										ASTTypeEvaluator *eval);
 
+	void typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
+										 const BaseType *targetBaseType,
+										 const BaseTypeList& ctxBaseTypes,
+										 ASTTypeEvaluator *eval);
+
 	void typeAlternateUsageVar(const TypeEvalDetails *ed,
 							   const BaseType *targetBaseType,
 							   ASTTypeEvaluator *eval);

@@ -2147,8 +2147,15 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
 {
     // Find context base types
     AstBaseTypeList ctxTypeRet = findBaseTypesForAstType(ed->ctxType, eval);
-    BaseTypeList ctxBaseTypes = ctxTypeRet.second;
+    typeAlternateUsageStructMember2(ed, targetBaseType, ctxTypeRet.second, eval);
+}
 
+
+void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
+                                                 const BaseType *targetBaseType,
+                                                 const BaseTypeList& ctxBaseTypes,
+                                                 ASTTypeEvaluator *eval)
+{
     int membersFound = 0, membersChanged = 0;
 
     assert(dynamic_cast<KernelSourceTypeEvaluator*>(eval) != 0);
@@ -2254,13 +2261,14 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
         QStringList ctxTypes;
         for (int i = 0; i < ctxBaseTypes.size(); ++i)
             if (ctxBaseTypes[i])
-                ctxTypes += QString("0x%1").arg(ctxBaseTypes[i]->id(), 0, 16);
+                ctxTypes += QString("0x%1")
+                                .arg((uint)ctxBaseTypes[i]->id(), 0, 16);
         debugmsg(QString("Changed %1 member%2 of type%3 %4 to target type 0x%5: %6")
                  .arg(membersFound)
                  .arg(membersFound == 1 ? "" : "s")
                  .arg(ctxBaseTypes.size() > 1 ? "s" : "")
                  .arg(ctxTypes.join((", ")))
-                 .arg(targetBaseType->id(), 0, 16)
+                 .arg((uint)targetBaseType->id(), 0, 16)
                  .arg(targetBaseType->prettyName()));
     }
 }
@@ -2277,6 +2285,10 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
     ASTExpressionEvaluator* exprEval =
             dynamic_cast<KernelSourceTypeEvaluator*>(eval)->exprEvaluator();
 
+#ifdef DEBUG
+    exprEval->clearCache();
+#endif
+
     // Find top-level node of right-hand side for expression
     const ASTNode* right = ed->srcNode;
     while (right && right->parent != ed->rootNode) {
@@ -2290,24 +2302,58 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
         factoryError(QString("Could not find top-level node for "
                              "right-hand side of expression"));
 
+    // Inter-links hash contains links from assignment expressions
+    // to primary expressions (for walking AST up), so we need to
+    // invert the links for walking the AST down
+    ASTNodeNodeHash ptsTo = invertHash(ed->interLinks);
+    ASTExpression* expr = exprEval->exprOfNode(right, ptsTo);
+
+    if (vars.size() > 1)
+        factoryError(QString("We found %1 variables with name \"%2\", we "
+                             "should narrow it down to one!")
+                     .arg(vars.size())
+                     .arg(ed->sym->name()));
+
     // Find the variable(s) using the targetBaseType
     for (int i = 0; i < vars.size(); ++i) {
         ++varsFound;
-        // Inter-links hash contains links from assignment expressions
-        // to primary expressions (for walking AST up), so we need to
-        // invert the links for walking the AST down
-        ASTNodeNodeHash ptsTo = invertHash(ed->interLinks);
-        ASTExpression* expr = exprEval->exprOfNode(right, ptsTo);
 
-        // Apply new type, if applicable
-        if (typeChangeDecision(vars[i], targetBaseType, expr)) {
-            ++_totalTypesChanged;
-            ++_varTypeChanges;
-            if (vars[i]->altRefTypeCount() > 0)
-                ++_conflictingTypeChanges;
+        // Without context members, we apply the change to the variable itself
+        if (ed->ctxMembers.isEmpty()) {
+            // Apply new type, if applicable
+            if (typeChangeDecision(vars[i], targetBaseType, expr)) {
+                ++_totalTypesChanged;
+                ++_varTypeChanges;
+                if (vars[i]->altRefTypeCount() > 0)
+                    ++_conflictingTypeChanges;
 
-            vars[i]->addAltRefType(targetBaseType->id(),
-                                   expr->clone(_expressions));
+                vars[i]->addAltRefType(targetBaseType->id(),
+                                       expr->clone(_expressions));
+            }
+        }
+        // Otherwise copy the type and apply the change to it
+        else {
+            BaseType* t = vars[i]->refType();
+            assert(t != 0);
+            // If this is not a type copy, create a copy now
+            if (t->id() > 0) {
+                int origRefTypeId = vars[i]->refTypeId();
+                t = makeDeepTypeCopy(t);
+                vars[i]->setRefTypeId(t->id());
+
+                debugmsg(QString("Created copy (0x%1 -> 0x%2) of type \"%3\" "
+                                 "for global variable \"%4\" (0x%5).")
+                         .arg((uint)origRefTypeId, 0, 16)
+                         .arg((uint)t->id(), 0, 16)
+                         .arg(t->prettyName(), 0, 16)
+                         .arg(vars[i]->name())
+                         .arg((uint)vars[i]->id(), 0, 16));
+
+            }
+            // Pass the type change on to the struct handling function
+            BaseTypeList list;
+            list << t;
+            typeAlternateUsageStructMember2(ed, targetBaseType, list, eval);
         }
     }
 
@@ -2318,7 +2364,7 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
         // declared variables that are not in the debugging symbols.
         debugerr("Did not find any variables to adjust!");
     }
-    else {
+    else if (ed->ctxMembers.isEmpty()) {
         QStringList varIds;
         for (int i = 0; i < vars.size(); ++i)
                 varIds += QString("0x%1").arg(vars[i]->id(), 0, 16);
@@ -2403,7 +2449,7 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
             debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\" with \"%5\"")
                      .arg(m ? m->name() : v->name())
                      .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
-                     .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
+                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
                      .arg(r->refType() ?
                               r->refType()->prettyName() :
                               QString("???"))
@@ -2416,7 +2462,7 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
             debugmsg(QString("Not changing \"%0\" of %1 (0x%2) from \"%3\" to \"%4\"")
                      .arg(m ? m->name() : v->name())
                      .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
-                     .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
+                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
                      .arg(r->refType() ?
                               r->refType()->prettyName() :
                               QString("???"))
@@ -2425,13 +2471,13 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
 
         case tcConflict:
             debugerr(QString("Conflicting target types in 0x%0: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
-                     .arg(m ? m->belongsTo()->id() : v->id(), 0, 16)
+                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
                      .arg(r->refType() ?
                               r->refType()->prettyName() :
                               QString("???"))
-                     .arg(r->refTypeId(), 0, 16)
+                     .arg((uint)r->refTypeId(), 0, 16)
                      .arg(targetBaseType->prettyName())
-                     .arg(targetBaseType->id(), 0, 16));
+                     .arg((uint)targetBaseType->id(), 0, 16));
             break;
 
         case tcReplace:
