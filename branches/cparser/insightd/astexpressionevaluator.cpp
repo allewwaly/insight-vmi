@@ -1070,7 +1070,77 @@ ASTExpression* ASTExpressionEvaluator::exprOfPostfixExpr(
         return 0;
     checkNodeType(node, nt_postfix_expression);
 
-    return exprOfNode(node->u.postfix_expression.primary_expression, ptsTo);
+    ASTExpression* expr =
+            exprOfNode(node->u.postfix_expression.primary_expression, ptsTo);
+
+    const ASTNodeList* suffixList =
+            node->u.postfix_expression.postfix_expression_suffix_list;
+
+    // Append postfix expression suffixes
+    if (expr && suffixList) {
+        ASTVariableExpression* varExpr = 0;
+        bool result;
+
+        switch (expr->type()) {
+        case etVariable:
+            varExpr = dynamic_cast<ASTVariableExpression*>(expr);
+            result = appendPostfixExpressionSuffixes(suffixList, varExpr);
+            break;
+
+        case etUnaryAmp: {
+            // If the child is a variable expression with a suffix that
+            // derefrences this expression, merge the two
+            ASTUnaryExpression* uExpr = dynamic_cast<ASTUnaryExpression*>(expr);
+            if (uExpr->child()->type() == etVariable) {
+                varExpr = dynamic_cast<ASTVariableExpression*>(
+                            uExpr->child()->clone(_allExpressions));
+                result = appendPostfixExpressionSuffixes(suffixList, varExpr);
+                // Don't bother if the result is a runtime expression anyway
+                if (result) {
+                    // Convert "->" into "." and forget about the "&"
+                    if (varExpr->pel().first().type == ASTVariableExpression::ptArrow)
+                    {
+                        varExpr->pel().first().type = ASTVariableExpression::ptDot;
+                    }
+                    // Remove "[0]" and forget about the "&"
+                    else if (varExpr->pel().first().type == ASTVariableExpression::ptBrackets &&
+                             varExpr->pel().first().arrayIndex == 0)
+                    {
+                        varExpr->pel().pop_front();
+                    }
+                    else {
+                        exprEvalError(QString("We cannot merge the address "
+                                              "operator with a corresponding "
+                                              "postfix expression suffix at "
+                                              "%2:%3:%4")
+                                      .arg(_ast->fileName())
+                                      .arg(node->start->line)
+                                      .arg(node->start->charPosition));
+                    }
+
+                    expr = varExpr;
+                }
+            }
+            }
+            break;
+
+        default:
+            break;
+        }
+
+        if (!varExpr)
+            exprEvalError(QString("We did not find a variable expression to "
+                                  "append the postfix expressions to at "
+                                  "%2:%3:%4")
+                          .arg(_ast->fileName())
+                          .arg(node->start->line)
+                          .arg(node->start->charPosition));
+
+        if (!result)
+            return createExprNode<ASTRuntimeExpression>();
+    }
+
+    return expr;
 }
 
 
@@ -1095,8 +1165,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
                 exprEvalError(QString("Cannot find enumerator \"%1\" at %2:%3:%4")
                               .arg(sym->name())
                               .arg(_ast->fileName())
-                              .arg(node ? node->start->line : 0)
-                              .arg(node ? node->start->charPosition : 0));
+                              .arg(node->start->line)
+                              .arg(node->start->charPosition));
             IntEnumPair iep = _factory->enumsByName().value(sym->name());
             return createExprNode<ASTEnumeratorExpression>(iep.first, sym);
         }
@@ -1121,64 +1191,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
     else
         exprEvalError(QString("Unexpected primary expression at %2:%3:%4")
                       .arg(_ast->fileName())
-                      .arg(node ? node->start->line : 0)
-                      .arg(node ? node->start->charPosition : 0));
-
-    if (expr && expr->type() == etVariable) {
-        ASTVariableExpression* varExpr =
-                dynamic_cast<ASTVariableExpression*>(expr);
-        // Append all postfix expression suffixes
-        for (const ASTNodeList* list =
-                node->parent->u.postfix_expression.postfix_expression_suffix_list;
-             list;
-             list = list->next)
-        {
-            const ASTNode* p = list->item;
-            switch(p->type) {
-            case nt_postfix_expression_arrow:
-                varExpr->appendPostfixExpression(
-                            ASTVariableExpression::PostfixExpression(
-                                ASTVariableExpression::ptArrow,
-                                antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
-                break;
-
-            case nt_postfix_expression_dot:
-                varExpr->appendPostfixExpression(
-                            ASTVariableExpression::PostfixExpression(
-                                ASTVariableExpression::ptDot,
-                                antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
-                break;
-
-            case nt_postfix_expression_brackets: {
-                // We expect array indices to be constant
-                const ASTNode* e = p->u.postfix_expression_suffix.expression ?
-                            p->u.postfix_expression_suffix.expression->item : 0;
-                ASTExpression* index = exprOfNode(e, ASTNodeNodeHash());
-                ExpressionResult result = index ?
-                            index->result() : ExpressionResult();
-                if (result.resultType == erConstant)
-                    varExpr->appendPostfixExpression(
-                                ASTVariableExpression::PostfixExpression(
-                                    result.value(esInt32)));
-                // Seems to be a runtime dependent expresssion
-                else
-                    return createExprNode<ASTRuntimeExpression>();
-                }
-                break;
-
-            // Any other type cannot be resolved
-            default:
-                return createExprNode<ASTRuntimeExpression>();
-            }
-        }
-    }
-    else if (!expr &&
-             node->parent->u.postfix_expression.postfix_expression_suffix_list)
-        exprEvalError(QString("We are missing some postfix expression suffixes "
-                              "at %2:%3:%4")
-                      .arg(_ast->fileName())
-                      .arg(node ? node->start->line : 0)
-                      .arg(node ? node->start->charPosition : 0));
+                      .arg(node->start->line)
+                      .arg(node->start->charPosition));
 
     return expr;
 }
@@ -1355,6 +1369,58 @@ unsigned int ASTExpressionEvaluator::sizeofType(const ASTType *type)
 }
 
 
+bool ASTExpressionEvaluator::appendPostfixExpressionSuffixes(
+        const ASTNodeList* suffixList, ASTVariableExpression *varExpr)
+{
+    if (!varExpr)
+        return false;
+
+    // Append all postfix expression suffixes
+    for (const ASTNodeList* list = suffixList; list; list = list->next)
+    {
+        const ASTNode* p = list->item;
+        switch(p->type) {
+        case nt_postfix_expression_arrow:
+            varExpr->appendPostfixExpression(
+                        ASTVariableExpression::PostfixExpression(
+                            ASTVariableExpression::ptArrow,
+                            antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
+            break;
+
+        case nt_postfix_expression_dot:
+            varExpr->appendPostfixExpression(
+                        ASTVariableExpression::PostfixExpression(
+                            ASTVariableExpression::ptDot,
+                            antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
+            break;
+
+        case nt_postfix_expression_brackets: {
+            // We expect array indices to be constant
+            const ASTNode* e = p->u.postfix_expression_suffix.expression ?
+                        p->u.postfix_expression_suffix.expression->item : 0;
+            ASTExpression* index = exprOfNode(e, ASTNodeNodeHash());
+            ExpressionResult result = index ?
+                        index->result() : ExpressionResult();
+            if (result.resultType == erConstant)
+                varExpr->appendPostfixExpression(
+                            ASTVariableExpression::PostfixExpression(
+                                result.value(esInt32)));
+            // Seems to be a runtime dependent expresssion
+            else
+                return false;
+        }
+            break;
+
+            // Any other type cannot be resolved
+        default:
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 ExpressionResultSize ASTExpressionEvaluator::realTypeToResultSize(RealType type)
 {
     switch (type) {
@@ -1370,4 +1436,10 @@ ExpressionResultSize ASTExpressionEvaluator::realTypeToResultSize(RealType type)
     case rtDouble: return esDouble;
     default:       return esUndefined;
     }
+}
+
+
+void ASTExpressionEvaluator::clearCache()
+{
+    _expressions.clear();
 }
