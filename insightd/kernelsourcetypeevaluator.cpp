@@ -14,6 +14,7 @@
 #include <abstractsyntaxtree.h>
 #include "shell.h"
 #include "astexpressionevaluator.h"
+#include "expressionevalexception.h"
 
 #define typeEvaluatorError(x) do { throw SourceTypeEvaluatorException((x), __FILE__, __LINE__); } while (0)
 
@@ -72,8 +73,28 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
     /// @todo Ignore casts from arrays to pointers of the same base type
 
     try {
+        // Find top-level node of right-hand side for expression
+        const ASTNode* right = ed.srcNode;
+        while (right && right->parent != ed.rootNode) {
+            if (ed.interLinks.contains(right))
+                right = ed.interLinks[right];
+            else
+                right = right->parent;
+        }
+        // Prepare the right-hand side expression
+        ASTNodeNodeHash ptsTo = invertHash(ed.interLinks);
+        ASTExpression* expr = 0;
+        try {
+            expr = right ? _eval->exprOfNode(right, ptsTo) : 0;
+        }
+        catch (ExpressionEvalException& e) {
+            // do nothing
+        }
+        QString s_expr = expr ? expr->toString() : QString("n/a");
+
+
         debugmsg("Passing the following type change to SymFactory:\n" +
-                 typeChangeInfo(ed));
+                 typeChangeInfo(ed, s_expr));
         _factory->typeAlternateUsage(&ed, this);
     }
     catch (FactoryException& e) {

@@ -4006,7 +4006,8 @@ inline bool srcLineLessThan(const ASTNode* n1, const ASTNode* n2)
 }
 
 
-QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed)
+QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed,
+                                         const QString& expr)
 {
     ASTSourcePrinter printer(_ast);
 #   define INDENT "    "
@@ -4024,19 +4025,36 @@ QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed)
         conSrc += printer.toString(nodes[i]->parent, true);
     }
 
-    return QString(INDENT "Symbol: %1 (%2)\n"
-                   INDENT "Source: %3 %4\n"
-                   INDENT "Target: %5 %6\n"
-                   "%7"
-                   INDENT "%8")
-            .arg(ed.sym->name(), -30)
-            .arg(scope + ed.sym->typeToString())
-            .arg(printer.toString(ed.primExNode->parent, false).trimmed() + ",", -30)
-            .arg(ed.srcType->toString())
-            .arg(printer.toString(ed.targetNode, false).trimmed() + ",", -30)
-            .arg(ed.targetType->toString())
-            .arg(conSrc)
-            .arg(printer.toString(ed.rootNode, true).trimmed());
+    if (expr.isEmpty())
+        return QString(INDENT "Symbol: %1 (%2)\n"
+                       INDENT "Source: %3 %4\n"
+                       INDENT "Target: %5 %6\n"
+                       "%7"
+                       INDENT "%8")
+                .arg(ed.sym->name(), -30)
+                .arg(scope + ed.sym->typeToString())
+                .arg(printer.toString(ed.primExNode->parent, false).trimmed() + ",", -30)
+                .arg(ed.srcType->toString())
+                .arg(printer.toString(ed.targetNode, false).trimmed() + ",", -30)
+                .arg(ed.targetType->toString())
+                .arg(conSrc)
+                .arg(printer.toString(ed.rootNode, true).trimmed());
+    else
+        return QString(INDENT "Symbol: %1 (%2)\n"
+                       INDENT "Source: %3 %4\n"
+                       INDENT "Target: %5 %6\n"
+                       INDENT "Expr.:  %9\n"
+                       "%7"
+                       INDENT "%8")
+                .arg(ed.sym->name(), -30)
+                .arg(scope + ed.sym->typeToString())
+                .arg(printer.toString(ed.primExNode->parent, false).trimmed() + ",", -30)
+                .arg(ed.srcType->toString())
+                .arg(printer.toString(ed.targetNode, false).trimmed() + ",", -30)
+                .arg(ed.targetType->toString())
+                .arg(conSrc)
+                .arg(printer.toString(ed.rootNode, true).trimmed())
+                .arg(expr);
 }
 
 
