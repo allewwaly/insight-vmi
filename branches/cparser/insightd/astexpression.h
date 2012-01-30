@@ -66,7 +66,7 @@ public:
 
     inline virtual bool equals(const ASTExpression* other) const
     {
-        return other && other->type();
+        return other && type() == other->type();
     }
 
     inline virtual ASTExpressionList findExpressions(ExpressionType type)
@@ -390,14 +390,19 @@ public:
         return cloneTempl<ASTVariableExpression>(list);
     }
 
-    const BaseType* baseType() const
+    inline const BaseType* baseType() const
     {
         return _baseType;
     }
 
-    void appendPostfixExpression(PostfixExpression pe)
+    inline void appendPostfixExpression(PostfixExpression pe)
     {
         _pel.append(pe);
+    }
+
+    inline PostfixExpressionList& pel()
+    {
+        return _pel;
     }
 
 protected:
