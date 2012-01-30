@@ -75,10 +75,14 @@ bool ASTVariableExpression::equals(const ASTExpression *other) const
         return false;
     const ASTVariableExpression* v =
             dynamic_cast<const ASTVariableExpression*>(other);
-    // Compare base type
-    if (!v || _baseType != v->_baseType || _pel.size() != v->_pel.size())
+    // Compare base type based on their hash
+    if (!v || !_baseType  || !v->_baseType ||
+        _baseType->hash() != v->baseType()->hash())
         return false;
-    // Compare postfix expressions
+
+    // Compare postfix expression suffixes
+    if (_pel.size() != v->_pel.size())
+        return false;
     for (int i = 0; i < _pel.size(); ++i) {
         if (_pel[i].type != v->_pel[i].type ||
             _pel[i].arrayIndex != v->_pel[i].arrayIndex ||
@@ -97,15 +101,17 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         return ExpressionResult(erUndefined);
 
     if (_pel.isEmpty()) {
-        // Check if the type IDs match.
-        if (inst->type()->id() == _baseType->id() ||
-            inst->type()->id() ==
-                _baseType->dereferencedBaseType(BaseType::trLexical)->id())
+        // Check if the type hashes match.
+        if (inst->type()->hash() == _baseType->hash() ||
+            inst->type()->hash() ==
+                _baseType->dereferencedBaseType(BaseType::trLexical)->hash())
             return inst->toExpressionResult();
         else
-            exprEvalError(QString("Type ID of instance (0x%1) is different "
-                                  "from ours (0x%2)")
+            exprEvalError(QString("Type hash of instance \"%1\" (0x%2) is different "
+                                  "from our type \"%3\" (0x%4)")
+                          .arg(inst->type()->prettyName())
                           .arg((uint)inst->type()->id(), 0, 16)
+                          .arg(_baseType->prettyName())
                           .arg((uint)_baseType->id(), 0, 16));
     }
 
@@ -115,13 +121,13 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 
     // Skip the suffixes starting from our _baseType until we find the matching
     // type ID
-    for (; bt && bt->id() != inst->type()->id() && i < _pel.size(); ++i) {
+    for (; bt && bt->hash() != inst->type()->hash() && i < _pel.size(); ++i) {
         // Did we find the instance's ID? Or can we dereference the type?
-        if (bt->id() != inst->type()->id() &&
+        if (bt->hash() != inst->type()->hash() &&
             (bt->type() & BaseType::trLexical))
             bt = bt->dereferencedBaseType(BaseType::trLexical);
         // Check once more
-        if (bt->id() == inst->type()->id())
+        if (bt->hash() == inst->type()->hash())
             break;
 
         switch (_pel[i].type) {
@@ -131,7 +137,7 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
             // Make sure we followed a pointer, but don't be fuzzy for the first
             // type as the context type normally is not a pointer type anyway
             if (i > 0 && cnt != 1)
-                exprEvalError(QString("Type \"%1\" (0x%2) is not pointer.")
+                exprEvalError(QString("Type \"%1\" (0x%2) is not a pointer.")
                               .arg(prettyType)
                               .arg((uint)bt->id(), 0, 16));
             // Only break for bracket expressions
@@ -157,12 +163,14 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         }
     }
 
-    if (!bt || bt->id() != inst->type()->id()) {
-        exprEvalError(QString("Type ID of instance (0x%1) is different "
-                              "from \"%2\" (0x%3)")
+    if (!bt || bt->hash() != inst->type()->hash()) {
+        exprEvalError(QString("Type hash of instance \"%1\" (0x%2) is different "
+                              "from type \"%3\" (0x%4) of expression \"%5\"")
+                      .arg(inst->type()->prettyName())
                       .arg((uint)inst->type()->id(), 0, 16)
-                      .arg(prettyType)
-                      .arg((uint)(bt ? bt->id() : 0), 0, 16));
+                      .arg(bt ? bt->prettyName() : QString("(null)"))
+                      .arg((uint)(bt ? bt->id() : 0), 0, 16)
+                      .arg(prettyType));
     }
 
     // Apply remaining suffixes
