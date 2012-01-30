@@ -12,6 +12,7 @@ class ASTNode;
 class ASTNodeList;
 class ASTExpression;
 class ASTBinaryExpression;
+class ASTVariableExpression;
 class ASTTypeEvaluator;
 class SymFactory;
 class AbstractSyntaxTree;
@@ -32,6 +33,12 @@ public:
     ASTExpression* exprOfNode(const ASTNode *node,
                               const ASTNodeNodeHash& ptsTo);
     static ExpressionResultSize realTypeToResultSize(RealType type);
+
+    /**
+     * Clears the internal cache of expressions and forces a re-evaluation
+     * of all AST nodes. This method is meant for debugging only.
+     */
+    void clearCache();
 
 protected:
     /**
@@ -88,6 +95,9 @@ private:
             const ASTNode *node, const ASTNodeNodeHash& ptsTo);
 
     unsigned int sizeofType(const ASTType *type);
+
+    bool appendPostfixExpressionSuffixes(const ASTNodeList *suffixList,
+                                         ASTVariableExpression *varExpr);
 
     ASTExpressionList _allExpressions;
     ASTNodeExpressionHash _expressions;
