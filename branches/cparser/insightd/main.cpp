@@ -355,8 +355,8 @@ int main(int argc, char* argv[])
 		delete shell;
 	}
 
-	if (memMapWindow)
-	    delete memMapWindow;
+//	if (memMapWindow)
+//	    delete memMapWindow;
 
     return ret;
 }
