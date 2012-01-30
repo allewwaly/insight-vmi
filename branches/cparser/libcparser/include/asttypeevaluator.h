@@ -243,7 +243,8 @@ protected:
     /**
      * @return a string with details about the given type change.
      */
-    QString typeChangeInfo(const TypeEvalDetails &ed);
+    QString typeChangeInfo(const TypeEvalDetails &ed,
+                           const QString &expr = QString());
 
     virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
 
