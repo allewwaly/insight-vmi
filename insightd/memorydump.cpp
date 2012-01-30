@@ -215,8 +215,11 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		if (!v)
 			queryError(QString("Variable does not exist: %1").arg(symbol));
 
-		/// @todo honor the candidate index appropriately
-		result = v->toInstance(_vmem, BaseType::trLexicalAndPointers);
+		if (candidateIndex > 0)
+			queryError("Candidate selection is not yet implemented for "
+					   "variables.");
+		else
+			result = v->toInstance(_vmem, BaseType::trLexicalAndPointers);
 	}
 	else {
 		// We have a instance therefore we resolve the member
