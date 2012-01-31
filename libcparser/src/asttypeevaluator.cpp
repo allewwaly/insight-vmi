@@ -3231,7 +3231,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                 // across inter-link boundaries, do not recurse for plain local
                 // variables without context (i.e., postfix expression suffixes)
                 (ed->sym->isGlobal() || ed->srcNode != ed->primExNode ||
-                 ed->postExNode->u.postfix_expression.postfix_expression_suffix_list)
+                 !ed->postExNodes.isEmpty())
                 )
             {
 
@@ -3287,7 +3287,10 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
         case nt_additive_expression:
             // Ignore numeric types in arithmetic expressions
             if (ed->rootNode->u.binary_expression.right &&  !ed->castExNode &&
-                (typeofNode(ed->postExNode)->type() & NumericTypes))
+                (typeofNode(
+                     ed->postExNodes.isEmpty() ?
+                     ed->primExNode->parent :
+                     ed->postExNodes.last())->type() & NumericTypes))
                 return erIntegerArithmetics;
             break;
 
@@ -3408,12 +3411,8 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                     goto cast_expression_type_change;
                 else {
                     localPostEx = ed->rootNode;
-                    // Do not change primEx/postEx accross interLink boundaries
-                    if (ed->interLinks.isEmpty()) {
-                        // Make a postfix expression with suffixes the new primary expr.
-                        ed->postExNode = ed->rootNode;
-                        ed->primExNode = ed->rootNode->u.postfix_expression.primary_expression;
-                    }
+                    // Save postfix expression with suffixes for later
+                    ed->postExNodes.append(ed->rootNode);
                     // Check for bracket and arrow operators that dereference a
                     // pointer
                     const ASTNodeList* list =
@@ -3554,10 +3553,11 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
         return erNoAssignmentUse;
 
     // Skip if source and target types are equal
-    if (lType->equalTo(typeofNode(ed->postExNode)))
+    const ASTNode* pe = ed->postExNodes.isEmpty() ?
+                ed->primExNode->parent : ed->postExNodes.last();
+    if (lType->equalTo(typeofNode(pe)))
         return erTypesAreEqual;
 
-    //
     ASTType* rType = typeofNode(rNode);
     // Skip if resulting type of one side does not fit to the other side. We
     // allow pointer-to-integer casts, though.
@@ -3574,7 +3574,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
 
     // Skip if address of some object is assigned/cast/whatever without being
     // dereferenced again by some postfix expression suffix
-    if ((derefs < 0) && !ed->postExNode)
+    if ((derefs < 0) && ed->postExNodes.isEmpty())
         return erAddressOperation;
 
     return erTypesAreDifferent;
@@ -3589,10 +3589,9 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
 {
     // Find the chain of changing types up to ae on the right-hand
     TypeChain typeChain;
-    assert(ed->postExNode->type == nt_postfix_expression);
-    typeChain.append(typeofNode(ed->postExNode));
+    typeChain.append(typeofNode(ed->primExNode->parent));
     int forcedChanges = 0, localDeref = 0;
-    const ASTNode* p = ed->postExNode;
+    const ASTNode* p = ed->primExNode->parent;
     ASTNodeNodeHash interLinks = ed->interLinks;
     QString op;
 
@@ -3782,18 +3781,27 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
 void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
 {
     // Find out the context of type change
-    ed->ctxNode = ed->primExNode;
     ASTNodeStack pesStack;
 
-    for (ASTNodeList* l = ed->postExNode->u.postfix_expression.postfix_expression_suffix_list;
-            l; l = l->next)
-    {
-        pesStack.push(l->item);
+    // Push all postfix expression suffixes on a stack
+    for (int i = 0; i < ed->postExNodes.size(); ++i) {
+        for (ASTNodeList* l =
+             ed->postExNodes[i]->u.postfix_expression.postfix_expression_suffix_list;
+             l;
+             l = l->next)
+        {
+            pesStack.push(l->item);
+        }
     }
 
     // Embedding struct in whose context we see the type change
+    ed->ctxNode = ed->postExNodes.isEmpty() ?
+                ed->primExNode :
+                ed->postExNodes.first()->u.postfix_expression.primary_expression;
     ed->ctxType = typeofNode(ed->ctxNode);
-    ed->srcType = typeofNode(ed->postExNode);
+    // Source node is the last suffix node of the last postfix expression
+    ed->srcNode = pesStack.isEmpty() ? ed->primExNode : pesStack.top();
+    ed->srcType = typeofNode(ed->srcNode);
     // Member chain of embedding struct in whose context we see the type change
     // True as long as we see member.sub.subsub expressions
     bool searchMember = true;
@@ -3803,6 +3811,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
     // Go through all postfix expression suffixes from right to left
     while (!pesStack.isEmpty()) {
         const ASTNode* n = pesStack.pop();
+
         // Still building chain of members?
         if (searchMember) {
             switch(n->type) {
@@ -3814,16 +3823,34 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
                 ctxTypeOps.clear();
                 break;
 
-            case nt_postfix_expression_arrow:
+            case nt_postfix_expression_arrow: {
+                bool treatAsDot = false;
+                // Is this the first suffix of a postfix expression?
+                if (pesStack.isEmpty() || n->parent != pesStack.top()->parent) {
+                    // If the the previous postfix expression has no pointer
+                    // type but the current one has pointer, there must have
+                    // been an address operator. In that case, we treat the
+                    // arrow operator equivalent to a dot.
+                    const ASTNode* prev = pesStack.isEmpty() ?
+                                ed->primExNode : pesStack.top()->parent;
+                    ASTType* prevType = typeofNode(prev);
+                    if (prevType->type() & (rtStruct|rtUnion))
+                        treatAsDot = true;
+                }
                 // Prepend name of member
                 ed->ctxMembers.prepend(
-                        antlrTokenToStr(n->u.postfix_expression_suffix.identifier));
+                            antlrTokenToStr(n->u.postfix_expression_suffix.identifier));
                 // Type changes now, so clear all pending operations
                 ctxTypeOps.clear();
-                // The arrow is by itself a dereference
-                ctxTypeOps.push(n->type);
-                searchMember = false;
+
+                // Stop searching members for "non-pseudo" dot operator
+                if (!treatAsDot) {
+                    // The arrow is by itself a dereference
+                    ctxTypeOps.push(n->type);
+                    searchMember = false;
+                }
                 break;
+            }
 
             case nt_postfix_expression_brackets:{
                 // If brackets are used on a pointer type, then this is a
@@ -3831,14 +3858,14 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
                 // but for embedded array types we treat it the same way as a
                 // "dot" member access
                 const ASTNode* pred = pesStack.isEmpty() ?
-                            ed->postExNode->u.postfix_expression.primary_expression :
+                            n->parent->u.postfix_expression.primary_expression :
                             pesStack.top();
                 if (typeofNode(pred)->type() == rtArray)
                     ctxTypeOps.push(n->type);
                 else {
                     // Type changes now, so clear all pending operations
                     ctxTypeOps.clear();
-                    // The arrow is by itself a dereference
+                    // The brackets are by themselves a dereference
                     ctxTypeOps.push(n->type);
                     searchMember = false;
                 }
@@ -3934,7 +3961,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
     ed.srcNode = node;
     ed.primExNode = node;
     ed.rootNode = node->parent;
-    ed.postExNode = node->parent;
+//    ed.postExNode = node->parent;
 
     return evaluateIdentifierUsedAsRek(&ed);
 }
@@ -4016,6 +4043,10 @@ QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed,
          ed.sym->type() == stVariableDecl)
         scope = ed.sym->isGlobal() ? "global " : "local ";
 
+    QString srcNode = printer.toString(
+                ed.postExNodes.isEmpty() ?
+                    ed.primExNode->parent : ed.postExNodes.last(), false).trimmed();
+
     // Print the source of all of all inter-connected code snippets
     QString conSrc;
     QList<const ASTNode*> nodes = ed.interLinks.keys();
@@ -4033,7 +4064,7 @@ QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed,
                        INDENT "%8")
                 .arg(ed.sym->name(), -30)
                 .arg(scope + ed.sym->typeToString())
-                .arg(printer.toString(ed.primExNode->parent, false).trimmed() + ",", -30)
+                .arg(srcNode + ",", -30)
                 .arg(ed.srcType->toString())
                 .arg(printer.toString(ed.targetNode, false).trimmed() + ",", -30)
                 .arg(ed.targetType->toString())
@@ -4048,7 +4079,7 @@ QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed,
                        INDENT "%8")
                 .arg(ed.sym->name(), -30)
                 .arg(scope + ed.sym->typeToString())
-                .arg(printer.toString(ed.primExNode->parent, false).trimmed() + ",", -30)
+                .arg(srcNode + ",", -30)
                 .arg(ed.srcType->toString())
                 .arg(printer.toString(ed.targetNode, false).trimmed() + ",", -30)
                 .arg(ed.targetType->toString())
@@ -4060,8 +4091,7 @@ QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed,
 
 void ASTTypeEvaluator::primaryExpressionTypeChange(const TypeEvalDetails &ed)
 {
-	checkNodeType(ed.srcNode, nt_primary_expression);
-	checkNodeType(ed.srcNode->parent, nt_postfix_expression);
+    checkNodeType(ed.primExNode, nt_primary_expression);
 
     QString symScope = ed.sym->isLocal() ? "local" : "global";
     QStringList symType = ed.sym->typeToString().split(' ');
@@ -4069,9 +4099,9 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const TypeEvalDetails &ed)
     	symType.pop_back();
 
     ASTSourcePrinter printer(_ast);
-    QString var = (ed.srcNode == ed.ctxNode) ?
-            printer.toString(ed.srcNode).trimmed() :
-            postfixExpressionToStr(ed.primExNode->parent, ed.ctxNode);
+    QString var = ed.postExNodes.isEmpty() ?
+                postfixExpressionToStr(ed.primExNode->parent, ed.ctxNode) :
+                printer.toString(ed.postExNodes.last()).trimmed();
 
     std::cout
             << (_ast && !_ast->fileName().isEmpty() ?

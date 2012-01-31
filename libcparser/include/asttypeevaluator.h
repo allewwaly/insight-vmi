@@ -124,7 +124,7 @@ struct TypeEvalDetails
         targetNode = 0;
         rootNode = 0;
         primExNode = 0;
-        postExNode = 0;
+        postExNodes.clear();
         castExNode = 0;
         srcType = 0;
         ctxType = 0;
@@ -142,7 +142,7 @@ struct TypeEvalDetails
     const ASTNode* targetNode;
     const ASTNode *rootNode;
     const ASTNode *primExNode;
-    const ASTNode *postExNode;
+    QList<const ASTNode*> postExNodes;
     const ASTNode *castExNode;
     ASTType* srcType;
     ASTType* ctxType;
