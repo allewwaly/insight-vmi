@@ -904,6 +904,12 @@ TEST_FUNCTION(transitiveEvaluation)
     // Order of statements does not matter
     CHANGE_FIRST("m = h; h = modules.next;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+}
+
+
+TEST_FUNCTION(transitiveFunctions)
+{
+    TEST_DATA_COLUMNS;
     // Transitivity through function
     CHANGE_FIRST2("void* getModule() { return modules.next; }",
                   "m = getModule();",
@@ -931,6 +937,11 @@ TEST_FUNCTION(transitiveEvaluation)
                  "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
     NO_CHANGE2("struct list_head* getModule() { return modules.next; }",
               "h = getModule();");
+}
+
+TEST_FUNCTION(transitiveIndirectPtrs)
+{
+    TEST_DATA_COLUMNS;
     // Transitivity through 1 indirect pointer
     CHANGE_FIRST("void *p, **q; q = &p; p = modules.next; m = p;",
                   "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
@@ -965,7 +976,11 @@ TEST_FUNCTION(transitiveEvaluation)
     // Transitivity through 1 direct pointer
     CHANGE_FIRST("void *p, **q; p = modules.next; *q = p; m = *q;",
                   "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+}
 
+TEST_FUNCTION(transitivePtrSensitivity)
+{
+    TEST_DATA_COLUMNS;
     // Pointer sensitivity
     CHANGE_FIRST("struct list_head **q; *q = modules.next; m = q;",
                  "q", "Pointer->Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
@@ -979,7 +994,11 @@ TEST_FUNCTION(transitiveEvaluation)
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head *p, **q; p = modules.next; *q = p; m = *q;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+}
 
+TEST_FUNCTION(transitiveFieldSensitivity)
+{
+    TEST_DATA_COLUMNS;
     // Field sensitivity of assignments
     CHANGE_FIRST("h->prev = modules.next; m = h->prev;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
@@ -997,7 +1016,11 @@ TEST_FUNCTION(transitiveEvaluation)
                  "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
     CHANGE_FIRST("h->next = modules.next; m = h;",
                  "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+}
 
+TEST_FUNCTION(transitivePostfixSuffixes)
+{
+    TEST_DATA_COLUMNS;
     // Combination of bracket and arrow expressions
     CHANGE_FIRST("struct list_head **ph; ph[0]->prev = modules.next; m = ph[0]->prev;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
@@ -1007,7 +1030,11 @@ TEST_FUNCTION(transitiveEvaluation)
                  "ph", "Struct(list_head)", "next", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head **ph; ph[0]->prev = modules.next; m = ph[0];",
                  "ph", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+}
 
+TEST_FUNCTION(transitiveNestedPrimary)
+{
+    TEST_DATA_COLUMNS;
     // Nested expressions that work
     CHANGE_FIRST("(h)->prev = modules.next; m = h->prev;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
@@ -1020,7 +1047,6 @@ TEST_FUNCTION(transitiveEvaluation)
                  "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
     CHANGE_FIRST("h->prev = modules.next; m = (*h).prev;",
                  "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
-
 }
 
 
