@@ -3263,7 +3263,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                             .arg(derefs)
                             .arg(ed->lastLinkDerefCount);
                 else if (!ed->sym->isGlobal() && ed->srcNode == ed->primExNode &&
-                         !ed->postExNode->u.postfix_expression.postfix_expression_suffix_list)
+                         ed->postExNodes.isEmpty())
                     reason = QString("source symbol \"%1\" is local variable without suffixes")
                             .arg(ed->sym->name());
                 else if (ed->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast))
@@ -3589,9 +3589,9 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
 {
     // Find the chain of changing types up to ae on the right-hand
     TypeChain typeChain;
-    typeChain.append(typeofNode(ed->primExNode->parent));
+    typeChain.append(typeofNode(ed->srcNode));
     int forcedChanges = 0, localDeref = 0;
-    const ASTNode* p = ed->primExNode->parent;
+    const ASTNode* p = ed->srcNode->parent;
     ASTNodeNodeHash interLinks = ed->interLinks;
     QString op;
 
@@ -3679,9 +3679,11 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
         if (ed->targetType->equalTo(typeChain.last()) ||
             ed->targetType->equalTo(typeChain.first()))
         {
-//        debugmsg(QString("Line %1: Skipping because types are equal (%1:%2)")
-//                        .arg(node->start->line)
-//                        .arg(node->start->charPosition));
+#ifdef DEBUG_USED_AS
+            debugmsg(QString("Line %1: Skipping because types are equal (%1:%2)")
+                        .arg(ed->rootNode->start->line)
+                        .arg(ed->rootNode->start->charPosition));
+#endif
             return erTypesAreEqual;
         }
         // Check for pointer arithmetics with += or -= operator
@@ -3698,21 +3700,25 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
                             typeofIntegerExpression(ed->targetType, rType, op);
 
                 if (ed->targetType->equalTo(resType)) {
-//                    debugmsg(QString("Line %1: Skipping because types are equal (%1:%2)")
-//                             .arg(node->start->line)
-//                             .arg(node->start->charPosition));
+#ifdef DEBUG_USED_AS
+                    debugmsg(QString("Line %1: Skipping because types are equal (%1:%2)")
+                             .arg(ed->rootNode->start->line)
+                             .arg(ed->rootNode->start->charPosition));
+#endif
                     return erTypesAreEqual;
                 }
                 else {
                     typeChain.append(resType);
                     ++forcedChanges;
-//                    debugmsg(QString("Added type %1 (%2)")
-//                             .arg(ed->lType->toString())
-//                             .arg(ed->lNode ?
-//                                      QString("%1:%2")
-//                                      .arg(ed->lNode->start->line)
-//                                      .arg(ed->lNode->start->charPosition) :
-//                                      QString("builtin")));
+#ifdef DEBUG_USED_AS
+                    debugmsg(QString("Added type %1 (%2)")
+                             .arg(ed->targetType->toString())
+                             .arg(ed->targetNode ?
+                                      QString("%1:%2")
+                                      .arg(ed->targetNode->start->line)
+                                      .arg(ed->targetNode->start->charPosition) :
+                                      QString("builtin")));
+#endif
                 }
             }
         }
@@ -3754,27 +3760,31 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
 
     // Skip if neither the left nor the right side involves pointers
     if (!rHasPointer && !ed->targetType->isPointer()) {
-//        debugmsg(QString("Line %1: Skipping because no pointer "
-//                "assignment (%1:%2)")
-//                .arg(node->start->line)
-//                .arg(node->start->charPosition));
+#ifdef DEBUG_USED_AS
+        debugmsg(QString("Line %1: Skipping because no pointer "
+                "assignment (%1:%2)")
+                .arg(ed->rootNode->start->line)
+                .arg(ed->rootNode->start->charPosition));
+#endif
         return erNoPointerAssignment;
     }
 
     // Add left-hand type, if different
     if (!ed->targetType->equalTo(typeChain.last())) {
-        typeChain.append(ed->targetType);
+//        typeChain.append(ed->targetType);
         ++forcedChanges;
-//        debugmsg(QString("Added type %1 (%2)")
-//                .arg(ed->lType->toString())
-//                .arg(ed->lNode ?
-//                        QString("%1:%2")
-//                            .arg(ed->lNode->start->line)
-//                            .arg(ed->lNode->start->charPosition) :
-//                        QString("builtin")));
+#ifdef DEBUG_USED_AS
+        debugmsg(QString("Added type %1 (%2)")
+                .arg(ed->targetType->toString())
+                .arg(ed->targetNode ?
+                        QString("%1:%2")
+                            .arg(ed->targetNode->start->line)
+                            .arg(ed->targetNode->start->charPosition) :
+                        QString("builtin")));
+#endif
     }
 
-    return erTypesAreDifferent;
+    return (forcedChanges > 0) ? erTypesAreDifferent : erTypesAreEqual;
 }
 
 
@@ -3798,13 +3808,13 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
     ed->ctxNode = ed->postExNodes.isEmpty() ?
                 ed->primExNode :
                 ed->postExNodes.first()->u.postfix_expression.primary_expression;
-    ed->ctxType = typeofNode(ed->ctxNode);
     // Source node is the last suffix node of the last postfix expression
     ed->srcNode = pesStack.isEmpty() ? ed->primExNode : pesStack.top();
     ed->srcType = typeofNode(ed->srcNode);
     // Member chain of embedding struct in whose context we see the type change
     // True as long as we see member.sub.subsub expressions
     bool searchMember = true;
+    bool treatAsDot = false;
     // Operations to be performed on the resulting ctxType
     QStack<ASTNodeType> ctxTypeOps;
 
@@ -3814,6 +3824,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
 
         // Still building chain of members?
         if (searchMember) {
+            treatAsDot = false;
             switch(n->type) {
             case nt_postfix_expression_dot:
                 // Prepend name of member
@@ -3823,9 +3834,8 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
                 ctxTypeOps.clear();
                 break;
 
-            case nt_postfix_expression_arrow: {
-                bool treatAsDot = false;
-                // Is this the first suffix of a postfix expression?
+            case nt_postfix_expression_arrow:
+                // Is this the first suffix of this postfix expression?
                 if (pesStack.isEmpty() || n->parent != pesStack.top()->parent) {
                     // If the the previous postfix expression has no pointer
                     // type but the current one has pointer, there must have
@@ -3850,7 +3860,6 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
                     searchMember = false;
                 }
                 break;
-            }
 
             case nt_postfix_expression_brackets:{
                 // If brackets are used on a pointer type, then this is a
@@ -3885,10 +3894,22 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
         else {
             // This is the node of the embedding struct
             ed->ctxNode = n;
-            ed->ctxType = typeofNode(ed->ctxNode);
             break;
         }
     }
+
+    // If we treated the last arrow operator as a dot operator, we need to
+    // adjust the context type as well
+    if (treatAsDot) {
+        // The only case we can get here with treatAsDot == true is when we have
+        // something like "(&foo)->bar", i.e., no direct suffixes for "foo"
+        // (e.g., "(&foo->bar)->baf"). Consequently, the context node must be
+        // the source primary expression itself
+        ed->ctxNode = ed->primExNode;
+    }
+
+    // The context node is found, now evaluate its type
+    ed->ctxType = typeofNode(ed->ctxNode);
 
     // Perform pending operations on the context type
     while (!ctxTypeOps.isEmpty()) {
@@ -4009,14 +4030,13 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
     if (ret != erTypesAreDifferent)
         return ret;
 
+    // Evaluate the context of type change
+    evaluateTypeContext(ed);
+
     // Evaluate the chain of changing types
     ret = evaluateTypeChanges(ed);
     if (ret != erTypesAreDifferent)
         return ret;
-
-    // Evaluate the context of type change
-    evaluateTypeContext(ed);
-
 
     primaryExpressionTypeChange(*ed);
 
