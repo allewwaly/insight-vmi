@@ -1078,57 +1078,13 @@ ASTExpression* ASTExpressionEvaluator::exprOfPostfixExpr(
 
     // Append postfix expression suffixes
     if (expr && suffixList) {
-        ASTVariableExpression* varExpr = 0;
+        ASTVariableExpression* var =
+                dynamic_cast<ASTVariableExpression*>(expr);
         bool result;
 
-        switch (expr->type()) {
-        case etVariable:
-            varExpr = dynamic_cast<ASTVariableExpression*>(expr);
-            result = appendPostfixExpressionSuffixes(suffixList, varExpr);
-            break;
-
-        case etUnaryAmp: {
-            // If the child is a variable expression with a suffix that
-            // derefrences this expression, merge the two
-            ASTUnaryExpression* uExpr = dynamic_cast<ASTUnaryExpression*>(expr);
-            if (uExpr->child()->type() == etVariable) {
-                varExpr = dynamic_cast<ASTVariableExpression*>(
-                            uExpr->child()->clone(_allExpressions));
-                result = appendPostfixExpressionSuffixes(suffixList, varExpr);
-                // Don't bother if the result is a runtime expression anyway
-                if (result) {
-                    // Convert "->" into "." and forget about the "&"
-                    if (varExpr->pel().first().type == ASTVariableExpression::ptArrow)
-                    {
-                        varExpr->pel().first().type = ASTVariableExpression::ptDot;
-                    }
-                    // Remove "[0]" and forget about the "&"
-                    else if (varExpr->pel().first().type == ASTVariableExpression::ptBrackets &&
-                             varExpr->pel().first().arrayIndex == 0)
-                    {
-                        varExpr->pel().pop_front();
-                    }
-                    else {
-                        exprEvalError(QString("We cannot merge the address "
-                                              "operator with a corresponding "
-                                              "postfix expression suffix at "
-                                              "%2:%3:%4")
-                                      .arg(_ast->fileName())
-                                      .arg(node->start->line)
-                                      .arg(node->start->charPosition));
-                    }
-
-                    expr = varExpr;
-                }
-            }
-            }
-            break;
-
-        default:
-            break;
-        }
-
-        if (!varExpr)
+        if (var)
+            result = appendPostfixExpressionSuffixes(suffixList, var);
+        else
             exprEvalError(QString("We did not find a variable expression to "
                                   "append the postfix expressions to at "
                                   "%2:%3:%4")
@@ -1137,7 +1093,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfPostfixExpr(
                           .arg(node->start->charPosition));
 
         if (!result)
-            return createExprNode<ASTRuntimeExpression>();
+            expr = createExprNode<ASTRuntimeExpression>();
     }
 
     return expr;
@@ -1205,6 +1161,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(
         return 0;
 
     ASTUnaryExpression* ue = 0;
+    ASTExpression* child = 0;
 
     switch (node->type) {
     case nt_unary_expression:
@@ -1215,39 +1172,43 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(
 
     case nt_unary_expression_dec:
         ue = createExprNode<ASTUnaryExpression>(etUnaryDec);
-        ue->setChild(exprOfNode(node->u.unary_expression.unary_expression, ptsTo));
-        return ue;
+        child = exprOfNode(node->u.unary_expression.unary_expression, ptsTo);
+        break;
 
     case nt_unary_expression_inc:
         ue = createExprNode<ASTUnaryExpression>(etUnaryInc);
-        ue->setChild(exprOfNode(node->u.unary_expression.unary_expression, ptsTo));
-        return ue;
+        child = exprOfNode(node->u.unary_expression.unary_expression, ptsTo);
+        break;
 
     case nt_unary_expression_op: {
         QString op = antlrTokenToStr(node->u.unary_expression.unary_operator);
-        ASTExpression* child =
-                exprOfNode(node->u.unary_expression.cast_expression, ptsTo);
+        child = exprOfNode(node->u.unary_expression.cast_expression, ptsTo);
+        ASTVariableExpression* var =
+                dynamic_cast<ASTVariableExpression*>(child);
 
-        if (op == "&")
-            ue = createExprNode<ASTUnaryExpression>(etUnaryAmp);
-        else if (op == "&&") {
-            // Double ampersand operator
-            ASTUnaryExpression* ue2 =
-                    createExprNode<ASTUnaryExpression>(etUnaryAmp);
-            ue2->setChild(child);
-            ue = createExprNode<ASTUnaryExpression>(etUnaryAmp);
-            ue->setChild(ue2);
-            return ue;
+        // For address operators, the child must be a variable expression
+        if (op == "&" || op == "&&") {
+            if (!var)
+                exprEvalError(QString("Expected variable type for address "
+                                      "operator, but found type %1 at %2:%3:%4")
+                              .arg(expressionTypeToString(child->type()))
+                              .arg(_ast->fileName())
+                              .arg(node->start->line)
+                              .arg(node->start->charPosition));
+
+            var->appendTransformation(ttAddress);
+            if (op == "&&")
+                var->appendTransformation(ttAddress);
         }
         else if (op == "*") {
-            // The address operator "&" cancels out the dereference "*"
-            if (child->type() == etUnaryAmp)
-                return dynamic_cast<ASTUnaryExpression*>(child)->child();
+            // The child is most likely a variable
+            if (var)
+                var->appendTransformation(ttDereference);
             else
                 ue = createExprNode<ASTUnaryExpression>(etUnaryStar);
         }
         else if (op == "+")
-            return exprOfNode(node->u.unary_expression.cast_expression, ptsTo);
+            return child;
         else if (op == "-")
             ue = createExprNode<ASTUnaryExpression>(etUnaryMinus);
         else if (op == "~")
@@ -1260,8 +1221,6 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(
                     .arg(_ast->fileName())
                     .arg(node->start->line)
                     .arg(node->start->charPosition));
-
-        ue->setChild(child);
         break;
     }
 
@@ -1273,7 +1232,9 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(
                 .arg(node->start->charPosition));
     }
 
-    return ue;
+    if (ue)
+        ue->setChild(child);
+    return ue ? ue : child;
 }
 
 
@@ -1381,17 +1342,13 @@ bool ASTExpressionEvaluator::appendPostfixExpressionSuffixes(
         const ASTNode* p = list->item;
         switch(p->type) {
         case nt_postfix_expression_arrow:
-            varExpr->appendPostfixExpression(
-                        ASTVariableExpression::PostfixExpression(
-                            ASTVariableExpression::ptArrow,
-                            antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
-            break;
+            varExpr->appendTransformation(ttDereference);
+            // no break
 
         case nt_postfix_expression_dot:
-            varExpr->appendPostfixExpression(
-                        ASTVariableExpression::PostfixExpression(
-                            ASTVariableExpression::ptDot,
-                            antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
+            varExpr->appendTransformation(
+                        antlrTokenToStr(
+                            p->u.postfix_expression_suffix.identifier));
             break;
 
         case nt_postfix_expression_brackets: {
@@ -1402,9 +1359,7 @@ bool ASTExpressionEvaluator::appendPostfixExpressionSuffixes(
             ExpressionResult result = index ?
                         index->result() : ExpressionResult();
             if (result.resultType == erConstant)
-                varExpr->appendPostfixExpression(
-                            ASTVariableExpression::PostfixExpression(
-                                result.value(esInt32)));
+                varExpr->appendTransformation(result.value(esInt32));
             // Seems to be a runtime dependent expresssion
             else
                 return false;

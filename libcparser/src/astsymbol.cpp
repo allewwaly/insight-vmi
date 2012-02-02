@@ -12,6 +12,26 @@
 #include <abstractsyntaxtree.h>
 #include <bitop.h>
 
+
+const char* SymbolTransformation::typeToString(SymbolTransformationType type)
+{
+	switch (type) {
+	case ttMember:		return "Member";
+	case ttArray:		return "Array";
+	case ttFuncCall:    return "FuncCall";
+	case ttDereference: return "Dereference";
+	case ttAddress:     return "Address";
+	}
+	return "(unknown)";
+}
+
+
+QString SymbolTransformation::typeString() const
+{
+	return typeToString(type);
+}
+
+
 uint AssignedNode::hashPostExprSuffixes() const
 {
 	return hashPostExprSuffixes(postExprSuffixes, sym->ast());
@@ -114,4 +134,5 @@ QString ASTSymbol::typeToString(ASTSymbolType type)
 	}
 	return "null";
 }
+
 
