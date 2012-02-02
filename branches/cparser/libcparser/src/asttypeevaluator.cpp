@@ -2549,6 +2549,44 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
 }
 
 
+void ASTTypeEvaluator::appendTransformations(
+        const ASTNode *node, SymbolTransformations *transformations) const
+{
+    if (!node || !transformations)
+        return;
+
+    switch (node->type) {
+    case nt_postfix_expression:
+        transformations->append(
+                    node->u.postfix_expression.postfix_expression_suffix_list);
+        break;
+
+    case nt_unary_expression_op: {
+        QString op = antlrTokenToStr(node->u.unary_expression.unary_operator);
+
+        if (op == "&" || op == "&&") {
+            transformations->append(ttAddress);
+            if (op == "&&")
+                transformations->append(ttAddress);
+        }
+        else if (op == "*")
+            transformations->append(ttDereference);
+        else
+            typeEvaluatorError(QString("Unhandled unary operator: \"%1\" at "
+                                       "%2:%3:%4")
+                               .arg(op)
+                               .arg(_ast->fileName())
+                               .arg(node->start->line)
+                               .arg(node->start->charPosition));
+        break;
+    }
+
+    default:
+        break;
+    }
+}
+
+
 void ASTTypeEvaluator::collectSymbols(const ASTNode *node)
 {
     if (!node)
@@ -2575,6 +2613,7 @@ void ASTTypeEvaluator::collectSymbols(const ASTNode *node)
         return;
 
     const ASTNode* root = node->parent, *rNode = node;
+    SymbolTransformations transformations(this);
 
     // Climb up the tree until the symbol goes out of scope
     while (root && root->scope != sym->astNode()->scope->parent()) {
@@ -2602,6 +2641,11 @@ void ASTTypeEvaluator::collectSymbols(const ASTNode *node)
             // An identifier underneath a return should be the initializer
             assert(rNode == root->u.jump_statement.initializer);
             _symbolsBelowNode[rNode].insert(sym);
+            break;
+
+        case nt_postfix_expression:
+        case nt_unary_expression_op:
+            appendTransformations(root, &transformations);
             break;
 
         default:

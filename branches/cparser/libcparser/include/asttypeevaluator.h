@@ -179,6 +179,7 @@ public:
 
     RealType realTypeOfConstFloat(const ASTNode* node, double* value = 0) const;
     RealType realTypeOfConstInt(const ASTNode* node, quint64* value = 0) const;
+    virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
 
 protected:
     enum EvalPhase {
@@ -205,6 +206,8 @@ protected:
 
 //    virtual void beforeChildren(const ASTNode *node, int flags);
     virtual void afterChildren(const ASTNode *node, int flags);
+    void appendTransformations(const ASTNode *node,
+                               SymbolTransformations *transformations) const;
     void collectSymbols(const ASTNode *node);
     void evaluateIdentifierPointsTo(const ASTNode *node);
     void evaluateIdentifierPointsToRek(PointsToEvalState *es);
@@ -245,8 +248,6 @@ protected:
      */
     QString typeChangeInfo(const TypeEvalDetails &ed,
                            const QString &expr = QString());
-
-    virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
 
     int stringLength(const ASTTokenList* list);
 

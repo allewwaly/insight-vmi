@@ -49,10 +49,10 @@ public:
         return _eval;
     }
 
+    virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
+
 protected:
     virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed);
-
-    virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
 
 private:
     SymFactory* _factory;
