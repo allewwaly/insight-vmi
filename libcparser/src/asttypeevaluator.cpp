@@ -19,8 +19,8 @@
 #include <astsourceprinter.h>
 
 #ifdef DEBUG
-//#define DEBUG_POINTS_TO 1
-//#define DEBUG_USED_AS 1
+#define DEBUG_POINTS_TO 1
+#define DEBUG_USED_AS 1
 #endif
 
 #define checkNodeType(node, expected_type) \
@@ -3646,8 +3646,18 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
             }
 
             typeChain.append(t);
-            if (forced)
+            if (forced) {
                 ++forcedChanges;
+#ifdef DEBUG_USED_AS
+                debugmsg(QString("Added type %1 (%2) to chain")
+                         .arg(typeChain.last()->toString())
+                         .arg(typeChain.last()->node() ?
+                                  QString("%1:%2")
+                                  .arg(typeChain.last()->node()->start->line)
+                                  .arg(typeChain.last()->node()->start->charPosition) :
+                                  QString("builtin")));
+#endif
+            }
         }
 
         // Follow the inter-connecting links, if existent, otherwise go up
@@ -3711,12 +3721,12 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
                     typeChain.append(resType);
                     ++forcedChanges;
 #ifdef DEBUG_USED_AS
-                    debugmsg(QString("Added type %1 (%2)")
-                             .arg(ed->targetType->toString())
-                             .arg(ed->targetNode ?
+                    debugmsg(QString("Added type %1 (%2) to chain")
+                             .arg(typeChain.last()->toString())
+                             .arg(typeChain.last()->node() ?
                                       QString("%1:%2")
-                                      .arg(ed->targetNode->start->line)
-                                      .arg(ed->targetNode->start->charPosition) :
+                                      .arg(typeChain.last()->node()->start->line)
+                                      .arg(typeChain.last()->node()->start->charPosition) :
                                       QString("builtin")));
 #endif
                 }
@@ -3774,13 +3784,13 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeChanges(
 //        typeChain.append(ed->targetType);
         ++forcedChanges;
 #ifdef DEBUG_USED_AS
-        debugmsg(QString("Added type %1 (%2)")
-                .arg(ed->targetType->toString())
-                .arg(ed->targetNode ?
-                        QString("%1:%2")
-                            .arg(ed->targetNode->start->line)
-                            .arg(ed->targetNode->start->charPosition) :
-                        QString("builtin")));
+        debugmsg(QString("Added type %1 (%2) to chain")
+                 .arg(typeChain.last()->toString())
+                 .arg(typeChain.last()->node() ?
+                          QString("%1:%2")
+                          .arg(typeChain.last()->node()->start->line)
+                          .arg(typeChain.last()->node()->start->charPosition) :
+                          QString("builtin")));
 #endif
     }
 
@@ -3984,6 +3994,14 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
     ed.rootNode = node->parent;
 //    ed.postExNode = node->parent;
 
+
+#ifdef DEBUG_USED_AS
+    debugmsg(QString("Starting with used-as analysis for \"%1\" at %2:%3")
+             .arg(findSymbolOfPrimaryExpression(ed.primExNode)->name())
+             .arg(ed.primExNode->start->line)
+             .arg(ed.primExNode->start->charPosition));
+#endif
+
     return evaluateIdentifierUsedAsRek(&ed);
 }
 
@@ -3991,6 +4009,17 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAs(
 ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
         TypeEvalDetails *ed)
 {
+    ASTTypeEvaluator::EvalResult ret;
+
+    // Check for endless recursions
+    if (_evalNodeStack.contains(ed->rootNode))
+        return erRecursiveExpression;
+    // Push current root on the recursion tracking stack, gets auto-popped later
+    StackAutoPopper<ASTNodeStack> autoPopper(&_evalNodeStack, ed->rootNode);
+
+    // Evaluate if type changes in this expression
+    ret = evaluateTypeFlow(ed);
+
 #ifdef DEBUG_USED_AS
     QString s;
     for (ASTNodeNodeHash::const_iterator it = ed->interLinks.begin();
@@ -4009,38 +4038,51 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
         }
     }
 
-    debugmsg(QString("Evaluating used-as for \"%1\" at %2:%3%4")
-             .arg(findSymbolOfPrimaryExpression(ed->srcNode)->name())
-             .arg(ed->srcNode->start->line)
-             .arg(ed->srcNode->start->charPosition)
+    debugmsg(QString("Evaluating used-as for \"%1\" at %2:%3 (links: %4)%5")
+             .arg(findSymbolOfPrimaryExpression(ed->primExNode)->name())
+             .arg(ed->primExNode->start->line)
+             .arg(ed->primExNode->start->charPosition)
+             .arg(ed->interLinks.size())
              .arg(s));
 #endif
 
-    ASTTypeEvaluator::EvalResult ret;
+    if (ret == erTypesAreDifferent) {
 
-    // Check for endless recursions
-    if (_evalNodeStack.contains(ed->rootNode))
-        return erRecursiveExpression;
-    // Push current root on the recursion tracking stack, gets auto-popped later
-    StackAutoPopper<ASTNodeStack> autoPopper(&_evalNodeStack, ed->rootNode);
+        // Evaluate the context of type change
+        evaluateTypeContext(ed);
 
-    // Evaluate if type changes in this expression
-    ret = evaluateTypeFlow(ed);
+        // Evaluate the chain of changing types
+        ret = evaluateTypeChanges(ed);
 
-    if (ret != erTypesAreDifferent)
-        return ret;
+        if (ret == erTypesAreDifferent)
+            primaryExpressionTypeChange(*ed);
+    }
 
-    // Evaluate the context of type change
-    evaluateTypeContext(ed);
+#ifdef DEBUG_USED_AS
+    switch (ret) {
+    case erNoPrimaryExpression:     s = "NoPrimaryExpression"; break;
+    case erNoIdentifier:            s = "NoIdentifier"; break;
+    case erUseInBuiltinFunction:    s = "UseInBuiltinFunction"; break;
+    case erNoAssignmentUse:         s = "NoAssignmentUse"; break;
+    case erNoPointerAssignment:     s = "NoPointerAssignment"; break;
+    case erIntegerArithmetics:      s = "IntegerArithmetics"; break;
+    case erTypesAreEqual:           s = "TypesAreEqual"; break;
+    case erTypesAreDifferent:       s = "TypesAreDifferent"; break;
+    case erLeftHandSide:            s = "LeftHandSide"; break;
+    case erAddressOperation:        s = "AddressOperation"; break;
+    case erRecursiveExpression:     s = "RecursiveExpression"; break;
+    case erInvalidTransition:       s = "InvalidTransition"; break;
+    }
 
-    // Evaluate the chain of changing types
-    ret = evaluateTypeChanges(ed);
-    if (ret != erTypesAreDifferent)
-        return ret;
+    debugmsg(QString(" Result of used-as for \"%1\" at %2:%3 (links: %4): %5")
+             .arg(findSymbolOfPrimaryExpression(ed->primExNode)->name())
+             .arg(ed->primExNode->start->line)
+             .arg(ed->primExNode->start->charPosition)
+             .arg(ed->interLinks.size())
+             .arg(s));
+#endif
 
-    primaryExpressionTypeChange(*ed);
-
-    return erTypesAreDifferent;
+    return ret;
 }
 
 
