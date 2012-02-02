@@ -3411,8 +3411,12 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                     goto cast_expression_type_change;
                 else {
                     localPostEx = ed->rootNode;
-                    // Save postfix expression with suffixes for later
-                    ed->postExNodes.append(ed->rootNode);
+                    // Save postfix expression with suffixes for later if we
+                    // didn't come here through an inter-link (in the latter
+                    // case, the p.e. suffix belongs to the pointer location)
+                    if (!ed->interLinks.values().contains(
+                            ed->rootNode->u.postfix_expression.primary_expression))
+                        ed->postExNodes.append(ed->rootNode);
                     // Check for bracket and arrow operators that dereference a
                     // pointer
                     const ASTNodeList* list =
