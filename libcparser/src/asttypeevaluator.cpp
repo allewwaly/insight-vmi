@@ -2679,10 +2679,11 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
         }
     }
 
-    debugmsg(QString("Evaluating points-to for \"%1\" at %2:%3%4")
+    debugmsg(QString("Evaluating points-to for \"%1\" at %2:%3 (links: %4)%5")
              .arg(es->sym->name())
              .arg(es->srcNode->start->line)
              .arg(es->srcNode->start->charPosition)
+             .arg(es->interLinks.size())
              .arg(s));
 #endif
 
