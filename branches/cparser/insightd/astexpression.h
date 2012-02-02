@@ -49,6 +49,7 @@ enum ExpressionType {
     etUnaryNot
 };
 
+const char* expressionTypeToString(ExpressionType type);
 
 /**
  * Abstract base class for a syntax tree expression.
@@ -346,24 +347,6 @@ protected:
 class ASTVariableExpression: public ASTExpression
 {
 public:
-    enum PostfixExpressionType {
-        ptDot,
-        ptArrow,
-        ptBrackets
-    };
-
-    struct PostfixExpression {
-        PostfixExpression(PostfixExpressionType type, const QString& member)
-            : type(type), member(member), arrayIndex(-1) {}
-        PostfixExpression(int arrayIndex)
-            : type(ptBrackets), arrayIndex(arrayIndex) {}
-        PostfixExpressionType type;
-        QString member;
-        int arrayIndex;
-    };
-
-    typedef QList<PostfixExpression> PostfixExpressionList;
-
     ASTVariableExpression(const BaseType* type = 0, bool global = false)
         : _baseType(type), _global(global) {}
 
@@ -395,20 +378,20 @@ public:
         return _baseType;
     }
 
-    inline void appendPostfixExpression(PostfixExpression pe)
-    {
-        _pel.append(pe);
-    }
+    void appendTransformation(const SymbolTransformation& st);
+    void appendTransformation(SymbolTransformationType type);
+    void appendTransformation(const QString& member);
+    void appendTransformation(int arrayIndex);
 
-    inline PostfixExpressionList& pel()
+    inline const TransformationList& transformations() const
     {
-        return _pel;
+        return _transformations;
     }
 
 protected:
     const BaseType* _baseType;
     bool _global;
-    PostfixExpressionList _pel;
+    TransformationList _transformations;
 };
 
 /**

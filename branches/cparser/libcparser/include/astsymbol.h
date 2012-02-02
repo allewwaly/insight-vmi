@@ -33,11 +33,11 @@ class ASTSymbol;
 /// This enumeration lists the possible transformations for a symbol
 enum SymbolTransformationType
 {
-    stMember,       ///< member access of a struct/union field
-    stArray,        ///< array access of a pointer/array type
-    stFuncCall,     ///< function invocation
-    stDereference,  ///< pointer dereference, either through "*" or "->"
-    stAddress       ///< address operator, i.e. "&"
+    ttMember,       ///< member access of a struct/union field
+    ttArray,        ///< array access of a pointer/array type
+    ttFuncCall,     ///< function invocation
+    ttDereference,  ///< pointer dereference, either through "*" or "->"
+    ttAddress       ///< address operator, i.e. "&"
 };
 
 /**
@@ -59,14 +59,24 @@ struct SymbolTransformation
      * @param member the member name that is accessed
      */
     SymbolTransformation(const QString& member)
-        : type(stMember), member(member), arrayIndex(-1) {}
+        : type(ttMember), member(member), arrayIndex(-1) {}
 
     /**
      * Constructor for an array access transformation
      * @param arrayIndex the index of the array access
      */
     SymbolTransformation(int arrayIndex)
-        : type(stArray), arrayIndex(arrayIndex) {}
+        : type(ttArray), arrayIndex(arrayIndex) {}
+
+    /**
+     * @return string representation of given \a type
+     */
+    static const char* typeToString(SymbolTransformationType type);
+
+    /**
+     * @return string representation if this transformation's type
+     */
+    QString typeString() const;
 
     SymbolTransformationType type;
     QString member;

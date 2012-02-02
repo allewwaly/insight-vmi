@@ -51,16 +51,22 @@ QString ASTVariableExpression::toString(bool /*compact*/) const
 
     QString s = QString("(%1)").arg(_baseType->prettyName());
 
-    for (int i = 0; i < _pel.size(); ++i) {
-        switch (_pel[i].type) {
-        case ptDot:
-            s += "." + _pel[i].member;
+    for (int i = 0; i < _transformations.size(); ++i) {
+        switch (_transformations[i].type) {
+        case ttMember:
+            s += "." + _transformations[i].member;
             break;
-        case ptArrow:
-            s += "->" + _pel[i].member;
+        case ttFuncCall:
+            s += "()";
             break;
-        case ptBrackets:
-            s += QString("[%1]").arg(_pel[i].arrayIndex);
+        case ttArray:
+            s += QString("[%1]").arg(_transformations[i].arrayIndex);
+            break;
+        case ttDereference:
+            s = QString("(* %1)").arg(s);
+            break;
+        case ttAddress:
+            s = QString("(& %1)").arg(s);
             break;
         }
     }
@@ -80,13 +86,13 @@ bool ASTVariableExpression::equals(const ASTExpression *other) const
         _baseType->hash() != v->baseType()->hash())
         return false;
 
-    // Compare postfix expression suffixes
-    if (_pel.size() != v->_pel.size())
+    // Compare transformations
+    if (_transformations.size() != v->_transformations.size())
         return false;
-    for (int i = 0; i < _pel.size(); ++i) {
-        if (_pel[i].type != v->_pel[i].type ||
-            _pel[i].arrayIndex != v->_pel[i].arrayIndex ||
-            _pel[i].member != v->_pel[i].member)
+    for (int i = 0; i < _transformations.size(); ++i) {
+        if (_transformations[i].type != v->_transformations[i].type ||
+            _transformations[i].arrayIndex != v->_transformations[i].arrayIndex ||
+            _transformations[i].member != v->_transformations[i].member)
             return false;
     }
 
@@ -100,7 +106,7 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
     if (!inst || !_baseType)
         return ExpressionResult(erUndefined);
 
-    if (_pel.isEmpty()) {
+    if (_transformations.isEmpty()) {
         // Check if the type hashes match.
         if (inst->type()->hash() == _baseType->hash() ||
             inst->type()->hash() ==
@@ -121,7 +127,7 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 
     // Skip the suffixes starting from our _baseType until we find the matching
     // type ID
-    for (; bt && bt->hash() != inst->type()->hash() && i < _pel.size(); ++i) {
+    for (; bt && bt->hash() != inst->type()->hash() && i < _transformations.size(); ++i) {
         // Did we find the instance's ID? Or can we dereference the type?
         if (bt->hash() != inst->type()->hash() &&
             (bt->type() & BaseType::trLexical))
@@ -130,9 +136,9 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         if (bt->hash() == inst->type()->hash())
             break;
 
-        switch (_pel[i].type) {
-        case ptBrackets:
-        case ptArrow:
+        switch (_transformations[i].type) {
+        case ttDereference:
+        case ttArray:
             bt = bt->dereferencedBaseType(BaseType::trAny, 1, &cnt);
             // Make sure we followed a pointer, but don't be fuzzy for the first
             // type as the context type normally is not a pointer type anyway
@@ -140,26 +146,30 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
                 exprEvalError(QString("Type \"%1\" (0x%2) is not a pointer.")
                               .arg(prettyType)
                               .arg((uint)bt->id(), 0, 16));
-            // Only break for bracket expressions
-            if (_pel[i].type == ptBrackets)
-                break;
-            // no break
+            break;
 
-        case ptDot: {
+        case ttMember: {
             const Structured* s = dynamic_cast<const Structured*>(bt);
             if (!s)
                 exprEvalError(QString("Type \"%1\" (0x%2) is not a structured "
                                       "type")
                               .arg(prettyType)
                               .arg((uint)bt->id(), 0, 16));
-            const StructuredMember* m = s->findMember(_pel[i].member);
+            const StructuredMember* m = s->findMember(_transformations[i].member);
             if (!m)
                 exprEvalError(QString("Type \"%1\" has no member \"%2\"")
                               .arg(prettyType)
-                              .arg(_pel[i].member));
+                              .arg(_transformations[i].member));
             bt = m->refType();
-            prettyType += "." + _pel[i].member;
+            prettyType += "." + _transformations[i].member;
+            break;
         }
+
+        default:
+            exprEvalError(QString("Unhandled symbol transformation for \"%1\" "
+                                  ": %2")
+                          .arg(prettyType)
+                          .arg(_transformations[i].typeString()));
         }
     }
 
@@ -175,28 +185,74 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 
     // Apply remaining suffixes
     Instance tmp(*inst);
-    for (int j = i; j < _pel.size() && tmp.isValid(); ++j) {
-        switch (_pel[j].type) {
-        case ptArrow:
+    for (int j = i; j < _transformations.size() && tmp.isValid(); ++j) {
+        switch (_transformations[j].type) {
+        case ttDereference:
             // Dereference the instance exactly once
             tmp = tmp.dereference(BaseType::trLexicalAndPointers, 1, &cnt);
             // Make sure we followed a pointer, but don't be fuzzy for the first
             // type as the context type normally is not a pointer type anyway
             if ((j > 0 && cnt != 1) || !tmp.isValid())
                 return ExpressionResult(erUndefined);
-            // no break
-
-        case ptDot:
-            tmp = tmp.findMember(_pel[j].member, BaseType::trLexical);
             break;
 
-        case ptBrackets:
-            tmp = tmp.arrayElem(_pel[j].arrayIndex);
+        case ttMember:
+            tmp = tmp.findMember(_transformations[j].member, BaseType::trLexical);
+            prettyType += "." + _transformations[i].member;
             break;
+
+        case ttArray:
+            tmp = tmp.arrayElem(_transformations[j].arrayIndex);
+            prettyType += QString("[%1]").arg(_transformations[i].arrayIndex);
+            break;
+
+        default:
+            exprEvalError(QString("Unhandled symbol transformation for \"%1\" "
+                                  ": %2")
+                          .arg(prettyType)
+                          .arg(_transformations[i].typeString()));
         }
     }
 
     return tmp.toExpressionResult();
+}
+
+
+void ASTVariableExpression::appendTransformation(const SymbolTransformation &st)
+{
+    // Try to simplify transformations: merge address operators and dereferences
+    if (!_transformations.isEmpty()) {
+        if ((st.type == ttDereference &&
+             _transformations.last().type == ttAddress) ||
+            (st.type == ttAddress &&
+             _transformations.last().type == ttDereference))
+        {
+            // Both operations cancel each other out
+            _transformations.pop_back();
+            return;
+        }
+    }
+
+    // No simplification, so append the transformation
+    _transformations.append(st);
+}
+
+
+void ASTVariableExpression::appendTransformation(SymbolTransformationType type)
+{
+    appendTransformation(SymbolTransformation(type));
+}
+
+
+void ASTVariableExpression::appendTransformation(const QString &member)
+{
+    appendTransformation(SymbolTransformation(member));
+}
+
+
+void ASTVariableExpression::appendTransformation(int arrayIndex)
+{
+    appendTransformation(SymbolTransformation(arrayIndex));
 }
 
 
