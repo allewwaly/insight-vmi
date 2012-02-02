@@ -348,7 +348,7 @@ class ASTVariableExpression: public ASTExpression
 {
 public:
     ASTVariableExpression(const BaseType* type = 0, bool global = false)
-        : _baseType(type), _global(global) {}
+        : _baseType(type), _global(global), _transformations(0) {}
 
     inline virtual ExpressionType type() const
     {
@@ -383,7 +383,7 @@ public:
     void appendTransformation(const QString& member);
     void appendTransformation(int arrayIndex);
 
-    inline const TransformationList& transformations() const
+    inline const SymbolTransformations& transformations() const
     {
         return _transformations;
     }
@@ -391,7 +391,7 @@ public:
 protected:
     const BaseType* _baseType;
     bool _global;
-    TransformationList _transformations;
+    SymbolTransformations _transformations;
 };
 
 /**

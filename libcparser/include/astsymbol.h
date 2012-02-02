@@ -29,6 +29,7 @@ struct ASTNode;
 struct ASTNodeList;
 class AbstractSyntaxTree;
 class ASTSymbol;
+class ASTTypeEvaluator;
 
 /// This enumeration lists the possible transformations for a symbol
 enum SymbolTransformationType
@@ -84,7 +85,24 @@ struct SymbolTransformation
 };
 
 /// A list of symbol transformations
-typedef QList<SymbolTransformation> TransformationList;
+class SymbolTransformations: public QList<SymbolTransformation>
+{
+public:
+    SymbolTransformations(ASTTypeEvaluator* typeEval);
+
+    void append(const SymbolTransformation& st);
+    void append(SymbolTransformationType type);
+    void append(const QString& member);
+    void append(int arrayIndex);
+    void append(const ASTNodeList *suffixList);
+
+    bool equals(const SymbolTransformations& other) const;
+
+private:
+    QString antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok) const;
+
+    ASTTypeEvaluator* _typeEval;
+};
 
 
 struct AssignedNode {

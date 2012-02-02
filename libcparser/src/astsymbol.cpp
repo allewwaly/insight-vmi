@@ -10,6 +10,7 @@
 #include <astnode.h>
 #include <astscopemanager.h>
 #include <abstractsyntaxtree.h>
+#include <asttypeevaluator.h>
 #include <bitop.h>
 
 
@@ -29,6 +30,121 @@ const char* SymbolTransformation::typeToString(SymbolTransformationType type)
 QString SymbolTransformation::typeString() const
 {
 	return typeToString(type);
+}
+
+
+SymbolTransformations::SymbolTransformations(ASTTypeEvaluator *typeEval)
+	: _typeEval(typeEval)
+{
+}
+
+
+void SymbolTransformations::append(const SymbolTransformation &st)
+{
+    // Try to simplify transformations: merge address operators and dereferences
+    if (!isEmpty()) {
+        if ((st.type == ttDereference && last().type == ttAddress) ||
+            (st.type == ttAddress && last().type == ttDereference))
+        {
+            // Both operations cancel each other out
+            pop_back();
+            return;
+        }
+    }
+
+    // No simplification, so append the transformation
+    QList<SymbolTransformation>::append(st);
+}
+
+
+void SymbolTransformations::append(SymbolTransformationType type)
+{
+    SymbolTransformations::append(SymbolTransformation(type));
+}
+
+
+void SymbolTransformations::append(const QString &member)
+{
+    SymbolTransformations::append(SymbolTransformation(member));
+}
+
+
+void SymbolTransformations::append(int arrayIndex)
+{
+    SymbolTransformations::append(SymbolTransformation(arrayIndex));
+}
+
+
+void SymbolTransformations::append(const ASTNodeList *suffixList)
+{
+    if (!suffixList)
+        return;
+
+    // Append all postfix expression suffixes
+    for (; suffixList; suffixList = suffixList->next)
+    {
+        const ASTNode* p = suffixList->item;
+        switch(p->type) {
+        case nt_postfix_expression_arrow:
+            SymbolTransformations::append(SymbolTransformation(ttDereference));
+            // no break
+
+        case nt_postfix_expression_dot:
+            SymbolTransformations::append(
+                        SymbolTransformation(
+                            antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
+            break;
+
+        case nt_postfix_expression_brackets: {
+            // We expect array indices to be constant
+            const ASTNode* e = p->u.postfix_expression_suffix.expression ?
+                        p->u.postfix_expression_suffix.expression->item : 0;
+            bool ok = false;
+            int index = _typeEval ?
+                        _typeEval->evaluateIntExpression(e, &ok) : -1;
+            SymbolTransformations::append(
+                        SymbolTransformation(ok ? index : -1));
+            break;
+        }
+
+        case nt_postfix_expression_parens:
+            SymbolTransformations::append(SymbolTransformation(ttFuncCall));
+            break;
+
+        default:
+            break;
+        }
+    }
+}
+
+
+bool SymbolTransformations::equals(const SymbolTransformations &other) const
+{
+    // Compare transformations
+    if (size() != other.size())
+        return false;
+    for (int i = 0; i < size(); ++i) {
+        if (at(i).type != other.at(i).type ||
+            at(i).arrayIndex != other.at(i).arrayIndex ||
+            at(i).member != other.at(i).member)
+            return false;
+    }
+
+    return true;
+}
+
+
+QString SymbolTransformations::antlrTokenToStr(
+        const pANTLR3_COMMON_TOKEN tok) const
+{
+    // Use the AST cached version, if available
+    if (_typeEval && _typeEval->ast())
+        return _typeEval->ast()->antlrTokenToStr(tok);
+    // Otherwise use the non-caching version
+    else {
+        pANTLR3_STRING s = tok->getText(tok);
+        return QString::fromAscii((const char*)s->chars, s->len);
+    }
 }
 
 
@@ -134,5 +250,6 @@ QString ASTSymbol::typeToString(ASTSymbolType type)
 	}
 	return "null";
 }
+
 
 
