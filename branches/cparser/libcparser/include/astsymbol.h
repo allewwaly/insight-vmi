@@ -30,6 +30,53 @@ struct ASTNodeList;
 class AbstractSyntaxTree;
 class ASTSymbol;
 
+/// This enumeration lists the possible transformations for a symbol
+enum SymbolTransformationType
+{
+    stMember,       ///< member access of a struct/union field
+    stArray,        ///< array access of a pointer/array type
+    stFuncCall,     ///< function invocation
+    stDereference,  ///< pointer dereference, either through "*" or "->"
+    stAddress       ///< address operator, i.e. "&"
+};
+
+/**
+ * This struct represents a transformation operation of a symbol, either through
+ * a postfix expression suffix, or through a unary expression such as the "*" or
+ * "&" operators.
+ */
+struct SymbolTransformation
+{
+    /**
+     * Constructor for a transformation without parameters
+     * @param type transformation type
+     */
+    SymbolTransformation(SymbolTransformationType type)
+        : type(type), arrayIndex(-1) {}
+
+    /**
+     * Constructor for a member access transformation
+     * @param member the member name that is accessed
+     */
+    SymbolTransformation(const QString& member)
+        : type(stMember), member(member), arrayIndex(-1) {}
+
+    /**
+     * Constructor for an array access transformation
+     * @param arrayIndex the index of the array access
+     */
+    SymbolTransformation(int arrayIndex)
+        : type(stArray), arrayIndex(arrayIndex) {}
+
+    SymbolTransformationType type;
+    QString member;
+    int arrayIndex;
+};
+
+/// A list of symbol transformations
+typedef QList<SymbolTransformation> TransformationList;
+
+
 struct AssignedNode {
     AssignedNode()
         : sym(0), node(0), postExprSuffixes(0), derefCount(0), addedInRound(0) {}
