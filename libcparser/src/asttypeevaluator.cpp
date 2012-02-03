@@ -102,7 +102,6 @@ ASTTypeEvaluator::~ASTTypeEvaluator()
 bool ASTTypeEvaluator::evaluateTypes()
 {
 	_typeNodeStack.clear();
-	_evalNodeStack.clear();
 	_pointsToRound = 0;
 
 	// Phase 1: find symbols in AST
@@ -2500,6 +2499,44 @@ QString ASTTypeEvaluator::postfixExpressionToStr(const ASTNode* postfix_exp,
 }
 
 
+void ASTTypeEvaluator::appendTransformations(
+        const ASTNode *node, SymbolTransformations *transformations) const
+{
+    if (!node || !transformations)
+        return;
+
+    switch (node->type) {
+    case nt_postfix_expression:
+        transformations->append(
+                    node->u.postfix_expression.postfix_expression_suffix_list);
+        break;
+
+    case nt_unary_expression_op: {
+        QString op = antlrTokenToStr(node->u.unary_expression.unary_operator);
+
+        if (op == "&" || op == "&&") {
+            transformations->append(ttAddress);
+            if (op == "&&")
+                transformations->append(ttAddress);
+        }
+        else if (op == "*")
+            transformations->append(ttDereference);
+        else
+            typeEvaluatorError(QString("Unhandled unary operator: \"%1\" at "
+                                       "%2:%3:%4")
+                               .arg(op)
+                               .arg(_ast->fileName())
+                               .arg(node->start->line)
+                               .arg(node->start->charPosition));
+        break;
+    }
+
+    default:
+        break;
+    }
+}
+
+
 void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
 {
     if (!node)
@@ -2549,44 +2586,6 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
 }
 
 
-void ASTTypeEvaluator::appendTransformations(
-        const ASTNode *node, SymbolTransformations *transformations) const
-{
-    if (!node || !transformations)
-        return;
-
-    switch (node->type) {
-    case nt_postfix_expression:
-        transformations->append(
-                    node->u.postfix_expression.postfix_expression_suffix_list);
-        break;
-
-    case nt_unary_expression_op: {
-        QString op = antlrTokenToStr(node->u.unary_expression.unary_operator);
-
-        if (op == "&" || op == "&&") {
-            transformations->append(ttAddress);
-            if (op == "&&")
-                transformations->append(ttAddress);
-        }
-        else if (op == "*")
-            transformations->append(ttDereference);
-        else
-            typeEvaluatorError(QString("Unhandled unary operator: \"%1\" at "
-                                       "%2:%3:%4")
-                               .arg(op)
-                               .arg(_ast->fileName())
-                               .arg(node->start->line)
-                               .arg(node->start->charPosition));
-        break;
-    }
-
-    default:
-        break;
-    }
-}
-
-
 void ASTTypeEvaluator::collectSymbols(const ASTNode *node)
 {
     if (!node)
@@ -2613,7 +2612,7 @@ void ASTTypeEvaluator::collectSymbols(const ASTNode *node)
         return;
 
     const ASTNode* root = node->parent, *rNode = node;
-    SymbolTransformations transformations(this);
+    TransformedSymbol transSym(sym, this);
 
     // Climb up the tree until the symbol goes out of scope
     while (root && root->scope != sym->astNode()->scope->parent()) {
@@ -2624,7 +2623,7 @@ void ASTTypeEvaluator::collectSymbols(const ASTNode *node)
             if (root->u.assignment_expression.lvalue &&
                rNode == root->u.assignment_expression.assignment_expression)
             {
-                _symbolsBelowNode[rNode].insert(sym);
+                _symbolsBelowNode[rNode].insertMulti(sym, transSym);
             }
             break;
 
@@ -2633,19 +2632,19 @@ void ASTTypeEvaluator::collectSymbols(const ASTNode *node)
             if (rNode == root->u.init_declarator.initializer &&
                 root->u.init_declarator.declarator)
             {
-                _symbolsBelowNode[rNode].insert(sym);
+                _symbolsBelowNode[rNode].insertMulti(sym, transSym);
             }
             break;
 
         case nt_jump_statement_return:
             // An identifier underneath a return should be the initializer
             assert(rNode == root->u.jump_statement.initializer);
-            _symbolsBelowNode[rNode].insert(sym);
+            _symbolsBelowNode[rNode].insertMulti(sym, transSym);
             break;
 
         case nt_postfix_expression:
         case nt_unary_expression_op:
-            appendTransformations(root, &transformations);
+            appendTransformations(root, &transSym.transformations);
             break;
 
         default:
@@ -2690,8 +2689,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
     if (es.sym->type() == stEnumerator)
         return;
 
-    _followedSymStack.clear();
-    _followedSymStack.push(FollowedSymbol(es.sym, 0));
+    es.followedSymStack.push(TransformedSymbol(es.sym, this));
 
     evaluateIdentifierPointsToRek(&es);
 }
@@ -2699,11 +2697,11 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
 
 void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
 {
-    // Check for endless recursions
-    if (_evalNodeStack.contains(es->root))
+    // Check for loop in recursion
+    if (es->evalNodeStack.contains(es->root))
         return;
     // Push current root on the recursion tracking stack, gets auto-popped later
-    StackAutoPopper<ASTNodeStack> autoPopper(&_evalNodeStack, es->root);
+    StackAutoPopper<ASTNodeStack> autoPopper(&es->evalNodeStack, es->root);
 
 #ifdef DEBUG_POINTS_TO
     QString s;
@@ -2735,80 +2733,59 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
 
     ASTNodeNodeMHash::const_iterator it, e = _assignedNodesRev.end();
     PointsToEvalState rek_es;
-    int localDerefCount = 0;
+    SymbolTransformations localTrans;
     const ASTNode* assigned = 0;
-    const ASTNode* localPostEx = 0;
+//    const ASTNode* localPostEx = 0;
 
     while (es->root) {
         // Was this node assigned to other variables?
         it = _assignedNodesRev.find(es->root);
         if (it != e) {
-            const ASTNodeList* pesl = localPostEx ?
-                        localPostEx->u.postfix_expression.postfix_expression_suffix_list :
-                        0;
-            if (// Follow inter-links if no links have been followed yet
-                es->interLinks.isEmpty() ||
-                // Follow inter-links if last link did not involve (de)references
-                ((!es->lastLinkDerefCount ||
-                  // If (de)references were involved, they must match
-                  localDerefCount >= es->lastLinkDerefCount) &&
-                 // Hash of postfix expression suffixes must always match
-                 es->lastLinkSuffixHash == AssignedNode::hashPostExprSuffixes(pesl, _ast)))
-            {
+            // If last link involved transformations, they must be a prefix
+            // of the local transformations, otherwise we can always
+            // follow the link since the empty transformation is prefix
+            // to any other
+            if (es->lastLinkTrans.isPrefixOf(localTrans)) {
                 for (; it != e && it.key() == es->root; ++it) {
-                    // Start only with links that were added last round
+                    // Only consider initial links that were added last round,
+                    // older links have been considered before
                     if (es->interLinks.isEmpty() &&
-                        it.value().addedInRound != _pointsToRound - 1)
+                        it->addedInRound != _pointsToRound - 1)
                         continue;
 
                     // Find symbol of node the inter-link points to
                     const ASTSymbol* sym = 0;
-                    if (it.value().node->type == nt_primary_expression)
-                        sym = findSymbolOfPrimaryExpression(it.value().node);
-                    else if (it.value().node->type == nt_direct_declarator)
-                        sym = findSymbolOfDirectDeclarator(it.value().node);
+                    if (it->node->type == nt_primary_expression)
+                        sym = findSymbolOfPrimaryExpression(it->node);
+                    else if (it->node->type == nt_direct_declarator)
+                        sym = findSymbolOfDirectDeclarator(it->node);
                     else
                         typeEvaluatorError(
                                     QString("Unexpected node type: %1")
-                                        .arg(ast_node_type_to_str(it.value().node)));
+                                        .arg(ast_node_type_to_str(it->node)));
                     // Do not follow any symbol twice
-                    FollowedSymbol fs(sym, it.value().derefCount);
-                    if (_followedSymStack.contains(fs))
+                    TransformedSymbol ts(sym, it->transformations);
+                    if (es->followedSymStack.contains(ts))
                         continue;
-
-                    // Push this symbol onto the stack
-                    StackAutoPopper<ASTFollowedSymStack> fsap(
-                                &_followedSymStack, fs);
 
                     // Recurive points-to analysis
                     rek_es = *es;
-                    rek_es.root = it.value().node;
-                    rek_es.lastLinkDerefCount = it.value().derefCount;
-                    rek_es.lastLinkSuffixHash = it.value().hashPostExprSuffixes();
+                    rek_es.followedSymStack.push(ts);
+                    rek_es.root = it->node;
+                    rek_es.lastLinkTrans = it->transformations;
                     rek_es.interLinks.insert(es->root,  rek_es.root);
                     evaluateIdentifierPointsToRek(&rek_es);
                 }
             }
 #ifdef DEBUG_POINTS_TO
-            // It's not the same pointer if the deref counters don't not match!
             else {
-                QString reason;
-                if (es->lastLinkDerefCount && localDerefCount < es->lastLinkDerefCount)
-                    reason = QString("previous deref counter mismatch (%1 < %2)")
-                            .arg(localDerefCount)
-                            .arg(es->lastLinkDerefCount);
-                else if (es->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast))
-                    reason = QString("suffix hashes do not match (%1 != %2)")
-                            .arg(es->lastLinkSuffixHash, 0, 16)
-                            .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16);
-                else
-                    reason = "of unknown reason";
-
-                debugmsg(QString("Skipping all links from %1 %2:%3 because %4")
+                debugmsg(QString("Skipping all links from %1 %2:%3 because %4 "
+                                 "is no prefix of %5")
                          .arg(ast_node_type_to_str(es->root))
                          .arg(es->root->start->line)
                          .arg(es->root->start->charPosition)
-                         .arg(reason));
+                         .arg(es->lastLinkTrans.toString(es->sym->name()))
+                         .arg(localTrans.toString(es->sym->name())));
             }
 #endif
         }
@@ -2826,22 +2803,26 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
         case nt_relational_expression:
         case nt_shift_expression:
             // A binary operation with two operands yields no valid lvalue
-            if (es->root->u.binary_expression.left && es->root->u.binary_expression.right)
+            if (es->root->u.binary_expression.left &&
+                es->root->u.binary_expression.right)
+            {
                 es->validLvalue = false;
+            }
             break;
 
         case nt_assignment_expression:
             // Is this in the left-hand of an assignment expression?
-            if (es->rNode == es->root->u.assignment_expression.lvalue &&
+            if (es->prevNode == es->root->u.assignment_expression.lvalue &&
                 (assigned = es->root->u.assignment_expression.assignment_expression))
             {
                 // Must be a valid lvalue
-                if (!es->validLvalue || es->derefCount < 0)
+                if (!es->validLvalue || es->transformations.derefCount() < 0)
                     return;
 
                 // Do not insert links for recursive expressions, we cannot
                 // resolve them anyway.
-                if (_symbolsBelowNode[assigned].contains(es->sym))
+                TransformedSymbol transSym(es->sym, es->transformations);
+                if (_symbolsBelowNode[assigned].contains(es->sym, transSym))
                     return;
 
                 if (!es->interLinks.isEmpty()) {
@@ -2892,7 +2873,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                     const ASTNodeList* pesl = localPostEx ?
                                 localPostEx->u.postfix_expression.postfix_expression_suffix_list :
                                 0;
-                    if (es->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast)) {
+                    if (es->lastLinkSuffixHash != AssignedNode::hashTransformations(pesl, _ast)) {
 #ifdef DEBUG_POINTS_TO
                         debugmsg(QString("Symbol \"%1\" at %2:%3 has wrong suffix "
                                          "hash (%4 != %5) at %6:%7:%8")
@@ -2900,7 +2881,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                                  .arg(es->srcNode->start->line)
                                  .arg(es->srcNode->start->charPosition)
                                  .arg(es->lastLinkSuffixHash, 0, 16)
-                                 .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16)
+                                 .arg(AssignedNode::hashTransformations(pesl, _ast), 0, 16)
                                  .arg(_ast ? _ast->fileName() : QString("-"))
                                  .arg(es->root->start->line)
                                  .arg(es->root->start->charPosition));
@@ -2918,25 +2899,20 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 // Record assignments for variables and parameters
                 if (es->sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
                 {
-                    const ASTNodeList *pesl = localPostEx ?
-                                localPostEx->u.postfix_expression.postfix_expression_suffix_list :
-                                0;
                     if (es->srcNode->scope->varAssignment(
-                            es->sym->name(), assigned, pesl, es->derefCount,
+                            es->sym->name(), assigned, es->transformations,
                             _pointsToRound))
                     {
 #ifdef DEBUG_POINTS_TO
-                        const ASTNode* n =
-                                es->root->u.assignment_expression.assignment_expression;
                         debugmsg(QString("Symbol \"%1\" at %2:%3 points to "
                                          "%4:%5:%6 (deref %7)")
                                  .arg(es->sym->name())
                                  .arg(es->srcNode->start->line)
                                  .arg(es->srcNode->start->charPosition)
-                                 .arg(ast_node_type_to_str(n))
-                                 .arg(n->start->line)
-                                 .arg(n->start->charPosition)
-                                 .arg(es->derefCount));
+                                 .arg(ast_node_type_to_str(assigned))
+                                 .arg(assigned->start->line)
+                                 .arg(assigned->start->charPosition)
+                                 .arg(es->transformations.derefCount()));
 #endif
                         ++_assignments;
                     }
@@ -2945,7 +2921,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
             }
             // Is this in the right-hand of an assignment expression?
             else if (es->root->u.assignment_expression.lvalue &&
-               es->rNode == es->root->u.assignment_expression.assignment_expression)
+               es->prevNode == es->root->u.assignment_expression.assignment_expression)
             {
                 return;
             }
@@ -2959,62 +2935,67 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
 
         case nt_init_declarator:
             // Is this in the left-hand of an init declarator?
-            if (es->rNode == es->root->u.init_declarator.declarator &&
+            if (es->prevNode == es->root->u.init_declarator.declarator &&
                 (assigned = es->root->u.init_declarator.initializer))
             {
-                // Must be a valid lvalue
-                if (!es->validLvalue || es->derefCount < 0)
+                // We disallow following inter-links to the left-hand side of
+                // initializations, this would make no sense
+                if (!es->interLinks.isEmpty())
                     return;
+//                // Must be a valid lvalue
+//                if (!es->validLvalue || es->transformations.derefCount() < 0)
+//                    return;
 
-                // Do not insert links for recursive expressions, we cannot
-                // resolve them anyway.
-                if (_symbolsBelowNode[assigned].contains(es->sym))
-                    return;
+//                // Do not insert links for recursive expressions, we cannot
+//                // resolve them anyway.
+//                if (_symbolsBelowNode[assigned].contains(es->sym))
+//                    return;
 
-                // No. of dereferences must match
-                if (localDerefCount != es->lastLinkDerefCount)
-                    return;
+//                // No. of dereferences must match
+//                if (localDerefCount != es->lastLinkDerefCount)
+//                    return;
 
                 // Check if hash of postfix expression suffixes match
-                const ASTNodeList* pesl = localPostEx ?
-                            localPostEx->u.postfix_expression.postfix_expression_suffix_list :
-                            0;
-                if (es->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast)) {
-#ifdef DEBUG_POINTS_TO
-                    debugmsg(QString("Symbol \"%1\" at %2:%3 has wrong suffix "
-                                     "hash (%4 != %5) at %6:%7:%8")
-                             .arg(es->sym->name())
-                             .arg(es->srcNode->start->line)
-                             .arg(es->srcNode->start->charPosition)
-                             .arg(es->lastLinkSuffixHash, 0, 16)
-                             .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16)
-                             .arg(_ast ? _ast->fileName() : QString("-"))
-                             .arg(es->root->start->line)
-                             .arg(es->root->start->charPosition));
-#endif
-                    return;
-                }
+//                const ASTNodeList* pesl = localPostEx ?
+//                            localPostEx->u.postfix_expression.postfix_expression_suffix_list :
+//                            0;
+//                if (es->lastLinkSuffixHash != AssignedNode::hashTransformations(pesl, _ast)) {
+//#ifdef DEBUG_POINTS_TO
+//                    debugmsg(QString("Symbol \"%1\" at %2:%3 has wrong suffix "
+//                                     "hash (%4 != %5) at %6:%7:%8")
+//                             .arg(es->sym->name())
+//                             .arg(es->srcNode->start->line)
+//                             .arg(es->srcNode->start->charPosition)
+//                             .arg(es->lastLinkSuffixHash, 0, 16)
+//                             .arg(AssignedNode::hashTransformations(pesl, _ast), 0, 16)
+//                             .arg(_ast ? _ast->fileName() : QString("-"))
+//                             .arg(es->root->start->line)
+//                             .arg(es->root->start->charPosition));
+//#endif
+//                    return;
+//                }
 
                 // Record assignments for variables and parameters
                 if (es->sym->type() & (stVariableDecl|stVariableDef|stFunctionParam))
                 {
-                    const ASTNodeList *pesl = localPostEx ?
-                                localPostEx->u.postfix_expression.postfix_expression_suffix_list :
-                                0;
                     if (es->srcNode->scope->varAssignment(
-                            es->sym->name(), assigned, pesl, es->derefCount,
+                            es->sym->name(), assigned, es->transformations,
                             _pointsToRound))
                     {
 #ifdef DEBUG_POINTS_TO
+                        QString s = es->transformations.isEmpty() ?
+                                    QString() :
+                                    QString(" with \"%1\"").arg(
+                                        es->transformations.toString(es->sym->name()));
                         debugmsg(QString("Symbol \"%1\" at %2:%3 points to "
-                                         "%4:%5:%6 (deref %7)")
+                                         "%4:%5:%6%7")
                                  .arg(es->sym->name())
                                  .arg(es->srcNode->start->line)
                                  .arg(es->srcNode->start->charPosition)
                                  .arg(ast_node_type_to_str(assigned))
                                  .arg(assigned->start->line)
                                  .arg(assigned->start->charPosition)
-                                 .arg(es->derefCount));
+                                 .arg(s));
 #endif
                         ++_assignments;
                     }
@@ -3033,18 +3014,19 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
             assert((assigned = es->root->u.jump_statement.initializer) != 0);
 
             // Check if hash of postfix expression suffixes match
-            const ASTNodeList* pesl = localPostEx ?
-                        localPostEx->u.postfix_expression.postfix_expression_suffix_list :
-                        0;
-            if (es->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast)) {
+//            const ASTNodeList* pesl = localPostEx ?
+//                        localPostEx->u.postfix_expression.postfix_expression_suffix_list :
+//                        0;
+
+            // Check last link's transformations are a prefix of the local ones
+            if (!es->lastLinkTrans.isPrefixOf(localTrans)) {
 #ifdef DEBUG_POINTS_TO
-                debugmsg(QString("Symbol \"%1\" at %2:%3 has wrong suffix "
-                                 "hash (%4 != %5) at %6:%7:%8")
-                         .arg(es->sym->name())
+                debugmsg(QString("Symbol \"%1\" at %2:%3 is no prefix of "
+                                 "\"%4\" at %5:%6:%7")
+                         .arg(es->lastLinkTrans.toString(es->sym->name()))
                          .arg(es->srcNode->start->line)
                          .arg(es->srcNode->start->charPosition)
-                         .arg(es->lastLinkSuffixHash, 0, 16)
-                         .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16)
+                         .arg(localTrans.toString(es->sym->name()))
                          .arg(_ast ? _ast->fileName() : QString("-"))
                          .arg(es->root->start->line)
                          .arg(es->root->start->charPosition));
@@ -3061,18 +3043,23 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
             // Treat any return statement as an assignment to the function
             // definition symbol
             if (es->root->scope->varAssignment(
-                    funcSym->name(), assigned, pesl, es->derefCount,
+                    funcSym->name(), assigned, es->transformations,
                     _pointsToRound))
             {
 #ifdef DEBUG_POINTS_TO
-                debugmsg(QString("Symbol \"%1\" at %2:%3 points to %4:%5:%6 (deref %7)")
+                QString s = es->transformations.isEmpty() ?
+                            QString() :
+                            QString(" with \"%1\"").arg(
+                                es->transformations.toString(es->sym->name()));
+                debugmsg(QString("Symbol \"%1\" at %2:%3 points to "
+                                 "%4:%5:%6%7")
                          .arg(es->sym->name())
                          .arg(es->srcNode->start->line)
                          .arg(es->srcNode->start->charPosition)
                          .arg(ast_node_type_to_str(assigned))
                          .arg(assigned->start->line)
                          .arg(assigned->start->charPosition)
-                         .arg(es->derefCount));
+                         .arg(s));
 #endif
                 ++_assignments;
             }
@@ -3080,63 +3067,76 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
             break;
 
         case nt_postfix_expression:
-            // Capture postfix expression such as "a->b" or "(a)->b", but
-            // not (*a)->b
-            if (es->root->u.postfix_expression.postfix_expression_suffix_list &&
-                localDerefCount == es->lastLinkDerefCount)
-            {
-                // Find local postfix expression in current AST branch
-                if (!localPostEx)
-                    localPostEx = es->root;
+            localTrans.append(
+                        es->root->u.postfix_expression.postfix_expression_suffix_list);
+            es->transformations.append(
+                        es->root->u.postfix_expression.postfix_expression_suffix_list);
 
-                // Find postfix expression only in original AST branch
-                if (es->interLinks.isEmpty() && !es->postExNode)
-                    es->postExNode = es->root;
-            }
+//            // Capture postfix expression such as "a->b" or "(a)->b", but
+//            // not (*a)->b
+//            if (es->root->u.postfix_expression.postfix_expression_suffix_list &&
+//                localDerefCount == es->lastLinkDerefCount)
+//            {
+//                // Find local postfix expression in current AST branch
+//                if (!localPostEx)
+//                    localPostEx = es->root;
+
+//                // Find postfix expression only in original AST branch
+//                if (es->interLinks.isEmpty() && !es->postExNode)
+//                    es->postExNode = es->root;
+//            }
 
 
-            if (es->root->u.postfix_expression.primary_expression == es->srcNode) {
-//                // Ignore expression that have postfix expression suffixes. They
-//                // are captured during the used-as analysis.
-//                if (es->root->u.postfix_expression.postfix_expression_suffix_list)
-//                    break;
+//            if (es->root->u.postfix_expression.primary_expression == es->srcNode) {
+////                // Ignore expression that have postfix expression suffixes. They
+////                // are captured during the used-as analysis.
+////                if (es->root->u.postfix_expression.postfix_expression_suffix_list)
+////                    break;
 
-                // Capture postfix expression such as "a->b" or "(a)->b", but
-                // not (*a)->b
-                if (!es->postExNode ||
-                    (!es->derefCount &&
-                     es->root->u.postfix_expression.postfix_expression_suffix_list &&
-                     !es->postExNode->u.postfix_expression.postfix_expression_suffix_list))
-                {
-                    es->postExNode = es->root;
-                }
-            }
-            // Find local postfix expression in current AST branch
-            if (!localPostEx ||
-                (!localDerefCount &&
-                 es->root->u.postfix_expression.postfix_expression_suffix_list &&
-                 !localPostEx->u.postfix_expression.postfix_expression_suffix_list))
-            {
-                localPostEx = es->root;
-            }
+//                // Capture postfix expression such as "a->b" or "(a)->b", but
+//                // not (*a)->b
+//                if (!es->postExNode ||
+//                    (!es->derefCount &&
+//                     es->root->u.postfix_expression.postfix_expression_suffix_list &&
+//                     !es->postExNode->u.postfix_expression.postfix_expression_suffix_list))
+//                {
+//                    es->postExNode = es->root;
+//                }
+//            }
+//            // Find local postfix expression in current AST branch
+//            if (!localPostEx ||
+//                (!localDerefCount &&
+//                 es->root->u.postfix_expression.postfix_expression_suffix_list &&
+//                 !localPostEx->u.postfix_expression.postfix_expression_suffix_list))
+//            {
+//                localPostEx = es->root;
+//            }
             break;
 
         case nt_unary_expression_op:
             op = antlrTokenToStr(es->root->u.unary_expression.unary_operator);
             if (op == "*") {
-                ++es->derefCount;
-                ++localDerefCount;
+//                ++es->derefCount;
+                es->transformations.append(ttDereference);
+                localTrans.append(ttDereference);
+//                ++localDerefCount;
             }
             else if (op == "&") {
-                --es->derefCount;
-                --localDerefCount;
+//                --es->derefCount;
+                es->transformations.append(ttAddress);
+                localTrans.append(ttAddress);
+//                --localDerefCount;
             }
             else if (op == "&&") {
-                es->derefCount -= 2;
-                localDerefCount -= 2;
+//                es->derefCount -= 2;
+                es->transformations.append(ttAddress);
+                es->transformations.append(ttAddress);
+                localTrans.append(ttAddress);
+                localTrans.append(ttAddress);
+//                localDerefCount -= 2;
             }
             else
-                es->validLvalue = true;
+                es->validLvalue = false;
             break;
 
         // Types we have to skip to come to a decision
@@ -3205,11 +3205,9 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
         }
 
         // Otherwise go up
-        es->rNode = es->root;
+        es->prevNode = es->root;
         es->root = es->root->parent;
     }
-
-    return;
 }
 
 
@@ -3230,11 +3228,11 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRev(const ASTNode *node)
          it != e; ++it)
     {
         // Only consider newly added links
-        if (it->addedInRound == _pointsToRound)
-            _assignedNodesRev.insertMulti(
-                        it->node,
-                        AssignedNode(sym, node, it->postExprSuffixes,
-                                     it->derefCount, _pointsToRound));
+        if (it->addedInRound == _pointsToRound) {
+            AssignedNode an(sym, node, it->transformations, _pointsToRound);
+            if (!_assignedNodesRev.contains(it->node, an))
+                _assignedNodesRev.insertMulti(it->node, an);
+        }
     }
 }
 
@@ -3271,7 +3269,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                  // Does the local derference counter match the last link's one?
                  ((!ed->lastLinkDerefCount || derefs >= ed->lastLinkDerefCount) &&
                   // Check if hash of postfix expression suffixes match
-                  (ed->lastLinkSuffixHash == AssignedNode::hashPostExprSuffixes(pesl, _ast)))) &&
+                  (ed->lastLinkSuffixHash == AssignedNode::hashTransformations(pesl, _ast)))) &&
                 // As ed->primExNode and ed->postExNode are not changed
                 // across inter-link boundaries, do not recurse for plain local
                 // variables without context (i.e., postfix expression suffixes)
@@ -3311,10 +3309,10 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                          ed->postExNodes.isEmpty())
                     reason = QString("source symbol \"%1\" is local variable without suffixes")
                             .arg(ed->sym->name());
-                else if (ed->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast))
+                else if (ed->lastLinkSuffixHash != AssignedNode::hashTransformations(pesl, _ast))
                     reason = QString("suffix hashes do not match (%1 != %2)")
                             .arg(ed->lastLinkSuffixHash, 0, 16)
-                            .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16);
+                            .arg(AssignedNode::hashTransformations(pesl, _ast), 0, 16);
                 else
                     reason = "of unknown reason";
 
@@ -3407,7 +3405,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
 
         case nt_expression_statement:
             // Expressions might be the return value of compound braces
-            // statements if the appear last
+            // statements if they appear last
             if (ed->rootNode->parent->type != nt_compound_braces_statement)
                 return erNoAssignmentUse;
             break;
@@ -3578,7 +3576,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
         const ASTNodeList* pesl = localPostEx ?
                     localPostEx->u.postfix_expression.postfix_expression_suffix_list :
                     0;
-        if (ed->lastLinkSuffixHash != AssignedNode::hashPostExprSuffixes(pesl, _ast))
+        if (ed->lastLinkSuffixHash != AssignedNode::hashTransformations(pesl, _ast))
         {
 #ifdef DEBUG_USED_AS
             debugmsg(QString("Skipping change in %1 %2:%3 because suffix "
@@ -3587,7 +3585,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                      .arg(ed->rootNode->start->line)
                      .arg(ed->rootNode->start->charPosition)
                      .arg(ed->lastLinkSuffixHash, 0, 16)
-                     .arg(AssignedNode::hashPostExprSuffixes(pesl, _ast), 0, 16));
+                     .arg(AssignedNode::hashTransformations(pesl, _ast), 0, 16));
 #endif
             return erNoAssignmentUse;
         }
@@ -4061,10 +4059,10 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
     ASTTypeEvaluator::EvalResult ret;
 
     // Check for endless recursions
-    if (_evalNodeStack.contains(ed->rootNode))
+    if (ed->evalNodeStack.contains(ed->rootNode))
         return erRecursiveExpression;
     // Push current root on the recursion tracking stack, gets auto-popped later
-    StackAutoPopper<ASTNodeStack> autoPopper(&_evalNodeStack, ed->rootNode);
+    StackAutoPopper<ASTNodeStack> autoPopper(&ed->evalNodeStack, ed->rootNode);
 
     // Evaluate if type changes in this expression
     ret = evaluateTypeFlow(ed);

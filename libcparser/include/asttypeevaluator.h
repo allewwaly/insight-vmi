@@ -65,6 +65,31 @@ private:
     int _arraySize;
 };
 
+
+struct TransformedSymbol
+{
+    TransformedSymbol(ASTTypeEvaluator* typeEval = 0)
+        : sym(0), transformations(typeEval) {}
+    TransformedSymbol(const ASTSymbol *sym, ASTTypeEvaluator* typeEval = 0)
+        : sym(sym), transformations(typeEval) {}
+    TransformedSymbol(const ASTSymbol *sym, const SymbolTransformations& transformations)
+        : sym(sym), transformations(transformations) {}
+
+    bool operator==(const TransformedSymbol& other) const
+    {
+        return sym == other.sym && transformations == other.transformations;
+    }
+
+    const ASTSymbol *sym;
+    SymbolTransformations transformations;
+};
+
+inline uint qHash(const TransformedSymbol& ts)
+{
+    return qHash(ts.sym) ^ qHash(ts.transformations);
+}
+
+
 typedef QHash<const ASTNode*, ASTType*> ASTNodeTypeHash;
 typedef QHash<const ASTNode*, const ASTNode*> ASTNodeNodeHash;
 typedef QMultiHash<const ASTNode*, AssignedNode> ASTNodeNodeMHash;
@@ -72,41 +97,32 @@ typedef QList<ASTType*> ASTTypeList;
 typedef QStack<const ASTNode*> ASTNodeStack;
 typedef QSet<const ASTSymbol*> ASTSymbolSet;
 typedef QHash<const ASTNode*, const ASTSymbol*> ASTNodeSymHash;
-typedef QHash<const ASTNode*, ASTSymbolSet> ASTNodeHashSymSet;
-
-struct FollowedSymbol {
-    FollowedSymbol() : sym(0), derefCount(0) {}
-    FollowedSymbol(const ASTSymbol *sym, int derefCount)
-        : sym(sym), derefCount(derefCount) {}
-    const ASTSymbol *sym;
-    int derefCount;
-
-    bool operator==(const FollowedSymbol& other) const
-    {
-        return sym == other.sym && derefCount == other.derefCount;
-    }
-};
-
-typedef QStack<FollowedSymbol> ASTFollowedSymStack;
+typedef QHash<const ASTNode*, QMultiHash<const ASTSymbol*, TransformedSymbol> >
+    ASTNodeTransSymHash;
+typedef QStack<TransformedSymbol> TransformedSymStack;
 
 
 struct PointsToEvalState
 {
-    PointsToEvalState(const ASTNode* node = 0, const ASTNode* root = 0)
-        : sym(0), srcNode(node), root(root), rNode(0), postExNode(0),
-          derefCount(0), lastLinkDerefCount(0), lastLinkSuffixHash(0),
-          validLvalue(true)
+    PointsToEvalState(ASTTypeEvaluator* typeEval = 0)
+        : sym(0), transformations(typeEval), srcNode(0), root(root),
+          prevNode(0), postExNode(0), lastLinkDerefCount(0),
+          lastLinkSuffixHash(0), validLvalue(true)
     {}
     const ASTSymbol* sym;
+    SymbolTransformations transformations;
     const ASTNode* srcNode;
     const ASTNode* root;
-    const ASTNode* rNode;
-    const ASTNode* postExNode;
-    int derefCount;
-    int lastLinkDerefCount;
-    uint lastLinkSuffixHash;
+    const ASTNode* prevNode;
+//    const ASTNode* postExNode;
+//    int derefCount;
+//    int lastLinkDerefCount;
+    SymbolTransformations lastLinkTrans;
+//    uint lastLinkSuffixHash;
     bool validLvalue;
     ASTNodeNodeHash interLinks;
+    TransformedSymStack followedSymStack;
+    ASTNodeStack evalNodeStack;
 };
 
 
@@ -153,6 +169,7 @@ struct TypeEvalDetails
     int lastLinkDerefCount;
     uint lastLinkSuffixHash;
     ASTNodeNodeHash interLinks;
+    ASTNodeStack evalNodeStack;
 };
 
 
@@ -311,10 +328,8 @@ private:
     ASTNodeTypeHash _types;
     ASTTypeList _allTypes;
     ASTNodeStack _typeNodeStack;
-    ASTNodeStack _evalNodeStack;
-    ASTFollowedSymStack _followedSymStack;
     ASTNodeNodeMHash _assignedNodesRev;
-    ASTNodeHashSymSet _symbolsBelowNode;
+    ASTNodeTransSymHash _symbolsBelowNode;
     ASTNodeSymHash _symbolOfNode;
     int _sizeofLong;
     EvalPhase _phase;
