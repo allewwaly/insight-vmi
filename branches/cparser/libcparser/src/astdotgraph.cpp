@@ -171,39 +171,15 @@ void ASTDotGraph::printDotGraphConnection(pANTLR3_COMMON_TOKEN src,
 
 
     QString s;
-    if (an->derefCount) {
-        if (an->derefCount < 0)
-            s.fill(QChar('&'), -an->derefCount);
+    if (an->transformations.derefCount()) {
+        if (an->transformations.derefCount() < 0)
+            s.fill(QChar('&'), -an->transformations.derefCount());
         else
-            s.fill(QChar('*'), an->derefCount);
+            s.fill(QChar('*'), an->transformations.derefCount());
         s = dotEscape(s);
     }
-    if (an->postExprSuffixes) {
-        for (const ASTNodeList* l = an->postExprSuffixes; l; l = l->next) {
-            s += "<BR/>";
-            switch (l->item->type) {
-            case nt_postfix_expression_arrow:
-                s += dotEscape("->" + antlrTokenToStr(l->item->u.postfix_expression_suffix.identifier));
-                break;
-            case nt_postfix_expression_brackets:
-                s += dotEscape("[]");
-                break;
-            case nt_postfix_expression_dec:
-                s += dotEscape("--");
-                break;
-            case nt_postfix_expression_dot:
-                s += dotEscape("." + antlrTokenToStr(l->item->u.postfix_expression_suffix.identifier));
-                break;
-            case nt_postfix_expression_inc:
-                s += dotEscape("++");
-                break;
-            case nt_postfix_expression_parens:
-                s += dotEscape("()");
-                break;
-            default:
-                break;
-            }
-        }
+    if (!an->transformations.isEmpty()) {
+        s += "<BR/>" + an->transformations.toString();
     }
 
     if (!s.isEmpty())

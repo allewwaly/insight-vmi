@@ -199,19 +199,19 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 
 void ASTVariableExpression::appendTransformation(SymbolTransformationType type)
 {
-    _transformations.append(type);
+    _transformations.append(type, 0);
 }
 
 
 void ASTVariableExpression::appendTransformation(const QString &member)
 {
-    _transformations.append(member);
+    _transformations.append(member, 0);
 }
 
 
 void ASTVariableExpression::appendTransformation(int arrayIndex)
 {
-    _transformations.append(arrayIndex);
+    _transformations.append(arrayIndex, 0);
 }
 
 
