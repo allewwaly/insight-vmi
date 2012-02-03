@@ -34,11 +34,11 @@ class ASTTypeEvaluator;
 /// This enumeration lists the possible transformations for a symbol
 enum SymbolTransformationType
 {
-    ttMember,       ///< member access of a struct/union field
-    ttArray,        ///< array access of a pointer/array type
-    ttFuncCall,     ///< function invocation
-    ttDereference,  ///< pointer dereference, either through "*" or "->"
-    ttAddress       ///< address operator, i.e. "&"
+    ttMember      = (1 << 0), ///< member access of a struct/union field
+    ttArray       = (1 << 1), ///< array access of a pointer/array type
+    ttFuncCall    = (1 << 2), ///< function invocation
+    ttDereference = (1 << 3), ///< pointer dereference, either through "*" or "->"
+    ttAddress     = (1 << 4)  ///< address operator, i.e. "&"
 };
 
 /**
@@ -79,6 +79,26 @@ struct SymbolTransformation
      */
     QString typeString() const;
 
+    /**
+     * @return \c true if this transformation equals \a other, \c false
+     * otherwise
+     */
+    inline bool operator==(const SymbolTransformation &other) const
+    {
+        return type == other.type &&
+                member == other.member &&
+                arrayIndex == other.arrayIndex;
+    }
+
+    /**
+     * @return \c true if this transformation differs from \a other, \c false
+     * otherwise
+     */
+    inline bool operator!=(const SymbolTransformation &other) const
+    {
+        return !operator==(other);
+    }
+
     SymbolTransformationType type;
     QString member;
     int arrayIndex;
@@ -88,7 +108,7 @@ struct SymbolTransformation
 class SymbolTransformations: public QList<SymbolTransformation>
 {
 public:
-    SymbolTransformations(ASTTypeEvaluator* typeEval);
+    SymbolTransformations(ASTTypeEvaluator* typeEval = 0);
 
     void append(const SymbolTransformation& st);
     void append(SymbolTransformationType type);
@@ -96,7 +116,19 @@ public:
     void append(int arrayIndex);
     void append(const ASTNodeList *suffixList);
 
-    bool equals(const SymbolTransformations& other) const;
+//    bool equals(const SymbolTransformations& other) const;
+
+    int derefCount() const;
+
+    bool isPrefixOf(const SymbolTransformations &other) const;
+
+    QString toString(const QString& symbol) const;
+
+    /**
+     * @return hash value of this struct's symbol transformations
+     * \sa transformations
+     */
+    uint hash() const;
 
 private:
     QString antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok) const;
@@ -105,53 +137,40 @@ private:
 };
 
 
-struct AssignedNode {
-    AssignedNode()
-        : sym(0), node(0), postExprSuffixes(0), derefCount(0), addedInRound(0) {}
+inline uint qHash(const SymbolTransformations& an)
+{
+    return an.hash();
+}
+
+
+struct AssignedNode
+{
+    AssignedNode(ASTTypeEvaluator* typeEval = 0)
+        : sym(0), node(0), transformations(typeEval), addedInRound(0) {}
     AssignedNode(const ASTSymbol* sym, const ASTNode* node,
-                 const ASTNodeList* postExprSuffixes, int derefCount, int round)
-        : sym(sym), node(node), postExprSuffixes(postExprSuffixes),
-          derefCount(derefCount), addedInRound(round) {}
+                 const SymbolTransformations& trans, int round)
+        : sym(sym), node(node), transformations(trans), addedInRound(round) {}
 
     /// The Symbol this assigned node belongs to
     const ASTSymbol* sym;
     /// The node that was assigned to this symbol
     const ASTNode* node;
     /// The postfix expression suffixes of the assignment's lvalue
-    const ASTNodeList* postExprSuffixes;
-    /// No. of (de)references of assignment's lvalue
-    int derefCount;
+    SymbolTransformations transformations;
     /// The round in the points-to analysis this link was added
     int addedInRound;
 
     /// Comparison operator
     inline bool operator==(const AssignedNode& other) const
     {
-        bool ret = (node == other.node && derefCount == other.derefCount);
-        if (ret && postExprSuffixes)
-            ret = (hashPostExprSuffixes() == other.hashPostExprSuffixes());
-        return ret;
+        return node == other.node && transformations == other.transformations;
     }
-
-    /**
-     * @return hash value of the suffixes in postExprSuffixes
-     */
-    uint hashPostExprSuffixes() const;
-
-    /**
-     * @return hash value of the suffixes in \a pesl
-     */
-    static uint hashPostExprSuffixes(const ASTNodeList* pesl,
-                                     const AbstractSyntaxTree* ast);
 };
 
 
 inline uint qHash(const AssignedNode& an)
 {
-    uint hash = qHash(an.node) ^ qHash(an.derefCount);
-    if (an.postExprSuffixes)
-        hash ^= an.hashPostExprSuffixes();
-    return hash;
+    return qHash(an.node) ^ qHash(an.transformations);
 }
 
 
@@ -233,8 +252,7 @@ public:
 	 * @return \c true if element did not already exist, \c false otherwise
 	 */
 	bool appendAssignedNode(const ASTNode* node,
-							const ASTNodeList* postExprSuffixes, int derefCount,
-							int round);
+							const SymbolTransformations &trans, int round);
 
 	/**
 	 * @return the name of the symbol
@@ -292,10 +310,9 @@ inline const AssignedNodeSet &ASTSymbol::assignedAstNodes() const
 
 
 inline bool ASTSymbol::appendAssignedNode(
-        const ASTNode *node, const ASTNodeList* postExprSuffixes,
-        int derefCount, int round)
+        const ASTNode *node, const SymbolTransformations& trans, int round)
 {
-    AssignedNode an(this, node, postExprSuffixes, derefCount, round);
+    AssignedNode an(this, node, trans, round);
     if (!_assignedAstNodes.contains(an)) {
         _assignedAstNodes.insert(an);
         return true;

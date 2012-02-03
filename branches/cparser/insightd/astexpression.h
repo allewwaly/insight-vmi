@@ -378,7 +378,6 @@ public:
         return _baseType;
     }
 
-    void appendTransformation(const SymbolTransformation& st);
     void appendTransformation(SymbolTransformationType type);
     void appendTransformation(const QString& member);
     void appendTransformation(int arrayIndex);

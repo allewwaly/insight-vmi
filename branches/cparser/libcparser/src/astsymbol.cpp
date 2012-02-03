@@ -118,19 +118,113 @@ void SymbolTransformations::append(const ASTNodeList *suffixList)
 }
 
 
-bool SymbolTransformations::equals(const SymbolTransformations &other) const
+//bool SymbolTransformations::equals(const SymbolTransformations &other) const
+//{
+//    // Compare transformations
+//    if (size() != other.size())
+//        return false;
+//    for (int i = 0; i < size(); ++i) {
+//        if (at(i).type != other.at(i).type ||
+//            at(i).arrayIndex != other.at(i).arrayIndex ||
+//            at(i).member != other.at(i).member)
+//            return false;
+//    }
+
+//    return true;
+//}
+
+
+int SymbolTransformations::derefCount() const
 {
-    // Compare transformations
-    if (size() != other.size())
-        return false;
+    int deref = 0;
+
+    // Count all (de-)references before the first member access
     for (int i = 0; i < size(); ++i) {
-        if (at(i).type != other.at(i).type ||
-            at(i).arrayIndex != other.at(i).arrayIndex ||
-            at(i).member != other.at(i).member)
-            return false;
+        switch (at(i).type) {
+        case ttArray:
+        case ttDereference:
+            ++deref;
+            break;
+
+        case ttAddress:
+            --deref;
+            break;
+
+        default:
+            goto for_exit;
+        }
     }
 
+    for_exit:
+    return deref;
+}
+
+
+bool SymbolTransformations::isPrefixOf(const SymbolTransformations &other) const
+{
+    // If this is a prefix of other, it must not be larger
+    if (size() > other.size())
+        return false;
+    // Compare all transformations
+    for (int i = 0; i < size(); ++i)
+        if (at(i) != other.at(i))
+            return false;
     return true;
+}
+
+
+QString SymbolTransformations::toString(const QString &symbol) const
+{
+    QString s = symbol;
+
+    for (int i = 0; i < size(); ++i) {
+        switch (at(i).type) {
+        case ttMember:
+            s += "." + at(i).member;
+            break;
+        case ttFuncCall:
+            s += "()";
+            break;
+        case ttArray:
+            s += QString("[%1]").arg(at(i).arrayIndex);
+            break;
+        case ttDereference:
+            s = QString("(* %1)").arg(s);
+            break;
+        case ttAddress:
+            s = QString("(& %1)").arg(s);
+            break;
+        }
+    }
+
+    return s;
+}
+
+
+uint SymbolTransformations::hash() const
+{
+	uint hash = 0;
+	int rot = 0;
+	// Hash the postfix expressions
+	for (int i = 0; i < size(); ++i) {
+		switch (at(i).type) {
+		case ttArray:
+			hash ^= rotl32(qHash(at(i).arrayIndex), rot);
+			rot = (rot + 3) % 32;
+			break;
+		case ttMember:
+			hash ^= rotl32(qHash(at(i).member), rot);
+			rot = (rot + 3) % 32;
+			break;
+		default:
+			break;
+		}
+
+		hash ^= rotl32(at(i).type, rot);
+		rot = (rot + 3) % 32;
+	}
+
+	return hash;
 }
 
 
@@ -145,49 +239,6 @@ QString SymbolTransformations::antlrTokenToStr(
         pANTLR3_STRING s = tok->getText(tok);
         return QString::fromAscii((const char*)s->chars, s->len);
     }
-}
-
-
-uint AssignedNode::hashPostExprSuffixes() const
-{
-	return hashPostExprSuffixes(postExprSuffixes, sym->ast());
-}
-
-
-uint AssignedNode::hashPostExprSuffixes(const ASTNodeList *pesl,
-										const AbstractSyntaxTree *ast)
-{
-	if (!pesl)
-		return 0;
-
-	uint hash = 0;
-	int rot = 0;
-	QString id;
-	// Hash the postfix expressions
-	for (const ASTNodeList* list = pesl; list; list = list->next)
-	{
-		const ASTNode* node = list->item;
-
-		switch (node->type) {
-		case nt_postfix_expression_arrow:
-		case nt_postfix_expression_dot:
-			id = ast->antlrTokenToStr(
-						node->u.postfix_expression_suffix.identifier);
-			hash ^= rotl32(qHash(id), rot);
-			rot = (rot + 3) % 32;
-			break;
-		case nt_postfix_expression_parens:
-			// ignore these
-			continue;
-		default:
-			break;
-		}
-
-		hash ^= rotl32(node->type, rot);
-		rot = (rot + 3) % 32;
-	}
-
-	return hash;
 }
 
 
@@ -250,6 +301,7 @@ QString ASTSymbol::typeToString(ASTSymbolType type)
 	}
 	return "null";
 }
+
 
 
 

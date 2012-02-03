@@ -54,8 +54,7 @@ void ASTScope::add(const QString &name, ASTSymbolType type, ASTNode *node)
 
 
 bool ASTScope::varAssignment(const QString &name, const ASTNode *assignedNode,
-                             const ASTNodeList* postExprSuffixes,
-                             int derefCount, int round)
+                             const SymbolTransformations& trans, int round)
 {
     // Search for variables, parameters and functions with given name
     for (ASTScope* p = this; p; p = p->_parent) {
@@ -63,9 +62,8 @@ bool ASTScope::varAssignment(const QString &name, const ASTNode *assignedNode,
             (p->_symbols[name]->type() &
              (stVariableDecl|stVariableDef|stFunctionParam|stFunctionDef)))
         {
-            return p->_symbols[name]->appendAssignedNode(assignedNode,
-                                                         postExprSuffixes,
-                                                         derefCount, round);
+            return p->_symbols[name]->appendAssignedNode(assignedNode, trans,
+                                                         round);
         }
     }
     // We should never come here

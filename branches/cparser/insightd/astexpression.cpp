@@ -49,29 +49,8 @@ QString ASTVariableExpression::toString(bool /*compact*/) const
     if (!_baseType)
         return "(undefined var. expr.)";
 
-    QString s = QString("(%1)").arg(_baseType->prettyName());
-
-    for (int i = 0; i < _transformations.size(); ++i) {
-        switch (_transformations[i].type) {
-        case ttMember:
-            s += "." + _transformations[i].member;
-            break;
-        case ttFuncCall:
-            s += "()";
-            break;
-        case ttArray:
-            s += QString("[%1]").arg(_transformations[i].arrayIndex);
-            break;
-        case ttDereference:
-            s = QString("(* %1)").arg(s);
-            break;
-        case ttAddress:
-            s = QString("(& %1)").arg(s);
-            break;
-        }
-    }
-
-    return s;
+    return _transformations.toString(
+                QString("(%1)").arg(_baseType->prettyName()));
 }
 
 
@@ -218,41 +197,21 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 }
 
 
-void ASTVariableExpression::appendTransformation(const SymbolTransformation &st)
-{
-    // Try to simplify transformations: merge address operators and dereferences
-    if (!_transformations.isEmpty()) {
-        if ((st.type == ttDereference &&
-             _transformations.last().type == ttAddress) ||
-            (st.type == ttAddress &&
-             _transformations.last().type == ttDereference))
-        {
-            // Both operations cancel each other out
-            _transformations.pop_back();
-            return;
-        }
-    }
-
-    // No simplification, so append the transformation
-    _transformations.append(st);
-}
-
-
 void ASTVariableExpression::appendTransformation(SymbolTransformationType type)
 {
-    appendTransformation(SymbolTransformation(type));
+    _transformations.append(type);
 }
 
 
 void ASTVariableExpression::appendTransformation(const QString &member)
 {
-    appendTransformation(SymbolTransformation(member));
+    _transformations.append(member);
 }
 
 
 void ASTVariableExpression::appendTransformation(int arrayIndex)
 {
-    appendTransformation(SymbolTransformation(arrayIndex));
+    _transformations.append(arrayIndex);
 }
 
 
