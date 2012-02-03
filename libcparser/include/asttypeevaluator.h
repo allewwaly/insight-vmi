@@ -104,10 +104,9 @@ typedef QStack<TransformedSymbol> TransformedSymStack;
 
 struct PointsToEvalState
 {
-    PointsToEvalState(ASTTypeEvaluator* typeEval = 0)
+    PointsToEvalState(ASTTypeEvaluator* typeEval)
         : sym(0), transformations(typeEval), srcNode(0), root(root),
-          prevNode(0), postExNode(0), lastLinkDerefCount(0),
-          lastLinkSuffixHash(0), validLvalue(true)
+          prevNode(0), lastLinkTrans(typeEval), validLvalue(true)
     {}
     const ASTSymbol* sym;
     SymbolTransformations transformations;
@@ -128,7 +127,8 @@ struct PointsToEvalState
 
 struct TypeEvalDetails
 {
-    TypeEvalDetails()
+    TypeEvalDetails(ASTTypeEvaluator* typeEval)
+        : transformations(typeEval), lastLinkTrans(typeEval)
     {
         clear();
     }
@@ -140,15 +140,17 @@ struct TypeEvalDetails
         targetNode = 0;
         rootNode = 0;
         primExNode = 0;
-        postExNodes.clear();
+//        postExNodes.clear();
         castExNode = 0;
         srcType = 0;
         ctxType = 0;
         targetType = 0;
         sym = 0;
-        derefCount = 0;
-        lastLinkDerefCount = 0;
-        lastLinkSuffixHash = 0;
+//        derefCount = 0;
+//        lastLinkDerefCount = 0;
+//        lastLinkSuffixHash = 0;
+        transformations.clear();
+        lastLinkTrans.clear();
         ctxMembers.clear();
         interLinks.clear();
     }
@@ -158,16 +160,18 @@ struct TypeEvalDetails
     const ASTNode* targetNode;
     const ASTNode *rootNode;
     const ASTNode *primExNode;
-    QList<const ASTNode*> postExNodes;
+//    QList<const ASTNode*> postExNodes;
     const ASTNode *castExNode;
     ASTType* srcType;
     ASTType* ctxType;
     ASTType* targetType;
     QStringList ctxMembers;
     const ASTSymbol* sym;
-    int derefCount;
-    int lastLinkDerefCount;
-    uint lastLinkSuffixHash;
+//    int derefCount;
+//    int lastLinkDerefCount;
+//    uint lastLinkSuffixHash;
+    SymbolTransformations transformations;
+    SymbolTransformations lastLinkTrans;
     ASTNodeNodeHash interLinks;
     ASTNodeStack evalNodeStack;
 };
@@ -221,6 +225,10 @@ protected:
         erInvalidTransition
     };
 
+    /// Relevant symbol types for points-to analysis
+    static const int PointsToTypes = stVariableDecl|stVariableDef|stFunctionParam;
+
+
 //    virtual void beforeChildren(const ASTNode *node, int flags);
     virtual void afterChildren(const ASTNode *node, int flags);
     void appendTransformations(const ASTNode *node,
@@ -234,6 +242,10 @@ protected:
     EvalResult evaluateTypeFlow(TypeEvalDetails *ed);
     EvalResult evaluateTypeChanges(TypeEvalDetails *ed);
     void evaluateTypeContext(TypeEvalDetails *ed);
+    SymbolTransformations combineTansformations(
+            const SymbolTransformations& global,
+            const SymbolTransformations& local,
+            const SymbolTransformations& lastLink) const;
 
     /**
      * This function is called during the execution of evaluateTypes() each

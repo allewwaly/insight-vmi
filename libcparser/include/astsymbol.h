@@ -52,22 +52,22 @@ struct SymbolTransformation
      * Constructor for a transformation without parameters
      * @param type transformation type
      */
-    SymbolTransformation(SymbolTransformationType type)
-        : type(type), arrayIndex(-1) {}
+    SymbolTransformation(SymbolTransformationType type, const ASTNode* node)
+        : node(node), type(type), arrayIndex(-1) {}
 
     /**
      * Constructor for a member access transformation
      * @param member the member name that is accessed
      */
-    SymbolTransformation(const QString& member)
-        : type(ttMember), member(member), arrayIndex(-1) {}
+    SymbolTransformation(const QString& member, const ASTNode* node)
+        : node(node), type(ttMember), member(member), arrayIndex(-1) {}
 
     /**
      * Constructor for an array access transformation
      * @param arrayIndex the index of the array access
      */
-    SymbolTransformation(int arrayIndex)
-        : type(ttArray), arrayIndex(arrayIndex) {}
+    SymbolTransformation(int arrayIndex, const ASTNode* node)
+        : node(node), type(ttArray), arrayIndex(arrayIndex) {}
 
     /**
      * @return string representation of given \a type
@@ -99,6 +99,7 @@ struct SymbolTransformation
         return !operator==(other);
     }
 
+    const ASTNode* node;
     SymbolTransformationType type;
     QString member;
     int arrayIndex;
@@ -111,18 +112,29 @@ public:
     SymbolTransformations(ASTTypeEvaluator* typeEval = 0);
 
     void append(const SymbolTransformation& st);
-    void append(SymbolTransformationType type);
-    void append(const QString& member);
-    void append(int arrayIndex);
+    void append(SymbolTransformationType type, const ASTNode* node);
+    void append(const QString& member, const ASTNode* node);
+    void append(int arrayIndex, const ASTNode* node);
     void append(const ASTNodeList *suffixList);
+    void append(const SymbolTransformations& other);
 
 //    bool equals(const SymbolTransformations& other) const;
 
     int derefCount() const;
 
+    int memberCount() const;
+
     bool isPrefixOf(const SymbolTransformations &other) const;
 
-    QString toString(const QString& symbol) const;
+    /**
+     * Creates a new list including only the last \a len transformations of the
+     * current list.
+     * @param len the number of transformations to include
+     * @return new list as described above
+     */
+    SymbolTransformations right(int len) const;
+
+    QString toString(const QString& symbol = QString()) const;
 
     /**
      * @return hash value of this struct's symbol transformations
@@ -151,6 +163,12 @@ struct AssignedNode
                  const SymbolTransformations& trans, int round)
         : sym(sym), node(node), transformations(trans), addedInRound(round) {}
 
+    /// Comparison operator
+    inline bool operator==(const AssignedNode& other) const
+    {
+        return node == other.node && transformations == other.transformations;
+    }
+
     /// The Symbol this assigned node belongs to
     const ASTSymbol* sym;
     /// The node that was assigned to this symbol
@@ -159,12 +177,6 @@ struct AssignedNode
     SymbolTransformations transformations;
     /// The round in the points-to analysis this link was added
     int addedInRound;
-
-    /// Comparison operator
-    inline bool operator==(const AssignedNode& other) const
-    {
-        return node == other.node && transformations == other.transformations;
-    }
 };
 
 

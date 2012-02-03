@@ -57,21 +57,21 @@ void SymbolTransformations::append(const SymbolTransformation &st)
 }
 
 
-void SymbolTransformations::append(SymbolTransformationType type)
+void SymbolTransformations::append(SymbolTransformationType type, const ASTNode *node)
 {
-    SymbolTransformations::append(SymbolTransformation(type));
+    SymbolTransformations::append(SymbolTransformation(type, node));
 }
 
 
-void SymbolTransformations::append(const QString &member)
+void SymbolTransformations::append(const QString &member, const ASTNode *node)
 {
-    SymbolTransformations::append(SymbolTransformation(member));
+    SymbolTransformations::append(SymbolTransformation(member, node));
 }
 
 
-void SymbolTransformations::append(int arrayIndex)
+void SymbolTransformations::append(int arrayIndex, const ASTNode *node)
 {
-    SymbolTransformations::append(SymbolTransformation(arrayIndex));
+    SymbolTransformations::append(SymbolTransformation(arrayIndex, node));
 }
 
 
@@ -86,13 +86,14 @@ void SymbolTransformations::append(const ASTNodeList *suffixList)
         const ASTNode* p = suffixList->item;
         switch(p->type) {
         case nt_postfix_expression_arrow:
-            SymbolTransformations::append(SymbolTransformation(ttDereference));
+            SymbolTransformations::append(SymbolTransformation(ttDereference, p));
             // no break
 
         case nt_postfix_expression_dot:
             SymbolTransformations::append(
                         SymbolTransformation(
-                            antlrTokenToStr(p->u.postfix_expression_suffix.identifier)));
+                            antlrTokenToStr(
+                                p->u.postfix_expression_suffix.identifier), p));
             break;
 
         case nt_postfix_expression_brackets: {
@@ -103,18 +104,25 @@ void SymbolTransformations::append(const ASTNodeList *suffixList)
             int index = _typeEval ?
                         _typeEval->evaluateIntExpression(e, &ok) : -1;
             SymbolTransformations::append(
-                        SymbolTransformation(ok ? index : -1));
+                        SymbolTransformation(ok ? index : -1, p));
             break;
         }
 
         case nt_postfix_expression_parens:
-            SymbolTransformations::append(SymbolTransformation(ttFuncCall));
+            SymbolTransformations::append(SymbolTransformation(ttFuncCall, p));
             break;
 
         default:
             break;
         }
     }
+}
+
+
+void SymbolTransformations::append(const SymbolTransformations &other)
+{
+    for (int i = 0; i < other.size(); ++i)
+        SymbolTransformations::append(other[i]);
 }
 
 
@@ -160,6 +168,18 @@ int SymbolTransformations::derefCount() const
 }
 
 
+int SymbolTransformations::memberCount() const
+{
+    int mbrCnt = 0;
+
+    for (int i = 0; i < size(); ++i)
+        if (at(i).type == ttMember)
+            ++mbrCnt;
+
+    return mbrCnt;
+}
+
+
 bool SymbolTransformations::isPrefixOf(const SymbolTransformations &other) const
 {
     // If this is a prefix of other, it must not be larger
@@ -173,9 +193,19 @@ bool SymbolTransformations::isPrefixOf(const SymbolTransformations &other) const
 }
 
 
+SymbolTransformations SymbolTransformations::right(int len) const
+{
+    SymbolTransformations result(*this);
+    if (len >= 0 && len < size()) {
+        result.erase(result.begin(), result.begin() + (size() - len));
+    }
+    return result;
+}
+
+
 QString SymbolTransformations::toString(const QString &symbol) const
 {
-    QString s = symbol;
+    QString s(symbol);
 
     for (int i = 0; i < size(); ++i) {
         switch (at(i).type) {
@@ -189,10 +219,10 @@ QString SymbolTransformations::toString(const QString &symbol) const
             s += QString("[%1]").arg(at(i).arrayIndex);
             break;
         case ttDereference:
-            s = QString("(* %1)").arg(s);
+            s = QString("(*%1)").arg(s);
             break;
         case ttAddress:
-            s = QString("(& %1)").arg(s);
+            s = QString("(&%1)").arg(s);
             break;
         }
     }
