@@ -1082,15 +1082,11 @@ ASTExpression* ASTExpressionEvaluator::exprOfPostfixExpr(
                 dynamic_cast<ASTVariableExpression*>(expr);
         bool result;
 
+        // May also be a ASTRuntimeExpression
         if (var)
             result = appendPostfixExpressionSuffixes(suffixList, var);
         else
-            exprEvalError(QString("We did not find a variable expression to "
-                                  "append the postfix expressions to at "
-                                  "%2:%3:%4")
-                          .arg(_ast->fileName())
-                          .arg(node->start->line)
-                          .arg(node->start->charPosition));
+            return expr;
 
         if (!result)
             expr = createExprNode<ASTRuntimeExpression>();
@@ -1188,17 +1184,12 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(
 
         // For address operators, the child must be a variable expression
         if (op == "&" || op == "&&") {
-            if (!var)
-                exprEvalError(QString("Expected variable type for address "
-                                      "operator, but found type %1 at %2:%3:%4")
-                              .arg(expressionTypeToString(child->type()))
-                              .arg(_ast->fileName())
-                              .arg(node->start->line)
-                              .arg(node->start->charPosition));
-
-            var->appendTransformation(ttAddress);
-            if (op == "&&")
+            // Can also be a runtime expression
+            if (var) {
                 var->appendTransformation(ttAddress);
+                if (op == "&&")
+                    var->appendTransformation(ttAddress);
+            }
         }
         else if (op == "*") {
             // The child is most likely a variable
