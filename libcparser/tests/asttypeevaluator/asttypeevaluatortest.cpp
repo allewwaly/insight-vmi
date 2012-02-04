@@ -811,6 +811,10 @@ TEST_FUNCTION(castExpressions)
                 "p", "Pointer->Void", "", "Pointer->Struct(list_head)");
     CHANGE_LAST("m = (struct module*)(h)->next;",
                 "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("m = (*(struct list_head**) &(modules.next));",
+                "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_LAST("m = (*(struct list_head**) &((&modules)->next));",
+                "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
 }
 
 
@@ -859,7 +863,6 @@ TEST_FUNCTION(compoundBraces)
     NO_CHANGE("modules.next = ({ int i = 0, j = 1; i += j; h->next; });");
     CHANGE_LAST("modules.next = ({ void *p; p; });",
                 "p", "Pointer->Void", "", "Pointer->Struct(list_head)");
-
 }
 
 
@@ -986,7 +989,7 @@ TEST_FUNCTION(transitivePtrSensitivity)
                  "q", "Pointer->Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head **q; *q = modules.next; m = *q;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
-    CHANGE_FIRST("struct list_head **q; q = modules.next; m = *q;",
+    CHANGE_FIRST("struct list_head **q; q = &modules.next; m = *q;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head *p, **q; q = &p; p = modules.next; m = q;",
                  "q", "Pointer->Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
@@ -1007,15 +1010,21 @@ TEST_FUNCTION(transitiveFieldSensitivity)
     CHANGE_FIRST("h->prev->next = modules.next; m = h->prev->next;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
     CHANGE_FIRST("h->prev = modules.next; m = h->prev->prev;",
-                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", "prev", "Pointer->Struct(module)");
     CHANGE_FIRST("h->prev->prev = modules.next; m = h->prev;",
                  "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
     CHANGE_FIRST("h->next = modules.next; m = h->prev;",
                  "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
     CHANGE_FIRST("h = modules.next; m = h->prev;",
-                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", "prev", "Pointer->Struct(module)");
     CHANGE_FIRST("h->next = modules.next; m = h;",
                  "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+
+    // Field sensitivity overlapping over inter-links
+    CHANGE_FIRST("h = &modules; m = h->next;",
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+    CHANGE_FIRST("h = &m->list; m = h->next;",
+                 "m", "Struct(module)", "list.next", "Pointer->Struct(module)");
 }
 
 TEST_FUNCTION(transitivePostfixSuffixes)
@@ -1041,12 +1050,12 @@ TEST_FUNCTION(transitiveNestedPrimary)
     CHANGE_FIRST("h->prev = modules.next; m = (h)->prev;",
                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
 
-    // Nested expressions that are two different pointers to us, even though
-    // they are semantically the same
+    // Nested expressions that are syntactially different but semantically
+    // equivalent
     CHANGE_FIRST("(*h).prev = modules.next; m = h->prev;",
-                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
     CHANGE_FIRST("h->prev = modules.next; m = (*h).prev;",
-                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
 }
 
 
