@@ -41,8 +41,9 @@ SymbolTransformations::SymbolTransformations(ASTTypeEvaluator *typeEval)
 
 void SymbolTransformations::append(const SymbolTransformation &st)
 {
-    // Try to simplify transformations: merge address operators and dereferences
+    // Try to simplify transformations
     if (!isEmpty()) {
+        // Merge address operators and dereferences
         if ((st.type == ttDereference && last().type == ttAddress) ||
             (st.type == ttAddress && last().type == ttDereference))
         {
@@ -50,6 +51,10 @@ void SymbolTransformations::append(const SymbolTransformation &st)
             pop_back();
             return;
         }
+        // Through inter-links it can happen that we count two function calls
+        // in a row, so discard one
+        if (st.type == ttFuncCall && last().type == ttFuncCall)
+            return;
     }
 
     // No simplification, so append the transformation
@@ -146,8 +151,9 @@ int SymbolTransformations::derefCount() const
 {
     int deref = 0;
 
-    // Count all (de-)references before the first member access
-    for (int i = 0; i < size(); ++i) {
+    // Count all (de-)references before the first member access from right to
+    // left
+    for (int i = size() - 1; i >= 0; --i) {
         switch (at(i).type) {
         case ttArray:
         case ttDereference:
@@ -219,7 +225,11 @@ QString SymbolTransformations::toString(const QString &symbol) const
             s += QString("[%1]").arg(at(i).arrayIndex);
             break;
         case ttDereference:
-            s = QString("(*%1)").arg(s);
+            // Use array operator for easier readability
+            if (i + 1 < size() && at(i + 1).type == ttMember)
+                s += "->" + at(++i).member;
+            else
+                s = QString("(*%1)").arg(s);
             break;
         case ttAddress:
             s = QString("(&%1)").arg(s);
