@@ -118,8 +118,6 @@ public:
     void append(const ASTNodeList *suffixList);
     void append(const SymbolTransformations& other);
 
-//    bool equals(const SymbolTransformations& other) const;
-
     int derefCount() const;
 
     int memberCount() const;

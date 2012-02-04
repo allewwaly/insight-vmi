@@ -131,22 +131,6 @@ void SymbolTransformations::append(const SymbolTransformations &other)
 }
 
 
-//bool SymbolTransformations::equals(const SymbolTransformations &other) const
-//{
-//    // Compare transformations
-//    if (size() != other.size())
-//        return false;
-//    for (int i = 0; i < size(); ++i) {
-//        if (at(i).type != other.at(i).type ||
-//            at(i).arrayIndex != other.at(i).arrayIndex ||
-//            at(i).member != other.at(i).member)
-//            return false;
-//    }
-
-//    return true;
-//}
-
-
 int SymbolTransformations::derefCount() const
 {
     int deref = 0;

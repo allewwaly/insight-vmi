@@ -113,11 +113,7 @@ struct PointsToEvalState
     const ASTNode* srcNode;
     const ASTNode* root;
     const ASTNode* prevNode;
-//    const ASTNode* postExNode;
-//    int derefCount;
-//    int lastLinkDerefCount;
     SymbolTransformations lastLinkTrans;
-//    uint lastLinkSuffixHash;
     bool validLvalue;
     ASTNodeNodeHash interLinks;
     TransformedSymStack followedSymStack;
@@ -140,15 +136,11 @@ struct TypeEvalDetails
         targetNode = 0;
         rootNode = 0;
         primExNode = 0;
-//        postExNodes.clear();
         castExNode = 0;
         srcType = 0;
         ctxType = 0;
         targetType = 0;
         sym = 0;
-//        derefCount = 0;
-//        lastLinkDerefCount = 0;
-//        lastLinkSuffixHash = 0;
         transformations.clear();
         lastLinkTrans.clear();
         ctxMembers.clear();
@@ -161,16 +153,12 @@ struct TypeEvalDetails
     const ASTNode* targetNode;
     const ASTNode *rootNode;
     const ASTNode *primExNode;
-//    QList<const ASTNode*> postExNodes;
     const ASTNode *castExNode;
     ASTType* srcType;
     ASTType* ctxType;
     ASTType* targetType;
     QStringList ctxMembers;
     const ASTSymbol* sym;
-//    int derefCount;
-//    int lastLinkDerefCount;
-//    uint lastLinkSuffixHash;
     SymbolTransformations transformations;
     SymbolTransformations lastLinkTrans;
     ASTNodeNodeHash interLinks;
@@ -230,8 +218,6 @@ protected:
     /// Relevant symbol types for points-to analysis
     static const int PointsToTypes = stVariableDecl|stVariableDef|stFunctionParam;
 
-
-//    virtual void beforeChildren(const ASTNode *node, int flags);
     virtual void afterChildren(const ASTNode *node, int flags);
     void appendTransformations(const ASTNode *node,
                                SymbolTransformations *transformations) const;
@@ -253,25 +239,8 @@ protected:
      * This function is called during the execution of evaluateTypes() each
      * time a noticeable type change is detected. Override this function in
      * descendant classes to handle these type changes.
-     * @param srcNode the nt_primary_expression node of the source type
-     * @param srcType the type of the nt_primary_expression node
-     * @param srcSymbol the symbol corresponding to the primary expression of the
-     * source type
-     * @param ctxType the context type where the source type originates from
-     * @param ctxNode the last nt_postfix_expression_XXX suffix node that
-     * belongs to the context type, if any
-     * @param ctxMembers the members to follow from \a ctxType to reach the
-     * actual source type
-     * @param targetNode the root node of the target type, may be null
-     * @param targetType the type that the source type is changed to
-     * @param rootNode the root note embedding source and target, e.g., an
-     * nt_assignment_expression or an nt_init_declarator node.
+     * @param ed the evaluation details for this type change
      */
-//    virtual void primaryExpressionTypeChange(const ASTNode* srcNode,
-//            const ASTType* srcType, const ASTSymbol* srcSymbol,
-//            const ASTType* ctxType, const ASTNode* ctxNode,
-//            const QStringList& ctxMembers, const ASTNode* targetNode,
-//            const ASTType* targetType, const ASTNode* rootNode);
     virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed);
 
     /**
