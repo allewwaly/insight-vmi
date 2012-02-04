@@ -153,6 +153,7 @@ struct TypeEvalDetails
         lastLinkTrans.clear();
         ctxMembers.clear();
         interLinks.clear();
+        followInterLinks = true;
     }
 
     const ASTNode *srcNode;
@@ -174,6 +175,7 @@ struct TypeEvalDetails
     SymbolTransformations lastLinkTrans;
     ASTNodeNodeHash interLinks;
     ASTNodeStack evalNodeStack;
+    bool followInterLinks;
 };
 
 
