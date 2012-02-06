@@ -140,10 +140,11 @@ struct TypeEvalDetails
         srcType = 0;
         ctxType = 0;
         targetType = 0;
+        lastLinkSrcType = 0;
+        lastLinkDestType = 0;
         sym = 0;
         transformations.clear();
         lastLinkTrans.clear();
-        ctxMembers.clear();
         interLinks.clear();
         followInterLinks = true;
     }
@@ -157,7 +158,8 @@ struct TypeEvalDetails
     ASTType* srcType;
     ASTType* ctxType;
     ASTType* targetType;
-    QStringList ctxMembers;
+    ASTType* lastLinkSrcType;
+    ASTType* lastLinkDestType;
     const ASTSymbol* sym;
     SymbolTransformations transformations;
     SymbolTransformations lastLinkTrans;
@@ -234,6 +236,8 @@ protected:
             const SymbolTransformations& global,
             const SymbolTransformations& local,
             const SymbolTransformations& lastLink) const;
+    bool interLinkTypeMatches(const TypeEvalDetails* ed,
+                              const SymbolTransformations& localTrans) const;
 
     /**
      * This function is called during the execution of evaluateTypes() each

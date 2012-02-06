@@ -99,7 +99,9 @@ void KernelSourceParser::parse()
             ++_filesDone;
 
             // Skip assembly files
-            if (!unit->name().endsWith(".S") && unit->name().endsWith("kernel/module.c"))
+//            if (!unit->name().endsWith(".S"))
+            if (!unit->name().endsWith(".S") && _filesDone >= 28)
+//            if (!unit->name().endsWith(".S") && unit->name().endsWith("kernel/module.c"))
             {
                 _currentFile = unit->name() + ".i";
 

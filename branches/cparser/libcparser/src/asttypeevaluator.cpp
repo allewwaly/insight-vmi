@@ -3066,6 +3066,9 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
         it = ed->followInterLinks ? _assignedNodesRev.find(ed->rootNode) : e;
         // Was this node assigned to other variables?
         if (it != e) {
+            if (!interLinkTypeMatches(ed, localTrans))
+                return erInvalidTransition;
+
             SymbolTransformations combTrans = combineTansformations(
                         ed->transformations, localTrans,
                         ed->lastLinkTrans);
@@ -3090,6 +3093,11 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                     rek_ed = *ed;
                     rek_ed.rootNode = it->node;
                     rek_ed.lastLinkTrans = it->transformations;
+                    rek_ed.lastLinkSrcType = typeofNode(ed->rootNode);
+                    rek_ed.lastLinkDestType = typeofNode(
+                                it->transformations.isEmpty() ?
+                                    it->node :
+                                    it->transformations.last().node);
                     rek_ed.transformations = combTrans;
                     rek_ed.interLinks.insert(ed->rootNode, rek_ed.rootNode);
                     evaluateIdentifierUsedAsRek(&rek_ed);
@@ -3346,6 +3354,12 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
         return erInvalidTransition;
     }
 
+    // If we followed a link for which the type changed AND we have futher
+    // symbol transformations, the transformations do not fit to the changed
+    // type
+    if (!interLinkTypeMatches(ed, localTrans))
+        return erInvalidTransition;
+
     // Combine the transformations
     ed->transformations = combineTansformations(
                 ed->transformations, localTrans,
@@ -3390,6 +3404,24 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
     return erTypesAreDifferent;
 }
 
+
+bool ASTTypeEvaluator::interLinkTypeMatches(
+        const TypeEvalDetails* ed,
+        const SymbolTransformations& localTrans) const
+{
+    // If last link changed the type AND we have futher symbol
+    // transformations, they do not fit to the changed type
+    if (!ed->interLinks.isEmpty() &&
+        ed->lastLinkTrans.size() != localTrans.size() &&
+        !ed->lastLinkSrcType->equalTo(ed->lastLinkDestType))
+    {
+        // Do we have type-specific local transformations?
+        for (int i = ed->lastLinkTrans.size(); i < localTrans.size(); ++i)
+            if (localTrans[i].type & (ttMember|ttArray))
+                return false;
+    }
+    return true;
+}
 
 typedef QList<ASTType*> TypeChain;
 
@@ -3630,8 +3662,6 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
         if (searchMember) {
             switch(it->type) {
             case ttMember:
-                // Prepend name of member
-                ed->ctxMembers.prepend(it->member);
                 // Type changes here, so clear all type operations
                 ctxTypeOps.clear();
                 break;
@@ -3961,10 +3991,7 @@ void ASTTypeEvaluator::primaryExpressionTypeChange(const TypeEvalDetails &ed)
                 .arg(ed.srcNode->start->line)
                 .arg(ed.srcNode->start->charPosition)
             << ed.ctxType->toString()
-            << (ed.ctxMembers.isEmpty() ?
-                    QString() :
-                    "." + ed.ctxMembers.join(".") + " of type " +
-                        ed.srcType->toString())
+            << ed.transformations.toString()
             << " is used as " << ed.targetType->toString()
             << " via " << symScope  << " " << symType.join(" ") << " "
             << "\"" << ed.sym->name() << "\"";

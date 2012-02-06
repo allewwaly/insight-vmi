@@ -47,7 +47,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         return;
     }
     // Ignore function parameters of non-struct source types as source
-    if (ed.sym->type() == stFunctionParam && ed.ctxMembers.isEmpty()) {
+    if (ed.sym->type() == stFunctionParam && !ed.transformations.memberCount()) {
         debugmsg("Source is a paramter without struct member reference:\n" +
                  typeChangeInfo(ed));
         return;
@@ -55,7 +55,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
     // Ignore local variables of non-struct source types as source
     if ((ed.sym->type() == stVariableDecl ||
          ed.sym->type() == stVariableDef)
-            && ed.sym->isLocal() && ed.ctxMembers.isEmpty())
+            && ed.sym->isLocal() && !ed.transformations.memberCount())
     {
         debugmsg("Source is a local variable without struct member reference:\n" +
                  typeChangeInfo(ed));

@@ -169,6 +169,14 @@ int SymbolTransformations::memberCount() const
     return mbrCnt;
 }
 
+QString SymbolTransformations::lastMember() const
+{
+    for (int i = size() - 1; i >= 0; --i)
+        if (at(i).type == ttMember)
+            return at(i).member;
+    return QString();
+}
+
 
 bool SymbolTransformations::isPrefixOf(const SymbolTransformations &other) const
 {
@@ -188,6 +196,16 @@ SymbolTransformations SymbolTransformations::right(int len) const
     SymbolTransformations result(*this);
     if (len >= 0 && len < size()) {
         result.erase(result.begin(), result.begin() + (size() - len));
+    }
+    return result;
+}
+
+
+SymbolTransformations SymbolTransformations::left(int len) const
+{
+    SymbolTransformations result(*this);
+    if (len >= 0 && len < size()) {
+        result.erase(result.begin() + len, result.end());
     }
     return result;
 }
