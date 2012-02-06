@@ -28,23 +28,23 @@ public:
 
 		fSymbolName.clear();
 		fCtxType.clear();
-		fCtxMembers.clear();
+		fTransformations.clear();
 		fTargetType.clear();
 
 		lSymbolName.clear();
 		lCtxType.clear();
-		lCtxMembers.clear();
+		lTransformations.clear();
 		lTargetType.clear();
 	}
 
 	bool typeChanged;
 	QString fSymbolName;
 	QString fCtxType;
-	QString fCtxMembers;
+	QString fTransformations;
 	QString fTargetType;
 	QString lSymbolName;
 	QString lCtxType;
-	QString lCtxMembers;
+	QString lTransformations;
 	QString lTargetType;
 	int interLinks;
 
@@ -56,14 +56,14 @@ protected:
             typeChanged = true;
             fSymbolName = ed.sym->name();
             fCtxType = ed.ctxType->toString();
-            fCtxMembers = ed.ctxMembers.join(".");
+            fTransformations = ed.transformations.toString();
             fTargetType = ed.targetType->toString();
             interLinks = ed.interLinks.size();
         }
         // Last type change
         lSymbolName = ed.sym->name();
         lCtxType = ed.ctxType->toString();
-        lCtxMembers = ed.ctxMembers.join(".");
+        lTransformations = ed.transformations.toString();
         lTargetType = ed.targetType->toString();
     }
 
@@ -162,7 +162,7 @@ void ASTTypeEvaluatorTest::cleanup()
    QTest::addColumn<int>("typeChanged"); \
    QTest::addColumn<QString>("symbolName"); \
    QTest::addColumn<QString>("ctxType"); \
-   QTest::addColumn<QString>("ctxMembers"); \
+   QTest::addColumn<QString>("transformations"); \
    QTest::addColumn<QString>("targetType"); \
    QTest::addColumn<QString>("exceptionMsg");
 
@@ -229,13 +229,13 @@ void ASTTypeEvaluatorTest::cleanup()
 				if (typeChanged > 0) { \
 					QTEST(_tester->fSymbolName, "symbolName"); \
 					QTEST(_tester->fCtxType, "ctxType"); \
-					QTEST(_tester->fCtxMembers, "ctxMembers"); \
+					QTEST(_tester->fTransformations, "transformations"); \
 					QTEST(_tester->fTargetType, "targetType"); \
 				} \
 				else if (typeChanged < 0) { \
 					QTEST(_tester->lSymbolName, "symbolName"); \
 					QTEST(_tester->lCtxType, "ctxType"); \
-					QTEST(_tester->lCtxMembers, "ctxMembers"); \
+					QTEST(_tester->lTransformations, "transformations"); \
 					QTEST(_tester->lTargetType, "targetType"); \
 				} \
 			} \
@@ -394,17 +394,17 @@ TEST_FUNCTION(basicTypeChanges)
     CHANGE_LAST("m = h;",
         "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
     CHANGE_LAST("m = h->next;",
-        "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+        "h", "Struct(list_head)", "->next", "Pointer->Struct(module)");
     CHANGE_LAST("m = h->next->prev;",
-        "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+        "h", "Struct(list_head)", "->next->prev", "Pointer->Struct(module)");
 
     // Dereference after address operator
     CHANGE_LAST("m = (*(&modules)).next;",
-                "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_LAST("m = (&modules)->next;",
-        "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+        "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_LAST("m = (&modules)[0].next;",
-                "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                "modules", "Struct(list_head)", "(&)[0].next", "Pointer->Struct(module)");
 }
 
 
@@ -414,15 +414,15 @@ TEST_FUNCTION(basicCastingChanges)
 
     // Casting changes
     CHANGE_LAST("m = (struct module*)h->next;",
-        "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+        "h", "Struct(list_head)", "->next", "Pointer->Struct(module)");
     CHANGE_LAST("m = (struct list_head*)h->next;",
-        "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+        "h", "Struct(list_head)", "->next", "Pointer->Struct(module)");
     CHANGE_LAST("m = (void*)h->next;",
-        "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+        "h", "Struct(list_head)", "->next", "Pointer->Struct(module)");
 
     // list_head-like casting changes
     CHANGE_LAST("m = (struct module*)(((char*)modules.next) - __builtin_offsetof(struct module, list));",
-        "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+        "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
 }
 
 
@@ -456,7 +456,7 @@ TEST_FUNCTION(structInitializers)
     CHANGE_LAST("struct list_head foo = { .prev = (struct list_head*)m, .next = h };",
         "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
     CHANGE_LAST("struct list_head foo = { .prev = (struct list_head*)m->foo, .next = h };",
-        "m", "Struct(module)", "foo", "Pointer->Struct(list_head)");
+        "m", "Struct(module)", "->foo", "Pointer->Struct(list_head)");
     CHANGE_LAST("struct module foo = { m, { h, h } };",
         "m", "Pointer->Struct(module)", "", "Int32");
     CHANGE_LAST("struct module foo = { 0, { m, h } };",
@@ -493,7 +493,7 @@ TEST_FUNCTION(designatedInitializers)
     CHANGE_LAST2("struct list_head foo;\n", "struct list_head foo = { .prev = (struct list_head*)m, .next = h };",
         "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
     CHANGE_LAST2("struct list_head foo;\n", "struct list_head foo = { .prev = (struct list_head*)m->foo, .next = h };",
-        "m", "Struct(module)", "foo", "Pointer->Struct(list_head)");
+        "m", "Struct(module)", "->foo", "Pointer->Struct(list_head)");
     CHANGE_LAST2("struct module foo;\n", "foo = (struct module){ m, { h, h } };",
         "m", "Pointer->Struct(module)", "", "Int32");
     CHANGE_LAST2("struct module foo;\n", "foo = (struct module){ 0, { m, h } };",
@@ -530,11 +530,11 @@ TEST_FUNCTION(arrayInitializers)
     CHANGE_LAST("struct list_head a[2] = { [0] = { .prev = m, .next = h} };",
         "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
     CHANGE_LAST("struct module* a[2] = { h->next, m };",
-        "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+        "h", "Struct(list_head)", "->next", "Pointer->Struct(module)");
     CHANGE_LAST("struct module* a[2] = { h->prev, m };",
-        "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+        "h", "Struct(list_head)", "->prev", "Pointer->Struct(module)");
     CHANGE_LAST("struct module* a[2] = { [0] = h->prev };",
-        "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+        "h", "Struct(list_head)", "->prev", "Pointer->Struct(module)");
 
 }
 
@@ -654,23 +654,23 @@ TEST_FUNCTION(functionPointerInvocations)
     TEST_DATA_COLUMNS;
     // Function pointer invocations
     CHANGE_LAST2("int   (  foo)();", "void* p = foo();",
-        "foo", "Int32", "", "Pointer->Void");
+        "foo", "Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int*  (  foo)();", "void* p = foo();",
-        "foo", "Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int** (  foo)();", "void* p = foo();",
-        "foo", "Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int   (* foo)();", "void* p = foo();",
-        "foo", "Int32", "", "Pointer->Void");
+        "foo", "Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int*  (* foo)();", "void* p = foo();",
-        "foo", "Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int** (* foo)();", "void* p = foo();",
-        "foo", "Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int   (**foo)();", "void* p = foo();",
-        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "FuncPointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int*  (**foo)();", "void* p = foo();",
-        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "FuncPointer->Pointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int** (**foo)();", "void* p = foo();",
-        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "FuncPointer->Pointer->Pointer->Int32", "()", "Pointer->Void");
 }
 
 
@@ -723,11 +723,11 @@ TEST_FUNCTION(funcPtrTypdefPtrInvocations)
     TEST_DATA_COLUMNS;
     // Invocation of pointers of function pointer typedefs
     CHANGE_LAST2("typedef int   (  foodef)(); foodef *foo;", "void* p = foo();",
-        "foo", "Int32", "", "Pointer->Void");
+        "foo", "Int32", "()", "Pointer->Void");
     CHANGE_LAST2("typedef int*  (  foodef)(); foodef *foo;", "void* p = foo();",
-        "foo", "Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("typedef int** (  foodef)(); foodef *foo;", "void* p = foo();",
-        "foo", "Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->Int32", "()", "Pointer->Void");
 
     // Illegal invocation of pointers of function pointer typedefs
     EXCEPTIONAL("typedef int   (* foodef)(); foodef *foo;", "void* p = foo();",
@@ -810,11 +810,11 @@ TEST_FUNCTION(castExpressions)
     CHANGE_LAST("void *p; m = (struct module*)((struct list_head*)p)->next;",
                 "p", "Pointer->Void", "", "Pointer->Struct(list_head)");
     CHANGE_LAST("m = (struct module*)(h)->next;",
-                "h", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                "h", "Struct(list_head)", "->next", "Pointer->Struct(module)");
     CHANGE_LAST("m = (*(struct list_head**) &(modules.next));",
-                "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_LAST("m = (*(struct list_head**) &((&modules)->next));",
-                "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
 }
 
 
@@ -829,7 +829,7 @@ TEST_FUNCTION(conditionalExpressions)
                 "struct dev_type { struct bus_type* bus; }; "
                 "void* f(struct dev_type* dev) { return dev->bus ? dev->bus->name : \"\"; }",
                 "",
-                "dev", "Struct(bus_type)", "name", "Pointer->Void");
+                "dev", "Struct(bus_type)", "->bus->name", "Pointer->Void");
 }
 
 
@@ -840,20 +840,20 @@ TEST_FUNCTION(pointerDerefByArrayOperator)
     // type embedding the pointer member, in this case "struct foo"
     CHANGE_LAST2("struct foo { struct foo* next; }; struct bar { struct foo *f; };",
                 "struct bar b; void *p = b.f[0].next;",
-                "b", "Struct(foo)", "next", "Pointer->Void");
+                "b", "Struct(foo)", ".f[0].next", "Pointer->Void");
     // For arrays dereferenced by an array operator, the context type is the
     // type embedding the array, in this case "struct bar"
     CHANGE_LAST2("struct foo { struct foo* next; }; struct bar { struct foo f[4]; };",
                 "struct bar b; void *p = b.f[0].next;",
-                "b", "Struct(bar)", "f.next", "Pointer->Void");
+                "b", "Struct(bar)", ".f[0].next", "Pointer->Void");
     // If the source symbol is dereferenced, there is no difference in whether
     // it was defined as an array or as a pointer.
     CHANGE_LAST2("struct foo { struct foo* next; };",
                 "struct foo *f; void *p = f[0].next;",
-                "f", "Struct(foo)", "next", "Pointer->Void");
+                "f", "Struct(foo)", "[0].next", "Pointer->Void");
     CHANGE_LAST2("struct foo { struct foo* next; };",
                 "struct foo f[4]; void *p = f[0].next;",
-                "f", "Struct(foo)", "next", "Pointer->Void");
+                "f", "Struct(foo)", "[0].next", "Pointer->Void");
 }
 
 
@@ -871,42 +871,42 @@ TEST_FUNCTION(transitiveEvaluation)
     TEST_DATA_COLUMNS;
     // Simple transitive change
     CHANGE_FIRST("void *p = modules.next; m = p;",
-                "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_LAST("void *p = modules.next; m = p;",
                  "p", "Pointer->Void", "", "Pointer->Struct(module)");
     // Simple transitive change through long
     CHANGE_FIRST("long i = modules.next; m = i;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_LAST("long i = modules.next; m = i;",
                  "i", "Int32", "", "Pointer->Struct(module)");
     // Double indirect change through void
     CHANGE_FIRST("void *p = modules.next, *q = p; m = q;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_LAST("void *p = modules.next, *q = p; m = q;",
                 "q", "Pointer->Void", "", "Pointer->Struct(module)");
     // Double indirect change through void and long
     CHANGE_FIRST("void *p = modules.next; long i = p; m = i;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_LAST("void *p = modules.next; long i = p; m = i;",
                 "i", "Int32", "", "Pointer->Struct(module)");
     // Indirect change through list_head
     CHANGE_FIRST("h = modules.next; m = h;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_LAST("h = modules.next; m = h;",
                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
     // Doubly indirect change through list_head and void
     CHANGE_FIRST("h = modules.next; void* p = h; m = p;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_LAST("h = modules.next; void* p = h; m = p;",
                 "p", "Pointer->Void", "", "Pointer->Struct(module)");
     // Indirect change through long
     CHANGE_FIRST("long i = (long)modules.next; m = (struct modules*)i;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_LAST("long i = (long)modules.next; m = (struct modules*)i;",
                 "i", "Int32", "", "Pointer->Struct(module)");
     // Order of statements does not matter
     CHANGE_FIRST("m = h; h = modules.next;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
 }
 
 
@@ -916,25 +916,25 @@ TEST_FUNCTION(transitiveFunctions)
     // Transitivity through function
     CHANGE_FIRST2("void* getModule() { return modules.next; }",
                   "m = getModule();",
-                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next()", "Pointer->Struct(module)");
     // Transitivity through two functions
     CHANGE_FIRST2("void* getModule() { return modules.next; }"
                   "void* getModule2() { return getModule(); }",
                   "m = getModule2();",
-                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next()", "Pointer->Struct(module)");
     // Transitivity through function and variable
     CHANGE_FIRST2("void* getModule() { return modules.next; }",
                   "long l = getModule(); m = l;",
-                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next()", "Pointer->Struct(module)");
     // Transitivity through two functions and variable
     CHANGE_FIRST2("void* getModule() { return modules.next; }"
                   "void* getModule2() { return getModule(); }",
                   "long l = getModule2(); m = l;",
-                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next()", "Pointer->Struct(module)");
     // Transitivity through function and variable
     CHANGE_FIRST2("struct list_head* getModule() { return modules.next; }",
                   "h = getModule(); m = h;",
-                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next()", "Pointer->Struct(module)");
     CHANGE_LAST2("struct list_head* getModule() { return modules.next; }",
                  "h = getModule(); m = h;",
                  "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
@@ -947,38 +947,38 @@ TEST_FUNCTION(transitiveIndirectPtrs)
     TEST_DATA_COLUMNS;
     // Transitivity through 1 indirect pointer
     CHANGE_FIRST("void *p, **q; q = &p; p = modules.next; m = p;",
-                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("void *p, **q; q = &p; p = modules.next; m = *q;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("void *p, **q; q = &p; *q = modules.next; m = *q;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("void *p, **q; q = &p; *q = modules.next; m = p;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
 
     CHANGE_FIRST("void *p = modules.next, **q = &p; m = p;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("void *p = modules.next, **q = &p; m = *q;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("void *p, **q = &p; *q  = modules.next; m = *q;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("void *p, **q = &p; *q  = modules.next; m = p;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     // Transitivity through 2 indirect pointers
     CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; p = modules.next; m = *q;",
-                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; p = modules.next; m = **r;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; *q = modules.next; m = p;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; *q = modules.next; m = **r;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; **r = modules.next; m = p;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("void *p, **q, ***r; q = &p; r = &q; **r = modules.next; m = *q;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     // Transitivity through 1 direct pointer
     CHANGE_FIRST("void *p, **q; p = modules.next; *q = p; m = *q;",
-                  "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
 }
 
 TEST_FUNCTION(transitivePtrSensitivity)
@@ -988,15 +988,15 @@ TEST_FUNCTION(transitivePtrSensitivity)
     CHANGE_FIRST("struct list_head **q; *q = modules.next; m = q;",
                  "q", "Pointer->Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head **q; *q = modules.next; m = *q;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head **q; q = &modules.next; m = *q;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head *p, **q; q = &p; p = modules.next; m = q;",
                  "q", "Pointer->Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head *p, **q; q = &p; p = modules.next; m = *q;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head *p, **q; p = modules.next; *q = p; m = *q;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
 }
 
 TEST_FUNCTION(transitiveFieldSensitivity)
@@ -1004,27 +1004,27 @@ TEST_FUNCTION(transitiveFieldSensitivity)
     TEST_DATA_COLUMNS;
     // Field sensitivity of assignments
     CHANGE_FIRST("h->prev = modules.next; m = h->prev;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("h->prev->prev = modules.next; m = h->prev->prev;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("h->prev->next = modules.next; m = h->prev->next;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("h->prev = modules.next; m = h->prev->prev;",
-                 "modules", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next->prev", "Pointer->Struct(module)");
     CHANGE_FIRST("h->prev->prev = modules.next; m = h->prev;",
-                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+                 "h", "Struct(list_head)", "->prev", "Pointer->Struct(module)");
     CHANGE_FIRST("h->next = modules.next; m = h->prev;",
-                 "h", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+                 "h", "Struct(list_head)", "->prev", "Pointer->Struct(module)");
     CHANGE_FIRST("h = modules.next; m = h->prev;",
-                 "modules", "Struct(list_head)", "prev", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next->prev", "Pointer->Struct(module)");
     CHANGE_FIRST("h->next = modules.next; m = h;",
                  "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
 
     // Field sensitivity overlapping over inter-links
     CHANGE_FIRST("h = &modules; m = h->next;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("h = &m->list; m = h->next;",
-                 "m", "Struct(module)", "list.next", "Pointer->Struct(module)");
+                 "m", "Struct(module)", "->list.next", "Pointer->Struct(module)");
 }
 
 TEST_FUNCTION(transitivePostfixSuffixes)
@@ -1032,13 +1032,13 @@ TEST_FUNCTION(transitivePostfixSuffixes)
     TEST_DATA_COLUMNS;
     // Combination of bracket and arrow expressions
     CHANGE_FIRST("struct list_head **ph; ph[0]->prev = modules.next; m = ph[0]->prev;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head **ph; ph[0]->prev = modules.next; m = ph[1]->prev;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head **ph; ph[0]->prev = modules.next; m = ph[0]->next;",
-                 "ph", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "ph", "Struct(list_head)", "[0]->next", "Pointer->Struct(module)");
     CHANGE_FIRST("struct list_head **ph; ph[0]->prev = modules.next; m = ph[0];",
-                 "ph", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+                 "ph", "Pointer->Struct(list_head)", "[0]", "Pointer->Struct(module)");
 }
 
 TEST_FUNCTION(transitiveNestedPrimary)
@@ -1046,16 +1046,16 @@ TEST_FUNCTION(transitiveNestedPrimary)
     TEST_DATA_COLUMNS;
     // Nested expressions that work
     CHANGE_FIRST("(h)->prev = modules.next; m = h->prev;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("h->prev = modules.next; m = (h)->prev;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
 
     // Nested expressions that are syntactially different but semantically
     // equivalent
     CHANGE_FIRST("(*h).prev = modules.next; m = h->prev;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_FIRST("h->prev = modules.next; m = (*h).prev;",
-                 "modules", "Struct(list_head)", "next", "Pointer->Struct(module)");
+                 "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
 }
 
 
