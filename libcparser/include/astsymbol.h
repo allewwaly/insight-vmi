@@ -122,6 +122,8 @@ public:
 
     int memberCount() const;
 
+    QString lastMember() const;
+
     bool isPrefixOf(const SymbolTransformations &other) const;
 
     /**
@@ -131,6 +133,14 @@ public:
      * @return new list as described above
      */
     SymbolTransformations right(int len) const;
+
+    /**
+     * Creates a new list including only the first \a len transformations of the
+     * current list.
+     * @param len the number of transformations to include
+     * @return new list as described above
+     */
+    SymbolTransformations left(int len) const;
 
     QString toString(const QString& symbol = QString()) const;
 
