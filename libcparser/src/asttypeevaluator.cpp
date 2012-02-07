@@ -2916,10 +2916,11 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 return;
 
             // Treat any return statement as an assignment to the function
-            // definition symbol without any transformations
+            // definition symbol with a function call transformations
+            SymbolTransformations trans(this);
+            trans.append(ttFuncCall, es->root);
             if (es->root->scope->varAssignment(
-                    funcSym->name(), assigned, SymbolTransformations(),
-                    _pointsToRound))
+                    funcSym->name(), assigned, trans, _pointsToRound))
             {
 #ifdef DEBUG_POINTS_TO
                 debugmsg(QString("Function symbol \"%1\" at %2:%3 points to "
@@ -2929,8 +2930,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                          .arg(funcSym->astNode()->start->charPosition)
                          .arg(ast_node_type_to_str(assigned))
                          .arg(assigned->start->line)
-                         .arg(assigned->start->charPosition)
-                         .arg(s));
+                         .arg(assigned->start->charPosition));
 #endif
                 ++_assignments;
             }
@@ -3644,6 +3644,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
 {
     // Embedding struct in whose context we see the type change
     ed->ctxNode = ed->primExNode;
+    ed->ctxTransformations = ed->transformations;
     // Source node is the last suffix node of the last postfix expression
     ed->srcNode = (ed->transformations.isEmpty()) ?
                 ed->primExNode : ed->transformations.last().node;
@@ -3711,6 +3712,9 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
         else {
             // This is the node of the embedding struct
             ed->ctxNode = it->node;
+            // The context transformations are all that we have visited so far
+            int len = (ed->transformations.constEnd() - it) - 1;
+            ed->ctxTransformations = ed->transformations.right(len);
             break;
         }
     }
@@ -3726,7 +3730,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
         case ttArray:
             // Array operator, i.e., dereferencing
             if (!ed->ctxType || !(ed->ctxType->type() & (rtFuncPointer|rtPointer|rtArray)))
-                typeEvaluatorError(
+                typeEvaluatorError2(*ed,
                         QString("Expected a pointer or array type here instead "
                                 "of \"%1\" at %2:%3:%4")
                                 .arg(ed->ctxType ? ed->ctxType->toString() : QString())
@@ -3740,7 +3744,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
         case ttFuncCall:
             // Function operator, i.e., function call
             if (!ed->ctxType || !(ed->ctxType->type() & (rtFuncPointer)))
-                typeEvaluatorError(
+                typeEvaluatorError2(*ed,
                         QString("Expected a function pointer type here instead "
                                 "of \"%1\" at %2:%3:%4")
                                 .arg(ed->ctxType ? ed->ctxType->toString() : QString())
@@ -3762,7 +3766,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
     }
 
     if (!ed->ctxType || !ed->ctxNode)
-        typeEvaluatorError(QString("Either context type or context node is "
+        typeEvaluatorError2(*ed, QString("Either context type or context node is "
                 "null: ctxType = 0x%1, ctxNode = 0x%2")
                 .arg((quint64)ed->ctxType, 0, 16)
                            .arg((quint64)ed->ctxNode, 0, 16));
@@ -3906,14 +3910,14 @@ QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed,
     ASTSourcePrinter printer(_ast);
 #   define INDENT "    "
     QString scope;
-    if (ed.sym->type() == stVariableDef ||
-         ed.sym->type() == stVariableDecl)
+    if (ed.sym && (ed.sym->type() == stVariableDef ||
+                   ed.sym->type() == stVariableDecl))
         scope = ed.sym->isGlobal() ? "global " : "local ";
 
-    const ASTNode* srcNode = ed.primExNode->parent;
+    const ASTNode* srcNode = ed.primExNode ? ed.primExNode->parent : 0;
     if (!ed.transformations.isEmpty()) {
         srcNode = ed.transformations.last().node;
-        if (srcNode->parent->type == nt_postfix_expression)
+        if (srcNode && srcNode->parent->type == nt_postfix_expression)
             srcNode = srcNode->parent;
     }
     QString src = printer.toString(srcNode, false).trimmed();
@@ -3927,40 +3931,29 @@ QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed,
         conSrc += printer.toString(nodes[i]->parent, true);
     }
 
-    if (expr.isEmpty())
-        return QString(INDENT "Symbol: %1 (%2)\n"
-                       INDENT "Trans.: %3\n"
-                       INDENT "Source: %4 %5\n"
-                       INDENT "Target: %6 %7\n"
-                       "%8"
-                       INDENT "%9")
-                .arg(ed.sym->name(), -30)
-                .arg(scope + ed.sym->typeToString())
-                .arg(ed.transformations.toString(ed.sym->name()))
-                .arg(src + ",", -30)
-                .arg(ed.srcType->toString())
-                .arg(printer.toString(ed.targetNode, false).trimmed() + ",", -30)
-                .arg(ed.targetType->toString())
-                .arg(conSrc)
-                .arg(printer.toString(ed.rootNode, true).trimmed());
-    else
-        return QString(INDENT "Symbol: %1 (%2)\n"
-                       INDENT "Trans.: %3\n"
-                       INDENT "Source: %4 %5\n"
-                       INDENT "Target: %6 %7\n"
-                       INDENT "Expr.:  %8\n"
-                       "%9"
-                       INDENT "%10")
-                .arg(ed.sym->name(), -30)
-                .arg(scope + ed.sym->typeToString())
-                .arg(ed.transformations.toString(ed.sym->name()))
-                .arg(src + ",", -30)
-                .arg(ed.srcType->toString())
-                .arg(printer.toString(ed.targetNode, false).trimmed() + ",", -30)
-                .arg(ed.targetType->toString())
-                .arg(conSrc)
-                .arg(printer.toString(ed.rootNode, true).trimmed())
-                .arg(expr);
+    QString e;
+    if (!expr.isEmpty())
+        e = QString(INDENT "Expr.:  %1\n").arg(expr);
+
+    QString symName = ed.sym ? ed.sym->name() : QString();
+
+    return QString(INDENT "Symbol: %1 (%2)\n"
+                   INDENT "Trans.: %3\n"
+                   INDENT "Source: %4 %5\n"
+                   INDENT "Target: %6 %7\n"
+                   "%8"
+                   "%9"
+                   INDENT "%10")
+            .arg(symName, -30)
+            .arg(scope + (ed.sym ? ed.sym->typeToString() : QString()))
+            .arg(ed.transformations.toString(symName))
+            .arg(src + ",", -30)
+            .arg(ed.srcType ? ed.srcType->toString() : QString())
+            .arg(printer.toString(ed.targetNode, false).trimmed() + ",", -30)
+            .arg(ed.targetType ? ed.targetType->toString() : QString())
+            .arg(e)
+            .arg(conSrc)
+            .arg(printer.toString(ed.rootNode, true).trimmed());
 }
 
 

@@ -12,6 +12,7 @@
 #include <astdotgraph.h>
 #include "kernelsourcetypeevaluator.h"
 #include <typeevaluatorexception.h>
+#include <astsourceprinter.h>
 #include <cassert>
 #include "debug.h"
 #include "shell.h"
@@ -100,7 +101,7 @@ void KernelSourceParser::parse()
 
             // Skip assembly files
 //            if (!unit->name().endsWith(".S"))
-            if (!unit->name().endsWith(".S") && _filesDone >= 28)
+            if (!unit->name().endsWith(".S") && _filesDone >= 84)
 //            if (!unit->name().endsWith(".S") && unit->name().endsWith("kernel/module.c"))
             {
                 _currentFile = unit->name() + ".i";
@@ -160,7 +161,28 @@ void KernelSourceParser::parseFile(const QString& fileName)
 
     // Evaluate types
     KernelSourceTypeEvaluator eval(&ast, _factory);
-    if (!eval.evaluateTypes())
-        sourceParserError(QString("Error evaluating types in %1").arg(file));
+    try {
+        if (!eval.evaluateTypes())
+            sourceParserError(QString("Error evaluating types in %1").arg(file));
+    }
+    catch (TypeEvaluatorException& e) {
+        // Print the source of the embedding external declaration
+        const ASTNode* n = e.ed.srcNode;
+        while (n && n->parent) // && n->type != nt_external_declaration)
+            n = n->parent;
+
+        ASTSourcePrinter printer(&ast);
+
+        shell->out() << "\r" << flush;
+        shell->err()
+                << "********************************************" << endl
+                << "WARNING: " << e.message << endl
+                << "------------------[Source]------------------" << endl
+                << printer.toString(n, true)
+                << "------------------[/Source]-----------------" << endl
+                << "Details (may be incomplete):" << endl
+                << eval.typeChangeInfo(e.ed) << endl << flush;
+        throw;
+    }
 }
 

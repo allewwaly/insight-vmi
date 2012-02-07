@@ -144,6 +144,7 @@ struct TypeEvalDetails
         lastLinkDestType = 0;
         sym = 0;
         transformations.clear();
+        ctxTransformations.clear();
         lastLinkTrans.clear();
         interLinks.clear();
         followInterLinks = true;
@@ -162,6 +163,7 @@ struct TypeEvalDetails
     ASTType* lastLinkDestType;
     const ASTSymbol* sym;
     SymbolTransformations transformations;
+    SymbolTransformations ctxTransformations;
     SymbolTransformations lastLinkTrans;
     ASTNodeNodeHash interLinks;
     ASTNodeStack evalNodeStack;
@@ -193,6 +195,12 @@ public:
     RealType realTypeOfConstFloat(const ASTNode* node, double* value = 0) const;
     RealType realTypeOfConstInt(const ASTNode* node, quint64* value = 0) const;
     virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
+
+    /**
+     * @return a string with details about the given type change.
+     */
+    QString typeChangeInfo(const TypeEvalDetails &ed,
+                           const QString &expr = QString());
 
 protected:
     enum EvalPhase {
@@ -246,12 +254,6 @@ protected:
      * @param ed the evaluation details for this type change
      */
     virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed);
-
-    /**
-     * @return a string with details about the given type change.
-     */
-    QString typeChangeInfo(const TypeEvalDetails &ed,
-                           const QString &expr = QString());
 
     int stringLength(const ASTTokenList* list);
 
