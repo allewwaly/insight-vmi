@@ -51,10 +51,6 @@ void SymbolTransformations::append(const SymbolTransformation &st)
             pop_back();
             return;
         }
-        // Through inter-links it can happen that we count two function calls
-        // in a row, so discard one
-        if (st.type == ttFuncCall && last().type == ttFuncCall)
-            return;
     }
 
     // No simplification, so append the transformation

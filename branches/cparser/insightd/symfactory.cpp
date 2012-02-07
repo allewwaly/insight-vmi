@@ -2175,6 +2175,11 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
         factoryError(QString("Could not find top-level node for "
                              "right-hand side of expression"));
 
+    // For global variables, we have to consider all transformations for that
+    // type, otherwise only the context type's transformations
+    const SymbolTransformations& trans = ed->sym->isGlobal() ?
+                ed->transformations : ed->ctxTransformations;
+
     for (int i = 0; i < ctxBaseTypes.size(); ++i) {
         BaseType* t = ctxBaseTypes[i];
         Structured* s;
@@ -2182,43 +2187,42 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
 
         // Find the correct member of the struct or union
         int deref, cnt = 0;
-        // If the context node is not the primary expression node, we may have
-        // to skip the first transformations. For global variables, however,
-        // we start with the variable's type, not with the context type, so we
-        // don't need to skip any transitions.
-        bool skipTransitions = (ed->ctxNode != ed->primExNode) && !ed->sym->isGlobal();
-        for (int i = 0; i < ed->transformations.size(); ++i) {
-            if (skipTransitions) {
-                if (ed->transformations[i].node == ed->ctxNode) {
-                    skipTransitions = false;
-                    // The arrow operator results in to transformations
-                    while (ed->transformations[i].node == ed->ctxNode)
-                        if (++i >= ed->transformations.size())
-                            continue;
-                }
-                else
-                    continue;
-            }
-
-            switch (ed->transformations[i].type) {
+        bool error = false;
+        for (int j = 0; j < trans.size() && !error; ++j) {
+            switch (trans[j].type) {
             case ttMember: {
                 // Do not follow more members than we still have in
-                if (!(s = dynamic_cast<Structured*>(t)))
-                    factoryError(QString("Expected struct/union type "
-                                         "here but found %1 (%2)")
-                                 .arg(realTypeToStr(t->type()))
-                                 .arg(t->prettyName()));
+                if (!(s = dynamic_cast<Structured*>(t))) {
+                    error = true;
+                    // Do not throw exception if we still have candidates left
+                    if (!membersFound && i + 1 >= ctxBaseTypes.size())
+                        factoryError(QString("Expected struct/union type "
+                                             "here but found %1 (%2)")
+                                     .arg(realTypeToStr(t->type()))
+                                     .arg(t->prettyName()));
+                    break;
+                }
                 nestingMember = member; // previous struct for nested structs
-                if (!(member = s->findMember(ed->transformations[i].member)))
-                    factoryError(QString("Type \"%1\" has no member %2")
-                                 .arg(s->prettyName())
-                                 .arg(ed->transformations[i].member));
+                if (!(member = s->findMember(trans[j].member))) {
+                    error = true;
+                    // Do not throw exception if we still have candidates left
+                    if (!membersFound && i + 1 >= ctxBaseTypes.size())
+                        factoryError(QString("Type \"%1\" has no member %2")
+                                     .arg(s->prettyName())
+                                     .arg(trans[j].member));
+                    break;
+                }
                 t = member->refTypeDeep(BaseType::trLexical);
                 break;
             }
 
-            case ttArray:
             case ttDereference:
+                // If we dereference the type, we have no member anymore
+                /// @todo reset for array transformations as well?
+                member = nestingMember = 0;
+                // no break
+
+            case ttArray:
                 t = t->dereferencedBaseType(
                             BaseType::trLexicalPointersArrays, 1, &deref);
                 // The first dereference usually is not required because the
@@ -2237,7 +2241,7 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
         }
 
         // If we have a member here, it is the one whose reference is to be replaced
-        if (member) {
+        if (! error && member) {
             ++membersFound;
 
             // Inter-links hash contains links from assignment expressions
@@ -2271,7 +2275,11 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                         // Find the member within the copied type
                         t = typeCopy->dereferencedBaseType(BaseType::trLexicalAndArrays);
                         Structured* s = dynamic_cast<Structured*>(t);
-                        assert(s != 0);
+                        if (!s)
+                            factoryError(QString("Expected struct/union type "
+                                                 "here but found %1 (%2)")
+                                         .arg(realTypeToStr(t->type()))
+                                         .arg(t->prettyName()));
                         member = s->findMember(ed->transformations.lastMember());
                         assert(member != 0);
                         debugmsg(QString("Created copy (0x%1 -> 0x%2) of "

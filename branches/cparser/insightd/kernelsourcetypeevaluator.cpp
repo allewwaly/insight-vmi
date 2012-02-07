@@ -38,37 +38,37 @@ KernelSourceTypeEvaluator::~KernelSourceTypeEvaluator()
 void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         const TypeEvalDetails &ed)
 {
-    // Ignore all usages of a pointer as an integer, we cannot learn anything
-    // from that
-    if (!(ed.targetType->type() & (rtArray|rtPointer))) {
-        debugmsg("Target is no pointer:\n" +
-                 typeChangeInfo(ed));
-        /// @todo Consider function pointers as target type
-        return;
-    }
-    // Ignore function parameters of non-struct source types as source
-    if (ed.sym->type() == stFunctionParam && !ed.transformations.memberCount()) {
-        debugmsg("Source is a paramter without struct member reference:\n" +
-                 typeChangeInfo(ed));
-        return;
-    }
-    // Ignore local variables of non-struct source types as source
-    if ((ed.sym->type() == stVariableDecl ||
-         ed.sym->type() == stVariableDef)
-            && ed.sym->isLocal() && !ed.transformations.memberCount())
-    {
-        debugmsg("Source is a local variable without struct member reference:\n" +
-                 typeChangeInfo(ed));
-        return;
-    }
-    // Ignore values return by functions
-    if (ed.sym->type() == stFunctionDef ||
-        ed.sym->type() == stFunctionDecl)
-    {
-        debugmsg("Source is return value of function invocation:\n" +
-                 typeChangeInfo(ed));
-        return;
-    }
+//    // Ignore all usages of a pointer as an integer, we cannot learn anything
+//    // from that
+//    if (!(ed.targetType->type() & (rtArray|rtPointer))) {
+//        debugmsg("Target is no pointer:\n" +
+//                 typeChangeInfo(ed));
+//        /// @todo Consider function pointers as target type
+//        return;
+//    }
+//    // Ignore function parameters of non-struct source types as source
+//    if (ed.sym->type() == stFunctionParam && !ed.transformations.memberCount()) {
+//        debugmsg("Source is a paramter without struct member reference:\n" +
+//                 typeChangeInfo(ed));
+//        return;
+//    }
+//    // Ignore local variables of non-struct source types as source
+//    if ((ed.sym->type() == stVariableDecl ||
+//         ed.sym->type() == stVariableDef)
+//            && ed.sym->isLocal() && !ed.transformations.memberCount())
+//    {
+//        debugmsg("Source is a local variable without struct member reference:\n" +
+//                 typeChangeInfo(ed));
+//        return;
+//    }
+//    // Ignore values return by functions
+//    if (ed.sym->type() == stFunctionDef ||
+//        ed.sym->type() == stFunctionDecl)
+//    {
+//        debugmsg("Source is return value of function invocation:\n" +
+//                 typeChangeInfo(ed));
+//        return;
+//    }
 
     /// @todo Ignore casts from arrays to pointers of the same base type
 
