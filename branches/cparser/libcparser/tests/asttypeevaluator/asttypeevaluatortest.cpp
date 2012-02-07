@@ -916,25 +916,25 @@ TEST_FUNCTION(transitiveFunctions)
     // Transitivity through function
     CHANGE_FIRST2("void* getModule() { return modules.next; }",
                   "m = getModule();",
-                  "modules", "Struct(list_head)", ".next()", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     // Transitivity through two functions
     CHANGE_FIRST2("void* getModule() { return modules.next; }"
                   "void* getModule2() { return getModule(); }",
                   "m = getModule2();",
-                  "modules", "Struct(list_head)", ".next()", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     // Transitivity through function and variable
     CHANGE_FIRST2("void* getModule() { return modules.next; }",
                   "long l = getModule(); m = l;",
-                  "modules", "Struct(list_head)", ".next()", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     // Transitivity through two functions and variable
     CHANGE_FIRST2("void* getModule() { return modules.next; }"
                   "void* getModule2() { return getModule(); }",
                   "long l = getModule2(); m = l;",
-                  "modules", "Struct(list_head)", ".next()", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     // Transitivity through function and variable
     CHANGE_FIRST2("struct list_head* getModule() { return modules.next; }",
                   "h = getModule(); m = h;",
-                  "modules", "Struct(list_head)", ".next()", "Pointer->Struct(module)");
+                  "modules", "Struct(list_head)", ".next", "Pointer->Struct(module)");
     CHANGE_LAST2("struct list_head* getModule() { return modules.next; }",
                  "h = getModule(); m = h;",
                  "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
