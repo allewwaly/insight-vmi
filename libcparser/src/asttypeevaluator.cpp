@@ -3702,6 +3702,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
     // Go through all postfix expression suffixes from right to left
     SymbolTransformations::const_iterator it = ed->transformations.end();
     SymbolTransformations::const_iterator begin = ed->transformations.begin();
+    int memberCnt = 0;
     while (it-- != begin) {
         // Still building chain of members?
         if (searchMember) {
@@ -3709,6 +3710,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
             case ttMember:
                 // Type changes here, so clear all type operations
                 ctxTypeOps.clear();
+                ++memberCnt;
                 break;
 
             case ttDereference:
@@ -3716,12 +3718,38 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
                 ctxTypeOps.clear();
                 ctxTypeOps.push(it->type);
 
-                // Stop searching members
-                searchMember = false;
+                // Stop searching members if we found one already
+                if (memberCnt)
+                    searchMember = false;
                 break;
 
             case ttArray: {
-                ctxTypeOps.push(it->type);
+//                ctxTypeOps.push(it->type);
+                // If brackets are used on a pointer type, then this is a
+                // dereference and the next suffix is the context type,
+                // but for embedded array types we treat it the same way as a
+                // "dot" member access
+                const ASTNode* pred;
+                if (it == begin) {
+                    checkNodeType(it->node->parent, nt_postfix_expression);
+                    pred = it->node->parent
+                            ->u.postfix_expression.primary_expression;
+                }
+                else {
+                    SymbolTransformations::const_iterator tmp = it - 1;
+                    pred = tmp->node;
+                }
+                if (typeofNode(pred)->type() == rtArray)
+                    ctxTypeOps.push(it->type);
+                else {
+                    // Type changes now, so clear all pending operations
+                    ctxTypeOps.clear();
+                    // The brackets are by themselves a dereference
+                    ctxTypeOps.push(it->type);
+                    // Stop searching members if we found one already
+                    if (memberCnt)
+                    searchMember = false;
+                }
                 break;
             }
 

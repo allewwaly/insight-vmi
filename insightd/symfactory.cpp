@@ -1807,18 +1807,23 @@ BaseTypeList SymFactory::typedefsOfType(BaseType* type)
 }
 
 
-AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
+FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                                                     ASTTypeEvaluator* eval)
 {
     // Find the first non-pointer ASTType
     const ASTType* astTypeNonPtr = astType;
-    while (astTypeNonPtr && (astTypeNonPtr->type() & (rtPointer|rtArray)))
+    QList<const ASTType*> preceedingPtrs;
+    while (astTypeNonPtr && (astTypeNonPtr->type() & (rtPointer|rtArray))) {
+        // Create a list of pointer/array types preceeding astTypeNonPtr
+        preceedingPtrs.append(astTypeNonPtr);
         astTypeNonPtr = astTypeNonPtr->next();
+    }
 
     if (!astTypeNonPtr)
         factoryError("The context type has no type besides pointers.");
 
-    QList<BaseType*> baseTypes;
+    BaseTypeList baseTypes;
+    bool isVarType = false, isNestedStruct = false;
 
     // Is the context type a struct or union?
     if (astTypeNonPtr->type() & (StructOrUnion|rtEnum)) {
@@ -1860,6 +1865,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
                 }
                 else {
                     VariableList vars = _varsByName.values(id);
+                    isVarType = true;
                     for (int i = 0; i < vars.size(); ++i) {
                         // Dereference any pointers, arrays or typedefs
                         BaseType* t = vars[i]->refTypeDeep(
@@ -1880,6 +1886,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
                         ->u.declarator.direct_declarator
                         ->u.direct_declarator.identifier;
                 QString id = eval->antlrTokenToStr(tok);
+                isNestedStruct = true;
 
                 // Get the BaseType of the embedding struct
                 const ASTNode* structSpecifier = astTypeNonPtr->node()->parent;
@@ -1887,7 +1894,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
                     if (structSpecifier->type == nt_struct_or_union_specifier) {
                         // Get the ASTType for the struct, and from there the BaseType
                         ASTType* structAstType = eval->typeofNode(structSpecifier);
-                        BaseTypeList candidates = findBaseTypesForAstType(structAstType, eval).second;
+                        BaseTypeList candidates = findBaseTypesForAstType(structAstType, eval).typesNonPtr;
                         for (int i = 0; i < candidates.size(); ++i) {
                             // Now find the member of that struct by name
                             Structured* s = dynamic_cast<Structured*>(candidates[i]);
@@ -1938,7 +1945,7 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
                 if (structSpecifier->type == nt_struct_or_union_specifier) {
                     // Get the ASTType for the struct, and from there the BaseType
                     ASTType* structAstType = eval->typeofNode(structSpecifier);
-                    BaseTypeList candidates = findBaseTypesForAstType(structAstType, eval).second;
+                    BaseTypeList candidates = findBaseTypesForAstType(structAstType, eval).typesNonPtr;
                     for (int i = 0; i < candidates.size(); ++i) {
                         // Now find the member of that struct by name
                         Structured* s = dynamic_cast<Structured*>(candidates[i]);
@@ -1993,64 +2000,45 @@ AstBaseTypeList SymFactory::findBaseTypesForAstType(const ASTType* astType,
             }
         }
     }
+    // Remove all custom types (id < 0) except for types found through global
+    // variables or nested structures
+    if ( !(isNestedStruct || isVarType) ) {
+        for (int i = baseTypes.size() - 1; i >= 0; --i) {
+            if (baseTypes[i] && baseTypes[i]->id() < 0)
+                baseTypes.removeAt(i);;
+        }
+    }
 
-    return AstBaseTypeList(astTypeNonPtr, baseTypes);
-}
+    BaseTypeList candidates, nextCandidates, typesUsingSrc, ptrBaseTypes;
 
-
-void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
-                                    ASTTypeEvaluator *eval)
-{
-    // Find the source base type
-    AstBaseTypeList srcTypeRet = findBaseTypesForAstType(ed->srcType, eval);
-//    const ASTType* srcTypeNonPtr = targetTypeRet.first;
-    BaseType* srcBaseType = 0;
-    if (srcTypeRet.second.isEmpty())
-        factoryError("Could not find source BaseType.");
-    else
-        srcBaseType = srcTypeRet.second.first();
-
-    // Find the target base types
-    AstBaseTypeList targetTypeRet = findBaseTypesForAstType(ed->targetType, eval);
-    const ASTType* targetTypeNonPtr = targetTypeRet.first;
-    BaseTypeList targetBaseTypes = targetTypeRet.second;
-
-    // Create a list of pointer/array types preceeding targetTypeNonPtr
-    QList<const ASTType*> targetPointers;
-    for (const ASTType* t = ed->targetType; t != targetTypeNonPtr; t = t->next())
-        targetPointers.append(t);
-
-    BaseType* targetBaseType = 0;
-
-    // Now go through the targetBaseTypes and find its usages as pointers or
-    // arrays as in ed->targetType
-    for (int i = 0; i < targetBaseTypes.size(); ++i) {
-        BaseTypeList candidates;
-        candidates += targetBaseTypes[i];
+    // Now go through the baseTypes and find its usages as pointers or
+    // arrays as in preceedingPtrs
+    for (int i = 0; i < baseTypes.size(); ++i) {
+        candidates.clear();
+        candidates += baseTypes[i];
         // Try to match all pointer/array usages
-        for (int j = targetPointers.size() - 1; j >= 0; --j) {
-            BaseTypeList nextCandidates;
+        for (int j = preceedingPtrs.size() - 1; j >= 0; --j) {
+            nextCandidates.clear();
             // Try it on all candidates
             for (int k = 0; k < candidates.size(); ++k) {
                 BaseType* candidate = candidates[k];
                 // Get all types that use the current candidate
-                QList<BaseType*> typesUsingSrc =
-                        typesUsingId(candidate ? candidate->id() : 0);
+                typesUsingSrc = typesUsingId(candidate ? candidate->id() : 0);
 
                 // Next candidates are all that use the type in the way
                 // defined by targetPointers[j]
                 for (int l = 0; l < typesUsingSrc.size(); ++l) {
-                    if (typesUsingSrc[l]->type() == targetPointers[j]->type()) {
+                    if (typesUsingSrc[l]->type() == preceedingPtrs[j]->type()) {
                         // Match the array size, if given
-                        if (targetPointers[j]->type() == rtArray &&
-                                targetPointers[j]->arraySize() >= 0)
+                        if (preceedingPtrs[j]->type() == rtArray &&
+                                preceedingPtrs[j]->arraySize() >= 0)
                         {
                             const Array* a =
                                     dynamic_cast<Array*>(typesUsingSrc[l]);
                             // In case the array has a specified length and it
                             // does not match the expected length, then skip it.
                             if (a->length() >= 0 &&
-                                    a->length() != targetPointers[j]->arraySize())
+                                    a->length() != preceedingPtrs[j]->arraySize())
                                 continue;
                         }
                         nextCandidates.append(typesUsingSrc[l]);
@@ -2059,52 +2047,70 @@ void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
                     }
                 }
             }
-
             candidates = nextCandidates;
         }
 
         // Did we find a candidate?
         if (!candidates.isEmpty()) {
             // Just use the first
-            targetBaseType = candidates.first();
-            break;
+            ptrBaseTypes += candidates.first();
         }
-    }
-
-    if (!targetBaseType) {
-        // If possible, we create the type ourself
-        if (targetBaseTypes.size() > 0) {
-            targetBaseType = targetBaseTypes.first();
-            for (int j = targetPointers.size() - 1; j >= 0; --j) {
+        // No, so we create the type ourself
+        else {
+            BaseType* ptrBaseType = baseTypes[i];
+            for (int j = preceedingPtrs.size() - 1; j >= 0; --j) {
                 // Create "next" pointer
                 Pointer* ptr = 0;
                 Array* a = 0;
-                switch (targetPointers[j]->type()) {
+                switch (preceedingPtrs[j]->type()) {
                 case rtArray: ptr = a = new Array(this); break;
                 case rtPointer: ptr = new Pointer(this); break;
                 default: factoryError("Unexpected type: " +
-                                      realTypeToStr(targetPointers[j]->type()));
+                                      realTypeToStr(preceedingPtrs[j]->type()));
                 }
                 ptr->setId(getUniqueTypeId());
                 // For void pointers, targetBaseType is null
-                if (targetBaseType)
-                    ptr->setRefTypeId(targetBaseType->id());
+                if (ptrBaseType)
+                    ptr->setRefTypeId(ptrBaseType->id());
                 ptr->setSize(_memSpecs.sizeofUnsignedLong);
                 // For arrays, set their length
                 if (a)
-                    a->setLength(targetPointers[j]->arraySize());
+                    a->setLength(preceedingPtrs[j]->arraySize());
                 addSymbol(ptr);
-                targetBaseType = ptr;
+                ptrBaseType = ptr;
             }
-        }
-        else {
-            // It can happen that GCC excludes unused symbols from the debugging
-            // symbols, so don't fail if we don't find the target base type
-            debugerr("Could not find target BaseType: "
-                     << ed->targetType->toString());
-            return;
+
+            ptrBaseTypes += ptrBaseType;
         }
     }
+
+    return FoundBaseTypes(ptrBaseTypes, baseTypes, astTypeNonPtr);
+}
+
+
+void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
+                                    ASTTypeEvaluator *eval)
+{
+    // Find the source base type
+    FoundBaseTypes srcTypeRet = findBaseTypesForAstType(ed->srcType, eval);
+    BaseType* srcBaseType = 0;
+    if (srcTypeRet.types.isEmpty())
+        factoryError("Could not find source BaseType.");
+    else
+        srcBaseType = srcTypeRet.types.first();
+
+    // Find the target base types
+    FoundBaseTypes targetTypeRet = findBaseTypesForAstType(ed->targetType, eval);
+
+    // It can happen that GCC excludes unused symbols from the debugging
+    // symbols, so don't fail if we don't find the target base type
+    if (targetTypeRet.types.isEmpty()) {
+        debugerr("Could not find target BaseType: "
+                 << ed->targetType->toString());
+        return;
+    }
+
+    BaseType* targetBaseType = targetTypeRet.types.first();
 
     // Compare source and target type
     if (compareConflictingTypes(srcBaseType, targetBaseType) == tcIgnore) {
@@ -2147,8 +2153,9 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
 												ASTTypeEvaluator *eval)
 {
     // Find context base types
-    AstBaseTypeList ctxTypeRet = findBaseTypesForAstType(ed->ctxType, eval);
-    typeAlternateUsageStructMember2(ed, targetBaseType, ctxTypeRet.second, eval);
+    FoundBaseTypes ctxTypeRet = findBaseTypesForAstType(ed->ctxType, eval);
+    /// @todo pass along ctxTypeRet.types or ctxTypeRet.typesNonPtr?
+    typeAlternateUsageStructMember2(ed, targetBaseType, ctxTypeRet.typesNonPtr, eval);
 }
 
 
@@ -2187,11 +2194,15 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
         StructuredMember *member = 0, *nestingMember = 0;
 
         // Find the correct member of the struct or union
-        int deref, arraysCnt = 0, arraysBetweenMembers = 0, cnt = 0;
+        int deref, arraysCnt = 0, arraysBetweenMembers = 0, cnt = 0,
+                finalDerefs = 0;
         bool error = false;
         for (int j = 0; j < trans.size() && !error; ++j) {
             switch (trans[j].type) {
             case ttMember: {
+                // If this is the last transformation, then there are no final
+                // dereferences
+                finalDerefs = 0;
 
                 if (!(s = dynamic_cast<Structured*>(t))) {
                     error = true;
@@ -2223,9 +2234,11 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
 
             case ttDereference:
                 // If we dereference the type, we have no member anymore
-                /// @todo reset for array transformations as well?
                 member = nestingMember = 0;
                 arraysCnt = 0;
+                // If this is the last transformation, then we have a final
+                // dereference
+                ++finalDerefs;
                 // no break
 
             case ttArray:
@@ -2266,9 +2279,10 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                 if (nestingMember) {
                     // Was the embedding member already copied?
                     if (nestingMember->refTypeId() < 0) {
-                        debugmsg(QString("Member %1 %2 is already a type copy.")
+                        debugmsg(QString("Member \"%1\" in \"%2\" is already a "
+                                         "type copy.")
                                  .arg(nestingMember->prettyName())
-                                 .arg(nestingMember->name()));
+                                 .arg(nestingMember->belongsTo()->prettyName()));
                     }
                     // Create a copy of the embedding struct
                     else {
@@ -2311,6 +2325,25 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                 ++_totalTypesChanged;
                 if (member->altRefTypeCount() > 0)
                     ++_conflictingTypeChanges;
+
+                // If we have dereferences at the end, we need to find a
+                // different BaseType
+                if (finalDerefs) {
+                    ASTTypeList extraAstTypes;
+                    ASTType *realTargetType = ed->targetType;
+                    // Prepend target type with required no. of pointers
+                    for (int j = 0; j < finalDerefs; ++j) {
+                        realTargetType = new ASTType(rtPointer, realTargetType);
+                        extraAstTypes.append(realTargetType);
+                    }
+                    // Find new target type
+                    FoundBaseTypes targetTypeRet = findBaseTypesForAstType(realTargetType, eval);
+                    if (targetTypeRet.types.isEmpty())
+                        factoryError(QString("Did not find BaseType for real "
+                                             "target type %1")
+                                     .arg(realTargetType->toString()));
+                    targetBaseType = targetTypeRet.types.first();
+                }
 
                 member->addAltRefType(targetBaseType->id(),
                                       expr->clone(_expressions));

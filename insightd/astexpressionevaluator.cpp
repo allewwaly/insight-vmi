@@ -671,7 +671,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
     }
 
     ASTExpression* expr = 0;
-    BaseTypeList bt_list = _factory->findBaseTypesForAstType(type, _eval).second;
+    BaseTypeList bt_list = _factory->findBaseTypesForAstType(type, _eval).typesNonPtr;
 
     // Try each type of the list in turn
     for (int i = 0; i < bt_list.size(); ++i) {
@@ -856,11 +856,13 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(
                     _eval->sizeofLong() == 4 ? esUInt32 : esUInt64,
                     (quint64)_eval->sizeofLong());
     // Return alternatives for all sizes
-    AstBaseTypeList alist = _factory->findBaseTypesForAstType(type, _eval);
-    BaseTypeList list = alist.second;
+    FoundBaseTypes found = _factory->findBaseTypesForAstType(type, _eval);
+    BaseTypeList list = found.typesNonPtr;
     int arrayLen = -1;
     // Find array definitions of type
-    for (ASTType* tmp = type; tmp && tmp != alist.first; tmp = tmp->next()) {
+    for (ASTType* tmp = type; tmp && tmp != found.astTypeNonPtr;
+         tmp = tmp->next())
+    {
         // Consider length of arrays
         if (tmp->type() == rtArray && tmp->arraySize() >= 0) {
             if (arrayLen < 0)
@@ -1166,9 +1168,9 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
         }
         // Otherwise return a variable
         const ASTType* type = _eval->typeofSymbol(sym);
-        AstBaseTypeList typeList = _factory->findBaseTypesForAstType(type, _eval);
-        const BaseType* bt = typeList.second.isEmpty() ?
-                    0 : typeList.second.first();
+        FoundBaseTypes found = _factory->findBaseTypesForAstType(type, _eval);
+        const BaseType* bt = found.types.isEmpty() ?
+                    0 : found.types.first();
         expr = createExprNode<ASTVariableExpression>(bt);
     }
     else if (node->u.primary_expression.constant)
@@ -1321,10 +1323,10 @@ unsigned int ASTExpressionEvaluator::sizeofType(const ASTType *type)
 	case rtStruct:
 	case rtUnion: {
 		// Find type in the factory
-		AstBaseTypeList baseTypes =
+		FoundBaseTypes found =
 				_factory->findBaseTypesForAstType(type, _eval);
-		if (!baseTypes.second.isEmpty()) {
-			return baseTypes.second.first()->size();
+		if (!found.types.isEmpty()) {
+			return found.types.first()->size();
 		}
 		else {
 			node = type->node();
