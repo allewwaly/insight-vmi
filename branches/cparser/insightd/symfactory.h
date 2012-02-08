@@ -118,7 +118,19 @@ typedef QMultiHash<int, StructuredMember*> StructMemberMultiHash;
 /// Hash table to find all FuncParam's that use a particular type
 typedef QMultiHash<int, FuncParam*> FuncParamMultiHash;
 
-typedef QPair<const ASTType*, BaseTypeList> AstBaseTypeList;
+struct FoundBaseTypes
+{
+    FoundBaseTypes() : astTypeNonPtr(0) {}
+    FoundBaseTypes(const BaseTypeList& types, const BaseTypeList& typesNonPtr,
+                   const ASTType* astTypeNonPtr)
+        : types(types), typesNonPtr(typesNonPtr), astTypeNonPtr(astTypeNonPtr)
+    {}
+    BaseTypeList types;
+    BaseTypeList typesNonPtr;
+    const ASTType* astTypeNonPtr;
+};
+
+//typedef QList<FoundBaseType> FoundBaseTypes;
 
 typedef QPair<qint32, const Enum*> IntEnumPair;
 typedef QHash<QString, IntEnumPair> EnumStringHash;
@@ -390,7 +402,7 @@ public:
 
     void typeAlternateUsage(const TypeEvalDetails *ed, ASTTypeEvaluator* eval);
 
-    AstBaseTypeList findBaseTypesForAstType(const ASTType* astType,
+    FoundBaseTypes findBaseTypesForAstType(const ASTType* astType,
                                             ASTTypeEvaluator *eval);
 
 protected:
