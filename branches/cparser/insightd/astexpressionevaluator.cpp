@@ -657,32 +657,66 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
         return 0;
     checkNodeType(node, nt_builtin_function_offsetof);
 
-    const ASTNode *pfe = node->u.builtin_function_offsetof.postfix_expression;
-    const ASTNode* pre = pfe->u.postfix_expression.primary_expression;
     ASTType* type = _eval->typeofNode(node->u.builtin_function_offsetof.type_name);
     if (!type || !(type->type() & StructOrUnion)) {
         ASTSourcePrinter printer(_ast);
         exprEvalError(QString("Cannot find struct/union definition for \"%1\" "
                               "at %2:%3:%4")
-                      .arg(printer.toString(pfe).trimmed())
+                      .arg(printer.toString(
+                               node->u.builtin_function_offsetof.postfix_expression)
+                           .trimmed())
                       .arg(_ast->fileName())
                       .arg(node->start->line)
                       .arg(node->start->charPosition));
     }
 
+    ASTExpression* expr = 0;
+    BaseTypeList bt_list = _factory->findBaseTypesForAstType(type, _eval).second;
+
+    // Try each type of the list in turn
+    for (int i = 0; i < bt_list.size(); ++i) {
+        if (bt_list[i]->type() & StructOrUnion) {
+            bool exceptions = (i + 1 == bt_list.size());
+            expr = exprOfBuiltinFuncOffsetOfSingle(node, bt_list[i], type,
+                                                   ptsTo, exceptions);
+            if (expr)
+                return expr;
+        }
+    }
+
+
+    ASTSourcePrinter printer(_ast);
+    exprEvalError(QString("Failed to evaluate offsetof() expression for \"%1\" "
+                          "at %2:%3:%4")
+                  .arg(printer.toString(
+                           node->u.builtin_function_offsetof.postfix_expression)
+                       .trimmed())
+                  .arg(_ast->fileName())
+                  .arg(node->start->line)
+                  .arg(node->start->charPosition));
+
+    return 0;
+}
+
+
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOfSingle(
+        const ASTNode *node, const BaseType* bt, const ASTType* type,
+        const ASTNodeNodeHash& ptsTo, bool exceptions)
+{
+    if (!node)
+        return 0;
+    checkNodeType(node, nt_builtin_function_offsetof);
+
     quint64 offset = 0;
-    QString name = antlrTokenToStr(pre->u.primary_expression.identifier);
     const ASTNode *arrayIndexExpr = 0;
+    const ASTNode *pfe = node->u.builtin_function_offsetof.postfix_expression;
+    const ASTNode *pre = pfe->u.postfix_expression.primary_expression;
     const ASTNodeList *pfesl =
             pfe->u.postfix_expression.postfix_expression_suffix_list;
-    BaseType* bt = 0;
-    BaseTypeList bt_list = _factory->findBaseTypesForAstType(type, _eval).second;
-    for (int i = 0; !bt && i < bt_list.size(); ++i)
-        if (bt_list[i]->type() & StructOrUnion)
-            bt = bt_list[i];
+    QString name = antlrTokenToStr(pre->u.primary_expression.identifier);
 
-    Structured* s = 0;
-    StructuredMember* m = 0;
+    const Structured* s = 0;
+    const StructuredMember* m = 0;
 
     do {
         // Offset of array operator to member
@@ -691,8 +725,10 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
             assert(m != 0);
             assert(bt != 0);
             // The type of bt should be rtArray
-            Array* a = dynamic_cast<Array*>(bt);
-            if (!a)
+            const Array* a = dynamic_cast<const Array*>(bt);
+            if (!a) {
+                if (!exceptions)
+                    return 0;
                 exprEvalError(QString("Type \"%1\" is not an array at %2:%3:%4")
                               .arg(bt ? bt->prettyName() : QString("NULL"))
                               .arg(_ast->fileName())
@@ -702,6 +738,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
                               .arg(pfesl ?
                                        pfesl->item->start->charPosition :
                                        pfe->start->charPosition));
+            }
             // The new BaseType is the array's referencing type
             bt = a->refTypeDeep(BaseType::trLexical);
 
@@ -726,8 +763,10 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
         }
         // Offset of member by name
         else {
-            s = dynamic_cast<Structured*>(bt);
-            if (!s)
+            s = dynamic_cast<const Structured*>(bt);
+            if (!s) {
+                if (!exceptions)
+                    return 0;
                 exprEvalError(QString("Cannot find type struct/union BaseType "
                                       "for \"%1\" at %2:%3:%4")
                               .arg(type->toString())
@@ -738,9 +777,12 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
                               .arg(pfesl ?
                                        pfesl->item->start->charPosition :
                                        pfe->start->charPosition));
+            }
 
             m = s->findMember(name);
-            if (!m)
+            if (!m) {
+                if (!exceptions)
+                    return 0;
                 exprEvalError(QString("Cannot find member \"%1\" in %2 at "
                                       "%3:%4:%5")
                               .arg(name)
@@ -752,6 +794,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
                               .arg(pfesl ?
                                        pfesl->item->start->charPosition :
                                        pfe->start->charPosition));
+            }
             // Add the member's offset to total offset
             offset += m->offset();
             bt = m->refTypeDeep(BaseType::trLexical);
@@ -771,13 +814,14 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
                         ->item;
             }
             else {
+                if (!exceptions)
+                    return 0;
                 exprEvalError(QString("Unexpected postfix expression suffix "
                                       "type: %1 at %2:%3:%4")
                               .arg(ast_node_type_to_str(pfesl->item))
                               .arg(_ast->fileName())
                               .arg(node->start->line)
                               .arg(node->start->charPosition));
-
             }
             pfesl = pfesl->next;
         }
