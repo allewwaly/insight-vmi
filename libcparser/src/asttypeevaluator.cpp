@@ -840,7 +840,8 @@ const ASTSymbol* ASTTypeEvaluator::embeddingFuncSymbol(const ASTNode *node)
     const ASTSymbol* sym = node->scope->find(name, ASTScope::ssSymbols);
     assert(sym && sym->type() == stFunctionDef);
 
-    _symbolOfNode.insert(node, sym);
+    if (sym)
+        _symbolOfNode.insert(node, sym);
     return sym;
 }
 
@@ -1483,8 +1484,8 @@ const ASTSymbol* ASTTypeEvaluator::findSymbolOfDirectDeclarator(
                         .arg(node->start->charPosition));
 
         QString id = antlrTokenToStr(node->u.direct_declarator.identifier);
-        sym = node->scope->find(id);
-        _symbolOfNode.insert(node, sym);
+        if ( (sym = node->scope->find(id)) )
+            _symbolOfNode.insert(node, sym);
     }
 
     if (!sym && enableExcpetions) {
@@ -1548,10 +1549,54 @@ const ASTSymbol* ASTTypeEvaluator::findSymbolOfPrimaryExpression(
                 case nt_builtin_function_offsetof:
                     found = true;
                     break;
+                // We can stop searching for the following node types:
+                case nt_assembler_parameter:
+                case nt_assembler_statement:
+                case nt_builtin_function_alignof:
+                case nt_builtin_function_constant_p:
+                case nt_builtin_function_expect:
+                case nt_builtin_function_extract_return_addr:
+                case nt_builtin_function_object_size:
+                case nt_builtin_function_prefetch:
+                case nt_builtin_function_return_address:
+                case nt_builtin_function_sizeof:
+                case nt_builtin_function_types_compatible_p:
+                case nt_builtin_function_va_arg:
+                case nt_builtin_function_va_copy:
+                case nt_builtin_function_va_end:
+                case nt_builtin_function_va_start:
+                case nt_compound_braces_statement:
+                case nt_compound_statement:
+                case nt_declarator_suffix_brackets:
+                case nt_designated_initializer:
+                case nt_expression_statement:
+                case nt_function_definition:
+                case nt_iteration_statement_do:
+                case nt_iteration_statement_for:
+                case nt_iteration_statement_while:
+                case nt_jump_statement_goto:
+                case nt_jump_statement_return:
+                case nt_labeled_statement:
+                case nt_labeled_statement_case:
+                case nt_labeled_statement_default:
+                case nt_postfix_expression_brackets:
+                case nt_postfix_expression_parens:
+                case nt_selection_statement_if:
+                case nt_selection_statement_switch:
                 case nt_typeof_specification:
-                    // Nested typeof(), so we break here
-                    offsetofNode = 0;
+                    offsetofNode = 0; // exit loop
                     break;
+                // A binary expression with a right-hand side is not valid
+                // inside __builtin_offsetof
+                case nt_equality_expression:
+                case nt_logical_and_expression:
+                case nt_logical_or_expression:
+                case nt_relational_expression:
+                    if (offsetofNode->u.binary_expression.right) {
+                        offsetofNode = 0;
+                        break;
+                    }
+                    // no break
                 default:
                     offsetofNode = offsetofNode->parent;
                     break;
@@ -1570,9 +1615,8 @@ const ASTSymbol* ASTTypeEvaluator::findSymbolOfPrimaryExpression(
         // If we have an ASTType node, try to find most inner struct/union
         while (t && !(t->type() & StructOrUnion))
             t = t->next();
-        if (t)
-            sym = t->node()->childrenScope->find(id);
-        _symbolOfNode.insert(node, sym);
+        if (t && (sym = t->node()->childrenScope->find(id)))
+            _symbolOfNode.insert(node, sym);
     }
 
     if (!sym && enableExcpetions) {
@@ -3677,29 +3721,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
                 break;
 
             case ttArray: {
-                // If brackets are used on a pointer type, then this is a
-                // dereference and the next suffix is the context type,
-                // but for embedded array types we treat it the same way as a
-                // "dot" member access
-                const ASTNode* pred;
-                if (it == begin) {
-                    checkNodeType(it->node->parent, nt_postfix_expression);
-                    pred = it->node->parent
-                            ->u.postfix_expression.primary_expression;
-                }
-                else {
-                    SymbolTransformations::const_iterator tmp = it - 1;
-                    pred = tmp->node;
-                }
-                if (typeofNode(pred)->type() == rtArray)
-                    ctxTypeOps.push(it->type);
-                else {
-                    // Type changes now, so clear all pending operations
-                    ctxTypeOps.clear();
-                    // The brackets are by themselves a dereference
-                    ctxTypeOps.push(it->type);
-                    searchMember = false;
-                }
+                ctxTypeOps.push(it->type);
                 break;
             }
 
@@ -3860,11 +3882,15 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
         // Evaluate the context of type change
         evaluateTypeContext(ed);
 
-        // Evaluate the chain of changing types
-        ret = evaluateTypeChanges(ed);
+        if (ed->ctxType->type() == rtVoid)
+            ret = erInvalidTransition;
+        else {
+            // Evaluate the chain of changing types
+            ret = evaluateTypeChanges(ed);
 
-        if (ret == erTypesAreDifferent)
-            primaryExpressionTypeChange(*ed);
+            if (ret == erTypesAreDifferent)
+                primaryExpressionTypeChange(*ed);
+        }
     }
 
 #ifdef DEBUG_USED_AS

@@ -28,6 +28,7 @@
 #include <asttypeevaluator.h>
 #include <astnode.h>
 #include <astscopemanager.h>
+#include <abstractsyntaxtree.h>
 //#include <astsourceprinter.h>
 
 #define factoryError(x) do { throw FactoryException((x), __FILE__, __LINE__); } while (0)
@@ -2186,12 +2187,12 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
         StructuredMember *member = 0, *nestingMember = 0;
 
         // Find the correct member of the struct or union
-        int deref, cnt = 0;
+        int deref, arraysCnt = 0, arraysBetweenMembers = 0, cnt = 0;
         bool error = false;
         for (int j = 0; j < trans.size() && !error; ++j) {
             switch (trans[j].type) {
             case ttMember: {
-                // Do not follow more members than we still have in
+
                 if (!(s = dynamic_cast<Structured*>(t))) {
                     error = true;
                     // Do not throw exception if we still have candidates left
@@ -2202,7 +2203,11 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                                      .arg(t->prettyName()));
                     break;
                 }
-                nestingMember = member; // previous struct for nested structs
+                // previous struct for nested structs
+                nestingMember = member;
+                arraysBetweenMembers = arraysCnt;
+                arraysCnt = 0;
+
                 if (!(member = s->findMember(trans[j].member))) {
                     error = true;
                     // Do not throw exception if we still have candidates left
@@ -2220,6 +2225,7 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                 // If we dereference the type, we have no member anymore
                 /// @todo reset for array transformations as well?
                 member = nestingMember = 0;
+                arraysCnt = 0;
                 // no break
 
             case ttArray:
@@ -2231,6 +2237,9 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                     factoryError(QString("Failed to dereference pointer "
                                          "of type \"%1\"")
                                  .arg(t->prettyName()));
+                // Count array operators following a member
+                if (member)
+                    arraysCnt += deref;
                 break;
 
             default:
@@ -2269,17 +2278,23 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                         BaseType* typeCopy =
                                 makeDeepTypeCopy(nestingMember->refType());
                         // Update the type relations
-                        _usedByStructMembers.remove(nestingMember->refTypeId(), nestingMember);
+                        _usedByStructMembers.remove(nestingMember->refTypeId(),
+                                                    nestingMember);
                         nestingMember->setRefTypeId(typeCopy->id());
                         insertUsedBy(nestingMember);
-                        // Find the member within the copied type
-                        t = typeCopy->dereferencedBaseType(BaseType::trLexicalAndArrays);
+                        // Dereference copied type to retrieve the structured
+                        // type again, but no more than we saw array operators
+                        // in between of them
+                        t = typeCopy->dereferencedBaseType(
+                                    BaseType::trLexicalPointersArrays,
+                                    arraysBetweenMembers);
                         Structured* s = dynamic_cast<Structured*>(t);
                         if (!s)
                             factoryError(QString("Expected struct/union type "
                                                  "here but found %1 (%2)")
                                          .arg(realTypeToStr(t->type()))
                                          .arg(t->prettyName()));
+                        // Find the member within the copied type
                         member = s->findMember(ed->transformations.lastMember());
                         assert(member != 0);
                         debugmsg(QString("Created copy (0x%1 -> 0x%2) of "
@@ -2330,13 +2345,42 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
     VariableList vars = _varsByName.values(ed->sym->name());
     int varsFound = 0;
 
+    if (vars.size() > 1) {
+        // Try to narrow it down based on the source file
+        QString varFile, parsedFile = ed->sym->ast()->fileName();
+
+        VariableList::iterator it = vars.begin();
+        while (it != vars.end()) {
+            Variable* v = *it;
+            CompileUnit* unit = _sources.value(v->srcFile());
+            if (!unit)
+                debugerr(QString("Did not found compilation unit for id 0x%1")
+                         .arg((uint)v->srcFile(), 0, 16));
+            varFile = unit ? unit->name() : QString();
+            // Remove variable if its defined file name is not a substring
+            // of the parsed file name
+            if (!parsedFile.contains(varFile))
+                it = vars.erase(it);
+            else
+                ++it;
+        }
+
+        // Did we narrow down the variables?
+        if (vars.size() > 1)
+            factoryError(QString("We found %1 variables with name \"%2\" but "
+                                 "could not narrow it down to one!")
+                         .arg(vars.size())
+                         .arg(ed->sym->name()));
+    }
+
+
     assert(dynamic_cast<KernelSourceTypeEvaluator*>(eval) != 0);
     ASTExpressionEvaluator* exprEval =
             dynamic_cast<KernelSourceTypeEvaluator*>(eval)->exprEvaluator();
 
-#ifdef DEBUG
-    exprEval->clearCache();
-#endif
+//#ifdef DEBUG
+//    exprEval->clearCache();
+//#endif
 
     // Find top-level node of right-hand side for expression
     const ASTNode* right = ed->srcNode;
@@ -2356,12 +2400,6 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
     // invert the links for walking the AST down
     ASTNodeNodeHash ptsTo = invertHash(ed->interLinks);
     ASTExpression* expr = exprEval->exprOfNode(right, ptsTo);
-
-    if (vars.size() > 1)
-        factoryError(QString("We found %1 variables with name \"%2\", we "
-                             "should narrow it down to one!")
-                     .arg(vars.size())
-                     .arg(ed->sym->name()));
 
     // Find the variable(s) using the targetBaseType
     for (int i = 0; i < vars.size(); ++i) {
@@ -2448,8 +2486,15 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
     }
 
     // Do we have runtime, invalid or other expressions that we cannot evaluate?
-    if (expr->resultType() & (erRuntime|erUndefined))
+    if (expr->resultType() & (erRuntime|erUndefined)) {
+        debugmsg(QString("Changing type from \"%1\" to \"%2\" involves runtime "
+                         "expression")
+                 .arg(r->refType() ?
+                          r->refType()->prettyName() :
+                          QString("???"))
+                 .arg(targetBaseType->prettyName()));
         return false;
+    }
 
     bool changeType = true;
 
