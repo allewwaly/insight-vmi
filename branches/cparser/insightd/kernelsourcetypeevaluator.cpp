@@ -46,6 +46,12 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         /// @todo Consider function pointers as target type
         return;
     }
+    // Ignore changes from any pointer to a void pointer
+    if (ed.srcType->type() == rtPointer &&
+        ed.targetType->next()->type() == rtVoid)
+    {
+        return;
+    }
     // Ignore function parameters of non-struct source types as source
     if (ed.sym->type() == stFunctionParam && !ed.transformations.memberCount()) {
 //        debugmsg("Source is a paramter without struct member reference:\n" +
