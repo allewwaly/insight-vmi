@@ -712,15 +712,13 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
                 expr = expr->alternative();
                 index = expr->result();
             }
-            // Make sure we can evaluate the expression
+            // The array operator is allowed to have a runtime expression
             if (index.resultType != erConstant) {
-                ASTSourcePrinter printer(_ast);
-                exprEvalError(QString("Expression in brackets is not constant "
-                                      "in \"%1\" at %2:%3:%4")
-                              .arg(printer.toString(pfe).trimmed())
-                              .arg(_ast->fileName())
-                              .arg(arrayIndexExpr->start->line)
-                              .arg(arrayIndexExpr->start->charPosition));
+                if (expr->type() == etRuntimeDependent ||
+                    expr->type() == etUndefined)
+                    return expr;
+                else
+                    return createExprNode<ASTRuntimeExpression>();
             }
             // Add array offset to total offset
             offset += index.result.ui64 * bt->size();
