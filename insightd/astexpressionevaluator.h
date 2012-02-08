@@ -77,6 +77,9 @@ private:
             const ASTNode *node, const ASTNodeNodeHash& ptsTo);
     ASTExpression *exprOfBuiltinFuncOffsetOf(
             const ASTNode *node, const ASTNodeNodeHash& ptsTo);
+    ASTExpression* exprOfBuiltinFuncOffsetOfSingle(
+            const ASTNode *node, const BaseType* bt, const ASTType* type,
+            const ASTNodeNodeHash &ptsTo, bool exceptions);
     ASTExpression *exprOfBuiltinFuncSizeof(
             const ASTNode *node, const ASTNodeNodeHash& ptsTo);
     ASTExpression *exprOfBuiltinFuncTypesCompatible(
