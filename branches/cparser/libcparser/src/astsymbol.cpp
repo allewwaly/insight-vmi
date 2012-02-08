@@ -220,7 +220,8 @@ QString SymbolTransformations::toString(const QString &symbol) const
             s += "()";
             break;
         case ttArray:
-            s += QString("[%1]").arg(at(i).arrayIndex);
+            s += at(i).arrayIndex < 0 ?
+                        QString("[?]") : QString("[%1]").arg(at(i).arrayIndex);
             break;
         case ttDereference:
             // Use array operator for easier readability
