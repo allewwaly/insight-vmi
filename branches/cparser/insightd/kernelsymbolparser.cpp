@@ -141,7 +141,7 @@ void KernelSymbolParser::finishLastSymbol()
                     switch (_info->symType()) {
                     case hsSubrangeType:
                         // We ignore subInfo.type() for now...
-                        _parentInfo->setUpperBounds(_info->upperBounds());
+                        _parentInfo->addUpperBounds(_info->upperBounds());
                         break;
                     case hsEnumerator:
                         _parentInfo->addEnumValue(_info->name(), _info->constValue().toInt());

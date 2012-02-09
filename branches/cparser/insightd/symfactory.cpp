@@ -239,12 +239,26 @@ BaseType* SymFactory::createEmptyType(RealType type)
 }
 
 
+Array* SymFactory::getTypeInstance(const TypeInfo& info, int boundsIndex)
+{
+    // Create a new type from the info
+    Array* t = new Array(this, info, boundsIndex);
+    return getTypeInstance2(t, info);
+}
+
+
 template<class T>
 T* SymFactory::getTypeInstance(const TypeInfo& info)
 {
     // Create a new type from the info
     T* t = new T(this, info);
+    return getTypeInstance2(t, info);
+}
 
+
+template<class T>
+T* SymFactory::getTypeInstance2(T* t, const TypeInfo& info)
+{
     if (!t)
         genericError("Out of memory.");
 
@@ -423,6 +437,12 @@ void SymFactory::insert(BaseType* type)
 // This function was only introduced to have a more descriptive comparison
 bool SymFactory::isNewType(const TypeInfo& info, BaseType* type) const
 {
+    // For array types, the ID may be in range between info.id() and
+    // info.id() - info.upperBounds.size() for multi-dimensional arrays
+    if (info.symType() == hsArrayType) {
+        int idUpperBound = info.id() - info.upperBounds().size();
+        return (type->id() >= idUpperBound && type->id() <= info.id());
+    }
     return isNewType(info.id(), type);
 }
 
@@ -769,14 +789,20 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 void SymFactory::addSymbol(const TypeInfo& info)
 {
 	if (!isSymbolValid(info))
-		factoryError(QString("Type information for the following symbol is incomplete:\n%1").arg(info.dump()));
+		factoryError(QString("Type information for the following symbol is "
+							 "incomplete:\n%1").arg(info.dump()));
 
 	ReferencingType* ref = 0;
 	Structured* str = 0;
 
 	switch(info.symType()) {
 	case hsArrayType: {
-		ref = getTypeInstance<Array>(info);
+		// Create instances for multi-dimensional array
+		for (int i = info.upperBounds().size() - 1; i > 0; --i) {
+			Array *a = new Array(this, info, i);
+			addSymbol(a);
+		}
+		ref = getTypeInstance(info, 0);
 		break;
 	}
 	case hsBaseType: {

@@ -252,8 +252,9 @@ public:
     DataEncoding enc() const;
     void setEnc(DataEncoding enc);
 
-    IntVec& upperBounds() const;
+    const IntVec &upperBounds() const;
     void setUpperBounds(const IntVec& bounds);
+    void addUpperBounds(const IntVec& bounds);
     void addUpperBound(qint32 bound);
 
     int external() const;

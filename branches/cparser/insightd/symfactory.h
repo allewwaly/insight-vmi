@@ -24,6 +24,7 @@ class RefBaseType;
 class CompileUnit;
 class Variable;
 class Enum;
+class Array;
 class ASTType;
 class ASTTypeEvaluator;
 class TypeEvalDetails;
@@ -432,6 +433,17 @@ protected:
 	T* getTypeInstance(const TypeInfo& info);
 
 	/**
+	 * Creates or retrieves an Array based on the information provided in
+	 * \a info and returns it. If that type has already been created, it is
+	 * found and returned, otherwise a new type is created and added to the
+	 * internal lists.
+	 * @param info the type information to create a type from
+	 * @param boundsIndex index into the \a info.bounds() list for array lengths
+	 * @return a BaseType object corresponding to \a info
+	 */
+	Array* getTypeInstance(const TypeInfo& info, int boundsIndex);
+
+    /**
      * Creates a Variable based on the information provided in
      * \a info and returns it.
      * @param info the type information to create a variable from
@@ -544,6 +556,12 @@ protected:
 	}
 
 private:
+	/**
+	 * Helper function for getTypeInstance()
+	 */
+	template<class T>
+	T* getTypeInstance2(T* t, const TypeInfo& info);
+
 	/**
 	 * Generates a working <tt>struct list_head</tt> from a given, generic one.
 	 *
