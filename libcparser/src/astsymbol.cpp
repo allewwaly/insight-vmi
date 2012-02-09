@@ -216,13 +216,16 @@ QString SymbolTransformations::toString(const QString &symbol) const
         case ttMember:
             s += "." + at(i).member;
             break;
+
         case ttFuncCall:
             s += "()";
             break;
+
         case ttArray:
-            s += at(i).arrayIndex < 0 ?
+            s += (at(i).arrayIndex < 0) ?
                         QString("[?]") : QString("[%1]").arg(at(i).arrayIndex);
             break;
+
         case ttDereference:
             // Use array operator for easier readability
             if (i + 1 < size() && at(i + 1).type == ttMember)
@@ -230,6 +233,7 @@ QString SymbolTransformations::toString(const QString &symbol) const
             else
                 s = QString("(*%1)").arg(s);
             break;
+
         case ttAddress:
             s = QString("(&%1)").arg(s);
             break;
