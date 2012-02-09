@@ -2194,14 +2194,19 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
         StructuredMember *member = 0, *nestingMember = 0;
 
         // Find the correct member of the struct or union
-        int deref, arraysCnt = 0, arraysBetweenMembers = 0, cnt = 0,
+        int deref, arraysCnt = 0, arraysBetweenMembers = 0,
                 finalDerefs = 0;
         bool error = false;
         for (int j = 0; j < trans.size() && !error; ++j) {
             switch (trans[j].type) {
             case ttMember: {
-                // If this is the last transformation, then there are no final
-                // dereferences
+                // If the type was dereferenced before, we actually have no
+                // member anymore
+                if (finalDerefs)
+                    member = nestingMember = 0;
+
+                // In case this is the last transformation, then there are no
+                // final dereferences
                 finalDerefs = 0;
 
                 if (!(s = dynamic_cast<Structured*>(t))) {
@@ -2233,9 +2238,6 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
             }
 
             case ttDereference:
-                // If we dereference the type, we have no member anymore
-                member = nestingMember = 0;
-                arraysCnt = 0;
                 // If this is the last transformation, then we have a final
                 // dereference
                 ++finalDerefs;
@@ -2246,12 +2248,13 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                             BaseType::trLexicalPointersArrays, 1, &deref);
                 // The first dereference usually is not required because the
                 // context type is a non-pointer struct
-                if (cnt > 0 && deref != 1)
+                if (j > 0 && deref != 1)
                     factoryError(QString("Failed to dereference pointer "
                                          "of type \"%1\"")
                                  .arg(t->prettyName()));
-                // Count array operators following a member
-                if (member)
+                // Count array operators following a member, if type has not
+                // been dereferenced by "*" operator
+                if (trans[j].type != ttDereference)
                     arraysCnt += deref;
                 break;
 
@@ -2259,7 +2262,6 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                 // ignore
                 break;
             }
-            ++cnt;
         }
 
         // If we have a member here, it is the one whose reference is to be replaced
