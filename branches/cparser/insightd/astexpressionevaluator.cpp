@@ -118,7 +118,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(
         return 0;
 
     // Return cached value, if possible
-    if (_expressions.contains(node))
+    if (ptsTo.isEmpty() && _expressions.contains(node))
         return _expressions[node];
 
     // If this expression points to another expression, return that instead
@@ -279,7 +279,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(
                 .arg(node->start->charPosition));
     }
 
-    _expressions[node] = expr;
+    if (ptsTo.isEmpty())
+        _expressions[node] = expr;
     return expr;
 }
 
@@ -1398,8 +1399,8 @@ bool ASTExpressionEvaluator::appendPostfixExpressionSuffixes(
             // Seems to be a runtime dependent expresssion
             else
                 return false;
-        }
             break;
+        }
 
             // Any other type cannot be resolved
         default:
