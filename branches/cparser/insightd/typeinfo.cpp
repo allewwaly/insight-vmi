@@ -26,7 +26,7 @@ void TypeInfo::clear()
 	_bitSize = _bitOffset = -1;
 	_location = 0;
 	_dataMemberLoc = -1;
-	_upperBound = -1;
+	_upperBounds.clear();
 	_external = 0;
 	_sibling = -1;
 	_inlined = false;
@@ -218,15 +218,21 @@ void TypeInfo::setEnc(DataEncoding enc)
 }
 
 
-qint32 TypeInfo::upperBound() const
+IntVec& TypeInfo::upperBounds() const
 {
-	return _upperBound;
+	return _upperBounds;
 }
 
 
-void TypeInfo::setUpperBound(qint32 bound)
+void TypeInfo::setUpperBounds(const IntVec& bounds)
 {
-	_upperBound = bound;
+	_upperBounds = bounds;
+}
+
+
+void TypeInfo::addUpperBound(qint32 bound)
+{
+	_upperBounds.append(bound);
 }
 
 
@@ -352,6 +358,10 @@ QString TypeInfo::dump() const
 		if (_enc == it.value())
 			enc = it.key();
 
+	QStringList ub;
+	for (int i = 0; i < _upperBounds.size(); ++i)
+		ub.append(QString::number(_upperBounds[i]));
+
 	QString ret;
 	if (_id != 0) 		        ret += QString("  id:            0x%1\n").arg(_id, 0, 16);
 	if (_symType >= 0)          ret += QString("  symType:       %1 (%2)\n").arg(_symType).arg(symType);
@@ -363,7 +373,7 @@ QString TypeInfo::dump() const
 	if (_location > 0)          ret += QString("  location:      %1\n").arg(_location);
 	if (_dataMemberLoc >= 0)    ret += QString("  dataMemberLoc: %1\n").arg(_dataMemberLoc);
 	if (_refTypeId != 0)        ret += QString("  refTypeId:     0x%1\n").arg(_refTypeId, 0, 16);
-	if (_upperBound >= 0)       ret += QString("  upperBound:    %1\n").arg(_upperBound);
+	if (_upperBounds >= 0)      ret += QString("  upperBound(s): %1\n").arg(ub.join(", "));
 	if (_external)              ret += QString("  external:      %1\n").arg(_external);
 	if (_inlined)               ret += QString("  inlined:       %1\n").arg(_inlined);
 	if (_pcLow)                 ret += QString("  pcLow:         %1\n").arg(_pcLow);
