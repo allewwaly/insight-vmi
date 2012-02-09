@@ -15,9 +15,19 @@ Array::Array(SymFactory* factory)
 }
 
 
-Array::Array(SymFactory* factory, const TypeInfo& info)
-    : Pointer(factory, info), _length(info.upperBound() < 0 ? -1 : info.upperBound() + 1)
+Array::Array(SymFactory *factory, const TypeInfo &info, int boundsIndex)
+    : Pointer(factory, info),  _length(-1)
 {
+    if (boundsIndex >= 0 && boundsIndex < info.upperBounds().size()) {
+        _length = info.upperBounds().at(boundsIndex) + 1;
+        // Create a new ID greater than the original one, depending on the
+        // boundsIndex. For the first dimension (boundsIndex == 0), the
+        // resulting ID must equal info.id()!
+        setId(info.id() +  boundsIndex);
+        // Only the last dimension of an array refers to info.refTypeId()
+        if (boundsIndex + 1 < info.upperBounds().size())
+            setRefTypeId(id() + 1);
+    }
 }
 
 

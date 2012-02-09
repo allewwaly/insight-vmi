@@ -218,15 +218,21 @@ void TypeInfo::setEnc(DataEncoding enc)
 }
 
 
-IntVec& TypeInfo::upperBounds() const
+const IntVec& TypeInfo::upperBounds() const
 {
-	return _upperBounds;
+    return _upperBounds;
 }
 
 
 void TypeInfo::setUpperBounds(const IntVec& bounds)
 {
 	_upperBounds = bounds;
+}
+
+
+void TypeInfo::addUpperBounds(const IntVec& bounds)
+{
+	_upperBounds += bounds;
 }
 
 
@@ -373,7 +379,7 @@ QString TypeInfo::dump() const
 	if (_location > 0)          ret += QString("  location:      %1\n").arg(_location);
 	if (_dataMemberLoc >= 0)    ret += QString("  dataMemberLoc: %1\n").arg(_dataMemberLoc);
 	if (_refTypeId != 0)        ret += QString("  refTypeId:     0x%1\n").arg(_refTypeId, 0, 16);
-	if (_upperBounds >= 0)      ret += QString("  upperBound(s): %1\n").arg(ub.join(", "));
+	if (!ub.isEmpty())          ret += QString("  upperBound(s): %1\n").arg(ub.join(", "));
 	if (_external)              ret += QString("  external:      %1\n").arg(_external);
 	if (_inlined)               ret += QString("  inlined:       %1\n").arg(_inlined);
 	if (_pcLow)                 ret += QString("  pcLow:         %1\n").arg(_pcLow);

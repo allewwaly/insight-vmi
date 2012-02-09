@@ -23,8 +23,9 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
+     * @param boundsIndex index into the \a info.bounds() list for array lengths
      */
-    Array(SymFactory* factory, const TypeInfo& info);
+    Array(SymFactory* factory, const TypeInfo& info, int boundsIndex);
 
 	/**
 	 @return the actual type of that polimorphic variable
