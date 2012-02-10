@@ -100,8 +100,8 @@ void KernelSourceParser::parse()
             ++_filesDone;
 
             // Skip assembly files
-//            if (!unit->name().endsWith(".S"))
-            if (!unit->name().endsWith(".S") && _filesDone >= 1117)
+            if (!unit->name().endsWith(".S"))
+//            if (!unit->name().endsWith(".S") && _filesDone >= 1140)
 //            if (!unit->name().endsWith(".S") && unit->name().endsWith("kernel/module.c"))
             {
                 _currentFile = unit->name() + ".i";
@@ -138,7 +138,8 @@ void KernelSourceParser::parse()
 
     operationStopped();
 
-    shell->out() << "\rParsed " << _filesDone << " files in " << elapsedTime()
+    shell->out() << "\rParsed " << _filesDone << "/" << _filesDone
+                 << " files in " << elapsedTime()
                  << endl;
 
     _factory->sourceParcingFinished();
