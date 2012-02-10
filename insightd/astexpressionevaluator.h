@@ -4,6 +4,7 @@
 //#include <astwalker.h>
 #include <QHash>
 #include <QList>
+#include <QStack>
 #include <realtypes.h>
 #include "astexpression.h"
 
@@ -20,6 +21,7 @@ class AbstractSyntaxTree;
 typedef QList<ASTExpression*> ASTExpressionList;
 typedef QHash<const ASTNode*, ASTExpression*> ASTNodeExpressionHash;
 typedef QHash<const ASTNode*, const ASTNode*> ASTNodeNodeHash;
+typedef QStack<const ASTNode*> ASTNodeStack;
 
 /**
   This class evaluates expressions within a syntax tree.
@@ -107,6 +109,7 @@ private:
     AbstractSyntaxTree* _ast;
     ASTTypeEvaluator* _eval;
     SymFactory* _factory;
+    ASTNodeStack _evalNodeStack;
 };
 
 #endif // ASTEXPRESSIONEVALUATOR_H
