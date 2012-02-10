@@ -117,6 +117,46 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(
     if (!node)
         return 0;
 
+    // Push current root on the recursion tracking stack, gets auto-popped later
+    StackAutoPopper<typeof(_evalNodeStack)> autoPopper(&_evalNodeStack, node);
+    Q_UNUSED(autoPopper);
+
+    // Check for loops in recursive evaluation
+    for (int i = 0; i < _evalNodeStack.size() - 1; ++i) {
+        if (_evalNodeStack[i] == node) {
+            // If we have followed inter-links before, try it without this time
+            if (!ptsTo.isEmpty()) {
+                ASTExpressionEvaluator other(_eval, _factory);
+                ASTExpression* expr = other.exprOfNode(node, ASTNodeNodeHash());
+                if (expr)
+                    expr = expr->clone(_allExpressions);
+                return expr;
+            }
+            // Otherwise raise an error
+            else {
+                QString msg = QString("Detected loop in recursive expression "
+                                      "evaluation:\n"
+                                      "File: %1\n")
+                        .arg(_ast->fileName());
+                int cnt = 0;
+                for (int j = _evalNodeStack.size() - 1; j >= 0; --j) {
+                    const ASTNode* n = _evalNodeStack[j];
+                    msg += QString("%0%1. 0x%2 %3 at line %4:%5\n")
+                            .arg(cnt == 0 || j == i ? "->" : "  ")
+                            .arg(cnt, 4)
+                            .arg((quint64)n, 0, 16)
+                            .arg(ast_node_type_to_str(n), -35)
+                            .arg(n->start->line)
+                            .arg(n->start->charPosition);
+                    ++cnt;
+                }
+
+                exprEvalError(msg);
+            }
+        }
+    }
+
+
     // Return cached value, if possible
     if (ptsTo.isEmpty() && _expressions.contains(node))
         return _expressions[node];
