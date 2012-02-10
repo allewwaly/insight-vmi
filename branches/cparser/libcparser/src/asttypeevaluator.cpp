@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <astsourceprinter.h>
+#include <bitop.h>
 
 #ifdef DEBUG
 //#define DEBUG_POINTS_TO 1
@@ -32,17 +33,6 @@
                     .arg(_ast->fileName()) \
                     .arg(node->start->line)); \
     }
-
-template <class Stack>
-class StackAutoPopper
-{
-    Stack* _stack;
-public:
-    explicit StackAutoPopper(Stack* s, typename Stack::value_type& value)
-        : _stack(s) { _stack->push(value); }
-    ~StackAutoPopper() { _stack->pop(); }
-};
-
 
 QString ASTType::toString() const
 {
@@ -85,7 +75,7 @@ bool ASTType::equalTo(const ASTType* other, bool exactMatch) const
 
 ASTTypeEvaluator::ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong)
     : ASTWalker(ast), _sizeofLong(sizeofLong), _phase(epFindSymbols),
-      _pointsToRound(0), _assignmentsTotal(0)
+      _pointsToRound(0), _assignmentsTotal(0), _pointsToDeadEndHits(0)
 {
 }
 
@@ -103,6 +93,7 @@ bool ASTTypeEvaluator::evaluateTypes()
 {
 	_typeNodeStack.clear();
 	_pointsToRound = 0;
+	_pointsToDeadEndHits = 0;
 
 	// Phase 1: find symbols in AST
 	_phase = epFindSymbols;
@@ -113,6 +104,7 @@ bool ASTTypeEvaluator::evaluateTypes()
 	// Repeat phase 2 and 3 until no more assignments were added
 	do {
 		_assignments = 0;
+		_pointsToDeadEnds.clear();
 		++_pointsToRound;
 		// Phase 2: points-to analysis
 		_phase = epPointsTo;
@@ -2645,11 +2637,12 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
 }
 
 
-void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
+int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
 {
     // Check for loop in recursion
     if (es->evalNodeStack.contains(es->root))
-        return;
+        return 0;
+
     // Push current root on the recursion tracking stack, gets auto-popped later
     StackAutoPopper<ASTNodeStack> autoPopper(&es->evalNodeStack, es->root);
 
@@ -2685,7 +2678,18 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
     PointsToEvalState rek_es(this);
     SymbolTransformations localTrans(this);
     const ASTNode* assigned = 0;
-//    const ASTNode* localPostEx = 0;
+    int assignments = 0;
+
+#ifdef DEBUG_POINTS_TO
+    QString debugPrefix = es->debugPrefix;
+
+    debugmsg(QString("%1:%2 %3 %4 interLinks: %5")
+             .arg(es->srcNode->start->line)
+             .arg(es->srcNode->start->charPosition, -3)
+             .arg(es->sym->name(), -10)
+             .arg(es->interLinks.count(), 2)
+             .arg(debugPrefix));
+#endif
 
     while (es->root) {
         // Was this node assigned to other variables?
@@ -2694,31 +2698,50 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
             // If last link involved transformations, they must be a prefix
             // of the local transformations
             if (es->lastLinkTrans.isPrefixOf(localTrans)) {
+#ifdef DEBUG_POINTS_TO
+                int cnt = 0, total = _assignedNodesRev.count(es->root), w = 0;
+                for (int i = total; i > 0; i /= 10)
+                    ++w;
+#endif
+
                 SymbolTransformations combinedTrans = combineTansformations(
                             es->transformations, localTrans,
                             es->lastLinkTrans);
 
+                TransformedSymbol curSym, ts;
+
                 for (; it != e && it.key() == es->root; ++it) {
+#ifdef DEBUG_POINTS_TO
+                    ++cnt;
+#endif
                     // For recursion, the initial link must have been added last
                     // round, older links have been considered before
                     if (es->interLinks.isEmpty() &&
                         it->addedInRound != _pointsToRound - 1)
                         continue;
 
-                    // Find symbol of node the inter-link points to
-                    const ASTSymbol* sym = 0;
-                    if (it->node->type == nt_primary_expression)
-                        sym = findSymbolOfPrimaryExpression(it->node);
-                    else if (it->node->type == nt_direct_declarator)
-                        sym = findSymbolOfDirectDeclarator(it->node);
-                    else
-                        typeEvaluatorError(
-                                    QString("Unexpected node type: %1")
-                                        .arg(ast_node_type_to_str(it->node)));
                     // Do not follow any symbol twice
-                    TransformedSymbol ts(sym, it->transformations);
+                    ts = TransformedSymbol(it->sym, it->transformations);
                     if (es->followedSymStack.contains(ts))
                         continue;
+
+                    curSym = TransformedSymbol(es->sym, combinedTrans);
+                    const uint symHash = qHash(curSym);
+                    const uint linkTargetHash =
+                            qHash(it->node) ^  qHash(it->transformations);
+
+                    // Check if the current transformed symbol leads to a dead
+                    // end when following this inter-link.
+                    if (_pointsToRound > 1 &&
+                        _pointsToDeadEnds.contains(symHash, linkTargetHash))
+                    {
+                        ++_pointsToDeadEndHits;
+#ifdef DEBUG_POINTS_TO
+                        debugmsg("Dead end no. " << _pointsToDeadEndHits
+                                 << " for " << combinedTrans.toString(es->sym->name()));
+#endif
+                        continue;
+                    }
 
                     // Recurive points-to analysis
                     rek_es = *es;
@@ -2727,8 +2750,18 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                     rek_es.lastLinkTrans = it->transformations;
                     rek_es.transformations = combinedTrans;
                     rek_es.interLinks.insert(es->root,  rek_es.root);
+#ifdef DEBUG_POINTS_TO
+                    rek_es.debugPrefix = QString("%1 %2/%3").arg(debugPrefix)
+                            .arg(cnt, w).arg(total);
+#endif
 
-                    evaluateIdentifierPointsToRek(&rek_es);
+                    int ret = evaluateIdentifierPointsToRek(&rek_es);
+
+                    // If we had no assignments, mark this state as a dead end.
+                    // It only depends on the current, transformed symbol as
+                    // well as the target node and its link transformations.
+                    if (!ret && _pointsToRound > 1)
+                        _pointsToDeadEnds.insert(symHash, linkTargetHash);
                 }
             }
 #ifdef DEBUG_POINTS_TO
@@ -2773,7 +2806,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                             es->root->u.assignment_expression.assignment_operator);
                 // Ignore assignment operators other than "="
                 if (op != "=")
-                    return;
+                    return assignments;
 
                 // Check if local transformations are a prefix of last
                 // link's transformations
@@ -2789,13 +2822,13 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                              .arg(es->root->start->line)
                              .arg(es->root->start->charPosition));
 #endif
-                    return;
+                    return assignments;
                 }
 
                 // Ignore cases where we have a = b, replaced left-hand a with
                 // right-hand b, leading to b = b.
                 if (es->interLinks.contains(assigned))
-                    return;
+                    return assignments;
 
                 // If the dereference level of the lvalue is smaller or
                 // equal to the last link's dereference level, we shouldn't
@@ -2824,7 +2857,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                              .arg(es->root->start->line)
                              .arg(es->root->start->charPosition));
 #endif
-                    return;
+                    return assignments;
                 }
 
                 // Combine global with local transformations
@@ -2834,13 +2867,13 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
 
                 // Must be a valid lvalue
                 if (!es->validLvalue || es->transformations.derefCount() < 0)
-                    return;
+                    return assignments;
 
                 // Do not insert links for recursive expressions, we cannot
                 // resolve them anyway.
                 TransformedSymbol transSym(es->sym, es->transformations);
                 if (_symbolsBelowNode[assigned].contains(es->sym, transSym))
-                    return;
+                    return assignments;
 
                 // Record assignments for variables and parameters
                 if ((es->sym->type() & PointsToTypes) &&
@@ -2865,14 +2898,15 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                              .arg(s));
 #endif
                     ++_assignments;
+                    ++assignments;
                 }
-                return;
+                return assignments;
             }
             // Is this in the right-hand of an assignment expression?
             else if (es->root->u.assignment_expression.lvalue &&
                es->prevNode == es->root->u.assignment_expression.assignment_expression)
             {
-                return;
+                return assignments;
             }
             break;
 
@@ -2890,7 +2924,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 // We disallow following inter-links to the left-hand side of
                 // initializations, this would make no sense
                 if (!es->interLinks.isEmpty())
-                    return;
+                    return assignments;
 
                 // Combine global with local transformations. Acutally no need
                 // to trim the transformations because es->lastLinkTrans is
@@ -2922,15 +2956,16 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                              .arg(s));
 #endif
                     ++_assignments;
+                    ++assignments;
                 }
-                return;
+                return assignments;
             }
             break;
 
         case nt_initializer:
             // Is this an array or struct initializer "struct foo f = {...}" ?
             if (es->root->parent && es->root->parent->type == nt_initializer)
-                return;
+                return assignments;
             break;
 
         case nt_jump_statement_return: {
@@ -2950,14 +2985,14 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                          .arg(es->root->start->line)
                          .arg(es->root->start->charPosition));
 #endif
-                return;
+                return assignments;
             }
 
             const ASTSymbol* funcSym = embeddingFuncSymbol(es->root);
             // Do not insert links for recursive expressions, we cannot
             // resolve them anyway.
             if (_symbolsBelowNode[assigned].contains(funcSym))
-                return;
+                return assignments;
 
             // Treat any return statement as an assignment to the function
             // definition symbol with a function call transformations
@@ -2977,9 +3012,10 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                          .arg(assigned->start->charPosition));
 #endif
                 ++_assignments;
+                ++assignments;
             }
             }
-            return;
+            return assignments;
 
         case nt_postfix_expression:
             appendTransformations(es->root, &localTrans);
@@ -3045,7 +3081,7 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
         case nt_typeof_specification:
         case nt_unary_expression_dec:
         case nt_unary_expression_inc:
-            return;
+            return assignments;
 
         default:
             typeEvaluatorError(QString("Unhandled node type \"%1\" in %2 at "
@@ -3061,6 +3097,8 @@ void ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
         es->prevNode = es->root;
         es->root = es->root->parent;
     }
+
+    return assignments;
 }
 
 
@@ -4286,3 +4324,4 @@ int ASTTypeEvaluator::stringLength(const ASTTokenList *list)
 
     return len;
 }
+

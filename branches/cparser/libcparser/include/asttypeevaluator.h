@@ -17,6 +17,17 @@
 #include <QStringList>
 
 
+template <class Stack>
+class StackAutoPopper
+{
+    Stack* _stack;
+public:
+    explicit StackAutoPopper(Stack* s, typename Stack::value_type& value)
+        : _stack(s) { _stack->push(value); }
+    ~StackAutoPopper() { _stack->pop(); }
+};
+
+
 class ASTType
 {
 public:
@@ -108,6 +119,7 @@ struct PointsToEvalState
         : sym(0), transformations(typeEval), srcNode(0), root(root),
           prevNode(0), lastLinkTrans(typeEval), validLvalue(true)
     {}
+
     const ASTSymbol* sym;
     SymbolTransformations transformations;
     const ASTNode* srcNode;
@@ -118,6 +130,7 @@ struct PointsToEvalState
     ASTNodeNodeHash interLinks;
     TransformedSymStack followedSymStack;
     ASTNodeStack evalNodeStack;
+    QString debugPrefix;
 };
 
 
@@ -233,7 +246,7 @@ protected:
                                SymbolTransformations *transformations) const;
     void collectSymbols(const ASTNode *node);
     void evaluateIdentifierPointsTo(const ASTNode *node);
-    void evaluateIdentifierPointsToRek(PointsToEvalState *es);
+    int evaluateIdentifierPointsToRek(PointsToEvalState *es);
     void evaluateIdentifierPointsToRev(const ASTNode *node);
     EvalResult evaluateIdentifierUsedAs(const ASTNode *node);
     EvalResult evaluateIdentifierUsedAsRek(TypeEvalDetails *ed);
@@ -325,6 +338,8 @@ private:
     int _pointsToRound;
     int _assignments;
     int _assignmentsTotal;
+    QMultiHash<uint, uint> _pointsToDeadEnds;
+    int _pointsToDeadEndHits;
 };
 
 
