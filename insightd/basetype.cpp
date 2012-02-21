@@ -154,7 +154,7 @@ bool BaseType::operator==(const BaseType& other) const
 }
 
 
-void BaseType::readFrom(QDataStream& in)
+void BaseType::readFrom(KernelSymbolStream &in)
 {
     // Read inherited values
     Symbol::readFrom(in);
@@ -164,7 +164,7 @@ void BaseType::readFrom(QDataStream& in)
 }
 
 
-void BaseType::writeTo(QDataStream& out) const
+void BaseType::writeTo(KernelSymbolStream &out) const
 {
     // Write inherited values
     Symbol::writeTo(out);
@@ -173,14 +173,14 @@ void BaseType::writeTo(QDataStream& out) const
 }
 
 
-QDataStream& operator>>(QDataStream& in, BaseType& type)
+KernelSymbolStream& operator>>(KernelSymbolStream& in, BaseType& type)
 {
     type.readFrom(in);
     return in;
 }
 
 
-QDataStream& operator<<(QDataStream& out, const BaseType& type)
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const BaseType& type)
 {
     type.writeTo(out);
     return out;

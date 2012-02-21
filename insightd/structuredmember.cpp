@@ -69,7 +69,7 @@ Instance StructuredMember::toInstance(size_t structAddress,
 }
 
 
-void StructuredMember::readFrom(QDataStream& in)
+void StructuredMember::readFrom(KernelSymbolStream& in)
 {
     Symbol::readFrom(in);
     ReferencingType::readFrom(in);
@@ -81,7 +81,7 @@ void StructuredMember::readFrom(QDataStream& in)
 }
 
 
-void StructuredMember::writeTo(QDataStream& out) const
+void StructuredMember::writeTo(KernelSymbolStream& out) const
 {
     Symbol::writeTo(out);
     ReferencingType::writeTo(out);
@@ -90,14 +90,15 @@ void StructuredMember::writeTo(QDataStream& out) const
 }
 
 
-QDataStream& operator>>(QDataStream& in, StructuredMember& member)
+KernelSymbolStream& operator>>(KernelSymbolStream& in, StructuredMember& member)
 {
     member.readFrom(in);
     return in;
 }
 
 
-QDataStream& operator<<(QDataStream& out, const StructuredMember& member)
+KernelSymbolStream& operator<<(KernelSymbolStream& out,
+                               const StructuredMember& member)
 {
     member.writeTo(out);
     return out;

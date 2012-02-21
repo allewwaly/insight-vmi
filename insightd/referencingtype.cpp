@@ -67,7 +67,7 @@ BaseType* ReferencingType::refTypeDeep(int resolveTypes)
 }
 
 
-void ReferencingType::readFrom(QDataStream& in)
+void ReferencingType::readFrom(KernelSymbolStream& in)
 {
     QList<int> altRefTypeIds;
     in >> _refTypeId >> altRefTypeIds;
@@ -77,7 +77,7 @@ void ReferencingType::readFrom(QDataStream& in)
 }
 
 
-void ReferencingType::writeTo(QDataStream& out) const
+void ReferencingType::writeTo(KernelSymbolStream& out) const
 {
     QList<int> altRefTypeIds;
     for (int i = 0; i < _altRefTypes.size(); ++i)

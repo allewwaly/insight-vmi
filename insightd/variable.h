@@ -100,14 +100,14 @@ public:
 	 * \sa writeTo()
 	 * @param in the data stream to read the data from, must be ready to read
 	 */
-	virtual void readFrom(QDataStream& in);
+	virtual void readFrom(KernelSymbolStream &in);
 
 	/**
 	 * Writes a serialized version of this object to \a out
 	 * \sa readFrom()
 	 * @param out the data stream to write the data to, must be ready to write
 	 */
-	virtual void writeTo(QDataStream& out) const;
+	virtual void writeTo(KernelSymbolStream& out) const;
 
 protected:
     /**
@@ -129,7 +129,7 @@ protected:
 * @param var object to store the serialized data to
 * @return the data stream \a in
 */
-QDataStream& operator>>(QDataStream& in, Variable& var);
+KernelSymbolStream& operator>>(KernelSymbolStream& in, Variable& var);
 
 
 /**
@@ -138,7 +138,7 @@ QDataStream& operator>>(QDataStream& in, Variable& var);
 * @param var object to serialize
 * @return the data stream \a out
 */
-QDataStream& operator<<(QDataStream& out, const Variable& var);
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const Variable& var);
 
 
 inline size_t Variable::offset() const

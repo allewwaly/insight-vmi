@@ -64,14 +64,14 @@ Instance RefBaseType::toInstance(size_t address, VirtualMemory* vmem,
 }
 
 
-void RefBaseType::readFrom(QDataStream& in)
+void RefBaseType::readFrom(KernelSymbolStream& in)
 {
     BaseType::readFrom(in);
     ReferencingType::readFrom(in);
 }
 
 
-void RefBaseType::writeTo(QDataStream& out) const
+void RefBaseType::writeTo(KernelSymbolStream& out) const
 {
     BaseType::writeTo(out);
     ReferencingType::writeTo(out);

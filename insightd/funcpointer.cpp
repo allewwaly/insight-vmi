@@ -131,7 +131,7 @@ const FuncParam * FuncPointer::findParam(const QString &paramName) const
 }
 
 
-void FuncPointer::readFrom(QDataStream& in)
+void FuncPointer::readFrom(KernelSymbolStream& in)
 {
     RefBaseType::readFrom(in);
 
@@ -148,7 +148,7 @@ void FuncPointer::readFrom(QDataStream& in)
 }
 
 
-void FuncPointer::writeTo(QDataStream& out) const
+void FuncPointer::writeTo(KernelSymbolStream& out) const
 {
     RefBaseType::writeTo(out);
 

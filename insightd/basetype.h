@@ -6,6 +6,7 @@
 #include <QSet>
 #include <QIODevice>
 #include <realtypes.h>
+#include "kernelsymbolstream.h"
 #include "symbol.h"
 #include "genericexception.h"
 #include "sourceref.h"
@@ -174,14 +175,14 @@ public:
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in);
+    virtual void readFrom(KernelSymbolStream& in);
 
     /**
      * Writes a serialized version of this type to \a out
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const;
+    virtual void writeTo(KernelSymbolStream& out) const;
 
     /**
      * @param mem the memory device to read the data from
@@ -447,7 +448,7 @@ protected:
  * @param type object to store the serialized data to
  * @return the data stream \a in
  */
-QDataStream& operator>>(QDataStream& in, BaseType& type);
+KernelSymbolStream& operator>>(KernelSymbolStream& in, BaseType& type);
 
 
 /**
@@ -456,7 +457,7 @@ QDataStream& operator>>(QDataStream& in, BaseType& type);
  * @param type object to serialize
  * @return the data stream \a out
  */
-QDataStream& operator<<(QDataStream& out, const BaseType& type);
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const BaseType& type);
 
 
 #endif // BASETYPE_H

@@ -1230,7 +1230,7 @@ BaseType* SymFactory::makeDeepTypeCopy(BaseType* source)
 
     // Use the symbol r/w mechanism to create the copy
     QByteArray ba;
-    QDataStream data(&ba, QIODevice::ReadWrite);
+    KernelSymbolStream data(&ba, QIODevice::ReadWrite);
 
     source->writeTo(data);
     data.device()->reset();

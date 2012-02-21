@@ -7,7 +7,7 @@
 
 #include "kernelsymbolreader.h"
 #include <QIODevice>
-#include <QDataStream>
+#include "kernelsymbolstream.h"
 #include <QSet>
 #include <QPair>
 #include <QLinkedList>
@@ -36,7 +36,7 @@ void KernelSymbolReader::read()
     qint16 flags, version;
     qint32 magic, qt_stream_version;
 
-    QDataStream in(_from);
+    KernelSymbolStream in(_from);
 
     // Read the header information;
     // 1. (qint32) magic number
@@ -49,11 +49,12 @@ void KernelSymbolReader::read()
     if (magic != kSym::fileMagic)
         readerWriterError(QString("The given file magic number 0x%1 is invalid.")
                                   .arg(magic, 0, 16));
-    if (version != kSym::fileVersion)
+    if (version < kSym::VERSION_MIN || version > kSym::VERSION_MAX)
         readerWriterError(QString("Don't know how to read symbol file verison "
-                                  "%1 (our version is %2).")
+                                  "%1 (our max. version is %2).")
                                   .arg(version)
-                                  .arg(kSym::fileVersion));
+                                  .arg(kSym::VERSION_MAX));
+    in.setKSymVersion(version);
     if (qt_stream_version > in.version()) {
         std::cerr << "WARNING: This file was created with a newer version of "
             << "the Qt libraries, your system is running version " << qVersion()
