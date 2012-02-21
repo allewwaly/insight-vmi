@@ -9,7 +9,7 @@
 
 #include "kernelsymbolwriter.h"
 #include <QIODevice>
-#include <QDataStream>
+#include "kernelsymbolstream.h"
 #ifdef WRITE_ASCII_FILE
 #include <QFile>
 #include <QTextStream>
@@ -40,7 +40,7 @@ void KernelSymbolWriter::write()
     qint16 flags = 0; // kSym::flagCompressed;
 
     // First, write the header information to the uncompressed device
-    QDataStream out(_to);
+    KernelSymbolStream out(_to);
 
 #ifdef WRITE_ASCII_FILE
     QFile debugOutFile("/tmp/insight.log");

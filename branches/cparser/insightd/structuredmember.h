@@ -59,14 +59,14 @@ public:
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in);
+    virtual void readFrom(KernelSymbolStream &in);
 
     /**
      * Writes a serialized version of this object to \a out
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const;
+    virtual void writeTo(KernelSymbolStream& out) const;
 
     /**
      * @return the Struct or Union this member belongs to
@@ -121,7 +121,7 @@ inline SymFactory* StructuredMember::fac()
  * @param member object to store the serialized data to
  * @return the data stream \a in
  */
-QDataStream& operator>>(QDataStream& in, StructuredMember& member);
+KernelSymbolStream& operator>>(KernelSymbolStream& in, StructuredMember& member);
 
 
 /**
@@ -130,6 +130,6 @@ QDataStream& operator>>(QDataStream& in, StructuredMember& member);
  * @param member object to serialize
  * @return the data stream \a out
  */
-QDataStream& operator<<(QDataStream& out, const StructuredMember& member);
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const StructuredMember& member);
 
 #endif /* STRUCTUREDMEMBER_H_ */

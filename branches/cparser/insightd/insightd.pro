@@ -64,7 +64,8 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     shell_readline.cpp \
     astexpressionevaluator.cpp \
     astexpression.cpp \
-    expressionresult.cpp
+    expressionresult.cpp \
+    kernelsymbolstream.cpp
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
     memorydumpsclass.h \
@@ -127,7 +128,8 @@ HEADERS += kernelsourcetypeevaluator.h \
     astexpressionevaluator.h \
     astexpression.h \
     expressionevalexception.h \
-    expressionresult.h
+    expressionresult.h \
+    kernelsymbolstream.h
 CONFIG += console \
     debug_and_release
 QMAKE_CFLAGS_RELEASE += -O3

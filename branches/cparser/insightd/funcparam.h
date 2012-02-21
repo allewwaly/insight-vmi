@@ -46,14 +46,14 @@ public:
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in);
+    virtual void readFrom(KernelSymbolStream &in);
 
     /**
      * Writes a serialized version of this object to \a out
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const;
+    virtual void writeTo(KernelSymbolStream &out) const;
 
     /**
      * @return the function pointer or function this parameter belongs to
@@ -107,7 +107,7 @@ inline SymFactory* FuncParam::fac()
  * @param param object to store the serialized data to
  * @return the data stream \a in
  */
-QDataStream& operator>>(QDataStream& in, FuncParam& param);
+KernelSymbolStream& operator>>(KernelSymbolStream& in, FuncParam& param);
 
 
 /**
@@ -116,7 +116,7 @@ QDataStream& operator>>(QDataStream& in, FuncParam& param);
  * @param param object to serialize
  * @return the data stream \a out
  */
-QDataStream& operator<<(QDataStream& out, const FuncParam& param);
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const FuncParam& param);
 
 
 #endif // FUNCPARAM_H

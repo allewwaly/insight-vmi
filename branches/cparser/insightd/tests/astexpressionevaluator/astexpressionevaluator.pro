@@ -45,6 +45,7 @@ HEADERS += astexpressionevaluatortester.h \
     ../../longoperation.h \
     ../../kernelsymbolsclass.h \
     ../../kernelsymbolparser.h \
+    ../../kernelsymbolstream.h \
     ../../kernelsymbolreader.h \
     ../../kernelsymbolwriter.h \
     ../../memspecparser.h \
@@ -100,6 +101,7 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../longoperation.cpp \
     ../../kernelsymbolsclass.cpp \
     ../../kernelsymbolparser.cpp \
+    ../../kernelsymbolstream.cpp \
     ../../kernelsymbolreader.cpp \
     ../../kernelsymbolwriter.cpp \
     ../../memspecparser.cpp \

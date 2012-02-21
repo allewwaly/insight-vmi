@@ -191,7 +191,7 @@ public:
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in)
+    virtual void readFrom(KernelSymbolStream& in)
     {
         BaseType::readFrom(in);
         in >> _bitSize >> _bitOffset;
@@ -202,7 +202,7 @@ public:
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const
+    virtual void writeTo(KernelSymbolStream& out) const
     {
         BaseType::writeTo(out);
         out << _bitSize << _bitOffset;

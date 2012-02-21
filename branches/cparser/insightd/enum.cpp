@@ -61,7 +61,7 @@ QString Enum::toString(QIODevice* mem, size_t offset) const
 }
 
 
-void Enum::readFrom(QDataStream& in)
+void Enum::readFrom(KernelSymbolStream& in)
 {
     BaseType::readFrom(in);
 
@@ -78,7 +78,7 @@ void Enum::readFrom(QDataStream& in)
 }
 
 
-void Enum::writeTo(QDataStream& out) const
+void Enum::writeTo(KernelSymbolStream& out) const
 {
     BaseType::writeTo(out);
     out << (qint32) _enumValues.size();

@@ -99,14 +99,14 @@ QString Array::toString(QIODevice* mem, size_t offset) const
 }
 
 
-void Array::readFrom(QDataStream& in)
+void Array::readFrom(KernelSymbolStream& in)
 {
     Pointer::readFrom(in);
     in >> _length;
 }
 
 
-void Array::writeTo(QDataStream& out) const
+void Array::writeTo(KernelSymbolStream& out) const
 {
     Pointer::writeTo(out);
     out << _length;

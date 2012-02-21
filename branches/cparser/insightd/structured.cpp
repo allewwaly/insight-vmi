@@ -124,7 +124,7 @@ const StructuredMember* Structured::findMember(const QString& memberName,
 }
 
 
-void Structured::readFrom(QDataStream& in)
+void Structured::readFrom(KernelSymbolStream& in)
 {
     BaseType::readFrom(in);
 
@@ -141,7 +141,7 @@ void Structured::readFrom(QDataStream& in)
 }
 
 
-void Structured::writeTo(QDataStream& out) const
+void Structured::writeTo(KernelSymbolStream& out) const
 {
     BaseType::writeTo(out);
 
