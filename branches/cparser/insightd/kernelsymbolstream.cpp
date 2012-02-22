@@ -26,13 +26,13 @@ KernelSymbolStream::KernelSymbolStream(const QByteArray &a)
 }
 
 
-int KernelSymbolStream::kSymVersion() const
+qint16 KernelSymbolStream::kSymVersion() const
 {
     return _ksymVersion;
 }
 
 
-void KernelSymbolStream::setKSymVersion(int ver)
+void KernelSymbolStream::setKSymVersion(qint16 ver)
 {
     _ksymVersion = ver;
 }

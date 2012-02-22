@@ -34,6 +34,7 @@ class ASTTypeEvaluator;
 /// This enumeration lists the possible transformations for a symbol
 enum SymbolTransformationType
 {
+    ttNull        = 0,
     ttMember      = (1 << 0), ///< member access of a struct/union field
     ttArray       = (1 << 1), ///< array access of a pointer/array type
     ttFuncCall    = (1 << 2), ///< function invocation
@@ -48,6 +49,11 @@ enum SymbolTransformationType
  */
 struct SymbolTransformation
 {
+    /**
+     * Empty constructor
+     */
+    SymbolTransformation() : node(0), type(ttNull), arrayIndex(-1) {}
+
     /**
      * Constructor for a transformation without parameters
      * @param type transformation type
@@ -105,11 +111,15 @@ struct SymbolTransformation
     int arrayIndex;
 };
 
+QDataStream& operator>>(QDataStream& in, SymbolTransformation& trans);
+QDataStream& operator<<(QDataStream& out, const SymbolTransformation& trans);
+
+
 /// A list of symbol transformations
 class SymbolTransformations: public QList<SymbolTransformation>
 {
 public:
-    SymbolTransformations(ASTTypeEvaluator* typeEval = 0);
+    explicit SymbolTransformations(ASTTypeEvaluator* typeEval = 0);
 
     void append(const SymbolTransformation& st);
     void append(SymbolTransformationType type, const ASTNode* node);
@@ -149,6 +159,16 @@ public:
      * \sa transformations
      */
     uint hash() const;
+
+    inline ASTTypeEvaluator* typeEvaluator() const
+    {
+        return _typeEval;
+    }
+
+    inline void setTypeEvaluator(ASTTypeEvaluator* typeEval)
+    {
+        _typeEval = typeEval;
+    }
 
 private:
     QString antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok) const;

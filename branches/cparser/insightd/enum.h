@@ -23,7 +23,7 @@ public:
 	 * Constructor
 	 * @param factory the factory that created this symbol
 	 */
-	Enum(SymFactory* factory);
+	explicit Enum(SymFactory* factory);
 
     /**
      * Constructor

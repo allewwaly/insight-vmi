@@ -2,6 +2,8 @@
 #define ASTEXPRESSIONRESULT_H
 
 #include <QString>
+//#include <QDataStream>
+#include "kernelsymbolstream.h"
 
 /**
  The type of an epxression result, which may be a bit-wise combination of the
@@ -46,13 +48,13 @@ struct ExpressionResult
 {
     /// Constructor
     ExpressionResult() : resultType(erUndefined), size(esInt32) { this->result.i64 = 0; }
-    ExpressionResult(int resultType)
+    explicit ExpressionResult(int resultType)
         : resultType(resultType), size(esInt32) { this->result.i64 = 0; }
-    ExpressionResult(int resultType, ExpressionResultSize size, quint64 result)
+    explicit ExpressionResult(int resultType, ExpressionResultSize size, quint64 result)
         : resultType(resultType), size(size) { this->result.ui64 = result; }
-    ExpressionResult(int resultType, ExpressionResultSize size, float result)
+    explicit ExpressionResult(int resultType, ExpressionResultSize size, float result)
         : resultType(resultType), size(size) { this->result.f = result; }
-    ExpressionResult(int resultType, ExpressionResultSize size, double result)
+    explicit ExpressionResult(int resultType, ExpressionResultSize size, double result)
         : resultType(resultType), size(size) { this->result.d = result; }
 
     /// ORed combination of ExpressionResultType values
@@ -85,5 +87,21 @@ struct ExpressionResult
 
     QString toString() const;
 };
+
+/**
+ * Operator for native usage of the ExpressionResult struct for streams
+ * @param in data stream to read from
+ * @param type object to store the serialized data to
+ * @return the data stream \a in
+ */
+KernelSymbolStream& operator>>(KernelSymbolStream& in, ExpressionResult& result);
+
+/**
+ * Operator for native usage of the ExpressionResult struct for streams
+ * @param out data stream to write the serialized data to
+ * @param type object to serialize
+ * @return the data stream \a out
+ */
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const ExpressionResult& result);
 
 #endif // ASTEXPRESSIONRESULT_H

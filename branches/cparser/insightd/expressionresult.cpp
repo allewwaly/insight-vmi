@@ -155,3 +155,22 @@ QString ExpressionResult::toString() const
                     QString::number(value());
     }
 }
+
+
+KernelSymbolStream& operator>>(KernelSymbolStream& in, ExpressionResult& result)
+{
+    qint32 size, resultType;
+    in >> size >> resultType >> result.result.ui64;
+    result.size = (ExpressionResultSize)size;
+    result.resultType = resultType;
+    return in;
+}
+
+
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const ExpressionResult& result)
+{
+    out << (qint32) result.size;
+    out << (qint32) result.resultType;
+    out << result.result.ui64;
+    return out;
+}

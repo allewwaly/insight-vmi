@@ -70,19 +70,68 @@ BaseType* ReferencingType::refTypeDeep(int resolveTypes)
 void ReferencingType::readFrom(KernelSymbolStream& in)
 {
     QList<int> altRefTypeIds;
-    in >> _refTypeId >> altRefTypeIds;
+    _altRefTypes.clear();
 
-    for (int i = 0; i < altRefTypeIds.size(); ++i)
-        _altRefTypes.append(AltRefType(altRefTypeIds[i]));
+    switch (in.kSymVersion()) {
+    case kSym::VERSION_11:
+        in >> _refTypeId >> altRefTypeIds;
+        for (int i = 0; i < altRefTypeIds.size(); ++i)
+            _altRefTypes.append(AltRefType(altRefTypeIds[i]));
+        break;
+
+    case kSym::VERSION_12:
+        in >> _refTypeId;
+        break;
+
+    default:
+        genericError(QString("Unsupported symbol version: %1")
+                     .arg(in.kSymVersion()));
+    }
 }
 
 
 void ReferencingType::writeTo(KernelSymbolStream& out) const
 {
     QList<int> altRefTypeIds;
+
+    switch (out.kSymVersion()) {
+    case kSym::VERSION_11:
+        for (int i = 0; i < _altRefTypes.size(); ++i)
+            altRefTypeIds.append(_altRefTypes[i].id);
+        out << _refTypeId << altRefTypeIds;
+        break;
+
+    case kSym::VERSION_12:
+        out << _refTypeId;
+        break;
+
+    default:
+        genericError(QString("Unsupported symbol version: %1")
+                     .arg(out.kSymVersion()));
+    }
+}
+
+
+void ReferencingType::readAltRefTypesFrom(KernelSymbolStream& in,
+                                          SymFactory* factory)
+{
+    qint32 count;
+    AltRefType altRefType;
+    _altRefTypes.clear();
+
+    in >> count;
+    for (qint32 i = 0; i < count; ++i) {
+        altRefType.readFrom(in, factory);
+        _altRefTypes.append(altRefType);
+    }
+}
+
+
+void ReferencingType::writeAltRefTypesTo(KernelSymbolStream& out) const
+{
+    out << (qint32) _altRefTypes.size();
     for (int i = 0; i < _altRefTypes.size(); ++i)
-        altRefTypeIds.append(_altRefTypes[i].id);
-    out << _refTypeId << altRefTypeIds;
+        _altRefTypes[i].writeTo(out);
 }
 
 
@@ -259,4 +308,22 @@ const ReferencingType::AltRefType& ReferencingType::altRefType(
 
         return _altRefTypes[useIndex];
     }
+}
+
+
+void ReferencingType::AltRefType::readFrom(KernelSymbolStream &in,
+                                           SymFactory* factory)
+{
+    qint32 id;
+
+    in >> id;
+    this->id = id;
+    this->expr = ASTExpression::fromStream(in, factory);
+}
+
+
+void ReferencingType::AltRefType::writeTo(KernelSymbolStream &out) const
+{
+    out << (qint32) id;
+    ASTExpression::toStream(expr, out);
 }

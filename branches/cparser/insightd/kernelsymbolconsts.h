@@ -16,7 +16,7 @@ namespace kSym {
         VERSION_MAX = 12
     };
     static const qint32 fileMagic = 0x4B53594D; // "KSYM"
-    static const qint16 fileVersion = VERSION_11;
+    static const qint16 fileVersion = VERSION_12;
 //    static const qint16 flagCompressed = 1;
 }
 

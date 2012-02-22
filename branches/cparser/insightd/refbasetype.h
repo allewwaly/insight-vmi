@@ -19,7 +19,7 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    RefBaseType(SymFactory* factory);
+    explicit RefBaseType(SymFactory* factory);
 
     /**
      * Constructor

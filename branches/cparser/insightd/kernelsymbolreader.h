@@ -9,6 +9,7 @@
 #define KERNELSYMBOLREADER_H_
 
 #include "longoperation.h"
+#include "kernelsymbolstream.h"
 
 // forward declarations
 class QIODevice;
@@ -43,6 +44,8 @@ protected:
      */
     virtual void operationProgress();
 
+    void readVersion11(KernelSymbolStream& in);
+    void readVersion12(KernelSymbolStream& in);
 private:
     /// Encodes the reading phases of the reading process
     enum Phases {

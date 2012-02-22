@@ -26,7 +26,7 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    NumericBaseType(SymFactory* factory)
+    explicit NumericBaseType(SymFactory* factory)
         : BaseType(factory), _type(realType)
     {
     }
