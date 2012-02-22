@@ -17,7 +17,7 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    Array(SymFactory* factory);
+    explicit Array(SymFactory* factory);
 
     /**
      * Constructor

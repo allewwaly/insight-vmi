@@ -8,6 +8,7 @@
 const char* expressionTypeToString(ExpressionType type)
 {
     switch (type) {
+    case etNull:                return "etNull";
     case etVoid:                return "etVoid";
     case etUndefined:           return "etUndefined";
     case etRuntimeDependent:    return "etRuntimeDependent";
@@ -41,6 +42,76 @@ const char* expressionTypeToString(ExpressionType type)
     case etUnaryNot:            return "etUnaryNot";
     }
     return "UNKNOWN";
+}
+
+
+void ASTExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
+{
+    // Read alternative
+    _alternative = fromStream(in, factory);
+}
+
+
+void ASTExpression::writeTo(KernelSymbolStream &out) const
+{
+    out << (qint32) type();
+    toStream(_alternative, out);
+}
+
+
+ASTExpression* ASTExpression::fromStream(KernelSymbolStream &in,
+                                         SymFactory *factory)
+{
+    ASTExpression* expr = 0;
+
+    qint32 type;
+    in >> type;
+
+    // A null type means a null expression
+    if (type) {
+        expr = factory->createEmptyExpression((ExpressionType)type);
+        expr->readFrom(in, factory);
+    }
+
+    return expr;
+}
+
+
+void ASTExpression::toStream(const ASTExpression* expr, KernelSymbolStream &out)
+{
+    if (expr)
+        expr->writeTo(out);
+    else
+        out << (qint32)0;
+}
+
+
+void ASTConstantExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
+{
+    ASTExpression::readFrom(in, factory);
+    in >> _value;
+}
+
+
+void ASTConstantExpression::writeTo(KernelSymbolStream &out) const
+{
+    ASTExpression::writeTo(out);
+    out << _value;
+}
+
+
+void ASTEnumeratorExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
+{
+    ASTConstantExpression::readFrom(in, factory);
+    in >> _valueSet;
+    _symbol = 0;
+}
+
+
+void ASTEnumeratorExpression::writeTo(KernelSymbolStream &out) const
+{
+    ASTConstantExpression::writeTo(out);
+    out << _valueSet;
 }
 
 
@@ -197,6 +268,18 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 }
 
 
+ASTExpression *ASTVariableExpression::clone(ASTExpressionList &list) const
+{
+    ASTVariableExpression* expr = cloneTempl<ASTVariableExpression>(list);
+    // Set nodes to null
+    for (int i = 0; i < expr->_transformations.size(); ++i)
+        expr->_transformations[i].node = 0;
+    expr->_transformations.setTypeEvaluator(0);
+
+    return expr;
+}
+
+
 void ASTVariableExpression::appendTransformation(SymbolTransformationType type)
 {
     _transformations.append(type, 0);
@@ -212,6 +295,29 @@ void ASTVariableExpression::appendTransformation(const QString &member)
 void ASTVariableExpression::appendTransformation(int arrayIndex)
 {
     _transformations.append(arrayIndex, 0);
+}
+
+
+void ASTVariableExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
+{
+    ASTExpression::readFrom(in, factory);
+    qint32 id;
+    in >> id >> _global >> _transformations;
+    _transformations.setTypeEvaluator(0);
+    _baseType = factory->findBaseTypeById(id);
+    // Make sure we found the type
+    if (id && !_baseType)
+        genericError(QString("Cannot find base type with ID 0x%1 in factory!")
+                     .arg((uint)id, 0, 16));
+}
+
+
+void ASTVariableExpression::writeTo(KernelSymbolStream &out) const
+{
+    ASTExpression::writeTo(out);
+    out << (qint32)(_baseType ? _baseType->id() : 0)
+        << _global
+        << _transformations;
 }
 
 
@@ -541,6 +647,22 @@ ExpressionResultSize ASTBinaryExpression::binaryExprSize(
 }
 
 
+void ASTBinaryExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
+{
+    ASTExpression::readFrom(in, factory);
+    _left = fromStream(in, factory);
+    _right = fromStream(in, factory);
+}
+
+
+void ASTBinaryExpression::writeTo(KernelSymbolStream &out) const
+{
+    ASTExpression::writeTo(out);
+    toStream(_left, out);
+    toStream(_right, out);
+}
+
+
 ExpressionResult ASTUnaryExpression::result(const Instance *inst) const
 {
     if (!_child)
@@ -659,6 +781,20 @@ QString ASTUnaryExpression::toString(bool compact) const
 }
 
 
+void ASTUnaryExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
+{
+    ASTExpression::readFrom(in, factory);
+    _child = fromStream(in, factory);
+}
+
+
+void ASTUnaryExpression::writeTo(KernelSymbolStream &out) const
+{
+    ASTExpression::writeTo(out);
+    toStream(_child, out);
+}
+
+
 QString ASTUnaryExpression::operatorToString() const
 {
     switch (_type) {
@@ -672,4 +808,3 @@ QString ASTUnaryExpression::operatorToString() const
     default:           return "??";
     }
 }
-

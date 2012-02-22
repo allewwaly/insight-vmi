@@ -77,14 +77,14 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    BaseType(SymFactory* factory);
+    explicit BaseType(SymFactory* factory);
 
     /**
      * Constructor
      * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
      */
-    BaseType(SymFactory* factory, const TypeInfo& info);
+    explicit BaseType(SymFactory* factory, const TypeInfo& info);
 
     /**
      * Destructor

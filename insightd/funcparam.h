@@ -25,7 +25,7 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    FuncParam(SymFactory* factory);
+    explicit FuncParam(SymFactory* factory);
 
     /**
      * Constructor

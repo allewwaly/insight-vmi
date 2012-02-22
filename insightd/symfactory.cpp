@@ -239,6 +239,80 @@ BaseType* SymFactory::createEmptyType(RealType type)
 }
 
 
+ASTExpression *SymFactory::createEmptyExpression(ExpressionType type)
+{
+    ASTExpression* expr = 0;
+
+    switch (type) {
+    case etVoid:
+        expr = new ASTVoidExpression();
+        break;
+
+    case etUndefined:
+        expr = new ASTUndefinedExpression();
+        break;
+
+    case etRuntimeDependent:
+        expr = new ASTRuntimeExpression();
+        break;
+
+    case etLiteralConstant:
+        expr = new ASTConstantExpression();
+        break;
+
+    case etEnumerator:
+        expr = new ASTEnumeratorExpression();
+        break;
+
+    case etVariable:
+        expr = new ASTVariableExpression();
+        break;
+
+    case etLogicalOr:
+    case etLogicalAnd:
+    case etInclusiveOr:
+    case etExclusiveOr:
+    case etAnd:
+    case etEquality:
+    case etUnequality:
+    case etRelationalGE:
+    case etRelationalGT:
+    case etRelationalLE:
+    case etRelationalLT:
+    case etShiftLeft:
+    case etShiftRight:
+    case etAdditivePlus:
+    case etAdditiveMinus:
+    case etMultiplicativeMult:
+    case etMultiplicativeDiv:
+    case etMultiplicativeMod:
+        expr = new ASTBinaryExpression(type);
+        break;
+
+    case etUnaryDec:
+    case etUnaryInc:
+    case etUnaryStar:
+    case etUnaryAmp:
+    case etUnaryMinus:
+    case etUnaryInv:
+    case etUnaryNot:
+        expr = new ASTUnaryExpression(type);
+        break;
+
+    default:
+        factoryError(QString("We don't handle expression type %1, but we "
+                             "should!").arg(type));
+        break;
+    }
+
+    if (!expr)
+        genericError("Out of memory");
+
+    _expressions.append(expr);
+    return expr;
+}
+
+
 Array* SymFactory::getTypeInstance(const TypeInfo& info, int boundsIndex)
 {
     // Create a new type from the info
@@ -1831,6 +1905,7 @@ BaseTypeList SymFactory::typedefsOfType(BaseType* type)
 
     return ret + temp;
 }
+
 
 
 FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,

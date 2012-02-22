@@ -20,10 +20,24 @@ class ReferencingType
 public:
     struct AltRefType
     {
-        AltRefType(int id = -1, const ASTExpression* expr = 0)
+        explicit AltRefType(int id = -1, const ASTExpression* expr = 0)
             : id(id), expr(expr) {}
         int id;
         const ASTExpression* expr;
+
+        /**
+         * Reads a serialized version of this object from \a in.
+         * \sa writeTo()
+         * @param in the data stream to read the data from, must be ready to read
+         */
+        void readFrom(KernelSymbolStream& in, SymFactory *factory);
+
+        /**
+         * Writes a serialized version of this object to \a out
+         * \sa readFrom()
+         * @param out the data stream to write the data to, must be ready to write
+         */
+        void writeTo(KernelSymbolStream &out) const;
     };
 
     /**
@@ -154,6 +168,21 @@ public:
      */
     virtual void writeTo(KernelSymbolStream &out) const;
 
+    /**
+     * Reads a serialized version of the alternative referencing types from
+     * \a in.
+     * @param in the data stream to read the data from, must be ready to read
+     * @param factory the symbol factory this symbol belongs to
+     */
+    void readAltRefTypesFrom(KernelSymbolStream& in, SymFactory* factory);
+
+    /**
+     * Writes a serialized version of the alternative referencing types to
+     * \a out
+     * @param out the data stream to write the data to, must be ready to write
+     */
+    void writeAltRefTypesTo(KernelSymbolStream& out) const;
+
 protected:
     /**
      * Creates an Instance object of a StructuredMember object.
@@ -275,6 +304,5 @@ inline BaseType* ReferencingType::refType()
 {
     return fac() && _refTypeId ? fac()->findBaseTypeById(_refTypeId) : 0;
 }
-
 
 #endif /* REFERENCINGTYPE_H_INLINE */

@@ -406,6 +406,16 @@ public:
     FoundBaseTypes findBaseTypesForAstType(const ASTType* astType,
                                             ASTTypeEvaluator *eval);
 
+	/**
+	 * Creates a new ASTExpression object of the given type \a type. This object
+	 * is owned by the factory and is automatically deleted when the factory is
+	 * deleted.
+	 * @param type the type of expression to create
+	 * @return pointer to the new ASTExpression object of type \a type
+	 */
+	ASTExpression* createEmptyExpression(ExpressionType type);
+
+
 protected:
 	void typeAlternateUsageStructMember(const TypeEvalDetails *ed,
 										const BaseType *targetBaseType,

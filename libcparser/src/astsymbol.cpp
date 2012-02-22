@@ -17,6 +17,7 @@
 const char* SymbolTransformation::typeToString(SymbolTransformationType type)
 {
 	switch (type) {
+	case ttNull:		return "(null)";
 	case ttMember:		return "Member";
 	case ttArray:		return "Array";
 	case ttFuncCall:    return "FuncCall";
@@ -30,6 +31,28 @@ const char* SymbolTransformation::typeToString(SymbolTransformationType type)
 QString SymbolTransformation::typeString() const
 {
 	return typeToString(type);
+}
+
+
+
+QDataStream& operator>>(QDataStream& in, SymbolTransformation& trans)
+//QDataStream &SymbolTransformation::operator >>(QDataStream &in)
+{
+	qint32 type, arrayIndex;
+	in >> type >> arrayIndex >> trans.member;
+	trans.type = (SymbolTransformationType) type;
+	trans.arrayIndex = arrayIndex;
+	trans.node = 0;
+	return in;
+}
+
+
+QDataStream& operator<<(QDataStream& out, const SymbolTransformation& trans)
+//QDataStream &SymbolTransformation::operator <<(QDataStream &out)
+{
+	return out << (qint32) trans.type
+			   << (qint32) trans.arrayIndex
+			   << trans.member;
 }
 
 
@@ -213,6 +236,10 @@ QString SymbolTransformations::toString(const QString &symbol) const
 
     for (int i = 0; i < size(); ++i) {
         switch (at(i).type) {
+        case ttNull:
+            s += "(null)";
+            break;
+
         case ttMember:
             s += "." + at(i).member;
             break;

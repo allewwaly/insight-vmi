@@ -5,10 +5,12 @@
 #include <astsymbol.h>
 #include <debug.h>
 #include "expressionresult.h"
+#include "kernelsymbolstream.h"
 
 class BaseType;
 class ASTExpression;
 class Instance;
+class SymFactory;
 
 typedef QList<ASTExpression*> ASTExpressionList;
 typedef QList<const ASTExpression*> ASTConstExpressionList;
@@ -16,6 +18,7 @@ typedef QList<const ASTExpression*> ASTConstExpressionList;
 
 /// Different types of expressions
 enum ExpressionType {
+    etNull = 0,
     etVoid,
     etUndefined,
     etRuntimeDependent,
@@ -108,6 +111,13 @@ public:
             _alternative = alt;
     }
 
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
+
+    static ASTExpression* fromStream(KernelSymbolStream &in,
+                                     SymFactory* factory);
+
+    static void toStream(const ASTExpression *expr, KernelSymbolStream &out);
 
 protected:
     template<class T>
@@ -293,6 +303,9 @@ public:
         _value.result.d = value;
     }
 
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
+
 protected:
     ExpressionResult _value;
 };
@@ -335,6 +348,9 @@ public:
         return _symbol;
     }
 
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
+
 protected:
     const ASTSymbol* _symbol;
     bool _valueSet;
@@ -347,7 +363,7 @@ protected:
 class ASTVariableExpression: public ASTExpression
 {
 public:
-    ASTVariableExpression(const BaseType* type = 0, bool global = false)
+    explicit ASTVariableExpression(const BaseType* type = 0, bool global = false)
         : _baseType(type), _global(global), _transformations(0) {}
 
     inline virtual ExpressionType type() const
@@ -368,10 +384,7 @@ public:
 
     virtual ExpressionResult result(const Instance* inst = 0) const;
 
-    inline virtual ASTExpression* clone(ASTExpressionList& list) const
-    {
-        return cloneTempl<ASTVariableExpression>(list);
-    }
+    virtual ASTExpression* clone(ASTExpressionList& list) const;
 
     inline const BaseType* baseType() const
     {
@@ -387,6 +400,9 @@ public:
         return _transformations;
     }
 
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
+
 protected:
     const BaseType* _baseType;
     bool _global;
@@ -400,7 +416,7 @@ protected:
 class ASTBinaryExpression: public ASTExpression
 {
 public:
-    ASTBinaryExpression(ExpressionType type) :
+    explicit ASTBinaryExpression(ExpressionType type) :
         _type(type), _left(0), _right(0) {}
 
     inline ASTExpression* left() const
@@ -489,6 +505,9 @@ public:
     static ExpressionResultSize binaryExprSize(const ExpressionResult& r1,
                                                const ExpressionResult& r2);
 
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
+
 protected:
     QString operatorToString() const;
 
@@ -504,7 +523,7 @@ protected:
 class ASTUnaryExpression: public ASTExpression
 {
 public:
-    ASTUnaryExpression(ExpressionType type) :
+    explicit ASTUnaryExpression(ExpressionType type) :
         _type(type), _child(0) {}
 
     inline ASTExpression* child() const
@@ -570,6 +589,8 @@ public:
         return list;
     }
 
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
 
 protected:
     QString operatorToString() const;
@@ -577,8 +598,6 @@ protected:
     ExpressionType _type;
     ASTExpression* _child;
 };
-
-
 
 
 #endif // ASTEXPRESSION_H
