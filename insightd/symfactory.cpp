@@ -5,6 +5,7 @@
  *      Author: chrschn
  */
 
+#include <QMutexLocker>
 #include "symfactory.h"
 #include "basetype.h"
 #include "refbasetype.h"
@@ -2192,6 +2193,9 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
 void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
                                     ASTTypeEvaluator *eval)
 {
+    // Allow only one thread at a time in here
+    QMutexLocker lock(&_typeAltUsageMutex);
+
     // Find the source base type
     FoundBaseTypes srcTypeRet = findBaseTypesForAstType(ed->srcType, eval);
     BaseType* srcBaseType = 0;
@@ -2215,8 +2219,8 @@ void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
 
     // Compare source and target type
     if (compareConflictingTypes(srcBaseType, targetBaseType) == tcIgnore) {
-        debugmsg("Ignoring change from " << ed->srcType->toString() << " to "
-                 << ed->targetType->toString());
+//        debugmsg("Ignoring change from " << ed->srcType->toString() << " to "
+//                 << ed->targetType->toString());
         return;
     }
 
@@ -2382,10 +2386,10 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                 if (nestingMember) {
                     // Was the embedding member already copied?
                     if (nestingMember->refTypeId() < 0) {
-                        debugmsg(QString("Member \"%1\" in \"%2\" is already a "
-                                         "type copy.")
-                                 .arg(nestingMember->prettyName())
-                                 .arg(nestingMember->belongsTo()->prettyName()));
+//                        debugmsg(QString("Member \"%1\" in \"%2\" is already a "
+//                                         "type copy.")
+//                                 .arg(nestingMember->prettyName())
+//                                 .arg(nestingMember->belongsTo()->prettyName()));
                     }
                     // Create a copy of the embedding struct
                     else {
@@ -2414,13 +2418,13 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                         // Find the member within the copied type
                         member = s->findMember(ed->transformations.lastMember());
                         assert(member != 0);
-                        debugmsg(QString("Created copy (0x%1 -> 0x%2) of "
-                                         "embedding member %3 in %4 (0x%5).")
-                                 .arg((uint)origRefTypeId, 0, 16)
-                                 .arg((uint)typeCopy->id(), 0, 16)
-                                 .arg(nestingMember->prettyName())
-                                 .arg(nestingMember->belongsTo()->prettyName())
-                                 .arg((uint)nestingMember->belongsTo()->id(), 0, 16));
+//                        debugmsg(QString("Created copy (0x%1 -> 0x%2) of "
+//                                         "embedding member %3 in %4 (0x%5).")
+//                                 .arg((uint)origRefTypeId, 0, 16)
+//                                 .arg((uint)typeCopy->id(), 0, 16)
+//                                 .arg(nestingMember->prettyName())
+//                                 .arg(nestingMember->belongsTo()->prettyName())
+//                                 .arg((uint)nestingMember->belongsTo()->id(), 0, 16));
                     }
                 }
 
@@ -2463,13 +2467,13 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
             if (ctxBaseTypes[i])
                 ctxTypes += QString("0x%1")
                                 .arg((uint)ctxBaseTypes[i]->id(), 0, 16);
-        debugmsg(QString("Changed %1 member%2 of type%3 %4 to target type 0x%5: %6")
-                 .arg(membersFound)
-                 .arg(membersFound == 1 ? "" : "s")
-                 .arg(ctxBaseTypes.size() > 1 ? "s" : "")
-                 .arg(ctxTypes.join((", ")))
-                 .arg((uint)targetBaseType->id(), 0, 16)
-                 .arg(targetBaseType->prettyName()));
+//        debugmsg(QString("Changed %1 member%2 of type%3 %4 to target type 0x%5: %6")
+//                 .arg(membersFound)
+//                 .arg(membersFound == 1 ? "" : "s")
+//                 .arg(ctxBaseTypes.size() > 1 ? "s" : "")
+//                 .arg(ctxTypes.join((", ")))
+//                 .arg((uint)targetBaseType->id(), 0, 16)
+//                 .arg(targetBaseType->prettyName()));
     }
 }
 
@@ -2564,13 +2568,13 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
                 t = makeDeepTypeCopy(t);
                 vars[i]->setRefTypeId(t->id());
 
-                debugmsg(QString("Created copy (0x%1 -> 0x%2) of type \"%3\" "
-                                 "for global variable \"%4\" (0x%5).")
-                         .arg((uint)origRefTypeId, 0, 16)
-                         .arg((uint)t->id(), 0, 16)
-                         .arg(t->prettyName(), 0, 16)
-                         .arg(vars[i]->name())
-                         .arg((uint)vars[i]->id(), 0, 16));
+//                debugmsg(QString("Created copy (0x%1 -> 0x%2) of type \"%3\" "
+//                                 "for global variable \"%4\" (0x%5).")
+//                         .arg((uint)origRefTypeId, 0, 16)
+//                         .arg((uint)t->id(), 0, 16)
+//                         .arg(t->prettyName(), 0, 16)
+//                         .arg(vars[i]->name())
+//                         .arg((uint)vars[i]->id(), 0, 16));
 
             }
             // Pass the type change on to the struct handling function
@@ -2587,18 +2591,18 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
         // declared variables that are not in the debugging symbols.
         debugerr("Did not find any variables to adjust!");
     }
-    else if (!ed->transformations.memberCount()) {
-        QStringList varIds;
-        for (int i = 0; i < vars.size(); ++i)
-                varIds += QString("0x%1").arg(vars[i]->id(), 0, 16);
-        debugmsg(QString("Changed %1 type%2 of variable%3 %4 to target type 0x%5: %6")
-                 .arg(varsFound)
-                 .arg(varsFound == 1 ? "" : "s")
-                 .arg(varIds.size() > 1 ? "s" : "")
-                 .arg(varIds.join(", "))
-                 .arg(targetBaseType->id(), 0, 16)
-                 .arg(targetBaseType->prettyName()));
-    }
+//    else if (!ed->transformations.memberCount()) {
+//        QStringList varIds;
+//        for (int i = 0; i < vars.size(); ++i)
+//                varIds += QString("0x%1").arg(vars[i]->id(), 0, 16);
+//        debugmsg(QString("Changed %1 type%2 of variable%3 %4 to target type 0x%5: %6")
+//                 .arg(varsFound)
+//                 .arg(varsFound == 1 ? "" : "s")
+//                 .arg(varIds.size() > 1 ? "s" : "")
+//                 .arg(varIds.join(", "))
+//                 .arg(targetBaseType->id(), 0, 16)
+//                 .arg(targetBaseType->prettyName()));
+//    }
 }
 
 
@@ -2623,12 +2627,12 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
 
     // Do we have runtime, invalid or other expressions that we cannot evaluate?
     if (expr->resultType() & (erRuntime|erUndefined)) {
-        debugmsg(QString("Changing type from \"%1\" to \"%2\" involves runtime "
-                         "expression")
-                 .arg(r->refType() ?
-                          r->refType()->prettyName() :
-                          QString("???"))
-                 .arg(targetBaseType->prettyName()));
+//        debugmsg(QString("Changing type from \"%1\" to \"%2\" involves runtime "
+//                         "expression")
+//                 .arg(r->refType() ?
+//                          r->refType()->prettyName() :
+//                          QString("???"))
+//                 .arg(targetBaseType->prettyName()));
         return false;
     }
 
@@ -2676,38 +2680,38 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
         switch (ret) {
         case tcNoConflict:
             changeType = false;
-            debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\" with \"%5\"")
-                     .arg(m ? m->name() : v->name())
-                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
-                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
-                     .arg(r->refType() ?
-                              r->refType()->prettyName() :
-                              QString("???"))
-                     .arg(targetBaseType->prettyName())
-                     .arg(expr->toString()));
+//            debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\" with \"%5\"")
+//                     .arg(m ? m->name() : v->name())
+//                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
+//                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
+//                     .arg(r->refType() ?
+//                              r->refType()->prettyName() :
+//                              QString("???"))
+//                     .arg(targetBaseType->prettyName())
+//                     .arg(expr->toString()));
             break;
 
         case tcIgnore:
             changeType = false;
-            debugmsg(QString("Not changing \"%0\" of %1 (0x%2) from \"%3\" to \"%4\"")
-                     .arg(m ? m->name() : v->name())
-                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
-                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
-                     .arg(r->refType() ?
-                              r->refType()->prettyName() :
-                              QString("???"))
-                     .arg(targetBaseType->prettyName()));
+//            debugmsg(QString("Not changing \"%0\" of %1 (0x%2) from \"%3\" to \"%4\"")
+//                     .arg(m ? m->name() : v->name())
+//                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
+//                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
+//                     .arg(r->refType() ?
+//                              r->refType()->prettyName() :
+//                              QString("???"))
+//                     .arg(targetBaseType->prettyName()));
             break;
 
         case tcConflict:
-            debugerr(QString("Conflicting target types in 0x%0: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
-                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
-                     .arg(r->refType() ?
-                              r->refType()->prettyName() :
-                              QString("???"))
-                     .arg((uint)r->refTypeId(), 0, 16)
-                     .arg(targetBaseType->prettyName())
-                     .arg((uint)targetBaseType->id(), 0, 16));
+//            debugerr(QString("Conflicting target types in 0x%0: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
+//                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
+//                     .arg(r->refType() ?
+//                              r->refType()->prettyName() :
+//                              QString("???"))
+//                     .arg((uint)r->refTypeId(), 0, 16)
+//                     .arg(targetBaseType->prettyName())
+//                     .arg((uint)targetBaseType->id(), 0, 16));
             break;
 
         case tcReplace:

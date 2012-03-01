@@ -53,6 +53,7 @@ public:
 
 protected:
     virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed);
+    virtual bool interrupted() const;
 
 private:
     SymFactory* _factory;

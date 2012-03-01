@@ -270,6 +270,8 @@ protected:
 
     int stringLength(const ASTTokenList* list);
 
+    virtual bool interrupted() const;
+
 private:
     ASTType* copyASTType(const ASTType* src);
     ASTType* createASTType(RealType type, ASTType* next = 0);
