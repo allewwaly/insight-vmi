@@ -13,6 +13,7 @@
 #include <QHash>
 #include <QMultiHash>
 #include <exception>
+#include <QMutex>
 
 // forward declaration
 class KernelSymbolReader;
@@ -735,6 +736,7 @@ private:
 	int _conflictingTypeChanges;
 	int _artificialTypeId;
 	quint32 _maxTypeSize;
+	QMutex _typeAltUsageMutex;
 };
 
 

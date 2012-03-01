@@ -11,6 +11,8 @@
 #include "longoperation.h"
 #include <QString>
 #include <QDir>
+#include <QThread>
+#include <QMutex>
 
 // forward declaration
 class SymFactory;
@@ -21,6 +23,25 @@ class SymFactory;
  */
 class KernelSourceParser: public LongOperation
 {
+    class WorkerThread: public QThread
+    {
+    public:
+        WorkerThread(KernelSourceParser* parser)
+            : _parser(parser), _stopExecution(false) {}
+
+        void stop() { _stopExecution = true; }
+
+    protected:
+        void run();
+
+    private:
+        void parseFile(const QString& fileName);
+        KernelSourceParser* _parser;
+        bool _stopExecution;
+    };
+
+    friend class WorkerThread;
+
 public:
     /**
      * Construtor
@@ -47,14 +68,17 @@ protected:
 
 
 private:
-    void parseFile(const QString& fileName);
+    void cleanUpThreads();
 
     SymFactory* _factory;
     QString _srcPath;
     QDir _srcDir;
     QString _currentFile;
-    int _filesDone;
+    QStringList _fileNames;
+    int _filesIndex;
     int _lastFileNameLen;
+    QList<WorkerThread*> _threads;
+    QMutex _filesMutex;
 };
 
 #endif /* KERNELSOURCEPARSER_H_ */

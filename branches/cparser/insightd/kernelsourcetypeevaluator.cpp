@@ -99,8 +99,8 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         QString s_expr = expr ? expr->toString() : QString("n/a");
 
 
-        debugmsg("Passing the following type change to SymFactory:\n" +
-                 typeChangeInfo(ed, s_expr));
+//        debugmsg("Passing the following type change to SymFactory:\n" +
+//                 typeChangeInfo(ed, s_expr));
         _factory->typeAlternateUsage(&ed, this);
     }
     catch (FactoryException& e) {
@@ -120,6 +120,12 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
                 << endl;
         throw e;
     }
+}
+
+
+bool KernelSourceTypeEvaluator::interrupted() const
+{
+    return shell->interrupted();
 }
 
 

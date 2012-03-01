@@ -122,7 +122,7 @@ bool ASTTypeEvaluator::evaluateTypes()
 		debugmsg("********** Round " << _pointsToRound << ": " << _assignments
 				 << " assignments, " << _assignmentsTotal << " total **********");
 #endif
-	} while (!_stopWalking && _assignments > 0);
+	} while (!_stopWalking && _assignments > 0 && !interrupted());
 
 	if (_stopWalking)
 		return false;
@@ -2464,6 +2464,11 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
     if (!node)
     	return;
 
+    if (interrupted()) {
+        _stopWalking = true;
+        return;
+    }
+
     switch (node->type) {
     case nt_direct_declarator:
         // The direct declarator must have an identifier
@@ -3795,6 +3800,9 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
             case ttFuncCall:
                 ctxTypeOps.push(it->type);
                 break;
+
+            case ttNull:
+                break;
             }
         }
         else {
@@ -3848,6 +3856,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
             break;
 
         case ttMember:
+        case ttNull:
             // ignored
             break;
         }
@@ -4323,5 +4332,11 @@ int ASTTypeEvaluator::stringLength(const ASTTokenList *list)
     }
 
     return len;
+}
+
+
+bool ASTTypeEvaluator::interrupted() const
+{
+    return false;
 }
 
