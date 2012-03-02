@@ -37,24 +37,9 @@ inline QScriptValue KernelSymbolsClass::listGeneric(QString filter, int index,
     int count = 0;
     bool applyFilter = !filter.isEmpty();
 
-    VirtualMemory* vmem = 0;
-
-    // Did the user specify a memory file index?
-    if (index < 0) {
-		// Default memDump index is the first one
-		index = 0;
-		while (index < shell->memDumps().size() && !shell->memDumps()[index])
-			index++;
-
-		if (index < shell->memDumps().size() && shell->memDumps()[index])
-			vmem = shell->memDumps()[index]->vmem();
-    }
-    // Check the user supplied index
-    else if (index >= shell->memDumps().size() || !shell->memDumps()[index]) {
-		context()->throwError(
-				QString("Invalid memory dump index: %1").arg(index));
-		return QScriptValue();
-	}
+    VirtualMemory* vmem = vmemFromIndex(index);
+    if (!vmem)
+        return QScriptValue();
 
     // Create resulting array
 	QScriptValue ret = engine()->newArray();
@@ -145,5 +130,45 @@ QList<int> KernelSymbolsClass::variableIds() const
     QList<int> ret = shell->symbols().factory().varsById().keys();
     qSort(ret);
     return ret;
+}
+
+
+Instance KernelSymbolsClass::getType(int id, int index) const
+{
+
+    BaseType* t = shell->symbols().factory().findBaseTypeById(id);
+    if (!t) {
+        context()->throwError(
+                    QString("Invalid type ID: 0x%1").arg((uint)id, 0, 16));
+        return Instance();
+    }
+    else {
+        VirtualMemory* vmem = vmemFromIndex(index);
+        return Instance(0, t, vmem);
+    }
+}
+
+
+VirtualMemory *KernelSymbolsClass::vmemFromIndex(int index) const
+{
+    VirtualMemory* vmem = 0;
+
+    // Did the user specify a memory file index?
+    if (index < 0) {
+        // Default memDump index is the first one
+        index = 0;
+        while (index < shell->memDumps().size() && !shell->memDumps()[index])
+            index++;
+
+		if (index < shell->memDumps().size() && shell->memDumps()[index])
+			vmem = shell->memDumps()[index]->vmem();
+	}
+	// Check the supplied index
+	else if (index >= shell->memDumps().size() || !shell->memDumps()[index]) {
+		context()->throwError(
+				QString("Invalid memory dump index: %1").arg(index));
+	}
+
+	return vmem;
 }
 
