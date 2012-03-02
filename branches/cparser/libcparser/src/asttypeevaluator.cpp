@@ -20,7 +20,10 @@
 #include <bitop.h>
 
 #ifdef DEBUG
+// Enable debug output for points-to analysis
 //#define DEBUG_POINTS_TO 1
+
+// Enable debug output for used-as analysis
 //#define DEBUG_USED_AS 1
 #endif
 
