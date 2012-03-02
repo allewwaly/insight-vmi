@@ -6,6 +6,7 @@
  */
 
 #include <QMutexLocker>
+#include <debug.h>
 #include "symfactory.h"
 #include "basetype.h"
 #include "refbasetype.h"
@@ -33,6 +34,10 @@
 //#include <astsourceprinter.h>
 
 #define factoryError(x) do { throw FactoryException((x), __FILE__, __LINE__); } while (0)
+
+
+// Enable debug output for applying used-as relations to the types and symbols
+//#define DEBUG_APPLY_USED_AS 1
 
 
 //------------------------------------------------------------------------------
@@ -2011,8 +2016,8 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                         structSpecifier = structSpecifier->parent;
                 }
             }
-            else
-                debugmsg("The context type has no identifier.");
+//            else
+//                debugmsg("The context type has no identifier.");
         }
         else {
             baseTypes = _typesByName.values(astTypeNonPtr->identifier());
@@ -2219,8 +2224,10 @@ void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
 
     // Compare source and target type
     if (compareConflictingTypes(srcBaseType, targetBaseType) == tcIgnore) {
-//        debugmsg("Ignoring change from " << ed->srcType->toString() << " to "
-//                 << ed->targetType->toString());
+#ifdef DEBUG_APPLY_USED_AS
+        debugmsg("Ignoring change from " << ed->srcType->toString() << " to "
+                 << ed->targetType->toString());
+#endif
         return;
     }
 
@@ -2386,16 +2393,20 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                 if (nestingMember) {
                     // Was the embedding member already copied?
                     if (nestingMember->refTypeId() < 0) {
-//                        debugmsg(QString("Member \"%1\" in \"%2\" is already a "
-//                                         "type copy.")
-//                                 .arg(nestingMember->prettyName())
-//                                 .arg(nestingMember->belongsTo()->prettyName()));
+#ifdef DEBUG_APPLY_USED_AS
+                        debugmsg(QString("Member \"%1\" in \"%2\" is already a "
+                                         "type copy.")
+                                 .arg(nestingMember->prettyName())
+                                 .arg(nestingMember->belongsTo()->prettyName()));
+#endif
                     }
                     // Create a copy of the embedding struct
                     else {
                         ++_typesCopied;
                         /// @todo What happens here if member is inside an anonymous struct?
+#ifdef DEBUG_APPLY_USED_AS
                         int origRefTypeId = nestingMember->refTypeId();
+#endif
                         BaseType* typeCopy =
                                 makeDeepTypeCopy(nestingMember->refType());
                         // Update the type relations
@@ -2418,13 +2429,15 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                         // Find the member within the copied type
                         member = s->findMember(ed->transformations.lastMember());
                         assert(member != 0);
-//                        debugmsg(QString("Created copy (0x%1 -> 0x%2) of "
-//                                         "embedding member %3 in %4 (0x%5).")
-//                                 .arg((uint)origRefTypeId, 0, 16)
-//                                 .arg((uint)typeCopy->id(), 0, 16)
-//                                 .arg(nestingMember->prettyName())
-//                                 .arg(nestingMember->belongsTo()->prettyName())
-//                                 .arg((uint)nestingMember->belongsTo()->id(), 0, 16));
+#ifdef DEBUG_APPLY_USED_AS
+                        debugmsg(QString("Created copy (0x%1 -> 0x%2) of "
+                                         "embedding member %3 in %4 (0x%5).")
+                                 .arg((uint)origRefTypeId, 0, 16)
+                                 .arg((uint)typeCopy->id(), 0, 16)
+                                 .arg(nestingMember->prettyName())
+                                 .arg(nestingMember->belongsTo()->prettyName())
+                                 .arg((uint)nestingMember->belongsTo()->id(), 0, 16));
+#endif
                     }
                 }
 
@@ -2467,13 +2480,15 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
             if (ctxBaseTypes[i])
                 ctxTypes += QString("0x%1")
                                 .arg((uint)ctxBaseTypes[i]->id(), 0, 16);
-//        debugmsg(QString("Changed %1 member%2 of type%3 %4 to target type 0x%5: %6")
-//                 .arg(membersFound)
-//                 .arg(membersFound == 1 ? "" : "s")
-//                 .arg(ctxBaseTypes.size() > 1 ? "s" : "")
-//                 .arg(ctxTypes.join((", ")))
-//                 .arg((uint)targetBaseType->id(), 0, 16)
-//                 .arg(targetBaseType->prettyName()));
+#ifdef DEBUG_APPLY_USED_AS
+        debugmsg(QString("Changed %1 member%2 of type%3 %4 to target type 0x%5: %6")
+                 .arg(membersFound)
+                 .arg(membersFound == 1 ? "" : "s")
+                 .arg(ctxBaseTypes.size() > 1 ? "s" : "")
+                 .arg(ctxTypes.join((", ")))
+                 .arg((uint)targetBaseType->id(), 0, 16)
+                 .arg(targetBaseType->prettyName()));
+#endif
     }
 }
 
@@ -2564,18 +2579,21 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
             assert(t != 0);
             // If this is not a type copy, create a copy now
             if (t->id() > 0) {
+#ifdef DEBUG_APPLY_USED_AS
                 int origRefTypeId = vars[i]->refTypeId();
+#endif
                 t = makeDeepTypeCopy(t);
                 vars[i]->setRefTypeId(t->id());
 
-//                debugmsg(QString("Created copy (0x%1 -> 0x%2) of type \"%3\" "
-//                                 "for global variable \"%4\" (0x%5).")
-//                         .arg((uint)origRefTypeId, 0, 16)
-//                         .arg((uint)t->id(), 0, 16)
-//                         .arg(t->prettyName(), 0, 16)
-//                         .arg(vars[i]->name())
-//                         .arg((uint)vars[i]->id(), 0, 16));
-
+#ifdef DEBUG_APPLY_USED_AS
+                debugmsg(QString("Created copy (0x%1 -> 0x%2) of type \"%3\" "
+                                 "for global variable \"%4\" (0x%5).")
+                         .arg((uint)origRefTypeId, 0, 16)
+                         .arg((uint)t->id(), 0, 16)
+                         .arg(t->prettyName(), 0, 16)
+                         .arg(vars[i]->name())
+                         .arg((uint)vars[i]->id(), 0, 16));
+#endif
             }
             // Pass the type change on to the struct handling function
             BaseTypeList list;
@@ -2589,20 +2607,24 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
 
         // Rarely happens, but sometimes we find references to externally
         // declared variables that are not in the debugging symbols.
+#ifdef DEBUG_APPLY_USED_AS
         debugerr("Did not find any variables to adjust!");
+#endif
     }
-//    else if (!ed->transformations.memberCount()) {
-//        QStringList varIds;
-//        for (int i = 0; i < vars.size(); ++i)
-//                varIds += QString("0x%1").arg(vars[i]->id(), 0, 16);
-//        debugmsg(QString("Changed %1 type%2 of variable%3 %4 to target type 0x%5: %6")
-//                 .arg(varsFound)
-//                 .arg(varsFound == 1 ? "" : "s")
-//                 .arg(varIds.size() > 1 ? "s" : "")
-//                 .arg(varIds.join(", "))
-//                 .arg(targetBaseType->id(), 0, 16)
-//                 .arg(targetBaseType->prettyName()));
-//    }
+#ifdef DEBUG_APPLY_USED_AS
+    else if (!ed->transformations.memberCount()) {
+        QStringList varIds;
+        for (int i = 0; i < vars.size(); ++i)
+                varIds += QString("0x%1").arg(vars[i]->id(), 0, 16);
+        debugmsg(QString("Changed %1 type%2 of variable%3 %4 to target type 0x%5: %6")
+                 .arg(varsFound)
+                 .arg(varsFound == 1 ? "" : "s")
+                 .arg(varIds.size() > 1 ? "s" : "")
+                 .arg(varIds.join(", "))
+                 .arg(targetBaseType->id(), 0, 16)
+                 .arg(targetBaseType->prettyName()));
+    }
+#endif
 }
 
 
@@ -2673,45 +2695,53 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
 
         for_end:
 
+#ifdef DEBUG_APPLY_USED_AS
         const StructuredMember* m = dynamic_cast<const StructuredMember*>(r);
         const Variable* v = dynamic_cast<const Variable*>(r);
+#endif
 
         // Do we have conflicting target types?
         switch (ret) {
         case tcNoConflict:
             changeType = false;
-//            debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\" with \"%5\"")
-//                     .arg(m ? m->name() : v->name())
-//                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
-//                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
-//                     .arg(r->refType() ?
-//                              r->refType()->prettyName() :
-//                              QString("???"))
-//                     .arg(targetBaseType->prettyName())
-//                     .arg(expr->toString()));
+#ifdef DEBUG_APPLY_USED_AS
+            debugmsg(QString("\"%0\" of %1 (0x%2) already changed from \"%3\" to \"%4\" with \"%5\"")
+                     .arg(m ? m->name() : v->name())
+                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
+                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
+                     .arg(r->refType() ?
+                              r->refType()->prettyName() :
+                              QString("???"))
+                     .arg(targetBaseType->prettyName())
+                     .arg(expr->toString()));
+#endif
             break;
 
         case tcIgnore:
             changeType = false;
-//            debugmsg(QString("Not changing \"%0\" of %1 (0x%2) from \"%3\" to \"%4\"")
-//                     .arg(m ? m->name() : v->name())
-//                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
-//                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
-//                     .arg(r->refType() ?
-//                              r->refType()->prettyName() :
-//                              QString("???"))
-//                     .arg(targetBaseType->prettyName()));
+#ifdef DEBUG_APPLY_USED_AS
+            debugmsg(QString("Not changing \"%0\" of %1 (0x%2) from \"%3\" to \"%4\"")
+                     .arg(m ? m->name() : v->name())
+                     .arg(m ? m->belongsTo()->prettyName() : v->prettyName())
+                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
+                     .arg(r->refType() ?
+                              r->refType()->prettyName() :
+                              QString("???"))
+                     .arg(targetBaseType->prettyName()));
+#endif
             break;
 
         case tcConflict:
-//            debugerr(QString("Conflicting target types in 0x%0: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
-//                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
-//                     .arg(r->refType() ?
-//                              r->refType()->prettyName() :
-//                              QString("???"))
-//                     .arg((uint)r->refTypeId(), 0, 16)
-//                     .arg(targetBaseType->prettyName())
-//                     .arg((uint)targetBaseType->id(), 0, 16));
+#ifdef DEBUG_APPLY_USED_AS
+            debugerr(QString("Conflicting target types in 0x%0: \"%1\" (0x%2) vs. \"%3\" (0x%4)")
+                     .arg((uint)(m ? m->belongsTo()->id() : v->id()), 0, 16)
+                     .arg(r->refType() ?
+                              r->refType()->prettyName() :
+                              QString("???"))
+                     .arg((uint)r->refTypeId(), 0, 16)
+                     .arg(targetBaseType->prettyName())
+                     .arg((uint)targetBaseType->id(), 0, 16));
+#endif
             break;
 
         case tcReplace:
