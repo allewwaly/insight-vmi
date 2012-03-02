@@ -107,32 +107,28 @@ void KernelSourceParser::parse()
 
     operationStarted();
 
-//    try {
-        // Collect files to process
-        _fileNames.clear();
-        CompileUnitIntHash::const_iterator it = _factory->sources().begin();
-        while (it != _factory->sources().end() && !shell->interrupted()) {
-            const CompileUnit* unit = it.value();
-            // Skip assembly files
-            if (!unit->name().endsWith(".S"))
-//            if (!unit->name().endsWith(".S") && _filesDone >= 1140)
-//            if (!unit->name().endsWith(".S") && unit->name().endsWith("kernel/module.c"))
-            {
-                _fileNames.append(unit->name() + ".i");
-            }
-            ++it;
+    // Collect files to process
+    _fileNames.clear();
+    CompileUnitIntHash::const_iterator it = _factory->sources().begin();
+    while (it != _factory->sources().end() && !shell->interrupted()) {
+        const CompileUnit* unit = it.value();
+        // Skip assembly files
+        if (!unit->name().endsWith(".S"))
+//        if (!unit->name().endsWith(".S") && _filesDone >= 1140)
+//        if (!unit->name().endsWith(".S") && unit->name().endsWith("kernel/module.c"))
+        {
+            _fileNames.append(unit->name() + ".i");
         }
-//    }
-//    catch (...) {
-//        // Exceptional cleanup
-//        operationProgress();
-//        operationStopped();
-//        shell->out() << endl;
-//        throw;
-//    }
-
-    // Create worker threads
-    for (int i = 0; i < QThread::idealThreadCount(); ++i) {
+        ++it;
+    }
+    
+    // Create worker threads, limited to single-threading for debugging
+#ifdef DEBUG_APPLY_USED_AS
+    for (int i = 0; i < 1; ++i)
+#else
+    for (int i = 0; i < QThread::idealThreadCount(); ++i)
+#endif
+    {
         WorkerThread* thread = new WorkerThread(this);
         _threads.append(thread);
         thread->start();
@@ -175,10 +171,6 @@ void KernelSourceParser::WorkerThread::run()
         try {
             parseFile(currentFile);
         }
-//        catch (SourceParserException& e) {
-//            shell->out() << "\r" << flush;
-//            shell->err() << "WARNING: " << e.message << endl << flush;
-//        }
         catch (FileNotFoundException& e) {
             shell->out() << "\r" << flush;
             shell->err() << "WARNING: " << e.message << endl << flush;
@@ -188,6 +180,12 @@ void KernelSourceParser::WorkerThread::run()
 //            shell->err() << "WARNING: At " << e.file << ":" << e.line
 //                         << ": " << e.message << endl << flush;
 //        }
+        catch (GenericException& e) {
+            shell->out() << "\r" << flush;
+            shell->err() << e.file << ":" << e.line
+                         << " WARNING: " << e.message << endl << flush;
+            throw e;
+        }
 
         lock.relock();
     }
@@ -211,8 +209,11 @@ void KernelSourceParser::WorkerThread::parseFile(const QString &fileName)
     // Evaluate types
     KernelSourceTypeEvaluator eval(&ast, _parser->_factory);
     try {
-        if (!_stopExecution && !eval.evaluateTypes())
-            sourceParserError(QString("Error evaluating types in %1").arg(file));
+        if (!_stopExecution && !eval.evaluateTypes()) {
+            // Only throw exception if evaluation was not interrupted
+            if (!_stopExecution && !eval.walkingStopped())
+                sourceParserError(QString("Error evaluating types in %1").arg(file));
+        }
     }
     catch (TypeEvaluatorException& e) {
         // Print the source of the embedding external declaration
