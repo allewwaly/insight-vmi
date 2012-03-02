@@ -111,6 +111,16 @@ public slots:
      */
 	QList<int> variableIds() const;
 
+	/**
+	 * Creates an Instance of the type with given ID \a id and a null address.
+	 * If no type with ID \a id exists, an empty Instance object is returned.
+	 * @param id the type ID for the instance
+	 * @param index the index of the memory file to use for the resulting
+	 * instances, defaults to -1 which uses the first available, if any
+	 * @return Instance object with type \a id and a null address
+	 */
+	Instance getType(int id, int index = -1) const;
+
 private:
 	InstanceClass* _instClass;
 
@@ -118,6 +128,8 @@ private:
 	QScriptValue listGeneric(QString filter, int index,	const QList<T*>& list,
 			const QMultiHash<QString, T*>& hash,
 			Instance (getInst)(const T*, VirtualMemory*));
+
+	VirtualMemory* vmemFromIndex(int index) const;
 };
 
 #endif /* KERNELSYMBOLSCLASS_H_ */
