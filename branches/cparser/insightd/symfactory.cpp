@@ -22,7 +22,7 @@
 #include "compileunit.h"
 #include "variable.h"
 #include "shell.h"
-#include "debug.h"
+#include <debug.h>
 #include "function.h"
 #include "kernelsourcetypeevaluator.h"
 #include "astexpressionevaluator.h"
@@ -34,10 +34,6 @@
 //#include <astsourceprinter.h>
 
 #define factoryError(x) do { throw FactoryException((x), __FILE__, __LINE__); } while (0)
-
-
-// Enable debug output for applying used-as relations to the types and symbols
-//#define DEBUG_APPLY_USED_AS 1
 
 
 //------------------------------------------------------------------------------

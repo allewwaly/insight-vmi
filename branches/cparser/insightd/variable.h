@@ -13,7 +13,7 @@
 #include "symbol.h"
 #include "referencingtype.h"
 #include "sourceref.h"
-#include "debug.h"
+#include <debug.h>
 
 /**
  * This class represents a variable variable of a certain type.

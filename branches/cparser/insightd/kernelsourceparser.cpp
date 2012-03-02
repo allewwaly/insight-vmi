@@ -14,7 +14,7 @@
 #include <typeevaluatorexception.h>
 #include <astsourceprinter.h>
 #include <cassert>
-#include "debug.h"
+#include <debug.h>
 #include "shell.h"
 #include "compileunit.h"
 #include "filenotfoundexception.h"

@@ -8,7 +8,7 @@
 #include "pointer.h"
 #include <string.h>
 #include "virtualmemoryexception.h"
-#include "debug.h"
+#include <debug.h>
 
 Pointer::Pointer(SymFactory* factory)
 	: RefBaseType(factory), _macroExtraOffset(0)

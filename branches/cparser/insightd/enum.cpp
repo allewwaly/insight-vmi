@@ -7,7 +7,7 @@
 
 #include <bitop.h>
 #include "enum.h"
-#include "debug.h"
+#include <debug.h>
 
 Enum::Enum(SymFactory* factory)
     : BaseType(factory)

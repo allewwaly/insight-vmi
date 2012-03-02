@@ -25,14 +25,12 @@ HEADERS += eventloopthread.h \
     include/insight/insight.h \
     sockethelper.h \
     include/insight/insightexception.h \
-    include/insight/constdefs.h \
-    debug.h
+    include/insight/constdefs.h
 SOURCES += eventloopthread.cpp \
     devicemuxer.cpp \
     sockethelper.cpp \
     insightexception.cpp \
     insight.cpp \
-    constdefs.cpp \
-    debug.cpp
-INCLUDEPATH += ./include
+    constdefs.cpp
+INCLUDEPATH += ./include ../libdebug/include
 SUBDIRS = tests

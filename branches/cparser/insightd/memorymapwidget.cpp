@@ -23,7 +23,7 @@
 #include "memorymaprangetree.h"
 #include "virtualmemory.h"
 #include "varsetter.h"
-#include "debug.h"
+#include <debug.h>
 
 static const int margin = 3;
 static const int cellSize = 8;

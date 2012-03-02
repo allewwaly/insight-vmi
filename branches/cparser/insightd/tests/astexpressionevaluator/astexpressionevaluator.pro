@@ -29,7 +29,6 @@ HEADERS += astexpressionevaluatortester.h \
     ../../funcparam.h \
     ../../expressionevalexception.h \
     ../../enum.h \
-    ../../debug.h \
     ../../consttype.h \
     ../../compileunit.h \
     ../../basetype.h \
@@ -85,7 +84,6 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../funcpointer.cpp \
     ../../funcparam.cpp \
     ../../enum.cpp \
-    ../../debug.cpp \
     ../../consttype.cpp \
     ../../compileunit.cpp \
     ../../basetype.cpp \
@@ -122,11 +120,13 @@ QT += core \
     testlib
 CONFIG += qtestlib debug
 INCLUDEPATH += ../../src \
+	../../../libdebug/include \
 	../../../libcparser/include \
 	../../../libcparser/antlr_generated \
         ../../../libantlr3c/include \
         ../../../libinsight/include
 LIBS += -L../../../libcparser -lcparser \
+	-L../../../libdebug -ldebug \
 	-L../../../libantlr3c -lantlr3c \
 	-L../../../libinsight -linsight \
 	-lreadline

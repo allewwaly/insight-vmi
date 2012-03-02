@@ -23,7 +23,7 @@
 #include "variable.h"
 #include "shell.h"
 #include "memspecs.h"
-#include "debug.h"
+#include <debug.h>
 
 
 KernelSymbolWriter::KernelSymbolWriter(QIODevice* to, SymFactory* factory, MemSpecs* specs)

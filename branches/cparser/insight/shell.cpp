@@ -15,7 +15,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include "programoptions.h"
-#include "debug.h"
+#include <debug.h>
 
 Shell* shell = 0;
 
