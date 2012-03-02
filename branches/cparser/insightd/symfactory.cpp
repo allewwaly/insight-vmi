@@ -1256,7 +1256,7 @@ Struct* SymFactory::makeStructHListNode(StructuredMember* member)
 }
 
 
-BaseType* SymFactory::makeDeepTypeCopy(BaseType* source)
+BaseType* SymFactory::makeDeepTypeCopy(BaseType* source, bool clearAltTypes)
 {
     if (!source)
         return 0;
@@ -1321,26 +1321,16 @@ BaseType* SymFactory::makeDeepTypeCopy(BaseType* source)
         // We create copies of all referencing types and structs/unions
         BaseType* t = rbt->refType();
         if (t && t->type() & ReferencingTypes) {
-            t = makeDeepTypeCopy(t);
+            t = makeDeepTypeCopy(t, clearAltTypes);
             rbt->setRefTypeId(t->id());
         }
     }
 
-    // Hack for now: Copy a struct's members alternative types by hand
-    Structured *src_s, *dst_s;
-    if ( (src_s = dynamic_cast<Structured*>(source)) ) {
-        dst_s = dynamic_cast<Structured*>(dest);
-        for (int i = 0; i < src_s->members().size(); ++i) {
-            StructuredMember* src_m = src_s->members().at(i);
-            StructuredMember* dst_m = dst_s->members().at(i);
-            for (int j = 0; j < src_m->altRefTypeCount(); ++j) {
-                if (dst_m->altRefTypes().size() <= j)
-                    dst_m->addAltRefType(src_m->altRefType(j).id,
-                                         src_m->altRefType(j).expr);
-                else
-                    dst_m->altRefTypes()[j] = src_m->altRefType(j);
-            }
-        }
+    // Clear the alternative types, if requested
+    if (clearAltTypes && (dest->type() & StructOrUnion)) {
+        Structured *dst_s = dynamic_cast<Structured*>(dest);
+        for (int i = 0; i < dst_s->members().size(); ++i)
+            dst_s->members().at(i)->altRefTypes().clear();
     }
 
     addSymbol(dest);
@@ -2404,7 +2394,7 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                         int origRefTypeId = nestingMember->refTypeId();
 #endif
                         BaseType* typeCopy =
-                                makeDeepTypeCopy(nestingMember->refType());
+                                makeDeepTypeCopy(nestingMember->refType(), false);
                         // Update the type relations
                         _usedByStructMembers.remove(nestingMember->refTypeId(),
                                                     nestingMember);
@@ -2425,6 +2415,9 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                         // Find the member within the copied type
                         member = s->findMember(ed->transformations.lastMember());
                         assert(member != 0);
+                        // Clear all alternative types for that member
+                        member->altRefTypes().clear();
+                        //
 #ifdef DEBUG_APPLY_USED_AS
                         debugmsg(QString("Created copy (0x%1 -> 0x%2) of "
                                          "embedding member %3 in %4 (0x%5).")
@@ -2578,7 +2571,8 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
 #ifdef DEBUG_APPLY_USED_AS
                 int origRefTypeId = vars[i]->refTypeId();
 #endif
-                t = makeDeepTypeCopy(t);
+                // Clear all existing alternative types on the copy
+                t = makeDeepTypeCopy(t, true);
                 vars[i]->setRefTypeId(t->id());
 
 #ifdef DEBUG_APPLY_USED_AS

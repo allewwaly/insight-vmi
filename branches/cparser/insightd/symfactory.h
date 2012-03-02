@@ -609,9 +609,11 @@ private:
      * \note The type will be automatically added to the factory with a call to
      * addSymbol().
      * @param source the source type
+     * @param clearAltTypes set to \c true to wipe all alternative types of
+     * any copied struct or union when it is copied
      * @return a shallow copy of \a source with a new, unique ID
      */
-    BaseType* makeDeepTypeCopy(BaseType* source);
+    BaseType* makeDeepTypeCopy(BaseType* source, bool clearAltTypes);
 
 	/**
      * Tries to resolve the type reference of a ReferencingType object \a ref.
