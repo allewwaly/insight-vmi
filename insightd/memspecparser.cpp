@@ -13,7 +13,7 @@
 #include <QFile>
 #include <QProcess>
 #include <QRegExp>
-#include "debug.h"
+#include <debug.h>
 
 #define MEMSPEC_C_BODY "%MEMSPEC_BODY%"
 const char* memspec_c_file = "memspec.c";

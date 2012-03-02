@@ -10,7 +10,7 @@
 
 #include <bitop.h>
 #include "basetype.h"
-#include "debug.h"
+#include <debug.h>
 
 /**
  * Generic template class for all numeric types

@@ -25,7 +25,7 @@
 #include "parserexception.h"
 #include "memspecparser.h"
 #include "shell.h"
-#include "debug.h"
+#include <debug.h>
 
 
 //------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 #include "basetype.h"
 #include "refbasetype.h"
-#include "debug.h"
+#include <debug.h>
 
 #include <QIODevice>
 

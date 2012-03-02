@@ -6,7 +6,7 @@
  */
 
 #include "refbasetype.h"
-#include "debug.h"
+#include <debug.h>
 
 RefBaseType::RefBaseType(SymFactory* factory)
     : BaseType(factory), _hashRefTypeId(0)

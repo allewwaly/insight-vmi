@@ -4,7 +4,6 @@
 
 #include "programoptions.h"
 #include "shell.h"
-#include "debug.h"
 
 
 int main(int argc, char *argv[])

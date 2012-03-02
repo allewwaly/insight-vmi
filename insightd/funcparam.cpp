@@ -4,7 +4,7 @@
 #include "refbasetype.h"
 #include "virtualmemory.h"
 #include "pointer.h"
-#include "debug.h"
+#include <debug.h>
 
 FuncParam::FuncParam(SymFactory* factory)
 	: Symbol(factory), _belongsTo(0)

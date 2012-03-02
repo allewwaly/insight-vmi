@@ -7,7 +7,7 @@
 
 #include "structured.h"
 #include "pointer.h"
-#include "debug.h"
+#include <debug.h>
 
 
 Structured::Structured(SymFactory* factory)

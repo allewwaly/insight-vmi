@@ -6,7 +6,7 @@
  */
 
 #include "longoperation.h"
-#include "debug.h"
+#include <debug.h>
 
 LongOperation::LongOperation(int progressInterval)
     : _duration(0), _progressInterval(progressInterval)

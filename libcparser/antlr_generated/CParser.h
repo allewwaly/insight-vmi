@@ -172,19 +172,21 @@
      
  //    #define DEBUG 1
       
-     #if (DEBUG == 1) && !defined(__cplusplus)
-         #if !defined(debugmsg)
-             #define debuginit() printf("(%s:%d) Executing INIT in %s, BACKTRACKING is %d\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, BACKTRACKING)
-             #define debugafter() printf("(%s:%d) Executing AFTER in %s, BACKTRACKING is %d\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, BACKTRACKING)
-             #define debugmsg(m, ...) printf("(%s:%d) " m, __FILE__, __LINE__, __VA_ARGS__)
-             #define debugerr(m, ...) fprintf(stderr, "(%s:%d) " m, __FILE__, __LINE__, __VA_ARGS__)
-         #endif
-     #else
-         #define debugmsg(...)
-         #define debugerr(...)
-         #define debuginit()
-         #define debugafter()
-     #endif
+#ifndef __cplusplus
+#   if (DEBUG == 1)
+#       if !defined(debugmsg)
+#           define debuginit() printf("(%s:%d) Executing INIT in %s, BACKTRACKING is %d\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, BACKTRACKING)
+#           define debugafter() printf("(%s:%d) Executing AFTER in %s, BACKTRACKING is %d\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, BACKTRACKING)
+#           define debugmsg(m, ...) printf("(%s:%d) " m, __FILE__, __LINE__, __VA_ARGS__)
+#           define debugerr(m, ...) fprintf(stderr, "(%s:%d) " m, __FILE__, __LINE__, __VA_ARGS__)
+#       endif
+#   else
+#       define debugmsg(...)
+#       define debugerr(...)
+#       define debuginit()
+#       define debugafter()
+#   endif
+#endif
 
 
 

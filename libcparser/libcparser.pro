@@ -15,7 +15,6 @@ HEADERS += include/ast_interface.h \
     include/realtypes.h \
     include/astwalker.h \
     include/astsymboltypes.h \
-    include/debug.h \
     include/typeevaluatorexception.h \
     include/asttypeevaluator.h \
     include/astdotgraph.h \
@@ -37,17 +36,20 @@ SOURCES += src/astscopemanager.cpp \
     src/astnode.cpp \
     src/asttypeevaluator.cpp \
     src/astwalker.cpp \
-    src/debug.cpp \
     src/genericexception.cpp \
     antlr_generated/CLexer.c \
     antlr_generated/CParser.c \
     src/astsourceprinter.cpp
 LIBS += -L../libantlr3c \
-    -lantlr3c
+    -lantlr3c \
+    -L../libdebug \
+    -ldebug
 INCLUDEPATH += ./antlr_generated \
     ./src \
     ./include \
-    ../libantlr3c/include
+    ../libdebug/include \
+    ../libantlr3c/include \
+    ../libinsight/include
 
 
 

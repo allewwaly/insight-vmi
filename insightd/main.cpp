@@ -96,7 +96,7 @@
 #include <stdlib.h>
 #include <insight/constdefs.h>
 
-#include "debug.h"
+#include <debug.h>
 #include "kernelsymbols.h"
 #include "shell.h"
 #include "genericexception.h"

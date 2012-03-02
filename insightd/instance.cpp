@@ -11,7 +11,7 @@
 #include "refbasetype.h"
 #include "pointer.h"
 #include "virtualmemory.h"
-#include "debug.h"
+#include <debug.h>
 #include "array.h"
 #include "astexpression.h"
 #include <QScriptEngine>

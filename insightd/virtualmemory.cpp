@@ -7,7 +7,7 @@
 
 #include "virtualmemory.h"
 #include "virtualmemoryexception.h"
-#include "debug.h"
+#include <debug.h>
 
 // Kernel constants for memory and page sizes.
 // I think it's reasonable to hard-code them for now.

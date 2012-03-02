@@ -16,7 +16,7 @@
 #include "shell.h"
 #include "varsetter.h"
 #include "memorymapbuilder.h"
-#include "debug.h"
+#include <debug.h>
 
 
 // static variable

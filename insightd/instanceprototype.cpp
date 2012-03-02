@@ -9,7 +9,7 @@
 #include <QScriptEngine>
 #include "basetype.h"
 #include "shell.h"
-#include "debug.h"
+#include <debug.h>
 
 Q_DECLARE_METATYPE(Instance*)
 

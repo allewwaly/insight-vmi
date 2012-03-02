@@ -13,7 +13,7 @@
 #include "virtualmemory.h"
 #include "virtualmemoryexception.h"
 #include "array.h"
-#include "debug.h"
+#include <debug.h>
 
 
 MemoryMapBuilder::MemoryMapBuilder(MemoryMap* map, int index)

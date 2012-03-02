@@ -10,7 +10,7 @@
 #include "virtualmemory.h"
 #include "pointer.h"
 #include "funcpointer.h"
-#include "debug.h"
+#include <debug.h>
 
 StructuredMember::StructuredMember(SymFactory* factory)
 	: Symbol(factory), _offset(0), _belongsTo(0)

@@ -7,7 +7,7 @@
 
 #include "array.h"
 #include "virtualmemoryexception.h"
-#include "debug.h"
+#include <debug.h>
 
 Array::Array(SymFactory* factory)
     : Pointer(factory), _length(-1)

@@ -11,7 +11,7 @@
 #include "instancedata.h"
 #include "instanceprototype.h"
 #include "basetype.h"
-#include "debug.h"
+#include <debug.h>
 
 Q_DECLARE_METATYPE(Instance)
 Q_DECLARE_METATYPE(Instance*)

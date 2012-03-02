@@ -19,7 +19,7 @@
 #include "readerwriterexception.h"
 #include "shell.h"
 #include "memspecs.h"
-#include "debug.h"
+#include <debug.h>
 
 //------------------------------------------------------------------------------
 
