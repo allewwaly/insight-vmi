@@ -12,7 +12,7 @@
 #include <debug.h>
 
 #define VADDR_SPACE_X86    0xFFFFFFFFUL
-#define VADDR_SPACE_X86_64 0xFFFFFFFFFFFFFFFFUL
+#define VADDR_SPACE_X86_64 0xFFFFFFFFFFFFFFFFULL
 
 /**
  * This struct holds the definition of how a memory specification can be
