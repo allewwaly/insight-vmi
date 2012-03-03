@@ -376,23 +376,6 @@ public:
 
     QList<BaseType*> typesUsingId(int id) const;
 
-//    /**
-//     * Checks if \a type represents the special type <tt>struct list_head</tt>.
-//     * @param type the type to check
-//     * @return \c true if \a type is <tt>struct list_head</tt>, or \c false
-//     * otherwise
-//     */
-//    bool isStructListHead(const BaseType* type) const;
-
-//    /**
-//     * Checks if \a type represents the special type <tt>struct hlist_node</tt>.
-//     * @param type the type to check
-//     * @return \c true if \a type is <tt>struct hlist_node</tt>, or \c false
-//     * otherwise
-//     */
-//    bool isStructHListNode(const BaseType* type) const;
-
-
     void typeAlternateUsage(const TypeEvalDetails *ed, ASTTypeEvaluator* eval);
 
     FoundBaseTypes findBaseTypesForAstType(const ASTType* astType,
@@ -564,34 +547,6 @@ private:
 	template<class T>
 	T* getTypeInstance2(T* t, const TypeInfo& info);
 
-//	/**
-//	 * Generates a working <tt>struct list_head</tt> from a given, generic one.
-//	 *
-//	 * It creates a new Struct object from \a member->refType() with exactly
-//	 * two members: two Pointer objects "next" and "prev" which point to the
-//	 * type of \a parent. In addition, the Pointer::macroExtraOffset() is
-//	 * set accordingly.
-//	 * @param member the StructuredMember to create a <tt>struct list_head</tt>
-//	 * from
-//	 * @return the resulting Struct type
-//	 * \sa SpecialIds
-//	 */
-//	Struct* makeStructListHead(StructuredMember* member);
-
-//    /**
-//     * Generates a working <tt>struct hlist_node</tt> from a given, generic one.
-//     *
-//     * It creates a new Struct object from \a member->refType() with exactly
-//     * two members: two Pointer objects "next" and "pprev" which point to the
-//     * type of \a parent. In addition, the Pointer::macroExtraOffset() is
-//     * set accordingly.
-//     * @param member the StructuredMember to create a <tt>struct hlist_node</tt>
-//     * from
-//     * @return the resulting Struct type
-//     * \sa SpecialIds
-//     */
-//    Struct* makeStructHListNode(StructuredMember* member);
-
     /**
      * Creates a deep copy of the given type \a source and returns it. The
      * copy will have a unique ID < 0 to be distinguishable from the original.
@@ -719,8 +674,6 @@ private:
 	ASTExpressionList _expressions;
 
 	int _typeFoundByHash;
-	int _structListHeadCount;
-	int _structHListNodeCount;
 	int _uniqeTypesChanged;
 	int _totalTypesChanged;
 	int _typesCopied;
