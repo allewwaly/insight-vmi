@@ -19,13 +19,16 @@ const ReferencingType::AltRefType ReferencingType::_emptyRefType;
 
 
 ReferencingType::ReferencingType()
-    : _refTypeId(0)
+    : _refTypeId(0), _refType(0), _refTypeDeep(0), _deepResolvedTypes(0),
+      _refTypeChangeClock(0)
+
 {
 }
 
 
 ReferencingType::ReferencingType(const TypeInfo& info)
-    : _refTypeId(info.refTypeId())
+    : _refTypeId(info.refTypeId()), _refType(0), _refTypeDeep(0),
+      _deepResolvedTypes(0), _refTypeChangeClock(0)
 {
 }
 
@@ -35,35 +38,76 @@ ReferencingType::~ReferencingType()
 }
 
 
+template<class ref_t, class base_t>
+inline base_t* ReferencingType::refTypeTempl(ref_t *ref)
+{
+    if (!ref->fac() || !ref->_refTypeId)
+        return 0;
+    // Did the types in the factory change?
+    if (ref->_refTypeChangeClock != ref->fac()->changeClock()) {
+        ref->_refType = ref->_refTypeDeep = 0;
+        ref->_refTypeChangeClock = ref->fac()->changeClock();
+    }
+    // Cache the value
+    if (!ref->_refType)
+        ref->_refType = ref->fac()->findBaseTypeById(ref->_refTypeId);
+    return ref->_refType;
+}
+
+
+const BaseType* ReferencingType::refType() const
+{
+    return refTypeTempl<const ReferencingType, const BaseType>(this);
+}
+
+
+BaseType* ReferencingType::refType()
+{
+    return refTypeTempl<ReferencingType, BaseType>(this);
+}
+
+
+template<class ref_t, class base_t, class ref_base_t>
+inline base_t* ReferencingType::refTypeDeepTempl(ref_t *ref, int resolveTypes)
+{
+    // Did the types in the factory change?
+    if (ref->_refTypeChangeClock != ref->fac()->changeClock()) {
+        ref->_refType = ref->_refTypeDeep = 0;
+        ref->_refTypeChangeClock = ref->fac()->changeClock();
+    }
+    // Cache the value
+    if (!ref->_refTypeDeep || resolveTypes != ref->_deepResolvedTypes) {
+        ref->_deepResolvedTypes = resolveTypes;
+        base_t* t = ref->refType();
+        if ( !t || !(t->type() & resolveTypes) )
+            return t;
+
+        ref_base_t* rbt = dynamic_cast<ref_base_t*>(t);
+        while (rbt && (rbt->type() & resolveTypes)) {
+            rbt = dynamic_cast<ref_base_t*>(t = rbt->refType());
+        }
+        ref->_refTypeDeep = const_cast<BaseType*>(t);
+    }
+
+    return ref->_refTypeDeep;
+}
+
+
 const BaseType* ReferencingType::refTypeDeep(int resolveTypes) const
 {
-    const BaseType* t = refType();
-    if ( !t || !(t->type() & resolveTypes) )
-        return t;
-
-    const ReferencingType* prev = this;
-    const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
-    while (rbt && (rbt->type() & resolveTypes)) {
-        prev = rbt;
-        rbt = dynamic_cast<const RefBaseType*>(rbt->refType());
-    }
-    return prev->refType();
+    return refTypeDeepTempl<
+            const ReferencingType,
+            const BaseType,
+            const RefBaseType>(this, resolveTypes);
 }
 
 
 BaseType* ReferencingType::refTypeDeep(int resolveTypes)
 {
-    BaseType* t = refType();
-    if ( !t || !(t->type() & resolveTypes) )
-        return t;
-
-    ReferencingType* prev = this;
-    RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
-    while (rbt && (rbt->type() & resolveTypes)) {
-        prev = rbt;
-        rbt = dynamic_cast<RefBaseType*>(rbt->refType());
-    }
-    return prev->refType();
+    return refTypeDeepTempl<
+            ReferencingType,
+            BaseType,
+            RefBaseType>(this, resolveTypes);
 }
 
 
