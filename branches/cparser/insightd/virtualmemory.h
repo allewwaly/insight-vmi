@@ -236,6 +236,7 @@ private:
     QCache<quint64, TLBEntry> _tlb;
 
     QIODevice* _physMem;
+    qint64 _physMemSize;
     // This must be a reference, not an object, since MemoryDump::init() might
     // change values later on
     const MemSpecs& _specs;
