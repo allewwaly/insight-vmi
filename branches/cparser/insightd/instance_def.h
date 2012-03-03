@@ -384,28 +384,38 @@ public:
 
     /**
      * Retrieves the candidate type no. \a cndtIndex for member with index
-     * \a mbrIndex. You can check for the number of members with MemberCount()
+     * \a mbrIndex. You can check for the number of members with memberCount()
      * and the number of candidate types for a particular member with
-     * MemberCandidatesCount().
+     * memberCandidatesCount().
      * @param mbrIndex index of the member
      * @param cndtIndex index of the candidate type for that member
      * @return a new Instance object for the member with the selected candidate
      * type, if such a member and candiate exists, or an empty object otherwise
-     * \sa MemberCount(), MemberCandidatesCount()
      */
     Instance memberCandidate(int mbrIndex, int cndtIndex) const;
 
     /**
      * Retrieves the candidate type no. \a cndtIndex for member \a name.
      * You can check for the number of candidate types for a particular member
-     * with MemberCandidatesCount().
+     * with memberCandidatesCount().
      * @param name the name of the member
      * @param cndtIndex index of the candidate type for that member
      * @return a new Instance object if the member \a name with the selected
      * candidate type exists, or an empty object otherwise
-     * \sa MemberCount(), MemberCandidatesCount()
      */
     Instance memberCandidate(const QString& name, int cndtIndex) const;
+
+    /**
+     * Retrieves the BaseType of candidate no. \a cndtIndex for member with index
+     * \a mbrIndex. You can check for the number of members with memberCount()
+     * and the number of candidate types for a particular member with
+     * memberCandidatesCount().
+     * @param mbrIndex index of the member
+     * @param cndtIndex index of the candidate type for that member
+     * @return a new Instance object for the member with the selected candidate
+     * type, if such a member and candiate exists, or an empty object otherwise
+     */
+    const BaseType* memberCandidateType(int mbrIndex, int cndtIndex) const;
 
     /**
      * Explicit representation of this instance as qint8.
