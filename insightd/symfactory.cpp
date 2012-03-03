@@ -31,7 +31,6 @@
 #include <astnode.h>
 #include <astscopemanager.h>
 #include <abstractsyntaxtree.h>
-//#include <astsourceprinter.h>
 
 #define factoryError(x) do { throw FactoryException((x), __FILE__, __LINE__); } while (0)
 
@@ -100,7 +99,6 @@ void SymFactory::clear()
 	// Clear all further hashes and lists
 	_typesById.clear();
 	_replacedMemberTypes.clear();
-	_artificialTypeIds.clear();
 	_equivalentTypes.clear();
 	_typesByName.clear();
 	_typesByHash.clear();
@@ -347,8 +345,6 @@ T* SymFactory::getTypeInstance2(T* t, const TypeInfo& info)
             p->setSize(_memSpecs.sizeofUnsignedLong);
     }
 
-//    RefBaseType* rbt = dynamic_cast<RefBaseType*>(t);
-
     // Try to find the type based on its hash, but only if hash is valid
     bool foundByHash = false;
 
@@ -530,82 +526,6 @@ bool SymFactory::isNewType(const int new_id, BaseType* type) const
 }
 
 
-bool SymFactory::isStructListHead(const BaseType* type) const
-{
-    const Struct* s = dynamic_cast<const Struct*>(type);
-
-    if (!s)
-        return false;
-
-    // Check name and member size
-    if (s->name() != "list_head" || s->members().size() != 2)
-        return false;
-
-    // Check the members
-    const StructuredMember* next = s->members().at(0);
-    const StructuredMember* prev = s->members().at(1);
-    return (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
-            next->name() == "next" &&
-            (!next->refType() ||
-             next->refType()->type() == rtPointer) &&
-            prev->name() == "prev" &&
-            (!prev->refType() ||
-             prev->refType()->type() == rtPointer));
-}
-
-
-bool SymFactory::isStructHListNode(const BaseType* type) const
-{
-    const Struct* s = dynamic_cast<const Struct*>(type);
-
-    if (!s)
-        return false;
-
-    // Check name and member size
-    if (s->name() != "hlist_node" || s->members().size() != 2)
-        return false;
-
-    // Check the members
-    const StructuredMember* next = s->members().at(0);
-    const StructuredMember* prev = s->members().at(1);
-    return (s->size() == (quint32)(2 * _memSpecs.sizeofUnsignedLong) &&
-            next->name() == "next" &&
-            (!next->refType() ||
-             next->refType()->type() == rtPointer) &&
-            prev->name() == "pprev" &&
-            (!prev->refType() ||
-             prev->refType()->type() == rtPointer));
-}
-
-
-//template<class T_key, class T_val>
-//void SymFactory::relocateHashEntry(const T_key& old_key, const T_key& new_key,
-//        T_val* value, QMultiHash<T_key, T_val*>* hash)
-//{
-//    bool removed = false;
-
-//    // Remove type at old hash-index
-//    QList<T_val*> list = hash->values(old_key);
-//    for (int i = 0; i < list.size(); i++) {
-//        if (value->id() == list[i]->id()) {
-//        	// Remove either the complete list or the single entry
-//        	if (list.size() == 1)
-//        		hash->remove(old_key);
-//        	else
-//        		hash->remove(old_key, list[i]);
-//            removed = true;
-//            break;
-//        }
-//    }
-
-//    if (!removed)
-//        debugerr("Did not find entry in hash table at index 0x" << std::hex << old_key << std::dec << "");
-
-//    // Re-add it at new hash-index
-//    hash->insert(new_key, value);
-//}
-
-
 QList<int> SymFactory::equivalentTypes(int id) const
 {
     const BaseType* t = findBaseTypeById(id);
@@ -660,17 +580,12 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
 
     // Perform certain actions for new types
     if (isNewType(new_id, target)) {
-        if (target->id() < 0 && _artificialTypeIds.contains(target->id()))
-            // Don't add artificial types to _types or _typesByHash
-            _artificialTypes.append(target);
-        else {
-            _types.append(target);
-            if (target->hashIsValid())
-                _typesByHash.insertMulti(target->hash(), target);
-            else if (!forceInsert)
-                factoryError(QString("Hash for type 0x%1 is not valid!")
-                             .arg(target->id(), 0, 16));
-        }
+        _types.append(target);
+        if (target->hashIsValid())
+            _typesByHash.insertMulti(target->hash(), target);
+        else if (!forceInsert)
+            factoryError(QString("Hash for type 0x%1 is not valid!")
+                         .arg(target->id(), 0, 16));
         // Add this type into the name relation table
         if (!new_name.isEmpty())
             _typesByName.insertMulti(new_name, target);
@@ -692,21 +607,6 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
             for (Enum::EnumHash::const_iterator it = en->enumValues().begin();
                  it != en->enumValues().end(); ++it)
             {
-//                if (_enumsByName.contains(it.value())) {
-//                    debugerr("Multiple enumerators with the same name:");
-//                    for (EnumStringHash::const_iterator eit =
-//                         _enumsByName.find(it.value());
-//                         eit != _enumsByName.end() && eit.key() == it.value();
-//                         ++eit)
-//                        debugerr(QString("type 0x%1: %2 = %3")
-//                                 .arg(eit.value().second->id(), 0, 16)
-//                                 .arg(eit.key())
-//                                 .arg(eit.value().first));
-//                    debugerr(QString("type 0x%1: %2 = %3")
-//                             .arg(en->id(), 0, 16)
-//                             .arg(it.value())
-//                             .arg(it.key()));
-//                }
                 _enumsByName.insertMulti(it.value(), IntEnumPair(it.key(), en));
             }
         }
@@ -783,17 +683,9 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
 
             // Check if this is dublicated type
             BaseType* t = findTypeByHash(rbt);
-            if (t && (rbt->id() > 0 || !_artificialTypeIds.contains(rbt->id())))
-            {
+            if (t && (rbt->id() > 0)) {
                 // Update type relations with equivalent type
                 updateTypeRelations(rbt->id(), rbt->name(), t);
-//                debugmsg(QString("\nDeleting      %2 (id 0x%3) @ 0x%4,\n"
-//                                 "other type is %5 (id 0x%6)")
-//                         .arg(rbt->prettyName())
-//                         .arg(rbt->id(), 0, 16)
-//                         .arg((quint64)rbt, 0, 16)
-//                         .arg(t->prettyName())
-//                         .arg(t->id(), 0, 16));
                 delete rbt;
             }
             else
@@ -963,7 +855,6 @@ void SymFactory::addSymbol(Variable* var)
 {
     // Insert and find referenced type
     insert(var);
-//    resolveReference(var);
 }
 
 
@@ -983,8 +874,6 @@ void SymFactory::addSymbol(BaseType* type)
             _zeroSizeStructs.append(s);;
         resolveReferences(s);
     }
-
-//    _typesByHash.insert(type->hash(), type);
 }
 
 
@@ -1062,10 +951,6 @@ BaseType* SymFactory::getNumericInstance(const ASTType* astType)
         break;
     }
 
-//    ASTSourcePrinter printer;
-//    QString s = printer.toString(astType->node());
-//    info.setName(s);
-
     return getNumericInstance(info);
 }
 
@@ -1129,130 +1014,6 @@ bool SymFactory::resolveReference(ReferencingType* ref)
         insertUsedBy(ref);
         return true;
     }
-}
-
-
-Struct* SymFactory::makeStructListHead(StructuredMember* member)
-{
-    assert(member != 0);
-
-    Structured* parent = member->belongsTo();
-    // Create a new struct a special ID. This way, the type will be recognized
-    // as "struct list_head" when the symbols are stored and loaded again.
-    Struct* ret = new Struct(this);
-    ret->setId(getUniqueTypeId());
-    ret->setName("list_head");
-    ret->setSize(2 * _memSpecs.sizeofUnsignedLong);
-
-    // Which macro offset should be used? In the kernel, the "childen" list_head
-    // in the struct "task_struct" actually points to the next "sibling", not
-    // to the next "children". So we catch special cases like this here.
-    int extraOffset = -member->offset();
-    if (member->name() == "children") {
-        StructuredMember *sibling = parent->findMember("sibling", false);
-        if (sibling)
-            extraOffset = -sibling->offset();
-    }
-
-    // Create "next" pointer
-    Pointer* nextPtr = new Pointer(this);
-    nextPtr->setId(getUniqueTypeId());
-    nextPtr->setRefTypeId(parent->id());
-    nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
-    // To dereference this pointer, the member's offset has to be subtracted
-    nextPtr->setMacroExtraOffset(extraOffset);
-
-    StructuredMember* next = new StructuredMember(this); // deleted by ~Structured()
-    next->setId(getUniqueTypeId());
-    next->setName("next");
-    next->setOffset(0);
-    next->setRefTypeId(nextPtr->id());
-    ret->addMember(next);
-
-    // Create "prev" pointer
-    Pointer* prevPtr = new Pointer(*nextPtr);
-    prevPtr->setId(getUniqueTypeId());
-    StructuredMember* prev = new StructuredMember(this); // deleted by ~Structured()
-    prev->setId(getUniqueTypeId());
-    prev->setName("prev");
-    prev->setOffset(_memSpecs.sizeofUnsignedLong);
-    prev->setRefTypeId(prevPtr->id());
-    ret->addMember(prev);
-
-    // IDs have to be added to artificial types set before addSymbol()
-    _artificialTypeIds.insert(nextPtr->id());
-    _artificialTypeIds.insert(prevPtr->id());
-    _artificialTypeIds.insert(ret->id());
-
-    addSymbol(nextPtr);
-    addSymbol(prevPtr);
-    addSymbol(ret);
-
-    return ret;
-}
-
-
-Struct* SymFactory::makeStructHListNode(StructuredMember* member)
-{
-    assert(member != 0);
-
-    // Create a new struct a special ID. This way, the type will be recognized
-    // as "struct list_head" when the symbols are stored and loaded again.
-    Struct* ret = new Struct(this);
-    ret->setId(getUniqueTypeId());
-
-    Structured* parent = member->belongsTo();
-
-    ret->setName("hlist_node");
-    ret->setSize(2 * _memSpecs.sizeofUnsignedLong);
-
-    int extraOffset = -member->offset();
-
-    // Create "next" pointer
-    Pointer* nextPtr = new Pointer(this);
-    nextPtr->setId(getUniqueTypeId());
-    nextPtr->setRefTypeId(parent->id());
-    nextPtr->setSize(_memSpecs.sizeofUnsignedLong);
-    insertUsedBy(nextPtr);
-    // To dereference this pointer, the member's offset has to be subtracted
-    nextPtr->setMacroExtraOffset(extraOffset);
-
-    StructuredMember* next = new StructuredMember(this); // deleted by ~Structured()
-    next->setId(getUniqueTypeId());
-    next->setName("next");
-    next->setOffset(0);
-    next->setRefTypeId(nextPtr->id());
-    ret->addMember(next);
-
-    // Create "prev" pointer from the next pointer
-    Pointer* prevPtr = new Pointer(*nextPtr);
-    prevPtr->setId(getUniqueTypeId());
-
-    // Create the "pprev" pointer which points to the "prev" pointer
-    Pointer* pprevPtr = new Pointer(this);
-    pprevPtr->setId(getUniqueTypeId());
-    pprevPtr->setSize(_memSpecs.sizeofUnsignedLong);
-    pprevPtr->setRefTypeId(prevPtr->id());
-
-    StructuredMember* pprev = new StructuredMember(this); // deleted by ~Structured()
-    pprev->setId(getUniqueTypeId());
-    pprev->setName("pprev");
-    pprev->setOffset(_memSpecs.sizeofUnsignedLong);
-    pprev->setRefTypeId(pprevPtr->id());
-    ret->addMember(pprev);
-
-    // IDs have to be added to artificial types set before addSymbol()
-    _artificialTypeIds.insert(nextPtr->id());
-    _artificialTypeIds.insert(prevPtr->id());
-    _artificialTypeIds.insert(pprevPtr->id());
-    _artificialTypeIds.insert(ret->id());
-
-    addSymbol(nextPtr);
-    addSymbol(pprevPtr);
-    addSymbol(prevPtr);
-    addSymbol(ret);
-
-    return ret;
 }
 
 
@@ -1346,35 +1107,8 @@ bool SymFactory::resolveReference(StructuredMember* member)
     // Don't try to resolve types without valid ID
     if (member->refTypeId() == 0)
         return false;
-/*
-    BaseType* base = member->refType();
-
-    if (base && member->refTypeId() > 0 && isStructListHead(base)) {
-        removePostponed(member);
-        // Save the original refTypeId
-        _replacedMemberTypes[member->id()] = member->refTypeId();
-        // Replace member's type with artificial type
-        Struct* list_head = makeStructListHead(member);
-        member->setRefTypeId(list_head->id());
-        insertUsedBy(member);
-        _structListHeadCount++;
-        return true;
-    }
-    else if (base && member->refTypeId() > 0 && isStructHListNode(base)) {
-        removePostponed(member);
-        // Save the original refTypeId
-        _replacedMemberTypes[member->id()] = member->refTypeId();
-        // Replace member's type with artificial type
-        Struct* hlist_node = makeStructHListNode(member);
-        member->setRefTypeId(hlist_node->id());
-        insertUsedBy(member);
-        _structHListNodeCount++;
-        return true;
-    }
-    else
-*/
-        // Fall back to the generic resolver
-        return resolveReference((ReferencingType*)member);
+    // Fall back to the generic resolver
+    return resolveReference((ReferencingType*)member);
 }
 
 
@@ -1438,7 +1172,6 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
     equiv += oldType->id();
     _equivalentTypes.remove(oldType->id());
     for (int i = 0; i < equiv.size(); ++i) {
-//        assert(_typesById.value(equiv[i]) == oldType);
         // Save the hashes of all types referencing the old type
         QList<RefBaseType*> refTypes = _usedByRefTypes.values(equiv[i]);
         QList<uint> refTypeHashes;
@@ -1458,9 +1191,7 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
 
                 // Is this a dublicated type?
                 BaseType* other = findTypeByHash(refTypes[j]);
-                if (other && (refTypes[j]->id() > 0 ||
-                              !_artificialTypeIds.contains(refTypes[j]->id())))
-                {
+                if (other && (refTypes[j]->id() > 0)) {
                     replaceType(refTypes[j], other);
                     delete refTypes[j];
                     _typeFoundByHash++;
@@ -1485,9 +1216,7 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
 
                 // Is this a dublicated type?
                 BaseType* other = findTypeByHash(fp);
-                if (other && (fp->id() > 0 ||
-                              !_artificialTypeIds.contains(fp->id())))
-                {
+                if (other && (fp->id() > 0)) {
                     replaceType(fp, other);
                     delete fp;
                     _typeFoundByHash++;
@@ -1633,7 +1362,7 @@ void SymFactory::symbolsFinished(RestoreType rt)
 
     shell->out() << "  | No. of types:              " << (_types.size() + _artificialTypes.size()) << endl;
     shell->out() << "  | No. of types by name:      " << _typesByName.size() << endl;
-    shell->out() << "  | No. of types by ID:        " << (_typesById.size() + _artificialTypeIds.size()) << endl;
+    shell->out() << "  | No. of types by ID:        " << _typesById.size() << endl;
     shell->out() << "  | No. of types by hash:      " << _typesByHash.size() << endl;
 //    shell->out() << "  | Types found by hash:       " << _typeFoundByHash << endl;
     shell->out() << "  | No of \"struct list_head\":  " << _structListHeadCount << endl;
@@ -2526,9 +2255,9 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
     ASTExpressionEvaluator* exprEval =
             dynamic_cast<KernelSourceTypeEvaluator*>(eval)->exprEvaluator();
 
-//#ifdef DEBUG
-//    exprEval->clearCache();
-//#endif
+#ifdef DEBUG_APPLY_USED_AS
+    exprEval->clearCache();
+#endif
 
     // Find top-level node of right-hand side for expression
     const ASTNode* right = ed->srcNode;
@@ -2596,11 +2325,9 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
         }
     }
 
+    // Rarely happens, but sometimes we find references to externally
+    // declared variables that are not in the debugging symbols.
     if (!varsFound) {
-//        factoryError("Did not find any variables to adjust!");
-
-        // Rarely happens, but sometimes we find references to externally
-        // declared variables that are not in the debugging symbols.
 #ifdef DEBUG_APPLY_USED_AS
         debugerr("Did not find any variables to adjust!");
 #endif
@@ -2820,7 +2547,3 @@ int SymFactory::getUniqueTypeId()
 
     return _artificialTypeId--;
 }
-
-
-
-

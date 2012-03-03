@@ -211,10 +211,7 @@ void KernelSymbolWriter::write()
         BaseTypeIntHash::const_iterator bt_id_it = _factory->typesById().constBegin();
         int written = 0;
         while (bt_id_it != _factory->typesById().constEnd()) {
-            if (!written_types.contains(bt_id_it.key()) &&
-                    ((bt_id_it.key() > 0 ||
-                      !_factory->artificialTypeIds().contains(bt_id_it.key()))))
-            {
+            if (!written_types.contains(bt_id_it.key())) {
                 out << (qint32) bt_id_it.key() << (qint32) bt_id_it.value()->id();
 #ifdef WRITE_ASCII_FILE
                 dout << hex << "0x" << bt_id_it.key() << " -> 0x"
@@ -227,8 +224,7 @@ void KernelSymbolWriter::write()
         }
 
         assert(written == ids_to_write);
-        assert(_factory->artificialTypeIds().size() + written_types.size() +
-               written == _factory->typesById().size());
+        assert(written_types.size() + written == _factory->typesById().size());
 
         // Write list of variables
         out << (qint32) _factory->vars().size();
