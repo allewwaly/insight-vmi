@@ -18,6 +18,7 @@ class QCloseEvent;
 
 #include "memorymaprangetree.h"
 #include "memorydifftree.h"
+#include "memspecs.h"
 
 
 class MemoryMapWidget: public QWidget
@@ -35,7 +36,7 @@ public:
     quint64 visibleAddrSpaceLength() const;
 
     const MemoryMapRangeTree* map() const;
-    void setMap(const MemoryMapRangeTree* map);
+    void setMap(const MemoryMapRangeTree* map, const MemSpecs &specs);
     const MemoryDiffTree* diff() const;
     void setDiff(const MemoryDiffTree* diff);
     bool antiAliasing() const;
@@ -68,8 +69,8 @@ private:
     bool _antialiasing;
     bool _isPainting;
     bool _showOnlyKernelSpace;
-    quint64 _shownAddrSpaceOffset;
     QMutex _buildMutex;
+    MemSpecs _specs;
 
 signals:
     void addressChanged(quint64 address);

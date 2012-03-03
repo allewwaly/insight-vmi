@@ -1700,9 +1700,11 @@ int Shell::cmdMemoryRevmapVisualize(int index, QString type)
 
     int ret = 0;
     if (QString("physical").startsWith(type) || QString("pmem").startsWith(type))
-        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->pmemMap());
+        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->pmemMap(),
+                                          _memDumps[index]->memSpecs());
     else if (QString("virtual").startsWith(type) || QString("vmem").startsWith(type))
-        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->vmemMap());
+        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->vmemMap(),
+                                          _memDumps[index]->memSpecs());
     else {
         cmdHelp(QStringList("memory"));
         ret = 1;
