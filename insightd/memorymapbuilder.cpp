@@ -149,13 +149,49 @@ void MemoryMapBuilder::run()
         else if (inst.memberCount() > 0) {
             // Add all struct members to the stack that haven't been visited
             for (int i = 0; i < inst.memberCount(); ++i) {
-                try {
-                    Instance m = inst.member(i, BaseType::trLexical);
-                    if (_map->addressIsWellFormed(m))
-                        _map->addChildIfNotExistend(m, node, _index);
+                const int candidateCnt = inst.memberCandidatesCount(i);
+                // No candidate types
+                if (!candidateCnt) {
+                    try {
+                        Instance m = inst.member(i, BaseType::trLexical);
+                        if (_map->addressIsWellFormed(m))
+                            _map->addChildIfNotExistend(m, node, _index);
+                    }
+                    catch (GenericException& e) {
+                        // Do nothing
+                    }
                 }
-                catch (GenericException& e) {
-                    // Do nothing
+                // Multiple candidates, so find the most likely one
+                else {
+                    Instance likely;
+                    float l_prob = 0.0;
+                    for (int j = 0; j < candidateCnt; ++j) {
+                        try {
+                            const BaseType* type = inst.memberCandidateType(i, j);
+                            type = type ? type->dereferencedBaseType(BaseType::trLexical) : 0;
+                            // Skip invalid and void* candidates
+                            if (!type ||
+                                ((type->type() & (rtPointer|rtArray)) &&
+                                 !dynamic_cast<const Pointer*>(type)->refType()))
+                                continue;
+                            // Try this candidate
+                            Instance m = inst.memberCandidate(i, j);
+                            if (_map->addressIsWellFormed(m)) {
+                                float m_prob = _map->calculateNodeProbability(&m);
+                                // Compare probabilities
+                                if (m_prob > l_prob || likely.isNull()) {
+                                    l_prob = m_prob;
+                                    likely = m;
+                                }
+                            }
+                        }
+                        catch (GenericException& e) {
+                            // Do nothing
+                        }
+                    }
+                    // Add the most likely candidate
+                    if (!likely.isNull())
+                        _map->addChildIfNotExistend(likely, node, _index);
                 }
             }
         }
