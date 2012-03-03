@@ -118,7 +118,7 @@
 
 VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
                              int memDumpIndex)
-    : _tlb(10000), _physMem(physMem), _specs(specs), _pos(-1),
+    : _tlb(50000), _physMem(physMem), _physMemSize(-1), _specs(specs), _pos(-1),
       _memDumpIndex(memDumpIndex), _threadSafe(false),
       _userland(false), _userPGD(0), _userlandMutex(QMutex::Recursive)
 {
@@ -126,6 +126,8 @@ VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
     if ( !_specs.arch & (MemSpecs::ar_i386|MemSpecs::ar_x86_64) )
         virtualMemoryError("No architecture set in memory specifications");
 
+    if (_physMem)
+        _physMemSize = _physMem->size();
 }
 
 
@@ -358,6 +360,7 @@ void VirtualMemory::setPhysMem(QIODevice* physMem)
         if (doLock) _tlbMutex.unlock();
     }
     _physMem = physMem;
+    _physMemSize = _physMem ? _physMem->size() : -1;
 
     if (doLock) _physMemMutex.unlock();
 }
@@ -398,8 +401,8 @@ T VirtualMemory::extractFromPhysMem(quint64 physaddr, bool enableExceptions,
 
 inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 {
-    // Disable TLB for now
-    return 0;
+//    // Disable TLB for now
+//    return 0;
 
     bool doLock = _threadSafe;
     quint64 result = 0;
@@ -700,7 +703,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
             virtualToPhysical32(vaddr, pageSize, enableExceptions) :
             virtualToPhysical64(vaddr, pageSize, enableExceptions);
 
-    if (_physMem->size() > 0 && physAddr >= (quint64)_physMem->size())
+    if (_physMemSize > 0 && physAddr >= (quint64)_physMemSize)
         virtualMemoryOtherError(
                 QString("Physical address 0x%1 out of bounds")
                         .arg(physAddr, 0, 16),
