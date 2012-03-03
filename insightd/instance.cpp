@@ -514,6 +514,19 @@ Instance Instance::memberCandidate(const QString &name, int cndtIndex) const
 }
 
 
+const BaseType *Instance::memberCandidateType(int mbrIndex, int cndtIndex) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s && mbrIndex >= 0 && mbrIndex < s->members().size() &&
+		_d.type && _d.type->factory()) {
+		int id = s->members().at(mbrIndex)->altRefType(cndtIndex).id;
+		return _d.type->factory()->findBaseTypeById(id);
+	}
+
+	return 0;
+}
+
+
 Instance Instance::memberCandidate(const StructuredMember* m,
 								   int cndtIndex) const
 {
@@ -540,8 +553,10 @@ Instance Instance::memberCandidate(const StructuredMember* m,
 	newType = dynamic_cast<const Pointer*>(newType)->refType();
 
 	// Create instance with new type at new address
-	return newType->toInstance(newAddr, _d.vmem, m->name(), _d.parentNames,
-							   BaseType::trLexical);
+	return newType ?
+				newType->toInstance(newAddr, _d.vmem, m->name(), _d.parentNames,
+									BaseType::trLexical) :
+				Instance();
 }
 
 
