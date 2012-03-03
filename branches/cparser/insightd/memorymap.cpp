@@ -125,6 +125,13 @@ void MemoryMap::build(float minProbability)
     for (VariableList::const_iterator it = _factory->vars().constBegin();
             it != _factory->vars().constEnd(); ++it)
     {
+        /// @todo consider alternative types for variables
+//        const Variable* v = *it;
+//        if (v->hasAltRefTypes())
+//            debugmsg(QString("Variable \"%1\" (0x%2) has %3 candidate types.")
+//                     .arg(v->name())
+//                     .arg(v->id(), 0, 16)
+//                     .arg(v->altRefTypeCount()));
         try {
             Instance inst = (*it)->toInstance(_vmem, BaseType::trLexical);
             if (!inst.isNull() && fitsInVmem(inst.address(), inst.size())) {
