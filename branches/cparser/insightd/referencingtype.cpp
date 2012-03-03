@@ -212,7 +212,7 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 				// Stop here, so that toString() later on will print this as string
 				break;
 			// If this is an unresolved type, don't resolve it anymore
-			else if (!rbt->refType())
+			if (!rbt->refType())
 			    break;
 			// Otherwise resolve pointer reference, if this is a pointer
 			if ( (p = dynamic_cast<const Pointer*>(rbt)) ) {
@@ -231,6 +231,10 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 					--maxPtrDeref;
 			}
 		}
+
+		// If this is a void type, don't resolve it anymore
+		if (!rbt->refTypeDeep(BaseType::trLexical))
+			break;
 		b = rbt->refType();
     }
 
