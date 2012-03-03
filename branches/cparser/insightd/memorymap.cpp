@@ -669,13 +669,15 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
                 dynamic_cast<const Structured*>(instType);
         quint32 nonAlignedChildAddrCnt = 0, invalidChildAddrCnt = 0;
         // Check address of all descendant pointers
-        for (int i = 0; i < structured->members().size(); ++i) {
-            const BaseType* m_type =
-                    structured->members().at(i)->refTypeDeep(BaseType::trLexical);
+        for (MemberList::const_iterator it = structured->members().begin(),
+             e = structured->members().end(); it != e; ++it)
+        {
+            const StructuredMember* m = *it;
+            const BaseType* m_type = m->refTypeDeep(BaseType::trLexical);
 
             if (m_type && (m_type->type() & rtPointer)) {
                 try {
-                    quint64 m_addr = inst->address() + structured->members().at(i)->offset();
+                    quint64 m_addr = inst->address() + m->offset();
                     // Try a safeSeek first to avoid costly throws of exceptions
                     if (_vmem->safeSeek(m_addr)) {
                         m_addr = (quint64)m_type->toPointer(_vmem, m_addr);
