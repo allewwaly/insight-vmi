@@ -39,7 +39,7 @@
 
 SymFactory::SymFactory(const MemSpecs& memSpecs)
 	: _memSpecs(memSpecs), _typeFoundByHash(0), _artificialTypeId(-1),
-	  _maxTypeSize(0)
+	  _changeClock(0), _maxTypeSize(0)
 {
 }
 
@@ -121,6 +121,7 @@ void SymFactory::clear()
 	_typesCopied = 0;
 	_conflictingTypeChanges = 0;
 	_artificialTypeId = -1;
+	_changeClock = 0;
 }
 
 
@@ -575,6 +576,7 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
     assert(_typesById.contains(new_id) == false);
     _typesById.insert(new_id, target);
     _equivalentTypes.insertMulti(target->id(), new_id);
+    ++_changeClock;
 
     // Perform certain actions for new types
     if (isNewType(new_id, target)) {
@@ -1170,6 +1172,7 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
     }
 
     _types.removeAll(oldType);
+    ++_changeClock;
 
     // Update all old equivalent types as well
     QList<int> equiv = equivalentTypes(oldType->id());

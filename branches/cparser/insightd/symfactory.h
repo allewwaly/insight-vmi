@@ -390,6 +390,15 @@ public:
 	 */
 	ASTExpression* createEmptyExpression(ExpressionType type);
 
+	/**
+	 * Whenever the SymFactory makes changes to its internal data structures,
+	 * this changeClock is increased.
+	 * In order to allow types to detect type changes to invalidate their
+	 * caches (if any), they can compare their saved "clock" value to this
+	 * counter value.
+	 * @return the value of the realtive change clock
+	 */
+	quint32 changeClock() const;
 
 protected:
 	void typeAlternateUsageStructMember(const TypeEvalDetails *ed,
@@ -680,6 +689,7 @@ private:
 	int _varTypeChanges;
 	int _conflictingTypeChanges;
 	int _artificialTypeId;
+	quint32 _changeClock;
 	quint32 _maxTypeSize;
 	QMutex _typeAltUsageMutex;
 };
@@ -706,6 +716,12 @@ inline BaseType* SymFactory::findBaseTypeByName(const QString & name) const
 inline Variable* SymFactory::findVarByName(const QString & name) const
 {
 	return _varsByName.value(name);
+}
+
+
+inline quint32 SymFactory::changeClock() const
+{
+	return _changeClock;
 }
 
 #endif /* SYMFACTORY_H_ */

@@ -232,6 +232,13 @@ protected:
     virtual const SymFactory* fac() const = 0;
 
     int _refTypeId;            ///< holds ID of the type this object is referencing    
+
+    // Caching variables
+    mutable BaseType* _refType;
+    mutable BaseType* _refTypeDeep;
+    mutable int _deepResolvedTypes;
+    mutable quint32 _refTypeChangeClock;
+
     QList<AltRefType> _altRefTypes; ///< a list of alternative types
     static const AltRefType _emptyRefType;
 
@@ -254,6 +261,12 @@ private:
     inline Instance createRefInstance(size_t address, VirtualMemory* vmem,
             const QString& name, const QStringList& parentNames, int id,
             int resolveTypes, int maxPtrDeref, int* derefCount) const;
+
+    template<class ref_t, class base_t>
+    static base_t* refTypeTempl(ref_t *ref);
+
+    template<class ref_t, class base_t, class ref_base_t>
+    static base_t* refTypeDeepTempl(ref_t *ref, int resolveTypes);
 };
 
 
@@ -293,16 +306,5 @@ inline QList<ReferencingType::AltRefType>& ReferencingType::altRefTypes()
 
 #if !defined(REFERENCINGTYPE_H_INLINE) && defined(SYMFACTORY_DEFINED)
 #define REFERENCINGTYPE_H_INLINE
-
-inline const BaseType* ReferencingType::refType() const
-{
-    return fac() && _refTypeId ? fac()->findBaseTypeById(_refTypeId) : 0;
-}
-
-
-inline BaseType* ReferencingType::refType()
-{
-    return fac() && _refTypeId ? fac()->findBaseTypeById(_refTypeId) : 0;
-}
 
 #endif /* REFERENCINGTYPE_H_INLINE */
