@@ -2055,8 +2055,10 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
         }
         else {
             baseTypes = _typesByName.values(name);
+#ifdef DEBUG_APPLY_USED_AS
             if (baseTypes.isEmpty())
                 debugerr("No type with name " << name << " found!");
+#endif
         }
     }
     // Is the source a numeric type?
@@ -2201,8 +2203,10 @@ void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
     // It can happen that GCC excludes unused symbols from the debugging
     // symbols, so don't fail if we don't find the target base type
     if (targetTypeRet.types.isEmpty()) {
+#ifdef DEBUG_APPLY_USED_AS
         debugerr("Could not find target BaseType: "
                  << ed->targetType->toString());
+#endif
         return;
     }
 
