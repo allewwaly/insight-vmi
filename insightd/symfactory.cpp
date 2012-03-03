@@ -38,8 +38,8 @@
 //------------------------------------------------------------------------------
 
 SymFactory::SymFactory(const MemSpecs& memSpecs)
-	: _memSpecs(memSpecs), _typeFoundByHash(0), _structListHeadCount(0),
-	  _structHListNodeCount(0), _artificialTypeId(-1), _maxTypeSize(0)
+	: _memSpecs(memSpecs), _typeFoundByHash(0), _artificialTypeId(-1),
+	  _maxTypeSize(0)
 {
 }
 
@@ -114,8 +114,6 @@ void SymFactory::clear()
 
 	// Reset other vars
 	_typeFoundByHash = 0;
-	_structListHeadCount = 0;
-	_structHListNodeCount = 0;
 	_maxTypeSize = 0;
 	_uniqeTypesChanged = 0;
 	_totalTypesChanged = 0;
@@ -638,14 +636,20 @@ BaseType* SymFactory::findTypeByHash(const BaseType* bt)
         return 0;
 
     uint hash = bt->hash();
+    BaseType* ret = 0;
     BaseTypeUIntHash::const_iterator it = _typesByHash.find(hash);
     while (it != _typesByHash.end() && it.key() == hash) {
         BaseType* t = it.value();
-        if (bt != t && *bt == *t)
-            return t;
+        if (bt != t && *bt == *t) {
+            // Prefer a non-artificial over an artificial type
+            if (t->id() > 0)
+                return t;
+            else
+                ret = t;
+        }
         ++it;
     }
-    return 0;
+    return ret;
 }
 
 
@@ -1365,8 +1369,6 @@ void SymFactory::symbolsFinished(RestoreType rt)
     shell->out() << "  | No. of types by ID:        " << _typesById.size() << endl;
     shell->out() << "  | No. of types by hash:      " << _typesByHash.size() << endl;
 //    shell->out() << "  | Types found by hash:       " << _typeFoundByHash << endl;
-    shell->out() << "  | No of \"struct list_head\":  " << _structListHeadCount << endl;
-    shell->out() << "  | No of \"struct hlist_node\": " << _structHListNodeCount << endl;
 //    shell->out() << "  | Postponed types:           " << << _postponedTypes.size() << endl;
     shell->out() << "  | No. of variables:          " << _vars.size() << endl;
     shell->out() << "  | No. of variables by ID:    " << _varsById.size() << endl;
