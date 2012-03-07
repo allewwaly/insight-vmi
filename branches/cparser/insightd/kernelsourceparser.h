@@ -79,6 +79,7 @@ private:
     int _lastFileNameLen;
     QList<WorkerThread*> _threads;
     QMutex _filesMutex;
+    QMutex _progressMutex;
 };
 
 #endif /* KERNELSOURCEPARSER_H_ */
