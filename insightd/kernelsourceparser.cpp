@@ -64,6 +64,7 @@ KernelSourceParser::~KernelSourceParser()
 
 void KernelSourceParser::operationProgress()
 {
+    QMutexLocker lock(&_progressMutex);
     int percent = (_filesIndex / (float) _factory->sources().size()) * 100;
 //    shell->out() << "Parsing file " << _filesDone << "/"
 //            <<  _factory->sources().size()
@@ -134,7 +135,11 @@ void KernelSourceParser::parse()
         thread->start();
     }
 
-    // Wait for threads to finish
+    // Show progress while parsing is not finished
+    while (!_threads[0]->wait(250))
+        checkOperationProgress();
+
+    // Wait for all threads to finish
     for (int i = 0; i < QThread::idealThreadCount(); ++i)
         _threads[i]->wait();
 
