@@ -95,6 +95,17 @@ public:
     Instance toInstance(VirtualMemory* vmem, int resolveTypes =
             BaseType::trLexical) const;
 
+    /**
+     * Retrieves an Instance for the alternative referencing type no. \a index
+     * of this variable. You can check for the number alternative types with
+     * altRefTypeCount().
+     * @param vmem the VirtualMemory object to create the instance for
+     * @param index index of the alternative type
+     * @return a new Instance object for the selected alternative type, if it
+     * exists, or an empty Instance otherwise
+     */
+    Instance altRefTypeInstance(VirtualMemory *vmem, int index) const;
+
 	/**
 	 * Reads a serialized version of this object from \a in.
 	 * \sa writeTo()
