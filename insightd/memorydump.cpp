@@ -215,9 +215,14 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		if (!v)
 			queryError(QString("Variable does not exist: %1").arg(symbol));
 
-		if (candidateIndex > 0)
-			queryError("Candidate selection is not yet implemented for "
-					   "variables.");
+		if (candidateIndex > 0) {
+			if (v->altRefTypeCount() < candidateIndex)
+				queryError(QString("Variable \"%1\" does not have a candidate "
+								   "with index %2")
+							.arg(symbol)
+							.arg(candidateIndex));
+			result = v->altRefTypeInstance(_vmem, candidateIndex - 1);
+		}
 		else
 			result = v->toInstance(_vmem, BaseType::trLexicalAndPointers);
 	}
