@@ -359,6 +359,32 @@ const ReferencingType::AltRefType& ReferencingType::altRefType(
 }
 
 
+Instance ReferencingType::AltRefType::toInstance(
+        VirtualMemory *vmem, const Instance *inst, const SymFactory *factory,
+        const QString& name, const QStringList& parentNames) const
+{
+    // Evaluate pointer arithmetic for new address
+    ExpressionResult result = expr->result(inst);
+    if (result.resultType & (erUndefined|erRuntime))
+        return Instance();
+
+    quint64 newAddr = result.uvalue(esUInt64);
+    // Retrieve new type
+    const BaseType* newType = factory ?
+                factory->findBaseTypeById(id) : 0;
+    assert(newType != 0);
+    // Calculating the new address already corresponds to a dereference, so
+    // get rid of one pointer instance
+    assert(newType->type() & (rtPointer|rtArray));
+    newType = dynamic_cast<const Pointer*>(newType)->refType();
+
+    // Create instance with new type at new address
+    return newType ?
+                newType->toInstance(newAddr, vmem, name, parentNames) :
+                Instance();
+}
+
+
 void ReferencingType::AltRefType::readFrom(KernelSymbolStream &in,
                                            SymFactory* factory)
 {

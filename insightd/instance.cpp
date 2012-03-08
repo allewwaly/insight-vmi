@@ -537,26 +537,8 @@ Instance Instance::memberCandidate(const StructuredMember* m,
 		return Instance();
 
 	ReferencingType::AltRefType alt = m->altRefType(cndtIndex);
-	// Evaluate pointer arithmetic for new address
-	ExpressionResult result = alt.expr->result(this);
-	if (result.resultType & (erUndefined|erRuntime))
-		return Instance();
-
-	quint64 newAddr = result.uvalue(esUInt64);
-	// Retrieve new type
-	const BaseType* newType = (_d.type && _d.type->factory()) ?
-				_d.type->factory()->findBaseTypeById(alt.id) : 0;
-	assert(newType != 0);
-	// Calculating the new address already corresponds to a dereference, so
-	// get rid of one pointer instance
-	assert(newType->type() & (rtPointer|rtArray));
-	newType = dynamic_cast<const Pointer*>(newType)->refType();
-
-	// Create instance with new type at new address
-	return newType ?
-				newType->toInstance(newAddr, _d.vmem, m->name(), _d.parentNames,
-									BaseType::trLexical) :
-				Instance();
+	return alt.toInstance(_d.vmem, this, _d.type ? _d.type->factory() : 0,
+						  m->name(), _d.parentNames);
 }
 
 

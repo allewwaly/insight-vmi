@@ -26,6 +26,19 @@ public:
         const ASTExpression* expr;
 
         /**
+         * Creates an Instance of this alternative type.
+         * @param vmem the VirtualMemory object to create the instance for
+         * @param inst the Instance object to evaluate expr with
+         * @param factory the factory to which this type belongs
+         * @param name the name for this instance, i.e., variable or member name
+         * @param parentNames the parent name components used to reach this
+         * alternative type
+         */
+        Instance toInstance(VirtualMemory* vmem, const Instance* inst,
+                            const SymFactory* factory, const QString &name,
+                            const QStringList &parentNames) const;
+
+        /**
          * Reads a serialized version of this object from \a in.
          * \sa writeTo()
          * @param in the data stream to read the data from, must be ready to read
