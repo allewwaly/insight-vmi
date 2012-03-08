@@ -66,6 +66,7 @@ void KernelSourceParser::operationProgress()
 {
     QMutexLocker lock(&_progressMutex);
     int percent = (_filesIndex / (float) _factory->sources().size()) * 100;
+    QString fileName = _currentFile;
 //    shell->out() << "Parsing file " << _filesDone << "/"
 //            <<  _factory->sources().size()
 //            << " (" << percent  << "%)"
@@ -75,9 +76,9 @@ void KernelSourceParser::operationProgress()
     shell->out() << "\rParsing file " << _filesIndex << "/"
             <<  _factory->sources().size() << " (" << percent  << "%)"
             << ", " << elapsedTime() << " elapsed: "
-            << qSetFieldWidth(_lastFileNameLen) << qPrintable(_currentFile)
+            << qSetFieldWidth(_lastFileNameLen) << qPrintable(fileName)
             << qSetFieldWidth(0) << flush;
-    _lastFileNameLen = _currentFile.length();
+    _lastFileNameLen = fileName.length();
 }
 
 
@@ -124,11 +125,13 @@ void KernelSourceParser::parse()
     }
     
     // Create worker threads, limited to single-threading for debugging
-#ifdef DEBUG_APPLY_USED_AS
-    for (int i = 0; i < 1; ++i)
+#if defined(DEBUG_APPLY_USED_AS) || defined(DEBUG_USED_AS) || defined(DEBUG_POINTS_TO)
+    const int THREAD_COUNT = 1;
 #else
-    for (int i = 0; i < QThread::idealThreadCount(); ++i)
+    const int THREAD_COUNT = QThread::idealThreadCount();
 #endif
+
+    for (int i = 0; i < THREAD_COUNT; ++i)
     {
         WorkerThread* thread = new WorkerThread(this);
         _threads.append(thread);
@@ -140,7 +143,7 @@ void KernelSourceParser::parse()
         checkOperationProgress();
 
     // Wait for all threads to finish
-    for (int i = 0; i < QThread::idealThreadCount(); ++i)
+    for (int i = 0; i < THREAD_COUNT; ++i)
         _threads[i]->wait();
 
     cleanUpThreads();
