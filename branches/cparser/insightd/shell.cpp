@@ -1805,6 +1805,7 @@ int Shell::cmdScript(QStringList args)
     // Read script code from file or from args[1] if the file name is "eval"
     QString scriptCode;
     if (fileName == "eval") {
+        fileName.clear();
     	if (args.size() < 2) {
 			_err << "Using the \"eval\" function expects script code as "
 					<< "additional argument." << endl;
@@ -1833,18 +1834,22 @@ int Shell::cmdScript(QStringList args)
 	QScriptValue result = _engine->evaluate(scriptCode, args,
 			includePathFileInfo.absolutePath());
 
-	if (result.isError()) {
-		if (_engine->hasUncaughtException()) {
-			_err << "Exception occured on " << fileName << ":"
-					<< _engine->uncaughtExceptionLineNumber() << ": " << endl
-					<< _engine->uncaughtException().toString() << endl;
-			QStringList bt = _engine->uncaughtExceptionBacktrace();
-			for (int i = 0; i < bt.size(); ++i)
-				_err << "    " << bt[i] << endl;
-		}
+	if (_engine->hasUncaughtException()) {
+		_err << "Exception occured on ";
+		if (fileName.isEmpty())
+			_err << "line ";
 		else
-			_err << result.toString() << endl;
+			_err << fileName << ":";
+		_err << _engine->uncaughtExceptionLineNumber() << ": " << endl
+			 << _engine->uncaughtException().toString() << endl;
+		QStringList bt = _engine->uncaughtExceptionBacktrace();
+		for (int i = 0; i < bt.size(); ++i)
+			_err << "    " << bt[i] << endl;
 		return 4;
+	}
+	else if (result.isError()) {
+		_err << result.toString() << endl;
+		return 5;
 	}
 
     return ecOk;
