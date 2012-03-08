@@ -99,8 +99,11 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         QString s_expr = expr ? expr->toString() : QString("n/a");
 
 
-//        debugmsg("Passing the following type change to SymFactory:\n" +
-//                 typeChangeInfo(ed, s_expr));
+#ifdef DEBUG_APPLY_USED_AS
+        debugmsg("Passing the following type change to SymFactory:\n" +
+                 typeChangeInfo(ed, s_expr));
+#endif
+
         _factory->typeAlternateUsage(&ed, this);
     }
     catch (FactoryException& e) {
