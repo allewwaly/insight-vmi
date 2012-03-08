@@ -5,31 +5,18 @@
 
 function printModuleList()
 {
-	var head = new Instance("modules");
-	var m = head.next;
-	m.ChangeType("module");	
+    var head = new Instance("modules");
 
-	// Offset we have to use for correction
-	var offset = m.MemberOffset("list");
-	m.AddToAddress(-offset);
+    if (head.MemberCandidatesCount("next") <= 1)
+        throw new Error("\"" + head.Name() + "\" does not have any candidate types for member \"next\"");
 
-	// Prepare head for correct loop terminaten
-	head.AddToAddress(-offset);
-	
-	do {
+    var m = head.MemberCandidate("next", 0);
+    print(m.name.toString());
+
+	while (m && m.list.next.Address() != head.Address()) {
+		m = m.list.MemberCandidate("next", 0);
 		print(m.name.toString());
-		// Automated through source code parser
-		if (m.list.MemberCandidatesCount("next") > 0) {
-			m = m.list.MemberCandidate("next", 0);
-		}
-		// Manually adjust type and offset work
-		else {
-			// Maybe throw an exception here?
-			m = m.list.next;
-			m.ChangeType("module");
-			m.AddToAddress(-offset);
-		}
-	} while (m && m.Address() != head.Address());
+	}
 }
 
 printModuleList();
