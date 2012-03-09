@@ -150,9 +150,12 @@ void KernelSourceParser::parse()
 
     operationStopped();
 
-    shell->out() << "\rParsed " << _filesIndex << "/" << _filesIndex
-                 << " files in " << elapsedTime()
-                 << endl;
+    shell->out() << qSetFieldWidth(_lastFileNameLen)
+                 << QString("\rParsed %1/%2 files in %3")
+                        .arg(_filesIndex)
+                        .arg(_fileNames.size())
+                        .arg(elapsedTime())
+                 << qSetFieldWidth(0) << endl;
 
     _factory->sourceParcingFinished();
 }
