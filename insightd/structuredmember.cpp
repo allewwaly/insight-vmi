@@ -61,11 +61,11 @@ QString StructuredMember::prettyName() const
 
 Instance StructuredMember::toInstance(size_t structAddress,
 		VirtualMemory* vmem, const Instance* parent,
-		int resolveTypes) const
+		int resolveTypes, int maxPtrDeref) const
 {
 	return createRefInstance(structAddress + _offset, vmem, _name,
 	        parent ? parent->parentNameComponents() : QStringList(),
-	        resolveTypes);
+			resolveTypes, maxPtrDeref);
 }
 
 
