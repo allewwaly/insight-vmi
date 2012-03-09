@@ -223,8 +223,15 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 							.arg(candidateIndex));
 			result = v->altRefTypeInstance(_vmem, candidateIndex - 1);
 		}
-		else
-			result = v->toInstance(_vmem, BaseType::trLexicalAndPointers);
+		else {
+			// If variable has exactly one alternative type and the user did
+			// not explicitly request the original type, we return the
+			// alternative type
+			if (candidateIndex < 0 && v->altRefTypeCount() == 1)
+				result = v->altRefTypeInstance(_vmem, 0);
+			else
+				result = v->toInstance(_vmem, BaseType::trLexicalAndPointers);
+		}
 	}
 	else {
 		// We have a instance therefore we resolve the member
@@ -246,8 +253,18 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
                             .arg(candidateIndex));
             result = instance.memberCandidate(symbol, candidateIndex - 1);
         }
-        else
-            result = instance.findMember(symbol, BaseType::trLexicalAndPointers);
+        else {
+            // If the member has exactly one alternative type and the user did
+            // not explicitly request the original type, we return the
+            // alternative type
+            if (candidateIndex < 0 &&
+                instance.memberCandidatesCount(symbol) == 1)
+                result = instance.memberCandidate(symbol, 0);
+            else
+                result = instance.findMember(symbol,
+                                             BaseType::trLexicalAndPointers,
+                                             true);
+        }
 
         if (!result.isValid()) {
             if (!result.type())
