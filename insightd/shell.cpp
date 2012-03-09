@@ -1992,19 +1992,13 @@ int Shell::cmdShowBaseType(const BaseType* t)
              <<  (r->refType() ? r->refType()->prettyName() :
                                  QString(r->refTypeId() ? "(unresolved)" : "void"))
             << endl;
-        if (r->hasAltRefTypes()) {
-            if (r->altRefTypeCount() == 1)
-                _out << "  Alt. ref. type:  ";
-            else
-                _out << "  Alt. ref. types: ";
-            for (int i = 0; i < r->altRefTypeCount(); ++i) {
-                if (i > 0)
-                    _out << "                   ";
-                const BaseType* t = r->altRefBaseType(i);
-                _out << "0x" << hex << (uint)t->id() << dec << " "
-                     << t->prettyName() << ": "
-                     << r->altRefType(i).expr->toString(true) << endl;
-            }
+        for (int i = 0; i < r->altRefTypeCount(); ++i) {
+            const BaseType* t = r->altRefBaseType(i);
+            _out << qSetFieldWidth(18) << right
+                 << QString("<%1> 0x%2 ").arg(i+1).arg((uint)t->id(), -8, 16)
+                 << qSetFieldWidth(0) << left
+                 << t->prettyName() << ": "
+                 << r->altRefType(i).expr->toString(true) << endl;
         }
     }
 
@@ -2156,16 +2150,14 @@ int Shell::cmdShowVariable(const Variable* v)
                              QString(v->refTypeId() ? "(unresolved)" : "void"))
          << endl;
 
-    if (v->hasAltRefTypes()) {        
-        for (int i = 0; i < v->altRefTypeCount(); ++i) {
-            const BaseType* t = v->altRefBaseType(i);
-            _out << "  <" << (i+1) << "> "
-                 << qSetFieldWidth(11) << left
-                 << QString("0x%1").arg((uint)t->id(), 0, 16)
-                 << qSetFieldWidth(0) << " "
-                 << t->prettyName() << ": "
-                 << v->altRefType(i).expr->toString(true) << endl;
-        }
+    for (int i = 0; i < v->altRefTypeCount(); ++i) {
+        const BaseType* t = v->altRefBaseType(i);
+        _out << "  <" << (i+1) << "> "
+             << qSetFieldWidth(11) << left
+             << QString("0x%1").arg((uint)t->id(), 0, 16)
+             << qSetFieldWidth(0) << " "
+             << t->prettyName() << ": "
+             << v->altRefType(i).expr->toString(true) << endl;
     }
 
 	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {
