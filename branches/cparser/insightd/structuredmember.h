@@ -80,11 +80,14 @@ public:
      * @param parent the parent instance of this member
      * @param resolveTypes which types to automatically resolve, see
      * BaseType::TypeResolution
+     * @param maxPtrDeref the maximum levels of pointers that should be
+     * dereferenced
      * @return an Instace object for this member
      */
     Instance toInstance(size_t structAddress, VirtualMemory* vmem,
-    		const Instance *parent, int resolveTypes =
-    		BaseType::trLexical) const;
+                        const Instance *parent,
+                        int resolveTypes = BaseType::trLexical,
+                        int maxPtrDeref = -1) const;
 
 protected:
     /**

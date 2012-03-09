@@ -238,11 +238,16 @@ public slots:
     QStringList MemberNames() const;
 
     /**
-     * Gives access to all members if this instance.
+     * Gives access to all members if this instance. If a member has exactly
+     * one candidate type, this type will be used instead of the originally
+     * declared type of the mamber. To have the declared types instead, set
+     * \a declaredTypes to \c true.
+     * @param declaredTypes selects if candidate types or declared types should
+     * be used, where applicable
      * @return a list of instances of all members
      * \sa MemberNames(), FindMember()
      */
-    InstanceList Members() const;
+    InstanceList Members(bool declaredTypes = false) const;
 
     /**
      * Retrieves the real type of this instance, as defined by
@@ -328,33 +333,39 @@ public slots:
      * You can check for the number of members with MemberCount().
      *
      * @param index the index of the member
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
      * @return a new Instance object if the member exists, or an empty
      * object otherwise
      * \sa MemberCount()
      */
-    Instance Member(int index) const;
+    Instance Member(int index, bool declaredType = false) const;
 
     /**
-     * Retrieves a member of this Instance, if it exists. You can check their
-     * existence with MemberExists() or by iterating over the names returned by
-     * MemberNames().
+     * Retrieves a member of this Instance, if it exists. If this struct or
+     * union has no member \a name, all anonymous nested structs or unions are
+     * searched as well. This is conforming to the C standard.
      *
      * \note Make sure to check IsValid() on the returned object to see if it is
      * valid or not.
      *
      * @param name the name of the member to find
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
      * @return a new Instance object if the member was found, or an empty
      * object otherwise
      * \sa MemberExists(), MemberNames(), IsValid()
      */
-    Instance FindMember(const QString& name) const;
+    Instance Member(const QString& name, bool declaredType = false) const;
 
     /**
      * Retrieves the type ID of the member \a name.
      * @param name the name of the member
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
      * @return the ID of the type, if that member exists, \c 0 otherwise.
      */
-    int TypeIdOfMember(const QString& name) const;
+    int TypeIdOfMember(const QString& name, bool declaredType = false) const;
 
     /**
      * Returns the number of candidate types for a particular member.
@@ -396,6 +407,27 @@ public slots:
      * \sa MemberCount(), MemberCandidatesCount()
      */
     Instance MemberCandidate(const QString& name, int cndtIndex) const;
+
+    /**
+     * Calculates the virtual address of a member, if this is a struct or union.
+     * @param index index into the member list
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
+     * @return the virtual address of member \a index as a string, or "0" if
+     * this is no struct or union
+     */
+    QString MemberAddress(int index, bool declaredType = false) const;
+
+    /**
+     * Calculates the virtual address of member \a name, if this is a struct or
+     * union.
+     * @param name the name of the member
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
+     * @return the virtual address of member \a name as a string, or "0" if
+     * this is no struct or union
+     */
+    QString MemberAddress(const QString& name, bool declaredType = false) const;
 
     /**
      * This method always returns 4 on 32-bit kernels and 8 on 64-bit kernels.

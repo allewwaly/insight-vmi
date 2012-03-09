@@ -42,6 +42,7 @@ public:
          * Reads a serialized version of this object from \a in.
          * \sa writeTo()
          * @param in the data stream to read the data from, must be ready to read
+         * @param factory the factory holding the symbols
          */
         void readFrom(KernelSymbolStream& in, SymFactory *factory);
 
@@ -108,9 +109,11 @@ public:
     void setRefTypeId(int id);
 
     /**
-     * Adds \a id to the list of alternative referencing type IDs.
-     * @param id the ID to add
-     * \sa hasAltRefTypes(), altRefType(), refTypeId()
+     * Adds an alternative referencing type to the list.
+     * @param id the ID of the alternative type
+     * @param expr the expression to transform the pointer value to the target
+     * address
+     * \sa hasAltRefTypes(), altRefType()
      */
     void addAltRefType(int id, const ASTExpression* expr);
 
@@ -267,6 +270,8 @@ private:
      * @param id the id of the instance (if it is a variable instance)
      * @param resolveTypes bitwise or'ed BaseType::RealType's that should
      * be resolved
+     * @param maxPtrDeref the maximum levels of pointers that should be
+     * dereferenced
      * @param derefCount pointer to a counter variable for how many pointers
      * have been dereferenced to create the instance
      * @return an Instance object for this member
