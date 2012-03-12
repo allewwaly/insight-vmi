@@ -36,6 +36,7 @@ fi
 
 # Resolve build dependencies, get source, and prepare Makefile
 $SUDO apt-get -y build-dep linux-image-$VER &&
+$SUDO apt-get -y install kernel-package &&
 apt-get -y source linux-image-$VER &&
 cd linux-*${MINOR_VER}* &&
 mv Makefile Makefile.orig &&
