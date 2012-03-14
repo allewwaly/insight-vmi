@@ -1969,6 +1969,9 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(const ASTNode *node)
 				// Search in struct/union's scope for member
 				memberSym = inner->childrenScope->find(memberName,
 						ASTScope::ssSymbols|ASTScope::ssCompoundTypes);
+				// Make sure we found a struct member
+				if (memberSym && memberSym->type() != stStructMember)
+					memberSym = 0;
 
 				// Search for possible other structs/unions inside of
 				// current struct/union
