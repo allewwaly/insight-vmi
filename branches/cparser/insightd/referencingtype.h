@@ -14,16 +14,26 @@
 
 class SymFactory;
 class ASTExpression;
+class ASTVariableExpression;
 
 class ReferencingType
 {
 public:
-    struct AltRefType
+    class AltRefType
     {
-        explicit AltRefType(int id = -1, const ASTExpression* expr = 0)
-            : id(id), expr(expr) {}
-        int id;
-        const ASTExpression* expr;
+    public:
+        explicit AltRefType(int id = -1, const ASTExpression* expr = 0);
+
+        /**
+         * Checks if the given Instance \a inst is compatible with the
+         * expression that needs to be evaluated for this alternative type.
+         * Therefore all ASTVariableExpressions within the expression are
+         * checked for type compatibility with \a inst.
+         * @param inst the Instance object to check against the expression
+         * @return \c true if \a inst is compatible to the expression, \c false
+         * otherwise
+         */
+        bool compatible(const Instance *inst) const;
 
         /**
          * Creates an Instance of this alternative type.
@@ -52,6 +62,28 @@ public:
          * @param out the data stream to write the data to, must be ready to write
          */
         void writeTo(KernelSymbolStream &out) const;
+
+        /**
+         * @return the ID of the target BaseType
+         */
+        inline int id() const
+        {
+            return _id;
+        }
+
+        /**
+         * @return the ASTExpression to compute the target type's address
+         */
+        inline const ASTExpression* expr() const
+        {
+            return _expr;
+        }
+
+    private:
+        void updateVarExpr();
+        int _id;
+        const ASTExpression* _expr;
+        QList<const ASTVariableExpression*> _varExpr;
     };
 
     /**
@@ -133,6 +165,12 @@ public:
      * @return reference to the list of alternative types
      */
     QList<AltRefType>& altRefTypes();
+
+    /**
+     * Gives direct access to the alterantive referencing types (const version)
+     * @return reference to the list of alternative types
+     */
+    const QList<AltRefType>& altRefTypes() const;
 
     /**
      * When this symbol has alternative referencing type IDs and \a index is -1,
@@ -313,6 +351,11 @@ inline int ReferencingType::altRefTypeCount() const
 
 
 inline QList<ReferencingType::AltRefType>& ReferencingType::altRefTypes()
+{
+    return _altRefTypes;
+}
+
+inline const QList<ReferencingType::AltRefType>& ReferencingType::altRefTypes() const
 {
     return _altRefTypes;
 }

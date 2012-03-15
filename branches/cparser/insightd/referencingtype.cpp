@@ -141,7 +141,7 @@ void ReferencingType::writeTo(KernelSymbolStream& out) const
     switch (out.kSymVersion()) {
     case kSym::VERSION_11:
         for (int i = 0; i < _altRefTypes.size(); ++i)
-            altRefTypeIds.append(_altRefTypes[i].id);
+            altRefTypeIds.append(_altRefTypes[i].id());
         out << _refTypeId << altRefTypeIds;
         break;
 
@@ -290,7 +290,7 @@ void ReferencingType::addAltRefType(int id, const ASTExpression* expr)
 {
     // Does entry already exist?
     for (int i = 0; i < _altRefTypes.size(); ++i) {
-        if (_altRefTypes[i].id == id && _altRefTypes[i].expr == expr)
+        if (_altRefTypes[i].id() == id && _altRefTypes[i].expr() == expr)
             return;
     }
 
@@ -301,14 +301,14 @@ void ReferencingType::addAltRefType(int id, const ASTExpression* expr)
 const BaseType* ReferencingType::altRefBaseType(int index) const
 {
     const SymFactory* f;
-    return (f = fac()) ? f->findBaseTypeById(altRefType(index).id) : 0;
+    return (f = fac()) ? f->findBaseTypeById(altRefType(index).id()) : 0;
 }
 
 
 BaseType* ReferencingType::altRefBaseType(int index)
 {
     const SymFactory* f;
-    return (f = fac()) ? f->findBaseTypeById(altRefType(index).id) : 0;
+    return (f = fac()) ? f->findBaseTypeById(altRefType(index).id()) : 0;
 }
 
 
@@ -359,19 +359,39 @@ const ReferencingType::AltRefType& ReferencingType::altRefType(
 }
 
 
+ReferencingType::AltRefType::AltRefType(int id, const ASTExpression *expr)
+    : _id(id), _expr(expr)
+{
+    updateVarExpr();
+}
+
+
+bool ReferencingType::AltRefType::compatible(const Instance *inst) const
+{
+    if (_varExpr.isEmpty())
+        return true;
+    if (!inst)
+        return false;
+    for (int i = 0; i < _varExpr.size(); ++i)
+        if (!_varExpr[i]->compatible(inst))
+            return false;
+    return true;
+}
+
+
 Instance ReferencingType::AltRefType::toInstance(
         VirtualMemory *vmem, const Instance *inst, const SymFactory *factory,
         const QString& name, const QStringList& parentNames) const
 {
     // Evaluate pointer arithmetic for new address
-    ExpressionResult result = expr->result(inst);
+    ExpressionResult result = _expr->result(inst);
     if (result.resultType & (erUndefined|erRuntime))
         return Instance();
 
     quint64 newAddr = result.uvalue(esUInt64);
     // Retrieve new type
     const BaseType* newType = factory ?
-                factory->findBaseTypeById(id) : 0;
+                factory->findBaseTypeById(_id) : 0;
     assert(newType != 0);
     // Calculating the new address already corresponds to a dereference, so
     // get rid of one pointer instance
@@ -391,13 +411,29 @@ void ReferencingType::AltRefType::readFrom(KernelSymbolStream &in,
     qint32 id;
 
     in >> id;
-    this->id = id;
-    this->expr = ASTExpression::fromStream(in, factory);
+    _id = id;
+    _expr = ASTExpression::fromStream(in, factory);
+    updateVarExpr();
 }
 
 
 void ReferencingType::AltRefType::writeTo(KernelSymbolStream &out) const
 {
-    out << (qint32) id;
-    ASTExpression::toStream(expr, out);
+    out << (qint32) _id;
+    ASTExpression::toStream(_expr, out);
+}
+
+
+void ReferencingType::AltRefType::updateVarExpr()
+{
+    _varExpr.clear();
+    if (!_expr)
+        return;
+    ASTConstExpressionList list = _expr->findExpressions(etVariable);
+    for (int i = 0; i < list.size(); ++i) {
+        const ASTVariableExpression* ve =
+                dynamic_cast<const ASTVariableExpression*>(list[i]);
+        if (ve)
+            _varExpr.append(ve);
+    }
 }
