@@ -382,6 +382,8 @@ public:
 
     virtual bool equals(const ASTExpression* other) const;
 
+    virtual bool compatible(const Instance* inst) const;
+
     virtual ExpressionResult result(const Instance* inst = 0) const;
 
     virtual ASTExpression* clone(ASTExpressionList& list) const;

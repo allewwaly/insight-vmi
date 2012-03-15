@@ -406,15 +406,36 @@ Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && index >= 0 && index < s->members().size()) {
 		const StructuredMember* m = s->members().at(index);
-		if (declaredType || m->altRefTypeCount() != 1)
+		if (declaredType)
 			return m->toInstance(_d.address, _d.vmem, this, resolveTypes, maxPtrDeref);
 		else {
-			Instance inst = memberCandidate(m, 0);
-			// Dereference instance again, if required
-			if (inst.type() && inst.type()->type() & resolveTypes)
-				inst = inst.dereference(resolveTypes,
-										maxPtrDeref == 0 ? 0 : maxPtrDeref - 1);
-			return inst;
+			// See how many candidates are compatible with this instance
+			int cndtIndex = -1;
+			for (int i = 0; i < m->altRefTypeCount(); ++i) {
+				if (m->altRefTypes().at(i).compatible(this)) {
+					// Is this the first compatible candidate?
+					if (cndtIndex < 0)
+						cndtIndex = i;
+					// More than one candidate
+					else {
+						cndtIndex = -1;
+						break;
+					}
+				}
+			}
+
+			// If we found only one compabile candidate, we return that one
+			if (cndtIndex >= 0) {
+				Instance inst = memberCandidate(m, cndtIndex);
+				// Dereference instance again, if required
+				if (inst.type() && inst.type()->type() & resolveTypes)
+					inst = inst.dereference(resolveTypes,
+											maxPtrDeref == 0 ? 0 : maxPtrDeref - 1);
+				return inst;
+			}
+			else
+				return m->toInstance(_d.address, _d.vmem, this, resolveTypes,
+									 maxPtrDeref);
 		}
 	}
 	return Instance();
@@ -523,7 +544,7 @@ int Instance::typeIdOfMember(const QString& name, bool declaredType) const
 	else if (declaredType || m->altRefTypeCount() != 1)
 		return m->refTypeId();
 	else
-		return m->altRefType(0).id;
+		return m->altRefType(0).id();
 }
 
 
@@ -568,12 +589,32 @@ Instance Instance::memberCandidate(const QString &name, int cndtIndex) const
 }
 
 
+bool Instance::memberCandidateCompatible(int mbrIndex, int cndtIndex) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s)
+		return memberCandidateCompatible(s->members().at(mbrIndex), cndtIndex);
+
+	return false;
+}
+
+
+bool Instance::memberCandidateCompatible(const QString &name, int cndtIndex) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s)
+		return memberCandidateCompatible(s->findMember(name, true), cndtIndex);
+
+	return false;
+}
+
+
 const BaseType *Instance::memberCandidateType(int mbrIndex, int cndtIndex) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && mbrIndex >= 0 && mbrIndex < s->members().size() &&
 		_d.type && _d.type->factory()) {
-		int id = s->members().at(mbrIndex)->altRefType(cndtIndex).id;
+		int id = s->members().at(mbrIndex)->altRefType(cndtIndex).id();
 		return _d.type->factory()->findBaseTypeById(id);
 	}
 
@@ -584,15 +625,22 @@ const BaseType *Instance::memberCandidateType(int mbrIndex, int cndtIndex) const
 Instance Instance::memberCandidate(const StructuredMember* m,
 								   int cndtIndex) const
 {
-	if (!m)
-		return Instance();
-
-	if (cndtIndex < 0 || cndtIndex >= m->altRefTypeCount())
+	if (!m || cndtIndex < 0 || cndtIndex >= m->altRefTypeCount())
 		return Instance();
 	// Otherwise use the alternative type
-	ReferencingType::AltRefType alt = m->altRefType(cndtIndex);
+	const ReferencingType::AltRefType& alt = m->altRefType(cndtIndex);
 	return alt.toInstance(_d.vmem, this, _d.type ? _d.type->factory() : 0,
 						  m->name(), _d.parentNames);
+}
+
+
+bool Instance::memberCandidateCompatible(const StructuredMember* m,
+										 int cndtIndex) const
+{
+	if (!m || cndtIndex < 0 || cndtIndex >= m->altRefTypeCount())
+		return false;
+
+	return m->altRefType(cndtIndex).compatible(this);
 }
 
 

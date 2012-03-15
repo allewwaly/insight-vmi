@@ -1998,7 +1998,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
                  << QString("<%1> 0x%2 ").arg(i+1).arg((uint)t->id(), -8, 16)
                  << qSetFieldWidth(0) << left
                  << t->prettyName() << ": "
-                 << r->altRefType(i).expr->toString(true) << endl;
+                 << r->altRefType(i).expr()->toString(true) << endl;
         }
     }
 
@@ -2041,12 +2041,12 @@ int Shell::cmdShowBaseType(const BaseType* t)
 					 << right << QString("<%1> ").arg(j+1)
 					 << qSetFieldWidth(id_width) << left
 					 << QString("0x%1")
-							.arg((uint)(rt ? rt->id() : m->altRefType(j).id), 0, 16)
+						.arg((uint)(rt ? rt->id() : m->altRefType(j).id()), 0, 16)
 					 << qSetFieldWidth(0) << " "
 					 << (rt ? rt->prettyName() :
 							 QString("(unresolved type, 0x%1)")
-								.arg((uint)m->altRefType(j).id, 0, 16))
-					 << ": " << m->altRefType(j).expr->toString(true)
+							  .arg((uint)m->altRefType(j).id(), 0, 16))
+					 << ": " << m->altRefType(j).expr()->toString(true)
 					 << endl;
 			}
 		}
@@ -2157,7 +2157,7 @@ int Shell::cmdShowVariable(const Variable* v)
              << QString("0x%1").arg((uint)t->id(), 0, 16)
              << qSetFieldWidth(0) << " "
              << t->prettyName() << ": "
-             << v->altRefType(i).expr->toString(true) << endl;
+             << v->altRefType(i).expr()->toString(true) << endl;
     }
 
 	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {

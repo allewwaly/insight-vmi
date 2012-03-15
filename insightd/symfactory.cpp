@@ -2391,11 +2391,11 @@ bool SymFactory::typeChangeDecision(const ReferencingType* r,
         TypeConflicts ret = tcNoConflict;
         // Compare to ALL alternative types
         for (int i = 0; i < r->altRefTypeCount(); ++i) {
-            const BaseType* t = findBaseTypeById(r->altRefType(i).id);
+            const BaseType* t = findBaseTypeById(r->altRefType(i).id());
             switch (compareConflictingTypes(t, targetBaseType)) {
             // If we found the same type, we take this as the final decision
             case tcNoConflict:
-                if (r->altRefType(i).expr->equals(expr)) {
+                if (r->altRefType(i).expr()->equals(expr)) {
                     ret = tcNoConflict;
                     goto for_end;
                 }

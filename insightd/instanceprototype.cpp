@@ -326,6 +326,22 @@ Instance InstancePrototype::MemberCandidate(const QString &name, int cndtIndex) 
 }
 
 
+bool InstancePrototype::MemberCandidateCompatible(int mbrIndex, int cndtIndex) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ?
+				inst->memberCandidateCompatible(mbrIndex, cndtIndex) : false;
+}
+
+
+bool InstancePrototype::MemberCandidateCompatible(const QString &name, int cndtIndex) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ?
+				inst->memberCandidateCompatible(name, cndtIndex) : false;
+}
+
+
 QString InstancePrototype::MemberAddress(int index, bool declaredType) const
 {
 	Instance* inst;

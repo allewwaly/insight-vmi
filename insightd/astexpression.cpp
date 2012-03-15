@@ -150,16 +150,82 @@ bool ASTVariableExpression::equals(const ASTExpression *other) const
 }
 
 
+bool ASTVariableExpression::compatible(const Instance *inst) const
+{
+    if (!inst)
+        return false;
+
+    const uint instHash = inst->type()->hash();
+
+    if (_transformations.isEmpty()) {
+        // Check if the type hashes match.
+        if (instHash == _baseType->hash() ||
+            instHash ==
+                _baseType->dereferencedBaseType(BaseType::trLexical)->hash())
+            return true;
+        else
+            return false;
+    }
+
+    const BaseType* bt = _baseType;
+    int cnt = 0;
+
+    // Skip the suffixes starting from our _baseType until we find the matching
+    // type ID
+    for (int i = 0;
+         bt && bt->hash() != instHash && i < _transformations.size();
+         ++i)
+    {
+        // Did we find the instance's ID? Or can we dereference the type?
+        if (bt->hash() != instHash &&
+            (bt->type() & BaseType::trLexical))
+            bt = bt->dereferencedBaseType(BaseType::trLexical);
+        // Check once more
+        if (bt->hash() == instHash)
+            return true;
+
+        switch (_transformations[i].type) {
+        case ttDereference:
+        case ttArray:
+            bt = bt->dereferencedBaseType(BaseType::trAny, 1, &cnt);
+            // Make sure we followed a pointer, but don't be fuzzy for the first
+            // type as the context type normally is not a pointer type anyway
+            if (i > 0 && cnt != 1)
+                return false;
+            break;
+
+        case ttMember: {
+            const Structured* s = dynamic_cast<const Structured*>(bt);
+            if (!s)
+                return false;
+            const StructuredMember* m = s->findMember(_transformations[i].member);
+            if (!m)
+                return false;
+            bt = m->refType();
+            break;
+        }
+
+        default:
+            return false;
+        }
+    }
+
+    return bt && bt->hash() == instHash;
+}
+
+
 ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 {
     // Make sure we got a valid instance and type
     if (!inst || !_baseType)
         return ExpressionResult(erUndefined);
 
+    const uint instHash = inst->type()->hash();
+
     if (_transformations.isEmpty()) {
         // Check if the type hashes match.
-        if (inst->type()->hash() == _baseType->hash() ||
-            inst->type()->hash() ==
+        if (instHash == _baseType->hash() ||
+            instHash ==
                 _baseType->dereferencedBaseType(BaseType::trLexical)->hash())
             return inst->toExpressionResult();
         else
@@ -177,13 +243,13 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 
     // Skip the suffixes starting from our _baseType until we find the matching
     // type ID
-    for (; bt && bt->hash() != inst->type()->hash() && i < _transformations.size(); ++i) {
+    for (; bt && bt->hash() != instHash && i < _transformations.size(); ++i) {
         // Did we find the instance's ID? Or can we dereference the type?
-        if (bt->hash() != inst->type()->hash() &&
+        if (bt->hash() != instHash &&
             (bt->type() & BaseType::trLexical))
             bt = bt->dereferencedBaseType(BaseType::trLexical);
         // Check once more
-        if (bt->hash() == inst->type()->hash())
+        if (bt->hash() == instHash)
             break;
 
         switch (_transformations[i].type) {
@@ -223,7 +289,7 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         }
     }
 
-    if (!bt || bt->hash() != inst->type()->hash()) {
+    if (!bt || bt->hash() != instHash) {
         exprEvalError(QString("Type hash of instance \"%1\" (0x%2) is different "
                               "from type \"%3\" (0x%4) of expression \"%5\"")
                       .arg(inst->type()->prettyName())
@@ -249,19 +315,19 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         case ttMember:
             tmp = tmp.findMember(_transformations[j].member,
                                  BaseType::trLexical, true);
-            prettyType += "." + _transformations[i].member;
+            prettyType += "." + _transformations[j].member;
             break;
 
         case ttArray:
             tmp = tmp.arrayElem(_transformations[j].arrayIndex);
-            prettyType += QString("[%1]").arg(_transformations[i].arrayIndex);
+            prettyType += QString("[%1]").arg(_transformations[j].arrayIndex);
             break;
 
         default:
             exprEvalError(QString("Unhandled symbol transformation for \"%1\" "
                                   ": %2")
                           .arg(prettyType)
-                          .arg(_transformations[i].typeString()));
+                          .arg(_transformations[j].typeString()));
         }
     }
 

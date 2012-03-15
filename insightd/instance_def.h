@@ -438,6 +438,28 @@ public:
     Instance memberCandidate(const QString& name, int cndtIndex) const;
 
     /**
+     * Checks if this Instance is compatible with the expression that needs to
+     * be evaluated for candidate type with index \a cndtIndex of member at
+     * index \a mbrIndex.
+     * @param mbrIndex the member index
+     * @param cndtIndex index of the candidate type for that member
+     * @return \c true if this Instance is compatible with the expression,
+     * \c false otherwise
+     */
+    bool memberCandidateCompatible(int mbrIndex, int cndtIndex) const;
+
+    /**
+     * Checks if this Instance is compatible with the expression that needs to
+     * be evaluated for candidate type with index \a cndtIndex of member
+     * \a name.
+     * @param name the name of the member
+     * @param cndtIndex index of the candidate type for that member
+     * @return \c true if this Instance is compatible with the expression,
+     * \c false otherwise
+     */
+    bool memberCandidateCompatible(const QString& name, int cndtIndex) const;
+
+    /**
      * Retrieves the BaseType of candidate no. \a cndtIndex for member with index
      * \a mbrIndex. You can check for the number of members with memberCount()
      * and the number of candidate types for a particular member with
@@ -570,8 +592,10 @@ private:
             bool includeNestedStructs, QStringList& result,
             VisitedSet& visited) const;
 
-	Instance memberCandidate(const StructuredMember* m,
-							 int cndtIndex) const;
+	Instance memberCandidate(const StructuredMember* m, int cndtIndex) const;
+
+	bool memberCandidateCompatible(const StructuredMember* m,
+								   int cndtIndex) const;
 
     InstanceData _d;
 };

@@ -409,6 +409,28 @@ public slots:
     Instance MemberCandidate(const QString& name, int cndtIndex) const;
 
     /**
+     * Checks if this Instance is compatible with the expression that needs to
+     * be evaluated for candidate type with index \a cndtIndex of member at
+     * index \a mbrIndex.
+     * @param mbrIndex the member index
+     * @param cndtIndex index of the candidate type for that member
+     * @return \c true if this Instance is compatible with the expression,
+     * \c false otherwise
+     */
+    bool MemberCandidateCompatible(int mbrIndex, int cndtIndex) const;
+
+    /**
+     * Checks if this Instance is compatible with the expression that needs to
+     * be evaluated for candidate type with index \a cndtIndex of member
+     * \a name.
+     * @param name the name of the member
+     * @param cndtIndex index of the candidate type for that member
+     * @return \c true if this Instance is compatible with the expression,
+     * \c false otherwise
+     */
+    bool MemberCandidateCompatible(const QString& name, int cndtIndex) const;
+
+    /**
      * Calculates the virtual address of a member, if this is a struct or union.
      * @param index index into the member list
      * @param declaredType selects if the candidate type (if it exists) or the
