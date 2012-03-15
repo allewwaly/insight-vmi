@@ -39,7 +39,7 @@ $SUDO apt-get -y build-dep linux-image-$VER &&
 $SUDO apt-get -y install kernel-package &&
 apt-get -y source linux-image-$VER &&
 cd linux-*${MINOR_VER}* &&
-mv Makefile Makefile.orig &&
+test -r Makefile.orig || mv -v Makefile Makefile.orig &&
 sed \
         -e 's@^\(CFLAGS_KERNEL\s*=\)@\1 -g @' \
         -e 's@^\(AFLAGS_KERNEL\s*=\)@\1 -gdwarf-2 @' \
@@ -69,11 +69,25 @@ fi
 # Compile source and create package
 make-kpkg --us --uc $ROOTCMD --append-to-version $APPEND_VER --initrd kernel_image kernel_headers || exit 1
 
+# Revert the compiler to the original one
+if [ -x "$GCC_PP" ]; then
+	GCC_ORIG=$(grep '^CC' Makefile.orig | sed "s@^CC\\s*=\(.*\)\$@\1@")
+	sed -i "s@^\(CC\\s*=\).*\$@\1 $GCC_ORIG@" Makefile
+	break
+fi
+
 if [ -r vmlinux ]; then
+#	# Create archive of pre-processed sources
+#	if [ -x "$GCC_PP" ] && [ -d "__PP__" ]; then
+#		echo "Generating archive of pre-processed sources"
+#		tar -C ../ -cjvf ../linux-src-pp-${VER}${APPEND}.tar.bz2 "$(basename $PWD)/__PP__/" &&
+#		echo "Succesfully created archive of pre-processed sources: linux-src-pp-${VER}${APPEND}.tar.bz2" ||
+#		echo "Error creating archive of pre-processed sources" >&2
+#	fi
 	#bzip2 -9 vmlinux -c > ../vmlinux-${VER}${APPEND}.bz2 &&
 	#cp -v vmlinux ../vmlinux-${VER}${APPEND} &&
 	echo -e "\nGenerating object dump for vmlinux-${VER}${APPEND}..." &&
-	objdump -W vmlinux 2>/dev/null | lzma -c -2 > ../objdump-${VER}${APPEND}.lzma &&
+	objdump -W vmlinux 2>/dev/null | bzip2 -z -c --best > ../objdump-${VER}${APPEND}.bz2 &&
 	echo "Done." || echo "Error generating objdump."
 fi
 
