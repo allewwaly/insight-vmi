@@ -116,11 +116,7 @@ void KernelSourceParser::parse()
         const CompileUnit* unit = it.value();
         // Skip assembly files
         if (!unit->name().endsWith(".S"))
-//        if (!unit->name().endsWith(".S") && _filesDone >= 1140)
-//        if (!unit->name().endsWith(".S") && unit->name().endsWith("kernel/module.c"))
-        {
             _fileNames.append(unit->name() + ".i");
-        }
         ++it;
     }
     
@@ -171,6 +167,10 @@ void KernelSourceParser::WorkerThread::run()
            _parser->_filesIndex < _parser->_fileNames.size())
     {
         currentFile = _parser->_fileNames[_parser->_filesIndex++];
+
+//        if (_parser->_filesIndex < 116)
+//            continue;
+
         _parser->_currentFile = currentFile;
 
         if (_parser->_filesIndex <= 1)
@@ -192,7 +192,7 @@ void KernelSourceParser::WorkerThread::run()
 //                         << ": " << e.message << endl << flush;
 //        }
         catch (GenericException& e) {
-            shell->out() << "\r" << flush;
+            shell->out() << endl;
             shell->err() << e.file << ":" << e.line
                          << " WARNING: " << e.message << endl << flush;
             throw e;
