@@ -392,7 +392,11 @@ T VirtualMemory::extractFromPhysMem(quint64 physaddr, bool enableExceptions,
     else {
         if (doLock) _physMemMutex.unlock();
         if (enableExceptions)
-            virtualMemoryError("Error reading from physical memory device.");
+            virtualMemoryError(QString("Error reading %1 bytes from physical "
+                                       "address 0x%2.")
+                               .arg(sizeof(T))
+                               .arg(physaddr, 0, 16));
+
     }
 
     return ret;
@@ -735,10 +739,12 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
 
-    // We don't expect to use _specs.vmemmapStart or _specs.modulesVaddr here,
-    // so they all should be null!
-    assert(_specs.vmemmapStart == 0 && _specs.vmemmapEnd == 0 &&
-           _specs.modulesVaddr == 0 &&_specs.modulesEnd == 0);
+    // We don't expect to use _specs.vmemmapStart here, should be null!
+    assert(_specs.vmemmapStart == 0 && _specs.vmemmapEnd == 0);
+    // If _specs.modulesVaddr is set, it should equal _specs.vmallocStart
+    if (_specs.modulesVaddr)
+        assert(_specs.modulesVaddr == _specs.vmallocStart &&
+               _specs.modulesEnd == _specs.vmallocEnd);
 
     // During initialization, the VMALLOC_START might be incorrect (i.e., less
     // than PAGE_OFFSET). This is reflected in the _specs.initialized variable.
