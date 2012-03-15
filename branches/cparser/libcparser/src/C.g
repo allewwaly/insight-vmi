@@ -1144,7 +1144,7 @@ abstract_declarator_suffix returns [pASTNode node]
     |  '(' ptl=parameter_type_list? ')'
         {
             $node->type = nt_abstract_declarator_suffix_parens;
-            $node->u.abstract_declarator_suffix.constant_expression = $ptl.node;
+            $node->u.abstract_declarator_suffix.parameter_type_list = $ptl.node;
         }  
     ;
 
