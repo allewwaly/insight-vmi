@@ -367,7 +367,7 @@ void Instance::differencesRek(const Instance& other,
 
 Instance Instance::arrayElem(int index) const
 {
-    if (!_d.type || !(_d.type->type() & rtPointer))
+    if (!_d.type || !(_d.type->type() & (rtPointer|rtArray)))
         return Instance();
 
     const Pointer* p = dynamic_cast<const Pointer*>(_d.type);
