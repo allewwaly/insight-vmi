@@ -184,7 +184,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 				")?"
 				"\\s*(" SYMBOL ")\\s*"
 				"(?:<\\s*(" NUMBER ")\\s*>\\s*)?"
-				"(?:\\[\\s*(" NUMBER ")\\s*\\])?\\s*");
+				"((?:\\[\\s*" NUMBER "\\s*\\]\\s*)*)\\s*");
 	 
 	if (!re.exactMatch(component)) {
 		queryError(QString("Could not parse a part of the query string: %1")
@@ -196,7 +196,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	offsetString = re.cap(2).trimmed();
 	symbol = re.cap(3);
 	candidate = re.cap(4);
-	arrayIndexString = re.cap(5);
+	arrayIndexString = re.cap(5).trimmed();
 
 	int candidateIndex = candidate.isEmpty() ? -1 : candidate.toInt();
 
@@ -230,7 +230,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 			if (candidateIndex < 0 && v->altRefTypeCount() == 1)
 				result = v->altRefTypeInstance(_vmem, 0);
 			else
-				result = v->toInstance(_vmem, BaseType::trLexicalAndPointers);
+				result = v->toInstance(_vmem, BaseType::trLexical);
 		}
 	}
 	else {
@@ -262,7 +262,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
                 result = instance.memberCandidate(symbol, 0);
             else
                 result = instance.findMember(symbol,
-                                             BaseType::trLexicalAndPointers,
+                                             BaseType::trLexical,
                                              true);
         }
 
@@ -320,46 +320,50 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		}
 
 		// Get address
-		if (result.type()->type() & (rtPointer)) {
-			// Manipulate pointer to enable list navigation
-			//pointer = (Pointer *)(result.type());
-//			pointer->setMacroExtraOffset(offset);
-			//pointer->setRefType(type);
+		if (result.type()->type() & (rtPointer))
 			address = (size_t)result.toPointer() - offset;
-		}
-		else {
+		else
 			address = result.address() - offset;
-			//queryError(QString("Casting has only be implemented for pointer, but %1 is of type %2.")
-			//				.arg(result.fullName()).arg(result.typeName()));
-		}
 		
 		result = getInstanceAt(typeString, address, result.fullNameComponents());
 	}
 	
 	// Add array index
-	if (arrayIndexString != "") {
-		quint32 arrayIndex = arrayIndexString.toUInt(&okay, 10);
-		
-		if (okay) {
-		    // Is this a pointer or an array type?
-		    Instance tmp = result.arrayElem(arrayIndex);
-		    if (!tmp.isNull())
-		        result = tmp.dereference(BaseType::trLexicalAndPointers);
-            // Manually update the address
-		    else {
-                result.addToAddress(arrayIndex * result.type()->size());
-                result.setName(QString("%1[%2]").arg(result.name()).arg(arrayIndex));
-		    }
+	if (!arrayIndexString.isEmpty()) {
+		QRegExp reArrayIndex("\\[\\s*(" NUMBER ")\\s*\\]\\s*");
+		QStringList matches;
+		int strpos = 0;
+		while (strpos < arrayIndexString.size() &&
+			   (strpos = arrayIndexString.indexOf(reArrayIndex, strpos)) >= 0)
+		{
+			matches.append(reArrayIndex.cap(1));
+			strpos += reArrayIndex.cap(0).size();
 		}
-		else {
-			queryError(QString("Given array index %1 could not be converted "
-			                "to a number.")
-							.arg(arrayIndexString));
+
+		for (int i = 0; i < matches.count(); ++i) {
+			quint32 arrayIndex = matches[i].toUInt(&okay, 10);
+
+			if (okay) {
+				// Is this a pointer or an array type?
+				Instance tmp = result.arrayElem(arrayIndex);
+				if (!tmp.isNull())
+					result = tmp.dereference(BaseType::trLexical);
+				// Manually update the address
+				else {
+					result.addToAddress(arrayIndex * result.type()->size());
+					result.setName(QString("%1[%2]").arg(result.name()).arg(arrayIndex));
+				}
+			}
+			else {
+				queryError(QString("Given array index %1 could not be converted "
+								   "to a number.")
+						   .arg(matches[i]));
+			}
 		}
 		
 	}
-	
-	return result;
+	// Try to dereference this instance as deep as possible
+	return result.dereference(BaseType::trAny);
 }
 
 Instance MemoryDump::queryInstance(const QString& queryString) const
