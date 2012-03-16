@@ -11,13 +11,13 @@
 #include <debug.h>
 
 Pointer::Pointer(SymFactory* factory)
-	: RefBaseType(factory), _macroExtraOffset(0)
+	: RefBaseType(factory)
 {
 }
 
 
 Pointer::Pointer(SymFactory* factory, const TypeInfo& info)
-	: RefBaseType(factory, info), _macroExtraOffset(0)
+	: RefBaseType(factory, info)
 {
 	// Make sure the host system can handle the pointer size of the guest
 	if (_size > 0 && _size > sizeof(void*)) {
@@ -90,7 +90,6 @@ uint Pointer::hash(bool* isValid) const
     if (!_hashValid || _hashRefTypeId != _refTypeId) {
         bool valid = false;
         RefBaseType::hash(&valid);
-        _hash ^= _macroExtraOffset;
         _hashValid = valid;
     }
     if (isValid)

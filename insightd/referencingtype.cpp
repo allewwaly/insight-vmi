@@ -226,9 +226,7 @@ inline Instance ReferencingType::createRefInstance(size_t address,
     const Pointer* p = dynamic_cast<const Pointer*>(this);
     if (p) {
         if (maxPtrDeref != 0 && vmem->safeSeek(addr)) {
-            size_t derefAddr = (size_t)p->toPointer(vmem, addr);
-           	// Don't taint NULL pointers by adding some artificial offsets!
-            addr = derefAddr ? derefAddr + p->macroExtraOffset() : derefAddr;
+            addr = (size_t)p->toPointer(vmem, addr);
             if (derefCount)
                 (*derefCount)++;
         }
@@ -263,9 +261,7 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 				// If we already hit the maximum allowed dereference level or
 				// we cannot dereference the pointer, we have to stop here
 				if (maxPtrDeref != 0 && vmem->safeSeek(addr)) {
-					size_t derefAddr = (size_t)p->toPointer(vmem, addr);
-	            	// Don't taint NULL pointers by adding some artificial offsets!
-	                addr = derefAddr ? derefAddr + p->macroExtraOffset() : derefAddr;
+					addr = (size_t)p->toPointer(vmem, addr);
 					if (derefCount)
 						(*derefCount)++;
 				}

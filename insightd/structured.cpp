@@ -206,17 +206,12 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
             if (m->refType()->dereferencedType() & StructOrUnion) {
                 // Resolve the memory address of that struct
                 quint64 addr = offset + m->offset();
-                int macroExtraOffset = 0;
                 const BaseType* t = m->refType();
                 bool wasPointer = false;
                 while ( addr && !(t->type() & StructOrUnion) ) {
                     const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
                     if (rbt->type() & rtPointer) {
                         addr = (quint64) rbt->toPointer(mem, addr);
-                        macroExtraOffset = addr ?
-                                dynamic_cast<const Pointer*>(t)->macroExtraOffset() :
-                                0;
-                        addr += macroExtraOffset;
                         wasPointer = true;
                     }
                     t = rbt->refType();
@@ -226,15 +221,7 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
                 if (!wasPointer)
                     addrStr = "...";
                 else if (addr) {
-                    qint64 meo = (qint64) macroExtraOffset;
-                    if (macroExtraOffset)
-                        addrStr = QString("... @ 0x%1 %2 0x%3 = 0x%4")
-                            .arg(addr - macroExtraOffset, 0, 16)
-                            .arg(meo < 0 ? "-" : "+")
-                            .arg(meo < 0 ? -meo : meo, 0, 16)
-                            .arg(addr, 0, 16);
-                    else
-                        addrStr = QString("... @ 0x%1").arg(addr, 0, 16);
+                    addrStr = QString("... @ 0x%1").arg(addr, 0, 16);
                     if (addr == offset)
                         addrStr += " (self)";
                 }
