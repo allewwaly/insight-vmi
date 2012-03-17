@@ -1700,9 +1700,11 @@ int Shell::cmdMemoryRevmapVisualize(int index, QString type)
 
     int ret = 0;
     if (QString("physical").startsWith(type) || QString("pmem").startsWith(type))
-        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->pmemMap());
+        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->pmemMap(),
+                                          _memDumps[index]->memSpecs());
     else if (QString("virtual").startsWith(type) || QString("vmem").startsWith(type))
-        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->vmemMap());
+        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->vmemMap(),
+                                          _memDumps[index]->memSpecs());
     else {
         cmdHelp(QStringList("memory"));
         ret = 1;
@@ -1803,6 +1805,7 @@ int Shell::cmdScript(QStringList args)
     // Read script code from file or from args[1] if the file name is "eval"
     QString scriptCode;
     if (fileName == "eval") {
+        fileName.clear();
     	if (args.size() < 2) {
 			_err << "Using the \"eval\" function expects script code as "
 					<< "additional argument." << endl;
@@ -1831,18 +1834,22 @@ int Shell::cmdScript(QStringList args)
 	QScriptValue result = _engine->evaluate(scriptCode, args,
 			includePathFileInfo.absolutePath());
 
-	if (result.isError()) {
-		if (_engine->hasUncaughtException()) {
-			_err << "Exception occured on " << fileName << ":"
-					<< _engine->uncaughtExceptionLineNumber() << ": " << endl
-					<< _engine->uncaughtException().toString() << endl;
-			QStringList bt = _engine->uncaughtExceptionBacktrace();
-			for (int i = 0; i < bt.size(); ++i)
-				_err << "    " << bt[i] << endl;
-		}
+	if (_engine->hasUncaughtException()) {
+		_err << "Exception occured on ";
+		if (fileName.isEmpty())
+			_err << "line ";
 		else
-			_err << result.toString() << endl;
+			_err << fileName << ":";
+		_err << _engine->uncaughtExceptionLineNumber() << ": " << endl
+			 << _engine->uncaughtException().toString() << endl;
+		QStringList bt = _engine->uncaughtExceptionBacktrace();
+		for (int i = 0; i < bt.size(); ++i)
+			_err << "    " << bt[i] << endl;
 		return 4;
+	}
+	else if (result.isError()) {
+		_err << result.toString() << endl;
+		return 5;
 	}
 
     return ecOk;
@@ -1972,28 +1979,26 @@ int Shell::cmdShow(QStringList args)
 
 int Shell::cmdShowBaseType(const BaseType* t)
 {
-	_out << "  ID:             " << "0x" << hex << (uint)t->id() << dec << endl;
-	_out << "  Name:           " << (t->prettyName().isEmpty() ? QString("(unnamed)") : t->prettyName()) << endl;
-	_out << "  Type:           " << realTypeToStr(t->type()) << endl;
-	_out << "  Size:           " << t->size() << endl;
-	_out << "  Hash:           " << "0x" << hex << t->hash() << dec << endl;
+	_out << "  ID:              " << "0x" << hex << (uint)t->id() << dec << endl;
+	_out << "  Name:            " << (t->prettyName().isEmpty() ? QString("(unnamed)") : t->prettyName()) << endl;
+	_out << "  Type:            " << realTypeToStr(t->type()) << endl;
+	_out << "  Size:            " << t->size() << endl;
+	_out << "  Hash:            " << "0x" << hex << t->hash() << dec << endl;
 
     const RefBaseType* r = dynamic_cast<const RefBaseType*>(t);
     if (r) {
-        _out << "  Ref. type ID:   " << "0x" << hex << (uint)r->refTypeId() << dec << endl;
-        _out << "  Ref. type:      "
+        _out << "  Ref. type ID:    " << "0x" << hex << (uint)r->refTypeId() << dec << endl;
+        _out << "  Ref. type:       "
              <<  (r->refType() ? r->refType()->prettyName() :
                                  QString(r->refTypeId() ? "(unresolved)" : "void"))
             << endl;
-        if (r->hasAltRefTypes()) {
-            _out << "  Alt. ref. type: ";
-            for (int i = 0; i < r->altRefTypeCount(); ++i) {
-                if (i > 0)
-                    _out << ", ";
-                const BaseType* t = r->altRefType(i);
-                _out << "0x" << hex << (uint)t->id() << dec << t->prettyName();
-            }
-            _out << endl;
+        for (int i = 0; i < r->altRefTypeCount(); ++i) {
+            const BaseType* t = r->altRefBaseType(i);
+            _out << qSetFieldWidth(18) << right
+                 << QString("<%1> 0x%2 ").arg(i+1).arg((uint)t->id(), -8, 16)
+                 << qSetFieldWidth(0) << left
+                 << t->prettyName() << ": "
+                 << r->altRefType(i).expr()->toString(true) << endl;
         }
     }
 
@@ -2012,38 +2017,38 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
 		for (int i = 0; i < s->members().size(); i++) {
 			StructuredMember* m = s->members().at(i);
-			const BaseType* rt = (m->altRefTypeCount() == 1) ?
-						m->altRefType() :
-						m->refType();
+			const BaseType* rt = m->refType();
 
 			QString pretty = rt ?
 						rt->prettyName() :
 						QString("(unresolved type, 0x%1)")
 							.arg((uint)m->refTypeId(), 0, 16);
 
-			if (m->altRefTypeCount() == 1)
-				pretty = "<" + pretty + ">";
-			else if (m->altRefTypeCount() > 1) {
-				BaseType* tmp;
-				pretty += " <";
-				for (int j = 0; j < m->altRefTypeCount(); ++j) {
-					if (! (tmp = m->altRefType(j)))
-						continue;
-					if (j > 0)
-						pretty += ", ";
-					pretty += tmp->prettyName();
-				}
-				pretty += ">";
-			}
+            _out << "    "
+                 << QString("0x%1").arg(m->offset(), 4, 16, QChar('0'))
+                 << "  "
+                 << qSetFieldWidth(20) << left << (m->name() + ": ")
+                 << qSetFieldWidth(id_width) << left
+                 << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
+                 << qSetFieldWidth(0) << " "
+                 << pretty
+                 << endl;
 
-			_out << "    "
-                    << QString("0x%1").arg(m->offset(), 4, 16, QChar('0'))
-                    << "  "
-                    << qSetFieldWidth(20) << left << (m->name() + ": ")
-                    << qSetFieldWidth(id_width) << left << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
-                    << qSetFieldWidth(0) << " "
-					<< pretty
-					<< endl;
+
+			for (int j = 0; j < m->altRefTypeCount(); ++j) {
+				rt = m->altRefBaseType(j);
+				_out << qSetFieldWidth(4+6+2+20)
+					 << right << QString("<%1> ").arg(j+1)
+					 << qSetFieldWidth(id_width) << left
+					 << QString("0x%1")
+						.arg((uint)(rt ? rt->id() : m->altRefType(j).id()), 0, 16)
+					 << qSetFieldWidth(0) << " "
+					 << (rt ? rt->prettyName() :
+							 QString("(unresolved type, 0x%1)")
+							  .arg((uint)m->altRefType(j).id(), 0, 16))
+					 << ": " << m->altRefType(j).expr()->toString(true)
+					 << endl;
+			}
 		}
 	}
 
@@ -2063,7 +2068,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
                      << endl;
             }
         }
-	}
+    }
 
 	const FuncPointer* fp = dynamic_cast<const FuncPointer*>(t);
 	if (fp) {
@@ -2091,7 +2096,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 		for (int i = 0; i < fp->params().size(); i++) {
 			FuncParam* param = fp->params().at(i);
 			const BaseType* rt = (param->altRefTypeCount() == 1) ?
-						param->altRefType() :
+						param->altRefBaseType() :
 						param->refType();
 
 			QString pretty = rt ?
@@ -2105,7 +2110,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 				BaseType* tmp;
 				pretty += " <";
 				for (int j = 0; j < param->altRefTypeCount(); ++j) {
-					if (! (tmp = param->altRefType(j)))
+					if (! (tmp = param->altRefBaseType(j)))
 						continue;
 					if (j > 0)
 						pretty += ", ";
@@ -2144,15 +2149,15 @@ int Shell::cmdShowVariable(const Variable* v)
          <<  (v->refType() ? v->refType()->prettyName() :
                              QString(v->refTypeId() ? "(unresolved)" : "void"))
          << endl;
-    if (v->hasAltRefTypes()) {
-        _out << "  Alt. ref. type: ";
-        for (int i = 0; i < v->altRefTypeCount(); ++i) {
-            if (i > 0)
-                _out << ", ";
-            const BaseType* t = v->altRefType(i);
-            _out << "0x" << hex << (uint)t->id() << dec << t->prettyName();
-        }
-        _out << endl;
+
+    for (int i = 0; i < v->altRefTypeCount(); ++i) {
+        const BaseType* t = v->altRefBaseType(i);
+        _out << "  <" << (i+1) << "> "
+             << qSetFieldWidth(11) << left
+             << QString("0x%1").arg((uint)t->id(), 0, 16)
+             << qSetFieldWidth(0) << " "
+             << t->prettyName() << ": "
+             << v->altRefType(i).expr()->toString(true) << endl;
     }
 
 	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {

@@ -102,6 +102,24 @@ private slots:
 	void test_transitiveEvaluation_func();
 	void test_transitiveEvaluation_func_data();
 
+	void test_transitiveFunctions_func();
+	void test_transitiveFunctions_func_data();
+
+	void test_transitiveIndirectPtrs_func();
+	void test_transitiveIndirectPtrs_func_data();
+
+	void test_transitivePtrSensitivity_func();
+	void test_transitivePtrSensitivity_func_data();
+
+	void test_transitiveFieldSensitivity_func();
+	void test_transitiveFieldSensitivity_func_data();
+
+	void test_transitivePostfixSuffixes_func();
+	void test_transitivePostfixSuffixes_func_data();
+
+	void test_transitiveNestedPrimary_func();
+	void test_transitiveNestedPrimary_func_data();
+
 private:
 	AbstractSyntaxTree* _ast;
 	ASTBuilder* _builder;

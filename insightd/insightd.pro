@@ -47,7 +47,6 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     sourceref.cpp \
     shell.cpp \
     referencingtype.cpp \
-    debug.cpp \
     structuredmember.cpp \
     structured.cpp \
     typeinfo.cpp \
@@ -63,7 +62,9 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     function.cpp \
     shell_readline.cpp \
     astexpressionevaluator.cpp \
-    astexpression.cpp
+    astexpression.cpp \
+    expressionresult.cpp \
+    kernelsymbolstream.cpp
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
     memorydumpsclass.h \
@@ -110,7 +111,6 @@ HEADERS += kernelsourcetypeevaluator.h \
     sourceref.h \
     shell.h \
     referencingtype.h \
-    debug.h \
     structuredmember.h \
     structured.h \
     typeinfo.h \
@@ -125,7 +125,9 @@ HEADERS += kernelsourcetypeevaluator.h \
     function.h \
     astexpressionevaluator.h \
     astexpression.h \
-    expressionevalexception.h
+    expressionevalexception.h \
+    expressionresult.h \
+    kernelsymbolstream.h
 CONFIG += console \
     debug_and_release
 QMAKE_CFLAGS_RELEASE += -O3
@@ -134,6 +136,8 @@ QT += script \
     network \
     gui
 LIBS += -lreadline \
+    -L../libdebug \
+    -ldebug \
     -L../libinsight \
     -linsight \
     -L../libantlr3c \
@@ -141,6 +145,7 @@ LIBS += -lreadline \
     -L../libcparser \
     -lcparser
 INCLUDEPATH += ../libinsight/include \
+    ../libdebug/include \
     ../libantlr3c/include \
     ../libcparser/include
 FORMS = memorymapwindow.ui

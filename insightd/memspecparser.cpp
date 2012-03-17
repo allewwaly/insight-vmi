@@ -13,7 +13,7 @@
 #include <QFile>
 #include <QProcess>
 #include <QRegExp>
-#include "debug.h"
+#include <debug.h>
 
 #define MEMSPEC_C_BODY "%MEMSPEC_BODY%"
 const char* memspec_c_file = "memspec.c";
@@ -104,7 +104,7 @@ const char* memprint_c_src =
 #define MAKEFILE_KDIR "%KDIR%"
 #define MAKEFILE_MDIR "%MDIR%"
 const char* memspec_makefile =
-    "EXTRA_CFLAGS += -I/usr/include\n"
+    "EXTRA_CFLAGS += -I/usr/include -I/usr/include/x86_64-linux-gnu\n"
     "KDIR := " MAKEFILE_KDIR "\n"  // this placeholder gets replaced later on
     "MDIR := " MAKEFILE_MDIR "\n"  // this placeholder gets replaced later on
     "OBJ := memspec.o memprint.o\n"

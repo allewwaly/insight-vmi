@@ -58,7 +58,7 @@ QString Function::toString(QIODevice* /*mem*/, size_t /*offset*/) const
 }
 
 
-void Function::readFrom(QDataStream& in)
+void Function::readFrom(KernelSymbolStream& in)
 {
     FuncPointer::readFrom(in);
 
@@ -69,7 +69,7 @@ void Function::readFrom(QDataStream& in)
 }
 
 
-void Function::writeTo(QDataStream& out) const
+void Function::writeTo(KernelSymbolStream& out) const
 {
     FuncPointer::writeTo(out);
 

@@ -12,7 +12,7 @@
 #include <insight/constdefs.h>
 #include <insight/devicemuxer.h>
 #include "eventloopthread.h"
-#include "debug.h"
+#include <debug.h>
 
 #define safe_delete(x) do { if ( (x) ) { delete x; x = 0; } } while (0)
 

@@ -41,13 +41,8 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
             "%16llx",
             "defined(VMALLOC_OFFSET)"));
 
-    // x86_64 only
-    // See <linux/include/asm-x86/page_64.h>
-    list.append(KernelMemSpec(
-            "START_KERNEL_map",
-            "__START_KERNEL_map",
-            "%16llx",
-            "defined(__START_KERNEL_map)"));
+    // x86_64 only for kernel version < 2.6.31
+    // Both i386 and x86_64 for kernel version >= 2.6.31
     // See <linux/include/asm-x86/pgtable_64.h>
     list.append(KernelMemSpec(
             "MODULES_VADDR",
@@ -59,6 +54,14 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
             "MODULES_END",
             "%16llx",
             "defined(MODULES_VADDR) && defined(MODULES_END)"));
+
+    // x86_64 only
+    // See <linux/include/asm-x86/page_64.h>
+    list.append(KernelMemSpec(
+            "START_KERNEL_map",
+            "__START_KERNEL_map",
+            "%16llx",
+            "defined(__START_KERNEL_map)"));
     list.append(KernelMemSpec(
             "VMEMMAP_START",
             "VMEMMAP_START",

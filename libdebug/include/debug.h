@@ -1,27 +1,35 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
-//#ifndef DEBUG
 #define DEBUG 1
-//#endif
+
+#if (DEBUG == 1) && defined(__cplusplus)
 
 // Activate for detailed node evaluation tracking
 #undef DEBUG_NODE_EVAL
 //#define DEBUG_NODE_EVAL 1
 
-#undef debugmsg
-#undef debugerr
-#undef debugenter
-#undef debugleave
+// Enable debug output for points-to analysis
+// (mostly in libcparser/asttypeevaluator.cpp)
+#undef DEBUG_POINTS_TO
+//#define DEBUG_POINTS_TO 1
 
-#if (DEBUG == 1)
+// Enable debug output for used-as analysis
+// (mostly in libcparser/asttypeevaluator.cpp)
+#undef DEBUG_USED_AS
+//#define DEBUG_USED_AS 1
 
+// Enable debug output for applying used-as relations to the types and symbols
+// (mostly in insightd/symfactory.cpp)
+#undef DEBUG_APPLY_USED_AS
+//#define DEBUG_APPLY_USED_AS 1
+
+
+#	include <QString>
 // #	include <QTime>
 #	include <iostream>
 #	include <iomanip>
 #	include <sstream>
-#   include <cassert>
-#	include <QString>
 
 /**
  * Operator that writes a QString to a std::ostream

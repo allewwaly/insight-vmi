@@ -5,7 +5,7 @@
  
  InSight is a tool for <a href="https://code.google.com/p/insight-vmi/wiki/About#Background">bridging the semantic gap</a> in the field of virtual machine introspection (VMI) and digital forensics. It operates either on <a href="https://code.google.com/p/insight-vmi/wiki/InSightShell#Memory_Files">memory dump files</a> or in conjunction with any hypervisor that provides read access to the physical memory of a guest VM. InSight is written in C++ based on the Qt libraries and features <a href="https://code.google.com/p/insight-vmi/wiki/InSightShell">interactive analysis of kernel objects</a> as well as a <a href="https://code.google.com/p/insight-vmi/wiki/ScriptingEngine">JavaScript engine</a> for automation of repeating inspection tasks. The source code is licensed under the terms and conditions of the <a href="http://www.gnu.org/licenses/old-licenses/gpl-2.0.html">GNU GPL v2</a>.
  
- This tool is developed by <a href="http://www.sec.in.tum.de/christian-schneider/">Christian Schneider</a> and other contributors as part of <a href="http://www.sec.in.tum.de/leveraging-virtualization-techniques-for-system-security/">their research</a> at the <a href="http://portal.mytum.de/welcome/?set_language=en">Technische Universit&auml;t M&uuml;nchen</a>, Munich, Germany. Together with his colleges at the <a href="http://www.sec.in.tum.de/">Chair for IT Security</a>, his interest lies in the field of virtual machine introspection and how this can be used in novel ways to improve current intrusion detection methods.
+ This tool is developed by <a href="http://www.sec.in.tum.de/christian-schneider/">Christian Schneider</a> and other contributors as part of <a href="http://www.sec.in.tum.de/leveraging-virtualization-techniques-for-system-security/">their research</a> at the <a href="http://portal.mytum.de/welcome/?set_language=en">Technische Universit&auml;t M&uuml;nchen</a>, Munich, Germany. Together with his colleagues at the <a href="http://www.sec.in.tum.de/">Chair for IT Security</a>, his interest lies in the field of virtual machine introspection and how this can be used in novel ways to improve current intrusion detection methods.
  
  This documentation describes the classes and methods used by the InSight daemon. The daemon can be run in foreground or in background mode and contains all the logic and intelligence of InSight. The project is hosted at Google Code where the source code, a bug tracker, mailing lists, as well as documentation about how to setup and use InSight for kernel analysis can be found.
  
@@ -96,7 +96,7 @@
 #include <stdlib.h>
 #include <insight/constdefs.h>
 
-#include "debug.h"
+#include <debug.h>
 #include "kernelsymbols.h"
 #include "shell.h"
 #include "genericexception.h"
@@ -217,7 +217,7 @@ void init_daemon()
 	QDir home = QDir::home();
 
 	// Change running directory to home
-	chdir((char*) home.absolutePath().toAscii().data());
+	assert(chdir((char*) home.absolutePath().toAscii().data()) == 0);
 
 	// Create a lock file
 	QByteArray lockFile = home.absoluteFilePath(mt_lock_file).toLocal8Bit();
@@ -254,7 +254,7 @@ void init_daemon()
 
 	// Write PID to lock file
 	QByteArray myPid = QString("%1\n").arg(getpid()).toLocal8Bit();
-	write(lock_fd, myPid.data(), myPid.size());
+	assert(write(lock_fd, myPid.data(), myPid.size()) == myPid.size());
 
 	// Detach background daemon from stdin, stdout and stderr
     if (! (programOptions.activeOptions() & opForeground) ) {
@@ -266,7 +266,7 @@ void init_daemon()
 
         // Use /dev/null for stdin and, stdout
         int fd = open("/dev/null", O_RDWR);
-        dup(fd);
+        assert(dup(fd) != -1);
         // Use log file for stderr
         QByteArray logFile = home.absoluteFilePath(mt_log_file).toLocal8Bit();
         open(logFile.data(), O_CREAT|O_APPEND|O_WRONLY, 0640);
@@ -355,8 +355,8 @@ int main(int argc, char* argv[])
 		delete shell;
 	}
 
-	if (memMapWindow)
-	    delete memMapWindow;
+//	if (memMapWindow)
+//	    delete memMapWindow;
 
     return ret;
 }

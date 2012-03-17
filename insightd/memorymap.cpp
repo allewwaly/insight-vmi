@@ -16,7 +16,7 @@
 #include "shell.h"
 #include "varsetter.h"
 #include "memorymapbuilder.h"
-#include "debug.h"
+#include <debug.h>
 
 
 // static variable
@@ -117,6 +117,7 @@ void MemoryMap::build(float minProbability)
     // How many threads to create?
     _shared->threadCount =
             qMin(qMax(QThread::idealThreadCount(), 1), MAX_BUILDER_THREADS);
+//    _shared->threadCount = 1;
 
 //    debugmsg("Building reverse map with " << _shared->threadCount << " threads.");
 
@@ -124,6 +125,13 @@ void MemoryMap::build(float minProbability)
     for (VariableList::const_iterator it = _factory->vars().constBegin();
             it != _factory->vars().constEnd(); ++it)
     {
+        /// @todo consider alternative types for variables
+//        const Variable* v = *it;
+//        if (v->hasAltRefTypes())
+//            debugmsg(QString("Variable \"%1\" (0x%2) has %3 candidate types.")
+//                     .arg(v->name())
+//                     .arg(v->id(), 0, 16)
+//                     .arg(v->altRefTypeCount()));
         try {
             Instance inst = (*it)->toInstance(_vmem, BaseType::trLexical);
             if (!inst.isNull() && fitsInVmem(inst.address(), inst.size())) {
@@ -186,7 +194,7 @@ void MemoryMap::build(float minProbability)
                     << ", pmemMap = " << _pmemMap.size()
                     << ", queue = " << queue_size << " " << indicator
                     << ", probability = " << (node ? node->probability() : 1.0)
-                    << flush;
+                    << endl;
             prev_queue_size = queue_size;
         }
 
@@ -618,12 +626,13 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
     // Degradation of 90% for an invalid address of this node
     const float degForInvalidAddr = 0.1;
 
-    // Degradation of 5% for each non-aligned pointer the type of this node
-    // has
-    const float degForNonAlignedChildAddr = 0.95;
+    // Max. degradation of 30% for non-aligned pointer childen the type of this
+    // node has
+    const float degForNonAlignedChildAddr = 0.7;
 
-    // Degradation of 10% for each invalid pointer the type of this node has
-    const float degForInvalidChildAddr = 0.9;
+    // Max. degradation of 50% for invalid pointer childen the type of this node
+    // has
+    const float degForInvalidChildAddr = 0.5;
 
     float prob = parentProbability < 0 ?
                  1.0 :
@@ -658,46 +667,55 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
     {
         const Structured* structured =
                 dynamic_cast<const Structured*>(instType);
+        quint32 nonAlignedChildAddrCnt = 0, invalidChildAddrCnt = 0;
         // Check address of all descendant pointers
-        for (int i = 0; i < structured->members().size(); ++i) {
-            const BaseType* m_type =
-                    structured->members().at(i)->refTypeDeep(BaseType::trLexical);
+        for (MemberList::const_iterator it = structured->members().begin(),
+             e = structured->members().end(); it != e; ++it)
+        {
+            const StructuredMember* m = *it;
+            const BaseType* m_type = m->refTypeDeep(BaseType::trLexical);
 
             if (m_type && (m_type->type() & rtPointer)) {
                 try {
-                    quint64 m_addr = inst->address() + structured->members().at(i)->offset();
-//                    quint64 m_addr = inst->memberAddress(i);
+                    quint64 m_addr = inst->address() + m->offset();
                     // Try a safeSeek first to avoid costly throws of exceptions
                     if (_vmem->safeSeek(m_addr)) {
                         m_addr = (quint64)m_type->toPointer(_vmem, m_addr);
                         // Check validity
                         if (! _vmem->safeSeek((qint64) m_addr) ) {
-                            prob *= degForInvalidChildAddr;
-                            degForInvalidChildAddrCnt++;
+                            invalidChildAddrCnt++;
                         }
                         // Check alignment
                         else if (m_addr & 0x3UL) {
-                            prob *= degForNonAlignedChildAddr;
-                            degForNonAlignedChildAddrCnt++;
+                            nonAlignedChildAddrCnt++;
                         }
                     }
                     else {
                         // Address was invalid
-                        prob *= degForInvalidChildAddr;
-                        degForInvalidChildAddrCnt++;
+                        invalidChildAddrCnt++;
                     }
                 }
                 catch (MemAccessException&) {
                     // Address was invalid
-                    prob *= degForInvalidChildAddr;
-                    degForInvalidChildAddrCnt++;
+                    invalidChildAddrCnt++;
                 }
                 catch (VirtualMemoryException&) {
                     // Address was invalid
-                    prob *= degForInvalidChildAddr;
-                    degForInvalidChildAddrCnt++;
+                    invalidChildAddrCnt++;
                 }
             }
+        }
+
+        // Penalize probabilities, weighted by total no. of children
+        if (nonAlignedChildAddrCnt) {
+            float invPart = nonAlignedChildAddrCnt / (float) structured->members().size();
+            prob *= invPart * degForNonAlignedChildAddr + (1.0 - invPart);
+            degForNonAlignedChildAddrCnt++;
+        }
+        if (invalidChildAddrCnt) {
+            float invPart = invalidChildAddrCnt / (float) structured->members().size();
+            prob *= invPart * degForInvalidChildAddr + (1.0 - invPart);
+            degForInvalidChildAddrCnt++;
         }
     }
     return prob;

@@ -12,8 +12,9 @@
 #include <astdotgraph.h>
 #include "kernelsourcetypeevaluator.h"
 #include <typeevaluatorexception.h>
+#include <astsourceprinter.h>
 #include <cassert>
-#include "debug.h"
+#include <debug.h>
 #include "shell.h"
 #include "compileunit.h"
 #include "filenotfoundexception.h"
@@ -48,7 +49,7 @@ public:
 
 KernelSourceParser::KernelSourceParser(SymFactory* factory,
         const QString& srcPath)
-    : _factory(factory), _srcPath(srcPath), _srcDir(srcPath), _filesDone(0),
+    : _factory(factory), _srcPath(srcPath), _srcDir(srcPath), _filesIndex(0),
       _lastFileNameLen(0)
 {
     assert(_factory);
@@ -57,24 +58,39 @@ KernelSourceParser::KernelSourceParser(SymFactory* factory,
 
 KernelSourceParser::~KernelSourceParser()
 {
+    cleanUpThreads();
 }
 
 
 void KernelSourceParser::operationProgress()
 {
-    int percent = (_filesDone / (float) _factory->sources().size()) * 100;
+    QMutexLocker lock(&_progressMutex);
+    int percent = (_filesIndex / (float) _factory->sources().size()) * 100;
+    QString fileName = _currentFile;
 //    shell->out() << "Parsing file " << _filesDone << "/"
 //            <<  _factory->sources().size()
 //            << " (" << percent  << "%)"
 //            << ", " << elapsedTime() << " elapsed: "
 //            << qPrintable(_currentFile)
 //            << endl;
-    shell->out() << "\rParsing file " << _filesDone << "/"
+    shell->out() << "\rParsing file " << _filesIndex << "/"
             <<  _factory->sources().size() << " (" << percent  << "%)"
             << ", " << elapsedTime() << " elapsed: "
-            << qSetFieldWidth(_lastFileNameLen) << qPrintable(_currentFile)
+            << qSetFieldWidth(_lastFileNameLen) << qPrintable(fileName)
             << qSetFieldWidth(0) << flush;
-    _lastFileNameLen = _currentFile.length();
+    _lastFileNameLen = fileName.length();
+}
+
+
+void KernelSourceParser::cleanUpThreads()
+{
+    for (int i = 0; i < _threads.size(); ++i)
+        _threads[i]->stop();
+    for (int i = 0; i < _threads.size(); ++i) {
+        _threads[i]->wait();
+        _threads[i]->deleteLater();
+    }
+    _threads.clear();
 }
 
 
@@ -88,76 +104,146 @@ void KernelSourceParser::parse()
         return;
     }
 
-    _filesDone = _lastFileNameLen = 0;
+    _filesIndex = _lastFileNameLen = 0;
+    cleanUpThreads();
 
     operationStarted();
 
-    try {
-        CompileUnitIntHash::const_iterator it = _factory->sources().begin();
-        while (it != _factory->sources().end() && !shell->interrupted()) {
-            const CompileUnit* unit = it.value();
-            ++_filesDone;
-
-            // Skip assembly files
-            if (!unit->name().endsWith(".S") /*&& _filesDone >= 500*/) {
-                _currentFile = unit->name() + ".i";
-
-                checkOperationProgress();
-
-                try {
-                    parseFile(_currentFile);
-                }
-//                catch (SourceParserException& e) {
-//                    shell->out() << "\r" << flush;
-//                    shell->err() << "WARNING: " << e.message << endl << flush;
-//                }
-                catch (FileNotFoundException& e) {
-                    shell->out() << "\r" << flush;
-                    shell->err() << "WARNING: " << e.message << endl << flush;
-                }
-//                catch (TypeEvaluatorException& e) {
-//                    shell->out() << "\r" << flush;
-//                    shell->err() << "WARNING: At " << e.file << ":" << e.line
-//                                 << ": " << e.message << endl << flush;
-//                }
-            }
-            ++it;
-        }
+    // Collect files to process
+    _fileNames.clear();
+    CompileUnitIntHash::const_iterator it = _factory->sources().begin();
+    while (it != _factory->sources().end() && !shell->interrupted()) {
+        const CompileUnit* unit = it.value();
+        // Skip assembly files
+        if (!unit->name().endsWith(".S"))
+            _fileNames.append(unit->name() + ".i");
+        ++it;
     }
-    catch (...) {
-        // Exceptional cleanup
-        operationProgress();
-        operationStopped();
-        shell->out() << endl;
-        throw;
+    
+    // Create worker threads, limited to single-threading for debugging
+#if defined(DEBUG_APPLY_USED_AS) || defined(DEBUG_USED_AS) || defined(DEBUG_POINTS_TO)
+    const int THREAD_COUNT = 1;
+#else
+    const int THREAD_COUNT = QThread::idealThreadCount();
+#endif
+
+    for (int i = 0; i < THREAD_COUNT; ++i)
+    {
+        WorkerThread* thread = new WorkerThread(this);
+        _threads.append(thread);
+        thread->start();
     }
+
+    // Show progress while parsing is not finished
+    while (!_threads[0]->wait(250))
+        checkOperationProgress();
+
+    // Wait for all threads to finish
+    for (int i = 0; i < THREAD_COUNT; ++i)
+        _threads[i]->wait();
+
+    cleanUpThreads();
 
     operationStopped();
 
-    shell->out() << "\rParsed " << _filesDone << " files in " << elapsedTime()
-                 << endl;
+    shell->out() << qSetFieldWidth(_lastFileNameLen)
+                 << QString("\rParsed %1/%2 files in %3")
+                        .arg(_filesIndex)
+                        .arg(_fileNames.size())
+                        .arg(elapsedTime())
+                 << qSetFieldWidth(0) << endl;
 
     _factory->sourceParcingFinished();
 }
 
 
-void KernelSourceParser::parseFile(const QString& fileName)
+void KernelSourceParser::WorkerThread::run()
 {
-    QString file = _srcDir.absoluteFilePath(fileName);
+    QString currentFile;
+    QMutexLocker lock(&_parser->_filesMutex);
+    _stopExecution = false;
 
-    if (!_srcDir.exists(fileName))
+    while (!_stopExecution && !shell->interrupted() &&
+           _parser->_filesIndex < _parser->_fileNames.size())
+    {
+        currentFile = _parser->_fileNames[_parser->_filesIndex++];
+
+//        if (_parser->_filesIndex < 116)
+//            continue;
+
+        _parser->_currentFile = currentFile;
+
+        if (_parser->_filesIndex <= 1)
+            _parser->operationProgress();
+        else
+            _parser->checkOperationProgress();
+        lock.unlock();
+
+        try {
+            parseFile(currentFile);
+        }
+        catch (FileNotFoundException& e) {
+            shell->out() << "\r" << flush;
+            shell->err() << "WARNING: " << e.message << endl << flush;
+        }
+//        catch (TypeEvaluatorException& e) {
+//            shell->out() << "\r" << flush;
+//            shell->err() << "WARNING: At " << e.file << ":" << e.line
+//                         << ": " << e.message << endl << flush;
+//        }
+        catch (GenericException& e) {
+            shell->out() << endl;
+            shell->err() << e.file << ":" << e.line
+                         << " WARNING: " << e.message << endl << flush;
+            throw e;
+        }
+
+        lock.relock();
+    }
+}
+
+
+void KernelSourceParser::WorkerThread::parseFile(const QString &fileName)
+{
+    QString file = _parser->_srcDir.absoluteFilePath(fileName);
+
+    if (!_parser->_srcDir.exists(fileName))
         fileNotFoundError(QString("File not found: %1").arg(file));
 
     AbstractSyntaxTree ast;
     ASTBuilder builder(&ast);
 
     // Parse the file
-    if (builder.buildFrom(file) != 0)
+    if (!_stopExecution && builder.buildFrom(file) != 0)
         sourceParserError(QString("Error parsing file %1").arg(file));
 
     // Evaluate types
-    KernelSourceTypeEvaluator eval(&ast, _factory);
-    if (!eval.evaluateTypes())
-        sourceParserError(QString("Error evaluating types in %1").arg(file));
+    KernelSourceTypeEvaluator eval(&ast, _parser->_factory);
+    try {
+        if (!_stopExecution && !eval.evaluateTypes()) {
+            // Only throw exception if evaluation was not interrupted
+            if (!_stopExecution && !eval.walkingStopped())
+                sourceParserError(QString("Error evaluating types in %1").arg(file));
+        }
+    }
+    catch (TypeEvaluatorException& e) {
+        // Print the source of the embedding external declaration
+        const ASTNode* n = e.ed.srcNode;
+        while (n && n->parent) // && n->type != nt_external_declaration)
+            n = n->parent;
+
+        ASTSourcePrinter printer(&ast);
+
+        shell->out() << "\r" << flush;
+        shell->err()
+                << "********************************************" << endl
+                << "WARNING: " << e.message << endl
+                << "------------------[Source]------------------" << endl
+                << printer.toString(n, true)
+                << "------------------[/Source]-----------------" << endl
+                << "Details (may be incomplete):" << endl
+                << eval.typeChangeInfo(e.ed) << endl << flush;
+        throw;
+    }
 }
 

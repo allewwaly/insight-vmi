@@ -23,7 +23,7 @@
 #include "memorymaprangetree.h"
 #include "virtualmemory.h"
 #include "varsetter.h"
-#include "debug.h"
+#include <debug.h>
 
 static const int margin = 3;
 static const int cellSize = 8;
@@ -54,7 +54,7 @@ static const QColor probColor[PROB_MAX+1] = {
 MemoryMapWidget::MemoryMapWidget(const MemoryMapRangeTree* map, QWidget *parent)
     : QWidget(parent), _map(map), _diff(0), _visMapValid(false), _address(-1),
       _cols(0), _rows(0), _antialiasing(false), _isPainting(false),
-      _showOnlyKernelSpace(false), _shownAddrSpaceOffset(0)
+      _showOnlyKernelSpace(false)
 {
 //    setWindowTitle(tr("Difference view"));
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -70,7 +70,9 @@ MemoryMapWidget::~MemoryMapWidget()
 
 quint64 MemoryMapWidget::visibleAddrSpaceStart() const
 {
-    return 0;
+    if (!_showOnlyKernelSpace || !_map)
+        return 0;
+    return _specs.pageOffset;
 }
 
 
@@ -466,11 +468,13 @@ void MemoryMapWidget::setDiff(const MemoryDiffTree* diff)
 }
 
 
-void MemoryMapWidget::setMap(const MemoryMapRangeTree* map)
+void MemoryMapWidget::setMap(const MemoryMapRangeTree* map,
+                             const MemSpecs& specs)
 {
     if (_map == map)
         return;
     _map = map;
+    _specs = specs;
     resizeEvent(0);
     update();
 }

@@ -46,6 +46,8 @@ public:
      */
     QString antlrStringToStr(const pANTLR3_STRING s) const;
 
+    bool walkingStopped() const;
+
 protected:
     int walkTree(const ASTNodeList *head);
     int walkTree(const ASTNode *node, int flags = 0);
@@ -68,5 +70,6 @@ inline void ASTWalker::afterChild(const ASTNode * /*node*/,
 inline void ASTWalker::afterChildren(const ASTNode * /*node*/, int /*flags*/) {}
 inline const AbstractSyntaxTree* ASTWalker::ast() const { return _ast; }
 inline AbstractSyntaxTree* ASTWalker::ast() { return _ast; }
+inline bool ASTWalker::walkingStopped() const { return _stopWalking; }
 
 #endif /* ASTWALKER_H_ */

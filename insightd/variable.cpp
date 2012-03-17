@@ -62,7 +62,7 @@ Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes) const
 }
 
 
-void Variable::readFrom(QDataStream& in)
+void Variable::readFrom(KernelSymbolStream& in)
 {
     Symbol::readFrom(in);
     ReferencingType::readFrom(in);
@@ -73,7 +73,7 @@ void Variable::readFrom(QDataStream& in)
 }
 
 
-void Variable::writeTo(QDataStream& out) const
+void Variable::writeTo(KernelSymbolStream& out) const
 {
     Symbol::writeTo(out);
     ReferencingType::writeTo(out);
@@ -82,15 +82,27 @@ void Variable::writeTo(QDataStream& out) const
 }
 
 
-QDataStream& operator>>(QDataStream& in, Variable& var)
+KernelSymbolStream& operator>>(KernelSymbolStream& in, Variable& var)
 {
     var.readFrom(in);
     return in;
 }
 
 
-QDataStream& operator<<(QDataStream& out, const Variable& var)
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const Variable& var)
 {
     var.writeTo(out);
     return out;
 }
+
+
+Instance Variable::altRefTypeInstance(VirtualMemory* vmem, int index) const
+{
+	if (index < 0 || index >= altRefTypeCount())
+		return Instance();
+
+	ReferencingType::AltRefType alt = altRefType(index);
+	Instance inst = toInstance(vmem);
+	return alt.toInstance(vmem, &inst, _factory, name(), QStringList());
+}
+

@@ -7,7 +7,7 @@
 
 #include "virtualmemory.h"
 #include "virtualmemoryexception.h"
-#include "debug.h"
+#include <debug.h>
 
 // Kernel constants for memory and page sizes.
 // I think it's reasonable to hard-code them for now.
@@ -118,7 +118,7 @@
 
 VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
                              int memDumpIndex)
-    : _tlb(10000), _physMem(physMem), _specs(specs), _pos(-1),
+    : _tlb(50000), _physMem(physMem), _physMemSize(-1), _specs(specs), _pos(-1),
       _memDumpIndex(memDumpIndex), _threadSafe(false),
       _userland(false), _userPGD(0), _userlandMutex(QMutex::Recursive)
 {
@@ -126,6 +126,8 @@ VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
     if ( !_specs.arch & (MemSpecs::ar_i386|MemSpecs::ar_x86_64) )
         virtualMemoryError("No architecture set in memory specifications");
 
+    if (_physMem)
+        _physMemSize = _physMem->size();
 }
 
 
@@ -358,6 +360,7 @@ void VirtualMemory::setPhysMem(QIODevice* physMem)
         if (doLock) _tlbMutex.unlock();
     }
     _physMem = physMem;
+    _physMemSize = _physMem ? _physMem->size() : -1;
 
     if (doLock) _physMemMutex.unlock();
 }
@@ -389,7 +392,11 @@ T VirtualMemory::extractFromPhysMem(quint64 physaddr, bool enableExceptions,
     else {
         if (doLock) _physMemMutex.unlock();
         if (enableExceptions)
-            virtualMemoryError("Error reading from physical memory device.");
+            virtualMemoryError(QString("Error reading %1 bytes from physical "
+                                       "address 0x%2.")
+                               .arg(sizeof(T))
+                               .arg(physaddr, 0, 16));
+
     }
 
     return ret;
@@ -398,8 +405,8 @@ T VirtualMemory::extractFromPhysMem(quint64 physaddr, bool enableExceptions,
 
 inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 {
-    // Disable TLB for now
-    return 0;
+//    // Disable TLB for now
+//    return 0;
 
     bool doLock = _threadSafe;
     quint64 result = 0;
@@ -700,7 +707,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
             virtualToPhysical32(vaddr, pageSize, enableExceptions) :
             virtualToPhysical64(vaddr, pageSize, enableExceptions);
 
-    if (_physMem->size() > 0 && physAddr >= (quint64)_physMem->size())
+    if (_physMemSize > 0 && physAddr >= (quint64)_physMemSize)
         virtualMemoryOtherError(
                 QString("Physical address 0x%1 out of bounds")
                         .arg(physAddr, 0, 16),
@@ -732,10 +739,12 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
 
-    // We don't expect to use _specs.vmemmapStart or _specs.modulesVaddr here,
-    // so they all should be null!
-    assert(_specs.vmemmapStart == 0 && _specs.vmemmapEnd == 0 &&
-           _specs.modulesVaddr == 0 &&_specs.modulesEnd == 0);
+    // We don't expect to use _specs.vmemmapStart here, should be null!
+    assert(_specs.vmemmapStart == 0 && _specs.vmemmapEnd == 0);
+    // If _specs.modulesVaddr is set, it should equal _specs.vmallocStart
+    if (_specs.modulesVaddr)
+        assert(_specs.modulesVaddr == _specs.vmallocStart &&
+               _specs.modulesEnd == _specs.vmallocEnd);
 
     // During initialization, the VMALLOC_START might be incorrect (i.e., less
     // than PAGE_OFFSET). This is reflected in the _specs.initialized variable.

@@ -29,7 +29,6 @@ HEADERS += astexpressionevaluatortester.h \
     ../../funcparam.h \
     ../../expressionevalexception.h \
     ../../enum.h \
-    ../../debug.h \
     ../../consttype.h \
     ../../compileunit.h \
     ../../basetype.h \
@@ -45,6 +44,7 @@ HEADERS += astexpressionevaluatortester.h \
     ../../longoperation.h \
     ../../kernelsymbolsclass.h \
     ../../kernelsymbolparser.h \
+    ../../kernelsymbolstream.h \
     ../../kernelsymbolreader.h \
     ../../kernelsymbolwriter.h \
     ../../memspecparser.h \
@@ -57,7 +57,8 @@ HEADERS += astexpressionevaluatortester.h \
     ../../memorymaprangetree.h \
     ../../memorymapwidget.h \
     ../../memorymapwindow.h \
-    ../../memoryrangetree.h
+    ../../memoryrangetree.h \
+    ../../expressionresult.h
 SOURCES += astexpressionevaluatortester.cpp \
     ../../array.cpp \
     ../../volatiletype.cpp \
@@ -83,7 +84,6 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../funcpointer.cpp \
     ../../funcparam.cpp \
     ../../enum.cpp \
-    ../../debug.cpp \
     ../../consttype.cpp \
     ../../compileunit.cpp \
     ../../basetype.cpp \
@@ -99,6 +99,7 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../longoperation.cpp \
     ../../kernelsymbolsclass.cpp \
     ../../kernelsymbolparser.cpp \
+    ../../kernelsymbolstream.cpp \
     ../../kernelsymbolreader.cpp \
     ../../kernelsymbolwriter.cpp \
     ../../memspecparser.cpp \
@@ -110,7 +111,8 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../memorymapnode.cpp \
     ../../memorymaprangetree.cpp \
     ../../memorymapwidget.cpp \
-    ../../memorymapwindow.cpp
+    ../../memorymapwindow.cpp \
+    ../../expressionresult.cpp
 QT += core \
     script \
     network \
@@ -118,11 +120,13 @@ QT += core \
     testlib
 CONFIG += qtestlib debug
 INCLUDEPATH += ../../src \
+	../../../libdebug/include \
 	../../../libcparser/include \
 	../../../libcparser/antlr_generated \
         ../../../libantlr3c/include \
         ../../../libinsight/include
 LIBS += -L../../../libcparser -lcparser \
+	-L../../../libdebug -ldebug \
 	-L../../../libantlr3c -lantlr3c \
 	-L../../../libinsight -linsight \
 	-lreadline

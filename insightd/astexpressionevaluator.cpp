@@ -96,28 +96,74 @@ inline ASTExpression* setExprOrAddAlternative(ASTExpression *dest,
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfNodeList(const ASTNodeList *list)
+ASTExpression* ASTExpressionEvaluator::exprOfNodeList(
+        const ASTNodeList *list, const ASTNodeNodeHash& ptsTo)
 {
     ASTExpression* expr = 0;
     while (list) {
         if (expr)
-            expr->addAlternative(exprOfNode(list->item));
+            expr->addAlternative(exprOfNode(list->item, ptsTo));
         else
-            expr = exprOfNode(list->item);
+            expr = exprOfNode(list->item, ptsTo);
         list = list->next;
     }
     return expr;
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfNode(
+        const ASTNode *node, const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
 
+    // Push current root on the recursion tracking stack, gets auto-popped later
+    StackAutoPopper<typeof(_evalNodeStack)> autoPopper(&_evalNodeStack, node);
+    Q_UNUSED(autoPopper);
+
+    // Check for loops in recursive evaluation
+    for (int i = 0; i < _evalNodeStack.size() - 1; ++i) {
+        if (_evalNodeStack[i] == node) {
+            // If we have followed inter-links before, try it without this time
+            if (!ptsTo.isEmpty()) {
+                ASTExpressionEvaluator other(_eval, _factory);
+                ASTExpression* expr = other.exprOfNode(node, ASTNodeNodeHash());
+                if (expr)
+                    expr = expr->clone(_allExpressions);
+                return expr;
+            }
+            // Otherwise raise an error
+            else {
+                QString msg = QString("Detected loop in recursive expression "
+                                      "evaluation:\n"
+                                      "File: %1\n")
+                        .arg(_ast->fileName());
+                int cnt = 0;
+                for (int j = _evalNodeStack.size() - 1; j >= 0; --j) {
+                    const ASTNode* n = _evalNodeStack[j];
+                    msg += QString("%0%1. 0x%2 %3 at line %4:%5\n")
+                            .arg(cnt == 0 || j == i ? "->" : "  ")
+                            .arg(cnt, 4)
+                            .arg((quint64)n, 0, 16)
+                            .arg(ast_node_type_to_str(n), -35)
+                            .arg(n->start->line)
+                            .arg(n->start->charPosition);
+                    ++cnt;
+                }
+
+                exprEvalError(msg);
+            }
+        }
+    }
+
+
     // Return cached value, if possible
-    if (_expressions.contains(node))
+    if (ptsTo.isEmpty() && _expressions.contains(node))
         return _expressions[node];
+
+    // If this expression points to another expression, return that instead
+    if (ptsTo.contains(node))
+        return exprOfNode(ptsTo[node], ptsTo);
 
     ASTExpression* expr = 0;
 
@@ -132,27 +178,27 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
     case nt_multiplicative_expression:
     case nt_relational_expression:
     case nt_shift_expression:
-        expr = exprOfBinaryExpr(node);
+        expr = exprOfBinaryExpr(node, ptsTo);
         break;
 
     case nt_assignment_expression:
-        expr = exprOfAssignmentExpr(node);
+        expr = exprOfAssignmentExpr(node, ptsTo);
         break;
 
     case nt_builtin_function_alignof:
-        expr = exprOfBuiltinFuncAlignOf(node);
+        expr = exprOfBuiltinFuncAlignOf(node, ptsTo);
         break;
 
     case nt_builtin_function_choose_expr:
-        expr = exprOfBuiltinFuncChooseExpr(node);
+        expr = exprOfBuiltinFuncChooseExpr(node, ptsTo);
         break;
 
     case nt_builtin_function_constant_p:
-        expr = exprOfBuiltinFuncConstant(node);
+        expr = exprOfBuiltinFuncConstant(node, ptsTo);
         break;
 
     case nt_builtin_function_expect:
-        expr = exprOfBuiltinFuncExpect(node);
+        expr = exprOfBuiltinFuncExpect(node, ptsTo);
         break;
 
     case nt_builtin_function_extract_return_addr:
@@ -160,11 +206,11 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
         break;
 
     case nt_builtin_function_object_size:
-        expr = exprOfBuiltinFuncObjectSize(node);
+        expr = exprOfBuiltinFuncObjectSize(node, ptsTo);
         break;
 
     case nt_builtin_function_offsetof:
-        expr = exprOfBuiltinFuncOffsetOf(node);
+        expr = exprOfBuiltinFuncOffsetOf(node, ptsTo);
         break;
 
     case nt_builtin_function_prefetch:
@@ -176,11 +222,11 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
         break;
 
     case nt_builtin_function_sizeof:
-        expr = exprOfBuiltinFuncSizeof(node);
+        expr = exprOfBuiltinFuncSizeof(node, ptsTo);
         break;
 
     case nt_builtin_function_types_compatible_p:
-        expr = exprOfBuiltinFuncTypesCompatible(node);
+        expr = exprOfBuiltinFuncTypesCompatible(node, ptsTo);
         break;
 
     case nt_builtin_function_va_arg:
@@ -193,40 +239,60 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
     case nt_cast_expression:
         if (node->u.cast_expression.type_name) {
             assert(node->u.cast_expression.cast_expression != 0);
-            return exprOfNode(node->u.cast_expression.cast_expression);
+            return exprOfNode(node->u.cast_expression.cast_expression, ptsTo);
         }
         else
-            return exprOfNode(node->u.cast_expression.unary_expression);
+            return exprOfNode(node->u.cast_expression.unary_expression, ptsTo);
         break;
 
     case nt_conditional_expression:
-        expr = exprOfConditionalExpr(node);
+        expr = exprOfConditionalExpr(node, ptsTo);
         break;
 
     case nt_constant_expression:
-        expr = exprOfNode(node->u.constant_expression.conditional_expression);
+        expr = exprOfNode(node->u.constant_expression.conditional_expression, ptsTo);
         break;
 
     case nt_constant_char:
     case nt_constant_int:
     case nt_constant_float:
-        expr = exprOfConstant(node);
+        expr = exprOfConstant(node, ptsTo);
+        break;
+
+    case nt_expression_statement:
+        if (node->u.expression_statement.expression) {
+            // Find last expression
+            const ASTNodeList* list = node->u.expression_statement.expression;
+            while (list && list->next)
+                list = list->next;
+            expr = exprOfNode(list->item, ptsTo);
+        }
+        break;
+
+    case nt_initializer:
+        if (node->u.initializer.assignment_expression)
+            expr = exprOfNode(node->u.initializer.assignment_expression, ptsTo);
+        break;
+
+    case nt_jump_statement_return:
+        if (node->u.jump_statement.initializer)
+            expr = exprOfNode(node->u.jump_statement.initializer, ptsTo);
         break;
 
     case nt_lvalue:
         // Could be an lvalue cast
         if (node->u.lvalue.lvalue)
-            expr = exprOfNode(node->u.lvalue.lvalue);
+            expr = exprOfNode(node->u.lvalue.lvalue, ptsTo);
         else
-            expr = exprOfNode(node->u.lvalue.unary_expression);
+            expr = exprOfNode(node->u.lvalue.unary_expression, ptsTo);
         break;
 
     case nt_postfix_expression:
-        expr = exprOfPostfixExpr(node);
+        expr = exprOfPostfixExpr(node, ptsTo);
         break;
 
     case nt_primary_expression:
-        expr = exprOfPrimaryExpr(node);
+        expr = exprOfPrimaryExpr(node, ptsTo);
         break;
 
     case nt_unary_expression:
@@ -234,7 +300,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
     case nt_unary_expression_dec:
     case nt_unary_expression_inc:
     case nt_unary_expression_op:
-        expr = exprOfUnaryExpr(node);
+        expr = exprOfUnaryExpr(node, ptsTo);
         break;
 
     default:
@@ -253,33 +319,36 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(const ASTNode *node)
                 .arg(node->start->charPosition));
     }
 
-    _expressions[node] = expr;
+    if (ptsTo.isEmpty())
+        _expressions[node] = expr;
     return expr;
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfAssignmentExpr(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfAssignmentExpr(
+        const ASTNode *node, const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
     checkNodeType(node, nt_assignment_expression);
 
     if (node->u.assignment_expression.assignment_expression)
-        return exprOfNode(node->u.assignment_expression.assignment_expression);
+        return exprOfNode(node->u.assignment_expression.assignment_expression, ptsTo);
     else if (node->u.assignment_expression.lvalue)
-        return exprOfNode(node->u.assignment_expression.lvalue);
+        return exprOfNode(node->u.assignment_expression.lvalue, ptsTo);
     else
-        return exprOfNode(node->u.assignment_expression.conditional_expression);
+        return exprOfNode(node->u.assignment_expression.conditional_expression, ptsTo);
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfBinaryExpr(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBinaryExpr(
+        const ASTNode *node,const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
 
     if (!node->u.binary_expression.right)
-        return exprOfNode(node->u.binary_expression.left);
+        return exprOfNode(node->u.binary_expression.left, ptsTo);
 
     ExpressionType exprType;
     QString op;
@@ -350,8 +419,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBinaryExpr(const ASTNode *node)
     }
 
     ASTBinaryExpression *expr = createExprNode<ASTBinaryExpression>(exprType);
-    expr->setLeft(exprOfNode(node->u.binary_expression.left));
-    expr->setRight(exprOfNode(node->u.binary_expression.right));
+    expr->setLeft(exprOfNode(node->u.binary_expression.left, ptsTo));
+    expr->setRight(exprOfNode(node->u.binary_expression.right, ptsTo));
     return expr;
 }
 
@@ -384,7 +453,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBinaryExpr(const ASTNode *node)
 
   Source: http://gcc.gnu.org/onlinedocs/gcc/Alignment.html
  */
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncAlignOf(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncAlignOf(
+        const ASTNode *node,  const ASTNodeNodeHash& /*ptsTo*/)
 {
     if (!node)
         return 0;
@@ -455,7 +525,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncAlignOf(const ASTNode *n
   Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
  */
 ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncChooseExpr(
-        const ASTNode *node)
+        const ASTNode *node, const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
@@ -464,7 +534,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncChooseExpr(
     ASTExpression *ret = 0, *ae1 = 0, *ae2;
 
     for (ASTExpression *expr = exprOfNode(
-                node->u.builtin_function_choose_expr.constant_expression);
+                node->u.builtin_function_choose_expr.constant_expression,
+                ptsTo);
          expr;
          expr = expr->alternative())
     {
@@ -474,15 +545,17 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncChooseExpr(
             const ASTNode *n = res.result.i64 ?
                         node->u.builtin_function_choose_expr.assignment_expression1 :
                         node->u.builtin_function_choose_expr.assignment_expression2;
-            ae1 = exprOfNode(n);
+            ae1 = exprOfNode(n, ptsTo);
             ret = setExprOrAddAlternative(ret, ae1);
         }
         // If not, add both alternatives
         else {
             ae1 = exprOfNode(
-                        node->u.builtin_function_choose_expr.assignment_expression1);
+                        node->u.builtin_function_choose_expr.assignment_expression1,
+                        ptsTo);
             ae2 = exprOfNode(
-                        node->u.builtin_function_choose_expr.assignment_expression2);
+                        node->u.builtin_function_choose_expr.assignment_expression2,
+                        ptsTo);
             ret = setExprOrAddAlternative(ret, ae1);
             ret = setExprOrAddAlternative(ret, ae2);
         }
@@ -513,13 +586,13 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncChooseExpr(
   Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Object-Size-Checking.html
  */
 ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncObjectSize(
-        const ASTNode *node)
+        const ASTNode *node, const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
     checkNodeType(node, nt_builtin_function_object_size);
 
-    ASTExpression *expr = exprOfNode(node->u.builtin_function_object_size.constant);
+    ASTExpression *expr = exprOfNode(node->u.builtin_function_object_size.constant, ptsTo);
     ExpressionResult res = expr->result();
     assert(res.resultType == erConstant);
 
@@ -558,14 +631,15 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncObjectSize(
 
   Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
  */
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncConstant(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncConstant(
+        const ASTNode *node, const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
     checkNodeType(node, nt_builtin_function_constant_p);
 
     ASTExpression *expr = exprOfNode(
-                node->u.builtin_function_constant_p.unary_expression);
+                node->u.builtin_function_constant_p.unary_expression, ptsTo);
     // We can only approximate GCC's constant value decision here
     return expr->resultType() == erConstant ?
                 createExprNode<ASTConstantExpression>(esInt32, 1ULL) :
@@ -598,14 +672,15 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncConstant(const ASTNode *
 
   Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
 */
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncExpect(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncExpect(
+        const ASTNode *node, const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
     checkNodeType(node, nt_builtin_function_expect);
 
     ASTExpression* expr =
-            exprOfNode(node->u.builtin_function_expect.assignment_expression);
+            exprOfNode(node->u.builtin_function_expect.assignment_expression, ptsTo);
     /// @todo Return type is long
 //    if (_eval->sizeofLong() == 4) {
 //    }
@@ -616,38 +691,73 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncExpect(const ASTNode *no
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
+        const ASTNode *node, const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
     checkNodeType(node, nt_builtin_function_offsetof);
 
-    const ASTNode *pfe = node->u.builtin_function_offsetof.postfix_expression;
-    const ASTNode* pre = pfe->u.postfix_expression.primary_expression;
     ASTType* type = _eval->typeofNode(node->u.builtin_function_offsetof.type_name);
     if (!type || !(type->type() & StructOrUnion)) {
         ASTSourcePrinter printer(_ast);
         exprEvalError(QString("Cannot find struct/union definition for \"%1\" "
                               "at %2:%3:%4")
-                      .arg(printer.toString(pfe).trimmed())
+                      .arg(printer.toString(
+                               node->u.builtin_function_offsetof.postfix_expression)
+                           .trimmed())
                       .arg(_ast->fileName())
                       .arg(node->start->line)
                       .arg(node->start->charPosition));
     }
 
+    ASTExpression* expr = 0;
+    BaseTypeList bt_list = _factory->findBaseTypesForAstType(type, _eval).typesNonPtr;
+
+    // Try each type of the list in turn
+    for (int i = 0; i < bt_list.size(); ++i) {
+        if (bt_list[i]->type() & StructOrUnion) {
+            bool exceptions = (i + 1 == bt_list.size());
+            expr = exprOfBuiltinFuncOffsetOfSingle(node, bt_list[i], type,
+                                                   ptsTo, exceptions);
+            if (expr)
+                return expr;
+        }
+    }
+
+
+    ASTSourcePrinter printer(_ast);
+    exprEvalError(QString("Failed to evaluate offsetof() expression for \"%1\" "
+                          "at %2:%3:%4")
+                  .arg(printer.toString(
+                           node->u.builtin_function_offsetof.postfix_expression)
+                       .trimmed())
+                  .arg(_ast->fileName())
+                  .arg(node->start->line)
+                  .arg(node->start->charPosition));
+
+    return 0;
+}
+
+
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOfSingle(
+        const ASTNode *node, const BaseType* bt, const ASTType* type,
+        const ASTNodeNodeHash& ptsTo, bool exceptions)
+{
+    if (!node)
+        return 0;
+    checkNodeType(node, nt_builtin_function_offsetof);
+
     quint64 offset = 0;
-    QString name = antlrTokenToStr(pre->u.primary_expression.identifier);
     const ASTNode *arrayIndexExpr = 0;
+    const ASTNode *pfe = node->u.builtin_function_offsetof.postfix_expression;
+    const ASTNode *pre = pfe->u.postfix_expression.primary_expression;
     const ASTNodeList *pfesl =
             pfe->u.postfix_expression.postfix_expression_suffix_list;
-    BaseType* bt = 0;
-    BaseTypeList bt_list = _factory->findBaseTypesForAstType(type, _eval).second;
-    for (int i = 0; !bt && i < bt_list.size(); ++i)
-        if (bt_list[i]->type() & StructOrUnion)
-            bt = bt_list[i];
+    QString name = antlrTokenToStr(pre->u.primary_expression.identifier);
 
-    Structured* s = 0;
-    StructuredMember* m = 0;
+    const Structured* s = 0;
+    const StructuredMember* m = 0;
 
     do {
         // Offset of array operator to member
@@ -656,8 +766,10 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *
             assert(m != 0);
             assert(bt != 0);
             // The type of bt should be rtArray
-            Array* a = dynamic_cast<Array*>(bt);
-            if (!a)
+            const Array* a = dynamic_cast<const Array*>(bt);
+            if (!a) {
+                if (!exceptions)
+                    return 0;
                 exprEvalError(QString("Type \"%1\" is not an array at %2:%3:%4")
                               .arg(bt ? bt->prettyName() : QString("NULL"))
                               .arg(_ast->fileName())
@@ -667,25 +779,24 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *
                               .arg(pfesl ?
                                        pfesl->item->start->charPosition :
                                        pfe->start->charPosition));
+            }
             // The new BaseType is the array's referencing type
             bt = a->refTypeDeep(BaseType::trLexical);
 
-            ASTExpression* expr = exprOfNode(arrayIndexExpr);
+            ASTExpression* expr = exprOfNode(arrayIndexExpr, ptsTo);
             ExpressionResult index = expr->result();
             // We should find at least one constant expression
             while (expr->hasAlternative() && index.resultType != erConstant) {
                 expr = expr->alternative();
                 index = expr->result();
             }
-            // Make sure we can evaluate the expression
+            // The array operator is allowed to have a runtime expression
             if (index.resultType != erConstant) {
-                ASTSourcePrinter printer(_ast);
-                exprEvalError(QString("Expression in brackets is not constant "
-                                      "in \"%1\" at %2:%3:%4")
-                              .arg(printer.toString(pfe).trimmed())
-                              .arg(_ast->fileName())
-                              .arg(arrayIndexExpr->start->line)
-                              .arg(arrayIndexExpr->start->charPosition));
+                if (expr->type() == etRuntimeDependent ||
+                    expr->type() == etUndefined)
+                    return expr;
+                else
+                    return createExprNode<ASTRuntimeExpression>();
             }
             // Add array offset to total offset
             offset += index.result.ui64 * bt->size();
@@ -693,8 +804,10 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *
         }
         // Offset of member by name
         else {
-            s = dynamic_cast<Structured*>(bt);
-            if (!s)
+            s = dynamic_cast<const Structured*>(bt);
+            if (!s) {
+                if (!exceptions)
+                    return 0;
                 exprEvalError(QString("Cannot find type struct/union BaseType "
                                       "for \"%1\" at %2:%3:%4")
                               .arg(type->toString())
@@ -705,9 +818,12 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *
                               .arg(pfesl ?
                                        pfesl->item->start->charPosition :
                                        pfe->start->charPosition));
+            }
 
             m = s->findMember(name);
-            if (!m)
+            if (!m) {
+                if (!exceptions)
+                    return 0;
                 exprEvalError(QString("Cannot find member \"%1\" in %2 at "
                                       "%3:%4:%5")
                               .arg(name)
@@ -719,6 +835,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *
                               .arg(pfesl ?
                                        pfesl->item->start->charPosition :
                                        pfe->start->charPosition));
+            }
             // Add the member's offset to total offset
             offset += m->offset();
             bt = m->refTypeDeep(BaseType::trLexical);
@@ -738,13 +855,14 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *
                         ->item;
             }
             else {
+                if (!exceptions)
+                    return 0;
                 exprEvalError(QString("Unexpected postfix expression suffix "
                                       "type: %1 at %2:%3:%4")
                               .arg(ast_node_type_to_str(pfesl->item))
                               .arg(_ast->fileName())
                               .arg(node->start->line)
                               .arg(node->start->charPosition));
-
             }
             pfesl = pfesl->next;
         }
@@ -760,7 +878,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(const ASTNode *
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(
+        const ASTNode *node, const ASTNodeNodeHash& /*ptsTo*/)
 {
     if (!node)
         return 0;
@@ -778,11 +897,13 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *no
                     _eval->sizeofLong() == 4 ? esUInt32 : esUInt64,
                     (quint64)_eval->sizeofLong());
     // Return alternatives for all sizes
-    AstBaseTypeList alist = _factory->findBaseTypesForAstType(type, _eval);
-    BaseTypeList list = alist.second;
+    FoundBaseTypes found = _factory->findBaseTypesForAstType(type, _eval);
+    BaseTypeList list = found.typesNonPtr;
     int arrayLen = -1;
     // Find array definitions of type
-    for (ASTType* tmp = type; tmp && tmp != alist.first; tmp = tmp->next()) {
+    for (ASTType* tmp = type; tmp && tmp != found.astTypeNonPtr;
+         tmp = tmp->next())
+    {
         // Consider length of arrays
         if (tmp->type() == rtArray && tmp->arraySize() >= 0) {
             if (arrayLen < 0)
@@ -862,7 +983,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncSizeof(const ASTNode *no
   Source: http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
  */
 ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncTypesCompatible(
-        const ASTNode *node)
+        const ASTNode *node, const ASTNodeNodeHash& /*ptsTo*/)
 {
     if (!node)
         return 0;
@@ -881,7 +1002,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncTypesCompatible(
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfConditionalExpr(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfConditionalExpr(
+        const ASTNode *node, const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
@@ -892,7 +1014,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfConditionalExpr(const ASTNode *node
         ASTExpression* ret = 0, *tmp = 0;
 
         for (ASTExpression* expr = exprOfNode(
-                    node->u.conditional_expression.logical_or_expression);
+                    node->u.conditional_expression.logical_or_expression,
+                 ptsTo);
              expr;
              expr = expr->alternative())
         {
@@ -900,17 +1023,22 @@ ASTExpression* ASTExpressionEvaluator::exprOfConditionalExpr(const ASTNode *node
             if (expr->resultType() == erConstant) {
                 if (expr->result().result.i64)
                     tmp = exprOfNodeList(
-                                node->u.conditional_expression.expression);
+                                node->u.conditional_expression.expression,
+                                ptsTo);
                 else
-                    tmp = exprOfNode(node->u.conditional_expression.conditional_expression);
+                    tmp = exprOfNode(
+                                node->u.conditional_expression.conditional_expression,
+                                ptsTo);
                 ret = setExprOrAddAlternative(ret, tmp);
             }
             // Otherwise add both possibilities as alternatives
             else {
-                tmp = exprOfNodeList(node->u.conditional_expression.expression);
+                tmp = exprOfNodeList(
+                            node->u.conditional_expression.expression, ptsTo);
                 ret = setExprOrAddAlternative(ret, tmp);
                 tmp = exprOfNode(
-                            node->u.conditional_expression.conditional_expression);
+                            node->u.conditional_expression.conditional_expression,
+                            ptsTo);
                 ret = setExprOrAddAlternative(ret, tmp);
             }
         }
@@ -918,11 +1046,12 @@ ASTExpression* ASTExpressionEvaluator::exprOfConditionalExpr(const ASTNode *node
         return ret;
     }
     else
-        return exprOfNode(node->u.conditional_expression.logical_or_expression);
+        return exprOfNode(node->u.conditional_expression.logical_or_expression, ptsTo);
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfConstant(
+        const ASTNode *node, const ASTNodeNodeHash& /*ptsTo*/)
 {
     if (!node)
         return 0;
@@ -1019,27 +1148,50 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(const ASTNode *node)
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfPostfixExpr(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfPostfixExpr(
+        const ASTNode *node, const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
     checkNodeType(node, nt_postfix_expression);
 
-    if (!node->u.postfix_expression.postfix_expression_suffix_list)
-        return exprOfNode(node->u.postfix_expression.primary_expression);
-    else
-        return createExprNode<ASTRuntimeExpression>();
+    ASTExpression* expr =
+            exprOfNode(node->u.postfix_expression.primary_expression, ptsTo);
+
+    const ASTNodeList* suffixList =
+            node->u.postfix_expression.postfix_expression_suffix_list;
+
+    // Append postfix expression suffixes
+    if (expr && suffixList) {
+        ASTVariableExpression* var =
+                dynamic_cast<ASTVariableExpression*>(expr);
+        bool result;
+
+        // May also be a ASTRuntimeExpression
+        if (var)
+            result = appendPostfixExpressionSuffixes(suffixList, var);
+        else
+            return expr;
+
+        if (!result)
+            expr = createExprNode<ASTRuntimeExpression>();
+    }
+
+    return expr;
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
+        const ASTNode *node, const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
     checkNodeType(node, nt_primary_expression);
 
+    ASTExpression* expr = 0;
+
     if (node->u.primary_expression.expression)
-        return exprOfNode(node->u.primary_expression.expression->item);
+        expr = exprOfNode(node->u.primary_expression.expression->item, ptsTo);
     else if (node->u.primary_expression.identifier &&
              !node->u.primary_expression.hasDot)
     {
@@ -1050,65 +1202,89 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(const ASTNode *node)
                 exprEvalError(QString("Cannot find enumerator \"%1\" at %2:%3:%4")
                               .arg(sym->name())
                               .arg(_ast->fileName())
-                              .arg(node ? node->start->line : 0)
-                              .arg(node ? node->start->charPosition : 0));
+                              .arg(node->start->line)
+                              .arg(node->start->charPosition));
             IntEnumPair iep = _factory->enumsByName().value(sym->name());
             return createExprNode<ASTEnumeratorExpression>(iep.first, sym);
         }
-        // Otherwise retun a variable
-        return createExprNode<ASTVariableExpression>(sym);
+        // Otherwise return a variable
+        const ASTType* type = _eval->typeofSymbol(sym);
+        FoundBaseTypes found = _factory->findBaseTypesForAstType(type, _eval);
+        const BaseType* bt = found.types.isEmpty() ?
+                    0 : found.types.first();
+        expr = createExprNode<ASTVariableExpression>(bt);
     }
     else if (node->u.primary_expression.constant)
-        return exprOfNode(node->u.primary_expression.constant);
+        expr = exprOfNode(node->u.primary_expression.constant, ptsTo);
+    else if (node->u.primary_expression.compound_braces_statement) {
+        // The last expression is the result
+        const ASTNode* cbs = node->u.primary_expression.compound_braces_statement;
+        const ASTNodeList* statements =
+                cbs->u.compound_braces_statement.declaration_or_statement_list;
+        while (statements && statements->next)
+            statements = statements->next;
+        expr = exprOfNode(statements->item, ptsTo);
+    }
     else
         exprEvalError(QString("Unexpected primary expression at %2:%3:%4")
                       .arg(_ast->fileName())
-                      .arg(node ? node->start->line : 0)
-                      .arg(node ? node->start->charPosition : 0));
+                      .arg(node->start->line)
+                      .arg(node->start->charPosition));
+
+    return expr;
 }
 
 
-ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(const ASTNode *node)
+ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(
+        const ASTNode *node, const ASTNodeNodeHash& ptsTo)
 {
     if (!node)
         return 0;
 
     ASTUnaryExpression* ue = 0;
+    ASTExpression* child = 0;
 
     switch (node->type) {
     case nt_unary_expression:
-        return exprOfNode(node->u.unary_expression.postfix_expression);
+        return exprOfNode(node->u.unary_expression.postfix_expression, ptsTo);
 
     case nt_unary_expression_builtin:
-        return exprOfNode(node->u.unary_expression.builtin_function);
+        return exprOfNode(node->u.unary_expression.builtin_function, ptsTo);
 
     case nt_unary_expression_dec:
         ue = createExprNode<ASTUnaryExpression>(etUnaryDec);
-        ue->setChild(exprOfNode(node->u.unary_expression.unary_expression));
-        return ue;
+        child = exprOfNode(node->u.unary_expression.unary_expression, ptsTo);
+        break;
 
     case nt_unary_expression_inc:
         ue = createExprNode<ASTUnaryExpression>(etUnaryInc);
-        ue->setChild(exprOfNode(node->u.unary_expression.unary_expression));
-        return ue;
+        child = exprOfNode(node->u.unary_expression.unary_expression, ptsTo);
+        break;
 
     case nt_unary_expression_op: {
         QString op = antlrTokenToStr(node->u.unary_expression.unary_operator);
-        if (op == "&")
-            ue = createExprNode<ASTUnaryExpression>(etUnaryAmp);
-        else if (op == "&&") {
-            // Double ampersand operator
-            ASTUnaryExpression* ue2 =
-                    createExprNode<ASTUnaryExpression>(etUnaryAmp);
-            ue2->setChild(exprOfNode(node->u.unary_expression.cast_expression));
-            ue = createExprNode<ASTUnaryExpression>(etUnaryAmp);
-            ue->setChild(ue2);
-            return ue;
+        child = exprOfNode(node->u.unary_expression.cast_expression, ptsTo);
+        ASTVariableExpression* var =
+                dynamic_cast<ASTVariableExpression*>(child);
+
+        // For address operators, the child must be a variable expression
+        if (op == "&" || op == "&&") {
+            // Can also be a runtime expression
+            if (var) {
+                var->appendTransformation(ttAddress);
+                if (op == "&&")
+                    var->appendTransformation(ttAddress);
+            }
         }
-        else if (op == "*")
-            ue = createExprNode<ASTUnaryExpression>(etUnaryStar);
+        else if (op == "*") {
+            // The child is most likely a variable
+            if (var)
+                var->appendTransformation(ttDereference);
+            else
+                ue = createExprNode<ASTUnaryExpression>(etUnaryStar);
+        }
         else if (op == "+")
-            return exprOfNode(node->u.unary_expression.cast_expression);
+            return child;
         else if (op == "-")
             ue = createExprNode<ASTUnaryExpression>(etUnaryMinus);
         else if (op == "~")
@@ -1121,8 +1297,6 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(const ASTNode *node)
                     .arg(_ast->fileName())
                     .arg(node->start->line)
                     .arg(node->start->charPosition));
-
-        ue->setChild(exprOfNode(node->u.unary_expression.cast_expression));
         break;
     }
 
@@ -1134,7 +1308,9 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(const ASTNode *node)
                 .arg(node->start->charPosition));
     }
 
-    return ue;
+    if (ue)
+        ue->setChild(child);
+    return ue ? ue : child;
 }
 
 
@@ -1188,10 +1364,10 @@ unsigned int ASTExpressionEvaluator::sizeofType(const ASTType *type)
 	case rtStruct:
 	case rtUnion: {
 		// Find type in the factory
-		AstBaseTypeList baseTypes =
+		FoundBaseTypes found =
 				_factory->findBaseTypesForAstType(type, _eval);
-		if (!baseTypes.second.isEmpty()) {
-			return baseTypes.second.first()->size();
+		if (!found.types.isEmpty()) {
+			return found.types.first()->size();
 		}
 		else {
 			node = type->node();
@@ -1230,6 +1406,52 @@ unsigned int ASTExpressionEvaluator::sizeofType(const ASTType *type)
 }
 
 
+bool ASTExpressionEvaluator::appendPostfixExpressionSuffixes(
+        const ASTNodeList* suffixList, ASTVariableExpression *varExpr)
+{
+    if (!varExpr)
+        return false;
+
+    // Append all postfix expression suffixes
+    for (const ASTNodeList* list = suffixList; list; list = list->next)
+    {
+        const ASTNode* p = list->item;
+        switch(p->type) {
+        case nt_postfix_expression_arrow:
+            varExpr->appendTransformation(ttDereference);
+            // no break
+
+        case nt_postfix_expression_dot:
+            varExpr->appendTransformation(
+                        antlrTokenToStr(
+                            p->u.postfix_expression_suffix.identifier));
+            break;
+
+        case nt_postfix_expression_brackets: {
+            // We expect array indices to be constant
+            const ASTNode* e = p->u.postfix_expression_suffix.expression ?
+                        p->u.postfix_expression_suffix.expression->item : 0;
+            ASTExpression* index = exprOfNode(e, ASTNodeNodeHash());
+            ExpressionResult result = index ?
+                        index->result() : ExpressionResult();
+            if (result.resultType == erConstant)
+                varExpr->appendTransformation(result.value(esInt32));
+            // Seems to be a runtime dependent expresssion
+            else
+                return false;
+            break;
+        }
+
+            // Any other type cannot be resolved
+        default:
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 ExpressionResultSize ASTExpressionEvaluator::realTypeToResultSize(RealType type)
 {
     switch (type) {
@@ -1245,4 +1467,10 @@ ExpressionResultSize ASTExpressionEvaluator::realTypeToResultSize(RealType type)
     case rtDouble: return esDouble;
     default:       return esUndefined;
     }
+}
+
+
+void ASTExpressionEvaluator::clearCache()
+{
+    _expressions.clear();
 }

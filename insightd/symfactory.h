@@ -13,6 +13,7 @@
 #include <QHash>
 #include <QMultiHash>
 #include <exception>
+#include <QMutex>
 
 // forward declaration
 class KernelSymbolReader;
@@ -24,6 +25,7 @@ class RefBaseType;
 class CompileUnit;
 class Variable;
 class Enum;
+class Array;
 class ASTType;
 class ASTTypeEvaluator;
 class TypeEvalDetails;
@@ -33,6 +35,7 @@ class TypeEvalDetails;
 #include "genericexception.h"
 #include "structured.h"
 #include "memspecs.h"
+#include "astexpression.h"
 #include <astsymbol.h>
 
 
@@ -117,7 +120,19 @@ typedef QMultiHash<int, StructuredMember*> StructMemberMultiHash;
 /// Hash table to find all FuncParam's that use a particular type
 typedef QMultiHash<int, FuncParam*> FuncParamMultiHash;
 
-typedef QPair<const ASTType*, BaseTypeList> AstBaseTypeList;
+struct FoundBaseTypes
+{
+    FoundBaseTypes() : astTypeNonPtr(0) {}
+    FoundBaseTypes(const BaseTypeList& types, const BaseTypeList& typesNonPtr,
+                   const ASTType* astTypeNonPtr)
+        : types(types), typesNonPtr(typesNonPtr), astTypeNonPtr(astTypeNonPtr)
+    {}
+    BaseTypeList types;
+    BaseTypeList typesNonPtr;
+    const ASTType* astTypeNonPtr;
+};
+
+//typedef QList<FoundBaseType> FoundBaseTypes;
 
 typedef QPair<qint32, const Enum*> IntEnumPair;
 typedef QHash<QString, IntEnumPair> EnumStringHash;
@@ -318,15 +333,6 @@ public:
         return _replacedMemberTypes;
     }
 
-    /**
-     * @return IDs of artificilly created types that should not be ignored by
-     * class KernelSymbolWriter
-     */
-    inline const IntSet& artificialTypeIds() const
-    {
-        return _artificialTypeIds;
-    }
-
 	/**
 	 * This function should be called after the last symbol has been added to
 	 * the factory, either after parsing or reading a custom symbol file is
@@ -370,36 +376,43 @@ public:
 
     QList<BaseType*> typesUsingId(int id) const;
 
-    /**
-     * Checks if \a type represents the special type <tt>struct list_head</tt>.
-     * @param type the type to check
-     * @return \c true if \a type is <tt>struct list_head</tt>, or \c false
-     * otherwise
-     */
-    bool isStructListHead(const BaseType* type) const;
-
-    /**
-     * Checks if \a type represents the special type <tt>struct hlist_node</tt>.
-     * @param type the type to check
-     * @return \c true if \a type is <tt>struct hlist_node</tt>, or \c false
-     * otherwise
-     */
-    bool isStructHListNode(const BaseType* type) const;
-
-
     void typeAlternateUsage(const TypeEvalDetails *ed, ASTTypeEvaluator* eval);
 
-    AstBaseTypeList findBaseTypesForAstType(const ASTType* astType,
+    FoundBaseTypes findBaseTypesForAstType(const ASTType* astType,
                                             ASTTypeEvaluator *eval);
+
+	/**
+	 * Creates a new ASTExpression object of the given type \a type. This object
+	 * is owned by the factory and is automatically deleted when the factory is
+	 * deleted.
+	 * @param type the type of expression to create
+	 * @return pointer to the new ASTExpression object of type \a type
+	 */
+	ASTExpression* createEmptyExpression(ExpressionType type);
+
+	/**
+	 * Whenever the SymFactory makes changes to its internal data structures,
+	 * this changeClock is increased.
+	 * In order to allow types to detect type changes to invalidate their
+	 * caches (if any), they can compare their saved "clock" value to this
+	 * counter value.
+	 * @return the value of the realtive change clock
+	 */
+	quint32 changeClock() const;
 
 protected:
 	void typeAlternateUsageStructMember(const TypeEvalDetails *ed,
 										const BaseType *targetBaseType,
 										ASTTypeEvaluator *eval);
 
+	void typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
+										 const BaseType *targetBaseType,
+										 const BaseTypeList& ctxBaseTypes,
+										 ASTTypeEvaluator *eval);
+
 	void typeAlternateUsageVar(const TypeEvalDetails *ed,
 							   const BaseType *targetBaseType,
-							   const ASTTypeEvaluator *eval);
+							   ASTTypeEvaluator *eval);
 
 
 	/**
@@ -414,6 +427,17 @@ protected:
 	T* getTypeInstance(const TypeInfo& info);
 
 	/**
+	 * Creates or retrieves an Array based on the information provided in
+	 * \a info and returns it. If that type has already been created, it is
+	 * found and returned, otherwise a new type is created and added to the
+	 * internal lists.
+	 * @param info the type information to create a type from
+	 * @param boundsIndex index into the \a info.bounds() list for array lengths
+	 * @return a BaseType object corresponding to \a info
+	 */
+	Array* getTypeInstance(const TypeInfo& info, int boundsIndex);
+
+    /**
      * Creates a Variable based on the information provided in
      * \a info and returns it.
      * @param info the type information to create a variable from
@@ -527,32 +551,10 @@ protected:
 
 private:
 	/**
-	 * Generates a working <tt>struct list_head</tt> from a given, generic one.
-	 *
-	 * It creates a new Struct object from \a member->refType() with exactly
-	 * two members: two Pointer objects "next" and "prev" which point to the
-	 * type of \a parent. In addition, the Pointer::macroExtraOffset() is
-	 * set accordingly.
-	 * @param member the StructuredMember to create a <tt>struct list_head</tt>
-	 * from
-	 * @return the resulting Struct type
-	 * \sa SpecialIds
+	 * Helper function for getTypeInstance()
 	 */
-	Struct* makeStructListHead(StructuredMember* member);
-
-    /**
-     * Generates a working <tt>struct hlist_node</tt> from a given, generic one.
-     *
-     * It creates a new Struct object from \a member->refType() with exactly
-     * two members: two Pointer objects "next" and "pprev" which point to the
-     * type of \a parent. In addition, the Pointer::macroExtraOffset() is
-     * set accordingly.
-     * @param member the StructuredMember to create a <tt>struct hlist_node</tt>
-     * from
-     * @return the resulting Struct type
-     * \sa SpecialIds
-     */
-    Struct* makeStructHListNode(StructuredMember* member);
+	template<class T>
+	T* getTypeInstance2(T* t, const TypeInfo& info);
 
     /**
      * Creates a deep copy of the given type \a source and returns it. The
@@ -562,9 +564,11 @@ private:
      * \note The type will be automatically added to the factory with a call to
      * addSymbol().
      * @param source the source type
+     * @param clearAltTypes set to \c true to wipe all alternative types of
+     * any copied struct or union when it is copied
      * @return a shallow copy of \a source with a new, unique ID
      */
-    BaseType* makeDeepTypeCopy(BaseType* source);
+    BaseType* makeDeepTypeCopy(BaseType* source, bool clearAltTypes);
 
 	/**
      * Tries to resolve the type reference of a ReferencingType object \a ref.
@@ -617,7 +621,8 @@ private:
                                           const BaseType* newType) const;
 
     bool typeChangeDecision(const ReferencingType* r,
-                            const BaseType* targetBaseType);
+                            const BaseType* targetBaseType,
+                            const ASTExpression *expr);
 
     BaseTypeList typedefsOfType(BaseType* type);
 
@@ -667,7 +672,6 @@ private:
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	IntIntMultiHash _equivalentTypes; ///< Holds all type IDs of equivalent types
 	IntIntHash _replacedMemberTypes;  ///< Holds all member IDs whose ref. type had been replaced
-	IntSet _artificialTypeIds;		  ///< Holds the IDs of all artificial types that should not be saved
 	BaseTypeUIntHash _typesByHash;    ///< Holds all BaseType objects, indexed by BaseType::hash()
 	RefTypeMultiHash _postponedTypes; ///< Holds temporary types which references could not yet been resolved
 	StructuredList _zeroSizeStructs;  ///< Holds all structs or unions with a size of zero
@@ -676,17 +680,18 @@ private:
 	StructMemberMultiHash _usedByStructMembers;///< Holds all StructuredMember objects that hold a reference to another type
 	FuncParamMultiHash _usedByFuncParams;///< Holds all FuncParam objects that hold a reference to another type
 	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
+	ASTExpressionList _expressions;
 
 	int _typeFoundByHash;
-	int _structListHeadCount;
-	int _structHListNodeCount;
 	int _uniqeTypesChanged;
 	int _totalTypesChanged;
 	int _typesCopied;
 	int _varTypeChanges;
 	int _conflictingTypeChanges;
 	int _artificialTypeId;
+	quint32 _changeClock;
 	quint32 _maxTypeSize;
+	QMutex _typeAltUsageMutex;
 };
 
 
@@ -711,6 +716,12 @@ inline BaseType* SymFactory::findBaseTypeByName(const QString & name) const
 inline Variable* SymFactory::findVarByName(const QString & name) const
 {
 	return _varsByName.value(name);
+}
+
+
+inline quint32 SymFactory::changeClock() const
+{
+	return _changeClock;
 }
 
 #endif /* SYMFACTORY_H_ */

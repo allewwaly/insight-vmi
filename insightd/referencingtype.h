@@ -13,10 +13,79 @@
 #include "basetype.h"
 
 class SymFactory;
+class ASTExpression;
+class ASTVariableExpression;
 
 class ReferencingType
 {
 public:
+    class AltRefType
+    {
+    public:
+        explicit AltRefType(int id = -1, const ASTExpression* expr = 0);
+
+        /**
+         * Checks if the given Instance \a inst is compatible with the
+         * expression that needs to be evaluated for this alternative type.
+         * Therefore all ASTVariableExpressions within the expression are
+         * checked for type compatibility with \a inst.
+         * @param inst the Instance object to check against the expression
+         * @return \c true if \a inst is compatible to the expression, \c false
+         * otherwise
+         */
+        bool compatible(const Instance *inst) const;
+
+        /**
+         * Creates an Instance of this alternative type.
+         * @param vmem the VirtualMemory object to create the instance for
+         * @param inst the Instance object to evaluate expr with
+         * @param factory the factory to which this type belongs
+         * @param name the name for this instance, i.e., variable or member name
+         * @param parentNames the parent name components used to reach this
+         * alternative type
+         */
+        Instance toInstance(VirtualMemory* vmem, const Instance* inst,
+                            const SymFactory* factory, const QString &name,
+                            const QStringList &parentNames) const;
+
+        /**
+         * Reads a serialized version of this object from \a in.
+         * \sa writeTo()
+         * @param in the data stream to read the data from, must be ready to read
+         * @param factory the factory holding the symbols
+         */
+        void readFrom(KernelSymbolStream& in, SymFactory *factory);
+
+        /**
+         * Writes a serialized version of this object to \a out
+         * \sa readFrom()
+         * @param out the data stream to write the data to, must be ready to write
+         */
+        void writeTo(KernelSymbolStream &out) const;
+
+        /**
+         * @return the ID of the target BaseType
+         */
+        inline int id() const
+        {
+            return _id;
+        }
+
+        /**
+         * @return the ASTExpression to compute the target type's address
+         */
+        inline const ASTExpression* expr() const
+        {
+            return _expr;
+        }
+
+    private:
+        void updateVarExpr();
+        int _id;
+        const ASTExpression* _expr;
+        QList<const ASTVariableExpression*> _varExpr;
+    };
+
     /**
      * Constructor
      */
@@ -72,11 +141,13 @@ public:
     void setRefTypeId(int id);
 
     /**
-     * Adds \a id to the list of alternative referencing type IDs.
-     * @param id the ID to add
-     * \sa hasAltRefTypes(), altRefType(), refTypeId()
+     * Adds an alternative referencing type to the list.
+     * @param id the ID of the alternative type
+     * @param expr the expression to transform the pointer value to the target
+     * address
+     * \sa hasAltRefTypes(), altRefType()
      */
-    void addAltRefTypeId(int id);
+    void addAltRefType(int id, const ASTExpression* expr);
 
     /**
      * @return \c true if at least one alternative referencing type ID exists,
@@ -88,6 +159,18 @@ public:
      * @return the number of alternative referencing type IDs
      */
     int altRefTypeCount() const;
+
+    /**
+     * Gives direct access to the alterantive referencing types
+     * @return reference to the list of alternative types
+     */
+    QList<AltRefType>& altRefTypes();
+
+    /**
+     * Gives direct access to the alterantive referencing types (const version)
+     * @return reference to the list of alternative types
+     */
+    const QList<AltRefType>& altRefTypes() const;
 
     /**
      * When this symbol has alternative referencing type IDs and \a index is -1,
@@ -102,27 +185,57 @@ public:
      *   guess"
      * @return the alternative referencing type if found, \c null otherwise
      */
-    BaseType* altRefType(int index = -1);
+    const AltRefType& altRefType(int index = -1) const;
 
     /**
-     * Overloaded method.
-     * \sa altRefType()
+     * When this symbol has alternative referencing type IDs and \a index is -1,
+     * this function returns the most useful type, e. g., a struct or union, if
+     * possible, or an otherwise typed pointer. If multiple such potential
+     * candidates exist, the first one that is found is returned.
+     *
+     * If \a index is >= 0, then the alterantive type with that list index is
+     * returned, if available, otherwise \c null is returned.
+     *
+     * @param index the list index of the alterative type, or -1 for a "best
+     *   guess"
+     * @return the alternative referencing type if found, \c null otherwise
      */
-    const BaseType* altRefType(int index = -1) const;
+    const BaseType* altRefBaseType(int index = -1) const;
+
+    /**
+     * This is an overloaded function.
+     * \sa altRefBaseType()
+     */
+    BaseType* altRefBaseType(int index = -1);
 
     /**
      * Reads a serialized version of this object from \a in.
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in);
+    virtual void readFrom(KernelSymbolStream& in);
 
     /**
      * Writes a serialized version of this object to \a out
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const;
+    virtual void writeTo(KernelSymbolStream &out) const;
+
+    /**
+     * Reads a serialized version of the alternative referencing types from
+     * \a in.
+     * @param in the data stream to read the data from, must be ready to read
+     * @param factory the symbol factory this symbol belongs to
+     */
+    void readAltRefTypesFrom(KernelSymbolStream& in, SymFactory* factory);
+
+    /**
+     * Writes a serialized version of the alternative referencing types to
+     * \a out
+     * @param out the data stream to write the data to, must be ready to write
+     */
+    void writeAltRefTypesTo(KernelSymbolStream& out) const;
 
 protected:
     /**
@@ -134,13 +247,15 @@ protected:
      * variable instance)
      * @param resolveTypes bitwise or'ed BaseType::RealType's that should
      * be resolved
-     * @param derefCount pointer to a counter variable for how many types have
-     * been followed to create the instance
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
+     * @param derefCount pointer to a counter variable for how many pointers
+     * have been dereferenced to create the instance
      * @return an Instance object for this member
      */
     Instance createRefInstance(size_t address, VirtualMemory* vmem,
             const QString& name, const QStringList& parentNames,
-            int resolveTypes, int* derefCount = 0) const;
+            int resolveTypes, int maxPtrDeref = -1, int *derefCount = 0) const;
 
     /**
      * Creates an Instance object of a Variable object.
@@ -150,13 +265,15 @@ protected:
      * @param id the id of the variable
      * @param resolveTypes bitwise or'ed BaseType::RealType's that should
      * be resolved
-     * @param derefCount pointer to a counter variable for how many types have
-     * been followed to create the instance
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
+     * @param derefCount pointer to a counter variable for how many pointers
+     * have been dereferenced to create the instance
      * @return an Instance object for this member
      */
     Instance createRefInstance(size_t address, VirtualMemory* vmem,
             const QString& name, int id, int resolveTypes,
-            int* derefCount = 0) const;
+            int maxPtrDeref = -1, int* derefCount = 0) const;
 
     /**
      * Access function to the factory this symbol belongs to.
@@ -169,7 +286,15 @@ protected:
     virtual const SymFactory* fac() const = 0;
 
     int _refTypeId;            ///< holds ID of the type this object is referencing    
-    QList<int> _altRefTypeIds; ///< a list of alternative types
+
+    // Caching variables
+    mutable BaseType* _refType;
+    mutable BaseType* _refTypeDeep;
+    mutable int _deepResolvedTypes;
+    mutable quint32 _refTypeChangeClock;
+
+    QList<AltRefType> _altRefTypes; ///< a list of alternative types
+    static const AltRefType _emptyRefType;
 
 private:
     /**
@@ -183,17 +308,21 @@ private:
      * @param id the id of the instance (if it is a variable instance)
      * @param resolveTypes bitwise or'ed BaseType::RealType's that should
      * be resolved
-     * @param derefCount pointer to a counter variable for how many types have
-     * been followed to create the instance
+     * @param maxPtrDeref the maximum levels of pointers that should be
+     * dereferenced
+     * @param derefCount pointer to a counter variable for how many pointers
+     * have been dereferenced to create the instance
      * @return an Instance object for this member
      */
     inline Instance createRefInstance(size_t address, VirtualMemory* vmem,
             const QString& name, const QStringList& parentNames, int id,
-            int resolveTypes, int* derefCount) const;
+            int resolveTypes, int maxPtrDeref, int* derefCount) const;
 
-    template<class T>
-    T* altRefTypeTempl(int index = -1) const;
+    template<class ref_t, class base_t>
+    static base_t* refTypeTempl(ref_t *ref);
 
+    template<class ref_t, class base_t, class ref_base_t>
+    static base_t* refTypeDeepTempl(ref_t *ref, int resolveTypes);
 };
 
 
@@ -209,22 +338,26 @@ inline void ReferencingType::setRefTypeId(int id)
 }
 
 
-inline void ReferencingType::addAltRefTypeId(int id)
-{
-    if (!_altRefTypeIds.contains(id))
-        _altRefTypeIds.prepend(id);
-}
-
-
 inline bool ReferencingType::hasAltRefTypes() const
 {
-    return !_altRefTypeIds.isEmpty();
+    return !_altRefTypes.isEmpty();
 }
 
 
 inline int ReferencingType::altRefTypeCount() const
 {
-    return _altRefTypeIds.size();
+    return _altRefTypes.size();
+}
+
+
+inline QList<ReferencingType::AltRefType>& ReferencingType::altRefTypes()
+{
+    return _altRefTypes;
+}
+
+inline const QList<ReferencingType::AltRefType>& ReferencingType::altRefTypes() const
+{
+    return _altRefTypes;
 }
 
 #endif /* REFERENCINGTYPE_H_ */
@@ -234,74 +367,5 @@ inline int ReferencingType::altRefTypeCount() const
 
 #if !defined(REFERENCINGTYPE_H_INLINE) && defined(SYMFACTORY_DEFINED)
 #define REFERENCINGTYPE_H_INLINE
-
-inline const BaseType* ReferencingType::refType() const
-{
-    return fac() && _refTypeId ? fac()->findBaseTypeById(_refTypeId) : 0;
-}
-
-
-inline BaseType* ReferencingType::refType()
-{
-    return fac() && _refTypeId ? fac()->findBaseTypeById(_refTypeId) : 0;
-}
-
-
-inline BaseType* ReferencingType::altRefType(int index)
-{
-    return altRefTypeTempl<BaseType>(index);
-}
-
-
-inline const BaseType* ReferencingType::altRefType(int index) const
-{
-    return altRefTypeTempl<const BaseType>(index);
-}
-
-
-template<class T>
-inline T* ReferencingType::altRefTypeTempl(int index) const
-{
-    if (_altRefTypeIds.isEmpty() || index >= _altRefTypeIds.size() || !fac())
-        return 0;
-    if (index >= 0)
-        return fac()->findBaseTypeById(_altRefTypeIds[index]);
-
-    // No index given, find the most usable type
-
-    // If we have only one alternative, the job is easy
-    if (_altRefTypeIds.size() == 1)
-        return fac()->findBaseTypeById(_altRefTypeIds.first());
-    else {
-        RealType useType = rtUndefined;
-        T *t, *useBt = 0;
-        for (int i = 0; i < _altRefTypeIds.size(); ++i) {
-            if (!(t = fac()->findBaseTypeById(_altRefTypeIds[i])))
-                continue;
-            RealType curType = t->dereferencedType();
-            // Init variables
-            if (!useBt) {
-                useBt = t;
-                useType = curType;
-            }
-            // Compare types
-            else {
-                // Prefer structs/unions, followed by function pointers,
-                // followed by pointers
-                if ((curType & StructOrUnion) ||
-                    (((useType & (NumericTypes|rtPointer)) && curType == rtFuncPointer)) ||
-                    ((useType & NumericTypes) && curType == rtPointer))
-                {
-                    useType = curType;
-                    useBt = t;
-                }
-            }
-            if (useType & StructOrUnion)
-                break;
-        }
-
-        return useBt;
-    }
-}
 
 #endif /* REFERENCINGTYPE_H_INLINE */

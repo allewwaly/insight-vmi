@@ -56,21 +56,22 @@ options
     #include <ast_interface.h>
     #define BUILDER SCOPE_TOP(translation_unit)->builder
     
-//    #define DEBUG 1
-     
-    #if (DEBUG == 1) && !defined(__cplusplus)
-        #if !defined(debugmsg)
-            #define debuginit() printf("(\%s:\%d) Executing INIT in \%s, BACKTRACKING is \%d\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, BACKTRACKING)
-            #define debugafter() printf("(\%s:\%d) Executing AFTER in \%s, BACKTRACKING is \%d\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, BACKTRACKING)
-            #define debugmsg(m, ...) printf("(\%s:\%d) " m, __FILE__, __LINE__, __VA_ARGS__)
-            #define debugerr(m, ...) fprintf(stderr, "(\%s:\%d) " m, __FILE__, __LINE__, __VA_ARGS__)
+    #ifndef __cplusplus
+//         #define DEBUG 1
+        #if (DEBUG == 1)
+            #if !defined(debugmsg)
+                #define debuginit() printf("(\%s:\%d) Executing INIT in \%s, BACKTRACKING is \%d\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, BACKTRACKING)
+                #define debugafter() printf("(\%s:\%d) Executing AFTER in \%s, BACKTRACKING is \%d\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, BACKTRACKING)
+                #define debugmsg(m, ...) printf("(\%s:\%d) " m, __FILE__, __LINE__, __VA_ARGS__)
+                #define debugerr(m, ...) fprintf(stderr, "(\%s:\%d) " m, __FILE__, __LINE__, __VA_ARGS__)
+            #endif
+        #else
+            #define debugmsg(...)
+            #define debugerr(...)
+            #define debuginit()
+            #define debugafter()
         #endif
-    #else
-        #define debugmsg(...)
-        #define debugerr(...)
-        #define debuginit()
-        #define debugafter()
-    #endif
+   #endif
 
 }
 
@@ -304,7 +305,7 @@ init_declarator returns [pASTNode node]
             pop_parent_node(BUILDER);
         } 
     }
-    : d=declarator attribute_specifier* assembler_register_variable? ('=' i=initializer)?
+    : d=declarator (attribute_specifier | assembler_register_variable)* ('=' i=initializer)?
         {
             $node->u.init_declarator.declarator = $d.node;
             $node->u.init_declarator.initializer  = $i.node;
@@ -1143,7 +1144,7 @@ abstract_declarator_suffix returns [pASTNode node]
     |  '(' ptl=parameter_type_list? ')'
         {
             $node->type = nt_abstract_declarator_suffix_parens;
-            $node->u.abstract_declarator_suffix.constant_expression = $ptl.node;
+            $node->u.abstract_declarator_suffix.parameter_type_list = $ptl.node;
         }  
     ;
 
@@ -1782,7 +1783,7 @@ constant returns [pASTNode node]
 
 expression returns [pASTNodeList list]
     @init  { pASTNodeList tail = 0; $list = 0; }
-    : ae=assignment_expression { $list = tail = new_ASTNodeList(BUILDER, $ae.node, 0); }
+    : '__extension__'? ae=assignment_expression { $list = tail = new_ASTNodeList(BUILDER, $ae.node, 0); }
       (',' ae=assignment_expression { tail = new_ASTNodeList(BUILDER, $ae.node, tail); } )*
     ;
 

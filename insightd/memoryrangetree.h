@@ -24,7 +24,7 @@
 #include <list>
 #endif
 
-#include "debug.h"
+#include <debug.h>
 
 // Forward declarations
 template<class T, class P> class MemoryRangeTree;

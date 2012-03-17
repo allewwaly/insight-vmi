@@ -13,7 +13,7 @@
 #include "symbol.h"
 #include "referencingtype.h"
 #include "sourceref.h"
-#include "debug.h"
+#include <debug.h>
 
 /**
  * This class represents a variable variable of a certain type.
@@ -25,7 +25,7 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    Variable(SymFactory* factory);
+    explicit Variable(SymFactory* factory);
 
     /**
      * Constructor
@@ -95,19 +95,30 @@ public:
     Instance toInstance(VirtualMemory* vmem, int resolveTypes =
             BaseType::trLexical) const;
 
+    /**
+     * Retrieves an Instance for the alternative referencing type no. \a index
+     * of this variable. You can check for the number alternative types with
+     * altRefTypeCount().
+     * @param vmem the VirtualMemory object to create the instance for
+     * @param index index of the alternative type
+     * @return a new Instance object for the selected alternative type, if it
+     * exists, or an empty Instance otherwise
+     */
+    Instance altRefTypeInstance(VirtualMemory *vmem, int index) const;
+
 	/**
 	 * Reads a serialized version of this object from \a in.
 	 * \sa writeTo()
 	 * @param in the data stream to read the data from, must be ready to read
 	 */
-	virtual void readFrom(QDataStream& in);
+	virtual void readFrom(KernelSymbolStream &in);
 
 	/**
 	 * Writes a serialized version of this object to \a out
 	 * \sa readFrom()
 	 * @param out the data stream to write the data to, must be ready to write
 	 */
-	virtual void writeTo(QDataStream& out) const;
+	virtual void writeTo(KernelSymbolStream& out) const;
 
 protected:
     /**
@@ -129,7 +140,7 @@ protected:
 * @param var object to store the serialized data to
 * @return the data stream \a in
 */
-QDataStream& operator>>(QDataStream& in, Variable& var);
+KernelSymbolStream& operator>>(KernelSymbolStream& in, Variable& var);
 
 
 /**
@@ -138,7 +149,7 @@ QDataStream& operator>>(QDataStream& in, Variable& var);
 * @param var object to serialize
 * @return the data stream \a out
 */
-QDataStream& operator<<(QDataStream& out, const Variable& var);
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const Variable& var);
 
 
 inline size_t Variable::offset() const

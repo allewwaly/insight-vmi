@@ -10,7 +10,7 @@
 
 #include <bitop.h>
 #include "basetype.h"
-#include "debug.h"
+#include <debug.h>
 
 /**
  * Generic template class for all numeric types
@@ -26,7 +26,7 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    NumericBaseType(SymFactory* factory)
+    explicit NumericBaseType(SymFactory* factory)
         : BaseType(factory), _type(realType)
     {
     }
@@ -47,6 +47,35 @@ public:
     virtual RealType type() const
     {
         return _type;
+    }
+
+    /**
+     * This gives a pretty name of that type which may involve referencing
+     * types.
+     * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
+     */
+    virtual QString prettyName() const
+    {
+        if (!_name.isEmpty())
+            return BaseType::prettyName();
+
+        switch (realType) {
+        case rtInt8:   return "int8";
+        case rtUInt8:  return "uint8";
+        case rtBool8:  return "bool8";
+        case rtInt16:  return "int16";
+        case rtUInt16: return "uint16";
+        case rtBool16: return "bool16";
+        case rtInt32:  return "int32";
+        case rtUInt32: return "uint32";
+        case rtBool32: return "bool32";
+        case rtInt64:  return "int64";
+        case rtUInt64: return "uint64";
+        case rtBool64: return "bool64";
+        case rtFloat:  return "float";
+        case rtDouble: return "double";
+        default:       return QString();
+        }
     }
 
 protected:
@@ -162,7 +191,7 @@ public:
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in)
+    virtual void readFrom(KernelSymbolStream& in)
     {
         BaseType::readFrom(in);
         in >> _bitSize >> _bitOffset;
@@ -173,7 +202,7 @@ public:
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const
+    virtual void writeTo(KernelSymbolStream& out) const
     {
         BaseType::writeTo(out);
         out << _bitSize << _bitOffset;

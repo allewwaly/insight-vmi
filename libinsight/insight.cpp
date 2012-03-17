@@ -16,7 +16,6 @@
 #include <insight/devicemuxer.h>
 #include <insight/insightexception.h>
 #include "sockethelper.h"
-#include "debug.h"
 
 // Register type that might need to be queued
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState)
