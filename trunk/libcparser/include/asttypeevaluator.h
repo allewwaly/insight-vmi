@@ -17,6 +17,17 @@
 #include <QStringList>
 
 
+template <class Stack>
+class StackAutoPopper
+{
+    Stack* _stack;
+public:
+    explicit StackAutoPopper(Stack* s, typename Stack::value_type& value)
+        : _stack(s) { _stack->push(value); }
+    ~StackAutoPopper() { _stack->pop(); }
+};
+
+
 class ASTType
 {
 public:
@@ -65,6 +76,31 @@ private:
     int _arraySize;
 };
 
+
+struct TransformedSymbol
+{
+    TransformedSymbol(ASTTypeEvaluator* typeEval = 0)
+        : sym(0), transformations(typeEval) {}
+    TransformedSymbol(const ASTSymbol *sym, ASTTypeEvaluator* typeEval = 0)
+        : sym(sym), transformations(typeEval) {}
+    TransformedSymbol(const ASTSymbol *sym, const SymbolTransformations& transformations)
+        : sym(sym), transformations(transformations) {}
+
+    bool operator==(const TransformedSymbol& other) const
+    {
+        return sym == other.sym && transformations == other.transformations;
+    }
+
+    const ASTSymbol *sym;
+    SymbolTransformations transformations;
+};
+
+inline uint qHash(const TransformedSymbol& ts)
+{
+    return qHash(ts.sym) ^ qHash(ts.transformations);
+}
+
+
 typedef QHash<const ASTNode*, ASTType*> ASTNodeTypeHash;
 typedef QHash<const ASTNode*, const ASTNode*> ASTNodeNodeHash;
 typedef QMultiHash<const ASTNode*, AssignedNode> ASTNodeNodeMHash;
@@ -72,47 +108,36 @@ typedef QList<ASTType*> ASTTypeList;
 typedef QStack<const ASTNode*> ASTNodeStack;
 typedef QSet<const ASTSymbol*> ASTSymbolSet;
 typedef QHash<const ASTNode*, const ASTSymbol*> ASTNodeSymHash;
-typedef QHash<const ASTNode*, ASTSymbolSet> ASTNodeHashSymSet;
-
-struct FollowedSymbol {
-    FollowedSymbol() : sym(0), derefCount(0) {}
-    FollowedSymbol(const ASTSymbol *sym, int derefCount)
-        : sym(sym), derefCount(derefCount) {}
-    const ASTSymbol *sym;
-    int derefCount;
-
-    bool operator==(const FollowedSymbol& other) const
-    {
-        return sym == other.sym && derefCount == other.derefCount;
-    }
-};
-
-typedef QStack<FollowedSymbol> ASTFollowedSymStack;
+typedef QHash<const ASTNode*, QMultiHash<const ASTSymbol*, TransformedSymbol> >
+    ASTNodeTransSymHash;
+typedef QStack<TransformedSymbol> TransformedSymStack;
 
 
 struct PointsToEvalState
 {
-    PointsToEvalState(const ASTNode* node = 0, const ASTNode* root = 0)
-        : sym(0), srcNode(node), root(root), rNode(0), postExNode(0),
-          derefCount(0), lastLinkDerefCount(0), lastLinkSuffixHash(0),
-          validLvalue(true)
+    PointsToEvalState(ASTTypeEvaluator* typeEval)
+        : sym(0), transformations(typeEval), srcNode(0), root(root),
+          prevNode(0), lastLinkTrans(typeEval), validLvalue(true)
     {}
+
     const ASTSymbol* sym;
+    SymbolTransformations transformations;
     const ASTNode* srcNode;
     const ASTNode* root;
-    const ASTNode* rNode;
-    const ASTNode* postExNode;
-    int derefCount;
-    int lastLinkDerefCount;
-    uint lastLinkSuffixHash;
+    const ASTNode* prevNode;
+    SymbolTransformations lastLinkTrans;
     bool validLvalue;
     ASTNodeNodeHash interLinks;
+    TransformedSymStack followedSymStack;
+    ASTNodeStack evalNodeStack;
+    QString debugPrefix;
 };
 
 
 struct TypeEvalDetails
 {
-    TypeEvalDetails()
+    TypeEvalDetails(ASTTypeEvaluator* typeEval)
+        : transformations(typeEval), lastLinkTrans(typeEval)
     {
         clear();
     }
@@ -124,17 +149,18 @@ struct TypeEvalDetails
         targetNode = 0;
         rootNode = 0;
         primExNode = 0;
-        postExNode = 0;
         castExNode = 0;
         srcType = 0;
         ctxType = 0;
         targetType = 0;
+        lastLinkSrcType = 0;
+        lastLinkDestType = 0;
         sym = 0;
-        derefCount = 0;
-        lastLinkDerefCount = 0;
-        lastLinkSuffixHash = 0;
-        ctxMembers.clear();
+        transformations.clear();
+        ctxTransformations.clear();
+        lastLinkTrans.clear();
         interLinks.clear();
+        followInterLinks = true;
     }
 
     const ASTNode *srcNode;
@@ -142,17 +168,19 @@ struct TypeEvalDetails
     const ASTNode* targetNode;
     const ASTNode *rootNode;
     const ASTNode *primExNode;
-    const ASTNode *postExNode;
     const ASTNode *castExNode;
     ASTType* srcType;
     ASTType* ctxType;
     ASTType* targetType;
-    QStringList ctxMembers;
+    ASTType* lastLinkSrcType;
+    ASTType* lastLinkDestType;
     const ASTSymbol* sym;
-    int derefCount;
-    int lastLinkDerefCount;
-    uint lastLinkSuffixHash;
+    SymbolTransformations transformations;
+    SymbolTransformations ctxTransformations;
+    SymbolTransformations lastLinkTrans;
     ASTNodeNodeHash interLinks;
+    ASTNodeStack evalNodeStack;
+    bool followInterLinks;
 };
 
 
@@ -169,6 +197,7 @@ public:
 
     bool evaluateTypes();
     ASTType* typeofNode(const ASTNode* node);
+    ASTType* typeofSymbol(const ASTSymbol* sym);
     int sizeofLong() const;
 
     const ASTSymbol *findSymbolOfDirectDeclarator(const ASTNode *node,
@@ -178,6 +207,13 @@ public:
 
     RealType realTypeOfConstFloat(const ASTNode* node, double* value = 0) const;
     RealType realTypeOfConstInt(const ASTNode* node, quint64* value = 0) const;
+    virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
+
+    /**
+     * @return a string with details about the given type change.
+     */
+    QString typeChangeInfo(const TypeEvalDetails &ed,
+                           const QString &expr = QString());
 
 protected:
     enum EvalPhase {
@@ -202,51 +238,39 @@ protected:
         erInvalidTransition
     };
 
-//    virtual void beforeChildren(const ASTNode *node, int flags);
+    /// Relevant symbol types for points-to analysis
+    static const int PointsToTypes = stVariableDecl|stVariableDef|stFunctionParam;
+
     virtual void afterChildren(const ASTNode *node, int flags);
+    void appendTransformations(const ASTNode *node,
+                               SymbolTransformations *transformations) const;
     void collectSymbols(const ASTNode *node);
     void evaluateIdentifierPointsTo(const ASTNode *node);
-    void evaluateIdentifierPointsToRek(PointsToEvalState *es);
+    int evaluateIdentifierPointsToRek(PointsToEvalState *es);
     void evaluateIdentifierPointsToRev(const ASTNode *node);
     EvalResult evaluateIdentifierUsedAs(const ASTNode *node);
     EvalResult evaluateIdentifierUsedAsRek(TypeEvalDetails *ed);
     EvalResult evaluateTypeFlow(TypeEvalDetails *ed);
     EvalResult evaluateTypeChanges(TypeEvalDetails *ed);
     void evaluateTypeContext(TypeEvalDetails *ed);
+    SymbolTransformations combineTansformations(
+            const SymbolTransformations& global,
+            const SymbolTransformations& local,
+            const SymbolTransformations& lastLink) const;
+    bool interLinkTypeMatches(const TypeEvalDetails* ed,
+                              const SymbolTransformations& localTrans) const;
 
     /**
      * This function is called during the execution of evaluateTypes() each
      * time a noticeable type change is detected. Override this function in
      * descendant classes to handle these type changes.
-     * @param srcNode the nt_primary_expression node of the source type
-     * @param srcType the type of the nt_primary_expression node
-     * @param srcSymbol the symbol corresponding to the primary expression of the
-     * source type
-     * @param ctxType the context type where the source type originates from
-     * @param ctxNode the last nt_postfix_expression_XXX suffix node that
-     * belongs to the context type, if any
-     * @param ctxMembers the members to follow from \a ctxType to reach the
-     * actual source type
-     * @param targetNode the root node of the target type, may be null
-     * @param targetType the type that the source type is changed to
-     * @param rootNode the root note embedding source and target, e.g., an
-     * nt_assignment_expression or an nt_init_declarator node.
+     * @param ed the evaluation details for this type change
      */
-//    virtual void primaryExpressionTypeChange(const ASTNode* srcNode,
-//            const ASTType* srcType, const ASTSymbol* srcSymbol,
-//            const ASTType* ctxType, const ASTNode* ctxNode,
-//            const QStringList& ctxMembers, const ASTNode* targetNode,
-//            const ASTType* targetType, const ASTNode* rootNode);
     virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed);
 
-    /**
-     * @return a string with details about the given type change.
-     */
-    QString typeChangeInfo(const TypeEvalDetails &ed);
-
-    virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
-
     int stringLength(const ASTTokenList* list);
+
+    virtual bool interrupted() const;
 
 private:
     ASTType* copyASTType(const ASTType* src);
@@ -273,7 +297,6 @@ private:
     ASTType* typeofNumericExpression(ASTType* lt, ASTType* rt, const QString& op) const;
     ASTType* typeofAdditiveExpression(ASTType* lt, ASTType* rt, const QString& op);
     ASTType* typeofBooleanExpression(ASTType* lt, ASTType* rt);
-    ASTType* typeofSymbol(const ASTSymbol* sym);
     ASTType* typeofSymbolDeclaration(const ASTSymbol* sym);
     ASTType* typeofSymbolFunctionDef(const ASTSymbol* sym);
     ASTType* typeofSymbolFunctionParam(const ASTSymbol* sym);
@@ -309,16 +332,16 @@ private:
     ASTNodeTypeHash _types;
     ASTTypeList _allTypes;
     ASTNodeStack _typeNodeStack;
-    ASTNodeStack _evalNodeStack;
-    ASTFollowedSymStack _followedSymStack;
     ASTNodeNodeMHash _assignedNodesRev;
-    ASTNodeHashSymSet _symbolsBelowNode;
+    ASTNodeTransSymHash _symbolsBelowNode;
     ASTNodeSymHash _symbolOfNode;
     int _sizeofLong;
     EvalPhase _phase;
     int _pointsToRound;
     int _assignments;
     int _assignmentsTotal;
+    QMultiHash<uint, uint> _pointsToDeadEnds;
+    int _pointsToDeadEndHits;
 };
 
 

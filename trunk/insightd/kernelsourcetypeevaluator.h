@@ -44,10 +44,16 @@ public:
     KernelSourceTypeEvaluator(AbstractSyntaxTree* ast, SymFactory* factory);
     virtual ~KernelSourceTypeEvaluator();
 
-protected:
-    virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed);
+    inline ASTExpressionEvaluator* exprEvaluator()
+    {
+        return _eval;
+    }
 
     virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
+
+protected:
+    virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed);
+    virtual bool interrupted() const;
 
 private:
     SymFactory* _factory;

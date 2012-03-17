@@ -6,7 +6,7 @@
  */
 
 #include "refbasetype.h"
-#include "debug.h"
+#include <debug.h>
 
 RefBaseType::RefBaseType(SymFactory* factory)
     : BaseType(factory), _hashRefTypeId(0)
@@ -57,21 +57,21 @@ QString RefBaseType::toString(QIODevice* mem, size_t offset) const
 
 Instance RefBaseType::toInstance(size_t address, VirtualMemory* vmem,
         const QString& name, const QStringList& parentNames,
-        int resolveTypes, int* derefCount) const
+        int resolveTypes, int maxPtrDeref, int *derefCount) const
 {
     return createRefInstance(address, vmem, name, parentNames, resolveTypes,
-            derefCount);
+            maxPtrDeref, derefCount);
 }
 
 
-void RefBaseType::readFrom(QDataStream& in)
+void RefBaseType::readFrom(KernelSymbolStream& in)
 {
     BaseType::readFrom(in);
     ReferencingType::readFrom(in);
 }
 
 
-void RefBaseType::writeTo(QDataStream& out) const
+void RefBaseType::writeTo(KernelSymbolStream& out) const
 {
     BaseType::writeTo(out);
     ReferencingType::writeTo(out);

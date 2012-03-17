@@ -141,7 +141,7 @@ void KernelSymbolParser::finishLastSymbol()
                     switch (_info->symType()) {
                     case hsSubrangeType:
                         // We ignore subInfo.type() for now...
-                        _parentInfo->setUpperBound(_info->upperBound());
+                        _parentInfo->addUpperBounds(_info->upperBounds());
                         break;
                     case hsEnumerator:
                         _parentInfo->addEnumValue(_info->name(), _info->constValue().toInt());
@@ -332,7 +332,7 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
         else if (!rxBound.exactMatch(value))
             parserError(QString(str::regexErrorMsg).arg(rxBound.pattern()).arg(value));
         parseInt(i, rxBound.cap(1), &ok);
-        _info->setUpperBound(i);
+        _info->addUpperBound(i);
         break;
     }
     case psExternal: {

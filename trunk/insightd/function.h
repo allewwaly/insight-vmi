@@ -15,7 +15,7 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    Function(SymFactory* factory);
+    explicit Function(SymFactory* factory);
 
     /**
      * Constructor
@@ -81,14 +81,14 @@ public:
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in);
+    virtual void readFrom(KernelSymbolStream &in);
 
     /**
      * Writes a serialized version of this object to \a out
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const;
+    virtual void writeTo(KernelSymbolStream &out) const;
 
 private:
     bool _inlined;  ///< Is this an inlined function?

@@ -11,6 +11,7 @@
 #include <QString>
 #include <QMultiHash>
 #include <QVariant>
+#include <QVector>
 #include <sys/types.h>
 
 /// These enum values represent all possible debugging symbol
@@ -83,6 +84,7 @@ enum DataEncoding {
 	eFloat     = (1 << 3)
 };
 
+typedef QVector<qint32> IntVec;
 
 typedef QHash<QString, HdrSymbolType> HdrSymMap;
 typedef QHash<QString, ParamSymbolType> ParamSymMap;
@@ -102,12 +104,14 @@ DataEncMap getDataEncMap();
  * @return an inverted version of @a hash
  */
 template<class T>
-QHash<typename T::mapped_type, typename T::key_type> invertHash(T hash)
+QHash<typename T::mapped_type, typename T::key_type> invertHash(const T& hash)
 {
     QHash<typename T::mapped_type, typename T::key_type> ret;
-    typename T::iterator it;
-    for (it = hash.begin(); it != hash.end(); ++it)
+    for (typename T::const_iterator it = hash.begin(), e = hash.end();
+         it != e; ++it)
+    {
         ret.insert(it.value(), it.key());
+    }
     return ret;
 }
 
@@ -248,8 +252,10 @@ public:
     DataEncoding enc() const;
     void setEnc(DataEncoding enc);
 
-    qint32 upperBound() const;
-    void setUpperBound(qint32 bound);
+    const IntVec &upperBounds() const;
+    void setUpperBounds(const IntVec& bounds);
+    void addUpperBounds(const IntVec& bounds);
+    void addUpperBound(qint32 bound);
 
     int external() const;
     void setExternal(int value);
@@ -294,7 +300,7 @@ private:
 	size_t _location;        ///< holds the absolute offset offset of this symbol
 	int _external;			 ///< holds whether this is an external symbol
 	qint32 _dataMemberLoc;   ///< holds the offset relative offset of this symbol
-	qint32 _upperBound;      ///< holds the upper bound for an integer type symbol
+	IntVec _upperBounds;     ///< holds the upper bounds for an integer type symbol
 	qint32 _sibling;         ///< holds the sibling for a subprogram type symbol
 	bool _inlined;           ///< was the function inlined?
 	size_t _pcLow;           ///< low program counter of a function

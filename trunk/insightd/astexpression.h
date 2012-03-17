@@ -1,12 +1,24 @@
 #ifndef ASTEXPRESSION_H
 #define ASTEXPRESSION_H
 
-#include <QtGlobal>
+#include <QList>
 #include <astsymbol.h>
 #include <debug.h>
+#include "expressionresult.h"
+#include "kernelsymbolstream.h"
+
+class BaseType;
+class ASTExpression;
+class Instance;
+class SymFactory;
+
+typedef QList<ASTExpression*> ASTExpressionList;
+typedef QList<const ASTExpression*> ASTConstExpressionList;
+
 
 /// Different types of expressions
 enum ExpressionType {
+    etNull = 0,
     etVoid,
     etUndefined,
     etRuntimeDependent,
@@ -40,85 +52,7 @@ enum ExpressionType {
     etUnaryNot
 };
 
-/**
- The type of an epxression result, which may be a bit-wise combination of the
- following enumeration values.
- */
-enum ExpressionResultType {
-    erUndefined = 0,         ///< Result is undefined
-    erConstant  = (1 << 0),  ///< Expression is compile-time constant
-    erGlobalVar = (1 << 1),  ///< Expression involves global variable
-    erLocalVar  = (1 << 2),  ///< Expression involves local variable
-    erParameter = (1 << 3),  ///< Expression involves function parameters
-    erRuntime   = (1 << 4),  ///< Expression involves run-time dependencies
-    erInvalid   = (1 << 5),  ///< Expression result cannot be determined
-    erVoid      = (1 << 6)   ///< Expression result is void
-};
-
-enum ExpressionResultSize {
-    esUndefined = 0,
-    es8Bit      = (1 << 1),
-    es16Bit     = (1 << 2),
-    es32Bit     = (1 << 3),
-    es64Bit     = (1 << 4),
-    esUnsigned  = (1 << 5),
-    esFloat     = (1 << 6),
-    esDouble    = (1 << 7),
-    esInt8      = es8Bit,
-    esUInt8     = es8Bit|esUnsigned,
-    esInt16     = es16Bit,
-    esUInt16    = es16Bit|esUnsigned,
-    esInt32     = es32Bit,
-    esUInt32    = es32Bit|esUnsigned,
-    esInt64     = es64Bit,
-    esUInt64    = es64Bit|esUnsigned,
-    esInteger   = es8Bit|es16Bit|es32Bit|es64Bit,
-    esReal      = esFloat|esDouble
-};
-
-
-/// The result of an expression
-struct ExpressionResult
-{
-    /// Constructor
-    ExpressionResult() : resultType(erUndefined), size(esInt32) { this->result.i64 = 0; }
-    ExpressionResult(int resultType)
-        : resultType(resultType), size(esInt32) { this->result.i64 = 0; }
-    ExpressionResult(int resultType, ExpressionResultSize size, quint64 result)
-        : resultType(resultType), size(size) { this->result.ui64 = result; }
-    ExpressionResult(int resultType, ExpressionResultSize size, float result)
-        : resultType(resultType), size(size) { this->result.f = result; }
-    ExpressionResult(int resultType, ExpressionResultSize size, double result)
-        : resultType(resultType), size(size) { this->result.d = result; }
-
-    /// ORed combination of ExpressionResultType values
-    int resultType;
-
-    /// size of result of expression. \sa ExpressionResultSize
-    ExpressionResultSize size;
-
-    /// Expression result, if valid
-    union Result {
-        quint64 ui64;
-        qint64 i64;
-        quint32 ui32;
-        qint32 i32;
-        quint16 ui16;
-        qint16 i16;
-        quint8 ui8;
-        qint8 i8;
-        float f;
-        double d;
-    } result;
-
-    qint64 value(ExpressionResultSize target = esUndefined) const;
-
-    quint64 uvalue(ExpressionResultSize target = esUndefined) const;
-
-    float fvalue() const;
-
-    double dvalue() const;
-};
+const char* expressionTypeToString(ExpressionType type);
 
 /**
  * Abstract base class for a syntax tree expression.
@@ -130,7 +64,31 @@ public:
 
     virtual ExpressionType type() const = 0;
     virtual int resultType() const = 0;
-    virtual ExpressionResult result() const = 0;
+    virtual ExpressionResult result(const Instance* inst = 0) const = 0;
+    virtual ASTExpression* clone(ASTExpressionList& list) const = 0;
+    virtual QString toString(bool compact = false) const = 0;
+
+    inline virtual bool equals(const ASTExpression* other) const
+    {
+        return other && type() == other->type();
+    }
+
+    inline virtual ASTExpressionList findExpressions(ExpressionType type)
+    {
+        ASTExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        return list;
+    }
+
+    inline virtual ASTConstExpressionList findExpressions(ExpressionType type)
+        const
+    {
+        ASTConstExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        return list;
+    }
 
     inline bool hasAlternative() const
     {
@@ -153,7 +111,25 @@ public:
             _alternative = alt;
     }
 
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
+
+    static ASTExpression* fromStream(KernelSymbolStream &in,
+                                     SymFactory* factory);
+
+    static void toStream(const ASTExpression *expr, KernelSymbolStream &out);
+
 protected:
+    template<class T>
+    T* cloneTempl(ASTExpressionList& list) const
+    {
+        T* expr = new T(*dynamic_cast<const T*>(this));
+        list.append(expr);
+        if (_alternative)
+            expr->_alternative = _alternative->clone(list);
+        return expr;
+    }
+
     ASTExpression* _alternative;
 };
 
@@ -173,9 +149,21 @@ public:
         return erUndefined;
     }
 
-    inline virtual ExpressionResult result() const
+    inline virtual ExpressionResult result(const Instance* inst = 0) const
     {
+        Q_UNUSED(inst);
         return ExpressionResult(resultType(), esInt32, 0ULL);
+    }
+
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        return cloneTempl<ASTUndefinedExpression>(list);
+    }
+
+    inline virtual QString toString(bool compact = false) const
+    {
+        Q_UNUSED(compact);
+        return "(undefined expr.)";
     }
 };
 
@@ -192,12 +180,24 @@ public:
 
     inline virtual int resultType() const
     {
-        return erInvalid|erRuntime;
+        return etUndefined;
     }
 
-    inline virtual ExpressionResult result() const
+    inline virtual ExpressionResult result(const Instance* inst = 0) const
     {
+        Q_UNUSED(inst);
         return ExpressionResult(resultType(), esInt32, 0ULL);
+    }
+
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        return cloneTempl<ASTVoidExpression>(list);
+    }
+
+    inline virtual QString toString(bool compact = false) const
+    {
+        Q_UNUSED(compact);
+        return "(void)";
     }
 };
 
@@ -217,9 +217,21 @@ public:
         return erRuntime;
     }
 
-    inline virtual ExpressionResult result() const
+    inline virtual ExpressionResult result(const Instance* inst = 0) const
     {
+        Q_UNUSED(inst);
         return ExpressionResult(resultType(), esInt32, 0ULL);
+    }
+
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        return cloneTempl<ASTRuntimeExpression>(list);
+    }
+
+    inline virtual QString toString(bool compact = false) const
+    {
+        Q_UNUSED(compact);
+        return "(runtime expr.)";
     }
 };
 
@@ -247,9 +259,30 @@ public:
         return erConstant;
     }
 
-    inline virtual ExpressionResult result() const
+    inline virtual ExpressionResult result(const Instance* inst = 0) const
     {
+        Q_UNUSED(inst);
         return _value;
+    }
+
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        return cloneTempl<ASTConstantExpression>(list);
+    }
+
+    inline virtual QString toString(bool compact = false) const
+    {
+        Q_UNUSED(compact);
+        return _value.toString();
+    }
+
+    virtual bool equals(const ASTExpression* other) const
+    {
+        if (!ASTExpression::equals(other))
+            return false;
+        const ASTConstantExpression* c =
+                dynamic_cast<const ASTConstantExpression*>(other);
+        return c && _value.uvalue() == c->_value.uvalue();
     }
 
     inline void setValue(ExpressionResultSize size, quint64 value)
@@ -270,6 +303,9 @@ public:
         _value.result.d = value;
     }
 
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
+
 protected:
     ExpressionResult _value;
 };
@@ -280,9 +316,9 @@ protected:
 class ASTEnumeratorExpression: public ASTConstantExpression
 {
 public:
-    ASTEnumeratorExpression() : _symbol(0) {}
+    ASTEnumeratorExpression() : _symbol(0), _valueSet(false) {}
     ASTEnumeratorExpression(qint32 value, const ASTSymbol* symbol)
-        : _symbol(symbol)
+        : _symbol(symbol), _valueSet(true)
     {
         _value.resultType = resultType();
         _value.size = esInt32;
@@ -296,7 +332,15 @@ public:
 
     inline virtual int resultType() const
     {
-        return _symbol ? erConstant : erUndefined;
+        return _valueSet ? erConstant : erUndefined;
+    }
+
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        ASTEnumeratorExpression* expr =
+                cloneTempl<ASTEnumeratorExpression>(list);
+        expr->_symbol = 0;
+        return expr;
     }
 
     const ASTSymbol* symbol() const
@@ -304,8 +348,12 @@ public:
         return _symbol;
     }
 
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
+
 protected:
     const ASTSymbol* _symbol;
+    bool _valueSet;
 };
 
 /**
@@ -315,7 +363,8 @@ protected:
 class ASTVariableExpression: public ASTExpression
 {
 public:
-    ASTVariableExpression(const ASTSymbol* symbol = 0) : _symbol(symbol) {}
+    explicit ASTVariableExpression(const BaseType* type = 0, bool global = false)
+        : _baseType(type), _global(global), _transformations(0) {}
 
     inline virtual ExpressionType type() const
     {
@@ -324,24 +373,42 @@ public:
 
     inline virtual int resultType() const
     {
-        if (!_symbol)
-            return erUndefined;
-        return _symbol->isGlobal() ? erGlobalVar : erLocalVar;
+        if (!_baseType)
+            return etUndefined;
+        return _global ? erGlobalVar : erLocalVar;
     }
 
-    virtual ExpressionResult result() const
+    virtual QString toString(bool compact = false) const;
+
+    virtual bool equals(const ASTExpression* other) const;
+
+    virtual bool compatible(const Instance* inst) const;
+
+    virtual ExpressionResult result(const Instance* inst = 0) const;
+
+    virtual ASTExpression* clone(ASTExpressionList& list) const;
+
+    inline const BaseType* baseType() const
     {
-        /// @todo Fixme
-        return ExpressionResult(resultType(), esInt32, 0ULL);
+        return _baseType;
     }
 
-    const ASTSymbol* symbol() const
+    void appendTransformation(SymbolTransformationType type);
+    void appendTransformation(const QString& member);
+    void appendTransformation(int arrayIndex);
+
+    inline const SymbolTransformations& transformations() const
     {
-        return _symbol;
+        return _transformations;
     }
+
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
 
 protected:
-    const ASTSymbol* _symbol;
+    const BaseType* _baseType;
+    bool _global;
+    SymbolTransformations _transformations;
 };
 
 /**
@@ -351,7 +418,7 @@ protected:
 class ASTBinaryExpression: public ASTExpression
 {
 public:
-    ASTBinaryExpression(ExpressionType type) :
+    explicit ASTBinaryExpression(ExpressionType type) :
         _type(type), _left(0), _right(0) {}
 
     inline ASTExpression* left() const
@@ -386,12 +453,66 @@ public:
                     erUndefined;
     }
 
-    virtual ExpressionResult result() const;
+    virtual ExpressionResult result(const Instance* inst = 0) const;
+
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        ASTBinaryExpression* expr = cloneTempl<ASTBinaryExpression>(list);
+        if (_left)
+            expr->_left = _left->clone(list);
+        if (_right)
+            expr->_right = _right->clone(list);
+        return expr;
+    }
+
+    virtual QString toString(bool compact) const;
+
+    virtual bool equals(const ASTExpression* other) const
+    {
+        if (!ASTExpression::equals(other))
+            return false;
+        const ASTBinaryExpression* b =
+                dynamic_cast<const ASTBinaryExpression*>(other);
+        // Compare childen to each other
+        return b && ((!_left && !b->_left) || _left->equals(b->_left)) &&
+                ((!_right && !b->_right) || _right->equals(b->_right));
+    }
+
+    inline virtual ASTExpressionList findExpressions(ExpressionType type)
+    {
+        ASTExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        if (_left)
+            list.append(_left->findExpressions(type));
+        if (_right)
+            list.append(_right->findExpressions(type));
+        return list;
+    }
+
+
+    inline virtual ASTConstExpressionList findExpressions(ExpressionType type)
+        const
+    {
+        ASTConstExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        if (_left)
+            list.append(((const ASTExpression*)_left)->findExpressions(type));
+        if (_right)
+            list.append(((const ASTExpression*)_right)->findExpressions(type));
+        return list;
+    }
 
     static ExpressionResultSize binaryExprSize(const ExpressionResult& r1,
                                                const ExpressionResult& r2);
 
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
+
 protected:
+    QString operatorToString() const;
+
     ExpressionType _type;
     ASTExpression* _left;
     ASTExpression* _right;
@@ -404,7 +525,7 @@ protected:
 class ASTUnaryExpression: public ASTExpression
 {
 public:
-    ASTUnaryExpression(ExpressionType type) :
+    explicit ASTUnaryExpression(ExpressionType type) :
         _type(type), _child(0) {}
 
     inline ASTExpression* child() const
@@ -427,14 +548,58 @@ public:
         return _child ? _child->resultType() : erUndefined;
     }
 
-    virtual ExpressionResult result() const;
+    virtual ExpressionResult result(const Instance* inst = 0) const;
+
+    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    {
+        ASTUnaryExpression* expr = cloneTempl<ASTUnaryExpression>(list);
+        if (_child)
+            expr->_child = _child->clone(list);
+        return expr;
+    }
+
+    virtual QString toString(bool compact) const;
+
+    virtual bool equals(const ASTExpression* other) const
+    {
+        if (!ASTExpression::equals(other))
+            return false;
+        const ASTUnaryExpression* u =
+                dynamic_cast<const ASTUnaryExpression*>(other);
+        // Compare childen to each other
+        return u && ((!_child && !u->_child) || _child->equals(u->_child));
+    }
+
+    inline virtual ASTExpressionList findExpressions(ExpressionType type)
+    {
+        ASTExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        if (_child)
+            list.append(_child->findExpressions(type));
+        return list;
+    }
+
+    inline virtual ASTConstExpressionList findExpressions(ExpressionType type)
+        const
+    {
+        ASTConstExpressionList list;
+        if (type == this->type())
+            list.append(this);
+        if (_child)
+            list.append(((const ASTExpression*)_child)->findExpressions(type));
+        return list;
+    }
+
+    virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
+    virtual void writeTo(KernelSymbolStream &out) const;
 
 protected:
+    QString operatorToString() const;
+
     ExpressionType _type;
     ASTExpression* _child;
 };
-
-
 
 
 #endif // ASTEXPRESSION_H

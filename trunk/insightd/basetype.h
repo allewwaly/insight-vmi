@@ -6,6 +6,7 @@
 #include <QSet>
 #include <QIODevice>
 #include <realtypes.h>
+#include "kernelsymbolstream.h"
 #include "symbol.h"
 #include "genericexception.h"
 #include "sourceref.h"
@@ -76,14 +77,14 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    BaseType(SymFactory* factory);
+    explicit BaseType(SymFactory* factory);
 
     /**
      * Constructor
      * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
      */
-    BaseType(SymFactory* factory, const TypeInfo& info);
+    explicit BaseType(SymFactory* factory, const TypeInfo& info);
 
     /**
      * Destructor
@@ -100,36 +101,45 @@ public:
      * until the final non-referencing type is revealed
      * @param resolveTypes which types to automatically resolve, see
      * TypeResolution
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
      * @param depth how many types have been dereferenced
      * @return non-referencing RealType if this is a referencing type, type()
      * otherwise
      */
     RealType dereferencedType(
-            int resolveTypes = trLexicalPointersArrays, int *depth = 0) const;
+            int resolveTypes = trLexicalPointersArrays, int maxPtrDeref = -1,
+            int *depth = 0) const;
 
     /**
      * If this is a referencing type, all types are successively dereferenced
      * until the final non-referencing type is revealed
      * @param resolveTypes which types to automatically resolve, see
      * TypeResolution
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
      * @param depth how many types have been dereferenced
      * @return non-referencing base type if this is a referencing type, \c this
      * otherwise
      */
     const BaseType* dereferencedBaseType(
-            int resolveTypes = trLexicalPointersArrays, int *depth = 0) const;
+            int resolveTypes = trLexicalPointersArrays, int maxPtrDeref = -1,
+            int *depth = 0) const;
 
     /**
      * If this is a referencing type, all types are successively dereferenced
      * until the final non-referencing type is revealed
      * @param resolveTypes which types to automatically resolve, see
      * TypeResolution
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
      * @param depth how many types have been dereferenced
      * @return non-referencing base type if this is a referencing type, \c this
      * otherwise
      */
     BaseType* dereferencedBaseType(
-            int resolveTypes = trLexicalPointersArrays, int *depth = 0);
+            int resolveTypes = trLexicalPointersArrays, int maxPtrDeref = -1,
+            int *depth = 0);
 
     /**
      * Create a hash of that type based on type(), size() and name().
@@ -165,14 +175,14 @@ public:
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in);
+    virtual void readFrom(KernelSymbolStream& in);
 
     /**
      * Writes a serialized version of this type to \a out
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const;
+    virtual void writeTo(KernelSymbolStream& out) const;
 
     /**
      * @param mem the memory device to read the data from
@@ -304,11 +314,19 @@ public:
     	// We have to consider the size of the pointer
     	if (_size == 4) {
     		quint32 p = toUInt32(mem, offset);
+#ifdef __x86_64__
+            return (void*)(quint64)p;
+#else
     		return (void*)p;
+#endif
     	}
     	else if (_size == 8) {
     		quint64 p = toUInt64(mem, offset);
-    		return (void*)p;
+#ifdef __x86_64__
+            return (void*)p;
+#else
+            return (void*)(quint32)p;
+#endif
     	}
     	else {
     		throw BaseTypeException(
@@ -353,14 +371,17 @@ public:
      * @param parentNames the names of the parent, i.e., nesting struct
      * @param resolveTypes which types to automatically resolve, see
      * TypeResolution
-     * @param derefCount pointer to a counter variable for how many types have
-     * been followed to create the instance
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
+     * @param derefCount pointer to a counter variable for how many pointers
+     * have been dereferenced to create the instance
      * @return an Instance object for the dereferenced type
      * \sa BaseType::TypeResolution
      */
     virtual Instance toInstance(size_t address, VirtualMemory* vmem,
             const QString& name, const QStringList& parentNames,
-            int resolveTypes = trLexical, int* derefCount = 0) const;
+            int resolveTypes = trLexical, int maxPtrDeref = -1,
+            int* derefCount = 0) const;
 
     /**
      * This operator considers two types to be equal if their following data
@@ -427,7 +448,7 @@ protected:
  * @param type object to store the serialized data to
  * @return the data stream \a in
  */
-QDataStream& operator>>(QDataStream& in, BaseType& type);
+KernelSymbolStream& operator>>(KernelSymbolStream& in, BaseType& type);
 
 
 /**
@@ -436,7 +457,7 @@ QDataStream& operator>>(QDataStream& in, BaseType& type);
  * @param type object to serialize
  * @return the data stream \a out
  */
-QDataStream& operator<<(QDataStream& out, const BaseType& type);
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const BaseType& type);
 
 
 #endif // BASETYPE_H

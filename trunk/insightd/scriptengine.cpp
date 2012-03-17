@@ -183,7 +183,6 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
         ctx->throwError("First argument must be a string or an integer value");
         return QScriptValue();
     }
-    QString query = ctx->argument(0).toString();
 
     // Default memDump index is the first one
     int index = 0;

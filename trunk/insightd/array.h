@@ -17,14 +17,15 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    Array(SymFactory* factory);
+    explicit Array(SymFactory* factory);
 
     /**
      * Constructor
      * @param factory the factory that created this symbol
      * @param info the type information to construct this type from
+     * @param boundsIndex index into the \a info.bounds() list for array lengths
      */
-    Array(SymFactory* factory, const TypeInfo& info);
+    Array(SymFactory* factory, const TypeInfo& info, int boundsIndex);
 
 	/**
 	 @return the actual type of that polimorphic variable
@@ -74,14 +75,14 @@ public:
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in);
+    virtual void readFrom(KernelSymbolStream &in);
 
     /**
      * Writes a serialized version of this object to \a out
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const;
+    virtual void writeTo(KernelSymbolStream &out) const;
 
 protected:
 	qint32 _length;   ///< the length if this array (if it was defined)

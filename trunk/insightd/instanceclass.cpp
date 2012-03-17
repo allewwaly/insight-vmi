@@ -11,7 +11,7 @@
 #include "instancedata.h"
 #include "instanceprototype.h"
 #include "basetype.h"
-#include "debug.h"
+#include <debug.h>
 
 Q_DECLARE_METATYPE(Instance)
 Q_DECLARE_METATYPE(Instance*)
@@ -113,7 +113,11 @@ QScriptValue InstanceClass::property(const QScriptValue& object,
     // We should never be called without a valid id
     assert(id < (uint)inst->memberCount());
 
-    Instance member = inst->member(id, BaseType::trAny);
+    // If the member has exactly one alternative type, we return that instead of
+    // the original member
+    Instance member = (inst->memberCandidatesCount(id) == 1) ?
+                inst->memberCandidate(id, 0) :
+                inst->member(id, BaseType::trAny, 1);
 
     return newInstance(member);
 }

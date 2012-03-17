@@ -3,23 +3,42 @@
  *
  */
 
+include("lib_string.js");
+
 function printModuleList()
 {
-	var head = new Instance("modules");
-	var m = head.next;
-	m.ChangeType("module");
+    var head = new Instance("modules");
 
-	// Offset we have to use for correction
-	var offset = m.MemberOffset("list");
-	m.AddToAddress(-offset);
-	
-	// Prepare head for correct loop terminaten
-	head.AddToAddress(-offset);
-	
-	do {
-		print(m.name.toString());
+    if (head.MemberCandidatesCount("next") < 1)
+        throw new Error("\"" + head.Name() + "\" does not have any candidate types for member \"next\"");
+
+    var w_mod = 20;
+    print(lalign("Module [Args]", w_mod) + " Used by");
+
+	// Iterate over all modules
+	var m = head.next;
+	while (m && m.MemberAddress("list", true) != head.Address()) {
+		// Build list of modules which use the current module
+		var usedList = "";
+		var u = m.modules_which_use_me.next;
+		while (u.MemberAddress("list", true) != m.modules_which_use_me.Address()) {
+			if (usedList.length > 0)
+				usedList = usedList + ", ";
+			usedList = usedList + u.module_which_uses.name.toString();
+			u = u.list.next;
+		}
+
+		var name = m.name.toString();
+		if (m.args.toString().length > 0)
+			name += " [" + m.args.toString() + "]";
+
+		if (usedList.length > 0)
+			print(lalign(name, w_mod) + " " + usedList);
+		else
+			print(name);
+
 		m = m.list.next;
-	} while (m && m.Address() != head.Address());
+	}
 }
 
 printModuleList();

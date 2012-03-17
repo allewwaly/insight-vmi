@@ -20,7 +20,7 @@
 #include "priorityqueue.h"
 #include "memorymaprangetree.h"
 #include "memorydifftree.h"
-#include "debug.h"
+#include <debug.h>
 
 class SymFactory;
 class VirtualMemory;

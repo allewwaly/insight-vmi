@@ -1,11 +1,14 @@
 
 #include "astexpression.h"
 #include "expressionevalexception.h"
+#include "instance.h"
+#include "structured.h"
 
 
 const char* expressionTypeToString(ExpressionType type)
 {
     switch (type) {
+    case etNull:                return "etNull";
     case etVoid:                return "etVoid";
     case etUndefined:           return "etUndefined";
     case etRuntimeDependent:    return "etRuntimeDependent";
@@ -42,133 +45,362 @@ const char* expressionTypeToString(ExpressionType type)
 }
 
 
-qint64 ExpressionResult::value(ExpressionResultSize target) const
+void ASTExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
 {
-    qint64 ret;
-
-    // Is either the target or this value unsigned?
-    if (target && ((target | size) & esUnsigned)) {
-        // If the target is unsigned, return the unsigned  value instead.
-        // If this value is unsigned, do not extend the sign!
-        ret = uvalue((ExpressionResultSize)(target | esUnsigned));
-    }
-    // No target specified, or both target and this value are signed, so
-    // extend this value's sign to 64 bit
-    else {
-        ret = (size & es64Bit) ?
-                    result.i64 :
-                    (size & es32Bit) ?
-                        (qint64) result.i32 :
-                        (size & es16Bit) ?
-                            (qint64) result.i16 :
-                            (qint64) result.i8;
-    }
-//        debugmsg(QString("Returning 0x%1").arg(ret, 16, 16, QChar('0')));
-    return ret;
+    // Read alternative
+    _alternative = fromStream(in, factory);
 }
 
 
-quint64 ExpressionResult::uvalue(ExpressionResultSize target) const
+void ASTExpression::writeTo(KernelSymbolStream &out) const
 {
-    quint64 ret;
+    out << (qint32) type();
+    toStream(_alternative, out);
+}
 
-    // Is either the target or this value unsigned?
-    if (target && !(target & size & esUnsigned)) {
-        // If the target is signed, return the signed value instead
-        if (!(target & esUnsigned))
-            ret = value(target);
-        // If this is a signed value and the target is unsigned, extend the
-        // sign up to target size before converting to unsigned
-        else {
-            switch (target & (es64Bit|es32Bit|es16Bit|es8Bit)) {
-            case es64Bit:
-                ret = (size & es64Bit) ?
-                            result.i64 :
-                            (size & es32Bit) ?
-                                (quint64) result.i32 :
-                                (size & es16Bit) ?
-                                    (quint64) result.i16 :
-                                    (quint64) result.i8;
-                break;
 
-            case es32Bit:
-                ret = (size & (es64Bit|es32Bit)) ?
-                            result.ui32 :
-                            (size & es16Bit) ?
-                                (quint32) result.i16 :
-                                (quint32) result.i8;
-                break;
+ASTExpression* ASTExpression::fromStream(KernelSymbolStream &in,
+                                         SymFactory *factory)
+{
+    ASTExpression* expr = 0;
 
-            case es16Bit:
-                ret = (size & (es64Bit|es32Bit|es16Bit)) ?
-                            result.ui16 :
-                            (quint16) result.i8;
-                break;
+    qint32 type;
+    in >> type;
 
-            case es8Bit:
-                ret = result.ui8;
-                break;
+    // A null type means a null expression
+    if (type) {
+        expr = factory->createEmptyExpression((ExpressionType)type);
+        expr->readFrom(in, factory);
+    }
 
-            default:
-                exprEvalError(QString("Invalid target size: %1").arg(target));
-                break;
-            }
+    return expr;
+}
+
+
+void ASTExpression::toStream(const ASTExpression* expr, KernelSymbolStream &out)
+{
+    if (expr)
+        expr->writeTo(out);
+    else
+        out << (qint32)0;
+}
+
+
+void ASTConstantExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
+{
+    ASTExpression::readFrom(in, factory);
+    in >> _value;
+}
+
+
+void ASTConstantExpression::writeTo(KernelSymbolStream &out) const
+{
+    ASTExpression::writeTo(out);
+    out << _value;
+}
+
+
+void ASTEnumeratorExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
+{
+    ASTConstantExpression::readFrom(in, factory);
+    in >> _valueSet;
+    _symbol = 0;
+}
+
+
+void ASTEnumeratorExpression::writeTo(KernelSymbolStream &out) const
+{
+    ASTConstantExpression::writeTo(out);
+    out << _valueSet;
+}
+
+
+QString ASTVariableExpression::toString(bool /*compact*/) const
+{
+    if (!_baseType)
+        return "(undefined var. expr.)";
+
+    return _transformations.toString(
+                QString("(%1)").arg(_baseType->prettyName()));
+}
+
+
+bool ASTVariableExpression::equals(const ASTExpression *other) const
+{
+    if (!ASTExpression::equals(other))
+        return false;
+    const ASTVariableExpression* v =
+            dynamic_cast<const ASTVariableExpression*>(other);
+    // Compare base type based on their hash
+    if (!v || !_baseType  || !v->_baseType ||
+        _baseType->hash() != v->baseType()->hash())
+        return false;
+
+    // Compare transformations
+    if (_transformations.size() != v->_transformations.size())
+        return false;
+    for (int i = 0; i < _transformations.size(); ++i) {
+        if (_transformations[i].type != v->_transformations[i].type ||
+            _transformations[i].arrayIndex != v->_transformations[i].arrayIndex ||
+            _transformations[i].member != v->_transformations[i].member)
+            return false;
+    }
+
+    return true;
+}
+
+
+bool ASTVariableExpression::compatible(const Instance *inst) const
+{
+    if (!inst)
+        return false;
+
+    const uint instHash = inst->type()->hash();
+
+    if (_transformations.isEmpty()) {
+        // Check if the type hashes match.
+        if (instHash == _baseType->hash() ||
+            instHash ==
+                _baseType->dereferencedBaseType(BaseType::trLexical)->hash())
+            return true;
+        else
+            return false;
+    }
+
+    const BaseType* bt = _baseType;
+    int cnt = 0;
+
+    // Skip the suffixes starting from our _baseType until we find the matching
+    // type ID
+    for (int i = 0;
+         bt && bt->hash() != instHash && i < _transformations.size();
+         ++i)
+    {
+        // Did we find the instance's ID? Or can we dereference the type?
+        if (bt->hash() != instHash &&
+            (bt->type() & BaseType::trLexical))
+            bt = bt->dereferencedBaseType(BaseType::trLexical);
+        // Check once more
+        if (bt->hash() == instHash)
+            return true;
+
+        switch (_transformations[i].type) {
+        case ttDereference:
+        case ttArray:
+            bt = bt->dereferencedBaseType(BaseType::trAny, 1, &cnt);
+            // Make sure we followed a pointer, but don't be fuzzy for the first
+            // type as the context type normally is not a pointer type anyway
+            if (i > 0 && cnt != 1)
+                return false;
+            break;
+
+        case ttMember: {
+            const Structured* s = dynamic_cast<const Structured*>(bt);
+            if (!s)
+                return false;
+            const StructuredMember* m = s->findMember(_transformations[i].member);
+            if (!m)
+                return false;
+            bt = m->refType();
+            break;
+        }
+
+        default:
+            return false;
         }
     }
-    else {
-        ret = (size & es64Bit) ?
-                result.ui64 :
-                (size & es32Bit) ?
-                    (quint64) result.ui32 :
-                    (size & es16Bit) ?
-                        (quint64) result.ui16 :
-                        (quint64) result.ui8;
+
+    return bt && bt->hash() == instHash;
+}
+
+
+ExpressionResult ASTVariableExpression::result(const Instance *inst) const
+{
+    // Make sure we got a valid instance and type
+    if (!inst || !_baseType)
+        return ExpressionResult(erUndefined);
+
+    const uint instHash = inst->type()->hash();
+
+    if (_transformations.isEmpty()) {
+        // Check if the type hashes match.
+        if (instHash == _baseType->hash() ||
+            instHash ==
+                _baseType->dereferencedBaseType(BaseType::trLexical)->hash())
+            return inst->toExpressionResult();
+        else
+            exprEvalError(QString("Type hash of instance \"%1\" (0x%2) is different "
+                                  "from our type \"%3\" (0x%4)")
+                          .arg(inst->type()->prettyName())
+                          .arg((uint)inst->type()->id(), 0, 16)
+                          .arg(_baseType->prettyName())
+                          .arg((uint)_baseType->id(), 0, 16));
     }
-//        debugmsg(QString("Returning 0x%1").arg(ret, 16, 16, QChar('0')));
-    return ret;
+
+    const BaseType* bt = _baseType;
+    QString prettyType = QString("(%1)").arg(bt->prettyName());
+    int i = 0, cnt = 0;
+
+    // Skip the suffixes starting from our _baseType until we find the matching
+    // type ID
+    for (; bt && bt->hash() != instHash && i < _transformations.size(); ++i) {
+        // Did we find the instance's ID? Or can we dereference the type?
+        if (bt->hash() != instHash &&
+            (bt->type() & BaseType::trLexical))
+            bt = bt->dereferencedBaseType(BaseType::trLexical);
+        // Check once more
+        if (bt->hash() == instHash)
+            break;
+
+        switch (_transformations[i].type) {
+        case ttDereference:
+        case ttArray:
+            bt = bt->dereferencedBaseType(BaseType::trAny, 1, &cnt);
+            // Make sure we followed a pointer, but don't be fuzzy for the first
+            // type as the context type normally is not a pointer type anyway
+            if (i > 0 && cnt != 1)
+                exprEvalError(QString("Type \"%1\" (0x%2) is not a pointer.")
+                              .arg(prettyType)
+                              .arg((uint)bt->id(), 0, 16));
+            break;
+
+        case ttMember: {
+            const Structured* s = dynamic_cast<const Structured*>(bt);
+            if (!s)
+                exprEvalError(QString("Type \"%1\" (0x%2) is not a structured "
+                                      "type")
+                              .arg(prettyType)
+                              .arg((uint)bt->id(), 0, 16));
+            const StructuredMember* m = s->findMember(_transformations[i].member);
+            if (!m)
+                exprEvalError(QString("Type \"%1\" has no member \"%2\"")
+                              .arg(prettyType)
+                              .arg(_transformations[i].member));
+            bt = m->refType();
+            prettyType += "." + _transformations[i].member;
+            break;
+        }
+
+        default:
+            exprEvalError(QString("Unhandled symbol transformation for \"%1\" "
+                                  ": %2")
+                          .arg(prettyType)
+                          .arg(_transformations[i].typeString()));
+        }
+    }
+
+    if (!bt || bt->hash() != instHash) {
+        exprEvalError(QString("Type hash of instance \"%1\" (0x%2) is different "
+                              "from type \"%3\" (0x%4) of expression \"%5\"")
+                      .arg(inst->type()->prettyName())
+                      .arg((uint)inst->type()->id(), 0, 16)
+                      .arg(bt ? bt->prettyName() : QString("(null)"))
+                      .arg((uint)(bt ? bt->id() : 0), 0, 16)
+                      .arg(prettyType));
+    }
+
+    // Apply remaining suffixes
+    Instance tmp(*inst);
+    for (int j = i; j < _transformations.size() && tmp.isValid(); ++j) {
+        switch (_transformations[j].type) {
+        case ttDereference:
+            // Dereference the instance exactly once
+            tmp = tmp.dereference(BaseType::trLexicalAndPointers, 1, &cnt);
+            // Make sure we followed a pointer, but don't be fuzzy for the first
+            // type as the context type normally is not a pointer type anyway
+            if ((j > 0 && cnt != 1) || !tmp.isValid())
+                return ExpressionResult(erUndefined);
+            break;
+
+        case ttMember:
+            tmp = tmp.findMember(_transformations[j].member,
+                                 BaseType::trLexical, true);
+            prettyType += "." + _transformations[j].member;
+            break;
+
+        case ttArray:
+            tmp = tmp.arrayElem(_transformations[j].arrayIndex);
+            prettyType += QString("[%1]").arg(_transformations[j].arrayIndex);
+            break;
+
+        default:
+            exprEvalError(QString("Unhandled symbol transformation for \"%1\" "
+                                  ": %2")
+                          .arg(prettyType)
+                          .arg(_transformations[j].typeString()));
+        }
+    }
+
+    return tmp.toExpressionResult();
 }
 
 
-float ExpressionResult::fvalue() const
+ASTExpression *ASTVariableExpression::clone(ASTExpressionList &list) const
 {
-    // Convert any value to float
-    if (size & esDouble)
-        return result.d;
-    else if (size & esFloat)
-        return result.f;
-    else if (size & esUnsigned)
-        return uvalue();
-    else
-        return value();
+    ASTVariableExpression* expr = cloneTempl<ASTVariableExpression>(list);
+    // Set nodes to null
+    for (int i = 0; i < expr->_transformations.size(); ++i)
+        expr->_transformations[i].node = 0;
+    expr->_transformations.setTypeEvaluator(0);
+
+    return expr;
 }
 
 
-double ExpressionResult::dvalue() const
+void ASTVariableExpression::appendTransformation(SymbolTransformationType type)
 {
-    // Convert any value to double
-    if (size & esDouble)
-        return result.d;
-    else if (size & esFloat)
-        return result.f;
-    else if (size & esUnsigned)
-        return uvalue();
-    else
-        return value();
+    _transformations.append(type, 0);
 }
 
 
-ExpressionResult ASTBinaryExpression::result() const
+void ASTVariableExpression::appendTransformation(const QString &member)
+{
+    _transformations.append(member, 0);
+}
+
+
+void ASTVariableExpression::appendTransformation(int arrayIndex)
+{
+    _transformations.append(arrayIndex, 0);
+}
+
+
+void ASTVariableExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
+{
+    ASTExpression::readFrom(in, factory);
+    qint32 id;
+    in >> id >> _global >> _transformations;
+    _transformations.setTypeEvaluator(0);
+    _baseType = factory->findBaseTypeById(id);
+    // Make sure we found the type
+    if (id && !_baseType)
+        genericError(QString("Cannot find base type with ID 0x%1 in factory!")
+                     .arg((uint)id, 0, 16));
+}
+
+
+void ASTVariableExpression::writeTo(KernelSymbolStream &out) const
+{
+    ASTExpression::writeTo(out);
+    out << (qint32)(_baseType ? _baseType->id() : 0)
+        << _global
+        << _transformations;
+}
+
+
+ExpressionResult ASTBinaryExpression::result(const Instance *inst) const
 {
     if (!_left || !_right)
         return ExpressionResult();
 
-    ExpressionResult lr = _left->result();
-    ExpressionResult rr = _right->result();
+    ExpressionResult lr = _left->result(inst);
+    ExpressionResult rr = _right->result(inst);
     ExpressionResult ret(lr.resultType | rr.resultType);
     ExpressionResultSize target = ret.size = binaryExprSize(lr, rr);
     // Is the expression decidable?
-    if (lr.resultType != erConstant || rr.resultType != erConstant) {
+    if (ret.resultType & (erRuntime|erUndefined)) {
         // Undecidable, so return the combined result type
+        ret.resultType |= erUndefined;
         return ret;
     }
 
@@ -372,6 +604,49 @@ ExpressionResult ASTBinaryExpression::result() const
 }
 
 
+
+QString ASTBinaryExpression::operatorToString() const
+{
+    switch (_type) {
+    case etLogicalOr:           return "||";
+    case etLogicalAnd:          return "&&";
+    case etInclusiveOr:         return "|";
+    case etExclusiveOr:         return "^";
+    case etAnd:                 return "&";
+    case etEquality:            return "==";
+    case etUnequality:          return "!=";
+    case etRelationalGE:        return ">=";
+    case etRelationalGT:        return ">";
+    case etRelationalLE:        return "<=";
+    case etRelationalLT:        return "<";
+    case etShiftLeft:           return "<<";
+    case etShiftRight:          return ">>";
+    case etAdditivePlus:        return "+";
+    case etAdditiveMinus:       return "-";
+    case etMultiplicativeMult:  return "*";
+    case etMultiplicativeDiv:   return "/";
+    case etMultiplicativeMod:   return "%";
+    default:                    return "??";
+    }
+}
+
+
+QString ASTBinaryExpression::toString(bool compact) const
+{
+    if (compact) {
+        ExpressionResult res = result();
+        // Does the expression evaluate to a constant value?
+        if (!(res.resultType & (erRuntime|erUndefined|erGlobalVar|erLocalVar)))
+            return res.toString();
+    }
+
+    QString left = _left ? _left->toString(compact) : QString("(left unset)");
+    QString right = _right ? _right->toString(compact) : QString("(right unset)");
+
+    return QString("(%1 %2 %3)").arg(left).arg(operatorToString()).arg(right);
+}
+
+
 ExpressionResultSize ASTBinaryExpression::binaryExprSize(
         const ExpressionResult& r1, const ExpressionResult& r2)
 {
@@ -439,17 +714,33 @@ ExpressionResultSize ASTBinaryExpression::binaryExprSize(
 }
 
 
-ExpressionResult ASTUnaryExpression::result() const
+void ASTBinaryExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
+{
+    ASTExpression::readFrom(in, factory);
+    _left = fromStream(in, factory);
+    _right = fromStream(in, factory);
+}
+
+
+void ASTBinaryExpression::writeTo(KernelSymbolStream &out) const
+{
+    ASTExpression::writeTo(out);
+    toStream(_left, out);
+    toStream(_right, out);
+}
+
+
+ExpressionResult ASTUnaryExpression::result(const Instance *inst) const
 {
     if (!_child)
         return ExpressionResult();
 
-    ExpressionResult res = _child->result();
+    ExpressionResult res = _child->result(inst);
     // Is the expression decidable?
-    if (res.resultType != erConstant) {
+    if (res.resultType & (erUndefined|erRuntime)) {
         /// @todo constants cannot be incremented, that makes no sense at all!
-        // Undecidable, so return the correct result type
-        res.resultType |= erInvalid;
+        // Undecidable, so return the combined result type
+        res.resultType |= erUndefined;
         return res;
     }
 
@@ -539,4 +830,48 @@ ExpressionResult ASTUnaryExpression::result() const
     }
 
     return res;
+}
+
+
+QString ASTUnaryExpression::toString(bool compact) const
+{
+    if (compact) {
+        ExpressionResult res = result();
+        // Does the expression evaluate to a constant value?
+        if (!(res.resultType & (erRuntime|erUndefined|erGlobalVar|erLocalVar)))
+            return res.toString();
+    }
+
+    QString child = _child ? _child->toString(compact) : QString("(child unset)");
+
+    return QString("%1%2").arg(operatorToString()).arg(child);
+}
+
+
+void ASTUnaryExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
+{
+    ASTExpression::readFrom(in, factory);
+    _child = fromStream(in, factory);
+}
+
+
+void ASTUnaryExpression::writeTo(KernelSymbolStream &out) const
+{
+    ASTExpression::writeTo(out);
+    toStream(_child, out);
+}
+
+
+QString ASTUnaryExpression::operatorToString() const
+{
+    switch (_type) {
+    case etUnaryInc:   return "++";
+    case etUnaryDec:   return "--";
+    case etUnaryMinus: return "-";
+    case etUnaryInv:   return "~";
+    case etUnaryNot:   return "!";
+    case etUnaryStar:  return "*";
+    case etUnaryAmp:   return "&";
+    default:           return "??";
+    }
 }

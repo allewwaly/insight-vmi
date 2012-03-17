@@ -4,7 +4,7 @@
 #include "refbasetype.h"
 #include "virtualmemory.h"
 #include "pointer.h"
-#include "debug.h"
+#include <debug.h>
 
 FuncParam::FuncParam(SymFactory* factory)
 	: Symbol(factory), _belongsTo(0)
@@ -58,7 +58,7 @@ Instance FuncParam::toInstance(size_t address,
 }
 
 
-void FuncParam::readFrom(QDataStream& in)
+void FuncParam::readFrom(KernelSymbolStream& in)
 {
     Symbol::readFrom(in);
     ReferencingType::readFrom(in);
@@ -66,7 +66,7 @@ void FuncParam::readFrom(QDataStream& in)
 }
 
 
-void FuncParam::writeTo(QDataStream& out) const
+void FuncParam::writeTo(KernelSymbolStream& out) const
 {
     Symbol::writeTo(out);
     ReferencingType::writeTo(out);
@@ -74,14 +74,14 @@ void FuncParam::writeTo(QDataStream& out) const
 }
 
 
-QDataStream& operator>>(QDataStream& in, FuncParam& param)
+KernelSymbolStream& operator>>(KernelSymbolStream& in, FuncParam& param)
 {
     param.readFrom(in);
     return in;
 }
 
 
-QDataStream& operator<<(QDataStream& out, const FuncParam& param)
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const FuncParam& param)
 {
     param.writeTo(out);
     return out;

@@ -12,10 +12,12 @@
 #include <QStringList>
 
 #include "instancedata.h"
+#include "expressionresult.h"
 
 class BaseType;
 class VirtualMemory;
 class Instance;
+class StructuredMember;
 
 /// A list of Instance objects
 typedef QList<Instance> InstanceList;
@@ -144,9 +146,15 @@ public:
     const QStringList& memberNames() const;
 
     /**
+     * Gives access to all members if this instance. If a member has exactly
+     * one candidate type, this type will be used instead of the originally
+     * declared type of the mamber. To have the declared types instead, set
+     * \a declaredTypes to \c true.
+     * @param declaredTypes selects if candidate types or declared types should
+     * be used, where applicable
      * @return a list of instances of all members
      */
-    InstanceList members() const;
+    InstanceList members(bool declaredTypes = false) const;
 
     /**
      * Gives access to the concrete BaseType of this instance.
@@ -180,7 +188,7 @@ public:
     bool isNull() const;
 
     /**
-     * Checks if this instance has type.
+     * Checks if this instance has a type.
      * @return \c true if this object has a type, \c false otherwise
      * \warning This does \e not check if the address is null or not!
      * \sa isNull()
@@ -259,12 +267,15 @@ public:
      * Dereferences this instance as far as possible.
      * @param resolveTypes which types to automatically resolve, see
      * BaseType::TypeResolution
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
      * @param derefCount pointer to a counter variable for how many types have
      * been followed to create the instance
      * @return a dereferenced version of this instance
      * \sa BaseType::TypeResolution
      */
-    Instance dereference(int resolveTypes, int* derefCount = 0) const;
+    Instance dereference(int resolveTypes, int maxPtrDeref = -1,
+                         int* derefCount = 0) const;
 
     /**
      * @return the number of members, if this is a struct, \c 0 otherwise
@@ -286,10 +297,15 @@ public:
      * @param index index into the member list
      * @param resolveTypes which types to automatically resolve, see
      * BaseType::TypeResolution
+     * @param maxPtrDeref the maximum levels of pointers that should be
+     * dereferenced
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
      * @return Instance object of the specified member
      * \sa BaseType::TypeResolution
      */
-    Instance member(int index, int resolveTypes = 0) const;
+    Instance member(int index, int resolveTypes = 0,
+                    int maxPtrDeref = -1, bool declaredType = false) const;
 
     /**
      * Gives access to the BaseType's of a member, if this is a struct or union.
@@ -299,18 +315,33 @@ public:
      * @param index index into the member list
      * @param resolveTypes which types to automatically resolve, see
      * BaseType::TypeResolution
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
      * @return pointer to the type of member \a index, or 0 if this is no struct
      * or union or \a index is out of bounds
      */
-    const BaseType* memberType(int index, int resolveTypes = 0) const;
+    const BaseType* memberType(int index, int resolveTypes = 0,
+                               bool declaredType = false) const;
 
     /**
      * Calculates the virtual address of a member, if this is a struct or union.
      * @param index index into the member list
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
      * @return the virtual address of member \a index, or 0 if this is no struct
      * or union
      */
-    quint64 memberAddress(int index) const;
+    quint64 memberAddress(int index, bool declaredType = false) const;
+
+    /**
+     * Calculates the virtual address of a member, if this is a struct or union.
+     * @param name the name of the member
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
+     * @return the virtual address of member \a index, or 0 if this is no struct
+     * or union
+     */
+    quint64 memberAddress(const QString& name, bool declaredType = false) const;
 
     /**
      * Calculates the offset of a member within a struct, if this is a struct
@@ -331,8 +362,9 @@ public:
 
     /**
      * Retrieves a member (i.e., struct components) of this Instance, if it
-     * exists. You can check their existence with memberExists() or by iterating
-     * over the names returned by memberNames().
+     * exists. If this struct or  union has no member \a name, all anonymous
+     * nested structs or unions are searched as well. This is conforming to the
+     * C standard.
      *
      * \note Make sure to check Instance::isNull() on the returned object to
      * see if it is valid or not.
@@ -340,11 +372,14 @@ public:
      * @param name the name of the member to find
      * @param resolveTypes which types to automatically resolve, see
      * BaseType::TypeResolution
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
      * @return a new Instance object if the member was found, or an empty
      * object otherwise
      * \sa BaseType::TypeResolution
      */
-    Instance findMember(const QString& name, int resolveTypes) const;
+    Instance findMember(const QString& name, int resolveTypes,
+                        bool declaredType = false) const;
 
     /**
      * Retrieves the index of the member with name \a name. This index can be
@@ -357,9 +392,84 @@ public:
     /**
      * Retrieves the type ID of the member \a name.
      * @param name the name of the member
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
      * @return the ID of the type, if that member exists, \c 0 otherwise.
      */
-    int typeIdOfMember(const QString& name) const;
+    int typeIdOfMember(const QString& name, bool declaredType = false) const;
+
+    /**
+     * Returns the number of candidate types for a particular member.
+     * @param name the name of the member
+     * @return 0 if only the originally declared type is available, otherwise
+     * the number of alternative candidate types
+     */
+    int memberCandidatesCount(const QString& name) const;
+
+    /**
+     * Returns the number of candidate types for a particular member.
+     * @param index index of the member
+     * @return 0 if only the originally declared type is available, otherwise
+     * the number of alternative candidate types
+     */
+    int memberCandidatesCount(int index) const;
+
+    /**
+     * Retrieves the candidate type no. \a cndtIndex for member with index
+     * \a mbrIndex. You can check for the number of members with memberCount()
+     * and the number of candidate types for a particular member with
+     * memberCandidatesCount().
+     * @param mbrIndex index of the member
+     * @param cndtIndex index of the candidate type for that member
+     * @return a new Instance object for the member with the selected candidate
+     * type, if such a member and candiate exists, or an empty object otherwise
+     */
+    Instance memberCandidate(int mbrIndex, int cndtIndex) const;
+
+    /**
+     * Retrieves the candidate type no. \a cndtIndex for member \a name.
+     * You can check for the number of candidate types for a particular member
+     * with memberCandidatesCount().
+     * @param name the name of the member
+     * @param cndtIndex index of the candidate type for that member
+     * @return a new Instance object if the member \a name with the selected
+     * candidate type exists, or an empty object otherwise
+     */
+    Instance memberCandidate(const QString& name, int cndtIndex) const;
+
+    /**
+     * Checks if this Instance is compatible with the expression that needs to
+     * be evaluated for candidate type with index \a cndtIndex of member at
+     * index \a mbrIndex.
+     * @param mbrIndex the member index
+     * @param cndtIndex index of the candidate type for that member
+     * @return \c true if this Instance is compatible with the expression,
+     * \c false otherwise
+     */
+    bool memberCandidateCompatible(int mbrIndex, int cndtIndex) const;
+
+    /**
+     * Checks if this Instance is compatible with the expression that needs to
+     * be evaluated for candidate type with index \a cndtIndex of member
+     * \a name.
+     * @param name the name of the member
+     * @param cndtIndex index of the candidate type for that member
+     * @return \c true if this Instance is compatible with the expression,
+     * \c false otherwise
+     */
+    bool memberCandidateCompatible(const QString& name, int cndtIndex) const;
+
+    /**
+     * Retrieves the BaseType of candidate no. \a cndtIndex for member with index
+     * \a mbrIndex. You can check for the number of members with memberCount()
+     * and the number of candidate types for a particular member with
+     * memberCandidatesCount().
+     * @param mbrIndex index of the member
+     * @param cndtIndex index of the candidate type for that member
+     * @return a new Instance object for the member with the selected candidate
+     * type, if such a member and candiate exists, or an empty object otherwise
+     */
+    const BaseType* memberCandidateType(int mbrIndex, int cndtIndex) const;
 
     /**
      * Explicit representation of this instance as qint8.
@@ -431,6 +541,18 @@ public:
     void* toPointer() const;
 
     /**
+     * Explicit representation of this instance as an ExpressionResult struct.
+     * Depending on the BaseType of this instance, the result is converted into
+     * a numeric representation. Lexical types are automatically dereferenced.
+     * Pointer values will be converted to an unsigned 32 bit or 64 bit integer,
+     * depending the memory specifications. Any other type will result in an
+     * invalid value (erInvalid).
+     * @return a numeric representation of this instance
+     * \sa pointerSize()
+     */
+    ExpressionResult toExpressionResult() const;
+
+    /**
      * Explicit representation of this instance as QVariant.
      * @return the value of this type as a variant
      */
@@ -469,6 +591,11 @@ private:
     void differencesRek(const Instance& other, const QString& relParent,
             bool includeNestedStructs, QStringList& result,
             VisitedSet& visited) const;
+
+	Instance memberCandidate(const StructuredMember* m, int cndtIndex) const;
+
+	bool memberCandidateCompatible(const StructuredMember* m,
+								   int cndtIndex) const;
 
     InstanceData _d;
 };

@@ -24,7 +24,7 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    Structured(SymFactory* factory);
+    explicit Structured(SymFactory* factory);
 
     /**
      * Constructor
@@ -102,14 +102,14 @@ public:
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in);
+    virtual void readFrom(KernelSymbolStream& in);
 
     /**
      * Writes a serialized version of this object to \a out
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const;
+    virtual void writeTo(KernelSymbolStream& out) const;
 
     /**
      * @param mem the memory device to read the data from

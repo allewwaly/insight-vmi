@@ -15,7 +15,6 @@
 #include <QTime>
 #include <QMetaType>
 #include <QThread>
-#include "debug.h"
 
 // Register this type in Qt's meta-type system
 static int __channel_t_meta_id = qRegisterMetaType<channel_t>("channel_t");

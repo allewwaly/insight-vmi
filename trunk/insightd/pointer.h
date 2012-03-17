@@ -53,23 +53,6 @@ public:
      */
     virtual uint hash(bool* isValid = 0) const;
 
-    /**
-     * This returns the additional offset to consider when de-referencing this
-     * pointer.
-     * \sa setMacroOffset()
-     * @return additional offset
-     */
-    int macroExtraOffset() const;
-
-    /**
-     * This sets the additional offset to consider when de-referencing this
-     * pointer. It is required, for example, to cope with C macro tricks that
-     * the kernel uses for its linked lists (\c struct \c list_head) and hash
-     * tables.
-     * @param offset the additional offset
-     */
-    void setMacroExtraOffset(int offset);
-
 protected:
     /**
      * Reads a zero-terminated string of max. length \a len from \a mem at
@@ -81,22 +64,6 @@ protected:
      * @return the read string
      */
     QString readString(QIODevice* mem, size_t offset, const int len, QString* errMsg) const;
-
-    // Doesn't need to be saved in writeTo() because it's only set when creating
-    // special struct types.
-    int _macroExtraOffset;  ///< Additional offset to consider when de-referencing this pointer
 };
-
-
-inline int Pointer::macroExtraOffset() const
-{
-    return _macroExtraOffset;
-}
-
-
-inline void Pointer::setMacroExtraOffset(int offset)
-{
-    _macroExtraOffset = offset;
-}
 
 #endif /* POINTER_H_ */

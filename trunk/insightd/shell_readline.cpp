@@ -5,7 +5,7 @@
 #include <QDir>
 #include <QLocalSocket>
 #include <insight/constdefs.h>
-#include "debug.h"
+#include <debug.h>
 
 
 void Shell::prepareReadline()

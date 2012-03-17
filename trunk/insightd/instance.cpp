@@ -11,8 +11,9 @@
 #include "refbasetype.h"
 #include "pointer.h"
 #include "virtualmemory.h"
-#include "debug.h"
+#include <debug.h>
 #include "array.h"
+#include "astexpression.h"
 #include <QScriptEngine>
 #include <QSharedData>
 
@@ -103,15 +104,22 @@ const QStringList& Instance::memberNames() const
 }
 
 
-InstanceList Instance::members() const
+InstanceList Instance::members(bool declaredTypes) const
 {
     if (!_d.type || !(_d.type->type() & StructOrUnion))
         return InstanceList();
 
 	const MemberList& list = dynamic_cast<const Structured*>(_d.type)->members();
 	InstanceList ret;
-	for (int i = 0; i < list.count(); ++i)
-		ret.append(list[i]->toInstance(_d.address, _d.vmem, this, BaseType::trLexical));
+	for (int i = 0; i < list.count(); ++i) {
+		const StructuredMember* m = list[i];
+		// Use declared or candidate type?
+		if (declaredTypes || m->altRefTypeCount() != 1)
+			ret.append(m->toInstance(_d.address, _d.vmem, this,
+										   BaseType::trLexical));
+		else
+			ret.append(memberCandidate(m, 0));
+	}
 	return ret;
 }
 
@@ -223,8 +231,8 @@ bool Instance::equals(const Instance& other) const
     case rtTypedef:
     case rtVolatile: {
         int cnt1, cnt2;
-        Instance inst1 = dereference(BaseType::trAny, &cnt1);
-        Instance inst2 = other.dereference(BaseType::trAny, &cnt2);
+        Instance inst1 = dereference(BaseType::trAny, -1, &cnt1);
+        Instance inst2 = other.dereference(BaseType::trAny, -1, &cnt2);
 
         if (cnt1 != cnt2)
             return false;
@@ -337,8 +345,8 @@ void Instance::differencesRek(const Instance& other,
     case rtTypedef:
     case rtVolatile: {
         int cnt1, cnt2;
-        Instance inst1 = dereference(BaseType::trAny, &cnt1);
-        Instance inst2 = other.dereference(BaseType::trAny, &cnt2);
+        Instance inst1 = dereference(BaseType::trAny, -1, &cnt1);
+        Instance inst2 = other.dereference(BaseType::trAny, -1, &cnt2);
 
         if (cnt1 != cnt2)
             result.append(relParent);
@@ -359,7 +367,7 @@ void Instance::differencesRek(const Instance& other,
 
 Instance Instance::arrayElem(int index) const
 {
-    if (!_d.type || !(_d.type->type() & rtPointer))
+    if (!_d.type || !(_d.type->type() & (rtPointer|rtArray)))
         return Instance();
 
     const Pointer* p = dynamic_cast<const Pointer*>(_d.type);
@@ -376,47 +384,110 @@ Instance Instance::arrayElem(int index) const
 }
 
 
-Instance Instance::dereference(int resolveTypes, int* derefCount) const
+Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCount) const
 {
+    if (derefCount)
+        *derefCount = 0;
+
     if (isNull())
         return *this;
 
-    if (resolveTypes && _d.type)
+    if (_d.type && (_d.type->type() & resolveTypes))
         return _d.type->toInstance(_d.address, _d.vmem, _d.name,
-                _d.parentNames, resolveTypes, derefCount);
+                _d.parentNames, resolveTypes, maxPtrDeref, derefCount);
 
-    if (derefCount)
-        *derefCount = 0;
     return *this;
 }
 
 
-Instance Instance::member(int index, int resolveTypes) const
+Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
+						  bool declaredType) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && index >= 0 && index < s->members().size()) {
-		return s->members().at(index)->toInstance(_d.address, _d.vmem,
-		        this, resolveTypes);
+		const StructuredMember* m = s->members().at(index);
+		if (declaredType)
+			return m->toInstance(_d.address, _d.vmem, this, resolveTypes, maxPtrDeref);
+		else {
+			// See how many candidates are compatible with this instance
+			int cndtIndex = -1;
+			for (int i = 0; i < m->altRefTypeCount(); ++i) {
+				if (m->altRefTypes().at(i).compatible(this)) {
+					// Is this the first compatible candidate?
+					if (cndtIndex < 0)
+						cndtIndex = i;
+					// More than one candidate
+					else {
+						cndtIndex = -1;
+						break;
+					}
+				}
+			}
+
+			// If we found only one compabile candidate, we return that one
+			if (cndtIndex >= 0) {
+				Instance inst = memberCandidate(m, cndtIndex);
+				// Dereference instance again, if required
+				if (inst.type() && inst.type()->type() & resolveTypes)
+					inst = inst.dereference(resolveTypes,
+											maxPtrDeref == 0 ? 0 : maxPtrDeref - 1);
+				return inst;
+			}
+			else
+				return m->toInstance(_d.address, _d.vmem, this, resolveTypes,
+									 maxPtrDeref);
+		}
 	}
 	return Instance();
 }
 
 
-const BaseType* Instance::memberType(int index, int resolveTypes) const
+const BaseType* Instance::memberType(int index, int resolveTypes,
+									 bool declaredType) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && index >= 0 && index < s->members().size()) {
-		return s->members().at(index)->refTypeDeep(resolveTypes);
+		const StructuredMember* m = s->members().at(index);
+		if (declaredType || m->altRefTypeCount() != 1)
+			return m->refTypeDeep(resolveTypes);
+		else {
+			const BaseType* ret = m->altRefBaseType(0);
+			if (ret && resolveTypes)
+				ret = ret->dereferencedBaseType(resolveTypes);
+			return ret;
+		}
 	}
 	return 0;
 }
 
 
-quint64 Instance::memberAddress(int index) const
+quint64 Instance::memberAddress(int index, bool declaredType) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && index >= 0 && index < s->members().size()) {
-		return _d.address + s->members().at(index)->offset();
+		const StructuredMember* m = s->members().at(index);
+		if (declaredType || m->altRefTypeCount() != 1)
+			return _d.address + m->offset();
+		else {
+			Instance inst = memberCandidate(m, 0);
+			return inst.address();
+		}
+	}
+	return 0;
+}
+
+
+quint64 Instance::memberAddress(const QString &name, bool declaredType) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	const StructuredMember* m;
+	if (s && (m = s->findMember(name, false))) {
+		if (declaredType || m->altRefTypeCount() != 1)
+			return _d.address + m->offset();
+		else {
+			Instance inst = memberCandidate(m, 0);
+			return inst.address();
+		}
 	}
 	return 0;
 }
@@ -442,14 +513,18 @@ bool Instance::memberExists(const QString& name) const
 }
 
 
-Instance Instance::findMember(const QString& name, int resolveTypes) const
+Instance Instance::findMember(const QString& name, int resolveTypes,
+							  bool declaredType) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	const StructuredMember* m = 0;
 	if ( !s || !(m = s->findMember(name)) )
 		return Instance();
 
-	return m->toInstance(_d.address, _d.vmem, this, resolveTypes);
+	if (declaredType || m->altRefTypeCount() != 1)
+		return m->toInstance(_d.address, _d.vmem, this, resolveTypes);
+	else
+		return memberCandidate(m, 0);
 }
 
 
@@ -460,12 +535,160 @@ int Instance::indexOfMember(const QString& name) const
 }
 
 
-int Instance::typeIdOfMember(const QString& name) const
+int Instance::typeIdOfMember(const QString& name, bool declaredType) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	const StructuredMember* m = 0;
 	if ( !s || !(m = s->findMember(name)) )
 		return 0;
-	else
+	else if (declaredType || m->altRefTypeCount() != 1)
 		return m->refTypeId();
+	else
+		return m->altRefType(0).id();
+}
+
+
+int Instance::memberCandidatesCount(const QString &name) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	const StructuredMember* m = 0;
+	if ( !s || !(m = s->findMember(name)) )
+		return -1;
+
+	return m->altRefTypeCount();
+}
+
+
+int Instance::memberCandidatesCount(int index) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s && index >= 0 && index < s->members().size()) {
+		return s->members().at(index)->altRefTypeCount();
+	}
+	return -1;
+}
+
+
+Instance Instance::memberCandidate(int mbrIndex, int cndtIndex) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s && mbrIndex >= 0 && mbrIndex < s->members().size())
+		return memberCandidate(s->members().at(mbrIndex), cndtIndex);
+
+	return Instance();
+}
+
+
+Instance Instance::memberCandidate(const QString &name, int cndtIndex) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s)
+		return memberCandidate(s->findMember(name, true), cndtIndex);
+
+	return Instance();
+}
+
+
+bool Instance::memberCandidateCompatible(int mbrIndex, int cndtIndex) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s)
+		return memberCandidateCompatible(s->members().at(mbrIndex), cndtIndex);
+
+	return false;
+}
+
+
+bool Instance::memberCandidateCompatible(const QString &name, int cndtIndex) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s)
+		return memberCandidateCompatible(s->findMember(name, true), cndtIndex);
+
+	return false;
+}
+
+
+const BaseType *Instance::memberCandidateType(int mbrIndex, int cndtIndex) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s && mbrIndex >= 0 && mbrIndex < s->members().size() &&
+		_d.type && _d.type->factory()) {
+		int id = s->members().at(mbrIndex)->altRefType(cndtIndex).id();
+		return _d.type->factory()->findBaseTypeById(id);
+	}
+
+	return 0;
+}
+
+
+Instance Instance::memberCandidate(const StructuredMember* m,
+								   int cndtIndex) const
+{
+	if (!m || cndtIndex < 0 || cndtIndex >= m->altRefTypeCount())
+		return Instance();
+	// Otherwise use the alternative type
+	const ReferencingType::AltRefType& alt = m->altRefType(cndtIndex);
+	return alt.toInstance(_d.vmem, this, _d.type ? _d.type->factory() : 0,
+						  m->name(), _d.parentNames);
+}
+
+
+bool Instance::memberCandidateCompatible(const StructuredMember* m,
+										 int cndtIndex) const
+{
+	if (!m || cndtIndex < 0 || cndtIndex >= m->altRefTypeCount())
+		return false;
+
+	return m->altRefType(cndtIndex).compatible(this);
+}
+
+
+ExpressionResult Instance::toExpressionResult() const
+{
+	if (_d.isNull)
+		return ExpressionResult(erUndefined);
+
+	const BaseType* t = _d.type->dereferencedBaseType(BaseType::trLexical);
+	ExpressionResultType ert = (_d.id > 0) ? erGlobalVar : erLocalVar;
+
+	switch (t->type()) {
+	case rtInt8:
+		return ExpressionResult(ert, esInt8,
+								(quint64)t->toInt8(_d.vmem, _d.address));
+	case rtUInt8:
+		return ExpressionResult(ert, esUInt8,
+								(quint64)t->toUInt8(_d.vmem, _d.address));
+	case rtInt16:
+		return ExpressionResult(ert, esInt16,
+								(quint64)t->toInt16(_d.vmem, _d.address));
+	case rtUInt16:
+		return ExpressionResult(ert, esUInt16,
+								(quint64)t->toUInt16(_d.vmem, _d.address));
+	case rtInt32:
+		return ExpressionResult(ert, esInt32,
+								(quint64)t->toInt32(_d.vmem, _d.address));
+	case rtUInt32:
+		return ExpressionResult(ert, esUInt32,
+								(quint64)t->toUInt32(_d.vmem, _d.address));
+	case rtInt64:
+		return ExpressionResult(ert, esInt64,
+								(quint64)t->toInt64(_d.vmem, _d.address));
+	case rtUInt64:
+		return ExpressionResult(ert, esUInt64,
+								(quint64)t->toUInt64(_d.vmem, _d.address));
+	case rtFloat:
+		return ExpressionResult(ert, esFloat, t->toFloat(_d.vmem, _d.address));
+	case rtDouble:
+		return ExpressionResult(ert, esDouble, t->toDouble(_d.vmem, _d.address));
+	case rtFuncPointer:
+	case rtPointer:
+		return pointerSize() == 4 ?
+					ExpressionResult(ert, esUInt32,
+									 (quint64)t->toUInt32(_d.vmem, _d.address)) :
+					ExpressionResult(ert, esUInt64,
+									 (quint64)t->toUInt64(_d.vmem, _d.address));
+	default:
+		return ExpressionResult(erUndefined);
+	}
 }

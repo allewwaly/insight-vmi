@@ -27,7 +27,7 @@ public:
      * Constructor
      * @param factory the factory that created this symbol
      */
-    StructuredMember(SymFactory* factory);
+    explicit StructuredMember(SymFactory* factory);
 
     /**
      * Constructor
@@ -59,14 +59,14 @@ public:
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in);
+    virtual void readFrom(KernelSymbolStream &in);
 
     /**
      * Writes a serialized version of this object to \a out
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const;
+    virtual void writeTo(KernelSymbolStream& out) const;
 
     /**
      * @return the Struct or Union this member belongs to
@@ -80,11 +80,14 @@ public:
      * @param parent the parent instance of this member
      * @param resolveTypes which types to automatically resolve, see
      * BaseType::TypeResolution
+     * @param maxPtrDeref the maximum levels of pointers that should be
+     * dereferenced
      * @return an Instace object for this member
      */
     Instance toInstance(size_t structAddress, VirtualMemory* vmem,
-    		const Instance *parent, int resolveTypes =
-    		BaseType::trLexical) const;
+                        const Instance *parent,
+                        int resolveTypes = BaseType::trLexical,
+                        int maxPtrDeref = -1) const;
 
 protected:
     /**
@@ -121,7 +124,7 @@ inline SymFactory* StructuredMember::fac()
  * @param member object to store the serialized data to
  * @return the data stream \a in
  */
-QDataStream& operator>>(QDataStream& in, StructuredMember& member);
+KernelSymbolStream& operator>>(KernelSymbolStream& in, StructuredMember& member);
 
 
 /**
@@ -130,6 +133,6 @@ QDataStream& operator>>(QDataStream& in, StructuredMember& member);
  * @param member object to serialize
  * @return the data stream \a out
  */
-QDataStream& operator<<(QDataStream& out, const StructuredMember& member);
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const StructuredMember& member);
 
 #endif /* STRUCTUREDMEMBER_H_ */

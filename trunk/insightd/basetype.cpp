@@ -1,6 +1,6 @@
 #include "basetype.h"
 #include "refbasetype.h"
-#include "debug.h"
+#include <debug.h>
 
 #include <QIODevice>
 
@@ -22,14 +22,16 @@ BaseType::~BaseType()
 }
 
 
-RealType BaseType::dereferencedType(int resolveTypes, int *depth) const
+RealType BaseType::dereferencedType(int resolveTypes, int maxPtrDeref,
+                                    int *depth) const
 {
-    const BaseType* b = dereferencedBaseType(resolveTypes, depth);
+    const BaseType* b = dereferencedBaseType(resolveTypes, maxPtrDeref, depth);
     return b ? b->type() : type();
 }
 
 
-BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth)
+BaseType* BaseType::dereferencedBaseType(int resolveTypes, int maxPtrDeref,
+                                         int *depth)
 {
     if (depth)
         *depth = 0;
@@ -39,16 +41,26 @@ BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth)
     BaseType* prev = this;
     RefBaseType* curr = dynamic_cast<RefBaseType*>(prev);
     while (curr && curr->refType() && (curr->type() & resolveTypes) ) {
+        if (curr->type() & (rtPointer|rtArray)) {
+            // Count down pointer dereferences
+            if (maxPtrDeref > 0)
+                --maxPtrDeref;
+            // Stop when we would exceed the allowed pointer limit
+            else if (maxPtrDeref == 0)
+                break;
+            // Only count pointer dereferences
+            if (depth)
+                *depth += 1;
+        }
         prev = curr->refType();
         curr = dynamic_cast<RefBaseType*>(prev);
-        if (depth)
-            *depth += 1;
     }
     return prev;
 }
 
 
-const BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth) const
+const BaseType* BaseType::dereferencedBaseType(
+        int resolveTypes, int maxPtrDeref, int *depth) const
 {
     if (depth)
         *depth = 0;
@@ -58,10 +70,19 @@ const BaseType* BaseType::dereferencedBaseType(int resolveTypes, int *depth) con
     const BaseType* prev = this;
     const RefBaseType* curr = dynamic_cast<const RefBaseType*>(prev);
     while (curr && curr->refType() && (curr->type() & resolveTypes) ) {
+        if (curr->type() & (rtPointer|rtArray)) {
+            // Count down pointer dereferences
+            if (maxPtrDeref > 0)
+                --maxPtrDeref;
+            // Stop when we would exceed the allowed pointer limit
+            else if (maxPtrDeref == 0)
+                break;
+            // Only count pointer dereferences
+            if (depth)
+                *depth += 1;
+        }
         prev = curr->refType();
         curr = dynamic_cast<const RefBaseType*>(prev);
-        if (depth)
-            *depth += 1;
     }
     return prev;
 }
@@ -117,7 +138,7 @@ void BaseType::setSize(quint32 size)
 
 Instance BaseType::toInstance(size_t address, VirtualMemory* vmem,
         const QString& name, const QStringList& parentNames,
-        int /*resolveTypes*/, int* /*derefCount*/) const
+        int /*resolveTypes*/, int /*maxPtrDeref*/, int* /*derefCount*/) const
 {
     return Instance(address, this, name, parentNames, vmem, -1);
 }
@@ -133,7 +154,7 @@ bool BaseType::operator==(const BaseType& other) const
 }
 
 
-void BaseType::readFrom(QDataStream& in)
+void BaseType::readFrom(KernelSymbolStream &in)
 {
     // Read inherited values
     Symbol::readFrom(in);
@@ -143,7 +164,7 @@ void BaseType::readFrom(QDataStream& in)
 }
 
 
-void BaseType::writeTo(QDataStream& out) const
+void BaseType::writeTo(KernelSymbolStream &out) const
 {
     // Write inherited values
     Symbol::writeTo(out);
@@ -152,14 +173,14 @@ void BaseType::writeTo(QDataStream& out) const
 }
 
 
-QDataStream& operator>>(QDataStream& in, BaseType& type)
+KernelSymbolStream& operator>>(KernelSymbolStream& in, BaseType& type)
 {
     type.readFrom(in);
     return in;
 }
 
 
-QDataStream& operator<<(QDataStream& out, const BaseType& type)
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const BaseType& type)
 {
     type.writeTo(out);
     return out;

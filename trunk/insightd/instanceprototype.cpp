@@ -9,7 +9,7 @@
 #include <QScriptEngine>
 #include "basetype.h"
 #include "shell.h"
-#include "debug.h"
+#include <debug.h>
 
 Q_DECLARE_METATYPE(Instance*)
 
@@ -205,10 +205,11 @@ QStringList InstancePrototype::MemberNames() const
 }
 
 
-InstanceList InstancePrototype::Members() const
+InstanceList InstancePrototype::Members(bool declaredTypes) const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->members() : InstanceList();
+	return ((inst = thisInstance())) ?
+				inst->members(declaredTypes) : InstanceList();
 }
 
 
@@ -235,10 +236,6 @@ QString InstancePrototype::TypeName() const
 
 QString InstancePrototype::Type() const
 {
-//    // Init static member
-//    static BaseType::RealTypeRevMap realTypeNames =
-//            BaseType::getRealTypeRevMap();
-
     Instance* inst;
     return ( ((inst = thisInstance())) && inst->type() ) ?
             realTypeToStr(inst->type()->type()) : QString("unknown");
@@ -262,22 +259,105 @@ bool InstancePrototype::MemberExists(const QString& name) const
 int InstancePrototype::MemberOffset(const QString& name) const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->memberOffset(name) : 0;
+	return ((inst = thisInstance())) ? inst->memberOffset(name) : 0;
 }
 
 
-Instance InstancePrototype::FindMember(const QString& name) const
+int InstancePrototype::MemberCount() const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ? inst->memberCount() : 0;
+}
+
+
+Instance InstancePrototype::Member(const QString& name, bool declaredType) const
 {
 	Instance* inst;
     return ((inst = thisInstance())) ?
-            inst->findMember(name, BaseType::trAny) : Instance();
+            inst->findMember(name, BaseType::trAny, declaredType) : Instance();
 }
 
 
-int InstancePrototype::TypeIdOfMember(const QString& name) const
+Instance InstancePrototype::Member(int index, bool declaredType) const
+{
+    Instance* inst;
+    return ((inst = thisInstance())) ?
+                inst->member(index, BaseType::trAny, -1, declaredType) :
+                Instance();
+}
+
+
+int InstancePrototype::TypeIdOfMember(const QString& name,
+									  bool declaredType) const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->typeIdOfMember(name) : -1;
+	return ((inst = thisInstance())) ?
+				inst->typeIdOfMember(name, declaredType) : -1;
+}
+
+
+int InstancePrototype::MemberCandidatesCount(const QString &name) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ? inst->memberCandidatesCount(name) : 0;
+}
+
+
+int InstancePrototype::MemberCandidatesCount(int index) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ? inst->memberCandidatesCount(index) : 0;
+}
+
+
+Instance InstancePrototype::MemberCandidate(int mbrIndex, int cndtIndex) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ?
+				inst->memberCandidate(mbrIndex, cndtIndex) : Instance();
+}
+
+
+Instance InstancePrototype::MemberCandidate(const QString &name, int cndtIndex) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ?
+				inst->memberCandidate(name, cndtIndex) : Instance();
+}
+
+
+bool InstancePrototype::MemberCandidateCompatible(int mbrIndex, int cndtIndex) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ?
+				inst->memberCandidateCompatible(mbrIndex, cndtIndex) : false;
+}
+
+
+bool InstancePrototype::MemberCandidateCompatible(const QString &name, int cndtIndex) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ?
+				inst->memberCandidateCompatible(name, cndtIndex) : false;
+}
+
+
+QString InstancePrototype::MemberAddress(int index, bool declaredType) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ?
+				QString::number(inst->memberAddress(index, declaredType), 16) :
+				QString("0");
+}
+
+
+QString InstancePrototype::MemberAddress(const QString &name,
+										 bool declaredType) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ?
+				QString::number(inst->memberAddress(name, declaredType), 16) :
+				QString("0");
 }
 
 
@@ -475,8 +555,14 @@ double InstancePrototype::toDouble() const
 QString InstancePrototype::toString() const
 {
     try {
-        Instance* inst;
-        return ((inst = thisInstance())) ? inst->toString() : QString();
+        Instance* inst = thisInstance();
+        if (!inst)
+            return QString();
+        QString s = inst->toString();
+        // Trim quotes from the string, if any
+        if (s.startsWith('"') && s.endsWith('"'))
+            s = s.mid(1, s.length() - 2);
+        return s;
     }
     catch (GenericException& e) {
         injectScriptError(e);

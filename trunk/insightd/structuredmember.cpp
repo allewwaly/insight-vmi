@@ -10,7 +10,7 @@
 #include "virtualmemory.h"
 #include "pointer.h"
 #include "funcpointer.h"
-#include "debug.h"
+#include <debug.h>
 
 StructuredMember::StructuredMember(SymFactory* factory)
 	: Symbol(factory), _offset(0), _belongsTo(0)
@@ -61,15 +61,15 @@ QString StructuredMember::prettyName() const
 
 Instance StructuredMember::toInstance(size_t structAddress,
 		VirtualMemory* vmem, const Instance* parent,
-		int resolveTypes) const
+		int resolveTypes, int maxPtrDeref) const
 {
 	return createRefInstance(structAddress + _offset, vmem, _name,
 	        parent ? parent->parentNameComponents() : QStringList(),
-	        resolveTypes);
+			resolveTypes, maxPtrDeref);
 }
 
 
-void StructuredMember::readFrom(QDataStream& in)
+void StructuredMember::readFrom(KernelSymbolStream& in)
 {
     Symbol::readFrom(in);
     ReferencingType::readFrom(in);
@@ -81,7 +81,7 @@ void StructuredMember::readFrom(QDataStream& in)
 }
 
 
-void StructuredMember::writeTo(QDataStream& out) const
+void StructuredMember::writeTo(KernelSymbolStream& out) const
 {
     Symbol::writeTo(out);
     ReferencingType::writeTo(out);
@@ -90,14 +90,15 @@ void StructuredMember::writeTo(QDataStream& out) const
 }
 
 
-QDataStream& operator>>(QDataStream& in, StructuredMember& member)
+KernelSymbolStream& operator>>(KernelSymbolStream& in, StructuredMember& member)
 {
     member.readFrom(in);
     return in;
 }
 
 
-QDataStream& operator<<(QDataStream& out, const StructuredMember& member)
+KernelSymbolStream& operator<<(KernelSymbolStream& out,
+                               const StructuredMember& member)
 {
     member.writeTo(out);
     return out;
