@@ -23,14 +23,17 @@
 
 //------------------------------------------------------------------------------
 
-KernelSymbolReader::KernelSymbolReader(QIODevice* from, SymFactory* factory, MemSpecs* specs)
-    : _from(from), _factory(factory), _specs(specs), _phase(phFinished)
+KernelSymbolReader::KernelSymbolReader(QIODevice* from, SymFactory* factory,
+                                       MemSpecs* specs)
+    : _from(from), _factory(factory), _specs(specs), _phase(phFinished),
+      _lastLen(0)
 {
 }
 
 
 void KernelSymbolReader::read()
 {
+    _lastLen = 0;
     operationStarted();
 
     qint16 flags, version;
@@ -206,7 +209,7 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
     catch (...) {
         // Exceptional cleanup
         operationStopped();
-        shell->out() << endl;
+        shellOut(QString(), true);
         throw; // Re-throw exception
     }
 
@@ -214,11 +217,12 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
 
     // Regular cleanup
     operationStopped();
-    shell->out() << "\rReading symbols finished";
+
+    QString s("\rReading symbols finished");
     if (!_from->isSequential())
-        shell->out() << " ("
-        << _from->pos() << " bytes read)";
-    shell->out() << "." << endl;
+        s += QString(" (%1 bytes read)").arg(_from->pos());
+    s += ".";
+    shellOut(s, true);
 }
 
 
@@ -441,7 +445,7 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
     catch (...) {
         // Exceptional cleanup
         operationStopped();
-        shell->out() << endl;
+        shellOut(QString(), true);
         throw; // Re-throw exception
     }
 
@@ -449,11 +453,29 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
 
     // Regular cleanup
     operationStopped();
-    shell->out() << "\rReading symbols finished";
+
+    QString s("\rReading symbols finished");
     if (!_from->isSequential())
-        shell->out() << " ("
-        << _from->pos() << " bytes read)";
-    shell->out() << "." << endl;
+        s += QString(" (%1 bytes read)").arg(_from->pos());
+    s += ".";
+    shellOut(s, true);
+}
+
+
+void KernelSymbolReader::shellOut(const QString &s, bool newline)
+{
+    if (!s.isEmpty())
+        shell->out() << qSetFieldWidth(_lastLen) << qPrintable(s)
+                     << qSetFieldWidth(0);
+
+    if (newline) {
+        shell->out() << endl;
+        _lastLen = 0;
+    }
+    else {
+        shell->out() << flush;
+        _lastLen = s.length();
+    }
 }
 
 
@@ -471,11 +493,13 @@ void KernelSymbolReader::operationProgress()
     default:                 what = "variables"; break;
     }
 
-    shell->out() << "\rReading " << what;
+    what = "\rReading " + what;
 
     qint64 size = _from->size();
     qint64 pos = _from->pos();
     if (!_from->isSequential() && size > 0)
-        shell->out() << " (" << (int) ((pos / (float) size) * 100) << "%)";
-    shell->out() << ", " << elapsedTime() << " elapsed" << flush;
+        what += QString(" (%1%)").arg((int)((pos / (float) size) * 100));
+    what += QString(", %1 elapsed").arg(elapsedTime());
+
+    shellOut(what, false);
 }
