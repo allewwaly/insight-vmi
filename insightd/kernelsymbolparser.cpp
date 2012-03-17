@@ -478,15 +478,16 @@ void KernelSymbolParser::parse()
     operationStopped();
 
     shell->out()
-        << "\rParsing " << _line << " lines ("
-        << _bytesRead << " bytes) finished." << endl;
+        << "\rParsing debugging symbols with " << _line << " lines ("
+        << _bytesRead << " bytes) finished in " << elapsedTimeVerbose() << "."
+        << endl;
 }
 
 
 // Show some progress information
 void KernelSymbolParser::operationProgress()
 {
-    shell->out() << "\rParsing line " << _line;
+    shell->out() << "\rParsing debugging symbols at line " << _line;
 
     qint64 size = _from->size();
     if (!_from->isSequential() && size > 0)

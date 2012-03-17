@@ -69,18 +69,8 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
             time = QString("%1 min ").arg(m) + time;
 
 	    shell->out()
-            << "\rSuccessfully parsed the memory specifications in " << time << endl;
-
-//        // Ask the user if he wants to keep the build directory
-//	    debugmsg("Ask user to keep the build directory");
-//        QString reply;
-//        do {
-//            QString prompt = QString("Keep build directory \"%1\"? [Y/n] ").arg(specParser.buildDir());
-//            reply = shell->readLine(prompt).toLower();
-//            if (reply.isEmpty())
-//                reply = "y";
-//        } while (reply != "y" && reply != "n");
-//        specParser.setAutoRemoveBuildDir(reply == "n");
+			<< "\rSuccessfully parsed the memory specifications in " << time
+			<< "." << endl;
 	}
     catch (GenericException& e) {
         shell->err()
@@ -89,14 +79,15 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
             << "Message: " << e.message << endl;
 
         // Was the error caused during the memspec build process?
-        if (!specParser.errorOutput().isEmpty()) {
+        if (!specParser.errorOutput().isEmpty() && shell->interactive()) {
             // Output the error messages
             shell->err() << endl << specParser.errorOutput() << endl;
 
             // Ask the user if he wants to keep the build directory
             QString reply;
             do {
-                QString prompt = QString("Keep build directory \"%1\"? [Y/n] ").arg(specParser.buildDir());
+                QString prompt = QString("Keep build directory \"%1\"? [Y/n] ")
+                                    .arg(specParser.buildDir());
                 reply = shell->readLine(prompt).toLower();
                 if (reply.isEmpty())
                     reply = "y";
@@ -113,18 +104,6 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
 		symParser.parse();
 	    _factory.symbolsFinished(SymFactory::rtParsing);
 
-        // Print out some timing statistics
-        int duration = timer.elapsed();
-        int s = (duration / 1000) % 60;
-        int m = duration / (60*1000);
-        QString time = QString("%1 sec").arg(s);
-        if (m > 0)
-            time = QString("%1 min ").arg(m) + time;
-
-		shell->out() << "Parsing finish in " << time;
-        if (duration > 0)
-            shell->out() << " (" << (int)((symParser.line() / (float)duration * 1000)) << " lines per second)";
-        shell->out() << "." << endl;
 	}
     catch (GenericException& e) {
         shell->err()
