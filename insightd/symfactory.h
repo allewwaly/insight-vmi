@@ -261,14 +261,6 @@ public:
 		return _types;
 	}
 
-    /**
-     * @return the list of all artificial types created by this factory
-     */
-    inline const BaseTypeList& artificialTypes() const
-    {
-        return _artificialTypes;
-    }
-
 	/**
 	 * @return the hash of all types by their ID
 	 */
@@ -667,7 +659,6 @@ private:
 	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
 	EnumStringHash _enumsByName;         ///< Holds all enumerator values, indexed by name
 	BaseTypeList _types;              ///< Holds all BaseType objects which were parsed or read from symbol files
-	BaseTypeList _artificialTypes;    ///< Holds all BaseType objects which were created artificially
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	IntIntMultiHash _equivalentTypes; ///< Holds all type IDs of equivalent types

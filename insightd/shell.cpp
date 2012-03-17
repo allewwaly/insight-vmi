@@ -932,102 +932,98 @@ int Shell::cmdListTypes(QStringList args)
     		Qt::CaseSensitive, QRegExp::WildcardUnix);
 
     QString src, srcLine, name;
-    for (int round = 1; round <= 2; ++round) {
 
-        for (int i = 0; i < types->size(); i++) {
-            BaseType* type = types->at(i);
+    for (int i = 0; i < types->size(); i++) {
+        BaseType* type = types->at(i);
 
-            // Apply name filter, if requested
-            if (applyFilter && !rxFilter.exactMatch(type->name()))
-                continue;
+        // Apply name filter, if requested
+        if (applyFilter && !rxFilter.exactMatch(type->name()))
+            continue;
 
-            // Print header if not yet done
-            if (!headerPrinted) {
-                _out << qSetFieldWidth(w_id)  << right << "ID"
-                     << qSetFieldWidth(w_colsep) << " "
-                     << qSetFieldWidth(w_type) << left << "Type"
-                     << qSetFieldWidth(w_name) << "Name"
-                     << qSetFieldWidth(w_size)  << right << "Size"
-                     << qSetFieldWidth(w_colsep) << " "
-                     << qSetFieldWidth(w_src) << left << "Source"
-                     << qSetFieldWidth(w_line) << right << "Line"
-                     << qSetFieldWidth(0)  << endl;
-
-                hline(w_total);
-                headerPrinted = true;
-            }
-
-            // Construct name and line of the source file
-            if (type->srcFile() > 0) {
-                if (!unit || unit->id() != type->srcFile())
-                    unit = _sym.factory().sources().value(type->srcFile());
-                if (!unit)
-                    src = QString("(unknown id: %1)").arg(type->srcFile());
-                else
-                    src = QString("%1").arg(unit->name());
-                if (src.size() > w_src)
-                    src = "..." + src.right(w_src - 3);
-            }
-            else
-                src = "--";
-
-            if (type->srcLine() > 0)
-                srcLine = QString::number(type->srcLine());
-            else
-                srcLine = "--";
-
-            // Get the pretty name
-            name = type->prettyName();
-            if (name.isEmpty())
-                name = "(none)";
-            // Shorten name, if necessary
-            else if (name.size() > w_name) {
-                if (type->type() & FunctionTypes) {
-                    const FuncPointer* fp = dynamic_cast<FuncPointer*>(type);
-                    if (!fp->refTypeId())
-                        name = "void";
-                    else if (fp->refType())
-                        name = fp->refType()->prettyName();
-                    else
-                        name = QString("(unresolved 0x%1)")
-                                .arg(fp->refTypeId(), 0, 16);
-                    if (!fp->name().isEmpty())
-                        name += " " + fp->name();
-
-                    QString params;
-                    for (int i = 0; i < fp->params().size(); ++i) {
-                        if (i > 0)
-                            params += ", ";
-                        params += fp->params().at(i)->prettyName();
-                    }
-
-                    if (name.size() + params.size() + 2 <= w_name)
-                        name += "(" + params + ")";
-                    else
-                        name += "(" + params.left(w_name - name.size() - 5) + "...)";
-                }
-
-                if (name.size() > w_name)
-                    name = name.left(w_name - 3) + "...";
-            }
-
-            _out << qSetFieldWidth(w_id)  << right << hex << (uint) type->id()
+        // Print header if not yet done
+        if (!headerPrinted) {
+            _out << qSetFieldWidth(w_id)  << right << "ID"
                  << qSetFieldWidth(w_colsep) << " "
-                 << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
-                 << qSetFieldWidth(w_name) << name
-                 << qSetFieldWidth(w_size) << right << dec << type->size()
+                 << qSetFieldWidth(w_type) << left << "Type"
+                 << qSetFieldWidth(w_name) << "Name"
+                 << qSetFieldWidth(w_size)  << right << "Size"
                  << qSetFieldWidth(w_colsep) << " "
-                 << qSetFieldWidth(w_src) << left << src
-                 << qSetFieldWidth(w_line) << right << srcLine
-                 << qSetFieldWidth(0) << endl;
+                 << qSetFieldWidth(w_src) << left << "Source"
+                 << qSetFieldWidth(w_line) << right << "Line"
+                 << qSetFieldWidth(0)  << endl;
 
-            ++typeCount;
+            hline(w_total);
+            headerPrinted = true;
         }
 
-        types = &_sym.factory().artificialTypes();
+        // Construct name and line of the source file
+        if (type->srcFile() > 0) {
+            if (!unit || unit->id() != type->srcFile())
+                unit = _sym.factory().sources().value(type->srcFile());
+            if (!unit)
+                src = QString("(unknown id: %1)").arg(type->srcFile());
+            else
+                src = QString("%1").arg(unit->name());
+            if (src.size() > w_src)
+                src = "..." + src.right(w_src - 3);
+        }
+        else
+            src = "--";
+
+        if (type->srcLine() > 0)
+            srcLine = QString::number(type->srcLine());
+        else
+            srcLine = "--";
+
+        // Get the pretty name
+        name = type->prettyName();
+        if (name.isEmpty())
+            name = "(none)";
+        // Shorten name, if necessary
+        else if (name.size() > w_name) {
+            if (type->type() & FunctionTypes) {
+                const FuncPointer* fp = dynamic_cast<FuncPointer*>(type);
+                if (!fp->refTypeId())
+                    name = "void";
+                else if (fp->refType())
+                    name = fp->refType()->prettyName();
+                else
+                    name = QString("(unresolved 0x%1)")
+                            .arg(fp->refTypeId(), 0, 16);
+                if (!fp->name().isEmpty())
+                    name += " " + fp->name();
+
+                QString params;
+                for (int i = 0; i < fp->params().size(); ++i) {
+                    if (i > 0)
+                        params += ", ";
+                    params += fp->params().at(i)->prettyName();
+                }
+
+                if (name.size() + params.size() + 2 <= w_name)
+                    name += "(" + params + ")";
+                else
+                    name += "(" + params.left(w_name - name.size() - 5) + "...)";
+            }
+
+            if (name.size() > w_name)
+                name = name.left(w_name - 3) + "...";
+        }
+
+        _out << qSetFieldWidth(w_id)  << right << hex << (uint) type->id()
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
+             << qSetFieldWidth(w_name) << name
+             << qSetFieldWidth(w_size) << right << dec << type->size()
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_src) << left << src
+             << qSetFieldWidth(w_line) << right << srcLine
+             << qSetFieldWidth(0) << endl;
+
+        ++typeCount;
     }
 
-    if (headerPrinted) {
+	if (headerPrinted) {
 		hline(w_total);
 		_out << "Total types: " << dec << typeCount << endl;
     }
@@ -2316,8 +2312,32 @@ int Shell::cmdSymbolsParse(QStringList args)
     }
 
     // Either use the given objdump file, or create it on the fly
-    if (mode == mDbgKernel)
+    if (mode == mDbgKernel) {
+        // Offer the user to parse the source, if found
+        bool parseSources = false;
+        QString ppSrc = kernelSrc + (kernelSrc.endsWith('/') ? "" : "/") + "__PP__";
+        QFileInfo ppSrcDir(ppSrc);
+        if (ppSrcDir.exists() && ppSrcDir.isDir()) {
+            if (_interactive) {
+                QString reply;
+                do {
+                    reply = readLine("Directory with pre-processed source "
+                                     "files detected. Process them as well? "
+                                     "[Y/n] ")
+                                .toLower();
+                    if (reply.isEmpty())
+                        reply = "y";
+                } while (reply != "y" && reply != "n");
+                parseSources = (reply == "y");
+            }
+            else
+                parseSources = true;
+        }
+
 		_sym.parseSymbols(kernelSrc);
+		if (parseSources && !interrupted())
+			cmdSymbolsSource(QStringList(ppSrc));
+	}
     else
     	_sym.parseSymbols(objdump, kernelSrc, sysmap);
 

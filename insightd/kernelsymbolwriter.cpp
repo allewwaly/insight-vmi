@@ -200,8 +200,7 @@ void KernelSymbolWriter::write()
 
         // Write list of missing types by ID
         const int ids_to_write =
-                _factory->typesById().size() - _factory->types().size() -
-                _factory->artificialTypes().size();
+                _factory->typesById().size() - _factory->types().size();
         out << (qint32)ids_to_write;
 #ifdef WRITE_ASCII_FILE
         dout << endl << "# Further type relations" << endl

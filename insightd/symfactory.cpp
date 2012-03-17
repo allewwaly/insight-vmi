@@ -80,14 +80,6 @@ void SymFactory::clear()
 	}
 	_types.clear();
 
-	// Delete all aritifical types
-	for (BaseTypeList::iterator it = _artificialTypes.begin();
-		 it != _artificialTypes.end(); ++it)
-	{
-		delete *it;
-	}
-	_artificialTypes.clear();
-
 	// Delete all expressions
 	for (ASTExpressionList::iterator it = _expressions.begin();
 		 it != _expressions.end(); ++it)
@@ -1367,7 +1359,7 @@ void SymFactory::symbolsFinished(RestoreType rt)
 
     shell->out() << qSetFieldWidth(10) << right;
 
-    shell->out() << "  | No. of types:              " << (_types.size() + _artificialTypes.size()) << endl;
+    shell->out() << "  | No. of types:              " << _types.size() << endl;
     shell->out() << "  | No. of types by name:      " << _typesByName.size() << endl;
     shell->out() << "  | No. of types by ID:        " << _typesById.size() << endl;
     shell->out() << "  | No. of types by hash:      " << _typesByHash.size() << endl;
@@ -1408,9 +1400,14 @@ void SymFactory::symbolsFinished(RestoreType rt)
     assert(_typesById.size() >= _typesByName.size());
     assert(_typesById.size() >= _typesByHash.size());
     assert(_typesByHash.size() == _types.size());
-    if (rt == rtParsing)
-        assert(_types.size() + _artificialTypes.size() + _typeFoundByHash ==
-               _typesById.size());
+//    if (rt == rtParsing) {
+//        assert(_types.size() + _typeFoundByHash == _typesById.size());
+//        if (_types.size() + _typeFoundByHash != _typesById.size()) {
+//            debugmsg("_types.size()     = " << _types.size());
+//            debugmsg("_typeFoundByHash  = " << _typeFoundByHash);
+//            debugmsg("_typesById.size() = " << _typesById.size());
+//        }
+//    }
 }
 
 
