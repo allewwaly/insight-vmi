@@ -56,3 +56,15 @@ QString LongOperation::elapsedTime() const
     return QString("%1:%2").arg(m).arg(s, 2, 10, QChar('0'));
 }
 
+
+QString LongOperation::elapsedTimeVerbose() const
+{
+    // Print out some timing statistics
+    int s = (_duration / 1000) % 60;
+    int m = _duration / (60*1000);
+    QString time = QString("%1 sec").arg(s);
+    if (m > 0)
+        time = QString("%1 min ").arg(m) + time;
+    return time;
+}
+

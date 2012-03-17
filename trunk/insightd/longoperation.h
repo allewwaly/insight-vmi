@@ -66,6 +66,12 @@ protected:
      */
     QString elapsedTime() const;
 
+    /**
+     * @return QString representing the elapsed time in the format "<m> min and
+     * <s> sec"
+     */
+    QString elapsedTimeVerbose() const;
+
     QTime _elapsedTime; ///< use _elapsedTime.elapsed() to get the elapsed
                         ///< time since operationStarted() was called
     int _duration;      ///< holds the elapsed time after operationStopped()
