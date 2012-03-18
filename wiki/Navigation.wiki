@@ -9,7 +9,7 @@
   * [GettingStarted Getting Started]
     * [Installation]
       * [BuildingFromSource Building from source]
-      * [InstallationOnDebian Installation on Debian/Ubuntu]
+      * [InstallationOnDebian Debian/Ubuntu]
     * [RunningInSight Running InSight]
     * [DebugSymbols Debugging Symbols]
       * [LinuxDebugSymbols Symbols for Linux]
