@@ -49,9 +49,14 @@ In order to extract kernel objects out of a machine's pyhsical memory, !InSight 
   # layout of the kernel's virtual memory
   # layout and size of kernel data structures
   # location of kernel objects in virtual memory
+  # dynamic type and pointer manipulations through the kernel
   # function of the virtual-to-physical address translation
 
-For a Linux system, !InSight obtains (2) and (3) from the [LinuxDebugSymbols debugging symbols] of the kernel begin analyzed. While the basic layout of the Linux kernel's address space (1) is public knowlege, the exact addresses and offsets of certain memory areas differ among kernel versions and addressing schemes. !InSight extracts the exact locations from three data sources: the `System.map` file, the kernel header files, and the debugging symbols. The virtual-to-physical address translation (4) itself is specified by the Intel IA-32 and the AMD64 architecture specification which is publicly available.
+For a Linux system, !InSight obtains (2) and (3) from the [LinuxDebugSymbols debugging symbols] of the kernel begin analyzed. While the basic layout of the Linux kernel's address space (1) is public knowlege, the exact addresses and offsets of certain memory areas differ among kernel versions and addressing schemes. !InSight extracts the exact locations from three data sources: the `System.map` file, the kernel header files, and the debugging symbols. 
+
+To capture the dynamic type and pointer manipulations (4) the kernel performs at runtime (type casts and pointer arithmetic), !InSight performs a static analysis of the pre-processed source code of the kernel. This knowledge is then applied to derive the correct object types and addresses when objects are read, allowing !InSight to read objects pointed to by `void*` pointers and following pointers stored as integer types.
+
+The virtual-to-physical address translation (5) itself is specified by the Intel IA-32 and the AMD64 architecture specification which is publicly available.
 
 With this information at hand, kernel objects can be read from physical memory. For example, when an application requests the object `init_task`, !InSight performs the following steps:
 
