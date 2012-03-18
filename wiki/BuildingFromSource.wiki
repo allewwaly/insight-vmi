@@ -14,7 +14,7 @@ The source code of the latest stable version of !InSight can be obtained from th
 
 <code language="sh">svn checkout http://insight-vmi.googlecode.com/svn/trunk/ insight-vmi</code>
 
-= Building from Source =
+= Compilation =
 
 The following instructions have been tested on a system with Ubuntu Linux (64-bit). Feel free to leave a comment if you experience problems with any of these steps in your environment.
 
