@@ -9,11 +9,11 @@ This page describes how to install the Debian packages we provide for Ubuntu and
 
 First download at least the `libinsight`, `insight` and `insightd` packages from the [https://code.google.com/p/insight-vmi/downloads/list download page]. You may want to download the package `insight-scripts` with some sample scripts as well.
 
-Install these packages with the `dpkg` package manager as usual:
+Install these packages with the `dpkg` package manager from the command line:
 
 <code language="sh">sudo dpkg -i \
-  ../libinsight_0.4_amd64.deb \
-  ../insight_0.4_amd64.deb \
-  ../insight-daemon_0.4_amd64.deb</code>
+  libinsight_0.4_amd64.deb \
+  insight_0.4_amd64.deb \
+  insight-daemon_0.4_amd64.deb</code>
 
 In the same way, you can install any other package you downloaded in addition.
