@@ -6,10 +6,14 @@ target.path += $$PREFIX/bin
 
 # Extra target for scripts
 scripts.files = scripts/*.js
-scripts.path += $$PREFIX/share/insight
+scripts.path += $$PREFIX/share/insight/examples
+
+# Extra target for tools
+tools.files = ../tools/gcc_pp ../tools/make-debug-kpkg
+tools.path += $$PREFIX/share/insight/tools
 
 # What to install
-INSTALLS += target scripts
+INSTALLS += target scripts tools
 
 SOURCES += kernelsourcetypeevaluator.cpp \
     kernelsourceparser.cpp \
