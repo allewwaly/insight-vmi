@@ -1,6 +1,6 @@
 #summary Building InSight from Source
 
-= Building InSight from Source =
+= Building !InSight from Source =
 
 <wiki:toc max_depth="2" />
 
