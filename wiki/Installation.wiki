@@ -11,7 +11,7 @@
 
 = Obtaining the Source Code =
 
-The source code of !InSight can be checked out from the subversion repository as explained on the [https://code.google.com/p/insight-vmi/source/checkout Source page]:
+The source code of the latest stable version of !InSight can be obtained from the [https://code.google.com/p/insight-vmi/downloads/list download page]. You can check out the latest, possibly instable version from the subversion repository as explained on the [https://code.google.com/p/insight-vmi/source/checkout source page]:
 
 <code language="sh">svn checkout http://insight-vmi.googlecode.com/svn/trunk/ insight-vmi</code>
 
