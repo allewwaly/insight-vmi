@@ -8,7 +8,7 @@ QT       -= gui
 
 TARGET = debug
 TEMPLATE = lib
-CONFIG += staticlib
+CONFIG += debug_and_release staticlib create_prl
 
 SOURCES += src/debug.cpp
 
