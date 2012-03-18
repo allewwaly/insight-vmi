@@ -7,7 +7,7 @@
 
 = Introduction =
 
-The foundation of InSight's ability to extract kernel objects out of physical memory are the debugging symbols of the Linux kernel being analyzed. How these symbols can be obtained depends on the operating system begin analyzed.
+The foundation of !InSight's ability to extract kernel objects out of physical memory are the debugging symbols of the Linux kernel being analyzed. How these symbols can be obtained depends on the operating system begin analyzed.
 
 = Linux =
 
