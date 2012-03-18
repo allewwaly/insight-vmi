@@ -7,88 +7,12 @@
 
 = Introduction =
 
-!InSight is distributed as source code rather than in form of packages for different distributions. The following instructions describe how to compile, install, and set up !InSight.
+We provide Debian and Ubuntu packages for the stable version of !InSight, along with the source code. This page helps you to decide how you can install !InSight on your system.
 
-= Obtaining the Source Code =
+= Debian/Ubuntu =
 
-The source code of the latest stable version of !InSight can be obtained from the [https://code.google.com/p/insight-vmi/downloads/list download page]. You can check out the latest, possibly instable version from the subversion repository as explained on the [https://code.google.com/p/insight-vmi/source/checkout source page]:
-
-<code language="sh">svn checkout http://insight-vmi.googlecode.com/svn/trunk/ insight-vmi</code>
+If you are using a Debian-based Linux distribution such as Ubuntu, you may install the Debian packages of !InSight by follow the [InstallationOnDebian instructions for Debian].
 
 = Building from Source =
 
-The following instructions have been tested on a system with Ubuntu Linux (64-bit). Feel free to leave a comment if you experience problems with any of these steps in your environment.
-
-== Prerequisites ==
-
-!InSight is written in C++ using the Qt libraries and the QMake build system. The following packages are required in order to build !InSight (package names might vary for different distrubutions):
-
-  * g++
-  * qt4-dev-tools
-  * make
-  * libqt4-dev
-  * libreadline-dev
-
-== Compilation and Installation ==
-
-The source directory `insight-vmi` you just checked out before should contain at least the following directories and files:
-
-<pre>
-debian/
-insight/
-insightd/
-libantlr3c/
-libcparser/
-libinsight/
-insight-vmi.pro
-Makefile.manual
-</pre>
-
-If your system fulfills the prerequisites, the source can be compiled by changing into the `insight-vmi` directory containing the above listed files and executing:
-
-<code language="sh">make -f Makefile.manual</code>
-
-You can verify that the compilation succeeded by assuring that the following files exist:
-
-<pre>
-insight/insight
-insightd/insightd
-libinsight/libinsight.so
-</pre>
-
-To install !InSight in the `/usr/local` tree, use the following command:
-
-{{{
-sudo make -f Makefile.manual DESTDIR=/ PREFIX=/usr/local install &&
-sudo ldconfig
-}}}
-
-You can also run !InSight without installation, see [RunningInSight Running InSight].
-
-== Creating Debian Packages ==
-
-The source code comes with all required control files to create packages for Debian-based distributions such as Ubuntu. This requires an additional package to be installed:
-
-  * dpkg-dev
-
-Now instead of the `make` utility issue the following command in the source directory:
-
-<code language="sh">dpkg-buildpackage -us -uc -b</code>
-
-This will compile the source and create `deb` packages in the directory one level above the current (the actual file names might differ depending on version and architecture):
-
-<pre>
-../insight_0.3_amd64.deb
-../insight-daemon_0.3_amd64.deb
-../insight-doc_0.3_all.deb
-../insight-scripts_0.3_amd64.deb
-../libinsight_0.3_amd64.deb
-../libinsight-dev_0.3_amd64.deb
-</pre>
-
-Install these packages with the `dpkg` package manager as usual, at least `insight`, `insightd`, and `libinsight` are required:
-
-<code language="sh">sudo dpkg -i \
-  ../libinsight_0.3_amd64.deb \
-  ../insight_0.3_amd64.deb \
-  ../insight-daemon_0.3_amd64.deb</code>
+If you use any other Linux distribution or want to try out the latest version from the source repository, read the description [BuildingFromSource how to compile InSight from source].
