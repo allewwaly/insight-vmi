@@ -118,7 +118,7 @@ QT += core \
     network \
     gui \
     testlib
-CONFIG += qtestlib debug
+CONFIG += qtestlib debug_and_release
 INCLUDEPATH += ../../src \
 	../../../libdebug/include \
 	../../../libcparser/include \
