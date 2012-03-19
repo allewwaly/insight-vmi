@@ -1,3 +1,17 @@
+insight (0.4) unstable; urgency=low
+
+  * Integrated C source parser is considered stable and enabled by default, if applicable
+  * Store and load candidate type information collected by the C parser in the symbols file
+  * Automatically retrieve object of non-ambiguous candidate type instead of declared type when following pointer members of objects
+  * Display candidate types of variables and members in the shell
+  * Allow to specify the desired candidate type for variables and members when querying objects in the shell
+  * Support for querying multi-dimensional arrays in the shell
+  * Added JavaScript bindings to list and retrieve candidate types for variables and pointer members
+  * Various bugfixes
+  * 
+
+ -- Christian Schneider <chrschn@sec.in.tum.de>  Mon, 19 Mar 2012 15:15:01 +0100
+
 insight (0.3) unstable; urgency=low
 
   * Resolved another type ambiguity with very similar structs
