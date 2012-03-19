@@ -48,7 +48,7 @@ sed \
 
 # Use gcc_pp, if available
 EXEC_DIR="$PWD"
-for GCC_PP in "$EXEC_DIR/gcc_pp" "$(dirname $0)/gcc_pp" "$(which gcc_pp)"; do
+for GCC_PP in "$EXEC_DIR/gcc_pp" "$(dirname $0)/gcc_pp" "$(which gcc_pp)" /usr/share/insight/tools/gcc_pp; do
 	if [ -x "$GCC_PP" ]; then
 		sed -i "s@^\(CC\\s*=\).*gcc\\s*\$@\1 $GCC_PP@" Makefile
 		echo "Using $GCC_PP as compiler"
