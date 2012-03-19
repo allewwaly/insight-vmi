@@ -1198,12 +1198,17 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
         const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);
         // Return a constant expression for an enumerator
         if (sym->type() == stEnumerator) {
-            if (!_factory->enumsByName().contains(sym->name()))
-                exprEvalError(QString("Cannot find enumerator \"%1\" at %2:%3:%4")
-                              .arg(sym->name())
-                              .arg(_ast->fileName())
-                              .arg(node->start->line)
-                              .arg(node->start->charPosition));
+            if (!_factory->enumsByName().contains(sym->name())) {
+//                exprEvalError(QString("Cannot find enumerator \"%1\" at %2:%3:%4")
+//                              .arg(sym->name())
+//                              .arg(_ast->fileName())
+//                              .arg(node->start->line)
+//                              .arg(node->start->charPosition));
+
+                // If no type using that enumerator is declared, it won't be
+                // include in the debugging symbols
+                return createExprNode<ASTUndefinedExpression>();
+            }
             IntEnumPair iep = _factory->enumsByName().value(sym->name());
             return createExprNode<ASTEnumeratorExpression>(iep.first, sym);
         }
