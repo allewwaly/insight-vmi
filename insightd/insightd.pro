@@ -9,7 +9,10 @@ scripts.files = scripts/*.js
 scripts.path += $$PREFIX/share/insight/examples
 
 # Extra target for tools
-tools.files = ../tools/gcc_pp ../tools/make-debug-kpkg
+tools.files = ../tools/gcc_pp \
+	../tools/make-debug-kpkg \
+	../tools/mount-img \
+	../tools/umount-img
 tools.path += $$PREFIX/share/insight/tools
 
 # What to install
