@@ -37,8 +37,10 @@ install:
 	@install -v -Dp libinsight/include/insight/*.h     $(INCLUDE)/insight
 	@##insightd
 	@install -v -Dp insightd/insightd  $(BIN)/insightd
-	@install -v -d $(SHARE)/insight/scripts
-	@install -v -Dp insightd/scripts/*.js   $(SHARE)/insight/scripts
+	@install -v -d $(SHARE)/insight/examples
+	@install -v -Dp insightd/scripts/*.js   	$(SHARE)/insight/examples
+	@install -v -d $(SHARE)/insight/tools
+	@install -v -Dp tools/{gcc_pp,make-debug-kpkg,{,u}mount-img} $(SHARE)/insight/tools
 	@##insight
 	@install -v -Dp insight/insight    $(BIN)/insight
 
