@@ -47,7 +47,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         return;
     }
     // Ignore changes from any pointer to a void pointer
-    if (ed.srcType->type() == rtPointer &&
+    if (ed.targetType->type() == rtPointer &&
         ed.targetType->next()->type() == rtVoid)
     {
         return;
