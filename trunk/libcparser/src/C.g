@@ -57,13 +57,27 @@ options
     #define BUILDER SCOPE_TOP(translation_unit)->builder
     
     #ifndef __cplusplus
-//         #define DEBUG 1
+//        #define DEBUG 1
         #if (DEBUG == 1)
             #if !defined(debugmsg)
-                #define debuginit() printf("(\%s:\%d) Executing INIT in \%s, BACKTRACKING is \%d\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, BACKTRACKING)
-                #define debugafter() printf("(\%s:\%d) Executing AFTER in \%s, BACKTRACKING is \%d\n", __FILE__, __LINE__, __PRETTY_FUNCTION__, BACKTRACKING)
                 #define debugmsg(m, ...) printf("(\%s:\%d) " m, __FILE__, __LINE__, __VA_ARGS__)
                 #define debugerr(m, ...) fprintf(stderr, "(\%s:\%d) " m, __FILE__, __LINE__, __VA_ARGS__)
+                #if 1
+                    #define debuginit()
+                    #define debugafter()
+                #else
+                    #define debuginit() debugmsg("BACKTRACKING = \%d, '\%s' at \%d:\%d, \%s\n", \
+                        BACKTRACKING, \
+                        (char*)LT(1)->getText(LT(1))->chars, \
+                        LT(1)->line, \
+                        LT(1)->charPosition, \
+                        __PRETTY_FUNCTION__)
+                    #define debugafter() printf("(\%s:\%d) Executing AFTER in \%s, BACKTRACKING is \%d\n", \
+                        __FILE__, \
+                        __LINE__, \
+                        __PRETTY_FUNCTION__, \
+                        BACKTRACKING)
+                #endif
             #endif
         #else
             #define debugmsg(...)
@@ -122,6 +136,7 @@ translation_unit [pASTBuilder b] returns [pASTNodeList list]
 external_declaration returns [pASTNode node] 
     @init  
     {
+        debuginit();
         if (BACKTRACKING == 0) {            
             INIT_NODE2($node, parent_node(BUILDER), nt_external_declaration);
             push_parent_node(BUILDER, $node);
@@ -158,7 +173,8 @@ external_declaration returns [pASTNode node]
 function_definition returns [pASTNode node]     
     @init 
     {
-        if (BACKTRACKING == 0) {                        
+        debuginit();
+        if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_function_definition);
             push_parent_node(BUILDER, $node);
 
@@ -200,6 +216,7 @@ declaration returns [pASTNode node]
     }
     @init 
     {
+        debuginit();
         $declaration::isTypedef = ANTLR3_FALSE;
         $declaration::typedefNode = 0;
         
@@ -215,7 +232,8 @@ declaration returns [pASTNode node]
             pop_parent_node(BUILDER);
         } 
     }
-    : ( '__extension__'? 'typedef' ds=declaration_specifier? attribute_specifier*
+    : ( ('__extension__'? 'typedef')=>
+          '__extension__'? 'typedef' ds=declaration_specifier? attribute_specifier*
     	{ 
     		$declaration::isTypedef = ANTLR3_TRUE; 
     	    $declaration::typedefNode = $node;
@@ -235,7 +253,8 @@ declaration returns [pASTNode node]
 declaration_specifier returns [pASTNode node]
     @init
     { 
-        if (BACKTRACKING == 0) {            
+        debuginit();
+        if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_declaration_specifier);
             push_parent_node(BUILDER, $node);
         }
@@ -254,7 +273,7 @@ declaration_specifier returns [pASTNode node]
     ;
     
 declaration_specifier_list returns [pASTNodeList list]
-    @init { pASTNodeList tail = 0; $list = 0; }
+    @init { pASTNodeList tail = 0; $list = 0; debuginit(); }
     :        
       ( sc=storage_class_specifier  
           { tail = new_ASTNodeList(BUILDER, $sc.node, tail); if (!$list) $list = tail; }
@@ -273,7 +292,7 @@ declaration_specifier_list returns [pASTNodeList list]
     ;
 
 init_declarator_list returns [pASTNodeList list]
-    @init  { pASTNodeList tail = 0; $list = 0; }
+    @init { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : i=init_declarator { $list = tail = new_ASTNodeList(BUILDER, $i.node, 0); } 
       (',' i=init_declarator { tail = new_ASTNodeList(BUILDER, $i.node, tail); } )*
     ;
@@ -289,7 +308,8 @@ init_declarator returns [pASTNode node]
         pANTLR3_COMMON_TOKEN id;
         pASTNode d_decl;
         pASTNodeList l;
-        
+
+        debuginit();
         if (BACKTRACKING == 0) {
             $init_declarator::isFuncTypedef = ANTLR3_FALSE;
             $init_declarator::typedefNameFound = ANTLR3_FALSE;
@@ -337,7 +357,7 @@ attribute_specifier
     ;
 
 attribute
-    : 'const' 
+    : 'const'
     | '__const__'
     | IDENTIFIER ('(' attribute_parameter_list? ')')?
     ;
@@ -347,7 +367,6 @@ attribute_parameter_list
     ;
 
 attribute_parameter
-//    : constant_expression
     : literal_constant_expression
     ;
     
@@ -387,7 +406,7 @@ literal_relational_expression
     : literal_shift_expression (('<'|'>'|'<='|'>=') literal_shift_expression)*
     ;
 
-literal_shift_expression     
+literal_shift_expression
     : literal_additive_expression (('<<'|'>>') literal_additive_expression)*
     ;
 
@@ -422,7 +441,8 @@ literal_primary_expression
 storage_class_specifier returns [pASTNode node] 
     @init  
     { 
-        if (BACKTRACKING == 0) {            
+        debuginit();
+        if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_storage_class_specifier);
             push_parent_node(BUILDER, $node);
         }
@@ -448,7 +468,8 @@ storage_class_specifier returns [pASTNode node]
 type_specifier returns [pASTNode node]
     @init  
     { 
-        if (BACKTRACKING == 0) {            
+        debuginit();
+        if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_type_specifier);
             push_parent_node(BUILDER, $node);
         }
@@ -469,7 +490,7 @@ type_specifier returns [pASTNode node]
     ;
     
 builtin_type_list returns [pASTTokenList list]
-    @init { pASTTokenList tail = 0; $list = 0; }
+    @init { pASTTokenList tail = 0; $list = 0; debuginit(); }
       // Allow a "const" in between built-in types, e.g., "long const int"
     : ( bt=builtin_type attribute_specifier? type_qualifier+ 
         bt2=builtin_type attribute_specifier?
@@ -484,6 +505,7 @@ builtin_type_list returns [pASTTokenList list]
     ;
 
 builtin_type
+    @init { debuginit(); }
     : 'void'
     | 'char'
     | 'short'
@@ -501,6 +523,7 @@ builtin_type
 typeof_specification returns [pASTNode node] 
     @init  
     {
+        debuginit();
         if (BACKTRACKING == 0) {            
             INIT_NODE2($node, parent_node(BUILDER), nt_typeof_specification);
             push_parent_node(BUILDER, $node);
@@ -529,7 +552,8 @@ typeof_token
 type_id returns [pASTNode node] 
     @init  
     {
-        if (BACKTRACKING == 0) { 
+        debuginit();
+        if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_type_id);
             push_parent_node(BUILDER, $node);
         } 
@@ -550,6 +574,7 @@ type_id returns [pASTNode node]
 struct_or_union_specifier returns [pASTNode node] 
     @init 
     {
+        debuginit();
         if (BACKTRACKING == 0) {             
             INIT_NODE2($node, parent_node(BUILDER), nt_struct_or_union_specifier);
             push_parent_node(BUILDER, $node);
@@ -585,6 +610,7 @@ struct_or_union_specifier returns [pASTNode node]
 struct_or_union returns [pASTNode node] 
     @init  
     { 
+        debuginit();
          if (BACKTRACKING == 0) { 
             INIT_NODE($node, parent_node(BUILDER));
             push_parent_node(BUILDER, $node);
@@ -602,7 +628,7 @@ struct_or_union returns [pASTNode node]
     ;
 
 struct_declaration_list returns [pASTNodeList list]
-    @init { pASTNodeList tail = 0; $list = 0; }
+    @init { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : ( sd=struct_declaration { tail = new_ASTNodeList(BUILDER, $sd.node, tail); if (!$list) $list = tail; }
       | ';'
       )+
@@ -611,6 +637,7 @@ struct_declaration_list returns [pASTNodeList list]
 struct_declaration returns [pASTNode node] 
     @init  
     {
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_struct_declaration);
             push_parent_node(BUILDER, $node);
@@ -631,7 +658,7 @@ struct_declaration returns [pASTNode node]
     ;
 
 specifier_qualifier_list returns [pASTNodeList list]
-    @init  { pASTNodeList tail = 0; $list = 0; }
+    @init  { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : ( tq=type_qualifier { tail = new_ASTNodeList(BUILDER, $tq.node, tail); if (!$list) $list = tail; } 
       )* 
       ts=type_specifier { tail = new_ASTNodeList(BUILDER, $ts.node, tail); if (!$list) $list = tail; }
@@ -641,7 +668,7 @@ specifier_qualifier_list returns [pASTNodeList list]
     ;
 
 struct_declarator_list returns [pASTNodeList list]
-    @init  { pASTNodeList tail = 0; $list = 0; }
+    @init  { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : sd=struct_declarator attribute_specifier* { $list = tail = new_ASTNodeList(BUILDER, $sd.node, 0); } 
       (',' sd=struct_declarator { tail = new_ASTNodeList(BUILDER, $sd.node, tail); } )*
     ;
@@ -649,10 +676,11 @@ struct_declarator_list returns [pASTNodeList list]
 struct_declarator returns [pASTNode node]
     @init  
     { 
-         if (BACKTRACKING == 0) { 
+        debuginit();
+        if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_struct_declarator);
             push_parent_node(BUILDER, $node);
-         } 
+        }
     }
     @after 
     {
@@ -677,6 +705,7 @@ enum_specifier returns [pASTNode node]
     }
     @init  
     {
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_enum_specifier);
             push_parent_node(BUILDER, $node);
@@ -701,7 +730,7 @@ enum_specifier returns [pASTNode node]
     ;
 
 enumerator_list returns [pASTNodeList list]
-    @init  { pASTNodeList tail = 0; $list = 0; }
+    @init  { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : e=enumerator { $list = tail = new_ASTNodeList(BUILDER, $e.node, 0); } 
       (',' e=enumerator { tail = new_ASTNodeList(BUILDER, $e.node, tail); } )*
       ','?
@@ -710,6 +739,7 @@ enumerator_list returns [pASTNodeList list]
 enumerator returns [pASTNode node] 
     @init 
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_enumerator);
             push_parent_node(BUILDER, $node);
@@ -734,6 +764,7 @@ enumerator returns [pASTNode node]
 type_qualifier returns [pASTNode node]
     @init 
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_type_qualifier);
             push_parent_node(BUILDER, $node);
@@ -754,13 +785,14 @@ type_qualifier returns [pASTNode node]
     ;
 
 type_qualifier_list returns [pASTTokenList list]
-    @init  { pASTTokenList tail = 0; $list = 0; }
+    @init  { pASTTokenList tail = 0; $list = 0; debuginit(); }
     : ( tq=type_qualifier { tail = new_ASTTokenList(BUILDER, $tq.start, tail); if (!$list) $list = tail; } )+
     ;
  
 declarator returns [pASTNode node] 
     @init  
     {
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_declarator);
             push_parent_node(BUILDER, $node);
@@ -784,6 +816,7 @@ declarator returns [pASTNode node]
     ;
 
 declarator_identifier returns [pANTLR3_COMMON_TOKEN token]
+    @init { debuginit(); }
     : id=IDENTIFIER attribute_specifier*
         {
             $token = $id;
@@ -804,6 +837,7 @@ declarator_identifier returns [pANTLR3_COMMON_TOKEN token]
     ;
 
 function_declarator returns [pASTNode node]
+    @init { debuginit(); }
     : '('
         {
             // Tell following rules that this is a function typedef
@@ -829,6 +863,7 @@ direct_declarator returns [pASTNode node]
         pANTLR3_STRING id = 0;
         ANTLR3_UINT64 id_line = 0;
 
+        debuginit();
         if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_direct_declarator);
             push_parent_node(BUILDER, $node);
@@ -918,13 +953,14 @@ direct_declarator returns [pASTNode node]
     ;
 
 declarator_suffix_list returns [pASTNodeList list]
-    @init { pASTNodeList tail = 0; $list = 0; }
+    @init { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : (ds=declarator_suffix { tail = new_ASTNodeList(BUILDER, $ds.node, tail); if (!$list) $list = tail; } )+
     ;
 
 declarator_suffix returns [pASTNode node] 
     @init  
     {
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE($node, parent_node(BUILDER));
             push_parent_node(BUILDER, $node);
@@ -959,6 +995,7 @@ declarator_suffix returns [pASTNode node]
 pointer returns [pASTNode node] 
     @init  
     {
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_pointer);
             push_parent_node(BUILDER, $node);
@@ -985,6 +1022,7 @@ pointer returns [pASTNode node]
 parameter_type_list returns [pASTNode node]
     @init  
     {
+        debuginit();
         if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_parameter_type_list);
             push_parent_node(BUILDER, $node);
@@ -1002,7 +1040,7 @@ parameter_type_list returns [pASTNode node]
     ;
 
 parameter_list returns [pASTNodeList list]
-    @init  { pASTNodeList tail = 0; $list = 0; }
+    @init  { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : pd=parameter_declaration { $list = tail = new_ASTNodeList(BUILDER, $pd.node, 0); } 
       (',' pd=parameter_declaration { tail = new_ASTNodeList(BUILDER, $pd.node, tail); } )*
     ;
@@ -1010,6 +1048,7 @@ parameter_list returns [pASTNodeList list]
 parameter_declaration returns [pASTNode node]
     @init  
     {
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_parameter_declaration);
             push_parent_node(BUILDER, $node);
@@ -1036,7 +1075,7 @@ parameter_declaration returns [pASTNode node]
     ;
 
 identifier_list returns [pASTTokenList list]
-    @init  { pASTTokenList tail = 0; $list = 0; }
+    @init  { pASTTokenList tail = 0; $list = 0; debuginit(); }
     : id=IDENTIFIER { $list = tail = new_ASTTokenList(BUILDER, $id, 0); } 
       (',' id=IDENTIFIER { tail = new_ASTTokenList(BUILDER, $id, tail); } )*
     ;
@@ -1044,6 +1083,7 @@ identifier_list returns [pASTTokenList list]
 type_name returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_type_name);
             push_parent_node(BUILDER, $node);
@@ -1066,6 +1106,7 @@ type_name returns [pASTNode node]
 abstract_declarator returns [pASTNode node]
     @init  
     {
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_abstract_declarator);
             push_parent_node(BUILDER, $node);
@@ -1092,6 +1133,7 @@ direct_abstract_declarator returns [pASTNode node]
     @init  
     {
         pASTNodeList tail = 0;
+        debuginit();
 
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_direct_abstract_declarator);
@@ -1124,7 +1166,8 @@ direct_abstract_declarator returns [pASTNode node]
 abstract_declarator_suffix returns [pASTNode node]
     @init  
     { 
-         if (BACKTRACKING == 0) { 
+        debuginit();
+        if (BACKTRACKING == 0) {
             INIT_NODE($node, parent_node(BUILDER));
             push_parent_node(BUILDER, $node);
         } 
@@ -1157,6 +1200,7 @@ initializer returns [pASTNode node]
     {
         $initializer::isInitializer = ANTLR3_TRUE;
 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_initializer);
             push_parent_node(BUILDER, $node);
@@ -1175,7 +1219,7 @@ initializer returns [pASTNode node]
     ;
 
 initializer_list returns [pASTNodeList list]
-    @init  { pASTNodeList tail = 0; $list = 0; }
+    @init  { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : in=initializer  { $list = tail = new_ASTNodeList(BUILDER, $in.node, 0); } 
       (',' in=initializer { tail = new_ASTNodeList(BUILDER, $in.node, tail); } )*
     ;
@@ -1183,14 +1227,15 @@ initializer_list returns [pASTNodeList list]
 // E x p r e s s i o n s
 
 argument_expression_list returns [pASTNodeList list]
-    @init  { pASTNodeList tail = 0; $list = 0; }
+    @init  { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : ae=assignment_expression { $list = tail = new_ASTNodeList(BUILDER, $ae.node, 0); } 
       (',' ae=assignment_expression { tail = new_ASTNodeList(BUILDER, $ae.node, tail); } )*
     ;
 
 additive_expression returns [pASTNode node]
     @init  
-    { 
+    {
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_additive_expression);
             push_parent_node(BUILDER, $node);
@@ -1210,6 +1255,7 @@ additive_expression returns [pASTNode node]
 multiplicative_expression returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_multiplicative_expression);
             push_parent_node(BUILDER, $node);
@@ -1229,6 +1275,7 @@ multiplicative_expression returns [pASTNode node]
 cast_expression returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_cast_expression);
             push_parent_node(BUILDER, $node);
@@ -1259,6 +1306,7 @@ cast_expression returns [pASTNode node]
 unary_expression returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_unary_expression);
             push_parent_node(BUILDER, $node);
@@ -1299,6 +1347,7 @@ unary_expression returns [pASTNode node]
     ;
 
 builtin_function returns [pASTNode node]
+    @init { debuginit(); }
     // See http://gcc.gnu.org/onlinedocs/gcc-4.4.2/gcc/Other-Builtins.html
     : ( n=builtin_function_alignof
       | n=builtin_function_choose_expr
@@ -1324,6 +1373,7 @@ builtin_function returns [pASTNode node]
 builtin_function_alignof returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_alignof);
             push_parent_node(BUILDER, $node);
@@ -1346,6 +1396,7 @@ builtin_function_alignof returns [pASTNode node]
 builtin_function_choose_expr returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_choose_expr);
             push_parent_node(BUILDER, $node);
@@ -1370,6 +1421,7 @@ builtin_function_choose_expr returns [pASTNode node]
 builtin_function_constant_p returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_constant_p);
             push_parent_node(BUILDER, $node);
@@ -1391,6 +1443,7 @@ builtin_function_constant_p returns [pASTNode node]
 builtin_function_expect returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_expect);
             push_parent_node(BUILDER, $node);
@@ -1413,6 +1466,7 @@ builtin_function_expect returns [pASTNode node]
 builtin_function_extract_return_addr returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_extract_return_addr);
             push_parent_node(BUILDER, $node);
@@ -1434,6 +1488,7 @@ builtin_function_extract_return_addr returns [pASTNode node]
 builtin_function_object_size returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_object_size);
             push_parent_node(BUILDER, $node);
@@ -1455,7 +1510,8 @@ builtin_function_object_size returns [pASTNode node]
         
 builtin_function_offsetof returns [pASTNode node]
     @init  
-    { 
+    {
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_offsetof);
             push_parent_node(BUILDER, $node);
@@ -1478,6 +1534,7 @@ builtin_function_offsetof returns [pASTNode node]
 builtin_function_prefetch returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_prefetch);
             push_parent_node(BUILDER, $node);
@@ -1502,6 +1559,7 @@ builtin_function_prefetch returns [pASTNode node]
 builtin_function_return_address returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_return_address);
             push_parent_node(BUILDER, $node);
@@ -1523,6 +1581,7 @@ builtin_function_return_address returns [pASTNode node]
 builtin_function_sizeof returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_sizeof);
             push_parent_node(BUILDER, $node);
@@ -1545,6 +1604,7 @@ builtin_function_sizeof returns [pASTNode node]
 builtin_function_types_compatible_p returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_types_compatible_p);
             push_parent_node(BUILDER, $node);
@@ -1567,6 +1627,7 @@ builtin_function_types_compatible_p returns [pASTNode node]
 builtin_function_va_arg returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_va_arg);
             push_parent_node(BUILDER, $node);
@@ -1589,6 +1650,7 @@ builtin_function_va_arg returns [pASTNode node]
 builtin_function_va_copy returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_va_copy);
             push_parent_node(BUILDER, $node);
@@ -1611,6 +1673,7 @@ builtin_function_va_copy returns [pASTNode node]
 builtin_function_va_end returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_va_end);
             push_parent_node(BUILDER, $node);
@@ -1632,6 +1695,7 @@ builtin_function_va_end returns [pASTNode node]
 builtin_function_va_start returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_builtin_function_va_start);
             push_parent_node(BUILDER, $node);
@@ -1655,10 +1719,11 @@ builtin_function_va_start returns [pASTNode node]
 postfix_expression returns [pASTNode node]
 	@init  
 	{ 
-	   if (BACKTRACKING == 0) { 
+		debuginit();
+		if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_postfix_expression);
             push_parent_node(BUILDER, $node);
-        } 
+        }
 	}
     @after 
     {
@@ -1676,7 +1741,7 @@ postfix_expression returns [pASTNode node]
     ;
 
 postfix_expression_suffix_list returns [pASTNodeList list]
-    @init { pASTNodeList tail = 0; $list = 0; }
+    @init { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : (
         pes=postfix_expression_suffix
         {
@@ -1689,6 +1754,7 @@ postfix_expression_suffix_list returns [pASTNodeList list]
 postfix_expression_suffix returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE($node, parent_node(BUILDER));
             push_parent_node(BUILDER, $node);
@@ -1713,6 +1779,7 @@ postfix_expression_suffix returns [pASTNode node]
     ;
 
 unary_operator
+    @init { debuginit(); }
     : '&'
     | '&&'
     | '*'
@@ -1725,7 +1792,8 @@ unary_operator
 primary_expression returns [pASTNode node]
 	@init  
 	{ 
-	   if (BACKTRACKING == 0) { 
+		debuginit();
+		if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_primary_expression);
             push_parent_node(BUILDER, $node);
         }
@@ -1755,6 +1823,7 @@ primary_expression returns [pASTNode node]
 constant returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE($node, parent_node(BUILDER));
             push_parent_node(BUILDER, $node);
@@ -1782,18 +1851,19 @@ constant returns [pASTNode node]
 /////
 
 expression returns [pASTNodeList list]
-    @init  { pASTNodeList tail = 0; $list = 0; }
+    @init  { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : '__extension__'? ae=assignment_expression { $list = tail = new_ASTNodeList(BUILDER, $ae.node, 0); }
       (',' ae=assignment_expression { tail = new_ASTNodeList(BUILDER, $ae.node, tail); } )*
     ;
 
 constant_expression returns [pASTNode node]
 	@init  
-	{ 
-	   if (BACKTRACKING == 0) { 
+	{
+		debuginit();
+		if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_constant_expression);
             push_parent_node(BUILDER, $node);
-        } 
+        }
 	}
     @after 
     {
@@ -1807,8 +1877,9 @@ constant_expression returns [pASTNode node]
 
 assignment_expression returns [pASTNode node]
 	@init  
-	{ 
-	   if (BACKTRACKING == 0) { 
+	{
+		debuginit();
+		if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_assignment_expression);
             push_parent_node(BUILDER, $node);
         } 
@@ -1820,11 +1891,10 @@ assignment_expression returns [pASTNode node]
             pop_parent_node(BUILDER);
         } 
     }
-    : lv=lvalue ao=assignment_operator ae=assignment_expression
+    // Try to match compound braces statement first to guide the parser
+    : ('(' '{')=> ce=conditional_expression
         {
-            $node->u.assignment_expression.lvalue = $lv.node;
-            $node->u.assignment_expression.assignment_operator = $ao.start;
-            $node->u.assignment_expression.assignment_expression = $ae.node;
+            $node->u.assignment_expression.conditional_expression = $ce.node;
         }
     | { SCOPE_TOP(initializer) && $initializer::isInitializer }?
       (lv=lvalue | dil=designated_initializer_list) op='=' in=initializer
@@ -1834,6 +1904,13 @@ assignment_expression returns [pASTNode node]
             $node->u.assignment_expression.assignment_operator = $op;
             $node->u.assignment_expression.initializer = $in.node;
         }
+    | (lvalue assignment_operator)=>
+        lv=lvalue ao=assignment_operator ae=assignment_expression
+        {
+            $node->u.assignment_expression.lvalue = $lv.node;
+            $node->u.assignment_expression.assignment_operator = $ao.start;
+            $node->u.assignment_expression.assignment_expression = $ae.node;
+        }
     | ce=conditional_expression
         {
             $node->u.assignment_expression.conditional_expression = $ce.node;
@@ -1841,14 +1918,15 @@ assignment_expression returns [pASTNode node]
     ;
     
 designated_initializer_list returns [pASTNodeList list]
-    @init { pASTNodeList tail = 0; $list = 0; }
+    @init { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : ( di=designated_initializer { tail = new_ASTNodeList(BUILDER, $di.node, tail); if (!$list) $list = tail; } )+
     ;
 
 designated_initializer returns [pASTNode node]
     @init  
-    { 
-       if (BACKTRACKING == 0) { 
+    {
+        debuginit();
+        if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_designated_initializer);
             push_parent_node(BUILDER, $node);
         } 
@@ -1872,7 +1950,8 @@ designated_initializer returns [pASTNode node]
 lvalue returns [pASTNode node]
 	@init  
 	{ 
-	   if (BACKTRACKING == 0) { 
+		debuginit();
+		if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_lvalue);
             push_parent_node(BUILDER, $node);
         } 
@@ -1884,15 +1963,24 @@ lvalue returns [pASTNode node]
             pop_parent_node(BUILDER);
         } 
     }
-    : '(' t=type_name ')' l=lvalue
+    // Try to match compound braces statement first to guide the parser
+    : ('(' '{')=> ue=unary_expression
+        {
+            $node->u.lvalue.unary_expression = $ue.node;
+        }
+    | '(' t=type_name ')' l=lvalue
         {
             $node->u.lvalue.type_name = $t.node;
             $node->u.lvalue.lvalue = $l.node;
         }
-    | ue=unary_expression { $node->u.lvalue.unary_expression = $ue.node; }
+    | ue=unary_expression
+        {
+            $node->u.lvalue.unary_expression = $ue.node;
+        }
     ;
 
 assignment_operator
+    @init { debuginit(); }
     : '='
     | '*='
     | '/='
@@ -1909,6 +1997,7 @@ assignment_operator
 conditional_expression returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_conditional_expression);
             push_parent_node(BUILDER, $node);
@@ -1932,6 +2021,7 @@ conditional_expression returns [pASTNode node]
 logical_or_expression returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_logical_or_expression);
             push_parent_node(BUILDER, $node);
@@ -1949,7 +2039,9 @@ logical_or_expression returns [pASTNode node]
     ;
 
 logical_and_expression returns [pASTNode node]
-	@init  { 
+	@init
+	{
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_logical_and_expression);
             push_parent_node(BUILDER, $node);
@@ -1969,6 +2061,7 @@ logical_and_expression returns [pASTNode node]
 inclusive_or_expression returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_inclusive_or_expression);
             push_parent_node(BUILDER, $node);
@@ -1988,6 +2081,7 @@ inclusive_or_expression returns [pASTNode node]
 exclusive_or_expression returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_exclusive_or_expression);
             push_parent_node(BUILDER, $node);
@@ -2007,6 +2101,7 @@ exclusive_or_expression returns [pASTNode node]
 and_expression returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_and_expression);
             push_parent_node(BUILDER, $node);
@@ -2026,6 +2121,7 @@ and_expression returns [pASTNode node]
 equality_expression returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_equality_expression);
             push_parent_node(BUILDER, $node);
@@ -2045,6 +2141,7 @@ equality_expression returns [pASTNode node]
 relational_expression returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_relational_expression);
             push_parent_node(BUILDER, $node);
@@ -2064,6 +2161,7 @@ relational_expression returns [pASTNode node]
 shift_expression returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_shift_expression);
             push_parent_node(BUILDER, $node);
@@ -2083,6 +2181,7 @@ shift_expression returns [pASTNode node]
 // S t a t e m e n t s
 
 statement returns [pASTNode node]
+    @init { debuginit(); }
     : attribute_specifier*
       ( s=labeled_statement
       | s=compound_statement
@@ -2100,6 +2199,7 @@ statement returns [pASTNode node]
 labeled_statement returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_labeled_statement);
             push_parent_node(BUILDER, $node);
@@ -2139,6 +2239,7 @@ local_label_declaration
 compound_statement returns [pASTNode node]
     @init 
     {
+        debuginit();
         if (BACKTRACKING == 0) {                
             INIT_NODE2($node, parent_node(BUILDER), nt_compound_statement);
             push_parent_node(BUILDER, $node);
@@ -2164,13 +2265,14 @@ compound_statement returns [pASTNode node]
 compound_braces_statement returns [pASTNode node]
     @init 
     {
-	     if (BACKTRACKING == 0) {               
+        debuginit();
+        if (BACKTRACKING == 0) {
             INIT_NODE2($node, parent_node(BUILDER), nt_compound_braces_statement);
             push_parent_node(BUILDER, $node);
 
             // blocks have a scope of symbols
             scopePush(BUILDER, $node);
-         }
+        }
     }
     @after 
     {
@@ -2181,14 +2283,13 @@ compound_braces_statement returns [pASTNode node]
         } 
     }
     : '(' '{' local_label_declaration? dsl=declaration_or_statement_list? '}' ')'
-//    : '(' '{' local_label_declaration? dsl=declaration_list? sl=statement_list '}' ')'
         {
             $node->u.compound_braces_statement.declaration_or_statement_list = $dsl.list;
         }
     ;
 
 declaration_or_statement_list returns [pASTNodeList list]
-    @init  { pASTNodeList tail = 0; $list = 0; }
+    @init  { pASTNodeList tail = 0; $list = 0; debuginit(); }
     // Put the assembler_statement first so that it becomes a direct item of
     // declaration_or_statement_list instead of external_declaration
     : ( (assembler_token)=> a=assembler_statement
@@ -2221,6 +2322,7 @@ declaration_or_statement_list returns [pASTNodeList list]
 expression_statement returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_expression_statement);
             push_parent_node(BUILDER, $node);
@@ -2240,6 +2342,7 @@ expression_statement returns [pASTNode node]
 selection_statement returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE($node, parent_node(BUILDER));
             push_parent_node(BUILDER, $node);
@@ -2270,6 +2373,7 @@ selection_statement returns [pASTNode node]
 iteration_statement returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE($node, parent_node(BUILDER));
             push_parent_node(BUILDER, $node);
@@ -2307,6 +2411,7 @@ iteration_statement returns [pASTNode node]
 jump_statement returns [pASTNode node]
 	@init  
 	{ 
+		debuginit();
 	    if (BACKTRACKING == 0) { 
             INIT_NODE($node, parent_node(BUILDER));
             push_parent_node(BUILDER, $node);
@@ -2338,6 +2443,7 @@ assembler_register_variable
 assembler_statement returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_assembler_statement);
             push_parent_node(BUILDER, $node);
@@ -2365,7 +2471,7 @@ assembler_statement returns [pASTNode node]
     ;
 
 assembler_parameter_list returns [pASTNodeList list]
-    @init  { pASTNodeList tail = 0; $list = 0; }
+    @init  { pASTNodeList tail = 0; $list = 0; debuginit(); }
     : a=assembler_parameter { $list = tail = new_ASTNodeList(BUILDER, $a.node, 0); } 
       (',' a=assembler_parameter { tail = new_ASTNodeList(BUILDER, $a.node, tail); } )*
     ;
@@ -2373,6 +2479,7 @@ assembler_parameter_list returns [pASTNodeList list]
 assembler_parameter returns [pASTNode node]
     @init  
     { 
+        debuginit();
         if (BACKTRACKING == 0) { 
             INIT_NODE2($node, parent_node(BUILDER), nt_assembler_parameter);
             push_parent_node(BUILDER, $node);
@@ -2394,7 +2501,7 @@ assembler_parameter returns [pASTNode node]
     ;
 
 string_token_list returns [pASTTokenList list]
-    @init  { pASTTokenList tail = 0; $list = 0; }
+    @init  { pASTTokenList tail = 0; $list = 0; debuginit(); }
     : ( s=STRING_LITERAL { tail = new_ASTTokenList(BUILDER, $s, tail); if (!$list) $list = tail; } )+
     ;
     
