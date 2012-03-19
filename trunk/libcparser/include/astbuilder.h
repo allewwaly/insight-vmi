@@ -50,6 +50,9 @@ public:
     pASTNodeList newASTNodeList(pASTNode item, pASTNodeList tail);
     pASTTokenList newASTTokenList(pANTLR3_COMMON_TOKEN item,
             pASTTokenList tail);
+
+    inline AbstractSyntaxTree* ast() { return _ast; }
+
 private:
     QStack<pASTNode> _parentStack;
     AbstractSyntaxTree* _ast;
