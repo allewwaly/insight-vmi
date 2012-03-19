@@ -15,6 +15,7 @@
 #include <astsymbol.h>
 #include <astscopemanager.h>
 #include <astbuilder.h>
+#include <abstractsyntaxtree.h>
 #include <debug.h>
 
 
@@ -98,7 +99,7 @@ void scopeAddSymbol(pASTBuilder builder, pANTLR3_STRING name, enum ASTSymbolType
 void scopeAddSymbol2(pASTBuilder builder, pANTLR3_STRING name,
 		enum ASTSymbolType type, pASTNode node, pASTScope scope)
 {
-//	QString s = antlrStringToStr(name);
+//	QString s = builder->ast()->antlrStringToStr(name);
 
 //	int line = node ?  node->start->line : 0;
 //
@@ -156,10 +157,10 @@ pASTScope scopeCurrent(pASTBuilder builder)
 ANTLR3_BOOLEAN isTypeName(pASTBuilder builder, pANTLR3_STRING name)
 {
 	if (builder->isTypeName(name)) {
-//	    debugmsg("\"" << name->chars << "\" is a defined type");
+//		debugmsg("\"" << name->chars << "\" is a defined type");
 		return ANTLR3_TRUE;
 	}
-//    debugmsg("\"" << name->chars << "\" is NOT a type");
+//	debugmsg("\"" << name->chars << "\" is NOT a type");
 	return ANTLR3_FALSE;
 }
 
