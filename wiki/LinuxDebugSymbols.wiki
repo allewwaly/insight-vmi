@@ -85,7 +85,7 @@ You are now ready to reboot your machine into the new kernel.
 
 = Parsing Debugging Symbols =
 
-Once the debugging symbols are available, !InSight needs to parse them to build its internal type database. This step is only necessary once and takes several minutes to complete. !InSight requires the following information to parse the debugging symbols:
+Once the debugging symbols are available, !InSight needs to parse them to build its internal type database. This step is necessary only once and takes several minutes to complete. !InSight requires the following information to parse the debugging symbols:
 
   * path to the object dump file of the kernel
   * path to the `System.map` file of the kernel
@@ -93,7 +93,7 @@ Once the debugging symbols are available, !InSight needs to parse them to build 
 
 There are two ways how these files can be passed to !InSight:
 
-  # The easiest way is to make the path to the *kernel source directory* available that was previously used to compile the kernel. In that case, !InSight will use the following data from this directory:
+  # The preferred method is to make the path to the *kernel source directory* available that was previously used to compile the kernel. In that case, !InSight will use the following data from this directory:
     * `System.map` file
     * extracting debugging symbols from the `vmlinux` file on the fly using the `objdump` utility
     * `.config` file
@@ -158,13 +158,15 @@ umount $DEV && losetup -d $DEV
 
 == Parsing Symbols with !InSight ==
 
-When either the build directory of the kernel source tree or the `System.map`, object dump, and kernel headers directory have been made available, !InSight is ready to parse the debugging symbols. The best way to do so is starting `insightd` and using its shell. The syntax is either
+When either the build directory of the kernel source tree or the `System.map`, object dump, and kernel headers directory have been made available, !InSight is ready to parse the debugging symbols. During this step, !InSight compiles a tiny helper program to extract some information from the kernel sources. This requires the `stdio.h` header to be available, so make sure the `libc6-dev` package is installed on your host system before you continue.
+
+Start `insightd` in interactive mode by not supplying any parameters. The shell syntax to parse the debugging symbols is either
 <pre>  symbols parse <kernel_src></pre>
 or
 <pre>  symbols parse <objdump> <System.map> <kernel_headers></pre>
 depending on the available data. 
 
-*Note:* The `<objdump>` file mentioned above must _not_ be compressed!
+*Note:* In the second case, the `<objdump>` file mentioned above must *not* be compressed! The non-compressed object dump does not have a `.bz2` or `.lzma` extension.
 
 While the symbols are being processed, the progress is being displayed. At the end of the operation, you will see a short statistic about the resulting type database:
 
