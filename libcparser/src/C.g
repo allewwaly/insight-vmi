@@ -2350,10 +2350,11 @@ assembler_statement returns [pASTNode node]
             pop_parent_node(BUILDER);
         } 
     }
-    : assembler_token tql=type_qualifier_list? '(' ins=string_token_list 
+    : assembler_token 'goto'? tql=type_qualifier_list? '(' ins=string_token_list
       (':' in=assembler_parameter_list? 
         (':' out=assembler_parameter_list?
-          (':' string_list?)?)?)? 
+          (':' string_list?
+            (':' identifier_list? )?)?)?)?
       ')' ';'
         {
             $node->u.assembler_statement.type_qualifier_list = $tql.list;
