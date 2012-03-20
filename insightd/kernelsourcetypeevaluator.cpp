@@ -79,6 +79,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
     /// @todo Ignore casts from arrays to pointers of the same base type
 
     try {
+#ifdef DEBUG_APPLY_USED_AS
         // Find top-level node of right-hand side for expression
         const ASTNode* right = ed.srcNode;
         while (right && right->parent != ed.rootNode) {
@@ -98,8 +99,6 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         }
         QString s_expr = expr ? expr->toString() : QString("n/a");
 
-
-#ifdef DEBUG_APPLY_USED_AS
         debugmsg("Passing the following type change to SymFactory:\n" +
                  typeChangeInfo(ed, s_expr));
 #endif
