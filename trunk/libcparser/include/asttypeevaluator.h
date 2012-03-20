@@ -300,7 +300,7 @@ private:
     ASTType* typeofSymbolDeclaration(const ASTSymbol* sym);
     ASTType* typeofSymbolFunctionDef(const ASTSymbol* sym);
     ASTType* typeofSymbolFunctionParam(const ASTSymbol* sym);
-    ASTType* typeofDesignatedInitializer(const ASTNode* node);
+    ASTType* typeofDesignatedInitializerList(const ASTNodeList *list);
     ASTType* typeofInitializer(const ASTNode* node);
     ASTType* typeofStructDeclarator(const ASTNode* node);
     ASTType* typeofStructOrUnionSpecifier(const ASTNode* node);

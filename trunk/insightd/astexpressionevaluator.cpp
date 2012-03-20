@@ -1192,9 +1192,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
 
     if (node->u.primary_expression.expression)
         expr = exprOfNode(node->u.primary_expression.expression->item, ptsTo);
-    else if (node->u.primary_expression.identifier &&
-             !node->u.primary_expression.hasDot)
-    {
+    else if (node->u.primary_expression.identifier) {
         const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);
         // Return a constant expression for an enumerator
         if (sym->type() == stEnumerator) {

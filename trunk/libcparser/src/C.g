@@ -1809,14 +1809,12 @@ primary_expression returns [pASTNode node]
         cbs=compound_braces_statement { $node->u.primary_expression.compound_braces_statement = $cbs.node; }
     | ('(')=>
         '(' ex=expression ')'         { $node->u.primary_expression.expression = $ex.list; }
-    | ('.')=> 
-      '.' id=IDENTIFIER               { $node->u.primary_expression.identifier = $id; $node->u.primary_expression.hasDot = ANTLR3_TRUE; }
       // Actually we would need to test here if we have a declaration such as 
       // "int foo = foo;", however I can't convince ANTLR to put the first "foo"
       // into the symbol table before evaluating the primary_expression rule.
       // As last resort, we check if we are in an init_declarator rule. *sigh* 
     | //{ isSymbolName(BUILDER, LT(1)->getText(LT(1))) || SCOPE_TOP(init_declarator) }? 
-        id=IDENTIFIER                 { $node->u.primary_expression.identifier = $id; $node->u.primary_expression.hasDot = ANTLR3_FALSE; }
+        id=IDENTIFIER                 { $node->u.primary_expression.identifier = $id; }
     | co=constant                     { $node->u.primary_expression.constant = $co.node; }
     ;
 
@@ -1896,16 +1894,13 @@ assignment_expression returns [pASTNode node]
         {
             $node->u.assignment_expression.conditional_expression = $ce.node;
         }
-    | { SCOPE_TOP(initializer) && $initializer::isInitializer }?
-      (lv=lvalue | dil=designated_initializer_list) op='=' in=initializer
+    | ('.' | '[')=> dil=designated_initializer_list op='=' in=initializer
         {
-            $node->u.assignment_expression.lvalue = $lv.node;
             $node->u.assignment_expression.designated_initializer_list = $dil.list;
             $node->u.assignment_expression.assignment_operator = $op;
             $node->u.assignment_expression.initializer = $in.node;
         }
-    | (lvalue assignment_operator)=>
-        lv=lvalue ao=assignment_operator ae=assignment_expression
+    | lv=lvalue ao=assignment_operator ae=assignment_expression
         {
             $node->u.assignment_expression.lvalue = $lv.node;
             $node->u.assignment_expression.assignment_operator = $ao.start;
@@ -1940,10 +1935,12 @@ designated_initializer returns [pASTNode node]
     }
     : ( '[' co1=constant_expression ']'
       | '[' co1=constant_expression '...' co2=constant_expression ']'
+      | '.' id=IDENTIFIER
       )
         {
             $node->u.designated_initializer.constant_expression1 = $co1.node;
             $node->u.designated_initializer.constant_expression2 = $co2.node;
+            $node->u.designated_initializer.identifier = $id;
         }
     ;
     

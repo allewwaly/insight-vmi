@@ -352,7 +352,8 @@ ASTType* ASTTypeEvaluator::typeofNode(const ASTNode *node)
         if (node->u.assignment_expression.lvalue)
             _types[node] = typeofNode(node->u.assignment_expression.lvalue);
         else if (node->u.assignment_expression.designated_initializer_list)
-            _types[node] = typeofNode(node->u.assignment_expression.designated_initializer_list->item);
+            _types[node] = typeofDesignatedInitializerList(
+                        node->u.assignment_expression.designated_initializer_list);
         else
             _types[node] = typeofNode(node->u.assignment_expression.conditional_expression);
 
@@ -436,10 +437,6 @@ ASTType* ASTTypeEvaluator::typeofNode(const ASTNode *node)
             _types[node] = typeofNode(node->u.declarator.direct_declarator);
         else
             _types[node] = typeofNode(node->u.declarator.pointer);
-        break;
-
-    case nt_designated_initializer:
-        _types[node] = typeofDesignatedInitializer(node);
         break;
 
     case nt_direct_declarator:
@@ -749,42 +746,93 @@ ASTType* ASTTypeEvaluator::typeofBooleanExpression(ASTType* lt, ASTType* rt)
 }
 
 
-ASTType* ASTTypeEvaluator::typeofDesignatedInitializer(const ASTNode *node)
+ASTType* ASTTypeEvaluator::typeofDesignatedInitializerList(const ASTNodeList *list)
 {
-    if (!node)
+    if (!list)
         return 0;
-    checkNodeType(node, nt_designated_initializer);
 
-    // Return cached value if existent
-    if (hasValidType(node))
-    	return typeofNode(node);
+    ASTType* ret = 0;
 
-#   ifdef DEBUG_NODE_EVAL
-    debugmsg("+++ Node " << ast_node_type_to_str(node)
-            << " (" << QString::number((quint64)node, 16) << ")"
-            << " at " << node->start->line << ":"
-            << node->start->charPosition);
-#   endif
-
-    // Find out type of embedding array
-    const ASTNode* initializer = node->parent->parent->parent;
-    checkNodeType(initializer, nt_initializer);
-    assert(!initializer->u.initializer.assignment_expression);
-
-    // Get the embedding initializer's type
-    ASTType *type = typeofNode(initializer);
-    if (type->type() & (rtPointer|rtArray))
-        _types[node] = type->next();
-    else {
-        typeEvaluatorError(
-                QString("Type of designated initializer is \"%1\", expected "
-                        "a Pointer or Array at %2:%3")
-                        .arg(type->toString())
-                        .arg(_ast->fileName())
-                        .arg(initializer->start->line));
+    // Find enclosing initializer node
+    const ASTNode* initializer = list->item->parent;
+    while (initializer) {
+        if (initializer->type == nt_initializer &&
+            !initializer->u.initializer.assignment_expression)
+            break;
+        initializer = initializer->parent;
     }
 
-    return _types[node];
+    if (initializer)
+        ret = typeofNode(initializer);
+    else {
+        typeEvaluatorError(
+                    QString("Could not find enclosing initializer at %3:%4:%5")
+                    .arg(_ast->fileName())
+                    .arg(list->item->start->line)
+                    .arg(list->item->start->charPosition));
+
+    }
+
+    // Go through complete list and find type of designated initializers
+    for (; list; list = list->next) {
+        const ASTNode* node = list->item;
+        checkNodeType(node, nt_designated_initializer);
+
+        // Return cached value if existent
+        if (hasValidType(node))
+            ret = typeofNode(node);
+        else {
+
+#ifdef DEBUG_NODE_EVAL
+            debugmsg("+++ Node " << ast_node_type_to_str(node)
+                     << " (" << QString::number((quint64)node, 16) << ")"
+                     << " at " << node->start->line << ":"
+                     << node->start->charPosition);
+#endif
+
+            // Array or struct initializer?
+            if (node->u.designated_initializer.identifier) {
+                QString id = antlrTokenToStr(node->u.designated_initializer.identifier);
+
+                // If we have an ASTType node, try to find most inner struct/union
+                while (ret && !(ret->type() & StructOrUnion))
+                    ret = ret->next();
+                const ASTSymbol* sym = ret ?
+                            ret->node()->childrenScope->find(id) : 0;
+
+                if (!sym || sym->type() != stStructMember) {
+//                    _ast->printScopeRek(ret ? ret->node()->childrenScope : node->scope);
+                    typeEvaluatorError(
+                                QString("Could not find member \"%1\" in %2 at %3:%4:%5")
+                                .arg(id)
+                                .arg(ret ? ret->toString() : QString("(n/a)"))
+                                .arg(_ast->fileName())
+                                .arg(node->start->line)
+                                .arg(node->start->charPosition));
+                }
+                // Use the symbol's type
+                ret = typeofSymbol(sym);
+            }
+            // Must be an array initializer
+            else {
+                // Make sure the type fits
+                if (!(ret->type() & (rtPointer|rtArray))) {
+                    typeEvaluatorError(
+                                QString("Type of designated initializer is \"%1\", expected "
+                                        "a Pointer or Array at %2:%3")
+                                .arg(ret->toString())
+                                .arg(_ast->fileName())
+                                .arg(initializer->start->line));
+                }
+                // Skip outer pointer/array
+                ret = ret->next();
+            }
+
+            _types[node] = ret;
+        }
+    }
+
+    return ret;
 }
 
 /**
@@ -1513,98 +1561,81 @@ const ASTSymbol* ASTTypeEvaluator::findSymbolOfPrimaryExpression(
 
         QString id = antlrTokenToStr(node->u.primary_expression.identifier);
 
-        // Is this a struct initializer or an initializer-like struct member
-        // assignment?
-        if (node->u.primary_expression.hasDot) {
-            // Find enclosing initializer node
-            const ASTNode* initializer = node->parent;
-            while (initializer) {
-                if (initializer->type == nt_initializer &&
-                    !initializer->u.initializer.assignment_expression)
-                    break;
-                initializer = initializer->parent;
-            }
-
-            if (initializer)
-                t = typeofNode(initializer);
-        }
-        else {
-            // Are we a direct child of a __builtin_offsetof node?
-            const ASTNode* offsetofNode = node->parent;
-            bool found = false;
-            while (offsetofNode && !found) {
-                switch (offsetofNode->type) {
-                case nt_builtin_function_offsetof:
-                    found = true;
-                    break;
+        // Are we a direct child of a __builtin_offsetof node?
+        const ASTNode* offsetofNode = node->parent;
+        bool found = false;
+        while (offsetofNode && !found) {
+            switch (offsetofNode->type) {
+            case nt_builtin_function_offsetof:
+                found = true;
+                break;
                 // We can stop searching for the following node types:
-                case nt_assembler_parameter:
-                case nt_assembler_statement:
-                case nt_builtin_function_alignof:
-                case nt_builtin_function_constant_p:
-                case nt_builtin_function_expect:
-                case nt_builtin_function_extract_return_addr:
-                case nt_builtin_function_object_size:
-                case nt_builtin_function_prefetch:
-                case nt_builtin_function_return_address:
-                case nt_builtin_function_sizeof:
-                case nt_builtin_function_types_compatible_p:
-                case nt_builtin_function_va_arg:
-                case nt_builtin_function_va_copy:
-                case nt_builtin_function_va_end:
-                case nt_builtin_function_va_start:
-                case nt_compound_braces_statement:
-                case nt_compound_statement:
-                case nt_declarator_suffix_brackets:
-                case nt_designated_initializer:
-                case nt_expression_statement:
-                case nt_function_definition:
-                case nt_iteration_statement_do:
-                case nt_iteration_statement_for:
-                case nt_iteration_statement_while:
-                case nt_jump_statement_goto:
-                case nt_jump_statement_return:
-                case nt_labeled_statement:
-                case nt_labeled_statement_case:
-                case nt_labeled_statement_default:
-                case nt_postfix_expression_brackets:
-                case nt_postfix_expression_parens:
-                case nt_selection_statement_if:
-                case nt_selection_statement_switch:
-                case nt_typeof_specification:
-                    offsetofNode = 0; // exit loop
-                    break;
+            case nt_assembler_parameter:
+            case nt_assembler_statement:
+            case nt_builtin_function_alignof:
+            case nt_builtin_function_constant_p:
+            case nt_builtin_function_expect:
+            case nt_builtin_function_extract_return_addr:
+            case nt_builtin_function_object_size:
+            case nt_builtin_function_prefetch:
+            case nt_builtin_function_return_address:
+            case nt_builtin_function_sizeof:
+            case nt_builtin_function_types_compatible_p:
+            case nt_builtin_function_va_arg:
+            case nt_builtin_function_va_copy:
+            case nt_builtin_function_va_end:
+            case nt_builtin_function_va_start:
+            case nt_compound_braces_statement:
+            case nt_compound_statement:
+            case nt_declarator_suffix_brackets:
+            case nt_designated_initializer:
+            case nt_expression_statement:
+            case nt_function_definition:
+            case nt_iteration_statement_do:
+            case nt_iteration_statement_for:
+            case nt_iteration_statement_while:
+            case nt_jump_statement_goto:
+            case nt_jump_statement_return:
+            case nt_labeled_statement:
+            case nt_labeled_statement_case:
+            case nt_labeled_statement_default:
+            case nt_postfix_expression_brackets:
+            case nt_postfix_expression_parens:
+            case nt_selection_statement_if:
+            case nt_selection_statement_switch:
+            case nt_typeof_specification:
+                offsetofNode = 0; // exit loop
+                break;
                 // A binary expression with a right-hand side is not valid
                 // inside __builtin_offsetof
-                case nt_equality_expression:
-                case nt_logical_and_expression:
-                case nt_logical_or_expression:
-                case nt_relational_expression:
-                    if (offsetofNode->u.binary_expression.right) {
-                        offsetofNode = 0;
-                        break;
-                    }
-                    // no break
-                default:
-                    offsetofNode = offsetofNode->parent;
+            case nt_equality_expression:
+            case nt_logical_and_expression:
+            case nt_logical_or_expression:
+            case nt_relational_expression:
+                if (offsetofNode->u.binary_expression.right) {
+                    offsetofNode = 0;
                     break;
                 }
+                // no break
+            default:
+                offsetofNode = offsetofNode->parent;
+                break;
             }
-
-            // If this is a child of a __builtin_offsetof, then find
-            // struct/union definition of type
-            if (offsetofNode)
-                t = typeofNode(offsetofNode->u.builtin_function_offsetof.type_name);
-            // Otherwise do a normal resolution of symbol in scope of node
-            else
-                sym = node->scope->find(id);
         }
 
-        // If we have an ASTType node, try to find most inner struct/union
-        while (t && !(t->type() & StructOrUnion))
-            t = t->next();
-        if (t && (sym = t->node()->childrenScope->find(id)))
-            _symbolOfNode.insert(node, sym);
+        // If this is a child of a __builtin_offsetof, then find
+        // struct/union definition of type
+        if (offsetofNode) {
+            t = typeofNode(offsetofNode->u.builtin_function_offsetof.type_name);
+            // If we have an ASTType node, try to find most inner struct/union
+            while (t && !(t->type() & StructOrUnion))
+                t = t->next();
+            if (t && (sym = t->node()->childrenScope->find(id)))
+                _symbolOfNode.insert(node, sym);
+        }
+        // Otherwise do a normal resolution of symbol in scope of node
+        else
+            sym = node->scope->find(id);
     }
 
     if (!sym && enableExcpetions) {
@@ -2492,8 +2523,7 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
     case nt_primary_expression:
         // The primary expressions must have an identifier.  If the identifier
         // has a leading dot, it is used as initializer identifier.
-        if (!node->u.primary_expression.identifier ||
-            node->u.primary_expression.hasDot)
+        if (!node->u.primary_expression.identifier)
             return;
 
         if (_phase == epFindSymbols)
@@ -3232,29 +3262,17 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
         case nt_assignment_expression:
             // Is this in the right-hand of an assignment expression?
             if ((lNode = ed->rootNode->u.assignment_expression.lvalue) &&
-                (rNode == ed->rootNode->u.assignment_expression.assignment_expression ||
-                 rNode == ed->rootNode->u.assignment_expression.initializer))
+                (rNode == ed->rootNode->u.assignment_expression.assignment_expression))
             {
-                // For an initializer we expect the primary expression to
-                // identify a struct member
-                if (rNode == ed->rootNode->u.assignment_expression.initializer) {
-                    const ASTNode* pe = lNode->u.lvalue.unary_expression
-                            ->u.unary_expression.postfix_expression
-                            ->u.postfix_expression.primary_expression;
-                    checkNodeType(pe, nt_primary_expression);
-                    if (!pe->u.primary_expression.hasDot) {
-                        typeEvaluatorError(
-                                    QString("Identifier \"%1\" in primary "
-                                            "expression at %2:%3:%4 is no "
-                                            "struct member identifier")
-                                    .arg(antlrTokenToStr(
-                                             pe->u.primary_expression.identifier))
-                                    .arg(_ast->fileName())
-                                    .arg(pe->start->line)
-                                    .arg(pe->start->charPosition));
-                    }
-                }
                 lType = typeofNode(lNode);
+                goto while_exit;
+            }
+            else if (ed->rootNode->u.assignment_expression.designated_initializer_list &&
+                (rNode == ed->rootNode->u.assignment_expression.initializer))
+            {
+                lType = typeofDesignatedInitializerList(
+                            ed->rootNode->u.assignment_expression.designated_initializer_list);
+                lNode = lType ? lType->node() : 0;
                 goto while_exit;
             }
             break;
