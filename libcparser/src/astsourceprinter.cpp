@@ -197,7 +197,10 @@ void ASTSourcePrinter::beforeChildren(const ASTNode *node, int flags)
         _line += tokenListToString(node->u.declarator_suffix.identifier_list, ",");
         break;
     case nt_designated_initializer:
-        _line += "[";
+        if (node->u.designated_initializer.identifier)
+            _line += "." + antlrTokenToStr(node->u.designated_initializer.identifier);
+        else
+            _line += "[";
         break;
     case nt_direct_declarator:
         _line += tokenToString(node->u.direct_declarator.identifier);
@@ -291,8 +294,6 @@ void ASTSourcePrinter::beforeChildren(const ASTNode *node, int flags)
     case nt_primary_expression:
         if (node->u.primary_expression.expression)
             _line += "(";
-        if (node->u.primary_expression.hasDot)
-            _line += ".";
         if (node->u.primary_expression.identifier)
             _line += tokenToString(node->u.primary_expression.identifier);
         break;
@@ -700,7 +701,8 @@ void ASTSourcePrinter::afterChildren(const ASTNode *node, int flags)
         _line += ")";
         break;
     case nt_designated_initializer:
-        _line += "]";
+        if (!node->u.designated_initializer.identifier)
+            _line += "]";
         break;
     case nt_expression_statement:
         _line += ";";

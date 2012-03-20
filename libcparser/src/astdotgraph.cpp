@@ -364,6 +364,10 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
         printDotGraphTokenList(node->u.declarator_suffix.identifier_list, ",", nodeId);
         break;
     case nt_designated_initializer:
+        if (node->u.designated_initializer.identifier) {
+            printDotGraphString(".", nodeId);
+            printDotGraphToken(node->u.designated_initializer.identifier, nodeId, TOK_POSTFIX_EX);
+        }
         break;
     case nt_direct_abstract_declarator:
         break;
@@ -505,8 +509,6 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
     case nt_primary_expression:
         if (node->u.primary_expression.expression)
             printDotGraphString("(", nodeId);
-        if (node->u.primary_expression.hasDot)
-            printDotGraphString(".", nodeId);
         printDotGraphToken(node->u.primary_expression.identifier, nodeId, TOK_PRIM_EX_IDENTIFIER);
         if (_eval && node->u.primary_expression.identifier) {
             const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);

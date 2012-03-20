@@ -423,7 +423,6 @@ struct ASTNode
 
         struct
         {
-            ANTLR3_BOOLEAN hasDot;
             pANTLR3_COMMON_TOKEN identifier;
             struct ASTNode* constant;
             struct ASTNodeList* expression;
@@ -455,6 +454,7 @@ struct ASTNode
         {
             struct ASTNode* constant_expression1;
             struct ASTNode* constant_expression2;
+            pANTLR3_COMMON_TOKEN identifier;
         } designated_initializer;
 
         struct
