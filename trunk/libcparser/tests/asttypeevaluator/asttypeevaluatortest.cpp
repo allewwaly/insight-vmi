@@ -471,9 +471,9 @@ TEST_FUNCTION(structInitializers)
         "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
     CHANGE_LAST("struct module foo = { .list = { h, m } };",
         "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
-    CHANGE_LAST2("struct bar { int i; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo = { .func = m };",
+    CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo = { .func = m };",
         "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
-    NO_CHANGE2("struct bar { int i; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo = { .func = ifunc };");
+    NO_CHANGE2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo = { .func = ifunc };");
 }
 
 
@@ -488,8 +488,14 @@ TEST_FUNCTION(designatedInitializers)
 	NO_CHANGE2("struct module foo;\n", "foo = (struct module){ .foo = 0, .list = { h, h } };");
 	NO_CHANGE2("struct module foo;\n", "foo = (struct module){ 0, { h, h } };");
 
+    CHANGE_LAST2("struct list_head foo;\n", "struct list_head foo = { .prev = m };",
+                 "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
     CHANGE_LAST2("struct list_head foo;\n", "struct list_head foo = { .prev = m, .next = h };",
         "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST2("struct list_head foo;\n", "struct list_head foo = { .next = m };",
+                 "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
+    CHANGE_LAST2("struct list_head foo;\n", "struct list_head foo = { .prev = h, .next = m };",
+                 "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
     CHANGE_LAST2("struct list_head foo;\n", "struct list_head foo = { .prev = (struct list_head*)m, .next = h };",
         "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
     CHANGE_LAST2("struct list_head foo;\n", "struct list_head foo = { .prev = (struct list_head*)m->foo, .next = h };",
@@ -506,6 +512,58 @@ TEST_FUNCTION(designatedInitializers)
         "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
     CHANGE_LAST2("struct module foo;\n", "foo = (struct module){ .foo = h, .list = { 0, 0 } };",
         "h", "Pointer->Struct(list_head)", "", "Int32");
+
+    // Nested initializers
+    NO_CHANGE2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[] = { [0].func = ifunc };");
+    NO_CHANGE2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[] = { [0] = { .func = ifunc } };");
+    NO_CHANGE2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0][0].func = ifunc };");
+    NO_CHANGE2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0] = { [0].func = ifunc } };");
+    NO_CHANGE2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0][0] = { .func = ifunc } };");
+    NO_CHANGE2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0] = { [0] = { .func = ifunc } } };");
+
+    CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[] = { [0].func = m };",
+        "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+    CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[] = { [0] = { .func = m } };",
+                 "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+    CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0][0].func = m };",
+                 "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+    CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0] = { [0].func = m } };",
+                 "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+    CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0][0] = { .func = m } };",
+                 "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+    CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0] = { [0] = { .func = m } } };",
+                 "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+
+    NO_CHANGE2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { 0, {m, m} };");
+    NO_CHANGE2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .p = 0 };");
+    NO_CHANGE2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .mod = {m, m} };");
+    NO_CHANGE2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .p = 0, .mod = {m, m} };");
+    NO_CHANGE2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .mod[0] = m, .mod[1] = m };");
+    NO_CHANGE2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .mod = { [0] = m } };");
+    NO_CHANGE2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .mod = { [0] = m, [1] = m } };");
+
+    CHANGE_LAST2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { 0, {m, h} };",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { 0, {h, m} };",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .mod = {m, h} };",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .mod = {h, m} };",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .p = 0, .mod = {m, h} };",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .p = 0, .mod = {h, m} };",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .mod[0] = m, .mod[1] = h };",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .mod[0] = h, .mod[1] = m };",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .mod = { [0] = h } };",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .mod = { [0] = m, [1] = h } };",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
+    CHANGE_LAST2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .mod = { [0] = h, [1] = m } };",
+                 "h", "Pointer->Struct(list_head)", "", "Pointer->Struct(module)");
 }
 
 
@@ -515,9 +573,14 @@ TEST_FUNCTION(arrayInitializers)
     // Array initializers
     NO_CHANGE("struct list_head a[2] = { {h, h}, {h, h} };");
     NO_CHANGE("struct list_head a[2] = { [0] = {h, h} };");
+    NO_CHANGE("struct list_head a[2] = { [0] = { .prev = h } };");
+    NO_CHANGE("struct list_head a[2] = { [0] = { .next = h } };");
     NO_CHANGE("struct list_head a[2] = { [0] = { .prev = h, .next = h } };");
     NO_CHANGE("struct module* a[2] = { m, m };");
     NO_CHANGE("struct module* a[2] = { [0] = m };");
+    NO_CHANGE("struct module* a[2] = { m, [1] = m };");
+    NO_CHANGE("struct module* a[2] = { [0] = m, m };");
+    NO_CHANGE("struct module* a[2] = { [0] = m, [1] = m };");
     NO_CHANGE2("enum en { enVal1, enVal2, enSize };",
               "int array[enSize][enSize] = { [enVal1] = { 0, 1 }, [enVal2] = { 2, 3 } };");
 
@@ -535,7 +598,6 @@ TEST_FUNCTION(arrayInitializers)
         "h", "Struct(list_head)", "->prev", "Pointer->Struct(module)");
     CHANGE_LAST("struct module* a[2] = { [0] = h->prev };",
         "h", "Struct(list_head)", "->prev", "Pointer->Struct(module)");
-
 }
 
 
