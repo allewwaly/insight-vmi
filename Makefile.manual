@@ -21,11 +21,17 @@ distclean:
 	@for dir in $(SUBDIRS) ; do cd $$dir ; make distclean ; rm -rf Makefile ; cd $(PWD) ; done
 	
 
-build:
-	@for dir in $(SUBDIRS) ; do cd $$dir ; qmake -makefile && make release ; cd $(PWD) ; done
+makefiles:
+	@for dir in $(SUBDIRS) ; do cd $$dir ; qmake -makefile ; cd $(PWD) ; done
+
+debug: makefiles
+	@for dir in $(SUBDIRS) ; do cd $$dir ; make debug ; cd $(PWD) ; done
+
+build: makefiles
+	@for dir in $(SUBDIRS) ; do cd $$dir ; make release ; cd $(PWD) ; done
 
 
-install:
+install: build
 	@##create install directory
 	@install -v -d $(DESTDIR)
 	@## libinsight
