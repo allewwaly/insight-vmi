@@ -3232,8 +3232,28 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
         case nt_assignment_expression:
             // Is this in the right-hand of an assignment expression?
             if ((lNode = ed->rootNode->u.assignment_expression.lvalue) &&
-               rNode == ed->rootNode->u.assignment_expression.assignment_expression)
+                (rNode == ed->rootNode->u.assignment_expression.assignment_expression ||
+                 rNode == ed->rootNode->u.assignment_expression.initializer))
             {
+                // For an initializer we expect the primary expression to
+                // identify a struct member
+                if (rNode == ed->rootNode->u.assignment_expression.initializer) {
+                    const ASTNode* pe = lNode->u.lvalue.unary_expression
+                            ->u.unary_expression.postfix_expression
+                            ->u.postfix_expression.primary_expression;
+                    checkNodeType(pe, nt_primary_expression);
+                    if (!pe->u.primary_expression.hasDot) {
+                        typeEvaluatorError(
+                                    QString("Identifier \"%1\" in primary "
+                                            "expression at %2:%3:%4 is no "
+                                            "struct member identifier")
+                                    .arg(antlrTokenToStr(
+                                             pe->u.primary_expression.identifier))
+                                    .arg(_ast->fileName())
+                                    .arg(pe->start->line)
+                                    .arg(pe->start->charPosition));
+                    }
+                }
                 lType = typeofNode(lNode);
                 goto while_exit;
             }
