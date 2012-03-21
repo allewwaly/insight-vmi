@@ -1890,11 +1890,7 @@ assignment_expression returns [pASTNode node]
         } 
     }
     // Try to match compound braces statement first to guide the parser
-    : ('(' '{')=> ce=conditional_expression
-        {
-            $node->u.assignment_expression.conditional_expression = $ce.node;
-        }
-    | ('.' | '[')=> dil=designated_initializer_list op='=' in=initializer
+    : ('.' | '[')=> dil=designated_initializer_list op='=' in=initializer
         {
             $node->u.assignment_expression.designated_initializer_list = $dil.list;
             $node->u.assignment_expression.assignment_operator = $op;
