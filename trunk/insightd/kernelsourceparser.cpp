@@ -49,8 +49,7 @@ public:
 
 KernelSourceParser::KernelSourceParser(SymFactory* factory,
         const QString& srcPath)
-    : _factory(factory), _srcPath(srcPath), _srcDir(srcPath), _filesIndex(0),
-      _lastFileNameLen(0)
+    : _factory(factory), _srcPath(srcPath), _srcDir(srcPath), _filesIndex(0)
 {
     assert(_factory);
 }
@@ -73,12 +72,13 @@ void KernelSourceParser::operationProgress()
 //            << ", " << elapsedTime() << " elapsed: "
 //            << qPrintable(_currentFile)
 //            << endl;
-    shell->out() << "\rParsing file " << _filesIndex << "/"
-            <<  _factory->sources().size() << " (" << percent  << "%)"
-            << ", " << elapsedTime() << " elapsed: "
-            << qSetFieldWidth(_lastFileNameLen) << qPrintable(fileName)
-            << qSetFieldWidth(0) << flush;
-    _lastFileNameLen = fileName.length();
+    QString s = QString("\rParsing file %1/%2 (%3%), %4 elapsed: %5")
+            .arg(_filesIndex)
+            .arg(_factory->sources().size())
+            .arg(percent)
+            .arg(elapsedTime())
+            .arg(fileName);
+    shellOut(s, false);
 }
 
 
@@ -104,7 +104,6 @@ void KernelSourceParser::parse()
         return;
     }
 
-    _filesIndex = _lastFileNameLen = 0;
     cleanUpThreads();
 
     operationStarted();
@@ -146,12 +145,11 @@ void KernelSourceParser::parse()
 
     operationStopped();
 
-    shell->out() << qSetFieldWidth(_lastFileNameLen)
-                 << QString("\rParsed %1/%2 files in %3")
-                        .arg(_filesIndex)
-                        .arg(_fileNames.size())
-                        .arg(elapsedTime())
-                 << qSetFieldWidth(0) << endl;
+    QString s = QString("\rParsed %1/%2 files in %3.")
+            .arg(_filesIndex)
+            .arg(_factory->sources().size())
+            .arg(elapsedTimeVerbose());
+    shellOut(s, true);
 
     _factory->sourceParcingFinished();
 }
@@ -168,7 +166,7 @@ void KernelSourceParser::WorkerThread::run()
     {
         currentFile = _parser->_fileNames[_parser->_filesIndex++];
 
-//        if (_parser->_filesIndex < 116)
+//        if (_parser->_filesIndex != 116 && _parser->_filesIndex != 117)
 //            continue;
 
         _parser->_currentFile = currentFile;
@@ -183,16 +181,16 @@ void KernelSourceParser::WorkerThread::run()
             parseFile(currentFile);
         }
         catch (FileNotFoundException& e) {
-            shell->out() << "\r" << flush;
+            shell->out() << endl << flush;
             shell->err() << "WARNING: " << e.message << endl << flush;
         }
 //        catch (TypeEvaluatorException& e) {
-//            shell->out() << "\r" << flush;
+//            shell->out() << endl << flush;
 //            shell->err() << "WARNING: At " << e.file << ":" << e.line
 //                         << ": " << e.message << endl << flush;
 //        }
         catch (GenericException& e) {
-            shell->out() << endl;
+            shell->out() << endl << flush;
             shell->err() << e.file << ":" << e.line
                          << " WARNING: " << e.message << endl << flush;
             throw e;
@@ -234,7 +232,7 @@ void KernelSourceParser::WorkerThread::parseFile(const QString &fileName)
 
         ASTSourcePrinter printer(&ast);
 
-        shell->out() << "\r" << flush;
+        shell->out() << endl << flush;
         shell->err()
                 << "********************************************" << endl
                 << "WARNING: " << e.message << endl

@@ -76,7 +76,6 @@ private:
     QString _currentFile;
     QStringList _fileNames;
     int _filesIndex;
-    int _lastFileNameLen;
     QList<WorkerThread*> _threads;
     QMutex _filesMutex;
     QMutex _progressMutex;

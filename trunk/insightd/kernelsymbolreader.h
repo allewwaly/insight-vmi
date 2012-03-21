@@ -46,8 +46,8 @@ protected:
 
     void readVersion11(KernelSymbolStream& in);
     void readVersion12(KernelSymbolStream& in);
+
 private:
-    void shellOut(const QString& s, bool newline);
 
     /// Encodes the reading phases of the reading process
     enum Phases {
@@ -64,7 +64,6 @@ private:
     SymFactory* _factory;
     MemSpecs* _specs;
     Phases _phase;
-    int _lastLen;
 };
 
 #endif /* KERNELSYMBOLREADER_H_ */
