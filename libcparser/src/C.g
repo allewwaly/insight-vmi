@@ -1896,7 +1896,8 @@ assignment_expression returns [pASTNode node]
             $node->u.assignment_expression.assignment_operator = $op;
             $node->u.assignment_expression.initializer = $in.node;
         }
-    | lv=lvalue ao=assignment_operator ae=assignment_expression
+    | (lvalue assignment_operator)=>
+        lv=lvalue ao=assignment_operator ae=assignment_expression
         {
             $node->u.assignment_expression.lvalue = $lv.node;
             $node->u.assignment_expression.assignment_operator = $ao.start;
