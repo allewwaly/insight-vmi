@@ -1,7 +1,32 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+// Enable/disable debug output globally
 #define DEBUG 1
+
+#ifdef __cplusplus
+
+#	include <QString>
+#	include <iostream>
+
+/**
+ * Operator that writes a QString to a std::ostream
+ * @param out output stream to write into
+ * @param s the QString to be written
+ * @return the output stream with \a s written to it
+ */
+std::ostream& operator<<(std::ostream& out, const QString &s);
+
+namespace VersionInfo
+{
+    extern const char* release;
+    extern const char* svnRevision;
+    extern const char* buildDate;
+    extern const char* architecture;
+}
+
+#endif /* __cplusplus */
+
 
 #if (DEBUG == 1) && defined(__cplusplus)
 
@@ -24,20 +49,9 @@
 #undef DEBUG_APPLY_USED_AS
 //#define DEBUG_APPLY_USED_AS 1
 
-
-#	include <QString>
 // #	include <QTime>
-#	include <iostream>
 #	include <iomanip>
 #	include <sstream>
-
-/**
- * Operator that writes a QString to a std::ostream
- * @param out output stream to write into
- * @param s the QString to be written
- * @return the output stream with \a s written to it
- */
-std::ostream& operator<<(std::ostream& out, const QString &s);
 
 #	ifndef assert
 #		define assert(x) if ( !(x) ) \
