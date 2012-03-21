@@ -2,6 +2,7 @@ TEMPLATE = app
 TARGET = asttypeevaluator
 QT += core \
     testlib
+QT -= gui webkit
 CONFIG += qtestlib debug_and_release
 HEADERS += asttypeevaluatortest.h
 SOURCES += asttypeevaluatortest.cpp

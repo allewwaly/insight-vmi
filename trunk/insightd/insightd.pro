@@ -5,31 +5,55 @@ isEmpty(PREFIX):PREFIX = /usr/local
 target.path += $$PREFIX/bin
 
 # Extra target for scripts
-scripts.files = scripts/*.js
 scripts.path += $$PREFIX/share/insight/examples
+scripts.files = scripts/*.js
 
 # Extra target for tools
+tools.path += $$PREFIX/share/insight/tools
 tools.files = ../tools/gcc_pp \
 	../tools/make-debug-kpkg \
 	../tools/mount-img \
 	../tools/umount-img
-tools.path += $$PREFIX/share/insight/tools
 
 # What to install
 INSTALLS += target scripts tools
+
+# Should the memory_map feature be built? Disabled by default.
+#CONFIG += memory_map
+
+CONFIG += console \
+    debug_and_release
+
+# Enable high optimization
+QMAKE_CFLAGS_RELEASE += -O3
+QMAKE_CXXFLAGS_RELEASE += -O3
+
+QT += script \
+    network
+QT -= gui webkit
+
+# Required libraries for building
+LIBS += -lreadline \
+    -L../libdebug \
+    -ldebug \
+    -L../libinsight \
+    -linsight \
+    -L../libantlr3c \
+    -lantlr3c \
+    -L../libcparser \
+    -lcparser
+
+# Inter-project include paths
+INCLUDEPATH += ../libinsight/include \
+    ../libdebug/include \
+    ../libantlr3c/include \
+    ../libcparser/include
 
 SOURCES += kernelsourcetypeevaluator.cpp \
     kernelsourceparser.cpp \
     memorydumpsclass.cpp \
     scriptengine.cpp \
     kernelsymbolsclass.cpp \
-    memorydifftree.cpp \
-    memorymaprangetree.cpp \
-    memorymapbuilder.cpp \
-    memorymapwindow.cpp \
-    memorymapwidget.cpp \
-    memorymapnode.cpp \
-    memorymap.cpp \
     instancedata.cpp \
     instance.cpp \
     instanceprototype.cpp \
@@ -72,22 +96,15 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     astexpression.cpp \
     expressionresult.cpp \
     kernelsymbolstream.cpp
+
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
     memorydumpsclass.h \
     scriptengine.h \
     kernelsymbolsclass.h \
-    memorydifftree.h \
-    memorymaprangetree.h \
-    memoryrangetree.h \
     instance_def.h \
-    memorymapbuilder.h \
     priorityqueue.h \
-    memorymapwindow.h \
-    memorymapwidget.h \
     varsetter.h \
-    memorymapnode.h \
-    memorymap.h \
     instancedata.h \
     instance.h \
     instanceprototype.h \
@@ -135,29 +152,33 @@ HEADERS += kernelsourcetypeevaluator.h \
     expressionevalexception.h \
     expressionresult.h \
     kernelsymbolstream.h
-CONFIG += console \
-    debug_and_release
-QMAKE_CFLAGS_RELEASE += -O3
-QMAKE_CXXFLAGS_RELEASE += -O3
-QT += script \
-    network \
-    gui
-LIBS += -lreadline \
-    -L../libdebug \
-    -ldebug \
-    -L../libinsight \
-    -linsight \
-    -L../libantlr3c \
-    -lantlr3c \
-    -L../libcparser \
-    -lcparser
-INCLUDEPATH += ../libinsight/include \
-    ../libdebug/include \
-    ../libantlr3c/include \
-    ../libcparser/include
-FORMS = memorymapwindow.ui
 
+# Things to do when the memory map builder and widget is to be built. Enabling
+# this feature requires InSight to run on an X server.
+CONFIG(memory_map) {
+    warning(Enabled compilation of the memory_map features. The resulting binary will must be run on an X windows system!)
 
+    DEFINES += CONFIG_MEMORY_MAP
+    QT += gui
 
+    FORMS += memorymapwindow.ui
+
+    SOURCES += memorydifftree.cpp \
+        memorymaprangetree.cpp \
+        memorymapbuilder.cpp \
+        memorymapwindow.cpp \
+        memorymapwidget.cpp \
+        memorymapnode.cpp \
+        memorymap.cpp
+
+    HEADERS += memorydifftree.h \
+        memorymaprangetree.h \
+        memoryrangetree.h \
+        memorymapbuilder.h \
+        memorymapwindow.h \
+        memorymapwidget.h \
+        memorymapnode.h \
+        memorymap.h
+}
 
 

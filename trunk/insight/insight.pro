@@ -4,6 +4,7 @@ isEmpty(PREFIX):PREFIX = /usr/local
 target.path += $$PREFIX/bin
 INSTALLS += target
 QT += core network
+QT -= gui webkit
 CONFIG += debug_and_release
 HEADERS += \
     shell.h \

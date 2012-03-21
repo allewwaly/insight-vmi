@@ -12,8 +12,10 @@
 #include <QRegExp>
 #include "symfactory.h"
 #include "variable.h"
-#include "memorymap.h"
 
+#ifdef CONFIG_MEMORY_MAP
+#include "memorymap.h"
+#endif
 
 #define queryError(msg) do { throw QueryException((msg), __FILE__, __LINE__); } while (0)
 #define queryError2(msg, err) do { \
@@ -29,9 +31,11 @@ MemoryDump::MemoryDump(const MemSpecs& specs, QIODevice* mem,
     : _specs(specs),
       _file(0),
       _vmem(new VirtualMemory(_specs, mem, index)),
+#ifdef CONFIG_MEMORY_MAP
+      _map(new MemoryMap(_factory, _vmem)),
+#endif
       _factory(factory),
-      _index(index),
-      _map(new MemoryMap(_factory, _vmem))
+      _index(index)
 {
     init();
 }
@@ -42,9 +46,11 @@ MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
     : _specs(specs),
       _file(new QFile(fileName)),
       _vmem(new VirtualMemory(_specs, _file, index)),
+#ifdef CONFIG_MEMORY_MAP
+      _map(new MemoryMap(_factory, _vmem)),
+#endif
       _factory(factory),
-      _index(index),
-      _map(new MemoryMap(_factory, _vmem))
+      _index(index)
 {
     _fileName = fileName;
     // Check existence
@@ -59,13 +65,15 @@ MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
 
 MemoryDump::~MemoryDump()
 {
+#ifdef CONFIG_MEMORY_MAP
+    if (_map)
+        delete _map;
+#endif
     if (_vmem)
         delete _vmem;
     // Delete the file object if we created one
     if (_file)
         delete _file;
-    if (_map)
-        delete _map;
 }
 
 
@@ -505,6 +513,8 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 }
 
 
+#ifdef CONFIG_MEMORY_MAP
+
 void MemoryDump::setupRevMap(float minProbability)
 {
     _map->build(minProbability);
@@ -516,4 +526,4 @@ void MemoryDump::setupDiff(MemoryDump* other)
     _map->diffWith(other->map());
 }
 
-
+#endif

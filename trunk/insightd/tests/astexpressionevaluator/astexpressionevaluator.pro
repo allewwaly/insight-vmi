@@ -48,16 +48,8 @@ HEADERS += astexpressionevaluatortester.h \
     ../../kernelsymbolreader.h \
     ../../kernelsymbolwriter.h \
     ../../memspecparser.h \
-    ../../memorydifftree.h \
     ../../memorydump.h \
     ../../memorydumpsclass.h \
-    ../../memorymapbuilder.h \
-    ../../memorymap.h \
-    ../../memorymapnode.h \
-    ../../memorymaprangetree.h \
-    ../../memorymapwidget.h \
-    ../../memorymapwindow.h \
-    ../../memoryrangetree.h \
     ../../expressionresult.h
 SOURCES += astexpressionevaluatortester.cpp \
     ../../array.cpp \
@@ -103,21 +95,14 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../kernelsymbolreader.cpp \
     ../../kernelsymbolwriter.cpp \
     ../../memspecparser.cpp \
-    ../../memorydifftree.cpp \
     ../../memorydump.cpp \
     ../../memorydumpsclass.cpp \
-    ../../memorymapbuilder.cpp \
-    ../../memorymap.cpp\
-    ../../memorymapnode.cpp \
-    ../../memorymaprangetree.cpp \
-    ../../memorymapwidget.cpp \
-    ../../memorymapwindow.cpp \
     ../../expressionresult.cpp
 QT += core \
     script \
     network \
-    gui \
     testlib
+QT -= gui webkit
 CONFIG += qtestlib debug_and_release
 INCLUDEPATH += ../../src \
 	../../../libdebug/include \

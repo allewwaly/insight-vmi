@@ -8,6 +8,7 @@ QMAKE_CFLAGS_DEBUG += -w
 QMAKE_CFLAGS_RELEASE += -O3 -w
 QMAKE_CXXFLAGS_RELEASE += -O3
 QT += core
+QT -= gui webkit
 HEADERS += include/ast_interface.h \
     include/astscopemanager.h \
     include/genericexception.h \

@@ -31,13 +31,16 @@
 #include "instanceclass.h"
 #include "instancedata.h"
 #include "varsetter.h"
-#include "memorymap.h"
-#include "memorymapwindow.h"
-#include "memorymapwidget.h"
 #include "basetype.h"
 #include "scriptengine.h"
 #include "kernelsourceparser.h"
 #include "function.h"
+
+#ifdef CONFIG_MEMORY_MAP
+#include "memorymap.h"
+#include "memorymapwindow.h"
+#include "memorymapwidget.h"
+#endif
 
 // Register socket enums for the Qt meta type system
 Q_DECLARE_METATYPE(QAbstractSocket::SocketState)
@@ -97,6 +100,7 @@ Shell::Shell(bool listenOnSocket)
 	qRegisterMetaType<QAbstractSocket::SocketError>();
 
     // Register all commands
+#ifdef CONFIG_MEMORY_MAP
     _commands.insert("diff",
             Command(
                 &Shell::cmdDiffVectors,
@@ -105,6 +109,7 @@ Shell::Shell(bool listenOnSocket)
                 "have changed in a series of memory dumps. The memory dump files can "
                 "be specified by a shell file glob pattern or by explicit file names.\n"
                 "  diff [min. probability] <file pattern 1> [<file pattern 2> ...]"));
+#endif
 
     _commands.insert("exit",
             Command(
@@ -155,13 +160,16 @@ Shell::Shell(bool listenOnSocket)
                 "                              a valid type name, or a valid type id.\n"
 				"                              Notice, that a type name or a type id\n"
 				"                              can be followed by a query string in case\n"
-				"                              a member of a struct should be dumped.\n"
+				"                              a member of a struct should be dumped."
+#ifdef CONFIG_MEMORY_MAP
+                "\n"
                 "  memory revmap [index] build|visualize [pmem|vmem]\n"
                 "                              Build or visualize a reverse mapping for \n"
                 "                              dump <index>\n"
                 "  memory diff [index1] build <index2>|visualize\n"
                 "                              Compare ore visualize a memory dump with\n"
                 "                              dump <index2>"
+#endif
                 ));
 
     _commands.insert("script",
@@ -1370,12 +1378,14 @@ int Shell::cmdMemory(QStringList args)
     else if (QString("dump").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryDump(args);
     }
+#ifdef CONFIG_MEMORY_MAP
     else if (QString("revmap").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryRevmap(args);
     }
     else if (QString("diff").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryDiff(args);
     }
+#endif
     else {
         cmdHelp(QStringList("memory"));
         return 1;
@@ -1620,6 +1630,7 @@ int Shell::cmdMemoryDump(QStringList args)
     return 2;
 }
 
+#ifdef CONFIG_MEMORY_MAP
 
 int Shell::cmdMemoryRevmap(QStringList args)
 {
@@ -1784,7 +1795,7 @@ int Shell::cmdMemoryDiffVisualize(int index)
     return ecOk;
 }
 
-
+#endif
 
 
 int Shell::cmdScript(QStringList args)
@@ -2436,6 +2447,7 @@ int Shell::cmdBinaryMemDumpList(QStringList /*args*/)
     return ecOk;
 }
 
+#ifdef CONFIG_MEMORY_MAP
 
 int Shell::cmdDiffVectors(QStringList args)
 {
@@ -2631,6 +2643,7 @@ int Shell::cmdDiffVectors(QStringList args)
     return ecOk;
 }
 
+#endif
 
 void Shell::printTimeStamp(const QTime& time)
 {

@@ -8,7 +8,6 @@
 #include <astsourceprinter.h>
 #include <abstractsyntaxtree.h>
 #include <astsymbol.h>
-#include <QTextDocument>
 #include <QTextStream>
 #include <QFile>
 #include <QDateTime>

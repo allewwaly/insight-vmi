@@ -84,7 +84,7 @@
 
  */ 
 
-#include <QApplication>
+#include <QCoreApplication>
 #include <QDir>
 #include <QDateTime>
 #include <sys/types.h>
@@ -280,7 +280,9 @@ void init_daemon()
  */
 int main(int argc, char* argv[])
 {
+#ifdef CONFIG_MEMORY_MAP
 	memMapWindow = 0;
+#endif
 	shell = 0;
 
 	// Parse the command line options
@@ -300,6 +302,7 @@ int main(int argc, char* argv[])
 		}
 
 		// Delay creation of QApplication until AFTER possible fork()!
+#ifdef CONFIG_MEMORY_MAP
 		QApplication app(argc, argv);
 
 		if (!daemonize) {
@@ -307,7 +310,9 @@ int main(int argc, char* argv[])
 			memMapWindow->resize(800, 600);
 			memMapWindow->setAttribute(Qt::WA_QuitOnClose, false);
 		}
-
+#else
+		QCoreApplication app(argc, argv);
+#endif
 	    shell = new Shell(daemonize);
         KernelSymbols& sym = shell->symbols();
 
@@ -355,8 +360,10 @@ int main(int argc, char* argv[])
 		delete shell;
 	}
 
+#ifdef CONFIG_MEMORY_MAP
 //	if (memMapWindow)
 //	    delete memMapWindow;
+#endif
 
     return ret;
 }

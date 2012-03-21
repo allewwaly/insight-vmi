@@ -4,6 +4,7 @@ VERSION = 3.0.1
 CONFIG += debug_and_release staticlib create_prl warn_off
 QMAKE_CFLAGS_RELEASE += -O3
 QMAKE_CXXFLAGS_RELEASE += -O3
+QT -= core gui webkit
 SOURCES = src/antlr3baserecognizer.c \
     src/antlr3basetree.c \
     src/antlr3basetreeadaptor.c \
