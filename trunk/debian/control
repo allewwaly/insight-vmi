@@ -2,7 +2,7 @@ Source: insight
 Section: unknown
 Priority: extra
 Maintainer: Christian Schneider <chrschn@sec.in.tum.de>
-Build-Depends: debhelper (>= 7.0.50~), libreadline6-dev
+Build-Depends: debhelper (>= 7.0.50~), libreadline6-dev, libqt4-dev, qt4-dev-tools
 Standards-Version: 3.8.4
 Homepage: https://code.google.com/p/insight-vmi/
 
@@ -50,7 +50,7 @@ Description: Sample JavaScript files for memory analysis with InSight
 
 Package: libinsight
 Architecture: i386 amd64
-Depends: ${shlibs:Depends}, ${misc:Depends}, qt4-dev-tools, libqt4-network
+Depends: ${shlibs:Depends}, ${misc:Depends}, libqt4-network
 Description: Shared functionality for InSight daemon and front-end
  InSight is a tool for bridging the semantic gap in the field of virtual machine
  introspection (VMI) and digital forensics. It operates either on memory dump
@@ -64,8 +64,8 @@ Description: Shared functionality for InSight daemon and front-end
 
 Package: libinsight-dev
 Architecture: i386 amd64
-Depends: ${misc:Depends}, libinsight, qt4-dev-tools, libqt4-dev
-Recommends: insight-daemon
+Depends: ${misc:Depends}, libinsight, libqt4-dev
+Recommends: insight-daemon, qt4-dev-tools
 Description: Developer package for InSight
  InSight is a tool for bridging the semantic gap in the field of virtual machine
  introspection (VMI) and digital forensics. It operates either on memory dump
