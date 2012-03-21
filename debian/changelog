@@ -7,10 +7,10 @@ insight (0.4) unstable; urgency=low
   * Allow to specify the desired candidate type for variables and members when querying objects in the shell
   * Support for querying multi-dimensional arrays in the shell
   * Added JavaScript bindings to list and retrieve candidate types for variables and pointer members
+  * Removed QtGui and X windows depencencies
   * Various bugfixes
-  * 
 
- -- Christian Schneider <chrschn@sec.in.tum.de>  Mon, 19 Mar 2012 15:15:01 +0100
+ -- Christian Schneider <chrschn@sec.in.tum.de>  Wed, 21 Mar 2012 16:16:00 +0100
 
 insight (0.3) unstable; urgency=low
 
