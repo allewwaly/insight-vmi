@@ -6,10 +6,12 @@
  */
 
 #include "longoperation.h"
+#include "shell.h"
 #include <debug.h>
+#include <QTextStream>
 
 LongOperation::LongOperation(int progressInterval)
-    : _duration(0), _progressInterval(progressInterval)
+    : _duration(0), _progressInterval(progressInterval), _lastLen(0)
 {
 }
 
@@ -22,6 +24,7 @@ LongOperation::~LongOperation()
 void LongOperation::operationStarted()
 {
     _duration = 0;
+    _lastLen = 0;
     _elapsedTime.start();
     _timer.start();
 }
@@ -67,4 +70,26 @@ QString LongOperation::elapsedTimeVerbose() const
         time = QString("%1 min ").arg(m) + time;
     return time;
 }
+
+
+void LongOperation::shellOut(const QString &s, bool newline)
+{
+    if (_lastLen > 0) {
+        int w = shell->out().fieldWidth();
+        shell->out() << qSetFieldWidth(_lastLen) << qPrintable(s)
+                     << qSetFieldWidth(w);
+    }
+    else
+        shell->out() << qPrintable(s);
+
+    if (newline) {
+        shell->out() << endl;
+        _lastLen = 0;
+    }
+    else {
+        shell->out() << flush;
+        _lastLen = s.length();
+    }
+}
+
 

@@ -37,7 +37,6 @@ protected:
      */
     virtual void operationProgress() = 0;
 
-protected:
     /**
      * Call this function at the start of the long operation.
      */
@@ -72,6 +71,15 @@ protected:
      */
     QString elapsedTimeVerbose() const;
 
+    /**
+     * Outputs string \a s to the shell, overwriting the complete last line
+     * that was output without line break.
+     * @param s the string to print
+     * @param newline set to \c true to insert a newline after \a s, \c set to
+     * \c false otherwise
+     */
+    void shellOut(const QString &s, bool newline);
+
     QTime _elapsedTime; ///< use _elapsedTime.elapsed() to get the elapsed
                         ///< time since operationStarted() was called
     int _duration;      ///< holds the elapsed time after operationStopped()
@@ -80,6 +88,7 @@ protected:
 
 private:
     QTime _timer;        ///< used internally to trigger progress events
+    int _lastLen;        ///< length of last output line before linebreak
 };
 
 #endif /* LONGOPERATION_H_ */

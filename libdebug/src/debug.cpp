@@ -4,7 +4,7 @@
 
 std::ostream& operator<<(std::ostream& out, const QString &s)
 {
-    return out << s.toStdString();
+    return out << qPrintable(s);
 }
 
 #endif

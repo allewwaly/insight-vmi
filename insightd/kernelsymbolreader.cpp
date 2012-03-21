@@ -25,15 +25,13 @@
 
 KernelSymbolReader::KernelSymbolReader(QIODevice* from, SymFactory* factory,
                                        MemSpecs* specs)
-    : _from(from), _factory(factory), _specs(specs), _phase(phFinished),
-      _lastLen(0)
+    : _from(from), _factory(factory), _specs(specs), _phase(phFinished)
 {
 }
 
 
 void KernelSymbolReader::read()
 {
-    _lastLen = 0;
     operationStarted();
 
     qint16 flags, version;
@@ -62,7 +60,7 @@ void KernelSymbolReader::read()
 
     // Set kernel symbol version
     in.setKSymVersion(version);
-    debugmsg(QString("Symbol version: %1").arg(version));
+//    debugmsg(QString("Symbol version: %1").arg(version));
     // Call the appropirate reader function
     switch (version) {
     case kSym::VERSION_11:
@@ -459,23 +457,6 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         s += QString(" (%1 bytes read)").arg(_from->pos());
     s += ".";
     shellOut(s, true);
-}
-
-
-void KernelSymbolReader::shellOut(const QString &s, bool newline)
-{
-    if (!s.isEmpty())
-        shell->out() << qSetFieldWidth(_lastLen) << qPrintable(s)
-                     << qSetFieldWidth(0);
-
-    if (newline) {
-        shell->out() << endl;
-        _lastLen = 0;
-    }
-    else {
-        shell->out() << flush;
-        _lastLen = s.length();
-    }
 }
 
 
