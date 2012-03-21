@@ -201,6 +201,7 @@ Shell::Shell(bool listenOnSocket)
                 "  symbols parse <objdump> <System.map> <kernel_headers>\n"
                 "                                 Parse the symbols from an objdump output, a\n"
                 "                                 System.map file and a kernel headers dir.\n"
+                "  symbols source <kernel_src_pp> Parse the pre-processed kernel source files\n"
                 "  symbols store <ksym_file>      Saves the parsed symbols to a file\n"
                 "  symbols save <ksym_file>       Alias for \"store\"\n"
                 "  symbols load <ksym_file>       Loads previously stored symbols for usage"));
