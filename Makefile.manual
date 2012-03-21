@@ -13,23 +13,19 @@ SHARE   = $(DESTDIR)$(PREFIX)/share
 all: build
 
 clean:
-	@echo clean
-	@for dir in $(SUBDIRS) ; do cd $$dir ; make clean ; cd $(PWD) ; done
+	@make clean
 	
 distclean:
-	@echo distclean
-	@for dir in $(SUBDIRS) ; do cd $$dir ; make distclean ; rm -rf Makefile ; cd $(PWD) ; done
-	
+	@make distclean
 
-makefiles:
-	@for dir in $(SUBDIRS) ; do cd $$dir ; qmake -makefile ; cd $(PWD) ; done
+makefiles: insight-vmi.pro
+	@qmake -makefile -recursive
 
 debug: makefiles
-	@for dir in $(SUBDIRS) ; do cd $$dir ; make debug ; cd $(PWD) ; done
+	@make debug
 
 build: makefiles
-	@for dir in $(SUBDIRS) ; do cd $$dir ; make release ; cd $(PWD) ; done
-
+	@make release
 
 install: build
 	@##create install directory
@@ -53,8 +49,3 @@ install: build
 documentation:
 	@for dir in $(SUBDIRS) ; do cd $$dir ; test -f Doxyfile && doxygen ; cd $(PWD) ; done
 	
-
-#%:
-#	@echo $@
-#	@echo "$@ Todo create this target"
-#	@#for i in `ls -d mem*/ -1` ; do cd $i ; make clean && make ; cd - ; done
