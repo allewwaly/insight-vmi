@@ -10,7 +10,6 @@
 #include <astsymbol.h>
 #include <asttypeevaluator.h>
 
-#include <QTextDocument>
 #include <QTextStream>
 #include <QFile>
 #include <QDateTime>
@@ -49,9 +48,14 @@ ASTDotGraph::~ASTDotGraph()
 }
 
 
-inline QString ASTDotGraph::dotEscape(const QString& s) const
+inline QString ASTDotGraph::dotEscape(QString s) const
 {
-    return Qt::escape(s).replace('[', "&#91;").replace(']', "&#93;");
+    return s.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+            .replace('[', "&#91;")
+            .replace(']', "&#93;");
 }
 
 

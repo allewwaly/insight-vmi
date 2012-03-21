@@ -18,7 +18,10 @@
 class QFile;
 class QIODevice;
 class SymFactory;
+
+#ifdef CONFIG_MEMORY_MAP
 class MemoryMap;
+#endif
 
 /**
  * Exception class for queries
@@ -217,6 +220,7 @@ public:
      */
     int index() const;
 
+#ifdef CONFIG_MEMORY_MAP
     /**
      * @return the memory map of this dump
      */
@@ -226,6 +230,7 @@ public:
      * @return the memory map of this dump
      */
     MemoryMap* map();
+#endif
 
     /**
      * Initializes the reverse mapping of addresses and instances.
@@ -247,9 +252,11 @@ private:
     QFile* _file;
     QString _fileName;
     VirtualMemory* _vmem;
+#ifdef CONFIG_MEMORY_MAP
+    MemoryMap* _map;
+#endif
     const SymFactory* _factory;
     int _index;
-    MemoryMap* _map;
 };
 
 /// An array of MemoryDump files
@@ -276,6 +283,8 @@ inline int MemoryDump::index() const
 }
 
 
+#ifdef CONFIG_MEMORY_MAP
+
 inline const MemoryMap* MemoryDump::map() const
 {
     return _map;
@@ -287,6 +296,7 @@ inline MemoryMap* MemoryDump::map()
     return _map;
 }
 
+#endif
 
 inline VirtualMemory* MemoryDump::vmem()
 {

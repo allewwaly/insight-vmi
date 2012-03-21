@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       -= gui
+QT       -= gui webkit
 
 TARGET = debug
 TEMPLATE = lib
