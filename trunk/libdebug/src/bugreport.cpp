@@ -126,7 +126,15 @@ QString BugReport::bugSubmissionHint(int errorCount) const
 
 QByteArray BugReport::systemInfo() const
 {
-    QString info, line, date(VersionInfo::buildDate);
+    QString info, line, buildDateStr(VersionInfo::buildDate);
+    const QString dateFmt("yyyy-MM-dd hh:mm:ss UTC");
+
+    // Try to parse the build date as a time_t value
+    bool ok = false;
+    uint buildDate = QString(VersionInfo::buildDate).toUInt(&ok);
+    if (ok)
+        buildDateStr = QDateTime::fromTime_t(buildDate).toString(dateFmt);
+
     line.fill('-', _sepLineWidth - 1);
     line.prepend('\'');
     info += QString("Log created on:        %1\n"
@@ -141,18 +149,18 @@ QByteArray BugReport::systemInfo() const
                     "| SYSTEM INFORMATION\n"
                     "%0\n"
                     "Host architecture:     %6\n"
-                    "Word size:             %7, %8 endian\n"
+                    "Word size:             %7 bit, %8 endian\n"
                     "Qt current version:    %9\n"
                     "\n\n"
                     "| OPERATING SYSTEM RELEASE\n"
                     "%0\n"
                     )
             .arg(line)
-            .arg(QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd hh:mm:ss UTC"))
+            .arg(QDateTime::currentDateTimeUtc().toString(dateFmt))
             .arg(VersionInfo::release)
             .arg(VersionInfo::svnRevision)
             .arg(QT_VERSION_STR)
-            .arg(date.replace('_', " "))
+            .arg(buildDateStr)
             .arg(VersionInfo::architecture)
             .arg(QSysInfo::WordSize)
             .arg(QSysInfo::ByteOrder == QSysInfo::BigEndian ? "big" : "little" )
