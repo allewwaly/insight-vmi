@@ -11,6 +11,7 @@
 #include "instancedata.h"
 #include "basetype.h"
 #include "virtualmemory.h"
+#include "virtualmemoryexception.h"
 #include "instance_def.h"
 
 inline int Instance::id() const
@@ -188,18 +189,20 @@ inline QString Instance::derefUserLand(const QString &pgd) const
 	//TODO
 	//diekmann
 	QString ret;
-    if(_d.isNull){
+	if (_d.isNull) {
     	ret = "NULL";
-    }else{
+    }
+    else {
     	bool ok;
 
     	qint64 pgd_d = pgd.toULongLong(&ok, 16);
-    	if(!ok) throw GenericException("(PDG invalid)");
+        if (!ok)
+            virtualMemoryError("(PDG invalid)");
 
     	_d.vmem->setUserLand(pgd_d);
-    	try{
+        try {
     		ret = _d.type->toString(_d.vmem, _d.address);
-    	}catch(...){
+        } catch(...) {
         	_d.vmem->setKernelSpace();
     		throw;
     	}
