@@ -1,7 +1,7 @@
 #include "astexpressionevaluator.h"
 #include <abstractsyntaxtree.h>
 #include "astexpression.h"
-#include "expressionevalexception.h"
+#include <expressionevalexception.h>
 #include <astnode.h>
 #include <asttypeevaluator.h>
 #include <astsourceprinter.h>
@@ -11,12 +11,13 @@
 
 #define checkNodeType(node, expected_type) \
     if ((node)->type != (expected_type)) { \
-            exprEvalError( \
+            exprEvalError2( \
                 QString("Expected node type \"%1\", given type is \"%2\" at %3:%4") \
                     .arg(ast_node_type_to_str2(expected_type)) \
                     .arg(ast_node_type_to_str(node)) \
                     .arg(_ast->fileName()) \
-                    .arg(node->start->line)); \
+                    .arg(node->start->line), \
+                node); \
     }
 
 
@@ -151,7 +152,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(
                     ++cnt;
                 }
 
-                exprEvalError(msg);
+                exprEvalError2(msg, node);
             }
         }
     }
@@ -304,19 +305,21 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(
         break;
 
     default:
-        exprEvalError(QString("Unexpexted node type: %1 at %2:%3:%4")
-                      .arg(ast_node_type_to_str(node))
-                      .arg(_ast ? _ast->fileName() : QString())
-                      .arg(node->start->line)
-                      .arg(node->start->charPosition));
+        exprEvalError2(QString("Unexpexted node type: %1 at %2:%3:%4")
+                       .arg(ast_node_type_to_str(node))
+                       .arg(_ast ? _ast->fileName() : QString())
+                       .arg(node->start->line)
+                       .arg(node->start->charPosition),
+                       node);
     }
 
     if (!expr) {
-        exprEvalError(QString("Failed to evaluate node %1 at %2:%3:%4")
-                .arg(ast_node_type_to_str(node))
-                .arg(_ast->fileName())
-                .arg(node->start->line)
-                .arg(node->start->charPosition));
+        exprEvalError2(QString("Failed to evaluate node %1 at %2:%3:%4")
+                       .arg(ast_node_type_to_str(node))
+                       .arg(_ast->fileName())
+                       .arg(node->start->line)
+                       .arg(node->start->charPosition),
+                       node);
     }
 
     if (ptsTo.isEmpty())
@@ -411,11 +414,12 @@ ASTExpression* ASTExpressionEvaluator::exprOfBinaryExpr(
             exprType = etMultiplicativeMod;
         break;
     default:
-        exprEvalError(QString("Type \"%1\" represents no binary expression at %2:%3:%4")
-                .arg(ast_node_type_to_str(node))
-                .arg(_ast->fileName())
-                .arg(node->start->line)
-                .arg(node->start->charPosition));
+        exprEvalError2(QString("Type \"%1\" represents no binary expression at %2:%3:%4")
+                       .arg(ast_node_type_to_str(node))
+                       .arg(_ast->fileName())
+                       .arg(node->start->line)
+                       .arg(node->start->charPosition),
+                       node);
     }
 
     ASTBinaryExpression *expr = createExprNode<ASTBinaryExpression>(exprType);
@@ -701,14 +705,15 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
     ASTType* type = _eval->typeofNode(node->u.builtin_function_offsetof.type_name);
     if (!type || !(type->type() & StructOrUnion)) {
         ASTSourcePrinter printer(_ast);
-        exprEvalError(QString("Cannot find struct/union definition for \"%1\" "
+        exprEvalError2(QString("Cannot find struct/union definition for \"%1\" "
                               "at %2:%3:%4")
                       .arg(printer.toString(
                                node->u.builtin_function_offsetof.postfix_expression)
                            .trimmed())
                       .arg(_ast->fileName())
                       .arg(node->start->line)
-                      .arg(node->start->charPosition));
+                      .arg(node->start->charPosition),
+                       node);
     }
 
     ASTExpression* expr = 0;
@@ -727,14 +732,15 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
 
 
     ASTSourcePrinter printer(_ast);
-    exprEvalError(QString("Failed to evaluate offsetof() expression for \"%1\" "
+    exprEvalError2(QString("Failed to evaluate offsetof() expression for \"%1\" "
                           "at %2:%3:%4")
                   .arg(printer.toString(
                            node->u.builtin_function_offsetof.postfix_expression)
                        .trimmed())
                   .arg(_ast->fileName())
                   .arg(node->start->line)
-                  .arg(node->start->charPosition));
+                  .arg(node->start->charPosition),
+                   node);
 
     return 0;
 }
@@ -770,7 +776,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOfSingle(
             if (!a) {
                 if (!exceptions)
                     return 0;
-                exprEvalError(QString("Type \"%1\" is not an array at %2:%3:%4")
+                exprEvalError2(QString("Type \"%1\" is not an array at %2:%3:%4")
                               .arg(bt ? bt->prettyName() : QString("NULL"))
                               .arg(_ast->fileName())
                               .arg(pfesl ?
@@ -778,7 +784,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOfSingle(
                                        pfe->start->line)
                               .arg(pfesl ?
                                        pfesl->item->start->charPosition :
-                                       pfe->start->charPosition));
+                                       pfe->start->charPosition),
+                               node);
             }
             // The new BaseType is the array's referencing type
             bt = a->refTypeDeep(BaseType::trLexical);
@@ -808,7 +815,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOfSingle(
             if (!s) {
                 if (!exceptions)
                     return 0;
-                exprEvalError(QString("Cannot find type struct/union BaseType "
+                exprEvalError2(QString("Cannot find type struct/union BaseType "
                                       "for \"%1\" at %2:%3:%4")
                               .arg(type->toString())
                               .arg(_ast->fileName())
@@ -817,14 +824,15 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOfSingle(
                                        pfe->start->line)
                               .arg(pfesl ?
                                        pfesl->item->start->charPosition :
-                                       pfe->start->charPosition));
+                                       pfe->start->charPosition),
+                               node);
             }
 
             m = s->findMember(name);
             if (!m) {
                 if (!exceptions)
                     return 0;
-                exprEvalError(QString("Cannot find member \"%1\" in %2 at "
+                exprEvalError2(QString("Cannot find member \"%1\" in %2 at "
                                       "%3:%4:%5")
                               .arg(name)
                               .arg(s->prettyName())
@@ -834,7 +842,8 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOfSingle(
                                        pfe->start->line)
                               .arg(pfesl ?
                                        pfesl->item->start->charPosition :
-                                       pfe->start->charPosition));
+                                       pfe->start->charPosition),
+                               node);
             }
             // Add the member's offset to total offset
             offset += m->offset();
@@ -857,12 +866,13 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOfSingle(
             else {
                 if (!exceptions)
                     return 0;
-                exprEvalError(QString("Unexpected postfix expression suffix "
+                exprEvalError2(QString("Unexpected postfix expression suffix "
                                       "type: %1 at %2:%3:%4")
                               .arg(ast_node_type_to_str(pfesl->item))
                               .arg(_ast->fileName())
                               .arg(node->start->line)
-                              .arg(node->start->charPosition));
+                              .arg(node->start->charPosition),
+                               node);
             }
             pfesl = pfesl->next;
         }
@@ -1117,11 +1127,12 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(
         }
 
         if (!expr)
-            exprEvalError(QString("Unsupported escape sequence: %1 at %2:%3:%4")
+            exprEvalError2(QString("Unsupported escape sequence: %1 at %2:%3:%4")
                           .arg(s)
                           .arg(_ast->fileName())
                           .arg(node->start->line)
-                          .arg(node->start->charPosition));
+                          .arg(node->start->charPosition),
+                           node);
 
         return expr;
     }
@@ -1137,11 +1148,12 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(
     }
 
     default:
-        exprEvalError(QString("Unexpected constant value type: %1 at %2:%3:%4")
+        exprEvalError2(QString("Unexpected constant value type: %1 at %2:%3:%4")
                       .arg(ast_node_type_to_str(node))
                       .arg(_ast->fileName())
                       .arg(node->start->line)
-                      .arg(node->start->charPosition));
+                      .arg(node->start->charPosition),
+                       node);
     }
 
     return 0;
@@ -1197,7 +1209,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
         // Return a constant expression for an enumerator
         if (sym->type() == stEnumerator) {
             if (!_factory->enumsByName().contains(sym->name())) {
-//                exprEvalError(QString("Cannot find enumerator \"%1\" at %2:%3:%4")
+//                exprEvalError2(QString("Cannot find enumerator \"%1\" at %2:%3:%4")
 //                              .arg(sym->name())
 //                              .arg(_ast->fileName())
 //                              .arg(node->start->line)
@@ -1229,10 +1241,11 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
         expr = exprOfNode(statements->item, ptsTo);
     }
     else
-        exprEvalError(QString("Unexpected primary expression at %2:%3:%4")
+        exprEvalError2(QString("Unexpected primary expression at %2:%3:%4")
                       .arg(_ast->fileName())
                       .arg(node->start->line)
-                      .arg(node->start->charPosition));
+                      .arg(node->start->charPosition),
+                       node);
 
     return expr;
 }
@@ -1295,20 +1308,22 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(
         else if (op == "!")
             ue = createExprNode<ASTUnaryExpression>(etUnaryNot);
         else
-            exprEvalError(QString("Unhandled unary operator: \"%1\" at %2:%3:%4")
-                    .arg(op)
-                    .arg(_ast->fileName())
-                    .arg(node->start->line)
-                    .arg(node->start->charPosition));
+            exprEvalError2(QString("Unhandled unary operator: \"%1\" at %2:%3:%4")
+                           .arg(op)
+                           .arg(_ast->fileName())
+                           .arg(node->start->line)
+                           .arg(node->start->charPosition),
+                           node);
         break;
     }
 
     default:
-        exprEvalError(QString("Type \"%1\" represents no unary expression at %2:%3:%4")
-                .arg(ast_node_type_to_str(node))
-                .arg(_ast->fileName())
-                .arg(node->start->line)
-                .arg(node->start->charPosition));
+        exprEvalError2(QString("Type \"%1\" represents no unary expression at %2:%3:%4")
+                       .arg(ast_node_type_to_str(node))
+                       .arg(_ast->fileName())
+                       .arg(node->start->line)
+                       .arg(node->start->charPosition),
+                       node);
     }
 
     if (ue)
@@ -1374,11 +1389,12 @@ unsigned int ASTExpressionEvaluator::sizeofType(const ASTType *type)
 		}
 		else {
 			node = type->node();
-			exprEvalError(QString("Cannot find type BaseType for \"%1\" at %2:%3:%4")
+			exprEvalError2(QString("Cannot find type BaseType for \"%1\" at %2:%3:%4")
 						  .arg(type->toString())
 						  .arg(_ast->fileName())
 						  .arg(node ? node->start->line : 0)
-						  .arg(node ? node->start->charPosition : 0));
+						  .arg(node ? node->start->charPosition : 0),
+						  node);
 		}
 		break;
 	}
@@ -1397,11 +1413,12 @@ unsigned int ASTExpressionEvaluator::sizeofType(const ASTType *type)
 //	case rtVaList:
     default:
         node = type->node();
-        exprEvalError(QString("Cannot determine size of type \"%1\" at %2:%3:%4")
+        exprEvalError2(QString("Cannot determine size of type \"%1\" at %2:%3:%4")
                       .arg(type->toString())
                       .arg(_ast->fileName())
                       .arg(node ? node->start->line : 0)
-                      .arg(node ? node->start->charPosition : 0));
+                      .arg(node ? node->start->charPosition : 0),
+                      node);
 
     }
 
