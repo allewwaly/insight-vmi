@@ -80,6 +80,12 @@ protected:
      */
     void shellOut(const QString &s, bool newline);
 
+    /**
+     * Outputs string \a s to the shell's error stream.
+     * @param s the string to print
+     */
+    void shellErr(const QString &s);
+
     QTime _elapsedTime; ///< use _elapsedTime.elapsed() to get the elapsed
                         ///< time since operationStarted() was called
     int _duration;      ///< holds the elapsed time after operationStopped()

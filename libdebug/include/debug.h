@@ -19,10 +19,19 @@ std::ostream& operator<<(std::ostream& out, const QString &s);
 
 namespace VersionInfo
 {
-    extern const char* release;
-    extern const char* svnRevision;
-    extern const char* buildDate;
-    extern const char* architecture;
+extern const char* release;
+extern const char* svnRevision;
+extern const char* buildDate;
+extern const char* architecture;
+}
+
+namespace ProjectInfo
+{
+extern const char* projectName;
+extern const char* homePage;
+extern const char* bugTracker;
+extern const char* devMailingList;
+extern const char* userMailingList;
 }
 
 #endif /* __cplusplus */
