@@ -93,3 +93,10 @@ void LongOperation::shellOut(const QString &s, bool newline)
 }
 
 
+void LongOperation::shellErr(const QString &s)
+{
+    shell->out() << endl << flush;
+    shell->err() << s << endl << flush;
+}
+
+

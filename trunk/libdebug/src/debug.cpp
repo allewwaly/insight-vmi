@@ -32,6 +32,17 @@ const char* architecture =
 #endif
 }
 
+
+namespace ProjectInfo
+{
+const char* projectName     = "InSight";
+const char* homePage        = "https://code.google.com/p/insight-vmi/";
+const char* bugTracker      = "https://code.google.com/p/insight-vmi/issues/list";
+const char* devMailingList  = "insight-vmi-dev@googlegroups.com";
+const char* userMailingList = "insight-vmi-discuss@googlegroups.com";
+}
+
+
 std::ostream& operator<<(std::ostream& out, const QString &s)
 {
     return out << qPrintable(s);

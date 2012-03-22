@@ -15,6 +15,7 @@
 #include <astsourceprinter.h>
 #include <cassert>
 #include <debug.h>
+#include <bugreport.h>
 #include "shell.h"
 #include "compileunit.h"
 #include "filenotfoundexception.h"
@@ -104,6 +105,11 @@ void KernelSourceParser::parse()
         return;
     }
 
+    if (bugReport)
+        bugReport->newFile("insightd");
+    else
+        bugReport = new BugReport("insightd");
+
     cleanUpThreads();
 
     operationStarted();
@@ -152,6 +158,15 @@ void KernelSourceParser::parse()
     shellOut(s, true);
 
     _factory->sourceParcingFinished();
+
+    // In case there were errors, show the user some information
+    if (bugReport && bugReport->entries()) {
+        bugReport->close();
+        shell->out() << endl
+                     << bugReport->bugSubmissionHint(bugReport->entries());
+        delete bugReport;
+        bugReport = 0;
+    }
 }
 
 
@@ -166,6 +181,8 @@ void KernelSourceParser::WorkerThread::run()
     {
         currentFile = _parser->_fileNames[_parser->_filesIndex++];
 
+//        if (!currentFile.endsWith("lib/sha1.c.i"))
+//            continue;
 //        if (_parser->_filesIndex != 116 && _parser->_filesIndex != 117)
 //            continue;
 
@@ -177,24 +194,7 @@ void KernelSourceParser::WorkerThread::run()
             _parser->checkOperationProgress();
         lock.unlock();
 
-        try {
-            parseFile(currentFile);
-        }
-        catch (FileNotFoundException& e) {
-            shell->out() << endl << flush;
-            shell->err() << "WARNING: " << e.message << endl << flush;
-        }
-//        catch (TypeEvaluatorException& e) {
-//            shell->out() << endl << flush;
-//            shell->err() << "WARNING: At " << e.file << ":" << e.line
-//                         << ": " << e.message << endl << flush;
-//        }
-        catch (GenericException& e) {
-            shell->out() << endl << flush;
-            shell->err() << e.file << ":" << e.line
-                         << " WARNING: " << e.message << endl << flush;
-            throw e;
-        }
+        parseFile(currentFile);
 
         lock.relock();
     }
@@ -205,23 +205,27 @@ void KernelSourceParser::WorkerThread::parseFile(const QString &fileName)
 {
     QString file = _parser->_srcDir.absoluteFilePath(fileName);
 
-    if (!_parser->_srcDir.exists(fileName))
-        fileNotFoundError(QString("File not found: %1").arg(file));
+    if (!_parser->_srcDir.exists(fileName)) {
+        _parser->shellErr(QString("File not found: %1").arg(file));
+        return;
+    }
 
     AbstractSyntaxTree ast;
     ASTBuilder builder(&ast);
-
-    // Parse the file
-    if (!_stopExecution && builder.buildFrom(file) != 0)
-        sourceParserError(QString("Error parsing file %1").arg(file));
-
-    // Evaluate types
     KernelSourceTypeEvaluator eval(&ast, _parser->_factory);
+
     try {
+        // Parse the file
+        if (!_stopExecution && builder.buildFrom(file) != 0) {
+            BugReport::reportErr(QString("Error parsing file: %1").arg(file));
+            return;
+        }
+
+        // Evaluate types
         if (!_stopExecution && !eval.evaluateTypes()) {
             // Only throw exception if evaluation was not interrupted
             if (!_stopExecution && !eval.walkingStopped())
-                sourceParserError(QString("Error evaluating types in %1").arg(file));
+                BugReport::reportErr(QString("Error evaluating types in %1").arg(file));
         }
     }
     catch (TypeEvaluatorException& e) {
@@ -231,17 +235,23 @@ void KernelSourceParser::WorkerThread::parseFile(const QString &fileName)
             n = n->parent;
 
         ASTSourcePrinter printer(&ast);
-
-        shell->out() << endl << flush;
-        shell->err()
-                << "********************************************" << endl
-                << "WARNING: " << e.message << endl
-                << "------------------[Source]------------------" << endl
-                << printer.toString(n, true)
-                << "------------------[/Source]-----------------" << endl
-                << "Details (may be incomplete):" << endl
-                << eval.typeChangeInfo(e.ed) << endl << flush;
-        throw;
+        QString msg = QString("%1\n"
+                              "\n"
+                              "Details (may be incomplete):\n"
+                              "%2\n"
+                              "\n"
+                              "File: %3\n"
+                              "------------------[Source]------------------\n"
+                              "%4"
+                              "------------------[/Source]-----------------")
+                                .arg(e.message)
+                                .arg(eval.typeChangeInfo(e.ed))
+                                .arg(fileName)
+                                .arg(printer.toString(n, true));
+        BugReport::reportErr(msg, e.file, e.line);
+    }
+    catch (GenericException& e) {
+        BugReport::reportErr(e.message, e.file, e.line);
     }
 }
 

@@ -33,7 +33,7 @@ unix {
     exists(../debian/changelog) {
         INSIGHT_RELEASE = $$system(awk \'{if (!s && /^insight/i) s=$2} END {print substr(s, 2, length(s)-2)}\' ../debian/changelog)
     }
-    BUILD_DATE = $$system(date)
+    BUILD_DATE = $$system(date | sed \'s@ @_@g\')
 }
 
 DEFINES += SVN_REVISION=\"\\\"$$SVN_REVISION\\\"\" \

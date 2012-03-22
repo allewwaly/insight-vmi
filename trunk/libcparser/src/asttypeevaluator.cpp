@@ -13,6 +13,7 @@
 #include <astscopemanager.h>
 #include <realtypes.h>
 #include <debug.h>
+#include <bugreport.h>
 #include <QStringList>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -2499,45 +2500,71 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
         return;
     }
 
-    switch (node->type) {
-    case nt_direct_declarator:
-        // The direct declarator must have an identifier
-        if (!node->u.direct_declarator.identifier)
-            return;
+    try {
 
-        if (_phase == epFindSymbols)
-            collectSymbols(node);
-        else if (_phase == epPointsTo)
-            evaluateIdentifierPointsTo(node);
-        break;
+        switch (node->type) {
+        case nt_direct_declarator:
+            // The direct declarator must have an identifier
+            if (!node->u.direct_declarator.identifier)
+                return;
 
-    case nt_jump_statement_return:
-        // We are only interested in jump statements that return a value
-        if (!node->u.jump_statement.initializer)
-            return;
+            if (_phase == epFindSymbols)
+                collectSymbols(node);
+            else if (_phase == epPointsTo)
+                evaluateIdentifierPointsTo(node);
+            break;
 
-        if (_phase == epPointsTo)
-            evaluateIdentifierPointsTo(node);
-        break;
+        case nt_jump_statement_return:
+            // We are only interested in jump statements that return a value
+            if (!node->u.jump_statement.initializer)
+                return;
 
-    case nt_primary_expression:
-        // The primary expressions must have an identifier.  If the identifier
-        // has a leading dot, it is used as initializer identifier.
-        if (!node->u.primary_expression.identifier)
-            return;
+            if (_phase == epPointsTo)
+                evaluateIdentifierPointsTo(node);
+            break;
 
-        if (_phase == epFindSymbols)
-            collectSymbols(node);
-        else if (_phase == epPointsTo)
-            evaluateIdentifierPointsTo(node);
-        else if (_phase == epPointsToRev)
-            evaluateIdentifierPointsToRev(node);
-        else
-            evaluateIdentifierUsedAs(node);
-        break;
+        case nt_primary_expression:
+            // The primary expressions must have an identifier.  If the identifier
+            // has a leading dot, it is used as initializer identifier.
+            if (!node->u.primary_expression.identifier)
+                return;
 
-    default:
-        break;
+            if (_phase == epFindSymbols)
+                collectSymbols(node);
+            else if (_phase == epPointsTo)
+                evaluateIdentifierPointsTo(node);
+            else if (_phase == epPointsToRev)
+                evaluateIdentifierPointsToRev(node);
+            else
+                evaluateIdentifierUsedAs(node);
+            break;
+
+        default:
+            break;
+        }
+
+    }
+    catch (TypeEvaluatorException& e) {
+        // Print the source of the embedding external declaration
+        const ASTNode* n = node;
+        while (n && n->parent) // && n->type != nt_external_declaration)
+            n = n->parent;
+
+        ASTSourcePrinter printer(_ast);
+        QString msg = QString("%1\n"
+                              "\n"
+                              "Details (may be incomplete):\n"
+                              "%2\n"
+                              "\n"
+                              "File: %3\n"
+                              "------------------[Source]------------------\n"
+                              "%4"
+                              "------------------[/Source]-----------------")
+                                .arg(e.message)
+                                .arg(typeChangeInfo(e.ed))
+                                .arg(_ast->fileName())
+                                .arg(printer.toString(n, true));
+        BugReport::reportErr(msg, e.file, e.line);
     }
 }
 

@@ -5,47 +5,160 @@
 #include <QFile>
 #include <QMutex>
 
+class QTextStream;
+
 /**
  * This class encapsulates a log file that can be used for bug reports.
  */
 class BugReport
 {
 public:
+    /**
+     * Constructor
+     */
     BugReport();
+
+    /**
+     * Constructor
+     * @param filePrefix
+     * @param inTempDir
+     * \sa newFile()
+     */
     BugReport(const QString& filePrefix, bool inTempDir = true);
 
+    /**
+     * Creates a new file. The file name will be <prefix>_yyyymmdd-hhmmss.log.
+     * \note Does not reset the counter!
+     * @param filePrefix the prefix for the new file name
+     * @param inTempDir If \c true, the file will be created in the system's
+     * temp directory. If \c false, the file is created in the current working
+     * directory, unless \a filePrefix specifies an absolute path.     *
+     */
     void newFile(const QString& filePrefix, bool inTempDir = true);
 
     /**
-     * Appends string \a msg to the bug report. The log file is created, if
+     * Appends data \a data to the bug report. The log file is created, if
      * it doesn't exist or is closed.
      *\note This function is thread safe.
-     * @param msg the string to append
+     * @param data the data to append
      */
-    void append(const QString& msg);
+    void append(const QByteArray& data);
+
+    /**
+     * Appends string \a s to the bug report. The log file is created, if
+     * it doesn't exist or is closed.
+     *\note This function is thread safe.
+     * @param s the string to append
+     */
+    void append(const QString& s);
+
+    /**
+     * Appends string \a s to the bug report. The log file is created, if
+     * it doesn't exist or is closed.
+     *\note This function is thread safe.
+     * @param s the string to append
+     */
+    void append(const char* s);
+
+    /**
+     * Appends a line of width sepLineWidth() to the bug report, followed by
+     * a newline.
+     *\note This function is thread safe.
+     * @param fillChar the character to use to fill the line
+     * \sa sepLineWidth()
+     */
+    void appendSepLine(char fillChar = '-');
 
     /**
      * Closes the log file of this bug report
      */
     void close();
 
+    /**
+     * Creates a generic suggestion for the user to submit this bug report to
+     * the project's bug tracker.
+     * @param errorCount the number of errors that occured (will be ignored if
+     * < 0)
+     * @return
+     */
+    QString bugSubmissionHint(int errorCount = -1) const;
+
+    /**
+     * @return the current file name
+     */
     inline const QString& fileName()
     {
         return _fileName;
     }
 
-private:
-    void createFileName(const QString& filePrefix, bool inTempDir);
+    /**
+     * @return the current with for separating lines
+     */
+    inline int sepLineWidth() const
+    {
+        return _sepLineWidth;
+    }
 
     /**
-     * \warning This function expexts \a _file is ready to write and
-     * \a _writeLock is locked!
+     * Sets the with for separating lines.
+     * @param width
      */
-    void writeSystemInfo();
+    inline void setSepLineWidth(int width)
+    {
+        _sepLineWidth = width;
+    }
+
+    /**
+     * @return the number of calls to append() have been performed for the
+     * current file
+     */
+    inline int entries() const
+    {
+        return _entries;
+    }
+
+    inline static QTextStream* err()
+    {
+        return _err;
+    }
+
+    inline static void setErr(QTextStream* err)
+    {
+        _err = err;
+    }
+
+    static void reportErr(QString msg);
+    static void reportErr(QString msg, const QString& file, int line);
+
+private:
+    /**
+     * Collects information about InSight and the host system.
+     * @return system information (ASCII text)
+     */
+    QByteArray systemInfo() const;
+
+    /**
+     * Reads the contents of the ASCII text file \a fileName and returns it as
+     * QByteArray.
+     *
+     * \note The file content is assumed to be ASCII text. Leading and trailing
+     * whitespace will be remove, except for one terminal newline character.
+     *
+     * @param fileName
+     * @param the result of the operation is returned to this variable
+     * @return the contents of file \a fileName, or an empty array in case of
+     * an error
+     */
+    static QByteArray fileContents(const QString& fileName, bool *ok = 0);
 
     QString _fileName;
     QFile _file;
     QMutex _writeLock;
+    QMutex _ctrLock;
+    int _sepLineWidth;
+    bool _headerWritten;
+    int _entries;
+    static QTextStream* _err;
 };
 
 /// Global BugReport instance

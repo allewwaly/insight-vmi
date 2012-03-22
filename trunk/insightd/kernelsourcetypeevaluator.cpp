@@ -8,6 +8,7 @@
 #include "kernelsourcetypeevaluator.h"
 #include "symfactory.h"
 #include <debug.h>
+#include <bugreport.h>
 #include <astnode.h>
 #include <astscopemanager.h>
 #include <astsourceprinter.h>
@@ -110,17 +111,22 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
         const ASTNode* n = ed.srcNode;
         while (n && n->parent) // && n->type != nt_external_declaration)
             n = n->parent;
-        ASTSourcePrinter printer(_ast);
-        shell->out()
-                << "File: " << _ast->fileName() << endl
-                << "------------------[Source]------------------" << endl
-                << printer.toString(n, true)
-                << "------------------[/Source]-----------------" << endl;
 
-        shell->out()
-                << typeChangeInfo(ed)
-                << endl;
-        throw e;
+        ASTSourcePrinter printer(_ast);
+        QString msg = QString("%1\n"
+                              "\n"
+                              "Details (may be incomplete):\n"
+                              "%2\n"
+                              "\n"
+                              "File: %3\n"
+                              "------------------[Source]------------------\n"
+                              "%4"
+                              "------------------[/Source]-----------------")
+                                .arg(e.message)
+                                .arg(typeChangeInfo(ed))
+                                .arg(_ast->fileName())
+                                .arg(printer.toString(n, true));
+        BugReport::reportErr(msg, e.file, e.line);
     }
 }
 
