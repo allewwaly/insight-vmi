@@ -15,6 +15,7 @@
 #include <QMultiHash>
 #include <QStack>
 #include <QStringList>
+#include <genericexception.h>
 
 
 template <class Stack>
@@ -213,7 +214,10 @@ public:
      * @return a string with details about the given type change.
      */
     QString typeChangeInfo(const TypeEvalDetails &ed,
-                           const QString &expr = QString());
+                           const QString &expr = QString()) const;
+
+    void reportErr(const GenericException& e,  const ASTNode* node,
+                   const TypeEvalDetails* ed) const;
 
 protected:
     enum EvalPhase {

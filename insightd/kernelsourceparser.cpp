@@ -19,6 +19,7 @@
 #include "shell.h"
 #include "compileunit.h"
 #include "filenotfoundexception.h"
+#include "expressionevalexception.h"
 
 
 #define sourceParserError(x) do { throw SourceParserException((x), __FILE__, __LINE__); } while (0)
@@ -43,6 +44,11 @@ public:
 
     virtual ~SourceParserException() throw()
     {
+    }
+
+    virtual const char* className() const
+    {
+        return "SourceParserException";
     }
 };
 
@@ -233,25 +239,17 @@ void KernelSourceParser::WorkerThread::parseFile(const QString &fileName)
         const ASTNode* n = e.ed.srcNode;
         while (n && n->parent) // && n->type != nt_external_declaration)
             n = n->parent;
-
-        ASTSourcePrinter printer(&ast);
-        QString msg = QString("%1\n"
-                              "\n"
-                              "Details (may be incomplete):\n"
-                              "%2\n"
-                              "\n"
-                              "File: %3\n"
-                              "------------------[Source]------------------\n"
-                              "%4"
-                              "------------------[/Source]-----------------")
-                                .arg(e.message)
-                                .arg(eval.typeChangeInfo(e.ed))
-                                .arg(fileName)
-                                .arg(printer.toString(n, true));
-        BugReport::reportErr(msg, e.file, e.line);
+        eval.reportErr(e, n, &e.ed);
+    }
+    catch (ExpressionEvalException& e) {
+        // Make sure we at least have the full postfix expression
+        const ASTNode* n = e.node;
+        for (int i = 0; i < 3 && n && n->parent; ++i)
+            n = n->parent;
+        eval.reportErr(e, n, 0);
     }
     catch (GenericException& e) {
-        BugReport::reportErr(e.message, e.file, e.line);
+        eval.reportErr(e, 0, 0);
     }
 }
 
