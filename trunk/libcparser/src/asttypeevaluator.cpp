@@ -10,6 +10,7 @@
 #include <abstractsyntaxtree.h>
 #include <astdotgraph.h>
 #include <typeevaluatorexception.h>
+#include <expressionevalexception.h>
 #include <astscopemanager.h>
 #include <realtypes.h>
 #include <debug.h>
@@ -2501,7 +2502,6 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
     }
 
     try {
-
         switch (node->type) {
         case nt_direct_declarator:
             // The direct declarator must have an identifier
@@ -2549,23 +2549,41 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
         const ASTNode* n = node;
         while (n && n->parent) // && n->type != nt_external_declaration)
             n = n->parent;
-
-        ASTSourcePrinter printer(_ast);
-        QString msg = QString("%1\n"
-                              "\n"
-                              "Details (may be incomplete):\n"
-                              "%2\n"
-                              "\n"
-                              "File: %3\n"
-                              "------------------[Source]------------------\n"
-                              "%4"
-                              "------------------[/Source]-----------------")
-                                .arg(e.message)
-                                .arg(typeChangeInfo(e.ed))
-                                .arg(_ast->fileName())
-                                .arg(printer.toString(n, true));
-        BugReport::reportErr(msg, e.file, e.line);
+        reportErr(e, n, &e.ed);
     }
+    catch (ExpressionEvalException& e) {
+        // Make sure we at least have the full postfix expression
+        const ASTNode* n = e.node;
+        for (int i = 0; i < 3 && n && n->parent; ++i)
+            n = n->parent;
+        reportErr(e, n, 0);
+    }
+}
+
+
+void ASTTypeEvaluator::reportErr(const GenericException& e, const ASTNode* node,
+                                 const TypeEvalDetails* ed) const
+{
+    // General information
+    QString msg = QString("%0: %1\n\n").arg(e.className()).arg(e.message);
+    // Evaluation details, if given
+    if (ed) {
+        msg += QString("Details (may be incomplete):\n%0\n\n")
+                .arg(typeChangeInfo(*ed));
+    }
+    // Source file name
+    msg += QString("File: %0").arg(_ast->fileName());
+    // Source code, if node is given
+    if (node) {
+        ASTSourcePrinter printer(_ast);
+        msg += QString("\n"
+                       "------------------[Source]------------------\n"
+                       "%0"
+                       "------------------[/Source]-----------------")
+                .arg(printer.toString(node, true));
+    }
+    // Write report
+    BugReport::reportErr(msg, e.file, e.line);
 }
 
 
@@ -4070,7 +4088,7 @@ inline bool srcLineLessThan(const ASTNode* n1, const ASTNode* n2)
 
 
 QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed,
-                                         const QString& expr)
+                                         const QString& expr) const
 {
     ASTSourcePrinter printer(_ast);
 #   define INDENT "    "
