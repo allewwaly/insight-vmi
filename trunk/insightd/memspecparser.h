@@ -35,6 +35,11 @@ public:
     virtual ~MemSpecParserException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "MemSpecParserException";
+    }
 };
 
 

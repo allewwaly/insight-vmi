@@ -34,6 +34,11 @@ public:
     virtual ~BaseTypeException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "BaseTypeException";
+    }
 };
 
 /**
@@ -49,6 +54,11 @@ public:
 
     virtual ~MemAccessException() throw()
     {
+    }
+
+    virtual const char* className() const
+    {
+        return "MemAccessException";
     }
 };
 

@@ -31,6 +31,11 @@ public:
     virtual ~IOException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "IOException";
+    }
 };
 
 #endif /* IOEXCEPTION_H_ */

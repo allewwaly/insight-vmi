@@ -11,7 +11,7 @@
 #include <QIODevice>
 #include <QCache>
 #include <QMutex>
-#include "genericexception.h"
+#include <genericexception.h>
 #include "memspecs.h"
 
 static const quint64 PADDR_ERROR = 0xFFFFFFFFFFFFFFFFUL;

@@ -149,7 +149,6 @@ HEADERS += kernelsourcetypeevaluator.h \
     function.h \
     astexpressionevaluator.h \
     astexpression.h \
-    expressionevalexception.h \
     expressionresult.h \
     kernelsymbolstream.h
 
