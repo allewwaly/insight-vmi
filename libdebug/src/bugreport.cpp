@@ -173,14 +173,13 @@ QByteArray BugReport::systemInfo() const
 
     // Can we execute lsb_release?
     proc.start("lsb_release", QStringList("-a"));
-    if (proc.waitForFinished() && proc.error() != QProcess::UnknownError &&
+    // QProcess::UnknownError means "no error occured"
+    if (proc.waitForFinished() && proc.error() == QProcess::UnknownError &&
         proc.exitStatus() == 0)
     {
         contents = proc.readAllStandardOutput().trimmed();
-        if (!contents.isEmpty()) {
-            ret += contents;
-            ret += '\n';
-        }
+        if (!contents.isEmpty())
+            contents += '\n';
     }
     // Search for /etc/*release
     if (contents.isEmpty()) {
@@ -211,7 +210,7 @@ QByteArray BugReport::systemInfo() const
 
     // Terminate the header with a double line
     ret += '\n';
-    ret += QByteArray(_sepLineWidth, '=');
+    ret += QByteArray(_sepLineWidth, '#');
     ret += "\n\n";
 
     return ret;
