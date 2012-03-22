@@ -33,6 +33,11 @@ public:
     virtual ~FileNotFoundException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "FileNotFoundException";
+    }
 };
 
 #endif /* FILENOTFOUNDEXCEPTION_H_ */

@@ -4,9 +4,14 @@
 #include <genericexception.h>
 
 #define exprEvalError(x) do { \
-        throw ExpressionEvalException((x), __FILE__, __LINE__); \
+        throw ExpressionEvalException((x), 0, __FILE__, __LINE__); \
     } while (0)
 
+#define exprEvalError2(x, n) do { \
+    throw ExpressionEvalException((x), (n), __FILE__, __LINE__); \
+    } while (0)
+
+struct ASTNode;
 
 class ExpressionEvalException: public GenericException
 {
@@ -14,19 +19,27 @@ public:
     /**
       Constructor
       @param msg error message
+      @param node the node on which the error occured
       @param file file name in which message was originally thrown
       @param line line number at which message was originally thrown
       @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
      */
-    ExpressionEvalException(QString msg = QString(), const char* file = 0,
-                                 int line = -1)
-        : GenericException(msg, file, line)
+    ExpressionEvalException(QString msg = QString(), const ASTNode* node = 0,
+                            const char* file = 0, int line = -1)
+        : GenericException(msg, file, line), node(node)
     {
     }
 
     virtual ~ExpressionEvalException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "ExpressionEvalException";
+    }
+
+    const ASTNode* node;
 };
 
 

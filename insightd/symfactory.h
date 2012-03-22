@@ -60,6 +60,11 @@ public:
     virtual ~FactoryException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "FactoryException";
+    }
 };
 
 

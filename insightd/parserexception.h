@@ -34,6 +34,11 @@ public:
     virtual ~ParserException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "ParserException";
+    }
 };
 
 #endif /* PARSEREXCEPTION_H_ */

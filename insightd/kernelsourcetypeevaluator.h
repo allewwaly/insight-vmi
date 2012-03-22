@@ -35,6 +35,11 @@ public:
     virtual ~SourceTypeEvaluatorException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "SourceTypeEvaluatorException";
+    }
 };
 
 

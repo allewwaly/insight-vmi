@@ -70,6 +70,11 @@ public:
     virtual ~QueryException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "QueryException";
+    }
 };
 
 

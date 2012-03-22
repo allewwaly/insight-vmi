@@ -36,6 +36,11 @@ public:
      * Destructor
      */
     virtual ~GenericException() throw();
+
+    virtual const char* className() const
+    {
+        return "GenericException";
+    }
 };
 
 #endif /* GENERICEXCEPTION_H_ */
