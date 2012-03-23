@@ -321,7 +321,7 @@ bool MemoryMapWidget::event(QEvent *event)
             {
                 addrEnd = totalAddrSpaceEnd();
             }
-            int width = _map && _map->addrSpaceEnd() >= (1UL << 32) ? 16 : 8;
+            int width = _map && _map->addrSpaceEnd() >= (1ULL << 32) ? 16 : 8;
 
             QTextDocument doc;
             QTextCursor cur(&doc);

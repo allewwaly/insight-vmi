@@ -13,7 +13,7 @@
 
 Q_DECLARE_METATYPE(Instance*)
 
-#define INT32MASK 0xFFFFFFFFUL
+#define INT32MASK 0xFFFFFFFFULL
 
 InstancePrototype::InstancePrototype(QObject *parent)
     : QObject(parent)

@@ -492,7 +492,7 @@ template<class T, class P>
 void MemoryRangeTreeNode<T, P>::outputDotCode(quint64 addrRangeStart,
         quint64 addrRangeEnd, QTextStream& out) const
 {
-    int width = tree->addrSpaceEnd() > (1UL << 32) ? 16 : 8;
+    int width = tree->addrSpaceEnd() > (1ULL << 32) ? 16 : 8;
 
     // Node's own label
     out << QString("\tnode%1 [label=\"0x%2\\n0x%3\\nObjCnt: %4\"];")

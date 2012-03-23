@@ -40,22 +40,22 @@
 
 // See <linux/include/asm-x86/page_32.h>
 #define __PHYSICAL_MASK_SHIFT_X86     32
-#define __PHYSICAL_MASK_X86           ((1UL << __PHYSICAL_MASK_SHIFT_X86) - 1)
+#define __PHYSICAL_MASK_X86           ((1ULL << __PHYSICAL_MASK_SHIFT_X86) - 1)
 #define __PHYSICAL_MASK_SHIFT_X86_PAE 44
-#define __PHYSICAL_MASK_X86_PAE       ((1UL << __PHYSICAL_MASK_SHIFT_X86_PAE) - 1)
+#define __PHYSICAL_MASK_X86_PAE       ((1ULL << __PHYSICAL_MASK_SHIFT_X86_PAE) - 1)
 
 #define __VIRTUAL_MASK_SHIFT_X86    32
-#define __VIRTUAL_MASK_X86         ((1UL << __VIRTUAL_MASK_SHIFT_X86) - 1)
+#define __VIRTUAL_MASK_X86         ((1ULL << __VIRTUAL_MASK_SHIFT_X86) - 1)
 
 // See <linux/include/asm-x86/page_64.h>
 #define __PHYSICAL_MASK_SHIFT_X86_64  40
-#define __PHYSICAL_MASK_X86_64        ((1UL << __PHYSICAL_MASK_SHIFT_X86_64) - 1)
+#define __PHYSICAL_MASK_X86_64        ((1ULL << __PHYSICAL_MASK_SHIFT_X86_64) - 1)
 //#define __VIRTUAL_MASK_SHIFT_X86_64   48
-//#define __VIRTUAL_MASK_X86_64         ((1UL << __VIRTUAL_MASK_SHIFT_X86_64) - 1)
+//#define __VIRTUAL_MASK_X86_64         ((1ULL << __VIRTUAL_MASK_SHIFT_X86_64) - 1)
 
 // See <linux/include/asm-x86/page.h>
 #define PAGE_SHIFT             12
-#define KPAGE_SIZE              (1UL << PAGE_SHIFT)
+#define KPAGE_SIZE              (1ULL << PAGE_SHIFT)
 
 #define PHYSICAL_PAGE_MASK_X86       (~(KPAGE_SIZE-1) & (__PHYSICAL_MASK_X86 << PAGE_SHIFT))
 #define PHYSICAL_PAGE_MASK_X86_PAE   (~(KPAGE_SIZE-1) & (__PHYSICAL_MASK_X86_PAE << PAGE_SHIFT))
@@ -316,7 +316,7 @@ qint64 VirtualMemory::readData(char* data, qint64 maxSize)
         }
         else {
             // Only read to the end of the page
-            qint64 pageOffset = _pos & (pageSize - 1UL);
+            qint64 pageOffset = _pos & (pageSize - 1ULL);
             qint64 remPageSize = pageSize - pageOffset;
             ret = _physMem->read(data, maxSize > remPageSize ? remPageSize : maxSize);
         }
@@ -418,7 +418,7 @@ inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
     if ( (tlbEntry = _tlb[vaddr & PAGEMASK]) ) {
         // Return page size and address
         *pageSize = tlbEntry->size;
-        quint64 mask = tlbEntry->size - 1UL;
+        quint64 mask = tlbEntry->size - 1ULL;
         result = tlbEntry->addr | (vaddr & mask);
     }
 
@@ -729,7 +729,7 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
 	}
 
 	// Make sure the address is within a valid range
-    if ((_specs.arch & MemSpecs::ar_i386) && (vaddr >= (1UL << 32)))
+	if ((_specs.arch & MemSpecs::ar_i386) && (vaddr >= (1ULL << 32)))
         virtualMemoryOtherError(
                 QString("Virtual address 0x%1 exceeds 32 bit address space")
                         .arg(vaddr, 0, 16),

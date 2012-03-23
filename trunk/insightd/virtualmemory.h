@@ -14,7 +14,7 @@
 #include <genericexception.h>
 #include "memspecs.h"
 
-static const quint64 PADDR_ERROR = 0xFFFFFFFFFFFFFFFFUL;
+static const quint64 PADDR_ERROR = 0xFFFFFFFFFFFFFFFFULL;
 
 /**
  * This class provides read access to a virtual address space and performs
