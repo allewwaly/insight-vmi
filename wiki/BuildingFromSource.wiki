@@ -66,7 +66,7 @@ sudo ldconfig
 
 You can also run !InSight without installation, see [RunningInSight Running InSight].
 
-== Creating Debian Packages ==
+= Creating Debian Packages =
 
 The source code comes with all required control files to create packages for Debian-based distributions such as Ubuntu. This requires an additional package to be installed:
 
