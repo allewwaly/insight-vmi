@@ -159,7 +159,7 @@ void KernelSourceParser::parse()
 
     QString s = QString("\rParsed %1/%2 files in %3.")
             .arg(_filesIndex)
-            .arg(_factory->sources().size())
+            .arg(_fileNames.size())
             .arg(elapsedTimeVerbose());
     shellOut(s, true);
 
