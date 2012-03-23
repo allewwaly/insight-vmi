@@ -93,7 +93,7 @@ bool MemoryMap::fitsInVmem(quint64 addr, quint64 size) const
     if (_vmem->memSpecs().arch == MemSpecs::ar_x86_64)
         return addr + size > addr;
     else
-        return addr + size <= (1UL << 32);
+        return addr + size <= (1ULL << 32);
 }
 
 
@@ -652,7 +652,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
         degForInvalidAddrCnt++;
     }
     // Check alignment
-    else if (inst->address() & 0x3UL) {
+    else if (inst->address() & 0x3ULL) {
         prob *= degForUnalignedAddr;
         degForUnalignedAddrCnt++;
     }
@@ -686,7 +686,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
                             invalidChildAddrCnt++;
                         }
                         // Check alignment
-                        else if (m_addr & 0x3UL) {
+                        else if (m_addr & 0x3ULL) {
                             nonAlignedChildAddrCnt++;
                         }
                     }

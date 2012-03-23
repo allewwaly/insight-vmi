@@ -101,8 +101,10 @@
 #include "shell.h"
 #include "genericexception.h"
 #include "programoptions.h"
-#include "memorymapwindow.h"
 
+#ifdef CONFIG_MEMORY_MAP
+#include "memorymapwindow.h"
+#endif
 
 /**
  * Log a message to stderr, prepended with the current date and time.
