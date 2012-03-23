@@ -1,0 +1,43 @@
+=== INTRODUCTION ===
+
+This is InSight, a tool for bridging the semantic gap in the field of virtual
+machine introspection (VMI) and digital forensics. It has been created by
+Christian Schneider <chrschn@sec.in.tum.de> as part of his PhD thesis.
+
+The InSight project is hosted on Google Code with lots of additional information
+and documentation: https://code.google.com/p/insight-vmi/
+
+
+=== LICENSE ===
+
+The code of this project is licensed according to the terms of the GNU General
+Public License, Version 2.
+
+
+=== INSTALLATION ===
+
+Installation instructions for the impatient:
+
+	make -f Makefile.manual
+
+Detailed instructions can be found in the project wiki:
+https://code.google.com/p/insight-vmi/wiki/Installation
+
+Once the building succeeded, you can try out InSight without installation:
+
+	./insightd/insightd.sh
+
+You should see the command prompt of the InSight shell. Type in "help" to get a
+short list of possible commands that you can run. Again, the project wiki
+provides extended information about using the InSight shell:
+https://code.google.com/p/insight-vmi/wiki/InSightShell
+
+
+=== CONTACT ===
+
+In case you run into problems or have some general suggestions, you can ask your
+questions on the InSight discussion list: insight-vmi-discuss@googlegroups.com
+
+Should you encounter any errors using InSight, you are welcome to file a bug
+report or feature request on the issue tracker:
+https://code.google.com/p/insight-vmi/issues/list
