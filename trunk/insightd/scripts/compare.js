@@ -1,19 +1,5 @@
 
-//Prints a string with a given width left-aligned
-function lalign(s, len)
-{
-	while (len > 0 && s.length < len)
-		s += " ";
-	return s;
-}
-
-//Prints a string with a given width right-aligned
-function ralign(s, len)
-{
-	while (len > 0 && s.length < len)
-		s = " " + s;
-	return s;
-}
+include("lib_string.js");
 
 function doCompare(inst1, inst2)
 {
@@ -67,7 +53,7 @@ function showDifferences(inst1, inst2, recursive)
 }
 
 
-var dumps = getMemDumps();
+var dumps = Memory.list();
 
 if (dumps.length < 2) {
 	print("We need at least two loaded memory dumps for this script.");
