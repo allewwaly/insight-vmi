@@ -245,7 +245,7 @@ public slots:
      * @param declaredTypes selects if candidate types or declared types should
      * be used, where applicable
      * @return a list of instances of all members
-     * \sa MemberNames(), FindMember()
+     * \sa MemberNames(), Member()
      */
     InstanceList Members(bool declaredTypes = false) const;
 
