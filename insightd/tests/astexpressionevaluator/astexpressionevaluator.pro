@@ -27,7 +27,6 @@ HEADERS += astexpressionevaluatortester.h \
     ../../function.h \
     ../../funcpointer.h \
     ../../funcparam.h \
-    ../../expressionevalexception.h \
     ../../enum.h \
     ../../consttype.h \
     ../../compileunit.h \
