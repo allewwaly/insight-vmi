@@ -8,9 +8,10 @@ insight (0.4) unstable; urgency=low
   * Support for querying multi-dimensional arrays in the shell
   * Added JavaScript bindings to list and retrieve candidate types for variables and pointer members
   * Removed QtGui and X windows depencencies
+  * Report most errors to log files for easier bug reportings.
   * Various bugfixes
 
- -- Christian Schneider <chrschn@sec.in.tum.de>  Wed, 21 Mar 2012 16:16:00 +0100
+ -- Christian Schneider <chrschn@sec.in.tum.de>  Fri, 23 Mar 2012 16:14:57 +0100
 
 insight (0.3) unstable; urgency=low
 
