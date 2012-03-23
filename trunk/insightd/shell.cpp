@@ -222,8 +222,7 @@ Shell::Shell(bool listenOnSocket)
                          &Shell::cmdSysInfo,
                          "Shows information about the host.",
                          "This command displays some general information about "
-                         "the host InSight runs on.",
-                         true));
+                         "the host InSight runs on."));
 
     _commands.insert("binary",
             Command(
