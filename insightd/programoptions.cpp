@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <QFileInfo>
 #include <QCoreApplication>
+#include <debug.h>
 
 ProgramOptions programOptions;
 
@@ -108,6 +109,12 @@ void ProgramOptions::cmdOptionsUsage()
             << options[i].help
             << std::endl;
     }
+
+    std::cout
+            << std::endl
+            << "Detailed information on how to use "
+            << ProjectInfo::projectName << " can be found online at:" << std::endl
+            << ProjectInfo::homePage << std::endl;
 }
 
 
