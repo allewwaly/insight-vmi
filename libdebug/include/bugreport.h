@@ -117,26 +117,75 @@ public:
         return _entries;
     }
 
+    /**
+     * @return the global BugReport object used to report errors
+     * \sa setLog()
+     */
+    inline static BugReport* log()
+    {
+        return _log;
+    }
+
+    /**
+     * Sets the global BugReport object that is used as the sink for error
+     * messages on calls to BugReport::reportErr().
+     * \note The user is responsible to delete the object and call
+     * BugReport::setLog(0) afterwards.
+     * @param log the file to write error messages to
+     * \sa reportErr()
+     */
+    inline static void setLog(BugReport* log)
+    {
+        _log = log;
+    }
+
+    /**
+     * @return the global error stream to report errors to
+     * \sa setErr()
+     */
     inline static QTextStream* err()
     {
         return _err;
     }
 
+    /**
+     * Sets the global error stream that is used as the sink for error messages
+     * on calls to BugReport::reportErr(), unless a log file is also in place
+     * set with setLog().
+     * @param err the stream to report errors to
+     * \sa reportErr()
+     */
     inline static void setErr(QTextStream* err)
     {
         _err = err;
     }
 
-    static void reportErr(QString msg);
-    static void reportErr(QString msg, const QString& file, int line);
-
-private:
     /**
      * Collects information about InSight and the host system.
      * @return system information (ASCII text)
      */
-    QByteArray systemInfo() const;
+    static QByteArray systemInfo(bool showDate = true);
 
+    /**
+     * Reports the error message \a msg to a sink. The following sinks are
+     * probed, in that order:
+     * \li the static BugReport object returned by log()
+     * \li the static QTextStream object returned by err()
+     * \li the standard error stream \c std::cerr
+     * @param msg error message
+     * \sa err(), setErr(), log(), setLog()
+     */
+    static void reportErr(QString msg);
+
+    /**
+     *
+     * @param msg
+     * @param file
+     * @param line
+     */
+    static void reportErr(QString msg, const QString& file, int line);
+
+private:
     /**
      * Reads the contents of the ASCII text file \a fileName and returns it as
      * QByteArray.
@@ -159,9 +208,7 @@ private:
     bool _headerWritten;
     int _entries;
     static QTextStream* _err;
+    static BugReport* _log;
 };
-
-/// Global BugReport instance
-extern BugReport* bugReport;
 
 #endif // BUGREPORT_H

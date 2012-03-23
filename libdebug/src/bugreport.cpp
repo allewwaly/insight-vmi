@@ -5,19 +5,20 @@
 #include <QProcess>
 #include <QTextStream>
 
-// Global variable instance
-BugReport* bugReport = 0;
+#define LINE_WIDTH 72
 
+// Static variable instances
+BugReport* BugReport::_log = 0;
 QTextStream* BugReport::_err = 0;
 
 BugReport::BugReport()
-    : _sepLineWidth(72), _headerWritten(false), _entries(0)
+    : _sepLineWidth(LINE_WIDTH), _headerWritten(false), _entries(0)
 {
 }
 
 
 BugReport::BugReport(const QString &filePrefix, bool inTempDir)
-    : _sepLineWidth(72), _headerWritten(false), _entries(0)
+    : _sepLineWidth(LINE_WIDTH), _headerWritten(false), _entries(0)
 {
     newFile(filePrefix, inTempDir);
 }
@@ -62,6 +63,10 @@ void BugReport::append(const QByteArray &data)
         // Write system information to the file, if not yet done
         if (!_headerWritten) {
             _file.write(systemInfo());
+            // Terminate the header with a double line
+            _file.write("\n");
+            _file.write(QByteArray(_sepLineWidth, '#'));
+            _file.write("\n\n");
             _headerWritten = true;
         }
     }
@@ -124,9 +129,10 @@ QString BugReport::bugSubmissionHint(int errorCount) const
 }
 
 
-QByteArray BugReport::systemInfo() const
+QByteArray BugReport::systemInfo(bool showDate)
 {
     QString info, line, buildDateStr(VersionInfo::buildDate);
+    const int lineWidth = _log ? _log->sepLineWidth() : LINE_WIDTH;
     const QString dateFmt("yyyy-MM-dd hh:mm:ss UTC");
 
     // Try to parse the build date as a time_t value
@@ -135,11 +141,16 @@ QByteArray BugReport::systemInfo() const
     if (ok)
         buildDateStr = QDateTime::fromTime_t(buildDate).toString(dateFmt);
 
-    line.fill('-', _sepLineWidth - 1);
+    line.fill('-', lineWidth - 1);
     line.prepend('\'');
-    info += QString("Log created on:        %1\n"
-                    "\n\n"
-                    "| BUILD INFORMATION\n"
+
+    if (showDate) {
+        info += QString("Log created on:        %1\n"
+                        "\n\n")
+                .arg(QDateTime::currentDateTime().toUTC().toString(dateFmt));
+    }
+
+    info += QString("| BUILD INFORMATION\n"
                     "%0\n"
                     "InSight release:       %2\n"
                     "SVN revision:          %3\n"
@@ -156,7 +167,6 @@ QByteArray BugReport::systemInfo() const
                     "%0\n"
                     )
             .arg(line)
-            .arg(QDateTime::currentDateTime().toUTC().toString(dateFmt))
             .arg(VersionInfo::release)
             .arg(VersionInfo::svnRevision)
             .arg(QT_VERSION_STR)
@@ -208,11 +218,6 @@ QByteArray BugReport::systemInfo() const
     else
         ret += contents;
 
-    // Terminate the header with a double line
-    ret += '\n';
-    ret += QByteArray(_sepLineWidth, '#');
-    ret += "\n\n";
-
     return ret;
 }
 
@@ -240,12 +245,12 @@ QByteArray BugReport::fileContents(const QString &fileName, bool *ok)
 void BugReport::reportErr(QString msg)
 {
     msg = msg.trimmed();
-    if (bugReport) {
+    if (_log) {
         QByteArray buf = msg.toUtf8();
         buf += "\n\n";
-        buf += QByteArray(bugReport->sepLineWidth(), '#');
+        buf += QByteArray(_log->sepLineWidth(), '#');
         buf += "\n\n";
-        bugReport->append(buf);
+        _log->append(buf);
     }
     // Otherwise report to the user-defined error stream
     else if (_err) {
