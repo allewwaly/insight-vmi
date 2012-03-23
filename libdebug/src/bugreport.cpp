@@ -241,34 +241,24 @@ void BugReport::reportErr(QString msg)
 {
     msg = msg.trimmed();
     if (bugReport) {
-        QByteArray buf = QString("%3\n\n")
-                            .arg(msg)
-                            .toUtf8();
+        QByteArray buf = msg.toUtf8();
+        buf += "\n\n";
         buf += QByteArray(bugReport->sepLineWidth(), '#');
         buf += "\n\n";
         bugReport->append(buf);
     }
+    // Otherwise report to the user-defined error stream
     else if (_err) {
-        *BugReport::_err << endl << msg << endl << flush;
+        *BugReport::_err << msg << endl << flush;
+    }
+    // Otherwise just report to std::cerr
+    else {
+        std::cerr << std::endl << msg << std::endl << std::flush;
     }
 }
 
 
 void BugReport::reportErr(QString msg, const QString &file, int line)
 {
-    msg = msg.trimmed();
-    if (bugReport) {
-        QByteArray buf = QString("At %1:%2:\n%3\n\n")
-                            .arg(file)
-                            .arg(line)
-                            .arg(msg)
-                            .toUtf8();
-        buf += QByteArray(bugReport->sepLineWidth(), '#');
-        buf += "\n\n";
-        bugReport->append(buf);
-    }
-    else if (_err) {
-        *BugReport::_err << endl << "At " << file << ":" << line << ": "
-                         << msg << endl << flush;
-    }
+    reportErr(QString("At %1:%2:\n%3").arg(file).arg(line).arg(msg));
 }
