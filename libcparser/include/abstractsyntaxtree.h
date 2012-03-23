@@ -25,20 +25,57 @@ typedef QList<pASTTokenList> ASTTokenListQList;
 
 class ASTBuilder;
 
-
+/**
+ * This class represents an abstract syntax tree for C. It holds all of its
+ * data itself, however it requires an ASTBuilder object to actually parse the
+ * source and build the tree.
+ *
+ * We use ANTLR3 library to perform the lexing and parsing of the C source.
+ * This library is entierly written in C. The ANTLR parser calles the interface
+ * functions in \c ast_interface.h. The ASTBuilder object serves as the
+ * interfacing object for these C binding functions.
+ */
 class AbstractSyntaxTree
 {
     friend class ASTBuilder;
 
 public:
+    /**
+     * Constructor
+     */
     AbstractSyntaxTree();
+
+    /**
+     * Destructor
+     */
     virtual ~AbstractSyntaxTree();
 
+    /**
+     * Deletes all data and resets the tree.
+     */
     void clear();
+
+    /**
+     * Prints the contents of scope \a sc and all enclosing scopes to standard
+     * output. If \a sc is omitted, the scope manager's current scope will be
+     * used.
+     * @param sc the scope to print
+     */
     void printScopeRek(ASTScope* sc = 0);
 
+    /**
+     * @return the total number of errors that occured when building the tree
+     */
     quint32 errorCount() const;
+
+    /**
+     * @return the name of the file that is parsed
+     */
     inline const QString& fileName() const { return _fileName; }
+
+    /**
+     * @return the list of root AST nodes
+     */
     inline pASTNodeList rootNodes() { return _rootNodes; }
 
     /**
@@ -56,8 +93,34 @@ public:
     QString antlrStringToStr(const pANTLR3_STRING s) const;
 
 private:
+    /**
+     * Parses the source code from file \a fileName and builds the AST.
+     * @param builder the builder object that interfaces with the C bindings
+     * @return In case of an unrecoverable error, the total number of errors
+     * that occured before parsing was given up is returned. In case of one or
+     * more recoverable errors, -1 is returned, otherwise the return value is 0.
+     * \sa errorCount()
+     */
     int parse(const QString& fileName, ASTBuilder* builder);
+
+    /**
+     * Parses the source code from \a asciiText and builds the AST.
+     * @param builder the builder object that interfaces with the C bindings
+     * @return In case of an unrecoverable error, the total number of errors
+     * that occured before parsing was given up is returned. In case of one or
+     * more recoverable errors, -1 is returned, otherwise the return value is 0.
+     * \sa errorCount()
+     */
     int parse(const QByteArray& asciiText, ASTBuilder* builder);
+
+    /**
+     * Parses the source code builds the AST.
+     * @param builder the builder object that interfaces with the C bindings
+     * @return In case of an unrecoverable error, the total number of errors
+     * that occured before parsing was given up is returned. In case of one or
+     * more recoverable errors, -1 is returned, otherwise the return value is 0.
+     * \sa errorCount()
+     */
     int parsePhase2(ASTBuilder* builder);
 
     QString _fileName;
