@@ -73,18 +73,18 @@ void KernelSourceParser::operationProgress()
     QMutexLocker lock(&_progressMutex);
     int percent = (_filesIndex / (float) _factory->sources().size()) * 100;
     QString fileName = _currentFile;
-//    shell->out() << "Parsing file " << _filesDone << "/"
-//            <<  _factory->sources().size()
-//            << " (" << percent  << "%)"
-//            << ", " << elapsedTime() << " elapsed: "
-//            << qPrintable(_currentFile)
-//            << endl;
-    QString s = QString("\rParsing file %1/%2 (%3%), %4 elapsed: %5")
+    QString s = QString("\rParsing file %1/%2 (%3%), %4 elapsed%6: %5")
             .arg(_filesIndex)
             .arg(_factory->sources().size())
             .arg(percent)
             .arg(elapsedTime())
             .arg(fileName);
+    // Show no. of errors
+    if (bugReport && bugReport->entries())
+        s = s.arg(QString(", %1 errors so far").arg(bugReport->entries()));
+    else
+        s = s.arg(QString());
+
     shellOut(s, false);
 }
 
@@ -187,7 +187,7 @@ void KernelSourceParser::WorkerThread::run()
     {
         currentFile = _parser->_fileNames[_parser->_filesIndex++];
 
-//        if (!currentFile.endsWith("lib/sha1.c.i"))
+//        if (!currentFile.endsWith("init/main.c.i"))
 //            continue;
 //        if (_parser->_filesIndex != 116 && _parser->_filesIndex != 117)
 //            continue;
@@ -222,8 +222,11 @@ void KernelSourceParser::WorkerThread::parseFile(const QString &fileName)
 
     try {
         // Parse the file
-        if (!_stopExecution && builder.buildFrom(file) != 0) {
-            BugReport::reportErr(QString("Error parsing file: %1").arg(file));
+        if (!_stopExecution && builder.buildFrom(file) > 0) {
+            BugReport::reportErr(QString("Could not recover after %1 errors "
+                                         "while parsing file:\n%2")
+                                 .arg(ast.errorCount())
+                                 .arg(file));
             return;
         }
 
@@ -231,20 +234,23 @@ void KernelSourceParser::WorkerThread::parseFile(const QString &fileName)
         if (!_stopExecution && !eval.evaluateTypes()) {
             // Only throw exception if evaluation was not interrupted
             if (!_stopExecution && !eval.walkingStopped())
-                BugReport::reportErr(QString("Error evaluating types in %1").arg(file));
+                BugReport::reportErr(QString("Error evaluating types in %1")
+                                     .arg(file));
         }
     }
     catch (TypeEvaluatorException& e) {
         // Print the source of the embedding external declaration
         const ASTNode* n = e.ed.srcNode;
-        while (n && n->parent) // && n->type != nt_external_declaration)
+        while (n && n->parent && n->type != nt_function_definition)
             n = n->parent;
         eval.reportErr(e, n, &e.ed);
     }
     catch (ExpressionEvalException& e) {
         // Make sure we at least have the full postfix expression
         const ASTNode* n = e.node;
-        for (int i = 0; i < 3 && n && n->parent; ++i)
+        for (int i = 0;
+             i < 3 && n && n->parent && n->type != nt_function_definition;
+             ++i)
             n = n->parent;
         eval.reportErr(e, n, 0);
     }
