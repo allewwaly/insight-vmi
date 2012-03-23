@@ -80,8 +80,8 @@ void KernelSourceParser::operationProgress()
             .arg(elapsedTime())
             .arg(fileName);
     // Show no. of errors
-    if (bugReport && bugReport->entries())
-        s = s.arg(QString(", %1 errors so far").arg(bugReport->entries()));
+    if (BugReport::log() && BugReport::log()->entries())
+        s = s.arg(QString(", %1 errors so far").arg(BugReport::log()->entries()));
     else
         s = s.arg(QString());
 
@@ -111,10 +111,10 @@ void KernelSourceParser::parse()
         return;
     }
 
-    if (bugReport)
-        bugReport->newFile("insightd");
+    if (BugReport::log())
+        BugReport::log()->newFile("insightd");
     else
-        bugReport = new BugReport("insightd");
+        BugReport::setLog(new BugReport("insightd"));
 
     cleanUpThreads();
 
@@ -166,12 +166,12 @@ void KernelSourceParser::parse()
     _factory->sourceParcingFinished();
 
     // In case there were errors, show the user some information
-    if (bugReport && bugReport->entries()) {
-        bugReport->close();
+    if (BugReport::log() && BugReport::log()->entries()) {
+        BugReport::log()->close();
         shell->out() << endl
-                     << bugReport->bugSubmissionHint(bugReport->entries());
-        delete bugReport;
-        bugReport = 0;
+                     << BugReport::log()->bugSubmissionHint(BugReport::log()->entries());
+        delete BugReport::log();
+        BugReport::setLog(0);
     }
 }
 
