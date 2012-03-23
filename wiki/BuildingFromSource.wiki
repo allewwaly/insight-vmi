@@ -14,7 +14,7 @@ The source code of the latest stable version of !InSight can be obtained from th
 
 <code language="sh">svn checkout http://insight-vmi.googlecode.com/svn/trunk/ insight-vmi</code>
 
-= Compilation =
+= Building the Source =
 
 The following instructions have been tested on a system with different 64-bit Linux distrubutions. This is the recommended host platform. Note that !InSight is completely untested on 32-bit hosts. Feel free to give it a try on some 32-bit host and share your experience with us.
 
