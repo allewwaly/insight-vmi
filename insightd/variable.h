@@ -77,13 +77,13 @@ public:
     /**
      * @return the offset of this variable in memory
      */
-	size_t offset() const;
+    quint64 offset() const;
 
 	/**
 	 * Sets the offset of this variable in memory
 	 * @param offset new offset
 	 */
-	void setOffset(size_t offset);
+	void setOffset(quint64 offset);
 
     /**
      * Creates an Instance object from this variable.
@@ -131,7 +131,7 @@ protected:
      */
     virtual const SymFactory* fac() const;
 
-	size_t _offset;
+    quint64 _offset;
 };
 
 /**
@@ -152,13 +152,13 @@ KernelSymbolStream& operator>>(KernelSymbolStream& in, Variable& var);
 KernelSymbolStream& operator<<(KernelSymbolStream& out, const Variable& var);
 
 
-inline size_t Variable::offset() const
+inline quint64 Variable::offset() const
 {
     return _offset;
 }
 
 
-inline void Variable::setOffset(size_t offset)
+inline void Variable::setOffset(quint64 offset)
 {
     _offset = offset;
 }

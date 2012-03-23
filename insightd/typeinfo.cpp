@@ -170,13 +170,13 @@ void TypeInfo::setBitOffset(int bitOffset)
 }
 
 
-size_t TypeInfo::location() const
+quint64 TypeInfo::location() const
 {
     return _location;
 }
 
 
-void TypeInfo::setLocation(size_t location)
+void TypeInfo::setLocation(quint64 location)
 {
     this->_location = location;
 }
@@ -278,25 +278,25 @@ void TypeInfo::setInlined(bool value)
 }
 
 
-size_t TypeInfo::pcLow() const
+quint64 TypeInfo::pcLow() const
 {
 	return _pcLow;
 }
 
 
-void TypeInfo::setPcLow(size_t pc)
+void TypeInfo::setPcLow(quint64 pc)
 {
 	_pcLow = pc;
 }
 
 
-size_t TypeInfo::pcHigh() const
+quint64 TypeInfo::pcHigh() const
 {
 	return _pcHigh;
 }
 
 
-void TypeInfo::setPcHigh(size_t pc)
+void TypeInfo::setPcHigh(quint64 pc)
 {
 	_pcHigh = pc;
 }
