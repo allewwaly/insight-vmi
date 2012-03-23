@@ -166,10 +166,12 @@ void KernelSourceParser::parse()
     _factory->sourceParcingFinished();
 
     // In case there were errors, show the user some information
-    if (BugReport::log() && BugReport::log()->entries()) {
-        BugReport::log()->close();
-        shell->out() << endl
-                     << BugReport::log()->bugSubmissionHint(BugReport::log()->entries());
+    if (BugReport::log()) {
+        if (BugReport::log()->entries()) {
+            BugReport::log()->close();
+            shell->out() << endl
+                         << BugReport::log()->bugSubmissionHint(BugReport::log()->entries());
+        }
         delete BugReport::log();
         BugReport::setLog(0);
     }

@@ -276,7 +276,7 @@ void MemSpecParser::buildHelperProg(const MemSpecs& specs)
     QStringList cmdlines;
     QString arch = (specs.arch & MemSpecs::ar_x86_64) ? "x86_64" : "i386";
 
-    cmdlines += QString("make KDIR=%1 ARCH=%2")
+    cmdlines += QString("make KDIR=%1 ARCH=%2 V=1")
             .arg(QDir::current().absoluteFilePath(_kernelSrcDir))
             .arg(arch);
     cmdlines += QString("make memspec");
@@ -292,12 +292,14 @@ void MemSpecParser::buildHelperProg(const MemSpecs& specs)
         proc.waitForFinished(-1);
 
         if (proc.exitCode() != 0) {
-            _errorOutput = proc.readAllStandardError();
-            memSpecParserError(
-                    QString("Command failed with exit code %3: %1 %2")
-                        .arg(cmd)
-                        .arg(args.join(" "))
-                        .arg(proc.exitCode()));
+            _errorOutput = proc.readAllStandardOutput();
+            _errorOutput += proc.readAllStandardError();
+            memSpecParserError2(
+                        QString("Command failed with exit code %3: %1 %2")
+                            .arg(cmd)
+                            .arg(args.join(" "))
+                            .arg(proc.exitCode()),
+                        _errorOutput);
         }
 
         proc.close();

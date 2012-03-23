@@ -34,7 +34,8 @@ public:
      * temp directory. If \c false, the file is created in the current working
      * directory, unless \a filePrefix specifies an absolute path.     *
      */
-    void newFile(const QString& filePrefix, bool inTempDir = true);
+    void newFile(const QString& filePrefix = QString("insightd"),
+                 bool inTempDir = true);
 
     /**
      * Appends data \a data to the bug report. The log file is created, if

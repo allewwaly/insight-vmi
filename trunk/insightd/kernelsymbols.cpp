@@ -26,6 +26,7 @@
 #include "memspecparser.h"
 #include "shell.h"
 #include <debug.h>
+#include <bugreport.h>
 
 
 //------------------------------------------------------------------------------
@@ -72,17 +73,13 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
 			<< "\rSuccessfully parsed the memory specifications in " << time
 			<< "." << endl;
 	}
-    catch (GenericException& e) {
-        shell->err()
-            << endl
-            << "Caught a " << e.className() << " at " << e.file << ":" << e.line
-            << endl
-            << "Message: " << e.message << endl;
-
-        // Was the error caused during the memspec build process?
+	catch (MemSpecParserException& e) {
+		// Was the error caused during the memspec build process?
         if (!specParser.errorOutput().isEmpty() && shell->interactive()) {
             // Output the error messages
-            shell->err() << endl << specParser.errorOutput() << endl;
+            shell->err() << endl << "Caught a " << e.className() << " at "
+                         << e.file << ":" << e.line << ": " << e.message
+                         << endl;
 
             // Ask the user if he wants to keep the build directory
             QString reply;

@@ -36,6 +36,7 @@
 #include "scriptengine.h"
 #include "kernelsourceparser.h"
 #include "function.h"
+#include "memspecparser.h"
 
 #ifdef CONFIG_MEMORY_MAP
 #include "memorymap.h"
@@ -2332,35 +2333,62 @@ int Shell::cmdSymbolsParse(QStringList args)
         return 4;
     }
 
-    // Either use the given objdump file, or create it on the fly
-    if (mode == mDbgKernel) {
-        // Offer the user to parse the source, if found
-        bool parseSources = false;
-        QString ppSrc = kernelSrc + (kernelSrc.endsWith('/') ? "" : "/") + "__PP__";
-        QFileInfo ppSrcDir(ppSrc);
-        if (ppSrcDir.exists() && ppSrcDir.isDir()) {
-            if (_interactive) {
-                QString reply;
-                do {
-                    reply = readLine("Directory with pre-processed source "
-                                     "files detected. Process them as well? "
-                                     "[Y/n] ")
-                                .toLower();
-                    if (reply.isEmpty())
-                        reply = "y";
-                } while (reply != "y" && reply != "n");
-                parseSources = (reply == "y");
-            }
-            else
-                parseSources = true;
-        }
-
-		_sym.parseSymbols(kernelSrc);
-		if (parseSources && !interrupted())
-			cmdSymbolsSource(QStringList(ppSrc));
-	}
+    if (BugReport::log())
+        BugReport::log()->newFile();
     else
-    	_sym.parseSymbols(objdump, kernelSrc, sysmap);
+        BugReport::setLog(new BugReport());
+
+    try {
+        // Either use the given objdump file, or create it on the fly
+        if (mode == mDbgKernel) {
+            // Offer the user to parse the source, if found
+            bool parseSources = false;
+            QString ppSrc = kernelSrc + (kernelSrc.endsWith('/') ? "" : "/") + "__PP__";
+            QFileInfo ppSrcDir(ppSrc);
+            if (ppSrcDir.exists() && ppSrcDir.isDir()) {
+                if (_interactive) {
+                    QString reply;
+                    do {
+                        reply = readLine("Directory with pre-processed source "
+                                         "files detected. Process them as well? "
+                                         "[Y/n] ")
+                                .toLower();
+                        if (reply.isEmpty())
+                            reply = "y";
+                    } while (reply != "y" && reply != "n");
+                    parseSources = (reply == "y");
+                }
+                else
+                    parseSources = true;
+            }
+
+            _sym.parseSymbols(kernelSrc);
+            if (parseSources && !interrupted())
+                cmdSymbolsSource(QStringList(ppSrc));
+        }
+        else
+            _sym.parseSymbols(objdump, kernelSrc, sysmap);
+    }
+    catch (MemSpecParserException& e) {
+        // Write log file
+        QString msg = QString("Caught a %1: %2\n\nOutput of command:\n\n%3")
+                .arg(e.className())
+                .arg(e.message)
+                .arg(QString::fromLocal8Bit(e.errorOutput.constData(),
+                                            e.errorOutput.size()));
+        BugReport::reportErr(msg, e.file, e.line);
+    }
+
+    // In case there were errors, show the user some information
+    if (BugReport::log()) {
+        if (BugReport::log()->entries()) {
+            BugReport::log()->close();
+            shell->out() << endl
+                         << BugReport::log()->bugSubmissionHint(BugReport::log()->entries());
+        }
+        delete BugReport::log();
+        BugReport::setLog(0);
+    }
 
     return ecOk;
 }
