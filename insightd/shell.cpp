@@ -21,6 +21,7 @@
 #include <QMutexLocker>
 #include <QTimer>
 #include <QBitArray>
+#include <bugreport.h>
 #include "compileunit.h"
 #include "variable.h"
 #include "refbasetype.h"
@@ -215,6 +216,14 @@ Shell::Shell(bool listenOnSocket)
                          "  stats types-by-hash     Information about the types by their hashes\n"
                          "  stats postponed         Information about types with missing\n"
                          "                          references"));
+
+    _commands.insert("sysinfo",
+                     Command(
+                         &Shell::cmdSysInfo,
+                         "Shows information about the host.",
+                         "This command displays some general information about "
+                         "the host InSight runs on.",
+                         true));
 
     _commands.insert("binary",
             Command(
@@ -2402,6 +2411,14 @@ int Shell::cmdSymbolsStore(QStringList args)
     }
 
     _sym.saveSymbols(fileName);
+
+    return ecOk;
+}
+
+
+int Shell::cmdSysInfo(QStringList /*args*/)
+{
+    shell->out() << BugReport::systemInfo(false) << endl;
 
     return ecOk;
 }
