@@ -67,9 +67,7 @@ void Variable::readFrom(KernelSymbolStream& in)
     Symbol::readFrom(in);
     ReferencingType::readFrom(in);
     SourceRef::readFrom(in);
-    quint64 offset;
-    in >> offset;
-    _offset = offset;
+    in >> _offset;
 }
 
 
@@ -78,7 +76,7 @@ void Variable::writeTo(KernelSymbolStream& out) const
     Symbol::writeTo(out);
     ReferencingType::writeTo(out);
     SourceRef::writeTo(out);
-    out << (quint64) _offset;
+    out << _offset;
 }
 
 

@@ -240,8 +240,8 @@ public:
     int bitOffset() const;
     void setBitOffset(int bitOffset);
 
-    size_t location() const;
-    void setLocation(size_t location);
+    quint64 location() const;
+    void setLocation(quint64 location);
 
     qint32 dataMemberLocation() const;
     void setDataMemberLocation(qint32 location);
@@ -266,11 +266,11 @@ public:
     bool inlined() const;
     void setInlined(bool value);
 
-    size_t pcLow() const;
-    void setPcLow(size_t pc);
+    quint64 pcLow() const;
+    void setPcLow(quint64 pc);
 
-    size_t pcHigh() const;
-    void setPcHigh(size_t pc);
+    quint64 pcHigh() const;
+    void setPcHigh(quint64 pc);
 
     QVariant constValue() const;
     void setConstValue(QVariant value);
@@ -297,14 +297,14 @@ private:
 	quint32 _byteSize;       ///< holds the size in byte of this symbol
 	int _bitSize;            ///< holds the number of bits for a bit-split struct
 	int _bitOffset;          ///< holds the bit offset for a bit-split struct
-	size_t _location;        ///< holds the absolute offset offset of this symbol
+	quint64 _location;        ///< holds the absolute offset offset of this symbol
 	int _external;			 ///< holds whether this is an external symbol
 	qint32 _dataMemberLoc;   ///< holds the offset relative offset of this symbol
 	IntVec _upperBounds;     ///< holds the upper bounds for an integer type symbol
 	qint32 _sibling;         ///< holds the sibling for a subprogram type symbol
 	bool _inlined;           ///< was the function inlined?
-	size_t _pcLow;           ///< low program counter of a function
-	size_t _pcHigh;          ///< high program counter of a function
+	quint64 _pcLow;           ///< low program counter of a function
+	quint64 _pcHigh;          ///< high program counter of a function
 	QVariant _constValue;    ///< holds the value of an enumerator symbol
 	EnumHash _enumValues; ///< holds the enumeration values, if this symbol is an enumeration
 	HdrSymbolType _symType;  ///< holds the type of this symbol
