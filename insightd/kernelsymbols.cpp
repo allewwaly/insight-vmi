@@ -75,7 +75,8 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
     catch (GenericException& e) {
         shell->err()
             << endl
-            << "Caught exception at " << e.file << ":" << e.line << endl
+            << "Caught a " << e.className() << " at " << e.file << ":" << e.line
+            << endl
             << "Message: " << e.message << endl;
 
         // Was the error caused during the memspec build process?
@@ -108,8 +109,9 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
     catch (GenericException& e) {
         shell->err()
             << endl
-            << "Caught exception at " << e.file << ":" << e.line
-            << " at input line " << symParser.line() << " of the debug symbols" << endl
+            << "Caught a " << e.className() << " at " << e.file << ":" << e.line
+            << " at input line " << symParser.line() << " of the debug symbols"
+            << endl
             << "Message: " << e.message << endl;
 		throw;
 	}
@@ -196,7 +198,8 @@ void KernelSymbols::loadSymbols(QIODevice* from)
     }
     catch (GenericException& e) {
         shell->err()
-            << "Caught exception at " << e.file << ":" << e.line << endl
+            << "Caught a " << e.className() << " at " << e.file << ":"
+            << endl
             << "Message: " << e.message << endl;
         throw;
     }
@@ -246,7 +249,8 @@ void KernelSymbols::saveSymbols(QIODevice* to)
     }
     catch (GenericException& e) {
         shell->err()
-            << "Caught exception at " << e.file << ":" << e.line << endl
+            << "Caught a " << e.className() << " at " << e.file << ":" << e.line
+            << endl
             << "Message: " << e.message << endl;
         throw;
     }
