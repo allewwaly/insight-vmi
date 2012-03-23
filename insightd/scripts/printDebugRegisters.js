@@ -1,17 +1,5 @@
 
-function lalign(s, len)
-{
-	while (len > 0 && s.length < len)
-		s += " ";
-	return s;
-}
-
-function ralign(s, len)
-{
-	while (len > 0 && s.length < len)
-		s = " " + s;
-	return s;
-}
+include("lib_string.js");
 
 var pid_size = 8;
 var register_size = 60;
