@@ -109,7 +109,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
     catch (FactoryException& e) {
         // Print the source of the embedding external declaration
         const ASTNode* n = ed.srcNode;
-        while (n && n->parent) // && n->type != nt_external_declaration)
+        while (n && n->parent && n->type != nt_function_definition)
             n = n->parent;
         reportErr(e, n, &ed);
     }
