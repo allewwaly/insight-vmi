@@ -16,7 +16,7 @@ The source code of the latest stable version of !InSight can be obtained from th
 
 = Compilation =
 
-The following instructions have been tested on a system with different 64-bit Linux distrubutions. However, note that !InSight is completely untested on 32-bit hosts. Feel free to give it a try on some 32-bit Linux and share your experience with us.
+The following instructions have been tested on a system with different 64-bit Linux distrubutions. This is the recommended host platform. Note that !InSight is completely untested on 32-bit hosts. Feel free to give it a try on some 32-bit host and share your experience with us.
 
 == Prerequisites ==
 
@@ -38,7 +38,9 @@ insight/
 insightd/
 libantlr3c/
 libcparser/
+libdebug/
 libinsight/
+tools/
 insight-vmi.pro
 Makefile.manual
 </pre>
