@@ -11,14 +11,12 @@ In order to try out !InSight without having to [DebugSymbols generate and parse]
 
 = Obtaining the Memory Snapshots =
 
-The sample data can be found in the [https://code.google.com/p/insight-vmi/downloads/list downloads] section. Just download one or more of the `sample-*` files and extract them to your disk.
-
-= Using the Memory Snapshots =
-
-Each sample archive contains at least two files:
+The sample data can be found in the [https://code.google.com/p/insight-vmi/downloads/list downloads] section. Just download one or more of the `sample-*` files and extract them to your disk. Each sample archive contains at least two files:
 
   * a `linux-x-y-z.sym` file, containing the symbol information for the guest
   * one or more `yyyymmdd-hhmmss.bin` files, the physical memory snapshots of the guest
+
+= Using the Memory Snapshots =
 
 You can start `insightd` interactively and specify to load these files from the command line, for example:
 
