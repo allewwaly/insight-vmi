@@ -139,18 +139,25 @@ int AbstractSyntaxTree::parsePhase2(ASTBuilder* builder)
         return ANTLR3_ERR_NOMEM;
     }
 
-//    debugmsg("Building AST");
+    // Install our own error display function
+    _psr->pParser->rec->displayRecognitionError = displayParserRecognitionError;
+
+    // Start to parse the source
     _rootNodes = _psr->translation_unit(_psr, builder);
 
-    if (_tstream->p > 0 && _tstream->p != (ANTLR3_INT64)_tstream->tokens->count)
+    // See if we could parse the source up to the last token
+    if (_tstream->p > 0 && _tstream->p == (ANTLR3_INT64)_tstream->tokens->count)
     {
-        pANTLR3_COMMON_TOKEN tok = (pANTLR3_COMMON_TOKEN)_tstream->tokens->get(_tstream->tokens, _tstream->p);
-        if (!tok)
-            debugerr("Null token");
-        else
-            debugmsg("We stopped at line " << tok->line
-                    << " (token " << _tstream->p << " of "
-                    << _tstream->tokens->count << ")");
+        // In case the parser recoverd from errors, we return -1, otherwise 0
+        return errorCount() ? -1 : 0;
+
+//        pANTLR3_COMMON_TOKEN tok = (pANTLR3_COMMON_TOKEN)_tstream->tokens->get(_tstream->tokens, _tstream->p);
+//        if (!tok)
+//            debugerr("Null token");
+//        else
+//            debugmsg("We stopped at line " << tok->line
+//                    << " (token " << _tstream->p << " of "
+//                    << _tstream->tokens->count << ")");
     }
 
     return errorCount();
