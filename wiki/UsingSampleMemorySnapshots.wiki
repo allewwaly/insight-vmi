@@ -47,7 +47,7 @@ Now you are ready to use the [InSightShell shell] to query the available types a
 
 == Listing Variables and Types ==
 
-The `list` command allows you to list variables and types. To list all global variables starting with `list_`, for example, you can execute:
+The `list` command allows you to list variables and types. To list all global variables starting with `init_`, for example, you can execute:
 
 {{{
 >>> list variables init_*
