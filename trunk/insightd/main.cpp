@@ -342,7 +342,8 @@ int main(int argc, char* argv[])
 		    shell->out() << "Done, exiting." << endl;
 	}
 	catch (GenericException e) {
-	    QString msg = QString("Caught exception at %1:%2\nMessage: %3")
+		QString msg = QString("Caught a %0 at %1:%2\nMessage: %3")
+				.arg(e.className())
 	            .arg(e.file)
 	            .arg(e.line)
 	            .arg(e.message);

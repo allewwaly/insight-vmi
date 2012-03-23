@@ -775,7 +775,8 @@ int Shell::evalLine()
     }
     catch (GenericException& e) {
             _err
-                << "Caught exception at " << e.file << ":" << e.line << endl
+                << "Caught a " << e.className() << " at " << e.file << ":"
+                << e.line << endl
                 << "Message: " << e.message << endl;
             // Write a return status to the socket
             if (_clSocket) {
