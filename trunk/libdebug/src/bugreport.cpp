@@ -156,7 +156,7 @@ QByteArray BugReport::systemInfo() const
                     "%0\n"
                     )
             .arg(line)
-            .arg(QDateTime::currentDateTimeUtc().toString(dateFmt))
+            .arg(QDateTime::currentDateTime().toUTC().toString(dateFmt))
             .arg(VersionInfo::release)
             .arg(VersionInfo::svnRevision)
             .arg(QT_VERSION_STR)
