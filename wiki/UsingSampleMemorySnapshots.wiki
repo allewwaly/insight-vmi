@@ -7,7 +7,7 @@
 
 = Introduction =
 
-In order to try out !InSight without having to [DebuggingSymbols generate and parse] the debugging symbols for a virtual machine yourself, we provide some ready-to-use sample data.
+In order to try out !InSight without having to [DebugSymbols generate and parse] the debugging symbols for a virtual machine yourself, we provide some ready-to-use sample data.
 
 = Obtaining the Memory Snapshots =
 
