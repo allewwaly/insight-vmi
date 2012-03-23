@@ -29,6 +29,17 @@ After !InSight has been installed, it needs to be started. The second part expla
 </table>
 <table>
 <tr>
+<td><img src="https://insight-vmi.googlecode.com/svn/wiki/images/pg_sample-data.png" /></td>
+<td width="8"></td>
+<td>
+== [UsingSampleMemorySnapshots Quick Start with Sample Snapshots] ==
+
+In order to try out !InSight without having to generate and parse the debugging symbols for a virtual machine yourself, we provide some ready-to-use sample data. 
+</td>
+</tr>
+</table>
+<table>
+<tr>
 <td><img src="https://insight-vmi.googlecode.com/svn/wiki/images/pg_debug_symbols.png" /></td>
 <td width="8"></td>
 <td>
