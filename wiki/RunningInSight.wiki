@@ -42,7 +42,6 @@ For the purpose of simple batch processing, `insight` reads any available input 
 echo help | insightd
 >>> help
 The following represents a complete list of valid commands:
-  diff        Generates a list of vectors corresponding to type IDs
   exit        Exits the program
   help        Displays some help for a command
   list        Lists various types of read symbols
@@ -51,6 +50,7 @@ The following represents a complete list of valid commands:
   show        Shows information about a symbol given by name or ID
   stats       Shows various statistics.
   symbols     Allows to load, store or parse the kernel symbols
+  sysinfo     Shows information about the host.
 >>> Done, exiting.
 }}}
 
