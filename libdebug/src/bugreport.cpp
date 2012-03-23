@@ -14,6 +14,7 @@ QTextStream* BugReport::_err = 0;
 BugReport::BugReport()
     : _sepLineWidth(LINE_WIDTH), _headerWritten(false), _entries(0)
 {
+    newFile();
 }
 
 

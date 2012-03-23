@@ -13,6 +13,7 @@
 #include "genericexception.h"
 
 #define memSpecParserError(x) do { throw MemSpecParserException((x), __FILE__, __LINE__); } while (0)
+#define memSpecParserError2(x, o) do { throw MemSpecParserException((x), (o), __FILE__, __LINE__); } while (0)
 
 /**
  * Exception class for MemSpecParser related errors
@@ -32,6 +33,20 @@ public:
     {
     }
 
+    /**
+      Constructor
+      @param msg error message
+      @param errorOutput the output of the failed command
+      @param file file name in which message was originally thrown
+      @param line line number at which message was originally thrown
+      @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
+     */
+    MemSpecParserException(QString msg, QByteArray errorOutput,
+                           const char* file = 0, int line = -1)
+        : GenericException(msg, file, line), errorOutput(errorOutput)
+    {
+    }
+
     virtual ~MemSpecParserException() throw()
     {
     }
@@ -40,6 +55,8 @@ public:
     {
         return "MemSpecParserException";
     }
+
+    QByteArray errorOutput;
 };
 
 
