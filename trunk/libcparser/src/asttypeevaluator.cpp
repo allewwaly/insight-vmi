@@ -1527,7 +1527,7 @@ const ASTSymbol* ASTTypeEvaluator::findSymbolOfDirectDeclarator(
     }
 
     if (!sym && enableExcpetions) {
-        _ast->printScopeRek(node->scope);
+//        _ast->printScopeRek(node->scope);
         typeEvaluatorError(
                     QString("Could not find symbol \"%1\" at %2:%3:4")
                     .arg(antlrTokenToStr(node->u.direct_declarator.identifier))
@@ -1641,7 +1641,7 @@ const ASTSymbol* ASTTypeEvaluator::findSymbolOfPrimaryExpression(
     }
 
     if (!sym && enableExcpetions) {
-        _ast->printScopeRek(t ? t->node()->childrenScope : node->scope);
+//        _ast->printScopeRek(t ? t->node()->childrenScope : node->scope);
         typeEvaluatorError(
                 QString("Could not find symbol \"%1\" at %2:%3:%4")
                     .arg(antlrTokenToStr(node->u.primary_expression.identifier))
@@ -1973,7 +1973,7 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(const ASTNode *node)
                 }
 
                 if (!structDeclSym) {
-                    _ast->printScopeRek(startScope);
+//                    _ast->printScopeRek(startScope);
                     typeEvaluatorError(
                             QString("Could not resolve type \"%1\" of member "
                                     "\"%2\" in %3 at %4:%5:%6")
@@ -2547,14 +2547,16 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
     catch (TypeEvaluatorException& e) {
         // Print the source of the embedding external declaration
         const ASTNode* n = node;
-        while (n && n->parent) // && n->type != nt_external_declaration)
+        while (n && n->parent && n->type != nt_function_definition)
             n = n->parent;
         reportErr(e, n, &e.ed);
     }
     catch (ExpressionEvalException& e) {
         // Make sure we at least have the full postfix expression
         const ASTNode* n = e.node;
-        for (int i = 0; i < 3 && n && n->parent; ++i)
+        for (int i = 0;
+             i < 3 && n && n->parent && n->type != nt_function_definition;
+             ++i)
             n = n->parent;
         reportErr(e, n, 0);
     }
@@ -2567,7 +2569,7 @@ void ASTTypeEvaluator::reportErr(const GenericException& e, const ASTNode* node,
     // General information
     QString msg = QString("%0: %1\n\n").arg(e.className()).arg(e.message);
     // Evaluation details, if given
-    if (ed) {
+    if (ed && ed->sym && ed->primExNode) {
         msg += QString("Details (may be incomplete):\n%0\n\n")
                 .arg(typeChangeInfo(*ed));
     }
