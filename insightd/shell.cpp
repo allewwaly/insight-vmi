@@ -663,7 +663,7 @@ int Shell::eval(QString command)
         else {
             // Try to match the prefix of a command
             QList<QString> cmds = _commands.keys();
-            int match, match_count = 0;
+            int match = -1, match_count = 0;
             for (int i = 0; i < cmds.size(); i++) {
                 if (cmds[i].startsWith(cmd)) {
                     match_count++;
