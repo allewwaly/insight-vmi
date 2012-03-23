@@ -291,6 +291,7 @@ private:
     int cmdSymbolsParse(QStringList args);
     int cmdSymbolsLoad(QStringList args);
     int cmdSymbolsStore(QStringList args);
+    int cmdSysInfo(QStringList args);
     int cmdBinary(QStringList args);
     int cmdBinaryMemDumpList(QStringList args);
 //    int cmdBinaryInstance(QStringList args);
