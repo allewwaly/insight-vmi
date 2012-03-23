@@ -54,6 +54,9 @@ ANTLR3_BOOLEAN isTypeName(pASTBuilder builder, pANTLR3_STRING name);
 ANTLR3_BOOLEAN isSymbolName(pASTBuilder builder, pANTLR3_STRING name);
 ANTLR3_BOOLEAN isInitializer(pASTNode node);
 
+void displayParserRecognitionError(
+		pANTLR3_BASE_RECOGNIZER recognizer, pANTLR3_UINT8 * tokenNames);
+
 #ifdef __cplusplus
 }
 #endif
