@@ -45,7 +45,7 @@ In order to try out !InSight without having to generate and parse the debugging 
 <td>
 == [DebugSymbols Debugging Symbols] ==
 
-Before any analysis can be performed, !InSight needs to parse the debugging symbols of the inspected operating system. This part shows how the debugging symbols can be obtained and how to process them with !InSight.
+Before any analysis can be performed on your own guest, !InSight needs to parse the debugging symbols of the inspected operating system. This page shows how the debugging symbols can be obtained and how to process them with !InSight.
 </td>
 </tr>
 </table>
