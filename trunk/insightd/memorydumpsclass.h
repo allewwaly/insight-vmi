@@ -15,8 +15,9 @@
 /**
  * This class allows management of memory files within the scripting engine.
  *
- * \note All methods of this class implemented as Qt slots are available within
- * the scripting environment using the global \c Memory object.
+ * All methods of this class implemented as Qt slots are available within
+ * the scripting environment using the global \c Memory object. See the list()
+ * method as an example.
  */
 class MemoryDumpsClass: public QObject, public QScriptable
 {
