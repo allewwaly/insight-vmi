@@ -242,6 +242,9 @@ private:
     ScriptEngine* _engine;
 
     void printTimeStamp(const QTime& time);
+    void printStructMembers(const Structured* s, int indent, int id_width = -1,
+                            int offset_width = -1, bool printAlt = true,
+                            size_t offset = 0);
     void prepare();
     void prepareReadline();
     void saveShellHistory();

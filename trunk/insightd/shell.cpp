@@ -2003,10 +2003,16 @@ int Shell::cmdShowBaseType(const BaseType* t)
 	_out << "  Size:            " << t->size() << endl;
 	_out << "  Hash:            " << "0x" << hex << t->hash() << dec << endl;
 
-    const RefBaseType* r = dynamic_cast<const RefBaseType*>(t);
-    if (r) {
-        _out << "  Ref. type ID:    " << "0x" << hex << (uint)r->refTypeId() << dec << endl;
-        _out << "  Ref. type:       "
+	if (t->srcFile() >= 0 && _sym.factory().sources().contains(t->srcFile())) {
+		_out << "  Source file:    " << _sym.factory().sources().value(t->srcFile())->name()
+			<< ":" << t->srcLine() << endl;
+	}
+
+    const RefBaseType* r;
+    int cnt = 1;
+    while ( (r = dynamic_cast<const RefBaseType*>(t)) ) {
+        _out << "  " << cnt << ". Ref. type ID: " << "0x" << hex << (uint)r->refTypeId() << dec << endl;
+        _out << "  " << cnt << ". Ref. type:    "
              <<  (r->refType() ? r->refType()->prettyName() :
                                  QString(r->refTypeId() ? "(unresolved)" : "void"))
             << endl;
@@ -2018,56 +2024,15 @@ int Shell::cmdShowBaseType(const BaseType* t)
                  << t->prettyName() << ": "
                  << r->altRefType(i).expr()->toString(true) << endl;
         }
-    }
 
-	if (t->srcFile() >= 0 && _sym.factory().sources().contains(t->srcFile())) {
-		_out << "  Source file:    " << _sym.factory().sources().value(t->srcFile())->name()
-			<< ":" << t->srcLine() << endl;
-	}
+        t = r->refType();
+        ++cnt;
+    }
 
 	const Structured* s = dynamic_cast<const Structured*>(t);
 	if (s) {
 		_out << "  Members:        " << s->members().size() << endl;
-		// Find out required ID width for members
-		int id_width = 2;
-		for (uint i = t->id(); i > 0; i >>= 4)
-			id_width++;
-
-		for (int i = 0; i < s->members().size(); i++) {
-			StructuredMember* m = s->members().at(i);
-			const BaseType* rt = m->refType();
-
-			QString pretty = rt ?
-						rt->prettyName() :
-						QString("(unresolved type, 0x%1)")
-							.arg((uint)m->refTypeId(), 0, 16);
-
-            _out << "    "
-                 << QString("0x%1").arg(m->offset(), 4, 16, QChar('0'))
-                 << "  "
-                 << qSetFieldWidth(20) << left << (m->name() + ": ")
-                 << qSetFieldWidth(id_width) << left
-                 << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
-                 << qSetFieldWidth(0) << " "
-                 << pretty
-                 << endl;
-
-
-			for (int j = 0; j < m->altRefTypeCount(); ++j) {
-				rt = m->altRefBaseType(j);
-				_out << qSetFieldWidth(4+6+2+20)
-					 << right << QString("<%1> ").arg(j+1)
-					 << qSetFieldWidth(id_width) << left
-					 << QString("0x%1")
-						.arg((uint)(rt ? rt->id() : m->altRefType(j).id()), 0, 16)
-					 << qSetFieldWidth(0) << " "
-					 << (rt ? rt->prettyName() :
-							 QString("(unresolved type, 0x%1)")
-							  .arg((uint)m->altRefType(j).id(), 0, 16))
-					 << ": " << m->altRefType(j).expr()->toString(true)
-					 << endl;
-			}
-		}
+		printStructMembers(s, 4);
 	}
 
 	const Enum* e = dynamic_cast<const Enum*>(t);
@@ -2149,8 +2114,82 @@ int Shell::cmdShowBaseType(const BaseType* t)
 		}
 	}
 
-
 	return ecOk;
+}
+
+void Shell::printStructMembers(const Structured* s, int indent, int id_width,
+							   int offset_width, bool printAlt, size_t offset)
+{
+	if (!s)
+		return;
+
+	// Find out required ID width for members
+	if (id_width < 0) {
+		id_width = 2;
+		for (int i = 0; i < s->members().size(); i++) {
+			int tmp_id_width = 2;
+			for (uint id = s->members().at(i)->refTypeId(); id > 0; id >>= 4)
+				tmp_id_width++;
+			if (tmp_id_width > id_width)
+				id_width = tmp_id_width;
+		}
+	}
+	// Find out required offset with
+	if (offset_width < 0 && !s->members().isEmpty()) {
+		offset_width = 0;
+		for (size_t o = s->members().last()->offset() + offset; o > 0; o >>= 4)
+			offset_width++;
+	}
+
+	for (int i = 0; i < s->members().size(); i++) {
+		StructuredMember* m = s->members().at(i);
+		const BaseType* rt = m->refType();
+
+		QString pretty = rt ?
+					rt->prettyName() :
+					QString("(unresolved type, 0x%1)")
+						.arg((uint)m->refTypeId(), 0, 16);
+
+        _out << qSetFieldWidth(indent) << QString() << qSetFieldWidth(0);
+        _out << QString("0x%1").arg(m->offset() + offset, offset_width, 16, QChar('0'));
+        _out << "  "
+             << qSetFieldWidth(24 - indent) << left;
+        if (m->name().isEmpty())
+            _out << QString();
+        else
+            _out << (m->name() + ": ");
+        _out << qSetFieldWidth(id_width) << left
+             << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
+             << qSetFieldWidth(0) << " "
+             << pretty;
+
+        // Print members of anonymous structs/unions recursively
+        if (rt && (rt->type() & StructOrUnion) && rt->name().isEmpty()) {
+            _out << endl << qSetFieldWidth(indent) << "" << qSetFieldWidth(0) << "{" << endl;
+            const Structured* ms = dynamic_cast<const Structured*>(rt);
+            printStructMembers(ms, indent + 2, id_width, offset_width, false,
+                               m->offset() + offset);
+            _out << qSetFieldWidth(indent) << "" << qSetFieldWidth(0) << "}";
+        }
+
+        _out << endl;
+
+
+		for (int j = 0; printAlt && j < m->altRefTypeCount(); ++j) {
+			rt = m->altRefBaseType(j);
+			_out << qSetFieldWidth(4+6+2+20)
+				 << right << QString("<%1> ").arg(j+1)
+				 << qSetFieldWidth(id_width) << left
+				 << QString("0x%1")
+					.arg((uint)(rt ? rt->id() : m->altRefType(j).id()), 0, 16)
+				 << qSetFieldWidth(0) << " "
+				 << (rt ? rt->prettyName() :
+						 QString("(unresolved type, 0x%1)")
+						  .arg((uint)m->altRefType(j).id(), 0, 16))
+				 << ": " << m->altRefType(j).expr()->toString(true)
+				 << endl;
+		}
+	}
 }
 
 
