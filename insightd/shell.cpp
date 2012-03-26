@@ -2167,7 +2167,7 @@ void Shell::printStructMembers(const Structured* s, int indent, int id_width,
         if (rt && (rt->type() & StructOrUnion) && rt->name().isEmpty()) {
             _out << endl << qSetFieldWidth(indent) << "" << qSetFieldWidth(0) << "{" << endl;
             const Structured* ms = dynamic_cast<const Structured*>(rt);
-            printStructMembers(ms, indent + 2, id_width, offset_width, false,
+            printStructMembers(ms, indent + 2, id_width, offset_width, true,
                                m->offset() + offset);
             _out << qSetFieldWidth(indent) << "" << qSetFieldWidth(0) << "}";
         }
@@ -2177,7 +2177,7 @@ void Shell::printStructMembers(const Structured* s, int indent, int id_width,
 
 		for (int j = 0; printAlt && j < m->altRefTypeCount(); ++j) {
 			rt = m->altRefBaseType(j);
-			_out << qSetFieldWidth(4+6+2+20)
+			_out << qSetFieldWidth(indent + 2 + offset_width + 2 + 24 - indent)
 				 << right << QString("<%1> ").arg(j+1)
 				 << qSetFieldWidth(id_width) << left
 				 << QString("0x%1")
