@@ -30,6 +30,32 @@ class DeviceMuxer;
 class MuxerChannel;
 class QFileInfo;
 
+enum ColorType {
+    ctReset = 0,
+    ctBold,
+    ctUnderline,
+    ctInverse,
+    ctPrompt,
+    ctVariable,
+    ctType,
+    ctBuiltinType,
+    ctRealType,
+    ctMember,
+    ctAddress,
+    ctOffset,
+    ctTypeId,
+    ctKeyword,
+    ctErrorLight,
+    ctError,
+    ctSrcFile,
+    ctNoName,
+    ctColHead,
+    COLOR_TYPE_SIZE
+};
+
+typedef QPair<QString, const char*> NamePart;
+typedef QList<NamePart> NamePartList;
+
 /**
  * This class represents the interactive shell, which is the primary interface
  * for a user. It allows to load, save and parse the debugging symbols and show
@@ -97,6 +123,11 @@ public:
      * @return the \c stderr stream of the shell
      */
     QTextStream& err();
+
+
+    void errMsg(const QString& s, bool newline = true);
+
+    void errMsg(const char* s, bool newline = true);
 
     /**
      * @return the KernelSymbol object of this Shell object
@@ -183,6 +214,12 @@ public:
      */
     int unloadMemDump(const QString& indexOrFileName, QString* unloadedFile = 0);
 
+    bool allowColor() const;
+
+    void setAllowColor(bool value);
+
+    const char* color(ColorType ct) const;
+
 protected:
     /**
      * Starts the interactive shell and does not return until the user invokes
@@ -240,11 +277,16 @@ private:
     int _lastStatus;
     QMutex _engineLock;
     ScriptEngine* _engine;
+    bool _allowColor;
 
     void printTimeStamp(const QTime& time);
     void printStructMembers(const Structured* s, int indent, int id_width = -1,
                             int offset_width = -1, bool printAlt = true,
                             size_t offset = 0);
+    QString namePartsToString(const NamePartList& parts, int minLen = 0, int maxLen = 0) const;
+    NamePartList prettyNameInColor(const BaseType* t) const;
+    QString prettyNameInColor(const BaseType* t, int minLen, int maxLen = 0) const;
+    QString prettyNameInColor(const Variable* v, int minLen, int maxLen = 0) const;
     void prepare();
     void prepareReadline();
     void saveShellHistory();

@@ -24,7 +24,7 @@
 #include <bugreport.h>
 #include "compileunit.h"
 #include "variable.h"
-#include "refbasetype.h"
+#include "array.h"
 #include "enum.h"
 #include "kernelsymbols.h"
 #include "programoptions.h"
@@ -96,7 +96,7 @@ QDataStream Shell::_ret;
 Shell::Shell(bool listenOnSocket)
     : _listenOnSocket(listenOnSocket), _interactive(!listenOnSocket),
       _clSocket(0), _srvSocket(0), _socketMuxer(0), _outChan(0), _errChan(0),
-      _binChan(0), _retChan(0), _engine(0)
+      _binChan(0), _retChan(0), _engine(0), _allowColor(true)
 {
 	qRegisterMetaType<QAbstractSocket::SocketState>();
 	qRegisterMetaType<QAbstractSocket::SocketError>();
@@ -333,6 +333,26 @@ QTextStream& Shell::out()
 QTextStream& Shell::err()
 {
     return _err;
+}
+
+
+void Shell::errMsg(const QString &s, bool newline)
+{
+    _err << color(ctErrorLight) << s << color(ctReset);
+    if (newline)
+        _err << endl;
+    else
+        _err << flush;
+}
+
+
+void Shell::errMsg(const char *s, bool newline)
+{
+    _err << color(ctErrorLight) << s << color(ctReset);
+    if (newline)
+        _err << endl;
+    else
+        _err << flush;
 }
 
 
@@ -587,11 +607,13 @@ QStringList Shell::splitIntoPipes(QString command) const
     }
 
     if (endedInPipe || lastPos != command.length()) {
-        _err << "Error parsing command line at position " << lastPos << ":" << endl
-            << command << endl;
+        _err << color(ctErrorLight) << "Error parsing command line at position "
+             << lastPos << ":" << endl
+            << color(ctError) << command << endl;
         for (int i = 0; i < lastPos; i++)
             _err << " ";
-        _err << "^ error occurred here" << endl;
+        _err << color(ctErrorLight) << "^ error occurred here"
+             << color(ctReset)<< endl;
         pipeCmds.clear();
     }
 
@@ -628,11 +650,13 @@ QStringList Shell::splitIntoWords(QString command) const
 
     if (lastPos != command.length())
     {
-        _err << "Error parsing command at position " << lastPos << ":" << endl
-            << command << endl;
+        _err << color(ctErrorLight) << "Error parsing command at position "
+             << lastPos << ":" << endl
+             << color(ctError) << command << endl;
         for (int i = 0; i < lastPos; i++)
             _err << " ";
-        _err << "^ error occurred here" << endl;
+        _err << color(ctErrorLight) << "^ error occurred here"
+             << color(ctReset) << endl;
         words.clear();
     }
 
@@ -674,14 +698,16 @@ int Shell::eval(QString command)
             if (match_count == 1)
                 c =_commands[cmds[match]].callback;
             else if (match_count > 1)
-                _err << "Command prefix \"" << cmd << "\" is ambiguous." << endl;
+                errMsg(QString("Command prefix \"%1\" is ambiguous.").arg(cmd));
             else
-            	_err << "Command not recognized: " << cmd << endl;
+                _err << color(ctErrorLight) << "Command not recognized: "
+                     << color(ctError) << cmd << color(ctReset) << endl;
         }
     }
 
     // Did we find a valid command?
     if (c) {
+        bool colorWasAllowed = _allowColor;
         // Setup piped processes if no socket connection
         if (pipeCmds.size() > 1) {
             // First, create piped processes in reverse order, i.e., right to left
@@ -712,18 +738,22 @@ int Shell::eval(QString command)
                 _pipedProcs[i]->start(prog, args);
                 _pipedProcs[i]->waitForStarted(-1);
                 if (_pipedProcs[i]->state() != QProcess::Running) {
-                    _err << "Error executing " << pipeCmds[i+1] << endl << flush;
+                    errMsg(QString("Error executing \"%1\"").arg(pipeCmds[i+1]));
                     cleanupPipedProcs();
                     return 0;
                 }
             }
+            // Disable colors for piped commands
+            _allowColor = false;
         }
 
         try {
             ret = (this->*c)(words);
+            _allowColor = colorWasAllowed;
         }
     	catch (QueryException& e) {
-    		_err << e.message << endl;
+            _allowColor = colorWasAllowed;
+            errMsg(e.message);
     		// Show a list of ambiguous types
     		if (e.errorCode == QueryException::ecAmbiguousType) {
     			_err << "Select a type by its ID from the following list:"
@@ -737,6 +767,7 @@ int Shell::eval(QString command)
     	}
         catch (...) {
             // Exceptional cleanup
+            _allowColor = colorWasAllowed;
             cleanupPipedProcs();
             throw;
         }
@@ -774,17 +805,18 @@ int Shell::evalLine()
         }
     }
     catch (GenericException& e) {
-            _err
-                << "Caught a " << e.className() << " at " << e.file << ":"
-                << e.line << endl
-                << "Message: " << e.message << endl;
-            // Write a return status to the socket
-            if (_clSocket) {
-                _out.flush();
-                _err.flush();
-                _ret << _lastStatus;
-                _clSocket->waitForBytesWritten(-1);
-            }
+        _err << color(ctError)
+             << "Caught a " << e.className() << " at " << e.file << ":"
+             << e.line << endl
+             << "Message: " << color(ctErrorLight) << e.message
+             << color(ctReset) << endl;
+        // Write a return status to the socket
+        if (_clSocket) {
+            _out.flush();
+            _err.flush();
+            _ret << _lastStatus;
+            _clSocket->waitForBytesWritten(-1);
+        }
     }
     return _lastStatus;
 }
@@ -907,14 +939,216 @@ int Shell::cmdListSources(QStringList /*args*/)
 
     for (int i = 0; i < keys.size(); i++) {
         CompileUnit* unit = _sym.factory().sources().value(keys[i]);
-        _out << qSetFieldWidth(w) << right << hex << unit->id() << qSetFieldWidth(0) << "  "
-             << qSetFieldWidth(0) << unit->name() << endl;
+        _out << color(ctTypeId) << qSetFieldWidth(w) << right << hex
+             << unit->id() << qSetFieldWidth(0) << "  "
+             << color(ctSrcFile) << unit->name() << endl;
     }
+    _out << color(ctReset);
 
     hline();
-    _out << "Total source files: " << dec << keys.size() << endl;
+    _out << "Total source files: " << color(ctBold) << dec << keys.size()
+         << color(ctReset) << endl;
 
     return ecOk;
+}
+
+
+QString Shell::namePartsToString(const NamePartList &parts, int minLen, int maxLen) const
+{
+    int len = 0;
+    QString ret;
+    int funcParams = 0;
+
+    for (int i = 0; i < parts.size(); ++i) {
+        const QString& part = parts[i].first;
+        const char* col = parts[i].second;
+        if (part.isEmpty())
+            continue;
+        if (col)
+            ret += col;
+        else
+            ret += color(ctReset);
+
+        if (maxLen > 0) {
+            if (len + part.size() <= maxLen) {
+                ret += part;
+                len += part.size();
+                if (part == ")(" || part == "(")
+                    ++funcParams;
+                else if (part == ")")
+                    --funcParams;
+            }
+            // We need to shorten it
+            else {
+                int remLen = maxLen - len - ((funcParams > 0) ? 4 : 3);
+                if (remLen < 0)
+                    remLen = 0;
+                ret += part.left(remLen);
+                ret += color(ctReset);
+                if (funcParams > 0)
+                    ret += QString("%1").arg(")", maxLen - len - remLen, QChar('.'));
+                else
+                    ret += QString("%1").arg("", maxLen - len - remLen, QChar('.'));
+                len = maxLen;
+                break;
+            }
+        }
+        else {
+            ret += part;
+            len += part.size();
+        }
+    }
+
+    // Do we need to the fill the string?
+    if (len < minLen)
+        ret += QString("%1").arg("", minLen - len);
+
+    return ret;
+}
+
+
+QString Shell::prettyNameInColor(const BaseType* t, int minLen, int maxLen) const
+{
+    if (!t)
+        return QString();
+
+    NamePartList parts = prettyNameInColor(t);
+    return namePartsToString(parts, minLen, maxLen);
+}
+
+
+NamePartList Shell::prettyNameInColor(const BaseType *t) const
+{
+    if (!t)
+        return NamePartList();
+
+    NamePartList parts;
+
+    const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
+
+    switch (t->type()) {
+    case rtInt8:
+    case rtUInt8:
+    case rtBool8:
+    case rtInt16:
+    case rtUInt16:
+    case rtBool16:
+    case rtInt32:
+    case rtUInt32:
+    case rtBool32:
+    case rtInt64:
+    case rtUInt64:
+    case rtBool64:
+    case rtFloat:
+    case rtDouble:
+//        if (t->name().isEmpty())
+            parts.append(NamePart(t->prettyName(), color(ctBuiltinType)));
+//        else
+//            parts.append(NamePart(t->name(), color(ctType)));
+        break;
+
+    case rtEnum:
+        if (t->name().isEmpty())
+            parts.append(NamePart("(none)", color(ctNoName)));
+        else
+            parts.append(NamePart(t->name(), color(ctType)));
+        break;
+
+    case rtStruct:
+    case rtUnion:
+        parts.append(NamePart(t->type() == rtStruct ? "struct " : "union ",
+                              color(ctKeyword)));
+        if (t->name().isEmpty())
+            parts.append(NamePart("(anon.)", color(ctNoName)));
+        else
+            parts.append(NamePart(t->name(), color(ctType)));
+        break;
+
+    case rtTypedef:
+        parts.append(NamePart(t->name(), color(ctType)));
+        break;
+
+    case rtConst:
+        parts.append(NamePart("const", color(ctKeyword)));
+        if (rbt->refTypeId() == 0)
+            parts.append(NamePart(" void", color(ctKeyword)));
+        else {
+            parts.append(NamePart(" ", 0));
+            parts += prettyNameInColor(rbt->refType());
+        }
+        break;
+
+    case rtVolatile:
+        parts.append(NamePart("volatile ", color(ctKeyword)));
+        if (rbt->refTypeId() == 0)
+            parts.append(NamePart("void", color(ctKeyword)));
+        else
+            parts += prettyNameInColor(rbt->refType());
+        break;
+
+    case rtPointer:
+        if (rbt->refTypeId() == 0)
+            parts.append(NamePart("void", color(ctKeyword)));
+        else
+            parts = prettyNameInColor(rbt->refType());
+        parts.append(NamePart(" *", color(ctType)));
+        break;
+
+    case rtArray: {
+        const Array* a = dynamic_cast<const Array*>(rbt);
+        if (rbt->refTypeId() == 0)
+            parts.append(NamePart("void", color(ctKeyword)));
+        else
+            parts = prettyNameInColor(rbt->refType());
+        parts.append(NamePart("[", color(ctReset)));
+        parts.append(NamePart(a->length() < 0 ?
+                                  QString("?") : QString::number(a->length()),
+                              color(ctBold)));
+        parts.append(NamePart("]", color(ctReset)));
+        break;
+    }
+
+    case rtFunction:
+    case rtFuncPointer: {
+        const FuncPointer* fp = dynamic_cast<const FuncPointer*>(rbt);
+        QString s;
+        for (int i = 0; i < fp->params().size(); ++i) {
+            if (i > 0)
+                s += ", ";
+            s += fp->params().at(i)->prettyName();
+        }
+        if (fp->refTypeId())
+            parts = prettyNameInColor(fp->refType());
+        else
+            parts.append(NamePart("void", color(ctKeyword)));
+        if (fp->type() & rtFuncPointer) {
+            parts.append(NamePart(" (", 0));
+            parts.append(NamePart(QString("*%1").arg(fp->name()), color(ctType)));
+            parts.append(NamePart(")(", 0));
+        }
+        else {
+            parts.append(NamePart(QString(" %1").arg(fp->name()), color(ctType)));
+            parts.append(NamePart("(", 0));
+        }
+        if (!s.isEmpty())
+            parts.append(NamePart(s, color(ctBold)));
+        parts.append(NamePart(")", 0));
+        break;
+    }
+
+    default:
+        break;
+
+    }
+
+    return parts;
+}
+
+
+
+QString Shell::prettyNameInColor(const Variable *v, int minLen, int maxLen) const
+{
+
 }
 
 
@@ -995,44 +1229,17 @@ int Shell::cmdListTypes(QStringList args)
             srcLine = "--";
 
         // Get the pretty name
-        name = type->prettyName();
+        name = prettyNameInColor(type, w_name, w_name);
         if (name.isEmpty())
             name = "(none)";
-        // Shorten name, if necessary
-        else if (name.size() > w_name) {
-            if (type->type() & FunctionTypes) {
-                const FuncPointer* fp = dynamic_cast<FuncPointer*>(type);
-                if (!fp->refTypeId())
-                    name = "void";
-                else if (fp->refType())
-                    name = fp->refType()->prettyName();
-                else
-                    name = QString("(unresolved 0x%1)")
-                            .arg(fp->refTypeId(), 0, 16);
-                if (!fp->name().isEmpty())
-                    name += " " + fp->name();
 
-                QString params;
-                for (int i = 0; i < fp->params().size(); ++i) {
-                    if (i > 0)
-                        params += ", ";
-                    params += fp->params().at(i)->prettyName();
-                }
-
-                if (name.size() + params.size() + 2 <= w_name)
-                    name += "(" + params + ")";
-                else
-                    name += "(" + params.left(w_name - name.size() - 5) + "...)";
-            }
-
-            if (name.size() > w_name)
-                name = name.left(w_name - 3) + "...";
-        }
-
-        _out << qSetFieldWidth(w_id)  << right << hex << (uint) type->id()
+        _out << color(ctTypeId)
+             << qSetFieldWidth(w_id)  << right << hex << (uint) type->id()
              << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(0) << color(ctRealType)
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
-             << qSetFieldWidth(w_name) << name
+             << qSetFieldWidth(0) << name
+             << qSetFieldWidth(0) << color(ctReset)
              << qSetFieldWidth(w_size) << right << dec << type->size()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_src) << left << src
@@ -1044,7 +1251,8 @@ int Shell::cmdListTypes(QStringList args)
 
 	if (headerPrinted) {
 		hline(w_total);
-		_out << "Total types: " << dec << typeCount << endl;
+		_out << "Total types: " << color(ctBold) << dec << typeCount
+			 << color(ctReset) << endl;
     }
     else if (applyFilter)
     	_out << "No types matching that name." << endl;
@@ -1074,7 +1282,7 @@ int Shell::cmdListTypesUsing(QStringList args)
     int id = (int)s.toUInt(&ok, 16);
 
     if (!ok) {
-        _err << "Invalid type ID given." << endl;
+        errMsg( "Invalid type ID given.");
         return ecInvalidId;
     }
 
@@ -1082,7 +1290,7 @@ int Shell::cmdListTypesUsing(QStringList args)
 
     if (types.isEmpty()) {
         if (_sym.factory().equivalentTypes(id).isEmpty()) {
-            _err << "No type with id " << args.front() << " found." << endl;
+            errMsg(QString("No type with id %1 found.").arg(args.front()));
             return ecInvalidId;
         }
         else {
@@ -1413,8 +1621,7 @@ int Shell::parseMemDumpIndex(QStringList &args, int skip, bool quiet)
         // Check the bounds
         if (index < 0 || index >= _memDumps.size() || !_memDumps[index]) {
             if (!quiet)
-                _err << "Memory dump index " << index << " does not exist."
-                    << endl;
+                errMsg(QString("Memory dump index %1 does not exist.").arg(index));
             return ecInvalidIndex;
         }
     }
@@ -1427,7 +1634,7 @@ int Shell::parseMemDumpIndex(QStringList &args, int skip, bool quiet)
     }
     // No memory dumps loaded at all?
     if (index < 0 && !quiet)
-        _err << "No memory dumps loaded." << endl;
+        errMsg("No memory dumps loaded.");
 
     return index;
 }
@@ -1470,7 +1677,7 @@ int Shell::cmdMemoryLoad(QStringList args)
 {
     // Check argument size
     if (args.size() != 1) {
-        _err << "No file name given." << endl;
+        errMsg("No file name given.");
         return ecNoFileNameGiven;
     }
 
@@ -1478,18 +1685,17 @@ int Shell::cmdMemoryLoad(QStringList args)
 
     switch(ret) {
     case ecNoSymbolsLoaded:
-        _err << "Cannot load memory dump file before symbols have been loaded."
-                << endl;
+        errMsg("Cannot load memory dump file before symbols have been loaded.");
         break;
 
     case ecFileNotFound:
-        _err << "File not found: " << args[0] << endl;
+        errMsg(QString("File not found: %1").arg(args[0]));
         break;
 
     default:
         if (ret < 0)
-            _err << "An unknown error occurred (error code " << ret << ")"
-                << endl;
+            errMsg(QString("An unknown error occurred (error code %1)")
+                   .arg(ret));
         else
             _out << "Loaded [" << ret << "] " << _memDumps[ret]->fileName()
                 << endl;
@@ -1534,11 +1740,148 @@ int Shell::unloadMemDump(const QString& indexOrFileName, QString* unloadedFile)
 }
 
 
+bool Shell::allowColor() const
+{
+    return _allowColor;
+}
+
+
+void Shell::setAllowColor(bool value)
+{
+    _allowColor = value;
+}
+
+
+const char *Shell::color(ColorType ct) const
+{
+
+    // ANSI color codes
+#define COLOR_BLACK   "30"
+#define COLOR_RED     "31"
+#define COLOR_GREEN   "32"
+#define COLOR_YELLOW  "33"
+#define COLOR_BLUE    "34"
+#define COLOR_MAGENTA "35"
+#define COLOR_CYAN    "36"
+#define COLOR_WHITE   "37"
+
+#define S_NONE      "0"
+#define S_BOLD      "1"
+#define S_UNDERLINE "4"
+#define S_INV       "7"
+
+#define DEFSTYLE(s) "\033[" s "m"
+#define DEFCOLOR(c, s) "\033[" s ";" c "m"
+
+#define C_RST DEFSTYLE(S_NONE)
+#define C_BLD DEFSTYLE(S_BOLD)
+#define C_UDL DEFSTYLE(S_UNDERLINE)
+#define C_INV DEFSTYLE(S_INV)
+
+#define C_BLK   DEFCOLOR(COLOR_BLACK, S_NONE)
+#define C_BLK_B DEFCOLOR(COLOR_BLACK, S_BOLD)
+#define C_BLK_U DEFCOLOR(COLOR_BLACK, S_UNDERLINE)
+#define C_BLK_I DEFCOLOR(COLOR_BLACK, S_INV)
+
+#define C_RED   DEFCOLOR(COLOR_RED, S_NONE)
+#define C_RED_B DEFCOLOR(COLOR_RED, S_BOLD)
+#define C_RED_U DEFCOLOR(COLOR_RED, S_UNDERLINE)
+#define C_RED_I DEFCOLOR(COLOR_RED, S_INV)
+
+#define C_GRN   DEFCOLOR(COLOR_GREEN, S_NONE)
+#define C_GRN_B DEFCOLOR(COLOR_GREEN, S_BOLD)
+#define C_GRN_U DEFCOLOR(COLOR_GREEN, S_UNDERLINE)
+#define C_GRN_I DEFCOLOR(COLOR_GREEN, S_INV)
+
+#define C_YLW   DEFCOLOR(COLOR_YELLOW, S_NONE)
+#define C_YLW_B DEFCOLOR(COLOR_YELLOW, S_BOLD)
+#define C_YLW_U DEFCOLOR(COLOR_YELLOW, S_UNDERLINE)
+#define C_YLW_I DEFCOLOR(COLOR_YELLOW, S_INV)
+
+#define C_BLU   DEFCOLOR(COLOR_BLUE, S_NONE)
+#define C_BLU_B DEFCOLOR(COLOR_BLUE, S_BOLD)
+#define C_BLU_U DEFCOLOR(COLOR_BLUE, S_UNDERLINE)
+#define C_BLU_I DEFCOLOR(COLOR_BLUE, S_INV)
+
+#define C_MGT   DEFCOLOR(COLOR_MAGENTA, S_NONE)
+#define C_MGT_B DEFCOLOR(COLOR_MAGENTA, S_BOLD)
+#define C_MGT_U DEFCOLOR(COLOR_MAGENTA, S_UNDERLINE)
+#define C_MGT_I DEFCOLOR(COLOR_MAGENTA, S_INV)
+
+#define C_CYN   DEFCOLOR(COLOR_CYAN, S_NONE)
+#define C_CYN_B DEFCOLOR(COLOR_CYAN, S_BOLD)
+#define C_CYN_U DEFCOLOR(COLOR_CYAN, S_UNDERLINE)
+#define C_CYN_I DEFCOLOR(COLOR_CYAN, S_INV)
+
+#define C_WHT   DEFCOLOR(COLOR_WHITE, S_NONE)
+#define C_WHT_B DEFCOLOR(COLOR_WHITE, S_BOLD)
+#define C_WHT_U DEFCOLOR(COLOR_WHITE, S_UNDERLINE)
+#define C_WHT_I DEFCOLOR(COLOR_WHITE, S_INV)
+
+    static const char* colors_dark[COLOR_TYPE_SIZE] = {
+        C_RST,   // ctReset
+        C_BLD,   // ctBold
+        C_UDL,   // ctUnderline
+        C_INV,   // ctInverse
+
+        C_GRN,   // ctPrompt
+        C_YLW_B, // ctVariable
+        C_BLU_B, // ctType
+        C_CYN_B, // ctBuiltinType
+        C_BLK_B, // ctRealType
+        C_YLW,   // ctMember
+        C_RED,   // ctAddress
+        C_RED,   // ctOffset
+        C_GRN,   // ctTypeId
+        C_MGT,   // ctKeyword
+        C_RED_B, // ctErrorLight
+        C_RED,   // ctError
+        C_WHT_B, // ctSrcFile
+        C_BLK_B, // ctNoName
+        C_BLK_B  // ctColHead
+    };
+
+    static const char* colors_light[COLOR_TYPE_SIZE] = {
+        C_RST,   // ctReset
+        C_BLD,   // ctBold
+        C_UDL,   // ctUnderline
+        C_INV,   // ctInverse
+
+        C_GRN,   // ctPrompt
+        C_CYN,   // ctVariable
+        C_MGT_B, // ctType
+        C_BLK_B, // ctRealType
+        C_YLW,   // ctMember
+        C_RED,   // ctAddress
+        C_RED,   // ctOffset
+        C_GRN,   // ctTypeId
+        C_BLU_B, // ctKeyword
+        C_RED_B, // ctErrorLight
+        C_RED    // ctError
+        C_WHT_B, // ctSrcFile
+        C_BLK_B, // ctNoName
+        C_BLK_B  // ctColHead
+    };
+
+    static const char* empty = "";
+
+    // Which color mode is enabled?
+    if (_allowColor && (ct >= 0) && (ct < COLOR_TYPE_SIZE)) {
+        if (programOptions.activeOptions() & opColorDarkBg)
+            return colors_dark[ct];
+        else if (programOptions.activeOptions() & opColorLightBg)
+            return colors_light[ct];
+    }
+
+    return empty;
+}
+
+
 int Shell::cmdMemoryUnload(QStringList args)
 {
     // Check argument size
     if (args.size() != 1) {
-        _err << "No file name given." << endl;
+        errMsg("No file name given.");
         return ecNoFileNameGiven;
     }
 
@@ -1546,27 +1889,24 @@ int Shell::cmdMemoryUnload(QStringList args)
     int ret = unloadMemDump(args.front(), &fileName);
 
     switch (ret) {
-    case ecFileNotFound:
-        _err << "File not loaded: " << args.front() << endl;
-        break;
-
     case ecInvalidIndex:
-        _err << "Memory dump index does not exist." << endl;
+        errMsg("Memory dump index does not exist.");
         break;
 
     case ecNoMemoryDumpsLoaded:
-        _err << "No memory dumps loaded." << endl;
+        errMsg("No memory dumps loaded.");
         break;
 
+    case ecFileNotFound:
     case ecFileNotLoaded:
-        _err << "No memory dump with file name \"" << fileName << "\" loaded."
-            << endl;
+        errMsg(QString("No memory dump with file name \"%1\" loaded.")
+               .arg(args.front()));
         break;
 
     default:
         if (ret < 0)
-            _err << "An unknown error occurred (error code " << ret << ")"
-                << endl;
+            errMsg(QString("An unknown error occurred (error code %1)")
+                   .arg(ret));
         else
             _out << "Unloaded [" << ret << "] " << fileName << endl;
         break;
@@ -1628,7 +1968,7 @@ int Shell::cmdMemoryDump(QStringList args)
         QRegExp re("^\\s*([^@]+)\\s*@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
 
         if (!re.exactMatch(args.join(" "))) {
-            _err << "Usage: memory dump [index] <char|int|long|type-name|type-id>(.<member>)* @ <address>" << endl;
+            errMsg("Usage: memory dump [index] <char|int|long|type-name|type-id>(.<member>)* @ <address>");
             return 1;
         }
 
@@ -1663,7 +2003,7 @@ int Shell::cmdMemoryRevmap(QStringList args)
                 return cmdMemoryRevmapVisualize(index);
         }
         else {
-            _err << "Unknown command: " << args[0] << endl;
+            _err << color(ctErrorLight) << "Unknown command: " << color(ctError) << args[0] << color(ctReset) << endl:
             return 2;
         }
     }
@@ -1757,7 +2097,8 @@ int Shell::cmdMemoryDiff(QStringList args)
             return cmdMemoryDiffVisualize(index);
         }
         else {
-            _err << "Unknown command: " << args[0] << endl;
+            _err << color(ctErrorLight) << "Unknown command: " << color(ctError)
+                 << args[0] << color(ctReset) << endl:
             return 2;
         }
     }
@@ -1825,8 +2166,8 @@ int Shell::cmdScript(QStringList args)
     if (fileName == "eval") {
         fileName.clear();
     	if (args.size() < 2) {
-			_err << "Using the \"eval\" function expects script code as "
-					<< "additional argument." << endl;
+            errMsg("Using the \"eval\" function expects script code as "
+                    "additional argument.");
 			return 4;
     	}
     	scriptCode = args[1];
@@ -1834,13 +2175,13 @@ int Shell::cmdScript(QStringList args)
     }
     else {
 		if (!file.exists()) {
-			_err << "File not found: " << fileName << endl;
+			errMsg(QString("File not found: %1").arg(fileName));
 			return 2;
 		}
 
 		// Try to read in the whole file
 		if (!file.open(QIODevice::ReadOnly)) {
-			_err << "Cannot open file \"" << fileName << "\" for reading." << endl;
+			errMsg(QString("Cannot open file \"%1\" for reading.").arg(fileName));
 			return 3;
 		}
 		QTextStream stream(&file);
@@ -1853,20 +2194,22 @@ int Shell::cmdScript(QStringList args)
 			includePathFileInfo.absolutePath());
 
 	if (_engine->hasUncaughtException()) {
-		_err << "Exception occured on ";
+		_err << color(ctError) << "Exception occured on ";
 		if (fileName.isEmpty())
 			_err << "line ";
 		else
 			_err << fileName << ":";
 		_err << _engine->uncaughtExceptionLineNumber() << ": " << endl
-			 << _engine->uncaughtException().toString() << endl;
+			 << color(ctErrorLight) <<
+				_engine->uncaughtException().toString() << color(ctError) << endl;
 		QStringList bt = _engine->uncaughtExceptionBacktrace();
 		for (int i = 0; i < bt.size(); ++i)
 			_err << "    " << bt[i] << endl;
+		_err << color(ctReset);
 		return 4;
 	}
 	else if (result.isError()) {
-		_err << result.toString() << endl;
+		errMsg(result.toString());
 		return 5;
 	}
 
@@ -1969,13 +2312,13 @@ int Shell::cmdShow(QStringList args)
                     errorMsg = "No such member: ";
 
                 if (!errorMsg.isEmpty()) {
-                    _err << errorMsg;
+                    _err << color(ctError) << errorMsg;
                     for (int j = 0; j <= i; ++j) {
                         if (j > 0)
                             _err << ".";
                         _err << expr[j];
                     }
-                    _err << endl;
+                    _err << color(ctReset) << endl;
                     return ecInvalidExpression;
                 }
             }
@@ -1997,25 +2340,34 @@ int Shell::cmdShow(QStringList args)
 
 int Shell::cmdShowBaseType(const BaseType* t)
 {
-	_out << "  ID:              " << "0x" << hex << (uint)t->id() << dec << endl;
-	_out << "  Name:            " << (t->prettyName().isEmpty() ? QString("(unnamed)") : t->prettyName()) << endl;
-	_out << "  Type:            " << realTypeToStr(t->type()) << endl;
-	_out << "  Size:            " << t->size() << endl;
-	_out << "  Hash:            " << "0x" << hex << t->hash() << dec << endl;
+	_out << color(ctColHead) << "  ID:              "
+		 << color(ctTypeId) << "0x" << hex << (uint)t->id() << dec << endl;
+	_out << color(ctColHead) << "  Name:            "
+		 << (t->prettyName().isEmpty() ?
+				 QString("(unnamed)") : prettyNameInColor(t, 0, 0)) << endl;
+	_out << color(ctColHead) << "  Type:            "
+		 << color(ctReset) << realTypeToStr(t->type()) << endl;
+	_out << color(ctColHead) << "  Size:            "
+		 << color(ctReset) << t->size() << endl;
+	_out << color(ctColHead) << "  Hash:            "
+		 << color(ctReset) << "0x" << hex << t->hash() << dec << endl;
 
 	if (t->srcFile() >= 0 && _sym.factory().sources().contains(t->srcFile())) {
-		_out << "  Source file:    " << _sym.factory().sources().value(t->srcFile())->name()
-			<< ":" << t->srcLine() << endl;
+		_out << color(ctColHead) << "  Source file:    "
+			 << color(ctReset) << _sym.factory().sources().value(t->srcFile())->name()
+			 << ":" << t->srcLine() << endl;
 	}
 
     const RefBaseType* r;
     int cnt = 1;
     while ( (r = dynamic_cast<const RefBaseType*>(t)) ) {
-        _out << "  " << cnt << ". Ref. type ID: " << "0x" << hex << (uint)r->refTypeId() << dec << endl;
-        _out << "  " << cnt << ". Ref. type:    "
-             <<  (r->refType() ? r->refType()->prettyName() :
+        _out << color(ctColHead) << "  " << cnt << ". Ref. type ID: "
+             << color(ctTypeId) << "0x" << hex << (uint)r->refTypeId() << dec << endl;
+        _out << color(ctColHead) << "  " << cnt
+             << ". Ref. type:    "
+             << color(ctReset) <<  (r->refType() ? prettyNameInColor(r->refType(), 0, 0) :
                                  QString(r->refTypeId() ? "(unresolved)" : "void"))
-            << endl;
+             << endl;
         for (int i = 0; i < r->altRefTypeCount(); ++i) {
             const BaseType* t = r->altRefBaseType(i);
             _out << qSetFieldWidth(18) << right
@@ -2031,13 +2383,15 @@ int Shell::cmdShowBaseType(const BaseType* t)
 
 	const Structured* s = dynamic_cast<const Structured*>(t);
 	if (s) {
-		_out << "  Members:        " << s->members().size() << endl;
+		_out << color(ctColHead) << "  Members:        "
+			 << color(ctReset) << s->members().size() << endl;
 		printStructMembers(s, 4);
 	}
 
 	const Enum* e = dynamic_cast<const Enum*>(t);
 	if (e) {
-        _out << "  Enumerators:    " << e->enumValues().size() << endl;
+		_out << color(ctColHead) << "  Enumerators:    "
+			 << color(ctReset) << e->enumValues().size() << endl;
 
         QList<Enum::EnumHash::key_type> keys = e->enumValues().uniqueKeys();
         qSort(keys);
@@ -2057,16 +2411,17 @@ int Shell::cmdShowBaseType(const BaseType* t)
 	if (fp) {
 		const Function* func = dynamic_cast<const Function*>(fp);
 		if (func) {
-			_out << "  Inlined:        " << func->inlined() << endl;
-			_out << "  PC low:         "
-				 << QString("0x%1")
+			_out << color(ctColHead) << "  Inlined:        "
+				 << color(ctReset) << func->inlined() << endl;
+			_out << color(ctColHead) << "  PC low:         "
+				 << color(ctReset) << QString("0x%1")
 					.arg(func->pcLow(),
 						 _sym.memSpecs().sizeofUnsignedLong << 1,
 						 16,
 						 QChar('0'))
 				 << endl;
-			_out << "  PC high:        "
-				 << QString("0x%1")
+			_out << color(ctColHead) << "  PC high:        "
+				 << color(ctReset) << QString("0x%1")
 					.arg(func->pcHigh(),
 						 _sym.memSpecs().sizeofUnsignedLong << 1,
 						 16,
@@ -2074,7 +2429,8 @@ int Shell::cmdShowBaseType(const BaseType* t)
 				 << endl;
 		}
 
-		_out << "  Parameters:     " << fp->params().size() << endl;
+		_out << color(ctColHead) << "  Parameters:     "
+			 << color(ctReset) << fp->params().size() << endl;
 
 		for (int i = 0; i < fp->params().size(); i++) {
 			FuncParam* param = fp->params().at(i);
@@ -2146,19 +2502,21 @@ void Shell::printStructMembers(const Structured* s, int indent, int id_width,
 		const BaseType* rt = m->refType();
 
 		QString pretty = rt ?
-					rt->prettyName() :
-					QString("(unresolved type, 0x%1)")
+					prettyNameInColor(rt, 0, 0) :
+					QString("%0(unresolved type, 0x%1)")
+						.arg(color(ctNoName))
 						.arg((uint)m->refTypeId(), 0, 16);
 
         _out << qSetFieldWidth(indent) << QString() << qSetFieldWidth(0);
-        _out << QString("0x%1").arg(m->offset() + offset, offset_width, 16, QChar('0'));
+        _out << color(ctOffset) << QString("0x%1").arg(m->offset() + offset, offset_width, 16, QChar('0'));
         _out << "  "
-             << qSetFieldWidth(24 - indent) << left;
+             << color(ctMember) << qSetFieldWidth(24 - indent) << left;
         if (m->name().isEmpty())
             _out << QString();
         else
             _out << (m->name() + ": ");
-        _out << qSetFieldWidth(id_width) << left
+        _out << qSetFieldWidth(0) << color(ctTypeId)
+             << qSetFieldWidth(id_width) << left
              << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
              << qSetFieldWidth(0) << " "
              << pretty;
@@ -2177,12 +2535,14 @@ void Shell::printStructMembers(const Structured* s, int indent, int id_width,
 
 		for (int j = 0; printAlt && j < m->altRefTypeCount(); ++j) {
 			rt = m->altRefBaseType(j);
-			_out << qSetFieldWidth(indent + 2 + offset_width + 2 + 24 - indent)
+			_out << qSetFieldWidth(0) << color(ctReset)
+				 << qSetFieldWidth(indent + 2 + offset_width + 2 + 24 - indent)
 				 << right << QString("<%1> ").arg(j+1)
+				 << qSetFieldWidth(0) << color(ctTypeId)
 				 << qSetFieldWidth(id_width) << left
 				 << QString("0x%1")
 					.arg((uint)(rt ? rt->id() : m->altRefType(j).id()), 0, 16)
-				 << qSetFieldWidth(0) << " "
+				 << qSetFieldWidth(0) << color(ctReset) << " "
 				 << (rt ? rt->prettyName() :
 						 QString("(unresolved type, 0x%1)")
 						  .arg((uint)m->altRefType(j).id(), 0, 16))
@@ -2319,7 +2679,7 @@ int Shell::cmdSymbolsSource(QStringList args)
 
     // Check files for existence
     if (!QFile::exists(args[0])) {
-        _err << "Directory not found: " << args[0] << endl;
+        errMsg(QString("Directory not found: %1").arg(args[0]));
         return ecFileNotFound;
     }
 
@@ -2360,15 +2720,15 @@ int Shell::cmdSymbolsParse(QStringList args)
 
     // Check files for existence
     if (!QFile::exists(kernelSrc)) {
-        _err << "Directory not found: " << kernelSrc << endl;
+        errMsg(QString("Directory not found: %1").arg(kernelSrc));
         return 2;
     }
     if (!QFile::exists(objdump)) {
-        _err << "File not found: " << objdump << endl;
+        errMsg(QString("File not found: %1").arg(objdump));
         return 3;
     }
     if (!QFile::exists(sysmap)) {
-        _err << "File not found: " << sysmap << endl;
+        errMsg(QString("File not found: %1").arg(sysmap));
         return 4;
     }
 
@@ -2445,7 +2805,7 @@ int Shell::cmdSymbolsLoad(QStringList args)
 
     // Check file for existence
     if (!QFile::exists(fileName)) {
-        _err << "File not found: " << fileName << endl;
+        errMsg(QString("File not found: %1").arg(fileName));
         return 2;
     }
 
@@ -2564,12 +2924,12 @@ int Shell::cmdDiffVectors(QStringList args)
 
     // Make sure the files exist
     if (files.isEmpty()) {
-        _err << "The file(s) could not be found." << endl;
+        errMsg("The file(s) could not be found.");
         debugmsg("args = " << args[0]);
         return 1;
     }
     else if (files.size() < 2) {
-        _err << "This operation requires at least two files." << endl;
+        errMsg("This operation requires at least two files.");
         return 2;
     }
 
@@ -2758,7 +3118,7 @@ void Shell::printTimeStamp(const QTime& time)
 //        return 1;
 
 //    if (args.size() != 1) {
-//        _err << "No query sting given." << endl;
+//        errMsg("No query sting given.");
 //        return 2;
 //    }
 

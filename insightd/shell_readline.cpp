@@ -39,7 +39,9 @@ void Shell::saveShellHistory()
 QString Shell::readLine(const QString& prompt)
 {
     QString ret;
-    QString p = prompt.isEmpty() ? QString(">>> ") : prompt;
+    QString p = prompt.isEmpty() ?
+                QString("%1>>>%2 ").arg(color(ctPrompt)).arg(color(ctReset)) :
+                prompt;
 
     // Read input from stdin or from socket?
     if (_listenOnSocket) {
