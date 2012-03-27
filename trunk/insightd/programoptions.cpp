@@ -12,9 +12,14 @@
 #include <QCoreApplication>
 #include <debug.h>
 
+// Color modes for console output
+#define CM_DARK  "dark"
+#define CM_LIGHT "light"
+#define CM_NONE  "off"
+
 ProgramOptions programOptions;
 
-const int OPTION_COUNT = 6;
+const int OPTION_COUNT = 7;
 
 const struct Option options[OPTION_COUNT] = {
         {
@@ -60,6 +65,16 @@ const struct Option options[OPTION_COUNT] = {
                 acNone,
                 opNone,
                 ntMemFileName,
+                0 // conflicting options
+        },
+        {
+                "-c",
+                "--color",
+                "Set the terminal color mode: \"" CM_LIGHT "\", \"" CM_DARK
+                "\", or \"" CM_NONE "\"",
+                acNone,
+                opNone,
+                ntColorMode,
                 0 // conflicting options
         },
         {
@@ -133,6 +148,7 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
     _action = acNone;
     NextToken nextToken = ntOption;
     bool found;
+    bool colorForced = false;
 
     // Parse the command line options
     while (!args.isEmpty()) {
@@ -204,12 +220,31 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
             nextToken = ntOption;
             break;
         }
+
+        case ntColorMode:
+            colorForced = true;
+            if (arg == CM_DARK)
+                _activeOptions = (_activeOptions & ~opColorLightBg) | opColorDarkBg;
+            else if (arg == CM_LIGHT)
+                _activeOptions = (_activeOptions & ~opColorDarkBg) | opColorLightBg;
+            else if (arg == CM_NONE)
+                _activeOptions = _activeOptions & ~(opColorLightBg | opColorDarkBg);
+            else {
+                colorForced = false;
+                std::cerr << "The color mode must be one of: "
+                             CM_LIGHT ", " CM_DARK  ", " CM_NONE << std::endl;
+            }
+            break;
         }
     }
 
     // The foreground option always implies the daemonize option
     if (_activeOptions & opForeground)
         _activeOptions |= opDaemonize;
+
+    // Enable color output for dark terminals per default on interactive shells
+    if (!colorForced)
+        _activeOptions |= opColorDarkBg;
 
     return true;
 }
