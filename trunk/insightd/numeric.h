@@ -11,6 +11,7 @@
 #include <bitop.h>
 #include "basetype.h"
 #include <debug.h>
+#include "colorpalette.h"
 
 /**
  * Generic template class for all numeric types
@@ -116,7 +117,7 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset) const
+    virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const
     {
         T n = BaseType::value<T>(mem, offset);
         // Take bit size and bit offset into account
@@ -128,7 +129,10 @@ public:
             // Extract the bits
             n = (n >> _bitOffset) & mask;
         }
-        return QString::number(n);
+        QString s = QString::number(n);
+        if (col)
+            s = col->color(ctNumber) + s + col->color(ctReset);
+        return s;
     }
 
     /**
@@ -246,9 +250,12 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset) const
+    virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const
     {
-        return QString::number(BaseType::value<T>(mem, offset));
+        QString s = QString::number(BaseType::value<T>(mem, offset));
+        if (col)
+            s = col->color(ctNumber) + s + col->color(ctReset);
+        return s;
     }
 };
 

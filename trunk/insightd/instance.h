@@ -110,9 +110,10 @@ inline bool Instance::isAccessible() const
 }
 
 
-inline QString Instance::toString() const
+inline QString Instance::toString(const ColorPalette* col) const
 {
-    return _d.isNull ? QString("NULL") : _d.type->toString(_d.vmem, _d.address);
+    return _d.isNull ?
+                QString("NULL") : _d.type->toString(_d.vmem, _d.address, col);
 }
 
 

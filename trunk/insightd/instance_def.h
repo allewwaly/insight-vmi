@@ -18,6 +18,7 @@ class BaseType;
 class VirtualMemory;
 class Instance;
 class StructuredMember;
+class ColorPalette;
 
 /// A list of Instance objects
 typedef QList<Instance> InstanceList;
@@ -565,7 +566,7 @@ public:
     /**
      * @return a string representation of this instance
      */
-    QString toString() const;
+    QString toString(const ColorPalette *col = 0) const;
 
     /**
      * Returns a toString() representation of this instance using the page

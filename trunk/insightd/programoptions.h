@@ -123,6 +123,12 @@ public:
      */
     int activeOptions() const;
 
+    /**
+     * Sets the active options
+     * @param options
+     */
+    void setActiveOptions(int options);
+
 private:
     QString _inFileName;
     QStringList _memFileNames;

@@ -291,3 +291,9 @@ int ProgramOptions::activeOptions() const
     return _activeOptions;
 }
 
+
+void ProgramOptions::setActiveOptions(int options)
+{
+    _activeOptions = options;
+}
+

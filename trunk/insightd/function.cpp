@@ -52,7 +52,7 @@ QString Function::prettyName() const
 }
 
 
-QString Function::toString(QIODevice* /*mem*/, size_t /*offset*/) const
+QString Function::toString(QIODevice* /*mem*/, size_t /*offset*/, const ColorPalette* /*col*/) const
 {
 	return QString();
 }

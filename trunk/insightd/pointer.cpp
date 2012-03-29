@@ -9,6 +9,7 @@
 #include <string.h>
 #include "virtualmemoryexception.h"
 #include <debug.h>
+#include "shell.h"
 
 Pointer::Pointer(SymFactory* factory)
 	: RefBaseType(factory)
@@ -47,12 +48,18 @@ QString Pointer::prettyName() const
 }
 
 
-QString Pointer::toString(QIODevice* mem, size_t offset) const
+QString Pointer::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
 {
     quint64 p = (quint64) toPointer(mem, offset);
 
-    if (!p)
-        return "NULL";
+    if (!p) {
+        if (col)
+            return QString("%1NULL%2")
+                    .arg(col->color(ctAddress))
+                    .arg(col->color(ctReset));
+        else
+            return "NULL";
+    }
 
     QString errMsg;
 
@@ -70,13 +77,20 @@ QString Pointer::toString(QIODevice* mem, size_t offset) const
           refRefType->type() == rtInt8)))
     {
         QString s = readString(mem, p, 255, &errMsg);
-        if (errMsg.isEmpty())
-            return QString("\"%1\"").arg(s);
+        if (errMsg.isEmpty()) {
+            s = QString("\"%1\"").arg(s);
+            if (col)
+                s = col->color(ctString) + s + col->color(ctReset);
+            return s;
+        }
     }
 
     QString ret = (_size == 4) ?
             QString("0x%1").arg((quint32)p, (_size << 1), 16, QChar('0')) :
             QString("0x%1").arg(p, (_size << 1), 16, QChar('0'));
+
+    if (col)
+        ret = col->color(ctAddress) + ret + col->color(ctReset);
 
     if (!errMsg.isEmpty())
         ret += QString(" (%1)").arg(errMsg);
