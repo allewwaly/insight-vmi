@@ -49,6 +49,7 @@ HEADERS += astexpressionevaluatortester.h \
     ../../memspecparser.h \
     ../../memorydump.h \
     ../../memorydumpsclass.h \
+    ../../colorpalette.h \
     ../../expressionresult.h
 SOURCES += astexpressionevaluatortester.cpp \
     ../../array.cpp \
@@ -96,6 +97,7 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../memspecparser.cpp \
     ../../memorydump.cpp \
     ../../memorydumpsclass.cpp \
+    ../../colorpalette.cpp \
     ../../expressionresult.cpp
 QT += core \
     script \

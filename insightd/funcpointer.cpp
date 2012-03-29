@@ -6,6 +6,7 @@
  */
 
 #include "funcpointer.h"
+#include "colorpalette.h"
 
 FuncPointer::FuncPointer(SymFactory* factory)
     : RefBaseType(factory)
@@ -89,12 +90,16 @@ QString FuncPointer::prettyName(const QString& name) const
 }
 
 
-QString FuncPointer::toString(QIODevice* mem, size_t offset) const
+QString FuncPointer::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
 {
+    QString s("0x%1");
     if (_size == 4)
-        return QString("0x%1").arg(value<quint32>(mem, offset), _size << 1, 16, QChar('0'));
+        s = s.arg(value<quint32>(mem, offset), _size << 1, 16, QChar('0'));
     else
-        return QString("0x%1").arg(value<quint64>(mem, offset), _size << 1, 16, QChar('0'));
+        s = s.arg(value<quint64>(mem, offset), _size << 1, 16, QChar('0'));
+    if (col)
+        s = col->color(ctAddress) + s + col->color(ctReset);
+    return s;
 }
 
 

@@ -13,6 +13,8 @@
 #include "typeinfo.h"
 #include "instance_def.h"
 
+class ColorPalette;
+
 /**
   Basic exception class for all type-related exceptions
  */
@@ -199,7 +201,7 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset) const = 0;
+    virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const = 0;
 
     /**
      * Explicit representation of a value is the given type.

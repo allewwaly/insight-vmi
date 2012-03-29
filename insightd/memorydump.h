@@ -128,7 +128,7 @@ public:
      * @exception QueryException the queried symbol does not exist or cannot
      * be read
      */
-    QString query(const int queryId) const;
+    QString query(const int queryId, const ColorPalette &col) const;
 
     /**
      * Retrieves a string representation a symbol specified in dotted notation,
@@ -141,7 +141,7 @@ public:
      * @exception QueryException the queried symbol does not exist or cannot
      * be read
      */
-    QString query(const QString& queryString) const;
+    QString query(const QString& queryString, const ColorPalette &col) const;
 
     /**
      * Retrieves an Instance object for the variable with ID \a queryId.
@@ -208,7 +208,7 @@ public:
      * @return a string representation of the memory region at \a address as
      * type \a type
      */
-    QString dump(const QString& type, quint64 address) const;
+    QString dump(const QString& type, quint64 address, const ColorPalette &col) const;
 
     /**
      * @return the memory specification this MemDump object uses

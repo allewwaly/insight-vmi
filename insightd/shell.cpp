@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 #include <insight/constdefs.h>
 #include <insight/devicemuxer.h>
 #include <insight/insight.h>
@@ -96,7 +97,7 @@ QDataStream Shell::_ret;
 Shell::Shell(bool listenOnSocket)
     : _listenOnSocket(listenOnSocket), _interactive(!listenOnSocket),
       _clSocket(0), _srvSocket(0), _socketMuxer(0), _outChan(0), _errChan(0),
-      _binChan(0), _retChan(0), _engine(0), _allowColor(true)
+      _binChan(0), _retChan(0), _engine(0)
 {
 	qRegisterMetaType<QAbstractSocket::SocketState>();
 	qRegisterMetaType<QAbstractSocket::SocketError>();
@@ -126,6 +127,16 @@ Shell::Shell(bool listenOnSocket)
                 "Without any arguments, this command displays a list of all "
                 "commands. For more detailed information about a command, try "
                 "\"help <command>\"."));
+
+    _commands.insert("color",
+                     Command(
+                         &Shell::cmdColor,
+                         "Sets the color palette for the output",
+                         "This command allows to change the color palette for the output.\n"
+                         "  color           Shows the currently set color palette\n"
+                         "  color dark      Palette for a terminal with dark background\n"
+                         "  color light     Palette for a terminal with light background\n"
+                         "  color off       Turn off color output"));
 
     _commands.insert("list",
             Command(
@@ -707,7 +718,7 @@ int Shell::eval(QString command)
 
     // Did we find a valid command?
     if (c) {
-        bool colorWasAllowed = _allowColor;
+        bool colorWasAllowed = _color.allowColor();
         // Setup piped processes if no socket connection
         if (pipeCmds.size() > 1) {
             // First, create piped processes in reverse order, i.e., right to left
@@ -744,15 +755,15 @@ int Shell::eval(QString command)
                 }
             }
             // Disable colors for piped commands
-            _allowColor = false;
+            _color.setAllowColor(false);
         }
 
         try {
             ret = (this->*c)(words);
-            _allowColor = colorWasAllowed;
+            _color.setAllowColor(colorWasAllowed);
         }
     	catch (QueryException& e) {
-            _allowColor = colorWasAllowed;
+            _color.setAllowColor(colorWasAllowed);
             errMsg(e.message);
     		// Show a list of ambiguous types
     		if (e.errorCode == QueryException::ecAmbiguousType) {
@@ -767,7 +778,7 @@ int Shell::eval(QString command)
     	}
         catch (...) {
             // Exceptional cleanup
-            _allowColor = colorWasAllowed;
+            _color.setAllowColor(colorWasAllowed);
             cleanupPipedProcs();
             throw;
         }
@@ -843,21 +854,62 @@ int Shell::cmdHelp(QStringList args)
         for (int i = 0; i < cmds.size(); i++) {
         	if (_commands[cmds[i]].exclude)
         		continue;
-            _out << "  " << qSetFieldWidth(12) << left << cmds[i]
-                 << qSetFieldWidth(0) << _commands[cmds[i]].helpShort << endl;
+            _out << color(ctBold) << "  " << qSetFieldWidth(12) << left << cmds[i]
+                 << qSetFieldWidth(0) << color(ctReset)
+                 << _commands[cmds[i]].helpShort << endl;
         }
     }
     // Show long cmdHelp for given command
     else {
         QString cmd = args[0].toLower();
         if (_commands.contains(cmd)) {
-            _out << "Command: " << cmd << endl
+            _out << "Command: " << color(ctBold) << cmd << color(ctReset) << endl
                  << "Description: " << _commands[cmd].helpLong << endl;
         }
     }
 
     return ecOk;
 }
+
+
+int Shell::cmdColor(QStringList args)
+{
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.isEmpty()) {
+        if (programOptions.activeOptions() & opColorDarkBg)
+            _out << "Color palette: dark background" << endl;
+        else if (programOptions.activeOptions() & opColorLightBg)
+            _out << "Color palette: light background" << endl;
+        else
+            _out << "Color output disabled." << endl;
+        return ecOk;
+    }
+
+    if (args.size() != 1) {
+        cmdHelp(QStringList("color"));
+        return ecInvalidArguments;
+    }
+
+    QString value = args[0].toLower();
+    int options = programOptions.activeOptions() & ~(opColorDarkBg|opColorLightBg);
+
+    // (Un)set the corresponding bits.
+    if (QString("dark").startsWith(value))
+        options |= opColorDarkBg;
+    else if (QString("light").startsWith(value))
+        options |= opColorLightBg;
+    else if (QString("off").startsWith(value)) {
+        // do nothing
+    }
+    else {
+        cmdHelp(QStringList("color"));
+        return ecInvalidArguments;
+    }
+
+    programOptions.setActiveOptions(options);
+    return ecOk;
+}
+
 
 
 int getFieldWidth(quint32 maxVal, int base = 16)
@@ -953,205 +1005,6 @@ int Shell::cmdListSources(QStringList /*args*/)
 }
 
 
-QString Shell::namePartsToString(const NamePartList &parts, int minLen, int maxLen) const
-{
-    int len = 0;
-    QString ret;
-    int funcParams = 0;
-
-    for (int i = 0; i < parts.size(); ++i) {
-        const QString& part = parts[i].first;
-        const char* col = parts[i].second;
-        if (part.isEmpty())
-            continue;
-        if (col)
-            ret += col;
-        else
-            ret += color(ctReset);
-
-        if (maxLen > 0) {
-            if (len + part.size() <= maxLen) {
-                ret += part;
-                len += part.size();
-                if (part == ")(" || part == "(")
-                    ++funcParams;
-                else if (part == ")")
-                    --funcParams;
-            }
-            // We need to shorten it
-            else {
-                int remLen = maxLen - len - ((funcParams > 0) ? 4 : 3);
-                if (remLen < 0)
-                    remLen = 0;
-                ret += part.left(remLen);
-                ret += color(ctReset);
-                if (funcParams > 0)
-                    ret += QString("%1").arg(")", maxLen - len - remLen, QChar('.'));
-                else
-                    ret += QString("%1").arg("", maxLen - len - remLen, QChar('.'));
-                len = maxLen;
-                break;
-            }
-        }
-        else {
-            ret += part;
-            len += part.size();
-        }
-    }
-
-    // Do we need to the fill the string?
-    if (len < minLen)
-        ret += QString("%1").arg("", minLen - len);
-
-    return ret;
-}
-
-
-QString Shell::prettyNameInColor(const BaseType* t, int minLen, int maxLen) const
-{
-    if (!t)
-        return QString();
-
-    NamePartList parts = prettyNameInColor(t);
-    return namePartsToString(parts, minLen, maxLen);
-}
-
-
-NamePartList Shell::prettyNameInColor(const BaseType *t) const
-{
-    if (!t)
-        return NamePartList();
-
-    NamePartList parts;
-
-    const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
-
-    switch (t->type()) {
-    case rtInt8:
-    case rtUInt8:
-    case rtBool8:
-    case rtInt16:
-    case rtUInt16:
-    case rtBool16:
-    case rtInt32:
-    case rtUInt32:
-    case rtBool32:
-    case rtInt64:
-    case rtUInt64:
-    case rtBool64:
-    case rtFloat:
-    case rtDouble:
-//        if (t->name().isEmpty())
-            parts.append(NamePart(t->prettyName(), color(ctBuiltinType)));
-//        else
-//            parts.append(NamePart(t->name(), color(ctType)));
-        break;
-
-    case rtEnum:
-        if (t->name().isEmpty())
-            parts.append(NamePart("(none)", color(ctNoName)));
-        else
-            parts.append(NamePart(t->name(), color(ctType)));
-        break;
-
-    case rtStruct:
-    case rtUnion:
-        parts.append(NamePart(t->type() == rtStruct ? "struct " : "union ",
-                              color(ctKeyword)));
-        if (t->name().isEmpty())
-            parts.append(NamePart("(anon.)", color(ctNoName)));
-        else
-            parts.append(NamePart(t->name(), color(ctType)));
-        break;
-
-    case rtTypedef:
-        parts.append(NamePart(t->name(), color(ctType)));
-        break;
-
-    case rtConst:
-        parts.append(NamePart("const", color(ctKeyword)));
-        if (rbt->refTypeId() == 0)
-            parts.append(NamePart(" void", color(ctKeyword)));
-        else {
-            parts.append(NamePart(" ", 0));
-            parts += prettyNameInColor(rbt->refType());
-        }
-        break;
-
-    case rtVolatile:
-        parts.append(NamePart("volatile ", color(ctKeyword)));
-        if (rbt->refTypeId() == 0)
-            parts.append(NamePart("void", color(ctKeyword)));
-        else
-            parts += prettyNameInColor(rbt->refType());
-        break;
-
-    case rtPointer:
-        if (rbt->refTypeId() == 0)
-            parts.append(NamePart("void", color(ctKeyword)));
-        else
-            parts = prettyNameInColor(rbt->refType());
-        parts.append(NamePart(" *", color(ctType)));
-        break;
-
-    case rtArray: {
-        const Array* a = dynamic_cast<const Array*>(rbt);
-        if (rbt->refTypeId() == 0)
-            parts.append(NamePart("void", color(ctKeyword)));
-        else
-            parts = prettyNameInColor(rbt->refType());
-        parts.append(NamePart("[", color(ctReset)));
-        parts.append(NamePart(a->length() < 0 ?
-                                  QString("?") : QString::number(a->length()),
-                              color(ctBold)));
-        parts.append(NamePart("]", color(ctReset)));
-        break;
-    }
-
-    case rtFunction:
-    case rtFuncPointer: {
-        const FuncPointer* fp = dynamic_cast<const FuncPointer*>(rbt);
-        QString s;
-        for (int i = 0; i < fp->params().size(); ++i) {
-            if (i > 0)
-                s += ", ";
-            s += fp->params().at(i)->prettyName();
-        }
-        if (fp->refTypeId())
-            parts = prettyNameInColor(fp->refType());
-        else
-            parts.append(NamePart("void", color(ctKeyword)));
-        if (fp->type() & rtFuncPointer) {
-            parts.append(NamePart(" (", 0));
-            parts.append(NamePart(QString("*%1").arg(fp->name()), color(ctType)));
-            parts.append(NamePart(")(", 0));
-        }
-        else {
-            parts.append(NamePart(QString(" %1").arg(fp->name()), color(ctType)));
-            parts.append(NamePart("(", 0));
-        }
-        if (!s.isEmpty())
-            parts.append(NamePart(s, color(ctBold)));
-        parts.append(NamePart(")", 0));
-        break;
-    }
-
-    default:
-        break;
-
-    }
-
-    return parts;
-}
-
-
-
-QString Shell::prettyNameInColor(const Variable *v, int minLen, int maxLen) const
-{
-
-}
-
-
 int Shell::cmdListTypes(QStringList args)
 {
     const BaseTypeList* types = &_sym.factory().types();
@@ -1169,14 +1022,16 @@ int Shell::cmdListTypes(QStringList args)
     }
 
     // Find out required field width (the types are sorted by ascending ID)
-    const int w_id = getFieldWidth(types->last()->id());
+    QSize tsize = termSize();
+    const int w_id = 8;
     const int w_type = 12;
-    const int w_name = 30;
     const int w_size = 5;
     const int w_src = 20;
-    const int w_line = 5;
     const int w_colsep = 2;
-    const int w_total = w_id + w_type + w_name + w_size + w_src + w_line + 2*w_colsep;
+    int w_name = tsize.width() - (w_id + w_type + w_size + w_src + 2*w_colsep) - 1;
+    if (w_name <= 0)
+        w_name = 30;
+    const int w_total = w_id + w_type + w_name + w_size + w_src + 2*w_colsep;
 
     bool headerPrinted = false;
     int typeCount = 0;
@@ -1186,7 +1041,7 @@ int Shell::cmdListTypes(QStringList args)
 
     QString src, srcLine, name;
 
-    for (int i = 0; i < types->size(); i++) {
+    for (int i = 0; i < types->size() && !_interrupted; i++) {
         BaseType* type = types->at(i);
 
         // Apply name filter, if requested
@@ -1195,15 +1050,15 @@ int Shell::cmdListTypes(QStringList args)
 
         // Print header if not yet done
         if (!headerPrinted) {
-            _out << qSetFieldWidth(w_id)  << right << "ID"
+            _out << color(ctBold)
+                 << qSetFieldWidth(w_id)  << right << "ID"
                  << qSetFieldWidth(w_colsep) << " "
                  << qSetFieldWidth(w_type) << left << "Type"
                  << qSetFieldWidth(w_name) << "Name"
                  << qSetFieldWidth(w_size)  << right << "Size"
                  << qSetFieldWidth(w_colsep) << " "
                  << qSetFieldWidth(w_src) << left << "Source"
-                 << qSetFieldWidth(w_line) << right << "Line"
-                 << qSetFieldWidth(0)  << endl;
+                 << qSetFieldWidth(0) << color(ctReset) << endl;
 
             hline(w_total);
             headerPrinted = true;
@@ -1239,23 +1094,23 @@ int Shell::cmdListTypes(QStringList args)
              << qSetFieldWidth(0) << color(ctRealType)
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
              << qSetFieldWidth(0) << name
-             << qSetFieldWidth(0) << color(ctReset)
              << qSetFieldWidth(w_size) << right << dec << type->size()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_src) << left << src
-             << qSetFieldWidth(w_line) << right << srcLine
              << qSetFieldWidth(0) << endl;
 
         ++typeCount;
     }
 
-	if (headerPrinted) {
-		hline(w_total);
-		_out << "Total types: " << color(ctBold) << dec << typeCount
-			 << color(ctReset) << endl;
-    }
-    else if (applyFilter)
-    	_out << "No types matching that name." << endl;
+	if (!_interrupted) {
+		if (headerPrinted) {
+			hline(w_total);
+			_out << "Total types: " << color(ctBold) << dec << typeCount
+				 << color(ctReset) << endl;
+		}
+		else if (applyFilter)
+			_out << "No types matching that name." << endl;
+	}
 
     return ecOk;
 }
@@ -1302,38 +1157,47 @@ int Shell::cmdListTypesUsing(QStringList args)
     qSort(types.begin(), types.end(), cmpIdLessThan);
 
     // Find out required field width (the types are sorted by ascending ID)
-    const int w_id = getFieldWidth(types.last()->id());
+    QSize tsize = termSize();
+    const int w_id = 8;
     const int w_type = 12;
-    const int w_name = 24;
     const int w_size = 5;
     const int w_colsep = 2;
+    int w_name = tsize.width() - (w_id + w_type + w_size + 2*w_colsep + 1);
+    if (w_name <= 0)
+        w_name = 24;
     const int w_total = w_id + w_type + w_name + w_size + 2*w_colsep;
 
-    _out << qSetFieldWidth(w_id)  << right << "ID"
+    _out << color(ctBold)
+         << qSetFieldWidth(w_id)  << right << "ID"
          << qSetFieldWidth(w_colsep) << " "
          << qSetFieldWidth(w_type) << left << "Type"
          << qSetFieldWidth(w_name) << "Name"
          << qSetFieldWidth(w_colsep) << " "
          << qSetFieldWidth(w_size)  << right << "Size"
-         << qSetFieldWidth(0)  << endl;
+         << qSetFieldWidth(0) << color(ctReset) << endl;
 
     hline(w_total);
 
-    for (int i = 0; i < types.size(); i++) {
+    for (int i = 0; i < types.size() && !_interrupted; i++) {
         BaseType* type = types[i];
-        _out << qSetFieldWidth(w_id)  << right << hex << (uint)type->id()
+        _out << color(ctTypeId)
+             << qSetFieldWidth(w_id)  << right << hex << (uint)type->id()
+             << qSetFieldWidth(0) << color(ctReset)
              << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(0) << color(ctRealType)
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
-             << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
+             << qSetFieldWidth(0) << prettyNameInColor(type, w_name, w_name)
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_size) << right << type->size() << qSetFieldWidth(0)
              << qSetFieldWidth(0) << endl;
     }
 
-    hline(w_total);
-    _out << "Total types using type " << args.front() << ": "
-         << dec << types.size() << endl;
-
+	if (!_interrupted) {
+		hline(w_total);
+		_out << "Total types using type " << color(ctTypeId) << args.front()
+			 << color(ctReset) << ": " << color(ctBold) << dec << types.size()
+			 << color(ctReset) << endl;
+	}
     return ecOk;
 }
 
@@ -1350,15 +1214,19 @@ int Shell::cmdListTypesById(QStringList /*args*/)
     qSort(ids);
 
     // Find out required field width (the types are sorted by ascending ID)
-    const int w_id = getFieldWidth(ids.last());
-    const int w_realId = getFieldWidth(ids.last()) <= 6 ? 6 : getFieldWidth(ids.last());
+    QSize tsize = termSize();
+    const int w_id = 8;
+    const int w_realId = 8;
     const int w_type = 12;
-    const int w_name = 24;
     const int w_size = 5;
     const int w_colsep = 2;
+    int w_name = tsize.width() - (w_id + w_realId + w_type + w_size + 3*w_colsep + 1);
+    if (w_name <= 0)
+        w_name = 24;
     const int w_total = w_id + w_realId + w_type + w_name + w_size + 3*w_colsep;
 
-    _out << qSetFieldWidth(w_id)  << right << "ID"
+    _out << color(ctBold)
+         << qSetFieldWidth(w_id)  << right << "ID"
          << qSetFieldWidth(w_colsep) << " "
          << qSetFieldWidth(w_realId) << "RealID"
          << qSetFieldWidth(w_colsep) << " "
@@ -1366,26 +1234,32 @@ int Shell::cmdListTypesById(QStringList /*args*/)
          << qSetFieldWidth(w_name) << "Name"
          << qSetFieldWidth(w_colsep) << " "
          << qSetFieldWidth(w_size)  << right << "Size"
-         << qSetFieldWidth(0)  << endl;
+         << qSetFieldWidth(0) << color(ctReset) << endl;
 
     hline(w_total);
 
-    for (int i = 0; i < ids.size(); i++) {
+    for (int i = 0; i < ids.size() && !_interrupted; i++) {
         BaseType* type = _sym.factory()._typesById.value(ids[i]);
         // Construct name and line of the source file
-        _out << qSetFieldWidth(w_id)  << right << hex << (uint)ids[i]
+        _out << qSetFieldWidth(0) << color(ctTypeId)
+             << qSetFieldWidth(w_id)  << right << hex << (uint)ids[i]
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_realId) << (uint)type->id()
              << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(0) << color(ctRealType)
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
-             << qSetFieldWidth(w_name) << (type->prettyName().isEmpty() ? "(none)" : type->prettyName())
+             << qSetFieldWidth(0) << prettyNameInColor(type, w_name, w_name)
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_size) << right << type->size() << qSetFieldWidth(0)
              << qSetFieldWidth(0) << endl;
     }
 
-    hline(w_total);
-    _out << "Total types by ID: " << dec << _sym.factory()._typesById.size() << endl;
+    if (!_interrupted) {
+        hline(w_total);
+        _out << "Total types by ID: " << color(ctBold)
+             << dec << _sym.factory()._typesById.size()
+             << color(ctReset) << endl;
+    }
 
     return ecOk;
 }
@@ -1403,38 +1277,47 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
     qSort(names);
 
     // Find out required field width (the types are sorted by ascending ID)
-    const int w_id = getFieldWidth(_sym.factory().types().last()->id());
+    QSize tsize = termSize();
+    const int w_id = 8;
     const int w_type = 12;
-    const int w_name = 24;
     const int w_size = 5;
     const int w_colsep = 2;
+    int w_name = tsize.width() - (w_id + w_type + w_size + 2*w_colsep + 1);
     const int w_total = w_id + w_type + w_name + w_size + 2*w_colsep;
 
-    _out << qSetFieldWidth(w_id)  << right << "ID" << qSetFieldWidth(0)
+    _out << color(ctBold)
+         << qSetFieldWidth(w_id)  << right << "ID" << qSetFieldWidth(0)
          << qSetFieldWidth(w_colsep) << " "
          << qSetFieldWidth(w_type) << left << "Type"
          << qSetFieldWidth(w_name) << "Name"
          << qSetFieldWidth(w_colsep) << " "
          << qSetFieldWidth(w_size)  << right << "Size" << qSetFieldWidth(0)
-         << qSetFieldWidth(0)  << endl;
+         << qSetFieldWidth(0) << color(ctReset) << endl;
 
     hline(w_total);
 
-    for (int i = 0; i < names.size(); i++) {
+    for (int i = 0; i < names.size() && !_interrupted; i++) {
         BaseType* type = _sym.factory()._typesByName.value(names[i]);
         // Construct name and line of the source file
-        _out << qSetFieldWidth(w_id)  << right << hex << (uint)type->id()
+        _out << qSetFieldWidth(0) << color(ctTypeId)
+             << qSetFieldWidth(w_id)  << right << hex << (uint)type->id()
              << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(0) << color(ctRealType)
              << qSetFieldWidth(w_type) << left << realTypeToStr(type->type())
+             << qSetFieldWidth(0) << color(ctType)
              << qSetFieldWidth(w_name) << names[i]
+             << qSetFieldWidth(0) << color(ctReset)
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_size) << right << type->size()
              << qSetFieldWidth(0) << endl;
     }
 
-    hline(w_total);
-    _out << "Total types by name: " << dec << _sym.factory()._typesByName.size() << endl;
-
+    if (!_interrupted) {
+        hline(w_total);
+        _out << "Total types by name: " << color(ctBold)
+             << dec << _sym.factory()._typesByName.size()
+             << color(ctReset) << endl;
+    }
     return ecOk;
 }
 
@@ -1456,15 +1339,19 @@ int Shell::cmdListVars(QStringList args)
     }
 
     // Find out required field width (the types are sorted by ascending ID)
+    QSize tsize = termSize();
     const int w_id = getFieldWidth(vars.last()->id());
     const int w_datatype = 12;
-    const int w_typename = 24;
-    const int w_name = 24;
     const int w_size = 5;
     const int w_src = 20;
-    const int w_line = 5;
+//    const int w_line = 5;
     const int w_colsep = 2;
-    const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + w_line + 6*w_colsep;
+    int avail = tsize.width() - (w_id + w_datatype + w_size +  w_src + 5*w_colsep + 1);
+    if (avail < 0)
+        avail = 2*24;
+    const int w_name = (avail + 1) / 2;
+    const int w_typename = avail - w_name;
+    const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + 5*w_colsep;
 
     bool headerPrinted = false;
     int varCount = 0;
@@ -1473,7 +1360,7 @@ int Shell::cmdListVars(QStringList args)
     		Qt::CaseSensitive, QRegExp::WildcardUnix);
 
 
-    for (int i = 0; i < vars.size(); i++) {
+    for (int i = 0; i < vars.size() && !_interrupted; i++) {
         Variable* var = vars[i];
 
         // Apply name filter, if requested
@@ -1482,21 +1369,19 @@ int Shell::cmdListVars(QStringList args)
 
         // Print header if not yet done
         if (!headerPrinted) {
-            _out
-                << qSetFieldWidth(w_id)  << right << "ID"
-                << qSetFieldWidth(w_colsep) << " "
-                << qSetFieldWidth(w_datatype) << left << "Base"
-                << qSetFieldWidth(w_colsep) << " "
-                << qSetFieldWidth(w_typename) << left << "Type name"
-                << qSetFieldWidth(w_colsep) << " "
-                << qSetFieldWidth(w_name) << "Name"
-                << qSetFieldWidth(w_colsep) << " "
-                << qSetFieldWidth(w_size)  << right << "Size"
-                << qSetFieldWidth(w_colsep) << " "
-                << qSetFieldWidth(w_src) << left << "Source"
-                << qSetFieldWidth(w_colsep) << " "
-                << qSetFieldWidth(w_line) << right << "Line"
-                << qSetFieldWidth(0) << endl;
+            _out << color(ctBold)
+                 << qSetFieldWidth(w_id)  << right << "ID"
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_datatype) << left << "Base"
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_typename) << left << "Type name"
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_name) << "Name"
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_size)  << right << "Size"
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_src) << left << "Source"
+                 << qSetFieldWidth(0) << color(ctReset) << endl;
 
             hline(w_total);
             headerPrinted = true;
@@ -1523,13 +1408,19 @@ int Shell::cmdListVars(QStringList args)
         QString s_datatype = base ? realTypeToStr(base->type()) : "(undef)";
 
         // Shorten the type name, if required
-        QString s_typename = var->refType() ?
-                    (var->refType()->name().isEmpty() ?
-                         var->refType()->prettyName() :
-                         var->refType()->name()) :
-                    "void";
-        if (s_typename.length() > w_typename)
-            s_typename = s_typename.left(w_typename - 3) + "...";
+        QString s_typename;
+        if (var->refType()) {
+//            if (var->refType()->name().isEmpty())
+                s_typename = prettyNameInColor(var->refType(), w_typename, w_typename);
+//            else {
+//                s_typename = var->refType()->name();
+//                if (s_typename.length() > w_typename)
+//                    s_typename = s_typename.left(w_typename - 3) + "...";
+//                s_typename = color(ctType) + s_typename;
+//            }
+        }
+        else
+            s_typename = QString("%1%2").arg(color(ctKeyword)).arg("void", -w_typename);
 
         QString s_name = var->name().isEmpty() ? "(none)" : var->name();
         if (s_name.length() > w_name)
@@ -1539,31 +1430,38 @@ int Shell::cmdListVars(QStringList args)
                     QString::number(var->refType()->size()) :
                     QString("n/a");
 
-        _out
+        _out << color(ctTypeId)
             << qSetFieldWidth(w_id)  << right << hex << (uint)var->id()
             << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(0) << color(ctRealType)
             << qSetFieldWidth(w_datatype) << left << s_datatype
             << qSetFieldWidth(w_colsep) << " "
-            << qSetFieldWidth(w_typename) << left << s_typename
+            << qSetFieldWidth(0) << s_typename
+//            << qSetFieldWidth(w_typename) << left << s_typename
             << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(0) << color(ctVariable)
             << qSetFieldWidth(w_name) << s_name
             << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(0) << color(ctReset)
             << qSetFieldWidth(w_size)  << right << right << s_size
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(w_src) << left << s_src
-            << qSetFieldWidth(w_colsep) << " "
-            << qSetFieldWidth(w_line) << right << dec << var->srcLine()
+//            << qSetFieldWidth(w_colsep) << " "
+//            << qSetFieldWidth(w_line) << right << dec << var->srcLine()
             << qSetFieldWidth(0) << endl;
 
         ++varCount;
     }
 
-    if (headerPrinted) {
-    	hline(w_total);
-    	_out << "Total variables: " << dec << varCount << endl;
+    if (!_interrupted) {
+        if (headerPrinted) {
+            hline(w_total);
+            _out << "Total variables: " << color(ctBold) << dec << varCount
+                 << color(ctReset) << endl;
+        }
+        else if (applyFilter)
+            _out << "No variables matching that name." << endl;
     }
-    else if (applyFilter)
-    	_out << "No variables matching that name." << endl;
 
     return ecOk;
 }
@@ -1740,140 +1638,25 @@ int Shell::unloadMemDump(const QString& indexOrFileName, QString* unloadedFile)
 }
 
 
-bool Shell::allowColor() const
-{
-    return _allowColor;
-}
-
-
-void Shell::setAllowColor(bool value)
-{
-    _allowColor = value;
-}
-
-
 const char *Shell::color(ColorType ct) const
 {
+    return _color.color(ct);
+}
 
-    // ANSI color codes
-#define COLOR_BLACK   "30"
-#define COLOR_RED     "31"
-#define COLOR_GREEN   "32"
-#define COLOR_YELLOW  "33"
-#define COLOR_BLUE    "34"
-#define COLOR_MAGENTA "35"
-#define COLOR_CYAN    "36"
-#define COLOR_WHITE   "37"
 
-#define S_NONE      "0"
-#define S_BOLD      "1"
-#define S_UNDERLINE "4"
-#define S_INV       "7"
+QString Shell::prettyNameInColor(const BaseType *t, int minLen, int maxLen) const
+{
+    return _color.prettyNameInColor(t, minLen, maxLen);
+}
 
-#define DEFSTYLE(s) "\033[" s "m"
-#define DEFCOLOR(c, s) "\033[" s ";" c "m"
 
-#define C_RST DEFSTYLE(S_NONE)
-#define C_BLD DEFSTYLE(S_BOLD)
-#define C_UDL DEFSTYLE(S_UNDERLINE)
-#define C_INV DEFSTYLE(S_INV)
-
-#define C_BLK   DEFCOLOR(COLOR_BLACK, S_NONE)
-#define C_BLK_B DEFCOLOR(COLOR_BLACK, S_BOLD)
-#define C_BLK_U DEFCOLOR(COLOR_BLACK, S_UNDERLINE)
-#define C_BLK_I DEFCOLOR(COLOR_BLACK, S_INV)
-
-#define C_RED   DEFCOLOR(COLOR_RED, S_NONE)
-#define C_RED_B DEFCOLOR(COLOR_RED, S_BOLD)
-#define C_RED_U DEFCOLOR(COLOR_RED, S_UNDERLINE)
-#define C_RED_I DEFCOLOR(COLOR_RED, S_INV)
-
-#define C_GRN   DEFCOLOR(COLOR_GREEN, S_NONE)
-#define C_GRN_B DEFCOLOR(COLOR_GREEN, S_BOLD)
-#define C_GRN_U DEFCOLOR(COLOR_GREEN, S_UNDERLINE)
-#define C_GRN_I DEFCOLOR(COLOR_GREEN, S_INV)
-
-#define C_YLW   DEFCOLOR(COLOR_YELLOW, S_NONE)
-#define C_YLW_B DEFCOLOR(COLOR_YELLOW, S_BOLD)
-#define C_YLW_U DEFCOLOR(COLOR_YELLOW, S_UNDERLINE)
-#define C_YLW_I DEFCOLOR(COLOR_YELLOW, S_INV)
-
-#define C_BLU   DEFCOLOR(COLOR_BLUE, S_NONE)
-#define C_BLU_B DEFCOLOR(COLOR_BLUE, S_BOLD)
-#define C_BLU_U DEFCOLOR(COLOR_BLUE, S_UNDERLINE)
-#define C_BLU_I DEFCOLOR(COLOR_BLUE, S_INV)
-
-#define C_MGT   DEFCOLOR(COLOR_MAGENTA, S_NONE)
-#define C_MGT_B DEFCOLOR(COLOR_MAGENTA, S_BOLD)
-#define C_MGT_U DEFCOLOR(COLOR_MAGENTA, S_UNDERLINE)
-#define C_MGT_I DEFCOLOR(COLOR_MAGENTA, S_INV)
-
-#define C_CYN   DEFCOLOR(COLOR_CYAN, S_NONE)
-#define C_CYN_B DEFCOLOR(COLOR_CYAN, S_BOLD)
-#define C_CYN_U DEFCOLOR(COLOR_CYAN, S_UNDERLINE)
-#define C_CYN_I DEFCOLOR(COLOR_CYAN, S_INV)
-
-#define C_WHT   DEFCOLOR(COLOR_WHITE, S_NONE)
-#define C_WHT_B DEFCOLOR(COLOR_WHITE, S_BOLD)
-#define C_WHT_U DEFCOLOR(COLOR_WHITE, S_UNDERLINE)
-#define C_WHT_I DEFCOLOR(COLOR_WHITE, S_INV)
-
-    static const char* colors_dark[COLOR_TYPE_SIZE] = {
-        C_RST,   // ctReset
-        C_BLD,   // ctBold
-        C_UDL,   // ctUnderline
-        C_INV,   // ctInverse
-
-        C_GRN,   // ctPrompt
-        C_YLW_B, // ctVariable
-        C_BLU_B, // ctType
-        C_CYN_B, // ctBuiltinType
-        C_BLK_B, // ctRealType
-        C_YLW,   // ctMember
-        C_RED,   // ctAddress
-        C_RED,   // ctOffset
-        C_GRN,   // ctTypeId
-        C_MGT,   // ctKeyword
-        C_RED_B, // ctErrorLight
-        C_RED,   // ctError
-        C_WHT_B, // ctSrcFile
-        C_BLK_B, // ctNoName
-        C_BLK_B  // ctColHead
-    };
-
-    static const char* colors_light[COLOR_TYPE_SIZE] = {
-        C_RST,   // ctReset
-        C_BLD,   // ctBold
-        C_UDL,   // ctUnderline
-        C_INV,   // ctInverse
-
-        C_GRN,   // ctPrompt
-        C_CYN,   // ctVariable
-        C_MGT_B, // ctType
-        C_BLK_B, // ctRealType
-        C_YLW,   // ctMember
-        C_RED,   // ctAddress
-        C_RED,   // ctOffset
-        C_GRN,   // ctTypeId
-        C_BLU_B, // ctKeyword
-        C_RED_B, // ctErrorLight
-        C_RED    // ctError
-        C_WHT_B, // ctSrcFile
-        C_BLK_B, // ctNoName
-        C_BLK_B  // ctColHead
-    };
-
-    static const char* empty = "";
-
-    // Which color mode is enabled?
-    if (_allowColor && (ct >= 0) && (ct < COLOR_TYPE_SIZE)) {
-        if (programOptions.activeOptions() & opColorDarkBg)
-            return colors_dark[ct];
-        else if (programOptions.activeOptions() & opColorLightBg)
-            return colors_light[ct];
-    }
-
-    return empty;
+QSize Shell::termSize() const
+{
+    struct winsize w;
+    int ret = ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int r = (ret != -1 && w.ws_row > 0) ? w.ws_row : 24;
+    int c = (ret != -1 && w.ws_col > 0) ? w.ws_col : 80;
+    return QSize(c, r);
 }
 
 
@@ -1952,7 +1735,7 @@ int Shell::cmdMemoryQuery(QStringList args)
     int index = parseMemDumpIndex(args);
     // Perform the query
     if (index >= 0) {
-		_out << _memDumps[index]->query(args.join(" ")) << endl;
+        _out << _memDumps[index]->query(args.join(" "), _color) << endl;
 		return ecOk;
     }
     return 1;
@@ -1974,7 +1757,7 @@ int Shell::cmdMemoryDump(QStringList args)
 
         bool ok;
         quint64 addr = re.cap(2).toULong(&ok, 16);
-        _out << _memDumps[index]->dump(re.cap(1).trimmed(), addr) << endl;
+        _out << _memDumps[index]->dump(re.cap(1).trimmed(), addr, _color) << endl;
         return ecOk;
     }
 
@@ -2237,15 +2020,18 @@ int Shell::cmdShow(QStringList args)
     const BaseType* bt = 0;
     const Variable * var = 0;
     QList<IntEnumPair> enums;
+    bool exprIsVar = false;
 
     // Did we parse an ID?
     if (ok) {
     	// Try to find this ID in types and variables
     	if ( (bt = _sym.factory().findBaseTypeById(id)) ) {
-            _out << "Found type with ID 0x" << hex << (uint)id << dec;
+            _out << "Found type with ID " << color(ctTypeId) << "0x"
+                 << hex << (uint)id << dec << color(ctReset);
     	}
     	else if ( (var = _sym.factory().findVarById(id)) ) {
-            _out << "Found variable with ID 0x" << hex << (uint)id << dec;
+            _out << "Found variable with ID " << color(ctTypeId) << "0x"
+                 << hex << (uint)id << dec << color(ctTypeId) ;
     	}
     }
 
@@ -2257,7 +2043,8 @@ int Shell::cmdShow(QStringList args)
     	QList<Variable*> vars = _sym.factory().varsByName().values(s);
         enums = _sym.factory().enumsByName().values(s);
         if (types.size() + vars.size() > 1) {
-    		_out << "The name \"" << s << "\" is ambiguous:" << endl << endl;
+            _out << "The name \"" << color(ctBold) << s << color(ctReset)
+                 << "\" is ambiguous:" << endl << endl;
 
     		if (!types.isEmpty()) {
     			cmdListTypes(QStringList(s));
@@ -2272,16 +2059,20 @@ int Shell::cmdShow(QStringList args)
         for (int i = 0; i < enums.size(); ++i) {
             if (i > 0)
                 _out << endl;
-            _out << "Found enumerator with name " << s << ":" << endl;
+            _out << "Found enumerator with name " << color(ctType) << s
+                  << color(ctReset) << ":" << endl;
             cmdShowBaseType(enums[i].second);
         }
 
         if (!types.isEmpty()) {
-            _out << "Found type with name " << s;
+            _out << "Found type with name "
+                 << color(ctType) << s << color(ctReset);
             bt = types.first();
     	}
     	if (!vars.isEmpty()) {
-            _out << "Found variable with name " << s;
+            exprIsVar = true;
+            _out << "Found variable with name "
+                 << color(ctVariable) << s << color(ctReset);
             if (expr.size() > 1)
                 bt = vars.first()->refType();
             else
@@ -2295,7 +2086,13 @@ int Shell::cmdShow(QStringList args)
     }
     else if (bt) {
         if (expr.size() > 1) {
-            _out << ", showing " << expr.join(".") << ":" << endl;
+            _out << ", showing "
+                 << (exprIsVar ? color(ctVariable) : color(ctType))
+                 << expr[0]
+                 << color(ctReset);
+            for (int i = 1; i < expr.size(); ++i)
+                _out << "." << color(ctMember) << expr[i] << color(ctReset);
+            _out << ":" << endl;
 
             // Resolve the expression
             const Structured* s;
@@ -2340,17 +2137,17 @@ int Shell::cmdShow(QStringList args)
 
 int Shell::cmdShowBaseType(const BaseType* t)
 {
-	_out << color(ctColHead) << "  ID:              "
+	_out << color(ctColHead) << "  ID:             "
 		 << color(ctTypeId) << "0x" << hex << (uint)t->id() << dec << endl;
-	_out << color(ctColHead) << "  Name:            "
+	_out << color(ctColHead) << "  Name:           "
 		 << (t->prettyName().isEmpty() ?
 				 QString("(unnamed)") : prettyNameInColor(t, 0, 0)) << endl;
-	_out << color(ctColHead) << "  Type:            "
+	_out << color(ctColHead) << "  Type:           "
 		 << color(ctReset) << realTypeToStr(t->type()) << endl;
-	_out << color(ctColHead) << "  Size:            "
+	_out << color(ctColHead) << "  Size:           "
 		 << color(ctReset) << t->size() << endl;
-	_out << color(ctColHead) << "  Hash:            "
-		 << color(ctReset) << "0x" << hex << t->hash() << dec << endl;
+//	_out << color(ctColHead) << "  Hash:           "
+//		 << color(ctReset) << "0x" << hex << t->hash() << dec << endl;
 
 	if (t->srcFile() >= 0 && _sym.factory().sources().contains(t->srcFile())) {
 		_out << color(ctColHead) << "  Source file:    "
@@ -2361,10 +2158,10 @@ int Shell::cmdShowBaseType(const BaseType* t)
     const RefBaseType* r;
     int cnt = 1;
     while ( (r = dynamic_cast<const RefBaseType*>(t)) ) {
-        _out << color(ctColHead) << "  " << cnt << ". Ref. type ID: "
+        _out << color(ctColHead) << "  " << cnt << ". Ref.type ID: "
              << color(ctTypeId) << "0x" << hex << (uint)r->refTypeId() << dec << endl;
         _out << color(ctColHead) << "  " << cnt
-             << ". Ref. type:    "
+             << ". Ref.type:    "
              << color(ctReset) <<  (r->refType() ? prettyNameInColor(r->refType(), 0, 0) :
                                  QString(r->refTypeId() ? "(unresolved)" : "void"))
              << endl;
@@ -2473,8 +2270,32 @@ int Shell::cmdShowBaseType(const BaseType* t)
 	return ecOk;
 }
 
+int Shell::memberNameLenth(const Structured* s, int indent) const
+{
+	if (!s)
+		return indent;
+
+	int len = indent;
+	const BaseType* rt;
+
+	// Find out required name width
+	for (int i = 0; i < s->members().size(); ++i) {
+		const StructuredMember* m = s->members().at(i);
+		int tmp = m->name().size() + indent;
+		// Anonymous struct/union?
+		if (tmp == indent && (rt = m->refType()) && (rt->type() & StructOrUnion))
+			tmp = memberNameLenth(dynamic_cast<const Structured*>(rt),
+								   indent + 2);
+		if (tmp > len)
+			len = tmp;
+	}
+
+	return len;
+}
+
 void Shell::printStructMembers(const Structured* s, int indent, int id_width,
-							   int offset_width, bool printAlt, size_t offset)
+							   int offset_width, int name_width, bool printAlt,
+							   size_t offset)
 {
 	if (!s)
 		return;
@@ -2497,24 +2318,38 @@ void Shell::printStructMembers(const Structured* s, int indent, int id_width,
 			offset_width++;
 	}
 
+	// Find out required name width
+	if (name_width < 0)
+		name_width = memberNameLenth(s, 0) + 2;
+
+	const int w_sep = 2;
+//	const int w_avail = tsize.width() - indent - offset_width - id_width - 2*w_sep - 1;
+	const int w_name = name_width;
+
+
+
 	for (int i = 0; i < s->members().size(); i++) {
 		StructuredMember* m = s->members().at(i);
 		const BaseType* rt = m->refType();
 
 		QString pretty = rt ?
 					prettyNameInColor(rt, 0, 0) :
-					QString("%0(unresolved type, 0x%1)")
+					QString("%0(unresolved type, 0x%1%2)")
 						.arg(color(ctNoName))
-						.arg((uint)m->refTypeId(), 0, 16);
+						.arg((uint)m->refTypeId(), 0, 16)
+						.arg(color(ctReset));
+
+        int w_name_fill = (m->name().size() < w_name) ?
+                    w_name - m->name().size() : 0;
 
         _out << qSetFieldWidth(indent) << QString() << qSetFieldWidth(0);
         _out << color(ctOffset) << QString("0x%1").arg(m->offset() + offset, offset_width, 16, QChar('0'));
-        _out << "  "
-             << color(ctMember) << qSetFieldWidth(24 - indent) << left;
+        _out << "  ";
         if (m->name().isEmpty())
-            _out << QString();
+            _out << qSetFieldWidth(w_name) << QString();
         else
-            _out << (m->name() + ": ");
+            _out << color(ctMember) << m->name() << color(ctReset)
+                 << qSetFieldWidth(w_name_fill) << left << ": ";
         _out << qSetFieldWidth(0) << color(ctTypeId)
              << qSetFieldWidth(id_width) << left
              << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
@@ -2525,8 +2360,8 @@ void Shell::printStructMembers(const Structured* s, int indent, int id_width,
         if (rt && (rt->type() & StructOrUnion) && rt->name().isEmpty()) {
             _out << endl << qSetFieldWidth(indent) << "" << qSetFieldWidth(0) << "{" << endl;
             const Structured* ms = dynamic_cast<const Structured*>(rt);
-            printStructMembers(ms, indent + 2, id_width, offset_width, true,
-                               m->offset() + offset);
+            printStructMembers(ms, indent + 2, id_width, offset_width,
+                               name_width - 2, true, m->offset() + offset);
             _out << qSetFieldWidth(indent) << "" << qSetFieldWidth(0) << "}";
         }
 
@@ -2535,17 +2370,22 @@ void Shell::printStructMembers(const Structured* s, int indent, int id_width,
 
 		for (int j = 0; printAlt && j < m->altRefTypeCount(); ++j) {
 			rt = m->altRefBaseType(j);
+			pretty = rt ?
+						prettyNameInColor(rt, 0, 0) :
+						QString("%0(unresolved type, 0x%1%2)")
+						.arg(color(ctNoName))
+						.arg((uint)m->altRefType(j).id(), 0, 16)
+						.arg(color(ctReset));
+
 			_out << qSetFieldWidth(0) << color(ctReset)
-				 << qSetFieldWidth(indent + 2 + offset_width + 2 + 24 - indent)
+				 << qSetFieldWidth(indent + w_sep + offset_width + w_sep + w_name)
 				 << right << QString("<%1> ").arg(j+1)
 				 << qSetFieldWidth(0) << color(ctTypeId)
 				 << qSetFieldWidth(id_width) << left
 				 << QString("0x%1")
 					.arg((uint)(rt ? rt->id() : m->altRefType(j).id()), 0, 16)
 				 << qSetFieldWidth(0) << color(ctReset) << " "
-				 << (rt ? rt->prettyName() :
-						 QString("(unresolved type, 0x%1)")
-						  .arg((uint)m->altRefType(j).id(), 0, 16))
+				 << pretty
 				 << ": " << m->altRefType(j).expr()->toString(true)
 				 << endl;
 		}
@@ -2557,15 +2397,24 @@ int Shell::cmdShowVariable(const Variable* v)
 {
 	assert(v != 0);
 
-	_out << "  ID:             " << "0x" << hex << (uint)v->id() << dec << endl;
-	_out << "  Name:           " << v->name() << endl;
-	_out << "  Location:       " << "0x" << hex << v->offset() << dec << endl;
+	_out << color(ctColHead) << "  ID:             "
+		 << color(ctTypeId) << "0x" << hex << (uint)v->id() << dec << endl;
+	_out << color(ctColHead) << "  Name:           "
+		 << color(ctVariable) << v->name() << endl;
+	_out << color(ctColHead) << "  Address:        "
+		 << color(ctAddress) << "0x" << hex << v->offset() << dec << endl;
 
-    _out << "  Ref. type ID:   " << "0x" << hex << (uint)v->refTypeId() << dec << endl;
-    _out << "  Ref. type:      "
-         <<  (v->refType() ? v->refType()->prettyName() :
-                             QString(v->refTypeId() ? "(unresolved)" : "void"))
-         << endl;
+    const BaseType* rt = v->refType();
+    _out << color(ctColHead) << "  Type ID:        "
+         << color(ctTypeId) << "0x" << hex << (uint)v->refTypeId() << dec << endl;
+    _out << color(ctColHead) << "  Type:           ";
+    if (rt)
+        _out << prettyNameInColor(rt, 0, 0);
+    else if (v->refTypeId())
+        _out << color(ctReset) << "(unresolved)";
+    else
+        _out << color(ctKeyword) << "void";
+    _out << endl;
 
     for (int i = 0; i < v->altRefTypeCount(); ++i) {
         const BaseType* t = v->altRefBaseType(i);
@@ -2578,16 +2427,14 @@ int Shell::cmdShowVariable(const Variable* v)
     }
 
 	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {
-		_out << "  Source file:    " << _sym.factory().sources().value(v->srcFile())->name()
+		_out << color(ctColHead) << "  Source file:    "
+			 << color(ctReset) << _sym.factory().sources().value(v->srcFile())->name()
 			<< ":" << v->srcLine() << endl;
 	}
 
-	if (v->refType()) {
+	if (rt) {
 		_out << "Corresponding type information:" << endl;
 		cmdShowBaseType(v->refType());
-	}
-	else {
-		_out << "  Type:           " << QString("(unresolved)") << endl;
 	}
 
 	return ecOk;

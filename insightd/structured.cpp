@@ -8,6 +8,7 @@
 #include "structured.h"
 #include "pointer.h"
 #include <debug.h>
+#include "shell.h"
 
 
 Structured::Structured(SymFactory* factory)
@@ -168,7 +169,7 @@ void Structured::writeTo(KernelSymbolStream& out) const
 }
 
 
-QString Structured::toString(QIODevice* mem, size_t offset) const
+QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
 {
 //    static RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
 
@@ -221,36 +222,81 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
                 if (!wasPointer)
                     addrStr = "...";
                 else if (addr) {
-                    addrStr = QString("... @ 0x%1").arg(addr, 0, 16);
+                    addrStr = QString("0x%1").arg(addr, 0, 16);
+                    if (col)
+                        addrStr = col->color(ctAddress) + addrStr + col->color(ctReset);
+                    addrStr.prepend("... @ ");
                     if (addr == offset)
                         addrStr += " (self)";
                 }
-                else
+                else {
                     addrStr = "NULL";
+                    if (col)
+                        addrStr = col->color(ctAddress) + addrStr + col->color(ctReset);
+                }
 
-                s += QString("%0.  0x%1  %2 : %3 = %4")
-                        .arg(i, index_len)
-                        .arg(m->offset(), offset_len, 16, QChar('0'))
-                        .arg(m->name(), -name_len)
-                        .arg(m->refType()->prettyName(), -type_len)
-						.arg(addrStr);
+                if (col) {
+                    s += QString("%0%1. 0x%2  %3%4%5 : %6 = %7")
+                            .arg(col->color(ctReset))
+                            .arg(i, index_len)
+                            .arg(m->offset(), offset_len, 16, QChar('0'))
+                            .arg(col->color(ctMember))
+                            .arg(m->name(), -name_len)
+                            .arg(col->color(ctReset))
+                            .arg(col->prettyNameInColor(m->refType(), type_len))
+                            .arg(addrStr);
+                }
+                else {
+                    s += QString("%0.  0x%1  %2 : %3 = %4")
+                            .arg(i, index_len)
+                            .arg(m->offset(), offset_len, 16, QChar('0'))
+                            .arg(m->name(), -name_len)
+                            .arg(m->refType()->prettyName(), -type_len)
+                            .arg(addrStr);
+                }
             }
             else {
-                s += QString("%0.  0x%1  %2 : %3 = %4")
-                        .arg(i, index_len)
-                        .arg(m->offset(), offset_len, 16, QChar('0'))
-                        .arg(m->name(), -name_len)
-                        .arg(m->refType()->prettyName(), -type_len)
-                        .arg(m->refType()->toString(mem, offset + m->offset()));
+                if (col) {
+                    s += QString("%0%1. 0x%2  %3%4%5 : %6 = %7")
+                            .arg(col->color(ctReset))
+                            .arg(i, index_len)
+                            .arg(m->offset(), offset_len, 16, QChar('0'))
+                            .arg(col->color(ctMember))
+                            .arg(m->name(), -name_len)
+                            .arg(col->color(ctReset))
+                            .arg(col->prettyNameInColor(m->refType(), type_len))
+                            .arg(m->refType()->toString(mem, offset + m->offset(), col));
+                }
+                else {
+                    s += QString("%0.  0x%1  %2 : %3 = %4")
+                            .arg(i, index_len)
+                            .arg(m->offset(), offset_len, 16, QChar('0'))
+                            .arg(m->name(), -name_len)
+                            .arg(m->refType()->prettyName(), -type_len)
+                            .arg(m->refType()->toString(mem, offset + m->offset()));
+                }
             }
         }
         else {
-            s += QString("%0.  0x%1  %2 : %3 = (unresolved type 0x%3)")
-                    .arg(i, index_len)
-                    .arg(m->offset(), offset_len, 16, QChar('0'))
-                    .arg(m->name(), -name_len)
-                    .arg(m->refType()->prettyName(), -type_len)
-                    .arg((uint)m->refTypeId(), 0, 16);
+            if (col) {
+                s += QString("%0%1. 0x%2  %3%4%5 : %6 = (unresolved type 0x%7)")
+                        .arg(col->color(ctReset))
+                        .arg(i, index_len)
+                        .arg(m->offset(), offset_len, 16, QChar('0'))
+                        .arg(col->color(ctMember))
+                        .arg(m->name(), -name_len)
+                        .arg(col->color(ctReset))
+                        .arg(col->prettyNameInColor(m->refType(), type_len))
+                        .arg((uint)m->refTypeId(), 0, 16);
+            }
+            else {
+                s += QString("%0.  0x%1  %2 : %3 = (unresolved type 0x%3)")
+                        .arg(i, index_len)
+                        .arg(m->offset(), offset_len, 16, QChar('0'))
+                        .arg(m->name(), -name_len)
+                        .arg(m->refType()->prettyName(), -type_len)
+                        .arg((uint)m->refTypeId(), 0, 16);
+            }
         }
     }
 

@@ -12,6 +12,7 @@
 #include <QRegExp>
 #include "symfactory.h"
 #include "variable.h"
+#include "shell.h"
 
 #ifdef CONFIG_MEMORY_MAP
 #include "memorymap.h"
@@ -406,22 +407,33 @@ Instance MemoryDump::queryInstance(const int queryId) const
 }
 
 
-QString MemoryDump::query(const int queryId) const
+QString MemoryDump::query(const int queryId, const ColorPalette& col) const
 {
     QString ret;
 
     Instance instance = queryInstance(queryId);
 
-    QString s = QString("0x%1: ").arg(queryId, 0, 16);
+    QString s = QString("%1%2%3%4: ")
+            .arg(col.color(ctTypeId))
+            .arg("0x")
+            .arg(queryId, 0, 16)
+            .arg(col.color(ctReset));
     if (instance.isValid()) {
-        s += QString("%1 (ID 0x%2)")
-                .arg(instance.typeName()).arg((uint)instance.type()->id(), 0, 16);
-        ret = instance.toString();
+        s += QString("%1%2%3 (ID%4 0x%5%6)")
+                .arg(col.color(ctType))
+                .arg(instance.typeName())
+                .arg(col.color(ctReset))
+                .arg(col.color(ctTypeId))
+                .arg((uint)instance.type()->id(), 0, 16)
+                .arg(col.color(ctReset));
+        ret = instance.toString(&col);
     }
     else
         s += "(unresolved type)";
-    s += QString(" @ 0x%1\n")
-            .arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'));
+    s += QString(" @%1 0x%2%3\n")
+            .arg(col.color(ctAddress))
+            .arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'))
+            .arg(col.color(ctReset));
 
     ret = s + ret;
 
@@ -429,7 +441,8 @@ QString MemoryDump::query(const int queryId) const
 }
 
 
-QString MemoryDump::query(const QString& queryString) const
+QString MemoryDump::query(const QString& queryString,
+                          const ColorPalette& col) const
 {
     QString ret;
 
@@ -445,16 +458,26 @@ QString MemoryDump::query(const QString& queryString) const
     else {
         Instance instance = queryInstance(queryString);
 
-        QString s = QString("%1: ").arg(queryString);
+        QString s = QString("%1%2%3: ")
+                .arg(col.color(ctBold))
+                .arg(queryString)
+                .arg(col.color(ctReset));
         if (instance.isValid()) {
-            s += QString("%1 (ID 0x%2)")
+            s += QString("%1%2%3 (ID%4 0x%5%6)")
+                    .arg(col.color(ctType))
                     .arg(instance.typeName())
-                    .arg((uint)instance.type()->id(), 0, 16);
-            ret = instance.toString();
+                    .arg(col.color(ctReset))
+                    .arg(col.color(ctTypeId))
+                    .arg((uint)instance.type()->id(), 0, 16)
+                    .arg(col.color(ctReset));
+            ret = instance.toString(&col);
         }
         else
             s += "(unresolved type)";
-        s += QString(" @ 0x%1\n").arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'));
+        s += QString(" @%1 0x%2%3\n")
+                .arg(col.color(ctAddress))
+                .arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'))
+                .arg(col.color(ctReset));
 
         ret = s + ret;
     }
@@ -463,7 +486,8 @@ QString MemoryDump::query(const QString& queryString) const
 }
 
 
-QString MemoryDump::dump(const QString& type, quint64 address) const
+QString MemoryDump::dump(const QString& type, quint64 address,
+                         const ColorPalette& col) const
 {
     if (!_vmem->seek(address))
         queryError(QString("Cannot seek address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
@@ -503,7 +527,17 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 		return QString("%1 (ID 0x%2) @ %3\n")
 					.arg(result.typeName())
 					.arg((uint)result.type()->id(), 0, 16)
-					.arg(result.address(), 0, 16) + result.toString();
+					.arg(result.address(), 0, 16) + result.toString(&col);
+		return QString("%1%2%3 (ID%4 0x%5%6) @%7 0x%8%9\n")
+				.arg(col.color(ctType))
+				.arg(result.typeName())
+				.arg(col.color(ctReset))
+				.arg(col.color(ctTypeId))
+				.arg((uint)result.type()->id(), 0, 16)
+				.arg(col.color(ctReset))
+				.arg(col.color(ctAddress))
+				.arg(result.address(), 0, 16)
+				.arg(col.color(ctReset)) + result.toString(&col);
 	}
 
     queryError3("Unknown type: " + type,

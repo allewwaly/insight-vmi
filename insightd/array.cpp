@@ -8,6 +8,7 @@
 #include "array.h"
 #include "virtualmemoryexception.h"
 #include <debug.h>
+#include "colorpalette.h"
 
 Array::Array(SymFactory* factory)
     : Pointer(factory), _length(-1)
@@ -65,7 +66,7 @@ QString Array::prettyName() const
 }
 
 
-QString Array::toString(QIODevice* mem, size_t offset) const
+QString Array::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
 {
     QString result;
 
@@ -76,15 +77,19 @@ QString Array::toString(QIODevice* mem, size_t offset) const
     if (t && t->type() == rtInt8) {
         QString s = readString(mem, offset, _length > 0 ? _length : 256, &result);
 
-        if (result.isEmpty())
-            return QString("\"%1\"").arg(s);
+        if (result.isEmpty()) {
+            s = QString("\"%1\"").arg(s);
+            if (col)
+                s = col->color(ctString) + s + col->color(ctReset);
+            return s;
+        }
     }
     else {
         if (_length >= 0) {
             // Output all array members
             QString s = "(";
             for (int i = 0; i < _length; i++) {
-                s += t->toString(mem, offset + i * t->size());
+                s += t->toString(mem, offset + i * t->size(), col);
                 if (i+1 < _length)
                     s += ", ";
             }
