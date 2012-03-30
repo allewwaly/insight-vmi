@@ -15,7 +15,7 @@
 
 
 ASTSourcePrinter::ASTSourcePrinter(AbstractSyntaxTree* ast)
-    : ASTWalker(ast), _indent(0), _lineIndent(0), _currNode(0)
+    : ASTWalker(ast), _indent(0), _lineIndent(0), _currNode(0), _rootNode(0)
 {
 }
 
@@ -350,6 +350,9 @@ void ASTSourcePrinter::beforeChildren(const ASTNode *node, int flags)
 
 void ASTSourcePrinter::beforeChild(const ASTNode *node, const ASTNode *childNode)
 {
+    if (_rootNode && _rootNode->parent == node)
+        return;
+
     switch (node->type) {
     case nt_abstract_declarator:
         if (childNode->type == nt_direct_abstract_declarator &&
@@ -757,7 +760,7 @@ QString ASTSourcePrinter::toString(bool lineNo)
     _line.clear();
     _out.clear();
     _lineIndent = _indent = 0;
-    _currNode = _ast && _ast->rootNodes() ? _ast->rootNodes()->item : 0;
+    _rootNode = _currNode = _ast && _ast->rootNodes() ? _ast->rootNodes()->item : 0;
     _prefixLineNo = lineNo;
 
     if (_ast) {
@@ -775,7 +778,7 @@ QString ASTSourcePrinter::toString(const ASTNode* node, bool lineNo)
     _line.clear();
     _out.clear();
     _lineIndent = _indent = 0;
-    _currNode = node;
+    _rootNode = _currNode = node;
     _prefixLineNo = lineNo;
 
     if (_currNode) {

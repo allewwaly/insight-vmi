@@ -4123,7 +4123,7 @@ QString ASTTypeEvaluator::typeChangeInfo(const TypeEvalDetails &ed,
     QString symName = ed.sym ? ed.sym->name() : QString();
 
     return QString(INDENT "Symbol: %1 (%2)\n"
-                   INDENT "Trans.: %3\n"
+                   INDENT "Lvalue: %3\n"
                    INDENT "Source: %4 %5\n"
                    INDENT "Target: %6 %7\n"
                    "%8"
