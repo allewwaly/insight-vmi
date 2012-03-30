@@ -92,6 +92,11 @@ public:
      */
     QString antlrStringToStr(const pANTLR3_STRING s) const;
 
+    /**
+     * @return the scope manager object of this AST
+     */
+    inline ASTScopeManager* scopeMgr() { return _scopeMgr; }
+
 private:
     /**
      * Parses the source code from file \a fileName and builds the AST.
