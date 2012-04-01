@@ -111,7 +111,7 @@ void SymFactory::clear()
 	_totalTypesChanged = 0;
 	_varTypeChanges = 0;
 	_typesCopied = 0;
-	_conflictingTypeChanges = 0;
+	_ambiguesAltTypes = 0;
 	_artificialTypeId = -1;
 	_changeClock = 0;
 }
@@ -1415,11 +1415,11 @@ void SymFactory::sourceParcingFinished()
 {
     shell->out() << "Statistics:" << endl;
     shell->out() << qSetFieldWidth(10) << right;
-    shell->out() << "  | Unique type changes:        " << _uniqeTypesChanged << endl;
-    shell->out() << "  | Type changes of variables:  " << _varTypeChanges << endl;
-    shell->out() << "  | Types copied:               " << _typesCopied << endl;
-    shell->out() << "  | Total type changes:         " << _totalTypesChanged << endl;
-    shell->out() << "  | Type conflicts:             " << _conflictingTypeChanges << endl;
+    shell->out() << "  | Type changes of struct members: " << _uniqeTypesChanged << endl;
+    shell->out() << "  | Type changes of variables:      " << _varTypeChanges << endl;
+    shell->out() << "  | Total type changes:             " << _totalTypesChanged << endl;
+    shell->out() << "  | Types copied:                   " << _typesCopied << endl;
+    shell->out() << "  | Ambigues types:                 " << _ambiguesAltTypes << endl;
     shell->out() << "  `-------------------------------------------" << endl;
     shell->out() << qSetFieldWidth(0) << left;
 }
@@ -2123,13 +2123,13 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                     }
                     // Create a copy of the embedding struct
                     else {
-                        ++_typesCopied;
                         /// @todo What happens here if member is inside an anonymous struct?
 #ifdef DEBUG_APPLY_USED_AS
                         int origRefTypeId = nestingMember->refTypeId();
 #endif
                         BaseType* typeCopy =
                                 makeDeepTypeCopy(nestingMember->refType(), false);
+                        ++_typesCopied;
                         // Update the type relations
                         _usedByStructMembers.remove(nestingMember->refTypeId(),
                                                     nestingMember);
@@ -2165,11 +2165,6 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                     }
                 }
 
-                ++membersChanged;
-                ++_totalTypesChanged;
-                if (member->altRefTypeCount() > 0)
-                    ++_conflictingTypeChanges;
-
                 // If we have dereferences at the end, we need to find a
                 // different BaseType
                 if (finalDerefs) {
@@ -2188,6 +2183,11 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                                      .arg(realTargetType->toString()));
                     targetBaseType = targetTypeRet.types.first();
                 }
+
+                ++membersChanged;
+                ++_totalTypesChanged;
+                if (member->altRefTypeCount() > 0)
+                    ++_ambiguesAltTypes;
 
                 member->addAltRefType(targetBaseType->id(),
                                       expr->clone(_expressions));
@@ -2291,7 +2291,7 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
                 ++_totalTypesChanged;
                 ++_varTypeChanges;
                 if (vars[i]->altRefTypeCount() > 0)
-                    ++_conflictingTypeChanges;
+                    ++_ambiguesAltTypes;
 
                 vars[i]->addAltRefType(targetBaseType->id(),
                                        expr->clone(_expressions));
@@ -2308,6 +2308,7 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
 #endif
                 // Clear all existing alternative types on the copy
                 t = makeDeepTypeCopy(t, true);
+                ++_typesCopied;
                 vars[i]->setRefTypeId(t->id());
 
 #ifdef DEBUG_APPLY_USED_AS
