@@ -10,7 +10,7 @@ var w_total = w_id + w_name + w_member + w_alt + 3;
 var minAlt = (ARGV.length > 1) ? ARGV[1] : 1;
 
 
-print("Searching struct members with more than " + minAlt.toString() + " candidates.");
+print("Searching struct members with at least " + minAlt.toString() + " candidates.");
 print();
 print(
 	lalign("ID", w_id) + " " +
