@@ -2105,8 +2105,13 @@ int Shell::cmdShow(QStringList args)
                     errorMsg = "Not a struct or a union: ";
                 else if ( (m = s->findMember(expr[i])) )
                     bt = m->refType();
-                else
-                    errorMsg = "No such member: ";
+                else {
+                    if (expr[i].contains('<'))
+                        errorMsg = "Showing alternative type of members not "
+                                    "implemented: ";
+                    else
+                        errorMsg = "No such member: ";
+                }
 
                 if (!errorMsg.isEmpty()) {
                     _err << color(ctError) << errorMsg;
