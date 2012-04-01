@@ -683,7 +683,7 @@ private:
 	int _totalTypesChanged;
 	int _typesCopied;
 	int _varTypeChanges;
-	int _conflictingTypeChanges;
+	int _ambiguesAltTypes;
 	int _artificialTypeId;
 	quint32 _changeClock;
 	quint32 _maxTypeSize;
