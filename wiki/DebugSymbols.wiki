@@ -1,5 +1,5 @@
 #summary How to obtain debugging symbols for different operating systems
-#labels Phase-Deploy
+#labels Phase-Usage
 
 = Debugging Symbols =
 
