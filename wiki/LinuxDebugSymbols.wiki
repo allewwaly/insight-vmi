@@ -40,7 +40,7 @@ You are now ready to reboot your machine into the new kernel.
 
 == Other Linux Guests ==
 
-Unpack the source code of the running kernel and change to its directory. Most Linux distributions provide means to obtain the source code of the distribution's kernel including all patches and additions. Consult the manual of your package manager on how to do this. For Debian and derived distributions such as Ubuntu, skip this section and [#Creating_Debian_Kernel_Packages continue below].
+Unpack the source code of the running kernel and change to its directory. Most Linux distributions provide means to obtain the source code of the distribution's kernel including all patches and additions. Consult the manual of your package manager on how to do this.
 
 Start by creating a backup copy of the original `Makefile`:
 
