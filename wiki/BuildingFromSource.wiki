@@ -1,4 +1,5 @@
 #summary Building InSight from Source
+#labels Phase-Deploy
 
 = Building !InSight from Source =
 
