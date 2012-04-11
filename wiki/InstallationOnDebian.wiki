@@ -1,4 +1,5 @@
 #summary Installing the Debian packages
+#labels Phase-Deploy
 
 = Introduction =
 
