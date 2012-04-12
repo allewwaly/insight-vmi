@@ -17,7 +17,7 @@ In order to create the debugging symbols and pre-process the source code for a L
 
 The latter is a Perl script that comes along with !InSight. It stores the pre-processed source files into a separate directory during compilation that are parsed later on.
 
-If you intend to inspect a system running inside of a virtual machine, follow the instructions below from *within* the virtual machine. Note that this process requires a lot of disk space, typically more than 10GB. For a virtual machine environment, you might consider to dedicate an additional virtual disk to the machine that is used exclusively for this purpose. This keeps the root disk image of the guest much smaller and easier to handle.
+If you intend to inspect a system running inside of a virtual machine, follow the instructions below from *within the virtual machine*. Note that this process requires a lot of disk space, typically more than 10GB. For a virtual machine environment, you might consider to dedicate an additional virtual disk to the machine that is used exclusively for this purpose. This keeps the root disk image of the guest much smaller and easier to handle.
 
 == Debian and Ubuntu Guests ==
 
@@ -46,9 +46,9 @@ You are now ready to reboot your machine into the new kernel.
 
 First make sure the [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/gcc_pp gcc_pp] script is executable within the guest.  You can find this script in the directory [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/ trunk/tools] of the !InSight source.  Copy that file to the guest, for example to the `/usr/local/bin/` directory.
 
-Unpack the source code of the running kernel and change to its directory. Most Linux distributions provide means to obtain the source code of the distribution's kernel including all patches and additions. Consult the manual of your package manager on how to do this.
+Now unpack the source code of the running kernel and change to its directory. Most Linux distributions provide means to obtain the source code of the distribution's kernel including all patches and additions. Consult the manual of your package manager on how to do this.
 
-Start by creating a backup copy of the original `Makefile`:
+To prepare for compilation of the kernel, start by creating a backup copy of the original `Makefile`:
 
 {{{
 cp -v Makefile Makefile.orig
@@ -86,9 +86,15 @@ sudo cp -v System.map /boot/System.map-$(uname -r)-dbg &&
 sudo cp -v .config /boot/config-$(uname -r)-dbg &&
 }}}
 
-*Warning:* Your kernel might require an *initial RAM disk* to load some modules in order to mount the root file system! If this is the case, such a file must be generated as file `/boot/initrd-$(uname -r)-dbg`. As each Linux distribution implements its own way of creating such `initrd` files, we will not describe this process here. *The kernel image might not be boot-able without a corresponding `initrd` file!*
+Revert the changes made to the `Makefile` to avoid problems during the parsing phase later on:
 
-Now update your bootloader's configuration files to include the new kernel.  Most distributions provide tools for this purpose, typically called `update-grub` or `update-bootloader`. Please consult your distro's manual for details.
+{{{
+cp -v Makefile.orig Makefile
+}}}
+
+Finally, update your bootloader's configuration files to include the new kernel.  Most distributions provide tools for this purpose, typically called `update-grub` or `update-bootloader`. Please consult your distro's manual for details.
+
+*Warning:* Your kernel might require an *initial RAM disk* to load some modules in order to mount the root file system! If this is the case, such a file must be generated as file `/boot/initrd-$(uname -r)-dbg`. As each Linux distribution implements its own way of creating such `initrd` files, we will not describe this process here. *The kernel image might not be bootable without a corresponding `initrd` file!*
 
 = Parsing Debugging Symbols =
 
