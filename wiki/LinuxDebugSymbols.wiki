@@ -17,16 +17,16 @@ In order to create the debugging symbols and pre-process the source code for a L
 
 The latter is a Perl script that comes along with !InSight. It stores the pre-processed source files in a separate directory during compilation that are parsed later on.
 
-If you intend to inspect a system running inside of a virtual machine, follow the instructions below from *within the virtual machine*. Also note that this process requires a lot of disk space, typically more than 10GB. For a virtual machine environment, you might consider to add another virtual disk to the machine that is used exclusively for this purpose. This keeps the root disk image of the guest much smaller and easier to handle.
+If you intend to inspect a system running inside of a virtual machine, follow the instructions to compile the kernel from *within the virtual machine*. Also note that this process requires a lot of disk space, typically more than 10GB. For a virtual machine environment, you might consider to add another virtual disk to the machine that is used exclusively for this purpose. This keeps the root disk image of the guest much smaller and easier to handle.
 
 == Debian and Ubuntu Guests ==
 
-Debian and derived distributions such as Ubuntu come with a handy tool called `make-kpkg` that creates custom kernel packages. These packages integrate the new kernel image seamlessly into the system and is the preferred way of compiling the kernel.
+Debian and derived distributions such as Ubuntu come with a handy tool called `make-kpkg` that creates custom kernel packages. These packages integrate the new kernel image seamlessly into the system.
 
 We provide an additional helper script
 [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/make-debug-kpkg make-debug-kpkg] that fetches the source of the running kernel, prepares it for debugging symbol generation, compiles it, and creates the kernel packages utilizing `make-kpkg`. You can find this script in the directory [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/ trunk/tools] of the !InSight source or in `/usr/share/insight/tools` if you installed the `insight-daemon` package.  
 
-The `make-debug-kpkg` tool depends on the [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/gcc_pp gcc_pp] script which can be found in the same directory as `make-debug-kpkg` script.  If not yet installed, copy both scripts to the same directory on the guest file system, for example `/usr/local/bin/`.  Now you are ready to execute `make-debug-kpkg` from within the directory you want the source to be built, for example:
+The `make-debug-kpkg` tool depends on the [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/gcc_pp gcc_pp] script which can be found in the same directory as `make-debug-kpkg` script.  If not yet installed, copy both scripts to the same directory of the *guest* file system, for example `/usr/local/bin/`.  Now you are ready to execute `make-debug-kpkg` from within the directory you want the source to be built, for example:
 
 {{{
 cd /usr/src && sudo /path/to/make-debug-kpkg
@@ -44,17 +44,17 @@ You are now ready to reboot your machine into the new kernel.
 
 == Other Linux Guests ==
 
-First make sure the [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/gcc_pp gcc_pp] script is executable within the guest.  You can find this script in the directory [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/ trunk/tools] of the !InSight source.  Copy that file to the guest, for example to the `/usr/local/bin/` directory.
+First make sure the [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/gcc_pp gcc_pp] script is executable within the guest.  You can find this script in the directory [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/ trunk/tools] of the !InSight source directory.  Copy that file to the guest, for example to the `/usr/local/bin/` directory.
 
-Now unpack the source code of the running kernel and change to its directory. Most Linux distributions provide means to obtain the source code of the distribution's kernel including all patches and additions. Consult the manual of your package manager on how to do this.
+Most Linux distributions provide means to obtain the source code of the distribution's kernel including all patches and additions. Consult the manual of your package manager on how to do this. 
 
-To prepare for compilation of the kernel, start by creating a backup copy of the original `Makefile`:
+Now unpack the source code of the running kernel and change to its directory. To prepare for compilation of the kernel, start by creating a backup copy of the original `Makefile`:
 
 {{{
 cp -v Makefile Makefile.orig
 }}}
 
-Now add the compiler switches for enabling debugging symbols and to the appropriate variables, replace the `gcc` compiler with `gcc_pp`, and append the string "`-dbg`" to the kernel version:
+Add the compiler switches for enabling debugging symbols and to the appropriate variables, replace the `gcc` compiler with `gcc_pp`, and append the string "`-dbg`" to the kernel version:
 
 {{{
 sed \
@@ -98,7 +98,7 @@ Finally, update your bootloader's configuration files to include the new kernel.
 
 = Parsing Debugging Symbols =
 
-Once the debugging symbols and pre-processed sources are available, !InSight needs to parse them to build its internal type database. This step is necessary only once and takes several minutes to complete. 
+Once the debugging symbols and pre-processed sources are available, !InSight is readyl to parse them to build its internal type database. This step is necessary only once and takes several minutes to complete. 
 
 In order to parse the data, !InSight requires access to the whole kernel source directory that was used to compile the kernel in the previous step.  More precisely, the following resources in that directory are required:
   * the `System.map` file
@@ -109,7 +109,7 @@ In order to parse the data, !InSight requires access to the whole kernel source 
 
 The symbol parsing can be performed either inside of the virtual machine, in which case !InSight needs to be compiled for that guest, or inside the host system. In the latter case, the required files need to be [#Copying_the_Kernel_Headers copied over to the host system], or the disk image of the virtual machine needs to be [#Mounting_a_Virtual_Disk_Image mounted on the host system].
 
-== Copying the Kernel Headers ==
+== Copying the Source Directory Using SSH ==
 
 If an SSH server is running inside of the virtual machine, the easiest way to copy the required files is to utilize `tar` over the SSH connection. This ensures that all symbolic links in the kernel source or headers directory are correctly restored. The following command does this trick (replace `vmhost` with the IP address of the guest, `/usr/src/` the previously specified source directory, and `linux-x.y.z` with the kernel version accordingly):
 
@@ -128,16 +128,18 @@ When using KVM or QEMU as the hypervisor, the disks in raw format can be directl
 qemu-img info disk-image.bin
 }}}
 
+Mounting a raw disk image works in conjunction with the kernels loop block devices and requires a certain offset to be calculated. !InSight comes with a convenient helper script called `mount-img` that automates this process. Again, it is located either in the `tools` directory of the source package of !InSight, or you may find it in `/usr/share/insight/tools` if you installed the provided packages. 
+
 *Warning: Unmount the disk image within the virtual machine before mounting the disk image on the host!*
 
-Mounting a raw disk image works in conjunction with the kernels loop block devices and requires a certain offset to be calculated. !InSight comes with convenient helper script `mount-img` that automates this process. Again, it is located either in the `tools` directory of the source package of !InSight, or you may find it in `/usr/share/insight/tools` if you installed the provided packages. Mounting the disk image with this script is easy:
+Mounting the disk image with this script is easy:
 
 {{{
 sudo mkdir -pv /mnt/vdisk &&
 sudo /path/to/mount-img disk-image.bin /mnt/vdisk
 }}}
 
-You should see message similar to the following:
+You should see a message similar to the following:
 
 {{{
 Image sucessfully mounted:                                                                          
@@ -146,32 +148,30 @@ Image sucessfully mounted:
 
 == Parsing Symbols with !InSight ==
 
-With the build directory of the kernel source tree available, !InSight is ready to parse the debugging symbols. During this step, !InSight compiles a tiny helper program to extract some information from the kernel sources. This requires the `stdio.h` header to be available, so make sure the `libc6-dev` package is installed on your host system before you continue. In case you intend to parse the symbols of a *32 bit guest* on a *64 bit host*, you additionally need the 32 bit C library and headers. On Debian and Ubuntu systems, this requires the package `libc6-dev-i386` to be installed as well.
+With the build directory of the kernel source tree available, !InSight is ready to parse the debugging symbols. During this step, !InSight compiles a tiny helper program to extract some information from the kernel sources. This requires the `stdio.h` header to be available, so make sure the `libc6-dev` package is installed on your host system before you continue. In case you intend to parse the symbols of a *32 bit guest* on a *64 bit host*, you additionally need the 32 bit version of this library and headers. For Debian and Ubuntu systems, this requires the package `libc6-dev-i386` to be installed as well.
 
-When the prerequisites are met, start `insightd` in interactive mode by not supplying any parameters. The shell syntax to parse the debugging symbols is:
+When all prerequisites are met, start `insightd` in interactive mode by not supplying any parameters. The shell syntax to parse the debugging symbols is:
 {{{
 symbols parse <kernel_src_dir>
 }}}
 
-If `gcc_pp` was enabled as `gcc` replacement, you will be asked if the source should be parsed as well:
+If `gcc_pp` was enabled as `gcc` replacement during kernel compilation, you will be asked if the source should be parsed as well:
 
 {{{
 >>> symbols parse /mnt/vdisk/usr/src/linux-2.6-2.6.32/
 Directory with pre-processed source files detected. Process them as well? [Y/n] _
 }}}
 
-Choose "yes" to leverage the full potential of of !InSight. While the symbols are being processed, the progress is being displayed. At the end of the operation, you will see some short statistics about the resulting type database:
+Choose "yes" to leverage the full potential of !InSight. While the symbols are being processed, the progress is being displayed. At the end of the operation, you will see some statistics about the resulting type database:
 
 {{{
->>> symbols parse /mnt/vdisk/usr/src/linux-2.6-2.6.32/
-Directory with pre-processed source files detected. Process them as well? [Y/n] y
 Successfully parsed the memory specifications in 3 sec
-Parsing 24778305 lines (1338583706 bytes) finished.
+Parsing debugging symbols with 24778305 lines (1338583672 bytes) finished in 6 min 28 sec.
 Statistics:
-  | No. of types:                   41786         
-  | No. of types by name:           32298         
-  | No. of types by ID:           1370492         
-  | No. of types by hash:           40150         
+  | No. of types:                   42605         
+  | No. of types by name:           31768         
+  | No. of types by ID:           1369658         
+  | No. of types by hash:           42605         
   | No. of variables:               24508         
   | No. of variables by ID:         24508         
   | No. of variables by name:       24508         
@@ -191,7 +191,7 @@ Statistics:
 
 == Storing Symbols Database ==
 
-!InSight needs to parse the debugging symbols and source files only once, they can then be stored in a custom data format for future use. The corresponding command is:
+!InSight stores the type database in a custom format, so the debugging symbols and source files need to be parsed only once. The command for storing the database is:
 
 <pre>  symbols store <dest_file></pre>
 
