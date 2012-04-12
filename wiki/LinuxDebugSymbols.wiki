@@ -13,9 +13,9 @@ The foundation of !InSight's ability to extract kernel objects out of physical m
 
 In order to create the debugging symbols and pre-process the source code for a Linux kernel, the kernel image of the system *being analyzed* must be re-compiled with
   * debugging symbol generation turned on and
-  * the C compiler set to the `gcc_pp` script that comes along with !InSight.
+  * the C compiler set to the `gcc_pp`.
 
-The latter is a Perl script that saves the pre-processed source files into a separate directory while compiling the kernel.
+The latter is a Perl script that comes along with !InSight. It stores the pre-processed source files into a separate directory during compilation that are parsed later on.
 
 If you intend to inspect a system running inside of a virtual machine, follow the instructions below from *within* the virtual machine. Note that this process requires a lot of disk space, typically more than 10GB. For a virtual machine environment, you might consider to dedicate an additional virtual disk to the machine that is used exclusively for this purpose. This keeps the root disk image of the guest much smaller and easier to handle.
 
