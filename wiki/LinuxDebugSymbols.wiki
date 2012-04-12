@@ -96,11 +96,9 @@ Finally, update your bootloader's configuration files to include the new kernel.
 
 *Warning:* Your kernel might require an *initial RAM disk* to load some modules in order to mount the root file system! If this is the case, such a file must be generated as file `/boot/initrd-$(uname -r)-dbg`. As each Linux distribution implements its own way of creating such `initrd` files, we will not describe this process here. *The kernel image might not be bootable without a corresponding `initrd` file!*
 
-= Parsing Debugging Symbols =
+= Giving !InSight Access to the Data =
 
-Once the debugging symbols and pre-processed sources are available, !InSight is readyl to parse them to build its internal type database. This step is necessary only once and takes several minutes to complete. 
-
-In order to parse the data, !InSight requires access to the whole kernel source directory that was used to compile the kernel in the previous step.  More precisely, the following resources in that directory are required:
+In order to parse the debugging symbols and source files, !InSight requires access to the whole kernel source directory that was used to compile the kernel in the previous step.  More precisely, the following resources in that directory are required:
   * the `System.map` file
   * the `vmlinux` kernel image, non-stripped
   * the `.config` file
@@ -146,9 +144,11 @@ Image sucessfully mounted:
 /dev/loop0 on /mnt/vdisk type ext3 (ro)
 }}}
 
-== Parsing Symbols with !InSight ==
+= Parsing the Debugging Symbols and Source Files =
 
-With the build directory of the kernel source tree available, !InSight is ready to parse the debugging symbols. During this step, !InSight compiles a tiny helper program to extract some information from the kernel sources. This requires the `stdio.h` header to be available, so make sure the `libc6-dev` package is installed on your host system before you continue. In case you intend to parse the symbols of a *32 bit guest* on a *64 bit host*, you additionally need the 32 bit version of this library and headers. For Debian and Ubuntu systems, this requires the package `libc6-dev-i386` to be installed as well.
+With the build directory of the kernel source tree available, !InSight is readyl to parse them to build its internal type database. This step is necessary only once and takes several minutes to complete. 
+
+During this step, !InSight compiles a tiny helper program to extract some information from the kernel sources. This requires the `stdio.h` header to be available, so make sure the `libc6-dev` package is installed on your host system before you continue. In case you intend to parse the symbols of a *32 bit guest* on a *64 bit host*, you additionally need the 32 bit version of this library and headers. For Debian and Ubuntu systems, this requires the package `libc6-dev-i386` to be installed as well.
 
 When all prerequisites are met, start `insightd` in interactive mode by not supplying any parameters. The shell syntax to parse the debugging symbols is:
 {{{
@@ -189,7 +189,7 @@ Statistics:
   `-------------------------------------------
 }}}
 
-== Storing Symbols Database ==
+= Storing Symbol Database =
 
 !InSight stores the type database in a custom format, so the debugging symbols and source files need to be parsed only once. The command for storing the database is:
 
