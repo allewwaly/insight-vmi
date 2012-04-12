@@ -13,7 +13,7 @@ The foundation of !InSight's ability to extract kernel objects out of physical m
 
 In order to create the debugging symbols and pre-process the source code for a Linux kernel, the kernel image of the system *being analyzed* must be re-compiled with
   * debugging symbol generation turned on and
-  * the C compiler set to the `gcc_pp`.
+  * the C compiler set to `gcc_pp`.
 
 The latter is a Perl script that comes along with !InSight. It stores the pre-processed source files into a separate directory during compilation that are parsed later on.
 
