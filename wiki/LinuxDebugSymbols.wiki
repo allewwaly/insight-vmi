@@ -13,20 +13,20 @@ The foundation of !InSight's ability to extract kernel objects out of physical m
 
 In order to create the debugging symbols and pre-process the source code for a Linux kernel, the kernel image of the system *being analyzed* must be re-compiled with
   * debugging symbol generation turned on and
-  * the C compiler set to the `gcc_pp` script that comes along with !InSight. 
+  * the C compiler set to the `gcc_pp` script that comes along with !InSight.
 
-If you intend to inspect a system running inside of a virtual machine, follow the instructions below from *within* the virtual machine. 
+The latter is a Perl script that saves the pre-processed source files into a separate directory while compiling the kernel.
 
-In addition, this process requires a lot of disk space, typically more than 10GB. For a virtual machine environment, you might consider to dedicate a separate virtual disk to the machine that is used exclusively for this purpose. This keeps the primary disk image of the guest much smaller and easier to handle.
-
-*Note:* The creation of debugging symbols does neither influence the semantics nor the performance of the resulting kernel image!
+If you intend to inspect a system running inside of a virtual machine, follow the instructions below from *within* the virtual machine. Note that this process requires a lot of disk space, typically more than 10GB. For a virtual machine environment, you might consider to dedicate an additional virtual disk to the machine that is used exclusively for this purpose. This keeps the root disk image of the guest much smaller and easier to handle.
 
 == Debian and Ubuntu Guests ==
 
-Debian and derived distributions such as Ubuntu come with a handy tool called `make-kpkg` that creates custom kernel packages. These packages integrate the new kernel seamlessly into the system and is the preferred way of compiling the kernel.
+Debian and derived distributions such as Ubuntu come with a handy tool called `make-kpkg` that creates custom kernel packages. These packages integrate the new kernel image seamlessly into the system and is the preferred way of compiling the kernel.
 
 We provide an additional helper script
-[https://code.google.com/p/insight-vmi/source/browse/trunk/tools/make-debug-kpkg make-debug-kpkg] that fetches the source of the running kernel, prepares it for debugging symbol generation, compiles it, and creates the kernel packages utilizing `make-kpkg`. You can find this script in the directory [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/ trunk/tools] of the !InSight source or in `/usr/share/insight/tools` if you installed the `insight-daemon` package.  Execute this script from within the directory you want the source to be built *within the guest*, for example:
+[https://code.google.com/p/insight-vmi/source/browse/trunk/tools/make-debug-kpkg make-debug-kpkg] that fetches the source of the running kernel, prepares it for debugging symbol generation, compiles it, and creates the kernel packages utilizing `make-kpkg`. You can find this script in the directory [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/ trunk/tools] of the !InSight source or in `/usr/share/insight/tools` if you installed the `insight-daemon` package.  
+
+The `make-debug-kpkg` tool depends on the [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/gcc_pp gcc_pp] script which can be found in the same directory as `make-debug-kpkg` script.  If not yet installed, copy both scripts to the same directory on the guest file system, for example `/usr/local/bin/`.  Now you are ready to execute `make-debug-kpkg` from within the directory you want the source to be built, for example:
 
 {{{
 cd /usr/src && sudo /path/to/make-debug-kpkg
@@ -44,6 +44,8 @@ You are now ready to reboot your machine into the new kernel.
 
 == Other Linux Guests ==
 
+First make sure the [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/gcc_pp gcc_pp] script is executable within the guest.  You can find this script in the directory [https://code.google.com/p/insight-vmi/source/browse/trunk/tools/ trunk/tools] of the !InSight source.  Copy that file to the guest, for example to the `/usr/local/bin/` directory.
+
 Unpack the source code of the running kernel and change to its directory. Most Linux distributions provide means to obtain the source code of the distribution's kernel including all patches and additions. Consult the manual of your package manager on how to do this.
 
 Start by creating a backup copy of the original `Makefile`:
@@ -52,12 +54,13 @@ Start by creating a backup copy of the original `Makefile`:
 cp -v Makefile Makefile.orig
 }}}
 
-Now add the compiler switches for enabling debugging symbols to the appropriate variables and append the string "`-dbg`" to the kernel version:
+Now add the compiler switches for enabling debugging symbols and to the appropriate variables, replace the `gcc` compiler with `gcc_pp`, and append the string "`-dbg`" to the kernel version:
 
 {{{
 sed \
     -e 's@^\(CFLAGS_KERNEL\s*=\)@\1 -g @' \
     -e 's@^\(AFLAGS_KERNEL\s*=\)@\1 -gdwarf-2 @' \
+    -e 's@^\(CC\s*=\).*gcc\s*$@\1 gcc_pp@' \
     -e 's@^\(EXTRAVERSION\s*=\)\s*\([^ ]*\)\s*$@\1 \2-dbg@' \
     Makefile.orig > Makefile
 }}}
@@ -83,9 +86,9 @@ sudo cp -v System.map /boot/System.map-$(uname -r)-dbg &&
 sudo cp -v .config /boot/config-$(uname -r)-dbg &&
 }}}
 
-*Warning:* Your kernel might require an initial RAM disk to load some modules in order to mount the root file system! If this is the case, such a file must be generated as file `/boot/initrd-$(uname -r)-dbg`. As each Linux distribution implements its own way of creating such `initrd` files, we will not describe this process here. *The kernel image might not be boot-able without a corresponding `initrd` file!*
+*Warning:* Your kernel might require an *initial RAM disk* to load some modules in order to mount the root file system! If this is the case, such a file must be generated as file `/boot/initrd-$(uname -r)-dbg`. As each Linux distribution implements its own way of creating such `initrd` files, we will not describe this process here. *The kernel image might not be boot-able without a corresponding `initrd` file!*
 
-Now edit your bootloader's configuration files (most likely `/boot/grub/menu.lst`) and add a new entry for the new kernel image based on the entry for the currently running kernel and reboot your system to the new kernel.
+Now update your bootloader's configuration files to include the new kernel.  Most distributions provide tools for this purpose, typically called `update-grub` or `update-bootloader`. Please consult your distro's manual for details.
 
 = Parsing Debugging Symbols =
 
