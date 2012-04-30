@@ -43,7 +43,7 @@ inline void Instance::setAddress(quint64 addr)
     _d.address = addr;
     if (_d.vmem && (_d.vmem->memSpecs().arch & MemSpecs::ar_i386))
         _d.address &= 0xFFFFFFFFUL;
-    _d.isNull = !_d.address || !_d.isValid;
+    _d.isNull = !_d.address;
 }
 
 
@@ -52,7 +52,7 @@ inline void Instance::addToAddress(quint64 offset)
     _d.address += offset;
     if (_d.vmem && (_d.vmem->memSpecs().arch & MemSpecs::ar_i386))
         _d.address &= 0xFFFFFFFFUL;
-    _d.isNull = !_d.address || !_d.isValid;
+    _d.isNull = !_d.address;
 }
 
 

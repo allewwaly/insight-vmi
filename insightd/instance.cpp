@@ -40,7 +40,7 @@ Instance::Instance(size_t address, const BaseType* type, VirtualMemory* vmem,
     _d.isValid = type != 0;
     if (_d.vmem && (_d.vmem->memSpecs().arch & MemSpecs::ar_i386))
         _d.address &= 0xFFFFFFFFUL;
-    _d.isNull = !_d.address || !_d.isValid;
+    _d.isNull = !_d.address;
 }
 
 
@@ -56,7 +56,7 @@ Instance::Instance(size_t address, const BaseType* type, const QString& name,
     _d.isValid = type != 0;
     if (_d.vmem && (_d.vmem->memSpecs().arch & MemSpecs::ar_i386))
         _d.address &= 0xFFFFFFFFUL;
-    _d.isNull = !_d.address || !_d.isValid;
+    _d.isNull = !_d.address;
 }
 
 

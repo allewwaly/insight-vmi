@@ -182,7 +182,7 @@ public:
     quint32 size() const;
 
     /**
-     * Checks if this is a valid instance and its address is not null.
+     * Checks if this instance has a non-null address.
      * @return \c true if this object is null, \c false otherwise
      * \sa isValid()
      */
