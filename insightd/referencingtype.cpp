@@ -208,9 +208,6 @@ inline Instance ReferencingType::createRefInstance(size_t address,
     // The "cursor" for resolving the type
     const BaseType* b = refType();
 
-	if (!b)
-		return Instance();
-
     // We need to keep track of the address
     size_t addr = address;
 #ifdef DEBUG
@@ -219,49 +216,81 @@ inline Instance ReferencingType::createRefInstance(size_t address,
                 .arg(addr, 0, 16));
 #endif
 
-    const RefBaseType* rbt = 0;
+    const Pointer* p = 0;
+    const BaseType* rbtRef = 0;
+    // Pointer to referenced type as RefBaseType
+    const RefBaseType* rbtRbt;
+    // Pointer to referenced type's referenced type
+    const BaseType* rbtRbtRef;
     bool done = false;
 
     // If this is a pointer, we already have to dereference the initial address
-    const Pointer* p = dynamic_cast<const Pointer*>(this);
-    if (p) {
-        if (maxPtrDeref != 0 && vmem->safeSeek(addr)) {
-            addr = (size_t)p->toPointer(vmem, addr);
-            if (derefCount)
-                (*derefCount)++;
+    if ( (p = dynamic_cast<const Pointer*>(this)) ) {
+        // If this is a type "char*" or "const char*", treat it as a string
+        if ((rbtRef = p->refType()) &&
+            ((rbtRef->type() == rtInt8) ||
+             (rbtRef->type() == rtConst &&
+              (rbtRbt = dynamic_cast<const RefBaseType*>(rbtRef)) &&
+              (rbtRbtRef = rbtRbt->refType()) &&
+              rbtRbtRef->type() == rtInt8)))
+            // Stop here, so that toString() later on will print this as string
+            return Instance(address, p, name, parentNames, vmem, id);
+        // Only dereference pointers, not arrays
+        if (p->type() == rtPointer) {
+            // Do not resolve a void pointer
+            if (!b)
+                return Instance(address, p, name, parentNames, vmem, id);
+
+            if (maxPtrDeref != 0 && vmem->safeSeek(addr)) {
+                addr = (size_t)p->toPointer(vmem, addr);
+                // Avoid instances with NULL addresses
+                if (!addr)
+                    return Instance(address, p, name, parentNames, vmem, id);
+
+                if (derefCount)
+                    (*derefCount)++;
+            }
+            else
+                done = true;
+            if (maxPtrDeref > 0)
+                --maxPtrDeref;
         }
-        else
-            done = true;
-        if (maxPtrDeref > 0)
-            --maxPtrDeref;
     }
+
+    // We should have a valid referencing type!
+    if (!b)
+        return Instance();
+
+    const RefBaseType* rbt = 0;
 
     while ( !done && (b->type() & resolveTypes) &&
             (rbt = dynamic_cast<const RefBaseType*>(b)) )
     {
+        // If this is an unresolved type, don't resolve it anymore
+        if (! (rbtRef = rbt->refType()) )
+            break;
+
 		// Resolve pointer references
 		if (rbt->type() & BaseType::trPointersAndArrays) {
-		    // Pointer to referenced type's referenced type
-            const BaseType* rbtRef = dynamic_cast<const RefBaseType*>(rbt->refType()) ?
-                    dynamic_cast<const RefBaseType*>(rbt->refType())->refType() :
-                    0;
 			// If this is a type "char*" or "const char*", treat it as a string
-			if (rbt->refType() &&
-			    (rbt->refType()->type() == rtInt8 ||
-			     (rbt->refType()->type() == rtConst &&
-			      rbtRef &&
-			      rbtRef->type() == rtInt8)))
+			if (rbtRef->type() == rtInt8 ||
+				(rbtRef->type() == rtConst &&
+				 (rbtRbt = dynamic_cast<const RefBaseType*>(rbtRef)) &&
+				 (rbtRbtRef = rbtRbt->refType()) &&
+				 rbtRbtRef->type() == rtInt8))
 				// Stop here, so that toString() later on will print this as string
 				break;
-			// If this is an unresolved type, don't resolve it anymore
-			if (!rbt->refType())
-			    break;
-			// Otherwise resolve pointer reference, if this is a pointer
-			if ( (p = dynamic_cast<const Pointer*>(rbt)) ) {
+			// Otherwise resolve pointer reference, if this is a pointer and
+			// not an array
+			if (rbt->type() == rtPointer) {
 				// If we already hit the maximum allowed dereference level or
 				// we cannot dereference the pointer, we have to stop here
 				if (maxPtrDeref != 0 && vmem->safeSeek(addr)) {
-					addr = (size_t)p->toPointer(vmem, addr);
+					size_t newAddr = (size_t)rbt->toPointer(vmem, addr);
+					// Avoid instances with NULL addresses
+					if (!newAddr)
+						break;
+					addr = newAddr;
 					if (derefCount)
 						(*derefCount)++;
 				}
@@ -275,7 +304,7 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 		// If this is a void type, don't resolve it anymore
 		if (!rbt->refTypeDeep(BaseType::trLexical))
 			break;
-		b = rbt->refType();
+		b = rbtRef;
     }
 
     return Instance(addr, b, name, parentNames, vmem, id);
