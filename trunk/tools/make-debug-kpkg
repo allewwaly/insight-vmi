@@ -60,6 +60,13 @@ if ! [ -x "$GCC_PP" ]; then
         echo "WARNING: gcc_pp script not found." >&2
 fi
 
+# Apply all patches found in base directory
+for f in ../*.diff ../*.patch; do
+	if [ -r "$f" ]; then
+		echo "Applying patch: $f"
+		patch -Np0 -i ../$f || exit 1
+	fi
+done
 
 # Run parallel jobs when compiling the source
 if [ -z "$CONCURRENCY_LEVEL" ]; then
