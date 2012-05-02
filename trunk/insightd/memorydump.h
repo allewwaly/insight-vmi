@@ -235,7 +235,6 @@ public:
      * @return the memory map of this dump
      */
     MemoryMap* map();
-#endif
 
     /**
      * Initializes the reverse mapping of addresses and instances.
@@ -249,6 +248,7 @@ public:
      * @param other
      */
     void setupDiff(MemoryDump* other);
+#endif
 
 private:
     void init();
