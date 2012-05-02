@@ -143,6 +143,8 @@ Shell::Shell(bool listenOnSocket)
                 &Shell::cmdList,
                 "Lists various types of read symbols",
                 "This command lists various types of read symbols.\n"
+                "  list functions [<glob>]   List all functions, optionally filtered by a\n"
+                "                            wildcard expression <glob>\n"
                 "  list sources              List all source files\n"
                 "  list types [<glob>]       List all types, optionally filtered by a\n"
                 "                            wildcard expression <glob>\n"
@@ -772,7 +774,7 @@ int Shell::eval(QString command)
 
     			QIODevice* outDev = _out.device();
     			_out.setDevice(_err.device());
-    			cmdListTypes(QStringList(e.errorParam.toString()));
+                cmdListTypes(QStringList(e.errorParam.toString()));
     			_out.setDevice(outDev);
     		}
     	}
@@ -949,8 +951,11 @@ int Shell::cmdList(QStringList args)
         if (QString("sources").startsWith(s)) {
             return cmdListSources(args);
         }
+        else if (QString("functions").startsWith(s)) {
+            return cmdListTypes(args, rtFunction);
+        }
         else if (s.length() <= 5 && QString("types").startsWith(s)) {
-            return cmdListTypes(args);
+            return cmdListTypes(args, ~rtFunction);
         }
         else if (s.length() >= 7 && QString("types-using").startsWith(s)) {
             return cmdListTypesUsing(args);
@@ -1005,7 +1010,7 @@ int Shell::cmdListSources(QStringList /*args*/)
 }
 
 
-int Shell::cmdListTypes(QStringList args)
+int Shell::cmdListTypes(QStringList args, int typeFilter)
 {
     const BaseTypeList* types = &_sym.factory().types();
     CompileUnit* unit = 0;
@@ -1043,6 +1048,10 @@ int Shell::cmdListTypes(QStringList args)
 
     for (int i = 0; i < types->size() && !_interrupted; i++) {
         BaseType* type = types->at(i);
+
+        // Skip all types not matching the filter
+        if (! (type->type() & typeFilter) )
+            continue;
 
         // Apply name filter, if requested
         if (applyFilter && !rxFilter.exactMatch(type->name()))
@@ -1786,7 +1795,7 @@ int Shell::cmdMemoryRevmap(QStringList args)
                 return cmdMemoryRevmapVisualize(index);
         }
         else {
-            _err << color(ctErrorLight) << "Unknown command: " << color(ctError) << args[0] << color(ctReset) << endl:
+            _err << color(ctErrorLight) << "Unknown command: " << color(ctError) << args[0] << color(ctReset) << endl;
             return 2;
         }
     }
@@ -1881,7 +1890,7 @@ int Shell::cmdMemoryDiff(QStringList args)
         }
         else {
             _err << color(ctErrorLight) << "Unknown command: " << color(ctError)
-                 << args[0] << color(ctReset) << endl:
+                 << args[0] << color(ctReset) << endl;
             return 2;
         }
     }
