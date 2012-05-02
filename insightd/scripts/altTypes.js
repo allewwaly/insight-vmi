@@ -25,6 +25,8 @@ var types = Symbols.listTypes();
 var tcount = 0;
 var mcount = 0;
 var lastType = 0;
+var typeNames = new Array();
+var typeNameCount = 0;
 
 for (var i in types) {
 	// Get instance of that type
@@ -43,6 +45,11 @@ for (var i in types) {
 			lastType = type.TypeId();
 			++tcount;
 		}
+		// Count unique types by hash
+		if (typeNames.indexOf(type.TypeHash()) < 0) {
+			++typeNameCount;
+			typeNames.push(type.TypeHash());
+		}
 
 		print(
 			lalign(uhex(type.TypeId()), w_id) + " " +
@@ -55,4 +62,4 @@ for (var i in types) {
 }
 
 print(hline(w_total));
-print("Total: " + mcount + " members in " + tcount + " types");
+print("Total: " + mcount + " members in " + tcount + " types, " + typeNameCount + " unique types");
