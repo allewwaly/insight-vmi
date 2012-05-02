@@ -64,7 +64,7 @@ fi
 for f in ../*.diff ../*.patch; do
 	if [ -r "$f" ]; then
 		echo "Applying patch: $f"
-		patch -Np0 -i ../$f || exit 1
+		patch -Np0 -i $f || exit 1
 	fi
 done
 
