@@ -299,6 +299,8 @@ public slots:
      */
     QString TypeName() const;
 
+    uint TypeHash() const;
+
     /**
      * Returns the value of \c sizeof(type) for this instance's type.
      * @return the size of this instance's type

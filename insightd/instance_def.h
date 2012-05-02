@@ -175,6 +175,8 @@ public:
      */
     QString typeName() const;
 
+    uint typeHash() const;
+
     /**
      * Convenience function to access type()->size()
      * @return the size of this instance's type

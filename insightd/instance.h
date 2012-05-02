@@ -86,6 +86,12 @@ inline QString Instance::typeName() const
 }
 
 
+inline uint Instance::typeHash() const
+{
+    return _d.type ? _d.type->hash() : 0;
+}
+
+
 inline quint32 Instance::size() const
 {
     return _d.type ? _d.type->size() : 0;
