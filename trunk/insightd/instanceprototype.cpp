@@ -230,7 +230,14 @@ int InstancePrototype::TypeId() const
 QString InstancePrototype::TypeName() const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->typeName() : QString();
+	return ((inst = thisInstance())) ? inst->typeName() : QString();
+}
+
+
+uint InstancePrototype::TypeHash() const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ? inst->typeHash() : 0;
 }
 
 
