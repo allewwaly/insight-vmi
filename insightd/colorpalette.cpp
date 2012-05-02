@@ -120,7 +120,7 @@ const char *ColorPalette::color(ColorType ct) const
         C_UDL,   // ctUnderline
         C_INV,   // ctInverse
 
-        C_GRN,   // ctPrompt
+        C_BLU,   // ctPrompt
         C_RED_B, // ctVariable
         C_BLU_B, // ctType
         C_CYN,   // ctBuiltinType
