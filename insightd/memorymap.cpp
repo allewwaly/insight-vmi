@@ -441,6 +441,88 @@ void MemoryMap::build(float minProbability)
 }
 
 
+bool MemoryMap::dump(const QString &fileName) const
+{
+    QFile fout(fileName);
+
+    if (!fout.open(QFile::WriteOnly|QFile::Truncate))
+        return false;
+
+    QTextStream out(&fout);
+
+    QTime time;
+    time.start();
+
+    int count = 0, totalCount = 0;
+    for (MemoryMapRangeTree::const_iterator it = _vmemMap.begin(),
+         e = _vmemMap.end(); it != e; ++it)
+    {
+        ++totalCount;
+        const MemoryMapNode* node = *it;
+        // Are there overlapping objects?
+        MemoryMapRangeTree::ItemSet items = _vmemMap.objectsInRange(
+                    node->address(), node->endAddress());
+        assert(items.isEmpty() == false);
+        // In case we find more than one node, we have to choose the one with
+        // the highest probability
+        if (items.size() > 1) {
+            debugmsg(QString("%1 overlapping objects @ 0x%2 - 0x%3 (%4 bytes), node 0x%5")
+                     .arg(items.size())
+                     .arg(node->address(), 0, 16)
+                     .arg(node->endAddress(), 0, 16)
+                     .arg(node->type()->size())
+                     .arg((quint64)node, 0, 16));
+            int cnt = 0;
+            const MemoryMapNode* maxProbNode = node;
+            for (MemoryMapRangeTree::ItemSet::const_iterator iit = items.begin();
+                 iit != items.end(); ++iit)
+            {
+                const MemoryMapNode* n = *iit;
+                if (n->probability() > maxProbNode->probability())
+                    maxProbNode = n;
+                debugmsg(QString("    %0. 0x%1 - 0x%2, 0x%3 %4 (%5 bytes): %6")
+                         .arg(++cnt)
+                         .arg(n->address(), 0, 16)
+                         .arg(n->endAddress(), 0, 16)
+                         .arg((uint)n->type()->id(), 0, 16)
+                         .arg(n->type()->prettyName())
+                         .arg(n->type()->size())
+                         .arg(n->fullName()));
+            }
+            // If current node does not have highest prob, we skip it
+            if (maxProbNode != node)
+                continue;
+        }
+
+        // Dump the node
+        out << left << qSetFieldWidth(0) << "0x" << hex << qSetFieldWidth(16) << node->address()
+            << qSetFieldWidth(0) << " "
+            << right << dec << qSetFieldWidth(6) << node->type()->size()
+            << qSetFieldWidth(0) << " "
+            << left << qSetFieldWidth(6) << QString::number(node->probability(), 'f', 4)
+            << qSetFieldWidth(0) << " 0x" << hex << qSetFieldWidth(8) << (uint) node->type()->id()
+            << qSetFieldWidth(0)
+            << " \"" << node->type()->prettyName() << "\""
+            << endl;
+
+        ++count;
+
+        if (time.elapsed() >= 1000) {
+            time.restart();
+            debugmsg("Wrote " << count << " of " << _vmemMap.size() << " nodes");
+        }
+    }
+
+    fout.close();
+
+    debugmsg("Wrote " << count << " of " << _vmemMap.size()
+             << " nodes to file \"" << fileName << "\", totalCount = "
+             << totalCount);
+
+    return true;
+}
+
+
 bool MemoryMap::addressIsWellFormed(quint64 address) const
 {
     // Make sure the address is within the virtual address space

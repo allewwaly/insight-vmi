@@ -1788,6 +1788,10 @@ int Shell::cmdMemoryRevmap(QStringList args)
             args.pop_front();
             return cmdMemoryRevmapBuild(index, args);
         }
+        else if (QString("dump").startsWith(args[0])) {
+            args.pop_front();
+            return cmdMemoryRevmapDump(index, args);
+        }
         else if (QString("visualize").startsWith(args[0])) {
             if (args.size() > 1)
                 return cmdMemoryRevmapVisualize(index, args[1]);
@@ -1834,6 +1838,31 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
                     .arg(msec, 3, 10, QChar('0'))
                 << endl;
 
+    return ecOk;
+}
+
+
+int Shell::cmdMemoryRevmapDump(int index, QStringList args)
+{
+    if (args.size() != 1) {
+        cmdHelp(QStringList("memory"));
+        return ecInvalidArguments;
+    }
+
+    const QString& fileName = args.front();
+    // Check file for existence
+    if (QFile::exists(fileName) && _interactive) {
+        QString reply;
+        do {
+            reply = readLine("Ok to overwrite existing file? [Y/n] ").toLower();
+            if (reply.isEmpty())
+                reply = "y";
+            else if (reply == "n")
+                return ecOk;
+        } while (reply != "y");
+    }
+
+    _memDumps[index]->map()->dump(fileName);
     return ecOk;
 }
 
