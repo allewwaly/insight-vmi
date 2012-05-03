@@ -19,7 +19,7 @@ tools.files = ../tools/gcc_pp \
 INSTALLS += target scripts tools
 
 # Should the memory_map feature be built? Disabled by default.
-#CONFIG += memory_map
+CONFIG += memory_map
 
 CONFIG += console \
     debug_and_release
@@ -30,7 +30,7 @@ QMAKE_CXXFLAGS_RELEASE += -O3
 
 QT += script \
     network
-QT -= gui webkit
+QT -= webkit
 
 # Required libraries for building
 LIBS += -lreadline \
@@ -181,5 +181,7 @@ CONFIG(memory_map) {
         memorymapnode.h \
         memorymap.h
 }
-
+!CONFIG(memory_map) {
+    QT -= gui
+}
 
