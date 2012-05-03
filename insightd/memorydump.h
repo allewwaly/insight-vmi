@@ -256,11 +256,11 @@ private:
     MemSpecs _specs;
     QFile* _file;
     QString _fileName;
+    const SymFactory* _factory;
     VirtualMemory* _vmem;
 #ifdef CONFIG_MEMORY_MAP
     MemoryMap* _map;
 #endif
-    const SymFactory* _factory;
     int _index;
 };
 

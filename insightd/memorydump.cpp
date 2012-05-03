@@ -31,11 +31,11 @@ MemoryDump::MemoryDump(const MemSpecs& specs, QIODevice* mem,
                        SymFactory* factory, int index)
     : _specs(specs),
       _file(0),
-      _vmem(new VirtualMemory(_specs, mem, index)),
+      _factory(factory),
+      _vmem(new VirtualMemory(specs, mem, index)),
 #ifdef CONFIG_MEMORY_MAP
       _map(new MemoryMap(_factory, _vmem)),
 #endif
-      _factory(factory),
       _index(index)
 {
     init();
@@ -46,11 +46,11 @@ MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
         const SymFactory* factory, int index)
     : _specs(specs),
       _file(new QFile(fileName)),
+      _factory(factory),
       _vmem(new VirtualMemory(_specs, _file, index)),
 #ifdef CONFIG_MEMORY_MAP
       _map(new MemoryMap(_factory, _vmem)),
 #endif
-      _factory(factory),
       _index(index)
 {
     _fileName = fileName;
