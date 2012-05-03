@@ -133,6 +133,8 @@ public:
 	 */
 	void build(float minProbability = 0.0);
 
+	bool dump(const QString& fileName) const;
+
 	/**
 	 * Finds the differences in physical memory between this and another memory
 	 * map
