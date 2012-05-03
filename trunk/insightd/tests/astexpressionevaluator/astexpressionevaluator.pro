@@ -103,7 +103,7 @@ QT += core \
     script \
     network \
     testlib
-QT -= gui webkit
+QT -= webkit
 CONFIG += qtestlib debug_and_release
 INCLUDEPATH += ../../src \
 	../../../libdebug/include \
@@ -118,3 +118,35 @@ LIBS += -L../../../libcparser -lcparser \
 	-lreadline
 QMAKE_CXXFLAGS_DEBUG += -w
 QMAKE_CXXFLAGS_RELEASE += -w
+
+# Things to do when the memory map builder and widget is to be built. Enabling
+# this feature requires InSight to run on an X server.
+CONFIG += memory_map
+CONFIG(memory_map) {
+    warning(Enabled compilation of the memory_map features. The resulting binary will must be run on an X windows system!)
+
+    DEFINES += CONFIG_MEMORY_MAP
+    QT += gui
+
+    FORMS += ../../memorymapwindow.ui
+
+    SOURCES += ../../memorydifftree.cpp \
+        ../../memorymaprangetree.cpp \
+        ../../memorymapbuilder.cpp \
+        ../../memorymapwindow.cpp \
+        ../../memorymapwidget.cpp \
+        ../../memorymapnode.cpp \
+        ../../memorymap.cpp
+
+    HEADERS += ../../memorydifftree.h \
+        ../../memorymaprangetree.h \
+        ../../memoryrangetree.h \
+        ../../memorymapbuilder.h \
+        ../../memorymapwindow.h \
+        ../../memorymapwidget.h \
+        ../../memorymapnode.h \
+        ../../memorymap.h
+}
+!CONFIG(memory_map) {
+    QT -= gui
+}
