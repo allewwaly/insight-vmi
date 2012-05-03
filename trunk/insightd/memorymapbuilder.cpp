@@ -145,58 +145,91 @@ void MemoryMapBuilder::run()
                 }
             }
         }
-        // If this is a struct, add all members
+        // If this is a struct, add all pointer members
         else if (inst.memberCount() > 0) {
-            // Add all struct members to the stack that haven't been visited
-            for (int i = 0; i < inst.memberCount(); ++i) {
-                const int candidateCnt = inst.memberCandidatesCount(i);
-                // No candidate types
-                if (!candidateCnt) {
-                    try {
-                        Instance m = inst.member(i, BaseType::trLexical);
-                        if (_map->addressIsWellFormed(m))
-                            _map->addChildIfNotExistend(m, node, _index);
-                    }
-                    catch (GenericException& e) {
-                        // Do nothing
-                    }
-                }
-                // Multiple candidates, so find the most likely one
-                else {
-                    Instance likely;
-                    float l_prob = 0.0;
-                    for (int j = 0; j < candidateCnt; ++j) {
-                        try {
-                            const BaseType* type = inst.memberCandidateType(i, j);
-                            type = type ? type->dereferencedBaseType(BaseType::trLexical) : 0;
-                            // Skip invalid and void* candidates
-                            if (!type ||
-                                ((type->type() & (rtPointer|rtArray)) &&
-                                 !dynamic_cast<const Pointer*>(type)->refType()))
-                                continue;
-                            // Try this candidate
-                            Instance m = inst.memberCandidate(i, j);
-                            if (_map->addressIsWellFormed(m)) {
-                                float m_prob = _map->calculateNodeProbability(&m);
-                                // Compare probabilities
-                                if (m_prob > l_prob || likely.isNull()) {
-                                    l_prob = m_prob;
-                                    likely = m;
-                                }
-                            }
-                        }
-                        catch (GenericException& e) {
-                            // Do nothing
-                        }
-                    }
-                    // Add the most likely candidate
-                    if (!likely.isNull())
-                        _map->addChildIfNotExistend(likely, node, _index);
-                }
-            }
+            addMembers(&inst, node);
         }
 
         // Lock the mutex again before we jump to the loop condition checking
         queueLock.relock();
+    }
+}
+
+void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
+{
+    if (!inst->memberCount())
+        return;
+
+    // Add all struct members to the stack that haven't been visited
+    for (int i = 0; i < inst->memberCount(); ++i) {
+        // Possible pointer types: Pointer and integers of pointer size
+        const int ptrTypes = rtPointer | rtFuncPointer |
+                ((_map->vmem()->memSpecs().arch & MemSpecs::ar_i386) ?
+                     (rtInt32 | rtUInt32) :
+                     (rtInt64 | rtUInt64));
+
+        // Get declared type of this member
+        const BaseType* mBaseType = inst->memberType(i, BaseType::trLexical, true);
+        if (!mBaseType)
+            continue;
+
+        // Consider the members of nested structs recurisvely
+        if (mBaseType->type() & StructOrUnion) {
+            Instance mi = inst->member(i, BaseType::trLexical, true);
+            addMembers(&mi, node);
+            continue;
+        }
+
+        // Skip members which cannot hold pointers
+        const int candidateCnt = inst->memberCandidatesCount(i);
+        if (!candidateCnt && !(mBaseType && (mBaseType->type() & ptrTypes)))
+            continue;
+
+        // No candidate types
+        if (!candidateCnt) {
+            try {
+                Instance m = inst->member(i, BaseType::trLexical, true);
+                // Only add pointer members with valid address
+                if (m.type() && m.type()->type() == rtPointer &&
+                    _map->addressIsWellFormed(m))
+                    _map->addChildIfNotExistend(m, node, _index);
+            }
+            catch (GenericException& e) {
+                // Do nothing
+            }
+        }
+        // Multiple candidates, so find the most likely one
+        else {
+            Instance likely;
+            float l_prob = 0.0;
+            for (int j = 0; j < candidateCnt; ++j) {
+                try {
+                    const BaseType* type = inst->memberCandidateType(i, j);
+                    type = type ? type->dereferencedBaseType(BaseType::trLexical) : 0;
+                    // Skip invalid and void* candidates
+                    if (!type ||
+                        ((type->type() & (rtPointer|rtArray)) &&
+                         !dynamic_cast<const Pointer*>(type)->refType()))
+                        continue;
+                    // Try this candidate
+                    Instance m = inst->memberCandidate(i, j);
+                    if (_map->addressIsWellFormed(m)) {
+                        float m_prob = _map->calculateNodeProbability(&m);
+                        // Compare probabilities
+                        if (m_prob > l_prob || likely.isNull()) {
+                            l_prob = m_prob;
+                            likely = m;
+                        }
+                    }
+                }
+                catch (GenericException& e) {
+                    // Do nothing
+                }
+            }
+            // Add the most likely candidate
+            if (!likely.isNull() && likely.type() &&
+                likely.type()->type() == rtPointer)
+                _map->addChildIfNotExistend(likely, node, _index);
+        }
     }
 }
