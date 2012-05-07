@@ -863,9 +863,7 @@ void MemoryMap::diffWith(MemoryMap* other)
                 if (equal) {
                     // Add difference to tree
                     if (!wasEqual)
-                        _pmemDiff.insert(Difference(startAddr, length),
-                                         startAddr,
-                                         startAddr + length - 1);
+                        _pmemDiff.insert(Difference(startAddr, length));
                 }
                 // Memory differs
                 else {
@@ -894,9 +892,7 @@ void MemoryMap::diffWith(MemoryMap* other)
 
     // Add last difference, if any
     if (!wasEqual)
-        _pmemDiff.insert(Difference(startAddr, length),
-                         startAddr,
-                         startAddr + length - 1);
+        _pmemDiff.insert(Difference(startAddr, length));
 
     shell->out() << "\rComparing memory dumps finished." << endl;
 

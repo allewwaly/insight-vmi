@@ -269,7 +269,7 @@ private:
     void hline(int width = 60);
     int parseMemDumpIndex(QStringList &args, int skip = 0, bool quiet = false);
     //---------------------------------
-    int cmdDiffVectors(QStringList args);
+//    int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
     int cmdHelp(QStringList args);
     int cmdColor(QStringList args);

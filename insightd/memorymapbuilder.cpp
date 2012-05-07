@@ -72,9 +72,12 @@ void MemoryMapBuilder::run()
             quint64 physAddr = _map->_vmem->virtualToPhysical(node->address(), &pageSize);
             // Linear memory region or paged memory?
             if (pageSize < 0) {
+                PhysMemoryMapNode pNode(
+                            physAddr,
+                            node->size() > 0 ? physAddr + node->size() - 1 : physAddr,
+                            node);
                 shared->pmemMapLock.lock();
-                _map->_pmemMap.insert(node, physAddr,
-                        node->size() > 0 ? physAddr + node->size() - 1 : physAddr);
+                _map->_pmemMap.insert(pNode);
                 shared->pmemMapLock.unlock();
             }
             else {
@@ -89,9 +92,12 @@ void MemoryMapBuilder::run()
                     quint32 sizeOnPage = pageSize - (virtAddr & ~pageMask);
                     if (sizeOnPage > size)
                         sizeOnPage = size;
+                    PhysMemoryMapNode pNode(
+                                physAddr, physAddr + sizeOnPage - 1, node);
+
                     // Add a memory mapping
                     shared->pmemMapLock.lock();
-                    _map->_pmemMap.insert(node, physAddr, physAddr + sizeOnPage - 1);
+                    _map->_pmemMap.insert(pNode);
                     shared->pmemMapLock.unlock();
                     // Subtract the available space from left-over size
                     size -= sizeOnPage;
