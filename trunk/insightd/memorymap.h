@@ -201,7 +201,7 @@ public:
      * in this mapping.
      * @return the map of allocated kernel objects in physical memory
      */
-    const MemoryMapRangeTree& pmemMap() const;
+    const PhysMemoryMapRangeTree& pmemMap() const;
 
     /**
      * Gives access to the difference map that was built using diffWith()
@@ -309,7 +309,7 @@ private:
     PointerNodeHash _pointersTo; ///< holds all pointers that point to a certain address
     IntNodeHash _typeInstances;  ///< holds all instances of a given type ID
     MemoryMapRangeTree _vmemMap; ///< map of all used kernel-space virtual memory
-    MemoryMapRangeTree _pmemMap; ///< map of all used physical memory
+    PhysMemoryMapRangeTree _pmemMap; ///< map of all used physical memory
     MemoryDiffTree _pmemDiff;    ///< differences between this and another map
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
@@ -342,7 +342,7 @@ inline const MemoryMapRangeTree& MemoryMap::vmemMap() const
 }
 
 
-inline const MemoryMapRangeTree& MemoryMap::pmemMap() const
+inline const PhysMemoryMapRangeTree& MemoryMap::pmemMap() const
 {
     return _pmemMap;
 }

@@ -179,6 +179,51 @@ private:
 };
 
 
+class PhysMemoryMapNode
+{
+public:
+    PhysMemoryMapNode()
+        : _memoryMapNode(0), _physAddrStart(0), _physAddrEnd(0) {}
+    PhysMemoryMapNode(quint64 physAddrStart, quint64 physAddrEnd,
+                      const MemoryMapNode* memoryMapNode)
+        : _memoryMapNode(memoryMapNode), _physAddrStart(physAddrStart),
+          _physAddrEnd(physAddrEnd) {}
+
+    inline const MemoryMapNode* memoryMapNode() const
+    {
+        return _memoryMapNode;
+    }
+
+    inline quint64 address() const
+    {
+        return _physAddrStart;
+    }
+
+    inline quint64 endAddress() const
+    {
+        return _physAddrEnd;
+    }
+
+    bool operator==(const PhysMemoryMapNode& other) const
+    {
+        return _memoryMapNode == other._memoryMapNode &&
+                _physAddrEnd == other._physAddrEnd &&
+                _physAddrStart == other._physAddrStart;
+    }
+
+private:
+    const MemoryMapNode* _memoryMapNode;
+    quint64 _physAddrStart;
+    quint64 _physAddrEnd;
+};
+
+
+inline uint qHash(const PhysMemoryMapNode& pmmNode)
+{
+    return qHash(pmmNode.memoryMapNode());
+}
+
+
 inline quint64 MemoryMapNode::address() const
 {
     return _address;

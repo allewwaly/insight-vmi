@@ -103,6 +103,7 @@ Shell::Shell(bool listenOnSocket)
 	qRegisterMetaType<QAbstractSocket::SocketError>();
 
     // Register all commands
+/*
 #ifdef CONFIG_MEMORY_MAP
     _commands.insert("diff",
             Command(
@@ -113,6 +114,7 @@ Shell::Shell(bool listenOnSocket)
                 "be specified by a shell file glob pattern or by explicit file names.\n"
                 "  diff [min. probability] <file pattern 1> [<file pattern 2> ...]"));
 #endif
+*/
 
     _commands.insert("exit",
             Command(
@@ -1878,10 +1880,10 @@ int Shell::cmdMemoryRevmapVisualize(int index, QString type)
     }
 
     int ret = 0;
-    if (QString("physical").startsWith(type) || QString("pmem").startsWith(type))
+    /*if (QString("physical").startsWith(type) || QString("pmem").startsWith(type))
         memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->pmemMap(),
                                           _memDumps[index]->memSpecs());
-    else if (QString("virtual").startsWith(type) || QString("vmem").startsWith(type))
+    else*/ if (QString("virtual").startsWith(type) || QString("vmem").startsWith(type))
         memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->vmemMap(),
                                           _memDumps[index]->memSpecs());
     else {
@@ -2782,6 +2784,7 @@ int Shell::cmdBinaryMemDumpList(QStringList /*args*/)
     return ecOk;
 }
 
+/*
 #ifdef CONFIG_MEMORY_MAP
 
 int Shell::cmdDiffVectors(QStringList args)
@@ -2918,20 +2921,20 @@ int Shell::cmdDiffVectors(QStringList args)
 
             // Iterate over all changes
             const MemoryDiffTree& diff = _memDumps[j]->map()->pmemDiff();
-            const MemoryMapRangeTree& currPMemMap = _memDumps[j]->map()->pmemMap();
+            const PhysMemoryMapRangeTree& currPMemMap = _memDumps[j]->map()->pmemMap();
             const MemoryMapRangeTree& prevVMemMap = _memDumps[prevj]->map()->vmemMap();
             for (MemoryDiffTree::const_iterator it = diff.constBegin();
                     it != diff.constEnd() && !_interrupted; ++it)
             {
-                MemoryMapRangeTree::ItemSet curr = currPMemMap.objectsInRange(
+                PhysMemoryMapRangeTree::ItemSet curr = currPMemMap.objectsInRange(
                         it->startAddr, it->startAddr + it->runLength - 1);
 
-                for (MemoryMapRangeTree::ItemSet::const_iterator cit =
+                for (PhysMemoryMapRangeTree::ItemSet::const_iterator cit =
                         curr.constBegin();
                         cit != curr.constEnd() && !_interrupted;
                         ++cit)
                 {
-                    const MemoryMapNode* cnode = *cit;
+                    const PhysMemoryMapNode& cnode = *cit;
 
                     // Try to find the object in the previous dump
                     const MemoryMapRangeTree::ItemSet& prev = prevVMemMap.objectsAt(cnode->address());
@@ -2979,6 +2982,7 @@ int Shell::cmdDiffVectors(QStringList args)
 }
 
 #endif
+*/
 
 void Shell::printTimeStamp(const QTime& time)
 {

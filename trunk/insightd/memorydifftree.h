@@ -9,7 +9,8 @@
 #define MEMORYDIFFTREE_H_
 
 // Forward declarations
-template<class T, class P> class MemoryRangeTree;
+template<class value_type, class value_accessor, class property_type>
+class MemoryRangeTree;
 
 #include "memorymapnode.h"
 #include "memoryrangetree.h"
@@ -72,8 +73,25 @@ public:
     DiffProperties& unite(const DiffProperties& other);
 };
 
+/**
+ * Accessor class for Difference objects used by MemoryDiffTree.
+ */
+class DiffAccessor
+{
+public:
+    static inline quint64 address(const Difference& diff)
+    {
+        return diff.startAddr;
+    }
 
-typedef MemoryRangeTree<Difference, DiffProperties> MemoryDiffTree;
+    static inline quint64 endAddress(const Difference& diff)
+    {
+        return diff.startAddr + diff.runLength - 1;
+    }
+};
+
+
+typedef MemoryRangeTree<Difference, DiffAccessor, DiffProperties> MemoryDiffTree;
 typedef MemoryDiffTree::ItemSet DiffSet;
 
 
