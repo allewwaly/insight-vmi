@@ -19,24 +19,32 @@ class TestItem
 {
 public:
     TestItem() : _address(0), _size(0) {}
-    TestItem(quint64 address, quint64 size) : _address(address), _size(size) {}
+    TestItem(quint64 address, quint64 size, const QString& name = QString())
+        : _address(address), _size(size), _name(name) {}
 
     quint64 address() const { return _address; }
     quint64 endAddress() const { return _address + _size - 1; }
+    quint64 size() const { return _size; }
+    QString name() const { return QString(); }
 
 private:
     quint64 _address;
     quint64 _size;
+    QString _name;
 };
 
 class TestItemProps
 {
 public:
+    TestItemProps() : objectCount(0) {}
     void update(const TestItem*) {}
+
+    int objectCount;
 };
 
 
-typedef MemoryRangeTree<const TestItem*, TestItemProps> TestTree;
+typedef MemoryRangeTree<const TestItem*, PtrAccessor<TestItem>, TestItemProps>
+    TestTree;
 typedef QList<TestItem*> TestItemList;
 
 class MemoryRangeTreeTester: public QObject

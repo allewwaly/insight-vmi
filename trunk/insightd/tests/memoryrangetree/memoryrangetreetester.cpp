@@ -24,13 +24,21 @@ MemoryRangeTreeTester::~MemoryRangeTreeTester()
 
 void MemoryRangeTreeTester::init()
 {
-    _items.resize(10);
+    _items.resize(100);
     const uint seed = QDateTime::currentDateTime().toTime_t() + _count++;
+//    const uint seed = 1336406854;
 
     std::cout << "Random seed for initialization: " << seed << std::endl;
     qsrand(seed);
 
     _tree = new TestTree(VMEM_END);
+
+//    _items.resize(2);
+//    _items[0] = new TestItem(0x3bf10c9fULL, 0x4c698898ULL, "0");
+//    _items[1] = new TestItem(0x75e3ac2bULL, 0x3a51960dULL, "1");
+//    for (int i = 0; i < _items.size(); ++i) {
+//        _tree->insert(_items[i]);
+//    }
 
     for (int i = 0; i < _items.size(); ++i) {
         quint64 addr, size = qrand();
@@ -38,8 +46,10 @@ void MemoryRangeTreeTester::init()
             addr = getRandAddr();
         } while (addr + size > VMEM_END);
 
-        _tree->insert(_items[i] = new TestItem(addr, size));
+        _tree->insert(_items[i] = new TestItem(addr, size, QString::number(i)));
     }
+
+//    _tree->outputDotFile(QString("%1.dot").arg(seed));
 }
 
 
@@ -58,7 +68,9 @@ void MemoryRangeTreeTester::addressQuery()
     TestTree::ItemSet queried;
 
     for (int i = 0; i < 10000; ++i) {
+//        std::cout << "i = " << i << std::endl;
         quint64 addr = getRandAddr();
+//        quint64 addr = 0x4877f85eUL;
         list = itemsInRange(addr, addr);
         queried = _tree->objectsAt(addr);
 
