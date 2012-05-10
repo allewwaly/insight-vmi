@@ -190,8 +190,9 @@ void MemoryMap::build(float minProbability)
             shell->out()
                     << "\rProcessed " << _shared->processed << " instances"
                     << ", vmemAddr = " << _vmemAddresses.size()
-                    << ", vmemMap = " << _vmemMap.objectCount()
-                    << ", pmemMap = " << _pmemMap.size()
+                    << ", objects = " << _vmemMap.size()
+                    << ", vmemMap nodes = " << _vmemMap.nodeCount()
+                    << ", pmemMap nodes = " << _pmemMap.nodeCount()
                     << ", queue = " << queue_size << " " << indicator
                     << ", probability = " << (node ? node->probability() : 1.0)
                     << endl;
@@ -509,13 +510,13 @@ bool MemoryMap::dump(const QString &fileName) const
 
         if (time.elapsed() >= 1000) {
             time.restart();
-            debugmsg("Wrote " << count << " of " << _vmemMap.size() << " nodes");
+            debugmsg("Wrote " << count << " of " << _vmemMap.nodeCount() << " nodes");
         }
     }
 
     fout.close();
 
-    debugmsg("Wrote " << count << " of " << _vmemMap.size()
+    debugmsg("Wrote " << count << " of " << _vmemMap.nodeCount()
              << " nodes to file \"" << fileName << "\", totalCount = "
              << totalCount);
 
