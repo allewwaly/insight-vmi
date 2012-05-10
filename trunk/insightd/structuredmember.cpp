@@ -64,7 +64,7 @@ Instance StructuredMember::toInstance(size_t structAddress,
 		int resolveTypes, int maxPtrDeref) const
 {
 	return createRefInstance(structAddress + _offset, vmem, _name,
-	        parent ? parent->parentNameComponents() : QStringList(),
+			parent ? parent->fullNameComponents() : QStringList(),
 			resolveTypes, maxPtrDeref);
 }
 
