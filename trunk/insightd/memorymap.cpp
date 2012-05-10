@@ -125,6 +125,9 @@ void MemoryMap::build(float minProbability)
     for (VariableList::const_iterator it = _factory->vars().constBegin();
             it != _factory->vars().constEnd(); ++it)
     {
+        // For testing now only start with this one variable
+        if ((*it)->name() != "init_task")
+            continue;
         /// @todo consider alternative types for variables
 //        const Variable* v = *it;
 //        if (v->hasAltRefTypes())
@@ -455,8 +458,8 @@ bool MemoryMap::dump(const QString &fileName) const
     time.start();
 
     int count = 0, totalCount = 0;
-    for (MemoryMapRangeTree::const_iterator it = _vmemMap.begin(),
-         e = _vmemMap.end(); it != e; ++it)
+    for (IntNodeHash::const_iterator it = _typeInstances.begin(),
+         e = _typeInstances.end(); it != e; ++it)
     {
         ++totalCount;
         const MemoryMapNode* node = *it;
@@ -473,7 +476,7 @@ bool MemoryMap::dump(const QString &fileName) const
                      .arg(node->endAddress(), 0, 16)
                      .arg(node->type()->size())
                      .arg((quint64)node, 0, 16));
-            int cnt = 0;
+//            int cnt = 0;
             const MemoryMapNode* maxProbNode = node;
             for (MemoryMapRangeTree::ItemSet::const_iterator iit = items.begin();
                  iit != items.end(); ++iit)
@@ -481,14 +484,14 @@ bool MemoryMap::dump(const QString &fileName) const
                 const MemoryMapNode* n = *iit;
                 if (n->probability() > maxProbNode->probability())
                     maxProbNode = n;
-                debugmsg(QString("    %0. 0x%1 - 0x%2, 0x%3 %4 (%5 bytes): %6")
-                         .arg(++cnt)
-                         .arg(n->address(), 0, 16)
-                         .arg(n->endAddress(), 0, 16)
-                         .arg((uint)n->type()->id(), 0, 16)
-                         .arg(n->type()->prettyName())
-                         .arg(n->type()->size())
-                         .arg(n->fullName()));
+//                debugmsg(QString("    %0. 0x%1 - 0x%2, 0x%3 %4 (%5 bytes): %6")
+//                         .arg(++cnt)
+//                         .arg(n->address(), 0, 16)
+//                         .arg(n->endAddress(), 0, 16)
+//                         .arg((uint)n->type()->id(), 0, 16)
+//                         .arg(n->type()->prettyName())
+//                         .arg(n->type()->size())
+//                         .arg(n->fullName()));
             }
             // If current node does not have highest prob, we skip it
             if (maxProbNode != node)
@@ -510,13 +513,13 @@ bool MemoryMap::dump(const QString &fileName) const
 
         if (time.elapsed() >= 1000) {
             time.restart();
-            debugmsg("Wrote " << count << " of " << _vmemMap.nodeCount() << " nodes");
+            debugmsg("Wrote " << count << " of " << _vmemMap.size() << " nodes");
         }
     }
 
     fout.close();
 
-    debugmsg("Wrote " << count << " of " << _vmemMap.nodeCount()
+    debugmsg("Wrote " << count << " of " << _vmemMap.size()
              << " nodes to file \"" << fileName << "\", totalCount = "
              << totalCount);
 
@@ -676,6 +679,11 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
             _shared->queue.insert(child->probability(), child);
             _shared->queueLock.unlock();
 
+//            // Sanity check
+//            if ((parent->type()->dereferencedType(BaseType::trLexical) & StructOrUnion) &&
+//                child->type()->dereferencedType(BaseType::trLexical) & StructOrUnion)
+//                debugerr("This should not happen! " << child->fullName());
+
             result = true;
         }
 
@@ -694,28 +702,26 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
 float MemoryMap::calculateNodeProbability(const Instance* inst,
         float parentProbability) const
 {
-    // Degradation of 1% per parent-child relation.
-    // Starting from 1.0, this means that the 69th generation will have a
-    // probability < 0.5, the 230th generation will be < 0.1.
-    const float degPerGeneration = 0.99;
+    // Degradation of 0.1% per parent-child relation.
+    static const float degPerGeneration = 0.999;
 
     // Degradation of 20% for address of this node not being aligned at 4 byte
     // boundary
-    const float degForUnalignedAddr = 0.8;
+    static const float degForUnalignedAddr = 0.8;
 
     // Degradation of 5% for address begin in userland
-    const float degForUserlandAddr = 0.95;
+    static const float degForUserlandAddr = 0.95;
 
     // Degradation of 90% for an invalid address of this node
-    const float degForInvalidAddr = 0.1;
+    static const float degForInvalidAddr = 0.1;
 
     // Max. degradation of 30% for non-aligned pointer childen the type of this
     // node has
-    const float degForNonAlignedChildAddr = 0.7;
+    static const float degForNonAlignedChildAddr = 0.7;
 
     // Max. degradation of 50% for invalid pointer childen the type of this node
     // has
-    const float degForInvalidChildAddr = 0.5;
+    static const float degForInvalidChildAddr = 0.5;
 
     float prob = parentProbability < 0 ?
                  1.0 :
@@ -764,8 +770,8 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
                     // Try a safeSeek first to avoid costly throws of exceptions
                     if (_vmem->safeSeek(m_addr)) {
                         m_addr = (quint64)m_type->toPointer(_vmem, m_addr);
-                        // Check validity
-                        if (! _vmem->safeSeek((qint64) m_addr) ) {
+                        // Check validity of non-null addresses
+                        if (m_addr && !_vmem->safeSeek((qint64) m_addr) ) {
                             invalidChildAddrCnt++;
                         }
                         // Check alignment
