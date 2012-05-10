@@ -311,14 +311,14 @@ public:
     /**
      * @return the number of MemoryRangeTreeNode objects within the tree
      */
-    inline int size() const { return _size; }
+    inline int nodeCount() const { return _nodeCount; }
 
     /**
      * @return the number of unique MemoryMapNode objects stored in the leaves
      * of the tree
      */
-    inline int objectCount() const
-    { return _objectCount; }
+    inline int size() const
+    { return _size; }
 
     /**
      * Deletes all data and resets the tree.
@@ -390,14 +390,14 @@ public:
     inline quint64 addrSpaceEnd() const { return _addrSpaceEnd; }
 
 private:
-    void normalizeInterval(quint64 &addrStart, quint64 &addrEnd) const;
+    void sanitizeInterval(quint64 &addrStart, quint64 &addrEnd) const;
 
     Node* _root;                  ///< Root node
     Node* _first;                 ///< First leaf
     Node* _last;                  ///< Last leaf
-    int _size;                    ///< No. of MemoryRangeTreeNode's
+    int _nodeCount;               ///< No. of MemoryRangeTreeNode's
     quint64 _addrSpaceEnd;        ///< Address of the last byte of address space
-    quint64 _objectCount;
+    quint64 _size;                ///< No. of items stored in this tree
     static ItemSet _emptyNodeSet;
     static Properties _emptyProperties;
 };
@@ -411,7 +411,7 @@ MemoryRangeTreeNode<value_type, value_accessor, property_type>::MemoryRangeTreeN
     : tree(tree), parent(parent), lChild(0), rChild(0), next(0), prev(0),
       addrStart(addrStart), addrEnd(addrEnd)
 {
-    ++tree->_size;
+    ++tree->_nodeCount;
 #ifdef ENABLE_DOT_CODE
     id = nodeId++;
 #endif
@@ -421,7 +421,7 @@ MemoryRangeTreeNode<value_type, value_accessor, property_type>::MemoryRangeTreeN
 template<class value_type, class value_accessor, class property_type>
 MemoryRangeTreeNode<value_type, value_accessor, property_type>::~MemoryRangeTreeNode()
 {
-    --tree->_size;
+    --tree->_nodeCount;
 }
 
 
@@ -621,8 +621,8 @@ typename MemoryRangeTree<value_type, value_accessor, property_type>::Properties 
 
 template<class value_type, class value_accessor, class property_type>
 MemoryRangeTree<value_type, value_accessor, property_type>::MemoryRangeTree(quint64 addrSpaceEnd)
-    : _root(0), _first(0), _last(0), _size(0), _addrSpaceEnd(addrSpaceEnd),
-      _objectCount(0)
+    : _root(0), _first(0), _last(0), _nodeCount(0), _addrSpaceEnd(addrSpaceEnd),
+      _size(0)
 {
 }
 
@@ -644,8 +644,8 @@ void MemoryRangeTree<value_type, value_accessor, property_type>::clear()
     delete _root;
 
     _root = _first = _last = 0;
+    _nodeCount = 0;
     _size = 0;
-    _objectCount = 0;
 
 #ifdef ENABLE_DOT_CODE
     Node::nodeId = 0;
@@ -661,7 +661,7 @@ void MemoryRangeTree<value_type, value_accessor, property_type>::insert(value_ty
         _root = _first = _last =
                 new Node(this, 0, _addrSpaceEnd);
     _root->insert(item);
-    ++_objectCount;
+    ++_size;
 }
 
 
@@ -678,7 +678,7 @@ template<class value_type, class value_accessor, class property_type>
 void MemoryRangeTree<value_type, value_accessor, property_type>::outputSubtreeDotFile(quint64 addrStart, quint64 addrEnd,
         const QString& filename) const
 {
-    normalizeInterval(addrStart, addrEnd);
+    sanitizeInterval(addrStart, addrEnd);
 
     QFile outFile;
     QTextStream out;
@@ -697,6 +697,21 @@ void MemoryRangeTree<value_type, value_accessor, property_type>::outputSubtreeDo
     out << "}" << endl;
 }
 #endif
+
+
+template<class value_type, class value_accessor, class property_type>
+void MemoryRangeTree<value_type, value_accessor, property_type>::sanitizeInterval(quint64 &addrStart, quint64 &addrEnd) const
+{
+    if (addrEnd > _addrSpaceEnd)
+        addrEnd = _addrSpaceEnd;
+    // Make sure the interval is valid, swap the addresses, if necessary
+    if (addrStart > addrEnd) {
+        quint64 tmp = addrStart;
+        addrStart = addrEnd;
+        addrEnd = tmp;
+    }
+}
+
 
 template<class value_type, class value_accessor, class property_type>
 const typename MemoryRangeTree<value_type, value_accessor, property_type>::ItemSet&
@@ -719,24 +734,10 @@ MemoryRangeTree<value_type, value_accessor, property_type>::objectsAt(quint64 ad
 
 
 template<class value_type, class value_accessor, class property_type>
-void MemoryRangeTree<value_type, value_accessor, property_type>::normalizeInterval(quint64 &addrStart, quint64 &addrEnd) const
-{
-    if (addrEnd > _addrSpaceEnd)
-        addrEnd = _addrSpaceEnd;
-    // Make sure the interval is valid, swap the addresses, if necessary
-    if (addrStart > addrEnd) {
-        quint64 tmp = addrStart;
-        addrStart = addrEnd;
-        addrEnd = tmp;
-    }
-}
-
-
-template<class value_type, class value_accessor, class property_type>
 typename MemoryRangeTree<value_type, value_accessor, property_type>::ItemSet
 MemoryRangeTree<value_type, value_accessor, property_type>::objectsInRange(quint64 addrStart, quint64 addrEnd) const
 {
-    normalizeInterval(addrStart, addrEnd);
+    sanitizeInterval(addrStart, addrEnd);
     // Make sure the tree isn't empty and the address is in range
     if (!_root || addrStart > _addrSpaceEnd)
         return _emptyNodeSet;
@@ -751,12 +752,15 @@ MemoryRangeTree<value_type, value_accessor, property_type>::objectsInRange(quint
     }
 
     // Unite all mappings that are in the requested range
-    ItemSet result;
-    do {
-        result.unite(n->items);
-        n = n->next;
-    } while (n && addrEnd >= n->addrStart);
+    ItemSet result(n->items);
+    typename ItemSet::const_iterator it, e;
+    n = n->next;
+    while (n && addrEnd >= n->addrStart) {
+        for (it = n->items.constBegin(), e = n->items.constEnd(); it != e; ++it)
+            result.insert(*it);
 
+        n = n->next;
+    }
     return result;
 }
 
@@ -786,7 +790,7 @@ typename MemoryRangeTree<value_type, value_accessor, property_type>::Properties
 MemoryRangeTree<value_type, value_accessor, property_type>::propertiesOfRange(quint64 addrStart,
         quint64 addrEnd) const
 {
-    normalizeInterval(addrStart, addrEnd);
+    sanitizeInterval(addrStart, addrEnd);
    // Make sure the tree isn't empty and the address is in range
     if (!_root || addrStart > _addrSpaceEnd)
         return _emptyProperties;
