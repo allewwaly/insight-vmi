@@ -634,7 +634,7 @@ Instance Instance::memberCandidate(const StructuredMember* m,
 	// Otherwise use the alternative type
 	const ReferencingType::AltRefType& alt = m->altRefType(cndtIndex);
 	return alt.toInstance(_d.vmem, this, _d.type ? _d.type->factory() : 0,
-						  m->name(), _d.parentNames);
+						  m->name(), fullNameComponents());
 }
 
 
