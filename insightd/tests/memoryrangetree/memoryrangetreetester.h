@@ -58,8 +58,9 @@ private slots:
     void init();
     void cleanup();
 
-    void addressQuery();
-    void rangeQuery();
+    void randomAddressQuery();
+    void randomRangeQuery();
+    void findAllItems();
 
 private:
     TestItemList itemsInRange(quint64 startAddr, quint64 endAddr);
