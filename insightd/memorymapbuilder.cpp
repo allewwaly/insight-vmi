@@ -166,13 +166,14 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
     if (!inst->memberCount())
         return;
 
+    // Possible pointer types: Pointer and integers of pointer size
+    const int ptrTypes = rtPointer | rtFuncPointer |
+            ((_map->vmem()->memSpecs().arch & MemSpecs::ar_i386) ?
+                 (rtInt32 | rtUInt32) :
+                 (rtInt64 | rtUInt64));
+
     // Add all struct members to the stack that haven't been visited
     for (int i = 0; i < inst->memberCount(); ++i) {
-        // Possible pointer types: Pointer and integers of pointer size
-        const int ptrTypes = rtPointer | rtFuncPointer |
-                ((_map->vmem()->memSpecs().arch & MemSpecs::ar_i386) ?
-                     (rtInt32 | rtUInt32) :
-                     (rtInt64 | rtUInt64));
 
         // Get declared type of this member
         const BaseType* mBaseType = inst->memberType(i, BaseType::trLexical, true);
@@ -182,13 +183,16 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
         // Consider the members of nested structs recurisvely
         if (mBaseType->type() & StructOrUnion) {
             Instance mi = inst->member(i, BaseType::trLexical, true);
+            // Adjust instance name to reflect full path
+            if (node->name() != inst->name())
+                mi.setName(inst->name() + "." + mi.name());
             addMembers(&mi, node);
             continue;
         }
 
         // Skip members which cannot hold pointers
         const int candidateCnt = inst->memberCandidatesCount(i);
-        if (!candidateCnt && !(mBaseType && (mBaseType->type() & ptrTypes)))
+        if (!candidateCnt && !(mBaseType->type() & ptrTypes))
             continue;
 
         // No candidate types
@@ -198,7 +202,16 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                 // Only add pointer members with valid address
                 if (m.type() && m.type()->type() == rtPointer &&
                     _map->addressIsWellFormed(m))
-                    _map->addChildIfNotExistend(m, node, _index);
+                {
+                    int cnt;
+                    m = m.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
+                    if (cnt) {
+                        // Adjust instance name to reflect full path
+                        if (node->name() != inst->name())
+                            m.setName(inst->name() + "." + m.name());
+                        _map->addChildIfNotExistend(m, node, _index);
+                    }
+                }
             }
             catch (GenericException& e) {
                 // Do nothing
@@ -220,7 +233,8 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                     // Try this candidate
                     Instance m = inst->memberCandidate(i, j);
                     if (_map->addressIsWellFormed(m)) {
-                        float m_prob = _map->calculateNodeProbability(&m);
+                        float m_prob = _map->calculateNodeProbability(
+                                    &m, node->probability());
                         // Compare probabilities
                         if (m_prob > l_prob || likely.isNull()) {
                             l_prob = m_prob;
@@ -233,9 +247,17 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                 }
             }
             // Add the most likely candidate
-            if (!likely.isNull() && likely.type() &&
-                likely.type()->type() == rtPointer)
-                _map->addChildIfNotExistend(likely, node, _index);
+            if (!likely.isNull() && likely.type()) {
+                int cnt = 1;
+                if (likely.type()->type() == rtPointer)
+                    likely = likely.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
+                if (cnt || (likely.type()->type() & StructOrUnion)) {
+                    // Adjust instance name to reflect full path
+                    if (node->name() != inst->name())
+                        likely.setName(inst->name() + "." + likely.name());
+                    _map->addChildIfNotExistend(likely, node, _index);
+                }
+            }
         }
     }
 }
