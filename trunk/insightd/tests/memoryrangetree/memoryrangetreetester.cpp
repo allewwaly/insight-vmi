@@ -160,6 +160,60 @@ void MemoryRangeTreeTester::findAllItems()
 }
 
 
+void MemoryRangeTreeTester::iterator()
+{
+    QSet<const TestItem*> items;
+
+    for (TestTree::iterator it = _tree->begin(); it != _tree->end(); ++it) {
+        items.insert(*it);
+    }
+
+    QCOMPARE(_items.size(), items.size());
+}
+
+
+void MemoryRangeTreeTester::iteratorRev()
+{
+    QSet<const TestItem*> items;
+
+    TestTree::iterator it = _tree->end();
+    do {
+        --it;
+        items.insert(*it);
+    } while (it != _tree->begin());
+
+    QCOMPARE(_items.size(), items.size());
+}
+
+
+void MemoryRangeTreeTester::constIterator()
+{
+    QSet<const TestItem*> items;
+
+    for (TestTree::const_iterator it = _tree->constBegin();
+         it != _tree->constEnd(); ++it)
+    {
+        items.insert(*it);
+    }
+
+    QCOMPARE(_items.size(), items.size());
+}
+
+
+void MemoryRangeTreeTester::constIteratorRev()
+{
+    QSet<const TestItem*> items;
+
+    TestTree::const_iterator it = _tree->constEnd();
+    do {
+        --it;
+        items.insert(*it);
+    } while (it != _tree->constBegin());
+
+    QCOMPARE(_items.size(), items.size());
+}
+
+
 TestItemList MemoryRangeTreeTester::itemsInRange(quint64 startAddr, quint64 endAddr)
 {
     TestItemList ret;
