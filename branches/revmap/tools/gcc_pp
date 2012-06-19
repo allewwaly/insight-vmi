@@ -1,0 +1,165 @@
+#!/usr/bin/perl -w
+#
+# This is a wrapper for GCC that invokes the compiler two times: Once only
+# for pre-processing the source file and outputting it into a special 
+# directory, and a second time to acutally compile the file.
+#
+# The script parses the arguments to GCC and invokes the pre-processor only
+# if the compile flag is given, see $cc_c_flag. The name of the output file
+# for the pre-processed sources is taken from the name of the file to be
+# compiled with ".i" appended, e.g., "file.c.i".
+#
+# Written 2011 by Christian Schneider <chrschn@sec.in.tum.de>
+#
+
+use strict;
+
+# ----Configuration variables----
+
+# Directory to store the pre-processed files, relative to current directory
+my $output_dir = "./__PP__/";
+
+# Compiler binary to invoke
+my $cc_bin = "gcc";
+
+# Compiler flag to generate pre-processed output
+my $cc_pp_flag = "-E";
+
+# Compiler flag to compile a source file
+my $cc_c_flag = "-c";
+
+# Compiler flag to define output file
+my $cc_o_flag = "-o";
+
+# Compiler flags that expect a second argument, e. g., a directory
+my @cc_arg_flags = (
+	# Overall options
+	"-x",
+	# Optimization options
+	"--param",
+	"-m",
+	# Preprocessor options
+	"-idirafter",
+	"-include",
+	"-imacros",
+	"-iprefix",
+	"-iwithprefix",
+	"-iwithprefixbefore",
+	"-isystem",
+	"-imultilib",
+	"-isysroot",
+	"-Xpreprocessor",
+	# Assembler options
+	"-Xassembler",
+	# Linker options
+	"-T",
+	"-u",
+	# Target options
+	"-V",
+	"-b"
+);
+
+# ------End of configuration-----
+
+my @PP_ARGS = ();
+my $compile = 0;
+my $source = 0;
+my $assembly = 0;
+
+# Redirect debug output to STDERR
+select STDERR;
+my $debug = 0;
+
+# Parse the arguments and turn on pre-processing
+argloop:
+foreach (my $i = 0; $i < @ARGV; $i++) {
+	$debug && print "$i ";
+	# Transform the compile flag into a PP flag
+	if ($ARGV[$i] eq $cc_c_flag) {
+		$debug && print "Found compiler flag: ".$ARGV[$i]."\n";
+		push @PP_ARGS, $cc_pp_flag;
+		$compile = 1;
+	}
+	# Omit the output file
+	elsif ($ARGV[$i] =~ /^$cc_o_flag/) {
+		# Are flag and argument space delimited?
+		if ($ARGV[$i] eq $cc_o_flag) {
+			$debug && print "Omitting output: ".$ARGV[$i]." ".$ARGV[$i+1]."\n";
+			$i++;
+		}
+		else {
+			$debug && print "Omitting output: ".$ARGV[$i]."\n";
+		}
+	}
+	# Take flags, possibily with additional arguments
+	elsif ($ARGV[$i] =~ /^-./) {
+		# Is this a flag with extra argument?
+		foreach my $flag(@cc_arg_flags) {
+			if ($ARGV[$i] =~ /^$flag/) {
+				# Are flag and argument space delimited?
+				if ($ARGV[$i] eq $flag) {
+					$debug && print "Take over flag with arg: ".$ARGV[$i]." ".$ARGV[$i+1]."\n";
+					push @PP_ARGS, $ARGV[$i], $ARGV[$i+1];
+					$i++;
+				}
+				else {
+					$debug && print "Take over flag with arg: ".$ARGV[$i]."\n";
+					push @PP_ARGS, $ARGV[$i];
+				}
+				next argloop;
+			}
+		}
+		
+		$debug && print "Take over regular flag: ".$ARGV[$i]."\n";
+		push @PP_ARGS, $ARGV[$i];
+	}
+	# 
+	# Must be the source file
+	elsif (($ARGV[$i] eq "-") || (! ($ARGV[$i] =~ /^-/)) && (-e $ARGV[$i]) && (! -d $ARGV[$i])) {
+		$debug && print "Found source file: ".$ARGV[$i]."\n";
+		$source = $ARGV[$i];
+		$assembly = 1 if ($source =~ /\.S$/);
+	}
+	# Take over all other arguments
+	else {
+		die "$0: Don't know what kind of argument that is: \"".$ARGV[$i]."\". Maybe parameter \"".$ARGV[$i-1]."\" should be added to the \@cc_arg_flags array.\n";
+	}
+}
+
+# Was this a compilation invokation for a regular C source file?
+if ($compile && !$assembly && ("-" ne $source)) {
+	if (!$source) {
+		die "$0: Did not find the source file! Command was:\n".__FILE__." ".join(" ", @ARGV)."\n";
+	}
+
+	# Generate output names
+	$source =~ /^\/*(.+\/)?([^\/]+)(\.[a-z]*)?/ || die "$0: Very strange source file: $source\n";
+	
+	my $outdir = $output_dir;
+	$outdir .= $1 if ($1);		
+	my $outfile = $outdir.$2.".i";
+
+	# Create output directory
+	if (! -d $outdir) {
+		my $dir = "";
+		foreach my $part(split /\/+/, $outdir) {
+			$dir .= $part."/";
+			mkdir $dir if (! -d $dir);
+		}
+	}
+
+	# Prepare preprocessor invokation
+	push @PP_ARGS, $cc_o_flag, $outfile, $source;
+	unshift @PP_ARGS, $cc_bin;
+
+	# Invoke preprocessor
+	$debug && print "Invoking preprocessor: ".join(" ", @PP_ARGS)."\n";	
+	system(@PP_ARGS) && die "$0: Error calling ".join(" ", @PP_ARGS);
+}
+
+# Prepare compiler invocation
+unshift @ARGV, $cc_bin;
+
+#Invoke compiler
+$debug && print "Invoking compiler: ".join(" ", @ARGV)."\n";
+exec @ARGV;
