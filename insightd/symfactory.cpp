@@ -884,6 +884,7 @@ BaseType* SymFactory::getNumericInstance(const ASTType* astType)
 
     TypeInfo info;
     info.setSymType(hsBaseType);
+    info.setName(astType->identifier());
 
     // Type size
     switch (astType->type()) {
@@ -1630,7 +1631,6 @@ BaseTypeList SymFactory::typedefsOfType(BaseType* type)
 }
 
 
-
 FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                                                     ASTTypeEvaluator* eval)
 {
@@ -1835,11 +1835,12 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
         }
     }
 
-    BaseTypeList candidates, nextCandidates, typesUsingSrc, ptrBaseTypes;
+    BaseTypeList candidates, nextCandidates, typesUsingSrc, ptrBaseTypes,
+            removedBaseTypes;
 
     // Now go through the baseTypes and find its usages as pointers or
     // arrays as in preceedingPtrs
-    for (int i = 0; i < baseTypes.size(); ++i) {
+    for (int i = baseTypes.size() - 1; i >= 0; --i) {
         candidates.clear();
         candidates += baseTypes[i];
         // Try to match all pointer/array usages
@@ -1879,11 +1880,21 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
         // Did we find a candidate?
         if (!candidates.isEmpty()) {
             // Just use the first
-            ptrBaseTypes += candidates.first();
+            ptrBaseTypes.prepend(candidates.first());
         }
-        // No, so we create the type ourself
+        // No, so delete the base type from the list as well
         else {
-            BaseType* ptrBaseType = baseTypes[i];
+            removedBaseTypes += baseTypes[i];
+            baseTypes.removeAt(i);
+        }
+    }
+
+    // Check if we threw out all types because we did not find a correspondig
+    // pointer type
+    if (baseTypes.isEmpty() && !removedBaseTypes.isEmpty()) {
+        // Create the pointer types for the thrown-out types ourselves
+        for (int i = 0; i < removedBaseTypes.size(); ++i) {
+            BaseType* ptrBaseType = removedBaseTypes[i];
             for (int j = preceedingPtrs.size() - 1; j >= 0; --j) {
                 // Create "next" pointer
                 Pointer* ptr = 0;
@@ -1906,7 +1917,14 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                 ptrBaseType = ptr;
             }
 
+            baseTypes += removedBaseTypes[i];
             ptrBaseTypes += ptrBaseType;
+
+//            debugmsg(QString("Created pointer type 0x%1 %2 for type 0x%3 %4")
+//                     .arg((uint) ptrBaseType->id(), 0, 16)
+//                     .arg(ptrBaseType->prettyName())
+//                     .arg((uint) removedBaseTypes[i]->id(), 0, 16)
+//                     .arg(removedBaseTypes[i]->prettyName()));
         }
     }
 
@@ -1925,8 +1943,24 @@ void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
     BaseType* srcBaseType = 0;
     if (srcTypeRet.types.isEmpty())
         factoryError("Could not find source BaseType.");
-    else
+    else {
         srcBaseType = srcTypeRet.types.first();
+
+        if (srcTypeRet.types.size() > 1) {
+            QString s = QString("Source AST type \"%1\" has %2 base types:")
+                                 .arg(ed->srcType->toString())
+                                 .arg(srcTypeRet.types.size());
+
+            assert(srcTypeRet.types.size() == srcTypeRet.typesNonPtr.size());
+            for (int i = 0; i < srcTypeRet.types.size(); ++i)
+                s += QString("\n    Ptr: 0x%1 %2 -> NPtr: 0x%3 %4")
+                        .arg((uint) srcTypeRet.types[i]->id(), 0, 16)
+                        .arg(srcTypeRet.types[i]->prettyName())
+                        .arg((uint) srcTypeRet.typesNonPtr[i]->id(), 0, 16)
+                        .arg(srcTypeRet.typesNonPtr[i]->prettyName());
+            debugmsg(s + "\n");
+        }
+    }
 
     // Find the target base types
     FoundBaseTypes targetTypeRet = findBaseTypesForAstType(ed->targetType, eval);
