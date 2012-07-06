@@ -1496,8 +1496,15 @@ ASTType* ASTTypeEvaluator::typeofSymbol(const ASTSymbol* sym)
 ASTType* ASTTypeEvaluator::typeofBuiltinType(const pASTTokenList list,
 											 const ASTNode *node)
 {
-	RealType type = evaluateBuiltinType(list);
-	return type ? createASTType(type, node) : 0;
+	QString tokens;
+	RealType type = evaluateBuiltinType(list, &tokens);
+	if (type == rtUndefined)
+		return 0;
+
+	ASTType* astType = createASTType(type, node);
+	astType->setIdentifier(tokens);
+
+	return astType;
 }
 
 
@@ -4218,7 +4225,8 @@ ASTType* ASTTypeEvaluator::typeofTypeId(const ASTNode *node)
 }
 
 
-RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list) const
+RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list,
+											   QString* pTokens) const
 {
 	if (!list)
 		return rtUndefined;
@@ -4244,9 +4252,14 @@ RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list) const
 	};
 
 	int types = 0, flags = 0;
+	QString tokens;
 
 	for (pASTTokenList p = list; p; p = p->next) {
 		QString tok = antlrTokenToStr(p->item);
+
+		if (!tokens.isEmpty())
+			tokens += " ";
+		tokens += tok;
 
 		// Types
 		if (tok == "void")
@@ -4291,22 +4304,39 @@ RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list) const
 	if (types & tVoid)
 		return rtVoid;
 
-	if (types & tChar)
+	if (types & tChar) {
+		if (pTokens)
+			*pTokens = (flags & fUnsigned) ? "unsigned char" : "char";
 		return (flags & fUnsigned) ? rtUInt8 : rtInt8;
+	}
 
-	if (types & tBool)
+	if (types & tBool) {
+		if (pTokens)
+			*pTokens = tokens;
 		return rtBool8;
+	}
 
 	if (types & tInt) {
-		if (flags & fShort)
+		if (flags & fShort) {
+			if (pTokens)
+				*pTokens = (flags & fUnsigned) ? "short unsigned int" : "short int";
 			return (flags & fUnsigned) ? rtUInt16 : rtInt16;
-		if (flags & fLongLong)
+		}
+		if (flags & fLongLong) {
+			if (pTokens)
+				*pTokens = (flags & fUnsigned) ? "long long unsigned int" : "long long int";
 			return (flags & fUnsigned) ? rtUInt64 : rtInt64;
+		}
 		if (flags & fLong) {
+			if (pTokens)
+				*pTokens = (flags & fUnsigned) ? "long unsigned int" : "long int";
 			return (flags & fUnsigned) ? realTypeOfULong() : realTypeOfLong();
 		}
-		else
-		    return (flags & fUnsigned) ? rtUInt32 : rtInt32;
+		else {
+			if (pTokens)
+				*pTokens = (flags & fUnsigned) ? "unsigned int" : "int";
+			return (flags & fUnsigned) ? rtUInt32 : rtInt32;
+		}
 	}
 
 	if (types & tFloat)
@@ -4323,14 +4353,9 @@ RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list) const
 	if (types & tVaList)
 		return rtVaList;
 
-
-	QStringList tokens;
-	for (pASTTokenList p = list; p; p = p->next)
-		tokens.append(antlrTokenToStr(p->item));
-
     typeEvaluatorError(
             QString("Cannot resolve base type for \"%1\" at %2:%3")
-            .arg(tokens.join(" "))
+            .arg(tokens)
             .arg(_ast->fileName())
             .arg(list->item->line));
 

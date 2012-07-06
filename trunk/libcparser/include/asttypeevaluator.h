@@ -285,7 +285,7 @@ private:
                            ASTType* next = 0);
     ASTType* copyDeepAppend(const ASTType* src, ASTType* next);
     ASTType* copyDeep(const ASTType* src);
-    RealType evaluateBuiltinType(const pASTTokenList list) const;
+    RealType evaluateBuiltinType(const pASTTokenList list, QString *pTokens) const;
     ASTType* typeofTypeId(const ASTNode* node);
     inline RealType realTypeOfLong() const;
     inline RealType realTypeOfULong() const;
