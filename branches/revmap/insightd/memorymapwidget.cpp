@@ -6,6 +6,7 @@
  */
 
 #include "memorymapwidget.h"
+#include "memorymapwindow.h"
 #include <QApplication>
 #include <QEvent>
 #include <QPainter>
@@ -19,6 +20,7 @@
 #include <QTextDocument>
 #include <QTextCursor>
 #include <QTextTable>
+#include <QTextEdit>
 #include <math.h>
 #include "memorymaprangetree.h"
 #include "virtualmemory.h"
@@ -300,6 +302,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
 
 bool MemoryMapWidget::event(QEvent *event)
 {
+    /*
     if (event->type() == QEvent::ToolTip) {
         QHelpEvent* helpEvent = static_cast<QHelpEvent *>(event);
 
@@ -307,6 +310,16 @@ bool MemoryMapWidget::event(QEvent *event)
         int x = helpEvent->x() - margin, y = helpEvent->y() - margin;
         if (x < 0 || y < 0 || x >= drawWidth() || y >= drawHeight()) {
             QToolTip::hideText();
+            event->ignore();
+        }
+        else {
+    */
+    if(event->type() == QEvent::MouseButtonRelease) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent *>(event);
+
+        // Find out at which address the mouse pointer is
+        int x = mouseEvent->x() - margin, y = mouseEvent->y() - margin;
+        if (x < 0 || y < 0 || x >= drawWidth() || y >= drawHeight()) {
             event->ignore();
         }
         else {
@@ -323,8 +336,13 @@ bool MemoryMapWidget::event(QEvent *event)
             }
             int width = _map && _map->addrSpaceEnd() >= (1ULL << 32) ? 16 : 8;
 
-            QTextDocument doc;
-            QTextCursor cur(&doc);
+            // create new doc
+            if(_doc)
+                delete _doc;
+
+            _doc = new QTextDocument();
+
+            QTextCursor cur(_doc);
 
             QTextBlockFormat hdrBlkFmt;
             hdrBlkFmt.setAlignment(Qt::AlignHCenter);
@@ -335,7 +353,7 @@ bool MemoryMapWidget::event(QEvent *event)
 
             QFont font; // = doc.defaultFont();
             font.setPointSizeF(8);
-            doc.setDefaultFont(font);
+            _doc->setDefaultFont(font);
 
             const QTextBlockFormat defBlkFmt = cur.blockFormat();
             const QTextCharFormat defCharFmt = cur.charFormat();
@@ -363,8 +381,8 @@ bool MemoryMapWidget::event(QEvent *event)
             qSort(nodes.begin(), nodes.end(), NodeProbabilityGreaterThan);
 
             if (!nodes.isEmpty()) {
-                const int maxTables = 1;
-                const int maxRowsPerTable = 30;
+                const int maxTables = 20;
+                const int maxRowsPerTable = 100;
                 int rows = nodes.size() > maxTables * maxRowsPerTable ?
                         maxTables * maxRowsPerTable : nodes.size();
 
@@ -380,14 +398,16 @@ bool MemoryMapWidget::event(QEvent *event)
                 int rowCnt = 0;
                 for (ConstNodeList::iterator it = nodes.begin();
                         it != nodes.end() && rowCnt < rows;
-                        ++it, ++rowCnt)
+                       ++it, ++rowCnt)
                 {
+
                     if (rowCnt % maxRowsPerTable == 0) {
                         int r = rows - rowCnt >= maxRowsPerTable ?
                                 maxRowsPerTable : rows - rowCnt;
                         cur.movePosition(QTextCursor::End);
                         cur.insertTable(r, 4, tabFmt);
                     }
+
 
                     const MemoryMapNode* node = *it;
                     int colorIdx = (unsigned char)(PROB_MAX * node->probability());
@@ -417,15 +437,20 @@ bool MemoryMapWidget::event(QEvent *event)
                     cur.movePosition(QTextCursor::NextCell);
                 }
 
+
                 if (rows < nodes.size()) {
                     cur.movePosition(QTextCursor::End);
                     cur.insertBlock(defBlkFmt, defCharFmt);
                     cur.insertText(QString("(%1 more)")
                             .arg(nodes.size() - rows));
                 }
+
             }
 
-            QToolTip::showText(helpEvent->globalPos(), doc.toHtml());
+            //debugmsg("this worked");
+
+            ((MemoryMapWindow *)parentWidget())->info()->setDocument(_doc);
+            //QToolTip::showText(helpEvent->globalPos(), doc.toHtml());
         }
 
         return true;

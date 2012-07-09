@@ -2,6 +2,7 @@
 #define MEMORYMAPWINDOW_H
 
 #include <QtGui/QMainWindow>
+#include <QTextEdit>
 #include "ui_memorymapwindow.h"
 
 class MemoryMapWidget;
@@ -20,6 +21,8 @@ public:
 //    void setMap(const MemoryMap* map);
     MemoryMapWidget* mapWidget();
 
+    QTextEdit* info();
+
 private slots:
     void virtualAddressChanged(quint64 address);
 //    void memMapBuildingStarted();
@@ -29,6 +32,7 @@ private:
     Ui::MemoryMapWindowClass ui;
     MemoryMapWidget* _memMapWidget;
     QLabel* _sbCursorPosition;
+    QTextEdit* _info;
 //    QLabel* _sbBuildingMsg;
 //    QProgressBar* _sbBuildingProgBar;
 };
