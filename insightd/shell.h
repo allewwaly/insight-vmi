@@ -277,6 +277,7 @@ private:
     int cmdListSources(QStringList args);
     int cmdListTypes(QStringList args, int typeFilter = -1);
     int cmdListVars(QStringList args);
+    int cmdListVarsUsing(QStringList args);
     int cmdListTypesUsing(QStringList args);
     int cmdListTypesById(QStringList args);
     int cmdListTypesByName(QStringList args);
