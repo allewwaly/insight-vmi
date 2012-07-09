@@ -373,10 +373,13 @@ public:
 
     QList<BaseType*> typesUsingId(int id) const;
 
+    QList<Variable*> varsUsingId(int id) const;
+
     void typeAlternateUsage(const TypeEvalDetails *ed, ASTTypeEvaluator* eval);
 
     FoundBaseTypes findBaseTypesForAstType(const ASTType* astType,
-                                            ASTTypeEvaluator *eval);
+                                            ASTTypeEvaluator *eval,
+                                           bool includeCustomTypes = false);
 
 	/**
 	 * Creates a new ASTExpression object of the given type \a type. This object
