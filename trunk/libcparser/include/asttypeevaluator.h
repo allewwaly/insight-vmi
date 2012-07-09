@@ -249,6 +249,7 @@ protected:
     void appendTransformations(const ASTNode *node,
                                SymbolTransformations *transformations) const;
     void collectSymbols(const ASTNode *node);
+    bool canHoldPointerValue(RealType type) const;
     void evaluateIdentifierPointsTo(const ASTNode *node);
     int evaluateIdentifierPointsToRek(PointsToEvalState *es);
     void evaluateIdentifierPointsToRev(const ASTNode *node);
