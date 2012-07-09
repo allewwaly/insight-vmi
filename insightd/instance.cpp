@@ -445,6 +445,20 @@ Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
 	return Instance();
 }
 
+Instance Instance::memberByOffset(quint64 off) const
+{
+    const Structured* s = dynamic_cast<const Structured*>(_d.type);
+
+    for(int i = 0; i < s->members().size(); i++) {
+        StructuredMember* m = s->members().at(i);
+
+        if(m->offset() == off)
+            return member(i);
+    }
+
+    return Instance();
+}
+
 
 const BaseType* Instance::memberType(int index, int resolveTypes,
 									 bool declaredType) const
@@ -469,7 +483,7 @@ quint64 Instance::memberAddress(int index, bool declaredType) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && index >= 0 && index < s->members().size()) {
-		const StructuredMember* m = s->members().at(index);
+        const StructuredMember* m = s->members().at(index);
 		if (declaredType || m->altRefTypeCount() != 1)
 			return _d.address + m->offset();
 		else {
@@ -696,3 +710,16 @@ ExpressionResult Instance::toExpressionResult() const
 		return ExpressionResult(erUndefined);
 	}
 }
+
+
+bool Instance::isListHead() const
+{
+    /// @todo There is probably a more elegant way to achieve that...
+    if(memberCount() == 2 && typeName().compare("struct list_head") == 0)
+    {
+        return true;
+    }
+
+    return false;
+}
+

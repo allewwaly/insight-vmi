@@ -10,6 +10,7 @@
 
 #include <QWidget>
 #include <QMutex>
+#include <QTextDocument>
 
 class QEvent;
 class QPaintEvent;
@@ -71,6 +72,7 @@ private:
     bool _showOnlyKernelSpace;
     QMutex _buildMutex;
     MemSpecs _specs;
+    QTextDocument *_doc;
 
 signals:
     void addressChanged(quint64 address);

@@ -198,6 +198,8 @@ void MemoryMap::build(float minProbability)
                     << ", pmemMap nodes = " << _pmemMap.nodeCount()
                     << ", queue = " << queue_size << " " << indicator
                     << ", probability = " << (node ? node->probability() : 1.0)
+                    << ", max_prob " << _shared->queue.largest()->probability()
+                    << ", min_prob " << _shared->queue.smallest()->probability()
                     << endl;
             prev_queue_size = queue_size;
         }
@@ -222,7 +224,9 @@ void MemoryMap::build(float minProbability)
     // Now wait for all threads and free them again
     for (int i = 0; i < _shared->threadCount; ++i) {
         if (threads[i]->isRunning())
+        {
             threads[i]->wait();
+        }
         delete threads[i];
     }
 
@@ -460,7 +464,7 @@ bool MemoryMap::dump(const QString &fileName) const
     int count = 0, totalCount = 0;
     for (IntNodeHash::const_iterator it = _typeInstances.begin(),
          e = _typeInstances.end(); it != e; ++it)
-    {
+    {   
         ++totalCount;
         const MemoryMapNode* node = *it;
         // Are there overlapping objects?
@@ -526,6 +530,74 @@ bool MemoryMap::dump(const QString &fileName) const
     return true;
 }
 
+void MemoryMap::dumpInitHelper(QTextStream &out, MemoryMapNode *node, quint32 curLvl, const quint32 level) const
+{
+    MemoryMapNode *tmp = node;
+    quint32 tmpLvl = curLvl;
+
+    for(int i = 0; i < node->children().size(); ++i) {
+        tmp = node->children().at(i);
+
+        out << left;
+
+        for(tmpLvl = curLvl; tmpLvl > 0; --tmpLvl) {
+            out << "\t";
+        }
+
+        out << " |-" << qSetFieldWidth(0) << "0x" << hex << qSetFieldWidth(16) << tmp->address()
+            << qSetFieldWidth(0) << " "
+            << left << qSetFieldWidth(6) << QString::number(tmp->probability(), 'f', 4)
+            << qSetFieldWidth(0)
+            << " \"" << tmp->fullName() << "\""
+            << qSetFieldWidth(0)
+            << " (" << tmp->type()->prettyName() << ")";
+
+        if(tmp->hasCandidates() && !tmp->getCandidatesComplete()) {
+            out << qSetFieldWidth(0)
+                << " [!]"
+                << endl;
+        } else {
+            out << endl;
+        }
+
+
+        if(tmp->children().size() > 0 && curLvl < level)
+            dumpInitHelper(out, tmp, curLvl + 1, level);
+
+    }
+}
+
+bool MemoryMap::dumpInit(const QString &fileName, const quint32 level) const
+{
+    MemoryMapNode *init_task = _roots.at(0);
+
+    if(!init_task)
+        return false;
+
+    QFile fout(fileName);
+
+    if (!fout.open(QFile::WriteOnly|QFile::Truncate))
+        return false;
+
+    QTextStream out(&fout);
+
+
+    out << left << qSetFieldWidth(0) << "0x" << hex << qSetFieldWidth(16) << init_task->address()
+        << qSetFieldWidth(0) << " "
+        << left << qSetFieldWidth(6) << QString::number(init_task->probability(), 'f', 4)
+        << qSetFieldWidth(0)
+        << " \"" << init_task->fullName() << "\""
+        << qSetFieldWidth(0)
+        << " (" << init_task->type()->prettyName() << ")"
+        << endl;
+
+    dumpInitHelper(out, init_task, 0, level);
+
+    fout.close();
+
+    return true;
+}
+
 
 bool MemoryMap::addressIsWellFormed(quint64 address) const
 {
@@ -562,7 +634,7 @@ bool MemoryMap::objectIsSane(const Instance& inst,
     static const float prob_significance_delta = 0.1;
 
     // Don't add null pointers
-    if (inst.isNull())
+    if (inst.isNull() || !parent)
         return false;
 
     if (_vmemMap.isEmpty())
@@ -575,29 +647,36 @@ bool MemoryMap::objectIsSane(const Instance& inst,
 
     bool isSane = true;
 
+    /*
     // Check if the list contains an object within the same memory region with a
     // significantly higher probability
     MemMapSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
 
+
     for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
         const MemoryMapNode* otherNode = *it;
-
         // Is the the same object already contained?
         bool ok1 = false, ok2 = false;
-        if (otherNode->address() == inst.address() &&
+        if (otherNode && otherNode->address() == inst.address() &&
                 otherNode->type() && inst.type() &&
                 otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
                 ok1 && ok2)
+        {
             isSane = false;
-        // Is this an overlapping object with a significantly higher
-        // probability?
+        }
         else {
+
+            // Is this an overlapping object with a significantly higher
+            // probability?
             float instProb =
-                    calculateNodeProbability(&inst, parent->probability());
+                    calculateNodeProbability(&inst);
             if (instProb + prob_significance_delta <= otherNode->probability())
                 isSane = false;
         }
+
+
     }
+    */
 
     // Decrease the reading counter again
     _shared->vmemReadingLock.lock();
@@ -606,12 +685,14 @@ bool MemoryMap::objectIsSane(const Instance& inst,
     // Wake up any sleeping thread
     _shared->vmemReadingDone.wakeAll();
 
+
     return isSane;
 }
 
 
-bool MemoryMap::addChildIfNotExistend(const Instance& inst,
-        MemoryMapNode* parent, int threadIndex)
+MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
+        MemoryMapNode* parent, int threadIndex, quint64 addrInParent,
+        bool hasCandidates)
 {
     static const int interestingTypes =
             BaseType::trLexical |
@@ -625,7 +706,7 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
     const Instance i = (inst.type()->type() & BaseType::trLexical) ?
             inst.dereference(BaseType::trLexical) : inst;
 
-    bool result = false;
+    MemoryMapNode *child = NULL;
 
     if (!i.isNull() && i.type() && (i.type()->type() & interestingTypes))
     {
@@ -646,6 +727,7 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
             else
                 ++idx;
         }
+
         // No conflicts anymore, so we lock our current address
         _shared->currAddresses[threadIndex] = i.address();
         _shared->perThreadLock[threadIndex].lock();
@@ -653,8 +735,25 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
         _shared->currAddressesLock.unlock();
 
         if (objectIsSane(i, parent)) {
+
             _shared->mapNodeLock.lock();
-            MemoryMapNode* child = parent->addChild(i);
+            try {
+                child = parent->addChild(i, addrInParent, hasCandidates);
+            }
+            catch(GenericException& ge) {
+                // The address of the instance is invalid
+                debugmsg(ge.message);
+
+                debugmsg("exception fail");
+
+                // Release locks and return
+                _shared->currAddresses[threadIndex] = 0;
+                _shared->perThreadLock[threadIndex].unlock();
+                _shared->mapNodeLock.unlock();
+
+                return child;
+            }
+
             _shared->mapNodeLock.unlock();
 
             // Acquire the writing lock
@@ -662,6 +761,7 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
 
             // Wait until there is no more reader and we hold the read lock
             _shared->vmemReadingLock.lock();
+
             while (_shared->vmemReading > 0) {
                 _shared->vmemReadingDone.wait(&_shared->vmemReadingLock);
                 // Keep the reading lock until we have finished writing
@@ -683,8 +783,8 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
 //            if ((parent->type()->dereferencedType(BaseType::trLexical) & StructOrUnion) &&
 //                child->type()->dereferencedType(BaseType::trLexical) & StructOrUnion)
 //                debugerr("This should not happen! " << child->fullName());
-
-            result = true;
+        } else {
+            debugmsg("Object sane fail!");
         }
 
         // Done, release our current address (no need to hold currAddressesLock)
@@ -693,21 +793,20 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
 //        // Wake up a waiting thread (if it exists)
 //        _shared->threadDone[threadIndex].wakeOne();
 
+    } else {
+        debugmsg("object type fail: " << inst.typeName());
     }
 
-    return result;
+    return child;
 }
 
 
-float MemoryMap::calculateNodeProbability(const Instance* inst,
-        float parentProbability) const
+float MemoryMap::calculateNodeProbability(const Instance* inst) const
 {
-    // Degradation of 0.1% per parent-child relation.
-    static const float degPerGeneration = 0.999;
-
     // Degradation of 20% for address of this node not being aligned at 4 byte
     // boundary
-    static const float degForUnalignedAddr = 0.8;
+    //static const float degForUnalignedAddr = 0.8;
+    static const float degForUnalignedAddr = 1.0;
 
     // Degradation of 5% for address begin in userland
     static const float degForUserlandAddr = 0.95;
@@ -715,20 +814,26 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
     // Degradation of 90% for an invalid address of this node
     static const float degForInvalidAddr = 0.1;
 
+    // Degradation of 90% for an invalid list_head within this node
+    static const float degForInvalidListHead = 0.1;
+
     // Max. degradation of 30% for non-aligned pointer childen the type of this
     // node has
-    static const float degForNonAlignedChildAddr = 0.7;
+    // static const float degForNonAlignedChildAddr = 0.7;
+    static const float degForNonAlignedChildAddr = 1.0;
 
     // Max. degradation of 50% for invalid pointer childen the type of this node
     // has
-    static const float degForInvalidChildAddr = 0.5;
+    // static const float degForInvalidChildAddr = 0.5;
+    static const float degForInvalidChildAddr = 1.0;
 
-    float prob = parentProbability < 0 ?
-                 1.0 :
-                 parentProbability * degPerGeneration;
+    // Stores the final probability value
+    float prob = 1.0;
 
-    if (parentProbability >= 0)
-        degPerGenerationCnt++;
+    // Store the number of children that we verify to calculate a weighted
+    // probability
+    quint32 pointer = 0, listHeads = 0;
+
 
     // Check userland address
     if (inst->address() < _vmem->memSpecs().pageOffset) {
@@ -756,7 +861,11 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
     {
         const Structured* structured =
                 dynamic_cast<const Structured*>(instType);
-        quint32 nonAlignedChildAddrCnt = 0, invalidChildAddrCnt = 0;
+
+        // Store the invalid member count
+        quint32 nonAlignedChildAddrCnt = 0, invalidChildAddrCnt = 0, invalidListHeadCnt = 0;
+
+
         // Check address of all descendant pointers
         for (MemberList::const_iterator it = structured->members().begin(),
              e = structured->members().end(); it != e; ++it)
@@ -764,7 +873,21 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
             const StructuredMember* m = *it;
             const BaseType* m_type = m->refTypeDeep(BaseType::trLexical);
 
+            // Create an instance if possible
+            Instance mi = Instance();
+            try {
+                mi = m->toInstance(inst->address(), _vmem, inst);
+            }
+            catch(GenericException& ge)
+            {
+                // Address invalid
+                mi = Instance();
+            }
+
+
             if (m_type && (m_type->type() & rtPointer)) {
+                pointer++;
+
                 try {
                     quint64 m_addr = inst->address() + m->offset();
                     // Try a safeSeek first to avoid costly throws of exceptions
@@ -793,19 +916,70 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
                     invalidChildAddrCnt++;
                 }
             }
+            else if(!mi.isNull() && mi.isListHead())
+            {
+                listHeads++;
+
+                // Check if a inst.list_head.next.prev pointer points to inst.list_head
+                // as it should. Penalty of 90% if this is not the case.
+                Instance iListHeadNext = mi.member(0, 0, -1, true);
+                if(!iListHeadNext.isNull() && iListHeadNext.type()
+                        && _vmem->safeSeek(iListHeadNext.address()))
+                {
+                    const BaseType *mNext = iListHeadNext.type();
+                    quint64 listHeadNext = (quint64)mNext->toPointer(_vmem, iListHeadNext.address());
+
+                    // A list_head.next pointer may be NULL
+                    if(listHeadNext == 0)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        // Check above mentioned condition
+                        if(_vmem->safeSeek(listHeadNext + mNext->size()))
+                        {
+                            quint64 listHeadNextPrev = (quint64)mNext->toPointer(_vmem, listHeadNext + mNext->size());
+
+                            if(mi.address() != listHeadNextPrev)
+                            {
+                                invalidListHeadCnt++;
+                            }
+                        }
+                        else {
+                            invalidListHeadCnt++;
+                        }
+                    }
+
+                }
+                else {
+                    invalidListHeadCnt++;
+                }
+            }
         }
 
-        // Penalize probabilities, weighted by total no. of children
+        // Penalize probabilities, weighted by number of meaningful children  
         if (nonAlignedChildAddrCnt) {
-            float invPart = nonAlignedChildAddrCnt / (float) structured->members().size();
+            float invPart = nonAlignedChildAddrCnt / (float) pointer;
             prob *= invPart * degForNonAlignedChildAddr + (1.0 - invPart);
             degForNonAlignedChildAddrCnt++;
         }
+
         if (invalidChildAddrCnt) {
-            float invPart = invalidChildAddrCnt / (float) structured->members().size();
+            float invPart = invalidChildAddrCnt / (float) pointer;
             prob *= invPart * degForInvalidChildAddr + (1.0 - invPart);
             degForInvalidChildAddrCnt++;
         }
+
+
+        // Penalize for invalid list_heads
+        if (invalidListHeadCnt) {
+            float invPart = invalidListHeadCnt / (float) listHeads;
+            prob *= invPart * degForInvalidListHead + (1.0 - invPart);
+            degForInvalidListHeadCnt++;
+        }
+
+
     }
     return prob;
 }

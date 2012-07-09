@@ -48,10 +48,10 @@ typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
 
 
-#define MAX_BUILDER_THREADS 2
+#define MAX_BUILDER_THREADS 1
 
 /**
- * Holds all variables that are shared amount the builder threads.
+ * Holds all variables that are shared among the builder threads.
  * \sa MemoryMapBuilder
  */
 struct BuilderSharedState
@@ -134,6 +134,8 @@ public:
 	void build(float minProbability = 0.0);
 
 	bool dump(const QString& fileName) const;
+    void dumpInitHelper(QTextStream &out, MemoryMapNode *node, quint32 curLvl, const quint32 level) const;
+    bool dumpInit(const QString &fileName, const quint32 level = 3) const;
 
 	/**
 	 * Finds the differences in physical memory between this and another memory
@@ -226,12 +228,9 @@ public:
      * Calculates the probability for the given Instance \a inst and
      * \a parentProbabilty.
      * @param inst Instance to calculate probability for
-     * @param parentProbability the anticipated probability of the parent node.
-     * Passing a negative number means that \a inst has no parent.
      * @return calculated probability
      */
-    float calculateNodeProbability(const Instance* inst,
-            float parentProbability = -1.0) const;
+    float calculateNodeProbability(const Instance* inst) const;
 
     /**
      * Inserts the given name \a name in the static list of names and returns
@@ -249,6 +248,7 @@ public:
 	mutable quint32 degForInvalidAddrCnt;
 	mutable quint32 degForNonAlignedChildAddrCnt;
 	mutable quint32 degForInvalidChildAddrCnt;
+    mutable quint32 degForInvalidListHeadCnt;
 #endif
 
 private:
@@ -297,11 +297,14 @@ private:
 	 * added, it is also appended to the queue \a queue for further processing.
 	 * @param inst the instance to create a new node from
 	 * @param parent the parent node of the new node to be created
-	 * @return \c true if a new node was added, \c false if that instance
-	 * already existed in the virtual memory mapping
+     * @param addrInParent the address of the member within the parent
+     * @param hasCandidates specifies if the node has candidates that will be
+     * added next
+     * @return \c A pointer to the new node if the node could be added, \c NULL
+     * if that instance already existed in the virtual memory mapping
 	 */
-	bool addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,
-	        int threadIndex);
+    MemoryMapNode * addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,
+            int threadIndex, quint64 addrInParent, bool hasCandidates = false);
 
     const SymFactory* _factory;  ///< holds the SymFactory to operate on
     VirtualMemory* _vmem;        ///< the virtual memory object this map is being built for

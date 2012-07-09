@@ -6,6 +6,7 @@
 #include <QHBoxLayout>
 #include <QCheckBox>
 #include <QLabel>
+#include <QTextEdit>
 //#include <QProgressBar>
 
 MemoryMapWindow* memMapWindow = 0;
@@ -32,12 +33,20 @@ MemoryMapWindow::MemoryMapWindow(QWidget *parent)
 	cbKernelSpaceOnly->setText(tr("Show only kernel space"));
 	cbKernelSpaceOnly->setChecked(false);
 
+    _info = new QTextEdit(this);
+    _info->setReadOnly(true);
+
 	QHBoxLayout* topLayout = new QHBoxLayout();
 	topLayout->addWidget(cbAntiAlias);
 	topLayout->addWidget(cbKernelSpaceOnly);
+    topLayout->addSpacing(_info->size().width());
+
+    QHBoxLayout* centerLayout = new QHBoxLayout();
+    centerLayout->addWidget(_memMapWidget, 3);
+    centerLayout->addWidget(_info, 2);
 
 	centralWidget()->layout()->addItem(topLayout);
-    centralWidget()->layout()->addWidget(_memMapWidget);
+    centralWidget()->layout()->addItem(centerLayout);
 
 	connect(_memMapWidget, SIGNAL(addressChanged(quint64)),
 	        SLOT(virtualAddressChanged(quint64)));
@@ -112,4 +121,9 @@ void MemoryMapWindow::virtualAddressChanged(quint64 address)
 MemoryMapWidget* MemoryMapWindow::mapWidget()
 {
     return _memMapWidget;
+}
+
+QTextEdit * MemoryMapWindow::info()
+{
+    return _info;
 }

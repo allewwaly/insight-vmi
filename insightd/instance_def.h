@@ -206,6 +206,13 @@ public:
     bool isAccessible() const;
 
     /**
+     * Checks if this instance is of type 'struct list_head'.
+     * @return \c true if this object is of type 'struct list_head', \c false
+     * otherwise
+     */
+    bool isListHead() const;
+
+    /**
      * Compares this Instance with \a other on a value basis. Two instances
      * must have the same BaseType as returned by type() to potentially be
      * equal. In addition, their following contents is compared to determine
@@ -309,6 +316,20 @@ public:
      */
     Instance member(int index, int resolveTypes = 0,
                     int maxPtrDeref = -1, bool declaredType = false) const;
+
+    /**
+     * Obtain the member of this instance that has the given offset provided that
+     * this instance is a structure. In case this instance is not a structure or
+     * if there is no member that has the given offset, a null Instance is returned.
+     *
+     * \note Make sure to check Instance::isNull() on the returned object to
+     * see if it is valid or not.
+     *
+     * @param off The offset of the member that we are looking for
+     * @return Instance object of the member at offset off or a null Instance
+     * \sa BaseType::TypeResolution
+     */
+     Instance memberByOffset(quint64 off) const;
 
     /**
      * Gives access to the BaseType's of a member, if this is a struct or union.

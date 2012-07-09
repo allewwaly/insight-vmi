@@ -128,7 +128,7 @@ void MemoryMapBuilder::run()
                 inst = inst.dereference(BaseType::trLexicalAndPointers, -1, &cnt);
 //                inst = inst.dereference(BaseType::trLexical, &cnt);
                 if (cnt && _map->addressIsWellFormed(inst))
-                    _map->addChildIfNotExistend(inst, node, _index);
+                    _map->addChildIfNotExistend(inst, node, _index, node->address());
             }
             catch (GenericException& e) {
                 // Do nothing
@@ -143,7 +143,7 @@ void MemoryMapBuilder::run()
                     try {
                         Instance e = inst.arrayElem(i);
                         if (_map->addressIsWellFormed(e))
-                            _map->addChildIfNotExistend(e, node, _index);
+                            _map->addChildIfNotExistend(e, node, _index, node->address() + (i * e.size()));
                     }
                     catch (GenericException& e) {
                         // Do nothing
@@ -186,7 +186,10 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
             // Adjust instance name to reflect full path
             if (node->name() != inst->name())
                 mi.setName(inst->name() + "." + mi.name());
-            addMembers(&mi, node);
+
+            _map->addChildIfNotExistend(mi, node, _index, inst->memberAddress(i));
+
+            // addMembers(&mi, node);
             continue;
         }
 
@@ -209,7 +212,7 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                         // Adjust instance name to reflect full path
                         if (node->name() != inst->name())
                             m.setName(inst->name() + "." + m.name());
-                        _map->addChildIfNotExistend(m, node, _index);
+                        _map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i));
                     }
                 }
             }
@@ -217,11 +220,15 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                 // Do nothing
             }
         }
-        // Multiple candidates, so find the most likely one
+        // Multiple candidates, add all that make sense at first glance
         else {
-            Instance likely;
-            float l_prob = 0.0;
+            MemoryMapNode *lastNode = NULL;
+            float penalize = 0.0;
+
             for (int j = 0; j < candidateCnt; ++j) {
+                // Reset the penalty
+                penalize = 0.0;
+
                 try {
                     const BaseType* type = inst->memberCandidateType(i, j);
                     type = type ? type->dereferencedBaseType(BaseType::trLexical) : 0;
@@ -230,34 +237,124 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                         ((type->type() & (rtPointer|rtArray)) &&
                          !dynamic_cast<const Pointer*>(type)->refType()))
                         continue;
+
                     // Try this candidate
                     Instance m = inst->memberCandidate(i, j);
-                    if (_map->addressIsWellFormed(m)) {
-                        float m_prob = _map->calculateNodeProbability(
-                                    &m, node->probability());
-                        // Compare probabilities
-                        if (m_prob > l_prob || likely.isNull()) {
-                            l_prob = m_prob;
-                            likely = m;
+
+                    if(_map->addressIsWellFormed(m)) {
+                        // We handle list_head instances seperately.
+                        if(inst->isListHead()) {
+                            // The candidate type must be a structure
+                            if(!(m.type()->type() & StructOrUnion))
+                            {
+                                //debugmsg("Out 1: " << m.fullName());
+
+                                // Penalty of 90%
+                                penalize = 0.9;
+                            }
+                            else {
+                                // Get the instance of the 'next' member within the list_head
+                                void *memberNext = inst->member(i).toPointer();
+
+                                // If this list head points to itself, we do not need to consider it
+                                // anymore.
+                                if((quint64)memberNext == inst->member(i).address())
+                                    continue;
+
+                                // The pointer can be NULL
+                                if((quint64)memberNext != 0) {
+
+                                    // Get the offset of the list_head struct within the candidate type
+                                    quint64 candOffset = (quint64)memberNext - m.address();
+
+                                    // Find the member based on the calculated offset within the candidate type
+                                    Instance candListHead = m.memberByOffset(candOffset);
+
+                                    // The member within the candidate type that the next pointer points to
+                                    // must be a list_head.
+                                    if(!candListHead.isNull() && candListHead.isListHead())
+                                    {
+                                        // Sanity check: The prev pointer of the list_head must point back to the
+                                        // original list_head
+                                        void *candListHeadPrev = candListHead.member(1).toPointer();
+
+                                        if((quint64)candListHeadPrev == (quint64)memberNext)
+                                        {
+
+                                            // At this point we know that the list_head struct within the candidate
+                                            // points indeed back to the list_head struct of the instance. However,
+                                            // if the offset of the list_head struct within the candidate is by chance
+                                            // equal to the real candidate or if the offset is zero, we will pass the
+                                            // check even though this may be the wrong candidate. This is why we use
+                                            // back propagation to calculate the final probabilities.
+                                            // _map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i));
+                                        }
+                                        else {
+                                            //debugmsg("Out 2: " << m.fullName());
+                                            // Penalty of 90%
+                                            penalize = 0.9;
+                                        }
+                                    }
+                                    else
+                                    {
+
+                                        //debugmsg("Out 3: " << m.fullName() << " (" << candListHead.typeName() << ")");
+                                        // Penalty of 90%
+                                        penalize = 0.9;
+                                    }
+                                }
+                            }
+
+
+                        }
+
+                        //if(inst->name().compare("init_task.sibling") == 0)
+                        //    debugmsg("sibling Candidate: " << m.name());
+
+
+                        // add node
+                        int cnt = 1;
+                        if (m.type()->type() == rtPointer)
+                            m = m.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
+                        if (cnt || (m.type()->type() & StructOrUnion)) {
+                            // Adjust instance name to reflect full path
+                            if (node->name() != inst->name())
+                                m.setName(inst->name() + "." + m.name());
+
+                            debugmsg("try:");
+
+                            lastNode = _map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i), true);
+
+                            if(lastNode == NULL) {
+                                debugmsg("Creation failed " << node->fullName() << "." << m.name());
+                            }
+                            else {
+                                // Set penalty
+                                float m_prob = lastNode->getInitialProbability() - penalize;
+
+                                if(m_prob < 0)
+                                    lastNode->setInitialProbability(0.0);
+                                else
+                                    lastNode->setInitialProbability(m_prob);
+                            }
                         }
                     }
                 }
                 catch (GenericException& e) {
                     // Do nothing
+                    //debugmsg("EXCEPTION!");
                 }
             }
-            // Add the most likely candidate
-            if (!likely.isNull() && likely.type()) {
-                int cnt = 1;
-                if (likely.type()->type() == rtPointer)
-                    likely = likely.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
-                if (cnt || (likely.type()->type() & StructOrUnion)) {
-                    // Adjust instance name to reflect full path
-                    if (node->name() != inst->name())
-                        likely.setName(inst->name() + "." + likely.name());
-                    _map->addChildIfNotExistend(likely, node, _index);
-                }
-            }
+
+            // Finish the canidate list.
+            if(lastNode)
+                lastNode->completeCandidates();
+            //else
+                ///debugmsg(inst->fullName() << " (" << inst->memberCandidatesCount(i) << ")");
         }
+
+        // In case of a list_head we just consider the next pointer
+        if(inst->isListHead())
+            break;
     }
 }
