@@ -2701,6 +2701,7 @@ bool ASTTypeEvaluator::canHoldPointerValue(RealType type) const
     case rtUInt8:
     case rtInt16:
     case rtUInt16:
+    case rtEnum:
         return false;
 
     case rtInt32:
