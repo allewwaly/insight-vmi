@@ -1431,6 +1431,47 @@ void SymFactory::symbolsFinished(RestoreType rt)
 
 void SymFactory::sourceParcingFinished()
 {
+    // Check if we can merge type copies again. We merge them when we find that
+    // all type copies belong to global variables and not to any struct/union.
+    BaseTypeList sameTypes;
+    for (int i = _types.size() - 1; i >= 0; --i) {
+        const BaseType *type = _types[i], *origType = 0;
+        // Skip non-artificial and non-struct/union types
+        if (type->id() >= 0 ||
+            !(type->dereferencedType(BaseType::trLexical) & StructOrUnion))
+            continue;
+
+        sameTypes.clear();
+        for (BaseTypeUIntHash::const_iterator
+             it = _typesByHash.find(type->hash()), e = _typesByHash.constEnd();
+             it != e && it.key() == type->hash();
+             ++it)
+        {
+            if (*it.value() == *type) {
+                if (it.value()->id() > 0)
+                    origType = it.value();
+                else
+                    sameTypes.append(it.value());
+            }
+        }
+
+        assert(origType != 0);
+        // If all artificial types are used by global variables, then merge them
+        bool merge = true;
+        for (int i = 0; i < sameTypes.size() && merge; ++i)
+            if (varsUsingId(sameTypes[i]->id()).isEmpty())
+                merge = false;
+        if (!merge)
+            continue;
+
+        // Replace all sameTypes with origType
+        VariableList vars;
+        for (int i = 0; i < sameTypes.size() && merge; ++i) {
+            vars = varsUsingId(sameTypes[i]->id());
+            /// @todo implement me
+        }
+    }
+
     shell->out() << "Statistics:" << endl;
     shell->out() << qSetFieldWidth(10) << right;
     shell->out() << "  | Type changes of struct members: " << _uniqeTypesChanged << endl;
