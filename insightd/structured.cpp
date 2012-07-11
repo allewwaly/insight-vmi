@@ -245,6 +245,19 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
                             .arg(col->color(ctReset))
                             .arg(col->prettyNameInColor(m->refType(), type_len))
                             .arg(addrStr);
+
+
+                    if(m->altRefTypeCount() > 1) {
+                        for (int j = 0; j < m->altRefTypeCount(); ++j) {
+                            const BaseType* t = m->altRefBaseType(j);
+                            s += QString("\n\t<%1>%2 0x%3 %4 : %5")
+                                    .arg(j+1)
+                                    .arg(col->color(ctTypeId))
+                                    .arg((uint)t->id(), -8, 16)
+                                    .arg(col->prettyNameInColor(t, t->prettyName().length()))
+                                    .arg(m->altRefType(j).expr()->toString(true));
+                       }
+                    }
                 }
                 else {
                     s += QString("%0.  0x%1  %2 : %3 = %4")
@@ -253,6 +266,17 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
                             .arg(m->name(), -name_len)
                             .arg(m->refType()->prettyName(), -type_len)
                             .arg(addrStr);
+
+                    if(m->altRefTypeCount() > 1) {
+                        for (int j = 0; j < m->altRefTypeCount(); ++j) {
+                            const BaseType* t = m->altRefBaseType(j);
+                            s += QString("\n\t<%1> 0x%2 %3 : %4")
+                                    .arg(j+1)
+                                    .arg((uint)t->id(), -8, 16)
+                                    .arg(t->prettyName())
+                                    .arg(m->altRefType(j).expr()->toString(true));
+                        }
+                    }
                 }
             }
             else {
@@ -266,6 +290,19 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
                             .arg(col->color(ctReset))
                             .arg(col->prettyNameInColor(m->refType(), type_len))
                             .arg(m->refType()->toString(mem, offset + m->offset(), col));
+
+                    if(m->altRefTypeCount() > 1) {
+                        for (int j = 0; j < m->altRefTypeCount(); ++j) {
+                            const BaseType* t = m->altRefBaseType(j);
+                            s += QString("\n\t<%1>%2 0x%3 %4 : %5")
+                                    .arg(j+1)
+                                    .arg(col->color(ctTypeId))
+                                    .arg((uint)t->id(), -8, 16)
+                                    .arg(col->prettyNameInColor(t, t->prettyName().length()))
+                                    .arg(m->altRefType(j).expr()->toString(true));
+                       }
+                    }
+
                 }
                 else {
                     s += QString("%0.  0x%1  %2 : %3 = %4")
@@ -274,6 +311,17 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
                             .arg(m->name(), -name_len)
                             .arg(m->refType()->prettyName(), -type_len)
                             .arg(m->refType()->toString(mem, offset + m->offset()));
+
+                    if(m->altRefTypeCount() > 1) {
+                        for (int j = 0; j < m->altRefTypeCount(); ++j) {
+                            const BaseType* t = m->altRefBaseType(j);
+                            s += QString("\n\t<%1> 0x%2 %3 : %4")
+                                    .arg(j+1)
+                                    .arg((uint)t->id(), -8, 16)
+                                    .arg(t->prettyName())
+                                    .arg(m->altRefType(j).expr()->toString(true));
+                        }
+                    }
                 }
             }
         }
@@ -296,6 +344,7 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
                         .arg(m->name(), -name_len)
                         .arg(m->refType()->prettyName(), -type_len)
                         .arg((uint)m->refTypeId(), 0, 16);
+
             }
         }
     }

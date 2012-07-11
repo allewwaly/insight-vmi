@@ -253,10 +253,18 @@ void MemoryMapNode::updateProbability(MemoryMapNode *initiator)
     // New probability
     prob = _initialProb * parentProb * childrenProb;
 
-    //debugmsg("parenProb: " << parentProb);
-    //debugmsg("initalProb: " << _initialProb);
-    //debugmsg("childrenProb: " << childrenProb);
-    //debugmsg("prob: " << prob);
+    /*
+    if(fullName().compare("init_task.active_mm.exe_file.f_mapping") == 0) {
+        debugmsg("parentProb: " << parentProb);
+        debugmsg("initalProb: " << _initialProb);
+        debugmsg("childrenProb: " << childrenProb);
+        debugmsg("prob: " << prob);
+    }
+
+
+    if(_probability == 1.0 && prob != 1.0)
+        debugmsg(this->fullName() << " triggers update.");
+    */
 
     if(prob != _probability) {
         _probability = prob;
@@ -264,29 +272,40 @@ void MemoryMapNode::updateProbability(MemoryMapNode *initiator)
         // Unlock before the update is propagated
         _mutex.unlock();
 
+        debugmsg(fullName() << " (" << type()->prettyName() << ")");
+        debugmsg("parentProb: " << parentProb);
+        debugmsg("initalProb: " << _initialProb);
+        debugmsg("childrenProb: " << childrenProb);
+        debugmsg("prob: " << prob);
+
         // Only update if this is the last candidate
         if((_hasCandidates && _candidatesComplete) || !_hasCandidates) {
 
-            // Update parent if any
-            if(_parent && initiator != _parent)
+            // Update parent only if it was not the initiator of the update and
+            // if the probability of this node is different than that of the parent
+            // otherwise the prob of the parent will be reduced by the child even though
+            // the child actually just inherited its prob from the parent.
+            if(_parent && initiator != _parent && _probability != parentProb) {
                 _parent->updateProbability(this);
 
-            // Update children
-            // Do this only in case the call did not come from the parent
-            // to take care of the recursion
-            if(initiator != _parent) {
-                // Update the children
-                for(int i = 0; i < _children.size(); ++i)
-                    _children[i]->updateProbability(this);
+                // The update will be propagated by the parent
+                return;
             }
+
+            // Update the children
+            for(int i = 0; i < _children.size(); ++i)
+                _children[i]->updateProbability(this);
+
         }
     }
     else {
         _mutex.unlock();
     }
 
-    //if(_name.compare("init_task") == 0)
-    //    debugmsg("Probability of init_task set to " << _probability << " (" << childrenProb << ")");
+    /*
+    if(_name.compare("init_task") == 0)
+        debugmsg("Probability of init_task set to " << _probability << " (" << childrenProb << ")");
+    */
 }
 
 

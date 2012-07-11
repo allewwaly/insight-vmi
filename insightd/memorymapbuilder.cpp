@@ -127,7 +127,10 @@ void MemoryMapBuilder::run()
                 int cnt = 0;
                 inst = inst.dereference(BaseType::trLexicalAndPointers, -1, &cnt);
 //                inst = inst.dereference(BaseType::trLexical, &cnt);
-                if (cnt && _map->addressIsWellFormed(inst))
+
+                // Check for NULL Pointer or Pointer that have a value of -1
+                if (cnt && _map->addressIsWellFormed(inst) && addr != 0 &&
+                        addr != 0xffffffff && addr != 0xffffffffffffffff)
                     _map->addChildIfNotExistend(inst, node, _index, node->address());
             }
             catch (GenericException& e) {
@@ -174,7 +177,6 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
 
     // Add all struct members to the stack that haven't been visited
     for (int i = 0; i < inst->memberCount(); ++i) {
-
         // Get declared type of this member
         const BaseType* mBaseType = inst->memberType(i, BaseType::trLexical, true);
         if (!mBaseType)
@@ -229,9 +231,16 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                 // Reset the penalty
                 penalize = 0.0;
 
+                // Check for compatibility
+                if(!inst->memberCandidateCompatible(i, j)) {
+                    //debugmsg("cont");
+                    continue;
+                }
+
                 try {
                     const BaseType* type = inst->memberCandidateType(i, j);
                     type = type ? type->dereferencedBaseType(BaseType::trLexical) : 0;
+
                     // Skip invalid and void* candidates
                     if (!type ||
                         ((type->type() & (rtPointer|rtArray)) &&
@@ -280,7 +289,6 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
 
                                         if((quint64)candListHeadPrev == (quint64)memberNext)
                                         {
-
                                             // At this point we know that the list_head struct within the candidate
                                             // points indeed back to the list_head struct of the instance. However,
                                             // if the offset of the list_head struct within the candidate is by chance
@@ -321,14 +329,10 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                             if (node->name() != inst->name())
                                 m.setName(inst->name() + "." + m.name());
 
-                            debugmsg("try:");
-
                             lastNode = _map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i), true);
 
-                            if(lastNode == NULL) {
-                                debugmsg("Creation failed " << node->fullName() << "." << m.name());
-                            }
-                            else {
+                            if(lastNode != NULL)
+                            {
                                 // Set penalty
                                 float m_prob = lastNode->getInitialProbability() - penalize;
 

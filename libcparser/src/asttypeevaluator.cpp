@@ -38,7 +38,7 @@ QString ASTType::toString() const
     for (const ASTType* type = this; type; type = type->next()) {
         if (!ret.isEmpty()) ret += "->";
         ret += realTypeToStr(type->type());
-        if (!type->identifier().isEmpty())
+        if (!(type->type() & NumericTypes) && !type->identifier().isEmpty())
             ret += "(" + type->identifier() + ")";
     }
     return ret;
@@ -1496,8 +1496,15 @@ ASTType* ASTTypeEvaluator::typeofSymbol(const ASTSymbol* sym)
 ASTType* ASTTypeEvaluator::typeofBuiltinType(const pASTTokenList list,
 											 const ASTNode *node)
 {
-	RealType type = evaluateBuiltinType(list);
-	return type ? createASTType(type, node) : 0;
+	QString tokens;
+	RealType type = evaluateBuiltinType(list, &tokens);
+	if (type == rtUndefined)
+		return 0;
+
+	ASTType* astType = createASTType(type, node);
+	astType->setIdentifier(tokens);
+
+	return astType;
 }
 
 
@@ -1942,6 +1949,7 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(const ASTNode *node)
             // definition, either in a direct declaration or in a typedef. In
             // that case, we have to search in the scope of the struct
             // definition rather then in the scope of the postfix expression.
+            assert(! (t->type() & NumericTypes));
             if (t->identifier().isEmpty()) {
                 if (t->node())
                     queue.push_back(t->node());
@@ -2680,6 +2688,39 @@ void ASTTypeEvaluator::collectSymbols(const ASTNode *node)
 }
 
 
+bool ASTTypeEvaluator::canHoldPointerValue(RealType type) const
+{
+    switch (type) {
+    case rtFloat:
+    case rtDouble:
+    case rtBool8:
+    case rtBool16:
+    case rtBool32:
+    case rtBool64:
+    case rtInt8:
+    case rtUInt8:
+    case rtInt16:
+    case rtUInt16:
+    case rtEnum:
+        return false;
+
+    case rtInt32:
+    case rtUInt32:
+        return (sizeofLong() <= 4);
+
+    case rtInt64:
+    case rtUInt64:
+        return true;
+
+    default:
+        typeEvaluatorError(QString("Expected a numeric type here instead of %1")
+                           .arg(realTypeToStr(type)));
+    }
+
+    return true;
+}
+
+
 void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
 {
     if (!node)
@@ -2710,6 +2751,10 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
         return;
     // Ignore enumerator symbols, they are constant values
     if (es.sym->type() == stEnumerator)
+        return;
+    // Ignore symbols of integer type that cannot hold a pointer
+    const ASTType* type = typeofSymbol(es.sym);
+    if ((type->type() & NumericTypes) && !canHoldPointerValue(type->type()))
         return;
 
     es.followedSymStack.push(TransformedSymbol(es.sym, this));
@@ -2910,6 +2955,14 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 // right-hand b, leading to b = b.
                 if (es->interLinks.contains(assigned))
                     return assignments;
+
+                // Ignore right-hand side expressions that cannot hold a pointer
+                // value
+                const ASTType* type = typeofNode(assigned);
+                if ((type->type() & NumericTypes) &&
+                    !canHoldPointerValue(type->type()))
+                    return assignments;
+
 
                 // If the dereference level of the lvalue is smaller or
                 // equal to the last link's dereference level, we shouldn't
@@ -4218,7 +4271,8 @@ ASTType* ASTTypeEvaluator::typeofTypeId(const ASTNode *node)
 }
 
 
-RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list) const
+RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list,
+											   QString* pTokens) const
 {
 	if (!list)
 		return rtUndefined;
@@ -4244,9 +4298,14 @@ RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list) const
 	};
 
 	int types = 0, flags = 0;
+	QString tokens;
 
 	for (pASTTokenList p = list; p; p = p->next) {
 		QString tok = antlrTokenToStr(p->item);
+
+		if (!tokens.isEmpty())
+			tokens += " ";
+		tokens += tok;
 
 		// Types
 		if (tok == "void")
@@ -4291,22 +4350,39 @@ RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list) const
 	if (types & tVoid)
 		return rtVoid;
 
-	if (types & tChar)
+	if (types & tChar) {
+		if (pTokens)
+			*pTokens = (flags & fUnsigned) ? "unsigned char" : "char";
 		return (flags & fUnsigned) ? rtUInt8 : rtInt8;
+	}
 
-	if (types & tBool)
+	if (types & tBool) {
+		if (pTokens)
+			*pTokens = tokens;
 		return rtBool8;
+	}
 
 	if (types & tInt) {
-		if (flags & fShort)
+		if (flags & fShort) {
+			if (pTokens)
+				*pTokens = (flags & fUnsigned) ? "short unsigned int" : "short int";
 			return (flags & fUnsigned) ? rtUInt16 : rtInt16;
-		if (flags & fLongLong)
+		}
+		if (flags & fLongLong) {
+			if (pTokens)
+				*pTokens = (flags & fUnsigned) ? "long long unsigned int" : "long long int";
 			return (flags & fUnsigned) ? rtUInt64 : rtInt64;
+		}
 		if (flags & fLong) {
+			if (pTokens)
+				*pTokens = (flags & fUnsigned) ? "long unsigned int" : "long int";
 			return (flags & fUnsigned) ? realTypeOfULong() : realTypeOfLong();
 		}
-		else
-		    return (flags & fUnsigned) ? rtUInt32 : rtInt32;
+		else {
+			if (pTokens)
+				*pTokens = (flags & fUnsigned) ? "unsigned int" : "int";
+			return (flags & fUnsigned) ? rtUInt32 : rtInt32;
+		}
 	}
 
 	if (types & tFloat)
@@ -4323,14 +4399,9 @@ RealType ASTTypeEvaluator::evaluateBuiltinType(const pASTTokenList list) const
 	if (types & tVaList)
 		return rtVaList;
 
-
-	QStringList tokens;
-	for (pASTTokenList p = list; p; p = p->next)
-		tokens.append(antlrTokenToStr(p->item));
-
     typeEvaluatorError(
             QString("Cannot resolve base type for \"%1\" at %2:%3")
-            .arg(tokens.join(" "))
+            .arg(tokens)
             .arg(_ast->fileName())
             .arg(list->item->line));
 

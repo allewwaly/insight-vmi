@@ -545,6 +545,23 @@ QList<BaseType*> SymFactory::typesUsingId(int id) const
 }
 
 
+QList<Variable*> SymFactory::varsUsingId(int id) const
+{
+    QList<int> typeIds = equivalentTypes(id);
+    if (typeIds.isEmpty())
+        typeIds += id;
+    QList<Variable*> ret;
+
+    for (int i = 0; i < typeIds.size(); ++i) {
+        for (VarMultiHash::const_iterator it = _usedByVars.find(typeIds[i]);
+             it != _usedByVars.end() && it.key() == typeIds[i]; ++it)
+            ret += it.value();
+    }
+
+    return ret;
+}
+
+
 void SymFactory::updateTypeRelations(const TypeInfo& info, BaseType* target)
 {
     updateTypeRelations(info.id(), info.name(), target);
@@ -884,6 +901,7 @@ BaseType* SymFactory::getNumericInstance(const ASTType* astType)
 
     TypeInfo info;
     info.setSymType(hsBaseType);
+    info.setName(astType->identifier());
 
     // Type size
     switch (astType->type()) {
@@ -1630,9 +1648,9 @@ BaseTypeList SymFactory::typedefsOfType(BaseType* type)
 }
 
 
-
 FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
-                                                    ASTTypeEvaluator* eval)
+                                                   ASTTypeEvaluator* eval,
+                                                   bool includeCustomTypes)
 {
     // Find the first non-pointer ASTType
     const ASTType* astTypeNonPtr = astType;
@@ -1806,6 +1824,14 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                         .arg(realTypeToStr(astTypeNonPtr->type())));
     }
 
+    // Remove all types that don't match the requested type
+    for (int i = baseTypes.size() - 1; i >= 0; --i) {
+        // Compare the dereferenced type
+        if (baseTypes[i] &&
+            (baseTypes[i]->dereferencedType() != astTypeNonPtr->type()))
+            baseTypes.removeAt(i);
+    }
+
     // Count the number of types with zero and non-zero size
     int non_zero = 0, zero = 0;
     for (int i = 0; i < baseTypes.size(); ++i) {
@@ -1828,18 +1854,26 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
     }
     // Remove all custom types (id < 0) except for types found through global
     // variables or nested structures
-    if ( !(isNestedStruct || isVarType) ) {
-        for (int i = baseTypes.size() - 1; i >= 0; --i) {
-            if (baseTypes[i] && baseTypes[i]->id() < 0)
-                baseTypes.removeAt(i);;
+    if (! (isNestedStruct || isVarType) ) {
+        for (int i = baseTypes.size() - 1; i >= 0; --i) {            
+            if (baseTypes[i] && baseTypes[i]->id() < 0) {
+                // If requested, we keep all custom types that are used by a
+                // global variable
+                if (includeCustomTypes && _usedByVars.contains(baseTypes[i]->id()))
+                    continue;
+                if (includeCustomTypes && baseTypes[i]->name() == "task_struct")
+                    debugmsg("Removed " << baseTypes[i]->prettyName());
+                baseTypes.removeAt(i);
+            }
         }
     }
 
-    BaseTypeList candidates, nextCandidates, typesUsingSrc, ptrBaseTypes;
+    BaseTypeList candidates, nextCandidates, typesUsingSrc, ptrBaseTypes,
+            removedBaseTypes;
 
     // Now go through the baseTypes and find its usages as pointers or
     // arrays as in preceedingPtrs
-    for (int i = 0; i < baseTypes.size(); ++i) {
+    for (int i = baseTypes.size() - 1; i >= 0; --i) {
         candidates.clear();
         candidates += baseTypes[i];
         // Try to match all pointer/array usages
@@ -1879,11 +1913,21 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
         // Did we find a candidate?
         if (!candidates.isEmpty()) {
             // Just use the first
-            ptrBaseTypes += candidates.first();
+            ptrBaseTypes.prepend(candidates.first());
         }
-        // No, so we create the type ourself
+        // No, so delete the base type from the list as well
         else {
-            BaseType* ptrBaseType = baseTypes[i];
+            removedBaseTypes += baseTypes[i];
+            baseTypes.removeAt(i);
+        }
+    }
+
+    // Check if we threw out all types because we did not find a correspondig
+    // pointer type
+    if (baseTypes.isEmpty() && !removedBaseTypes.isEmpty()) {
+        // Create the pointer types for the thrown-out types ourselves
+        for (int i = 0; i < removedBaseTypes.size(); ++i) {
+            BaseType* ptrBaseType = removedBaseTypes[i];
             for (int j = preceedingPtrs.size() - 1; j >= 0; --j) {
                 // Create "next" pointer
                 Pointer* ptr = 0;
@@ -1906,7 +1950,14 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                 ptrBaseType = ptr;
             }
 
+            baseTypes += removedBaseTypes[i];
             ptrBaseTypes += ptrBaseType;
+
+//            debugmsg(QString("Created pointer type 0x%1 %2 for type 0x%3 %4")
+//                     .arg((uint) ptrBaseType->id(), 0, 16)
+//                     .arg(ptrBaseType->prettyName())
+//                     .arg((uint) removedBaseTypes[i]->id(), 0, 16)
+//                     .arg(removedBaseTypes[i]->prettyName()));
         }
     }
 
@@ -1925,8 +1976,24 @@ void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
     BaseType* srcBaseType = 0;
     if (srcTypeRet.types.isEmpty())
         factoryError("Could not find source BaseType.");
-    else
+    else {
         srcBaseType = srcTypeRet.types.first();
+
+        if (srcTypeRet.types.size() > 1) {
+            QString s = QString("Source AST type \"%1\" has %2 base types:")
+                                 .arg(ed->srcType->toString())
+                                 .arg(srcTypeRet.types.size());
+
+            assert(srcTypeRet.types.size() == srcTypeRet.typesNonPtr.size());
+            for (int i = 0; i < srcTypeRet.types.size(); ++i)
+                s += QString("\n    Ptr: 0x%1 %2 -> NPtr: 0x%3 %4")
+                        .arg((uint) srcTypeRet.types[i]->id(), 0, 16)
+                        .arg(srcTypeRet.types[i]->prettyName())
+                        .arg((uint) srcTypeRet.typesNonPtr[i]->id(), 0, 16)
+                        .arg(srcTypeRet.typesNonPtr[i]->prettyName());
+            debugmsg(s + "\n");
+        }
+    }
 
     // Find the target base types
     FoundBaseTypes targetTypeRet = findBaseTypesForAstType(ed->targetType, eval);
@@ -1986,8 +2053,7 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
 												ASTTypeEvaluator *eval)
 {
     // Find context base types
-    FoundBaseTypes ctxTypeRet = findBaseTypesForAstType(ed->ctxType, eval);
-    /// @todo pass along ctxTypeRet.types or ctxTypeRet.typesNonPtr?
+    FoundBaseTypes ctxTypeRet = findBaseTypesForAstType(ed->ctxType, eval, true);
     typeAlternateUsageStructMember2(ed, targetBaseType, ctxTypeRet.typesNonPtr, eval);
 }
 
@@ -2152,7 +2218,7 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                         assert(member != 0);
                         // Clear all alternative types for that member
                         member->altRefTypes().clear();
-                        //
+
 #ifdef DEBUG_APPLY_USED_AS
                         debugmsg(QString("Created copy (0x%1 -> 0x%2) of "
                                          "embedding member %3 in %4 (0x%5).")
@@ -2191,6 +2257,18 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
 
                 member->addAltRefType(targetBaseType->id(),
                                       expr->clone(_expressions));
+
+                if (ctxBaseTypes[i]->name() == "task_struct" &&
+                    targetBaseType->prettyName().contains("task_struct"))
+                {
+                    debugmsg(QString("Changed member %1 of type 0x%2 to "
+                                     "target type 0x%3: %4")
+                             .arg(trans.toString(ctxBaseTypes[i]->prettyName()))
+                             .arg((uint)ctxBaseTypes[i]->id(), 0, 16)
+                             .arg((uint)targetBaseType->id(), 0, 16)
+                             .arg(targetBaseType->prettyName()));
+
+                }
             }
         }
     }
@@ -2199,12 +2277,29 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
         factoryError("Did not find any members to adjust!");
     else if (membersChanged) {
         ++_uniqeTypesChanged;
+
+        if (membersChanged > 1) {
+            QString s = QString("Applied type change from \"%1\" to \"%2\" to "
+                                "%3 of %4 context types:")
+                                .arg(ed->srcType->toString())
+                                .arg(ed->targetType->toString())
+                                .arg(membersChanged)
+                                .arg(ctxBaseTypes.size());
+
+            for (int i = 0; i < ctxBaseTypes.size(); ++i)
+                s += QString("\n    0x%1 %2")
+                        .arg((uint) ctxBaseTypes[i]->id(), 0, 16)
+                        .arg(ctxBaseTypes[i]->prettyName());
+            debugmsg(s + "\n");
+        }
+
+
+#ifdef DEBUG_APPLY_USED_AS
         QStringList ctxTypes;
         for (int i = 0; i < ctxBaseTypes.size(); ++i)
             if (ctxBaseTypes[i])
                 ctxTypes += QString("0x%1")
                                 .arg((uint)ctxBaseTypes[i]->id(), 0, 16);
-#ifdef DEBUG_APPLY_USED_AS
         debugmsg(QString("Changed %1 member%2 of type%3 %4 to target type 0x%5: %6")
                  .arg(membersFound)
                  .arg(membersFound == 1 ? "" : "s")
@@ -2309,7 +2404,21 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
                 // Clear all existing alternative types on the copy
                 t = makeDeepTypeCopy(t, true);
                 ++_typesCopied;
+
+                if (vars[i]->name() == "init_task") {
+                    debugmsg(QString("Created copy (0x%1 -> 0x%2) of type \"%3\" "
+                                     "for global variable \"%4\" (0x%5).")
+                             .arg((uint)vars[i]->refTypeId(), 0, 16)
+                             .arg((uint)t->id(), 0, 16)
+                             .arg(t->prettyName(), 0, 16)
+                             .arg(vars[i]->name())
+                             .arg((uint)vars[i]->id(), 0, 16));
+                }
+
+                _usedByVars.remove(vars[i]->refTypeId(), vars[i]);
                 vars[i]->setRefTypeId(t->id());
+                insertUsedBy(vars[i]);
+
 
 #ifdef DEBUG_APPLY_USED_AS
                 debugmsg(QString("Created copy (0x%1 -> 0x%2) of type \"%3\" "
