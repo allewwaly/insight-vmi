@@ -397,9 +397,12 @@ bool ReferencingType::AltRefType::compatible(const Instance *inst) const
         return true;
     if (!inst)
         return false;
-    for (int i = 0; i < _varExpr.size(); ++i)
-        if (!_varExpr[i]->compatible(inst))
+    for (int i = 0; i < _varExpr.size(); ++i) {
+        if (!_varExpr[i]->compatible(inst)) {
+            //debugmsg("Inst " << inst->fullName()  << " with type " << inst->type()->prettyName() << " is incompatible to " << _varExpr[i]->toString());
             return false;
+        }
+    }
     return true;
 }
 

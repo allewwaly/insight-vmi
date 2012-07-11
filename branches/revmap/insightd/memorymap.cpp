@@ -742,9 +742,6 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
             }
             catch(GenericException& ge) {
                 // The address of the instance is invalid
-                debugmsg(ge.message);
-
-                debugmsg("exception fail");
 
                 // Release locks and return
                 _shared->currAddresses[threadIndex] = 0;
@@ -783,8 +780,6 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
 //            if ((parent->type()->dereferencedType(BaseType::trLexical) & StructOrUnion) &&
 //                child->type()->dereferencedType(BaseType::trLexical) & StructOrUnion)
 //                debugerr("This should not happen! " << child->fullName());
-        } else {
-            debugmsg("Object sane fail!");
         }
 
         // Done, release our current address (no need to hold currAddressesLock)
@@ -793,8 +788,6 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
 //        // Wake up a waiting thread (if it exists)
 //        _shared->threadDone[threadIndex].wakeOne();
 
-    } else {
-        debugmsg("object type fail: " << inst.typeName());
     }
 
     return child;
@@ -815,17 +808,18 @@ float MemoryMap::calculateNodeProbability(const Instance* inst) const
     static const float degForInvalidAddr = 0.1;
 
     // Degradation of 90% for an invalid list_head within this node
-    static const float degForInvalidListHead = 0.1;
+    // static const float degForInvalidListHead = 0.1;
+    static const float degForInvalidListHead = 0.8;
 
     // Max. degradation of 30% for non-aligned pointer childen the type of this
     // node has
-    // static const float degForNonAlignedChildAddr = 0.7;
-    static const float degForNonAlignedChildAddr = 1.0;
+    static const float degForNonAlignedChildAddr = 0.7;
+    // static const float degForNonAlignedChildAddr = 1.0;
 
     // Max. degradation of 50% for invalid pointer childen the type of this node
     // has
-    // static const float degForInvalidChildAddr = 0.5;
-    static const float degForInvalidChildAddr = 1.0;
+    static const float degForInvalidChildAddr = 0.5;
+    //static const float degForInvalidChildAddr = 1.0;
 
     // Stores the final probability value
     float prob = 1.0;
@@ -841,7 +835,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst) const
         degForUserlandAddrCnt++;
     }
     // Check validity
-    if (! _vmem->safeSeek((qint64) inst->address()) ) {
+    if (!_vmem->safeSeek((qint64) inst->address()) ) {
         prob *= degForInvalidAddr;
         degForInvalidAddrCnt++;
     }
@@ -921,7 +915,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst) const
                 listHeads++;
 
                 // Check if a inst.list_head.next.prev pointer points to inst.list_head
-                // as it should. Penalty of 90% if this is not the case.
+                // as it should.
                 Instance iListHeadNext = mi.member(0, 0, -1, true);
                 if(!iListHeadNext.isNull() && iListHeadNext.type()
                         && _vmem->safeSeek(iListHeadNext.address()))
@@ -930,6 +924,8 @@ float MemoryMap::calculateNodeProbability(const Instance* inst) const
                     quint64 listHeadNext = (quint64)mNext->toPointer(_vmem, iListHeadNext.address());
 
                     // A list_head.next pointer may be NULL
+                    /// todo: Check if this condition is already handled by !iListHeadNext.isNull()
+                    /// in this case the else clause of the above if statement needs to be updated.
                     if(listHeadNext == 0)
                     {
                         continue;
@@ -959,6 +955,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst) const
         }
 
         // Penalize probabilities, weighted by number of meaningful children  
+        /*
         if (nonAlignedChildAddrCnt) {
             float invPart = nonAlignedChildAddrCnt / (float) pointer;
             prob *= invPart * degForNonAlignedChildAddr + (1.0 - invPart);
@@ -970,7 +967,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst) const
             prob *= invPart * degForInvalidChildAddr + (1.0 - invPart);
             degForInvalidChildAddrCnt++;
         }
-
+        */
 
         // Penalize for invalid list_heads
         if (invalidListHeadCnt) {

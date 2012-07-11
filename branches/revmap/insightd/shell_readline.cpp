@@ -40,7 +40,11 @@ QString Shell::readLine(const QString& prompt)
 {
     QString ret;
     QString p = prompt.isEmpty() ?
-                QString("%1>>>%2 ").arg(color(ctPrompt)).arg(color(ctReset)) :
+                // Wrap color codes in \001...\002 so readline ignores them
+                // when calculating the line length
+                QString("\001%1\002>>>\001%2\002 ")
+                    .arg(color(ctPrompt))
+                    .arg(color(ctReset)) :
                 prompt;
 
     // Read input from stdin or from socket?

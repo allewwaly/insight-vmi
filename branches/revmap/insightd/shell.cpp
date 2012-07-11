@@ -154,7 +154,8 @@ Shell::Shell(bool listenOnSocket)
                 "  list types-by-id          List the types-by-ID hash\n"
                 "  list types-by-name        List the types-by-name hash\n"
                 "  list variables [<glob>]   List all variables, optionally filtered by\n"
-                "                            a wildcard expression <glob>\n"));
+                "                            a wildcard expression <glob>\n"
+                "  list vars-using <id>      List the variables of type <id>"));
 
     _commands.insert("memory",
             Command(
@@ -968,6 +969,9 @@ int Shell::cmdList(QStringList args)
         else if (s.length() > 9 && QString("types-by-name").startsWith(s)) {
             return cmdListTypesByName(args);
         }
+        else if (s.length() > 3 && QString("vars-using").startsWith(s)) {
+            return cmdListVarsUsing(args);
+        }
         else if (QString("variables").startsWith(s)) {
             return cmdListVars(args);
         }
@@ -1473,6 +1477,162 @@ int Shell::cmdListVars(QStringList args)
         else if (applyFilter)
             _out << "No variables matching that name." << endl;
     }
+
+    return ecOk;
+}
+
+
+bool cmpVarIdLessThan(const Variable* v1, const Variable* v2)
+{
+    return ((uint)v1->id()) < ((uint)v2->id());
+}
+
+
+int Shell::cmdListVarsUsing(QStringList args)
+{
+    // Expect one parameter
+    if (args.size() != 1) {
+        cmdHelp(QStringList("list"));
+        return ecInvalidArguments;
+    }
+
+    QList<Variable*> vars;
+
+    QString s = args.front();
+    if (s.startsWith("0x"))
+        s = s.right(s.size() - 2);
+    bool ok = false;
+    int id = (int)s.toUInt(&ok, 16);
+
+    // Did we parse an ID?
+    if (ok) {
+        vars = _sym.factory().varsUsingId(id);
+    }
+    // No ID given, so try to find the type by name
+    else {
+        QList<BaseType*> types = _sym.factory().typesByName().values(s);
+        if (types.isEmpty()) {
+            errMsg("No type found with that name.");
+            return ecInvalidId;
+
+        }
+
+        for (int i = 0; i < types.size(); ++i)
+            vars += _sym.factory().varsUsingId(types[i]->id());
+    }
+
+    if (vars.isEmpty()) {
+        if (ok && _sym.factory().equivalentTypes(id).isEmpty()) {
+            errMsg(QString("No type with id %1 found.").arg(args.front()));
+            return ecInvalidId;
+        }
+        else {
+            _out << "There are no variables using type " << args.front() << "." << endl;
+            return ecOk;
+        }
+    }
+
+    qSort(vars.begin(), vars.end(), cmpVarIdLessThan);
+
+    // Find out required field width (the types are sorted by ascending ID)
+    QSize tsize = termSize();
+    const int w_id = getFieldWidth(vars.last()->id());
+    const int w_datatype = 12;
+    const int w_size = 5;
+    const int w_src = 20;
+//    const int w_line = 5;
+    const int w_colsep = 2;
+    int avail = tsize.width() - (w_id + w_datatype + w_size +  w_src + 5*w_colsep + 1);
+    if (avail < 0)
+        avail = 2*24;
+    const int w_name = (avail + 1) / 2;
+    const int w_typename = avail - w_name;
+    const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + 5*w_colsep;
+
+    // Print header if not yet done
+    _out << color(ctBold)
+         << qSetFieldWidth(w_id)  << right << "ID"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_datatype) << left << "Base"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_typename) << left << "Type name"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_name) << "Name"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_size)  << right << "Size"
+         << qSetFieldWidth(w_colsep) << " "
+         << qSetFieldWidth(w_src) << left << "Source"
+         << qSetFieldWidth(0) << color(ctReset) << endl;
+
+    hline(w_total);
+
+    int varCount = 0;
+    CompileUnit* unit = 0;
+
+    for (int i = 0; i < vars.size() && !_interrupted; i++) {
+        Variable* var = vars[i];
+
+        // Construct name and line of the source file
+        QString s_src;
+        if (var->srcFile() >= 0) {
+            if (!unit || unit->id() != var->srcFile())
+                unit = _sym.factory().sources().value(var->srcFile());
+            if (!unit)
+                s_src = QString("(unknown id: %1)").arg(var->srcFile());
+            else
+                s_src = QString("%1").arg(unit->name());
+            // Shorten, if neccessary
+            if (s_src.length() > w_src)
+                s_src = "..." + s_src.right(w_src - 3);
+        }
+        else
+            s_src = "--";
+
+        // Find out the basic data type of this variable
+        const BaseType* base = var->refTypeDeep(BaseType::trLexical);
+        QString s_datatype = base ? realTypeToStr(base->type()) : "(undef)";
+
+        // Shorten the type name, if required
+        QString s_typename;
+        if (var->refType())
+            s_typename = prettyNameInColor(var->refType(), w_typename, w_typename);
+        else
+            s_typename = QString("%1%2").arg(color(ctKeyword)).arg("void", -w_typename);
+
+        QString s_name = var->name().isEmpty() ? "(none)" : var->name();
+        if (s_name.length() > w_name)
+            s_name = s_name.left(w_name - 3) + "...";
+
+        QString s_size = var->refType() ?
+                    QString::number(var->refType()->size()) :
+                    QString("n/a");
+
+        _out << color(ctTypeId)
+            << qSetFieldWidth(w_id)  << right << hex << (uint)var->id()
+            << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(0) << color(ctRealType)
+            << qSetFieldWidth(w_datatype) << left << s_datatype
+            << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(0) << s_typename
+//            << qSetFieldWidth(w_typename) << left << s_typename
+            << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(0) << color(ctVariable)
+            << qSetFieldWidth(w_name) << s_name
+            << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(0) << color(ctReset)
+            << qSetFieldWidth(w_size)  << right << right << s_size
+            << qSetFieldWidth(w_colsep) << " "
+            << qSetFieldWidth(w_src) << left << s_src
+//            << qSetFieldWidth(w_colsep) << " "
+//            << qSetFieldWidth(w_line) << right << dec << var->srcLine()
+            << qSetFieldWidth(0) << endl;
+
+        ++varCount;
+    }
+
+    hline(w_total);
+    _out << "Total variables: " << color(ctBold) << dec << varCount
+         << color(ctReset) << endl;
 
     return ecOk;
 }
