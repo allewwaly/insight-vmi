@@ -272,11 +272,13 @@ void MemoryMapNode::updateProbability(MemoryMapNode *initiator)
         // Unlock before the update is propagated
         _mutex.unlock();
 
+        /*
         debugmsg(fullName() << " (" << type()->prettyName() << ")");
         debugmsg("parentProb: " << parentProb);
         debugmsg("initalProb: " << _initialProb);
         debugmsg("childrenProb: " << childrenProb);
         debugmsg("prob: " << prob);
+        */
 
         // Only update if this is the last candidate
         if((_hasCandidates && _candidatesComplete) || !_hasCandidates) {

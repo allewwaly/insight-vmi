@@ -184,7 +184,7 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
 
         // Consider the members of nested structs recurisvely
         if (mBaseType->type() & StructOrUnion) {
-            Instance mi = inst->member(i, BaseType::trLexical, true);
+            Instance mi = inst->member(i, BaseType::trLexical, -1, true);
             // Adjust instance name to reflect full path
             if (node->name() != inst->name())
                 mi.setName(inst->name() + "." + mi.name());
@@ -200,10 +200,17 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
         if (!candidateCnt && !(mBaseType->type() & ptrTypes))
             continue;
 
-        // No candidate types
+        // Skip self pointers
+        if(mBaseType->type() & rtPointer) {
+             Instance m = inst->member(i, BaseType::trLexical, -1, true);
+
+             if((quint64)m.toPointer() == inst->address())
+                 continue;
+        }
+
         if (!candidateCnt) {
             try {
-                Instance m = inst->member(i, BaseType::trLexical, true);
+                Instance m = inst->member(i, BaseType::trLexical, -1, true);
                 // Only add pointer members with valid address
                 if (m.type() && m.type()->type() == rtPointer &&
                     _map->addressIsWellFormed(m))
@@ -226,6 +233,32 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
         else {
             MemoryMapNode *lastNode = NULL;
             float penalize = 0.0;
+
+            // Lets first try to add the original type of the member
+            // This approach makes sure we get the correct type even if
+            // the candidates are incorrect due to weird hacks within the
+            // kernel
+            try {
+                Instance m = inst->member(i, BaseType::trLexical, -1, true);
+                // Only add pointer members with valid address
+                if (m.type() && m.type()->type() == rtPointer &&
+                    _map->addressIsWellFormed(m))
+                {
+                    int cnt;
+                    m = m.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
+                    if (cnt || (m.type()->type() & StructOrUnion)) {
+                        // Adjust instance name to reflect full path
+                        if (node->name() != inst->name())
+                            m.setName(inst->name() + "." + m.name());
+
+                       // Member has condidates
+                       lastNode = _map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i), true);
+                    }
+                }
+            }
+            catch (GenericException& e) {
+                // Do nothing
+            }
 
             for (int j = 0; j < candidateCnt; ++j) {
                 // Reset the penalty
@@ -254,8 +287,7 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                         // We handle list_head instances seperately.
                         if(inst->isListHead()) {
                             // The candidate type must be a structure
-                            if(!(m.type()->type() & StructOrUnion))
-                            {
+                            if(!(m.type()->type() & StructOrUnion)) {
                                 //debugmsg("Out 1: " << m.fullName());
 
                                 // Penalty of 90%
@@ -263,16 +295,15 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                             }
                             else {
                                 // Get the instance of the 'next' member within the list_head
-                                void *memberNext = inst->member(i).toPointer();
+                                void *memberNext = inst->member(i, 0, -1, true).toPointer();
 
                                 // If this list head points to itself, we do not need to consider it
                                 // anymore.
-                                if((quint64)memberNext == inst->member(i).address())
+                                if((quint64)memberNext == inst->member(i, 0, -1, true).address())
                                     continue;
 
                                 // The pointer can be NULL
                                 if((quint64)memberNext != 0) {
-
                                     // Get the offset of the list_head struct within the candidate type
                                     quint64 candOffset = (quint64)memberNext - m.address();
 
@@ -285,7 +316,7 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                                     {
                                         // Sanity check: The prev pointer of the list_head must point back to the
                                         // original list_head
-                                        void *candListHeadPrev = candListHead.member(1).toPointer();
+                                        void *candListHeadPrev = candListHead.member(1, 0, -1, true).toPointer();
 
                                         if((quint64)candListHeadPrev == (quint64)memberNext)
                                         {
@@ -316,9 +347,10 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
 
                         }
 
-                        //if(inst->name().compare("init_task.sibling") == 0)
-                        //    debugmsg("sibling Candidate: " << m.name());
-
+                        /*
+                        if(inst->fullName().compare("tasks") == 0)
+                           debugmsg("sibling Candidate: " << m.name());
+                        */
 
                         // add node
                         int cnt = 1;
@@ -346,7 +378,6 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                 }
                 catch (GenericException& e) {
                     // Do nothing
-                    //debugmsg("EXCEPTION!");
                 }
             }
 

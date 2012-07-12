@@ -809,7 +809,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst) const
 
     // Degradation of 90% for an invalid list_head within this node
     // static const float degForInvalidListHead = 0.1;
-    static const float degForInvalidListHead = 0.8;
+    static const float degForInvalidListHead = 0.5;
 
     // Max. degradation of 30% for non-aligned pointer childen the type of this
     // node has
