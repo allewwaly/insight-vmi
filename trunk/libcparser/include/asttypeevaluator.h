@@ -193,13 +193,20 @@ struct TypeEvalDetails
 class ASTTypeEvaluator: public ASTWalker
 {
 public:
-    ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong);
+    /**
+     * Constructor
+     * @param ast the AbstractSyntaxTree to work on
+     * @param sizeofLong the size of a <tt>long int</tt> type, in bytes
+     * @param sizeofPointer the size of a pointer type, in bytes
+     */
+    ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong, int sizeofPointer);
     virtual ~ASTTypeEvaluator();
 
     bool evaluateTypes();
     ASTType* typeofNode(const ASTNode* node);
     ASTType* typeofSymbol(const ASTSymbol* sym);
     int sizeofLong() const;
+    int sizeofPointer() const;
 
     const ASTSymbol *findSymbolOfDirectDeclarator(const ASTNode *node,
                                                   bool enableExcpetions = true);
@@ -288,8 +295,8 @@ private:
     ASTType* copyDeep(const ASTType* src);
     RealType evaluateBuiltinType(const pASTTokenList list, QString *pTokens) const;
     ASTType* typeofTypeId(const ASTNode* node);
-    inline RealType realTypeOfLong() const;
-    inline RealType realTypeOfULong() const;
+    RealType realTypeOfLong() const;
+    RealType realTypeOfULong() const;
     RealType resolveBaseType(const ASTType* type) const;
     int sizeofType(RealType type) const;
     inline bool typeIsLargerThen(RealType typeA, RealType typeB) const;
@@ -341,6 +348,7 @@ private:
     ASTNodeTransSymHash _symbolsBelowNode;
     ASTNodeSymHash _symbolOfNode;
     int _sizeofLong;
+    int _sizeofPointer;
     EvalPhase _phase;
     int _pointsToRound;
     int _assignments;
@@ -353,6 +361,11 @@ private:
 inline int ASTTypeEvaluator::sizeofLong() const
 {
     return _sizeofLong;
+}
+
+inline int ASTTypeEvaluator::sizeofPointer() const
+{
+    return _sizeofPointer;
 }
 
 inline RealType ASTTypeEvaluator::realTypeOfLong() const

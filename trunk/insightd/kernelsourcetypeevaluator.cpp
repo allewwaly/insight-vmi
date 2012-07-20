@@ -22,7 +22,9 @@
 
 KernelSourceTypeEvaluator::KernelSourceTypeEvaluator(AbstractSyntaxTree* ast,
         SymFactory* factory)
-    : ASTTypeEvaluator(ast, factory->memSpecs().sizeofUnsignedLong),
+    : ASTTypeEvaluator(ast,
+                       factory->memSpecs().sizeofLong,
+                       factory->memSpecs().sizeofPointer),
       _factory(factory), _eval(0)
 {
     _eval = new ASTExpressionEvaluator(this, _factory);

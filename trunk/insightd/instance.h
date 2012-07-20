@@ -125,7 +125,7 @@ inline QString Instance::toString(const ColorPalette* col) const
 
 inline int Instance::pointerSize() const
 {
-    return _d.vmem ? _d.vmem->memSpecs().sizeofUnsignedLong : 8;
+    return _d.vmem ? _d.vmem->memSpecs().sizeofPointer : sizeof(void*);
 }
 
 

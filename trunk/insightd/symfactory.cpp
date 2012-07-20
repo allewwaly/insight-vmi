@@ -333,7 +333,7 @@ T* SymFactory::getTypeInstance2(T* t, const TypeInfo& info)
         Pointer* p = dynamic_cast<Pointer*>(t);
         assert(p != 0);
         if (p->size() == 0)
-            p->setSize(_memSpecs.sizeofUnsignedLong);
+            p->setSize(_memSpecs.sizeofPointer);
     }
 
     // Try to find the type based on its hash, but only if hash is valid
@@ -1983,7 +1983,7 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                 // For void pointers, targetBaseType is null
                 if (ptrBaseType)
                     ptr->setRefTypeId(ptrBaseType->id());
-                ptr->setSize(_memSpecs.sizeofUnsignedLong);
+                ptr->setSize(_memSpecs.sizeofPointer);
                 // For arrays, set their length
                 if (a)
                     a->setLength(preceedingPtrs[j]->arraySize());

@@ -100,7 +100,7 @@
         if (throwExceptions) \
             virtualMemoryError(\
                 QString("Error reading from virtual address 0x%1: page not present in %2") \
-                    .arg(vaddr, _specs.sizeofUnsignedLong << 1, 16, QChar('0')) \
+                    .arg(vaddr, _specs.sizeofPointer << 1, 16, QChar('0')) \
                     .arg(level)); \
         else \
             return PADDR_ERROR; \
@@ -308,7 +308,7 @@ qint64 VirtualMemory::readData(char* data, qint64 maxSize)
             virtualMemoryError(QString("Cannot seek to address 0x%1 "
                     "(translated from virtual address 0x%2")
                     .arg(physAddr, 8, 16, QChar('0'))
-                    .arg(_pos, _specs.sizeofUnsignedLong, 16, QChar('0')));
+                    .arg(_pos, (_specs.sizeofPointer << 1), 16, QChar('0')));
         }
         // A page size of -1 means the address belongs to linear space
         if (pageSize < 0) {
@@ -762,7 +762,7 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
                             QString("Error reading from virtual address 0x%1: "
                                     "address below linear offsets, seems to be "
                                     "user-land memory")
-                                .arg(vaddr, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')),
+                                .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
                             enableExceptions);
         }
         *pageSize = -1;
@@ -816,14 +816,14 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
             if (high_bits != 0 && high_bits != 0x1FFFFUL)
                 virtualMemoryOtherError(
                                 QString("Virtual address 0x%1 is not in canonical form")
-                                    .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')),
+                                    .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
                                 enableExceptions);
 
             virtualMemoryOtherError(
                             QString("Error reading from virtual address 0x%1: "
                                     "address below linear offsets, seems to be "
                                     "user-land memory")
-                                .arg(vaddr, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')),
+                                .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
                             enableExceptions);
         }
         *pageSize = -1;

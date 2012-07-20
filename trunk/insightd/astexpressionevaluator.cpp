@@ -1370,7 +1370,7 @@ unsigned int ASTExpressionEvaluator::sizeofType(const ASTType *type)
 		return 8;
 
 	case rtPointer:
-		return _eval->sizeofLong();
+		return _eval->sizeofPointer();
 
 	/// @todo
 //	case rtArray:
@@ -1405,7 +1405,7 @@ unsigned int ASTExpressionEvaluator::sizeofType(const ASTType *type)
 //	case rtTypedef:
 	case rtFuncPointer:
 	case rtFunction:
-		return _eval->sizeofLong();
+		return _eval->sizeofPointer();
 
 	case rtVoid:
 		return 1;

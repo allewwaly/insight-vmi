@@ -2351,8 +2351,10 @@ int Shell::cmdShowBaseType(const BaseType* t)
 		 << color(ctReset) << realTypeToStr(t->type()) << endl;
 	_out << color(ctColHead) << "  Size:           "
 		 << color(ctReset) << t->size() << endl;
-//	_out << color(ctColHead) << "  Hash:           "
-//		 << color(ctReset) << "0x" << hex << t->hash() << dec << endl;
+#ifdef DEBUG
+	_out << color(ctColHead) << "  Hash:           "
+		 << color(ctReset) << "0x" << hex << t->hash() << dec << endl;
+#endif
 
 	if (t->srcFile() >= 0 && _sym.factory().sources().contains(t->srcFile())) {
 		_out << color(ctColHead) << "  Source file:    "
@@ -2418,14 +2420,14 @@ int Shell::cmdShowBaseType(const BaseType* t)
 			_out << color(ctColHead) << "  PC low:         "
 				 << color(ctReset) << QString("0x%1")
 					.arg(func->pcLow(),
-						 _sym.memSpecs().sizeofUnsignedLong << 1,
+						 _sym.memSpecs().sizeofPointer << 1,
 						 16,
 						 QChar('0'))
 				 << endl;
 			_out << color(ctColHead) << "  PC high:        "
 				 << color(ctReset) << QString("0x%1")
 					.arg(func->pcHigh(),
-						 _sym.memSpecs().sizeofUnsignedLong << 1,
+						 _sym.memSpecs().sizeofPointer << 1,
 						 16,
 						 QChar('0'))
 				 << endl;

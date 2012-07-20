@@ -432,7 +432,7 @@ QString MemoryDump::query(const int queryId, const ColorPalette& col) const
         s += "(unresolved type)";
     s += QString(" @%1 0x%2%3\n")
             .arg(col.color(ctAddress))
-            .arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'))
+            .arg(instance.address(), _specs.sizeofPointer << 1, 16, QChar('0'))
             .arg(col.color(ctReset));
 
     ret = s + ret;
@@ -476,7 +476,7 @@ QString MemoryDump::query(const QString& queryString,
             s += "(unresolved type)";
         s += QString(" @%1 0x%2%3\n")
                 .arg(col.color(ctAddress))
-                .arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'))
+                .arg(instance.address(), _specs.sizeofPointer << 1, 16, QChar('0'))
                 .arg(col.color(ctReset));
 
         ret = s + ret;
@@ -490,24 +490,28 @@ QString MemoryDump::dump(const QString& type, quint64 address,
                          const ColorPalette& col) const
 {
     if (!_vmem->seek(address))
-        queryError(QString("Cannot seek address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
+        queryError(QString("Cannot seek address 0x%1")
+                   .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
 
     if (type == "char") {
         char c;
         if (_vmem->read(&c, sizeof(char)) != sizeof(char))
-            queryError(QString("Cannot read memory from address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
+            queryError(QString("Cannot read memory from address 0x%1")
+                       .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
         return QString("%1 (0x%2)").arg(c).arg(c, (sizeof(c) << 1), 16, QChar('0'));
     }
     if (type == "int") {
         qint32 i;
         if (_vmem->read((char*)&i, sizeof(qint32)) != sizeof(qint32))
-            queryError(QString("Cannot read memory from address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
+            queryError(QString("Cannot read memory from address 0x%1")
+                       .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
         return QString("%1 (0x%2)").arg(i).arg((quint32)i, (sizeof(i) << 1), 16, QChar('0'));
     }
     if (type == "long") {
         qint64 l;
         if (_vmem->read((char*)&l, sizeof(qint64)) != sizeof(qint64))
-            queryError(QString("Cannot read memory from address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
+            queryError(QString("Cannot read memory from address 0x%1")
+                       .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
         return QString("%1 (0x%2)").arg(l).arg((quint64)l, (sizeof(l) << 1), 16, QChar('0'));
     }
 

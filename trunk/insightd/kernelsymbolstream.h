@@ -5,7 +5,8 @@
 #include "kernelsymbolconsts.h"
 
 /**
- * This class extends the QDataStream with a custom version number.
+ * This class extends the QDataStream with a version number for the kernel
+ * symbols file format.
  */
 class KernelSymbolStream : public QDataStream
 {
