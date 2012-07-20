@@ -124,6 +124,7 @@ void ReferencingType::readFrom(KernelSymbolStream& in)
         break;
 
     case kSym::VERSION_12:
+    case kSym::VERSION_13:
         in >> _refTypeId;
         break;
 
@@ -146,6 +147,7 @@ void ReferencingType::writeTo(KernelSymbolStream& out) const
         break;
 
     case kSym::VERSION_12:
+    case kSym::VERSION_13:
         out << _refTypeId;
         break;
 

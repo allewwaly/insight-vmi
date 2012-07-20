@@ -13,9 +13,14 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
 
     // Both i386 and x86_64
     list.append(KernelMemSpec(
-            "SIZEOF_UNSIGNED_LONG",
-            "sizeof(unsigned long)",
+            "SIZEOF_LONG",
+            "sizeof(long)",
             "%lld"));
+    // Both i386 and x86_64
+    list.append(KernelMemSpec(
+                    "SIZEOF_POINTER",
+                    "sizeof(void*)",
+                    "%lld"));
     // See <linux/include/asm-x86/page_32.h>
     // See <linux/include/asm-x86/page_64.h>
     list.append(KernelMemSpec(
@@ -99,8 +104,10 @@ bool MemSpecs::setFromKeyValue(const QString& key, const QString& value)
         vmemmapStart = value.toULong(&ok, 16);
     else if (key == "VMEMMAP_END")
         vmemmapEnd = value.toULong(&ok, 16);
-    else if (key == "SIZEOF_UNSIGNED_LONG")
-        sizeofUnsignedLong = value.toInt(&ok);
+    else if (key == "SIZEOF_LONG")
+        sizeofLong = value.toInt(&ok);
+    else if (key == "SIZEOF_POINTER")
+        sizeofPointer = value.toInt(&ok);
     else if (key == "ARCHITECTURE") {
         if (value == "i386")
             arch |= ar_i386;
@@ -120,11 +127,12 @@ QString MemSpecs::toString() const
 {
     QString ret;
     int key_w = -21;
-    int val_w = sizeofUnsignedLong << 1;
+    int val_w = sizeofPointer << 1;
     QString pae = arch & ar_pae_enabled ? " (PAE enabled)" : (arch & ar_i386 ? " (PAE disabled)" : "");
 
     ret += QString("%1 = %2%3\n").arg("ARCHITECTURE", key_w).arg(arch & ar_i386 ? "i386" : "x86_64").arg(pae);
-    ret += QString("%1 = %2\n").arg("sizeof(unsigned long)", key_w).arg(sizeofUnsignedLong);
+    ret += QString("%1 = %2\n").arg("sizeof(long)", key_w).arg(sizeofLong);
+    ret += QString("%1 = %2\n").arg("sizeof(void*)", key_w).arg(sizeofPointer);
     ret += QString("%1 = 0x%2\n").arg("PAGE_OFFSET", key_w).arg(pageOffset, val_w, 16, QChar('0'));
     if (vmallocStart > 0)
         ret += QString("%1 = 0x%2\n").arg("VMALLOC_START", key_w).arg(realVmallocStart(), val_w, 16, QChar('0'));
@@ -154,7 +162,7 @@ QString MemSpecs::toString() const
 }
 
 
-QDataStream& operator>>(QDataStream& in, MemSpecs& specs)
+KernelSymbolStream& operator>>(KernelSymbolStream& in, MemSpecs& specs)
 {
     in  >> specs.pageOffset
         >> specs.vmallocStart
@@ -167,14 +175,20 @@ QDataStream& operator>>(QDataStream& in, MemSpecs& specs)
         >> specs.startKernelMap
         >> specs.initLevel4Pgt
         >> specs.swapperPgDir
-        >> specs.sizeofUnsignedLong
+        >> specs.sizeofPointer
         >> specs.arch;
+
+    // Distiction sizeofLong/sizeofPointer was introduced in v13
+    if (in.kSymVersion() >= kSym::VERSION_13)
+        in >> specs.sizeofLong;
+    else
+        specs.sizeofLong = specs.sizeofPointer;
 
     return in;
 }
 
 
-QDataStream& operator<<(QDataStream& out, const MemSpecs& specs)
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const MemSpecs& specs)
 {
     out << specs.pageOffset
         << specs.vmallocStart
@@ -187,8 +201,12 @@ QDataStream& operator<<(QDataStream& out, const MemSpecs& specs)
         << specs.startKernelMap
         << specs.initLevel4Pgt
         << specs.swapperPgDir
-        << specs.sizeofUnsignedLong
+        << specs.sizeofPointer
         << specs.arch;
+
+    // Distiction sizeofLong/sizeofPointer was introduced in v13
+    if (out.kSymVersion() >= kSym::VERSION_13)
+        out << specs.sizeofLong;
 
     return out;
 }

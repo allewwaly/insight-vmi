@@ -67,6 +67,7 @@ void KernelSymbolReader::read()
         readVersion11(in);
         break;
     case kSym::VERSION_12:
+    case kSym::VERSION_13:
         readVersion12(in);
         break;
     default:

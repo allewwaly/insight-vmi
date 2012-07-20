@@ -10,6 +10,7 @@
 
 #include <QDataStream>
 #include <debug.h>
+#include "kernelsymbolstream.h"
 
 #define VADDR_SPACE_X86    0xFFFFFFFFUL
 #define VADDR_SPACE_X86_64 0xFFFFFFFFFFFFFFFFULL
@@ -108,7 +109,8 @@ struct MemSpecs
         swapperPgDir(0),
         highMemory(0),
         vmallocEarlyreserve(0),
-        sizeofUnsignedLong(sizeof(unsigned long)),
+        sizeofLong(sizeof(long)),
+        sizeofPointer(sizeof(void*)),
         arch(ar_undefined),
         initialized(false)
     {}
@@ -162,7 +164,8 @@ struct MemSpecs
     quint64 swapperPgDir;
     quint64 highMemory;          ///< This is set at runtime by MemoryDump::init()
     quint64 vmallocEarlyreserve; ///< This is set at runtime by MemoryDump::init()
-    qint32 sizeofUnsignedLong;
+    qint32 sizeofLong;
+    qint32 sizeofPointer;
     qint32 arch;                 ///< An Architecture value
     bool initialized;            ///< \c true after MemoryDump::init() is complete, \c false otherwise
 };
@@ -191,7 +194,7 @@ inline quint64 MemSpecs::realVmallocStart() const
 * @param specs object to store the serialized data to
 * @return the data stream \a in
 */
-QDataStream& operator>>(QDataStream& in, MemSpecs& specs);
+KernelSymbolStream& operator>>(KernelSymbolStream& in, MemSpecs& specs);
 
 
 /**
@@ -200,7 +203,7 @@ QDataStream& operator>>(QDataStream& in, MemSpecs& specs);
 * @param specs object to serialize
 * @return the data stream \a out
 */
-QDataStream& operator<<(QDataStream& out, const MemSpecs& specs);
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const MemSpecs& specs);
 
 
 #endif /* MEMSPECS_H_ */

@@ -71,9 +71,11 @@ bool ASTType::equalTo(const ASTType* other, bool exactMatch) const
 }
 
 
-ASTTypeEvaluator::ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong)
-    : ASTWalker(ast), _sizeofLong(sizeofLong), _phase(epFindSymbols),
-      _pointsToRound(0), _assignmentsTotal(0), _pointsToDeadEndHits(0)
+ASTTypeEvaluator::ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong,
+                                   int sizeofPointer)
+    : ASTWalker(ast), _sizeofLong(sizeofLong), _sizeofPointer(sizeofPointer),
+      _phase(epFindSymbols), _pointsToRound(0), _assignmentsTotal(0),
+      _pointsToDeadEndHits(0)
 {
 }
 
@@ -240,7 +242,7 @@ int ASTTypeEvaluator::sizeofType(RealType type) const
     case rtDouble:
     	return 8;
     case rtPointer:
-    	return sizeofLong();
+        return sizeofPointer();
     case rtArray:
     	return 0;
     case rtEnum:
@@ -252,7 +254,7 @@ int ASTTypeEvaluator::sizeofType(RealType type) const
     case rtTypedef:
     	return 0;
     case rtFuncPointer:
-    	return sizeofLong();
+        return sizeofPointer();
     case rtFunction:
         return 0;
     case rtVoid:
@@ -2706,11 +2708,11 @@ bool ASTTypeEvaluator::canHoldPointerValue(RealType type) const
 
     case rtInt32:
     case rtUInt32:
-        return (sizeofLong() <= 4);
+        return (sizeofPointer() <= 4);
 
     case rtInt64:
     case rtUInt64:
-        return true;
+        return (sizeofPointer() <= 8);
 
     default:
         typeEvaluatorError(QString("Expected a numeric type here instead of %1")
@@ -3616,13 +3618,13 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
     // allow pointer-to-integer casts, though.
     if (lType->isPointer() &&
         !rType->isPointer() &&
-        !(sizeofLong() == 4 && (rType->type() & (rtUInt32|rtInt32))) &&
-        !(sizeofLong() == 8 && (rType->type() & (rtUInt64|rtInt64))))
+        !(sizeofPointer() == 4 && (rType->type() & (rtUInt32|rtInt32))) &&
+        !(sizeofPointer() == 8 && (rType->type() & (rtUInt64|rtInt64))))
         return erNoPointerAssignment;
     if (rType->isPointer() &&
         !lType->isPointer() &&
-        !(sizeofLong() == 4 && (lType->type() & (rtUInt32|rtInt32))) &&
-        !(sizeofLong() == 8 && (lType->type() & (rtUInt64|rtInt64))))
+        !(sizeofPointer() == 4 && (lType->type() & (rtUInt32|rtInt32))) &&
+        !(sizeofPointer() == 8 && (lType->type() & (rtUInt64|rtInt64))))
         return erNoPointerAssignment;
 
     return erTypesAreDifferent;

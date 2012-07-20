@@ -254,7 +254,8 @@ void ASTExpressionEvaluatorTester::initTestCase()
 {
     _specs = new MemSpecs();
     _specs->arch = MemSpecs::ar_x86_64;
-    _specs->sizeofUnsignedLong = 8;
+    _specs->sizeofPointer = 8;
+    _specs->sizeofLong = 8;
 
     _factory = new SymFactory(*_specs);
 
@@ -2007,7 +2008,7 @@ TEST_FUNCTION(builtins)
     CONSTANT_EXPR2(__builtin_types_compatible_p(volatile int, int), 1);
     CONSTANT_EXPR2(__builtin_types_compatible_p(unsigned int, int), 0);
     CONSTANT_EXPR2(__builtin_types_compatible_p(long, long long),
-                   (_specs->sizeofUnsignedLong == 4) ? 0 : 1);
+                   (_specs->sizeofLong == 4) ? 0 : 1);
     CONSTANT_EXPR2(__builtin_types_compatible_p(long, char*), 0);
 
     CONSTANT_EXPR2(__builtin_types_compatible_p(float, int), 0);
