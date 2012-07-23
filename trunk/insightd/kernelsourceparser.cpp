@@ -189,13 +189,13 @@ void KernelSourceParser::WorkerThread::run()
     {
         currentFile = _parser->_fileNames[_parser->_filesIndex++];
 
-        if (currentFile.startsWith("net/") ||
-            currentFile.startsWith("fs/") ||
-            currentFile.startsWith("security/") ||
-            currentFile.startsWith("drivers/") ||
-            currentFile.startsWith("block/") ||
-            currentFile.startsWith("crypto/"))
-            continue;
+//        if (//currentFile.startsWith("net/") ||
+//            currentFile.startsWith("fs/") ||
+//            currentFile.startsWith("security/") ||
+//            currentFile.startsWith("drivers/") ||
+//            currentFile.startsWith("block/") ||
+//            currentFile.startsWith("crypto/"))
+//            continue;
 //        if (!currentFile.endsWith("sleep.c.i") &&
 //            !currentFile.endsWith("kill.c.i"))
 //            continue;
