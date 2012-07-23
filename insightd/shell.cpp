@@ -2365,19 +2365,19 @@ int Shell::cmdShowBaseType(const BaseType* t)
     const RefBaseType* r;
     int cnt = 1;
     while ( (r = dynamic_cast<const RefBaseType*>(t)) ) {
-        _out << color(ctColHead) << "  " << cnt << ". Ref.type ID: "
-             << color(ctTypeId) << "0x" << hex << (uint)r->refTypeId() << dec << endl;
-        _out << color(ctColHead) << "  " << cnt
-             << ". Ref.type:    "
-             << color(ctReset) <<  (r->refType() ? prettyNameInColor(r->refType(), 0, 0) :
+        _out << color(ctColHead) << "  " << cnt << ". Ref. type:   "
+             << color(ctTypeId) << "0x" << hex << (uint)r->refTypeId() << dec
+             << color(ctReset) << " " <<  (r->refType() ? prettyNameInColor(r->refType(), 0, 0) :
                                  QString(r->refTypeId() ? "(unresolved)" : "void"))
              << endl;
         for (int i = 0; i < r->altRefTypeCount(); ++i) {
             const BaseType* t = r->altRefBaseType(i);
             _out << qSetFieldWidth(18) << right
-                 << QString("<%1> 0x%2 ").arg(i+1).arg((uint)t->id(), -8, 16)
+                 << QString("<%1> ").arg(i+1)
+                 << color(ctTypeId)
+                 << QString("0x%2 ").arg((uint)t->id(), -8, 16)
                  << qSetFieldWidth(0) << left
-                 << t->prettyName() << ": "
+                 << prettyNameInColor(t) << color(ctReset) << ": "
                  << r->altRefType(i).expr()->toString(true) << endl;
         }
 
@@ -2612,9 +2612,8 @@ int Shell::cmdShowVariable(const Variable* v)
 		 << color(ctAddress) << "0x" << hex << v->offset() << dec << endl;
 
     const BaseType* rt = v->refType();
-    _out << color(ctColHead) << "  Type ID:        "
-         << color(ctTypeId) << "0x" << hex << (uint)v->refTypeId() << dec << endl;
-    _out << color(ctColHead) << "  Type:           ";
+    _out << color(ctColHead) << "  Type:           "
+         << color(ctTypeId) << "0x" << hex << (uint)v->refTypeId() << dec << " ";
     if (rt)
         _out << prettyNameInColor(rt, 0, 0);
     else if (v->refTypeId())
@@ -2625,11 +2624,12 @@ int Shell::cmdShowVariable(const Variable* v)
 
     for (int i = 0; i < v->altRefTypeCount(); ++i) {
         const BaseType* t = v->altRefBaseType(i);
-        _out << "  <" << (i+1) << "> "
-             << qSetFieldWidth(11) << left
-             << QString("0x%1").arg((uint)t->id(), 0, 16)
-             << qSetFieldWidth(0) << " "
-             << t->prettyName() << ": "
+        _out << qSetFieldWidth(18) << right
+             << QString("<%1> ").arg(i+1)
+             << color(ctTypeId)
+             << QString("0x%2 ").arg((uint)t->id(), -8, 16)
+             << qSetFieldWidth(0) << left
+             << prettyNameInColor(t) << color(ctReset) << ": "
              << v->altRefType(i).expr()->toString(true) << endl;
     }
 
@@ -2714,6 +2714,10 @@ int Shell::cmdSymbols(QStringList args)
         return cmdSymbolsStore(args);
     else if (QString("load").startsWith(action))
         return cmdSymbolsLoad(args);
+#ifdef DEBUG_MERGE_TYPES_AFTER_PARSING
+    else if (QString("postprocess").startsWith(action))
+        return cmdSymbolsPostProcess(args);
+#endif
     else if (QString("source").startsWith(action))
         return cmdSymbolsSource(args);
     else {
@@ -2722,6 +2726,16 @@ int Shell::cmdSymbols(QStringList args)
     }
 }
 
+
+#ifdef DEBUG_MERGE_TYPES_AFTER_PARSING
+
+int Shell::cmdSymbolsPostProcess(QStringList /*args*/)
+{
+    _sym.factory().sourceParcingFinished();
+    return ecOk;
+}
+
+#endif
 
 int Shell::cmdSymbolsSource(QStringList args)
 {

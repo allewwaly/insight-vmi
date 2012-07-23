@@ -1433,23 +1433,28 @@ void SymFactory::sourceParcingFinished()
 {
     // Check if we can merge type copies again. We merge them when we find that
     // all type copies belong to global variables and not to any struct/union.
-    BaseTypeList sameTypes;
+    BaseTypeList sameTypes, structsUsingType;
+    VariableList varsUsingType;
     for (int i = _types.size() - 1; i >= 0; --i) {
-        const BaseType *type = _types[i], *origType = 0;
+        const BaseType *type = _types[i];
+        BaseType *origType = 0;
         // Skip non-artificial and non-struct/union types
         if (type->id() >= 0 ||
             !(type->dereferencedType(BaseType::trLexical) & StructOrUnion))
             continue;
 
         sameTypes.clear();
+        // Find all same types based on their hash and exact comparison
         for (BaseTypeUIntHash::const_iterator
              it = _typesByHash.find(type->hash()), e = _typesByHash.constEnd();
              it != e && it.key() == type->hash();
              ++it)
         {
             if (*it.value() == *type) {
-                if (it.value()->id() > 0)
+                if (it.value()->id() > 0) {
+                    assert(origType == 0);
                     origType = it.value();
+                }
                 else
                     sameTypes.append(it.value());
             }
@@ -1457,19 +1462,98 @@ void SymFactory::sourceParcingFinished()
 
         assert(origType != 0);
         // If all artificial types are used by global variables, then merge them
-        bool merge = true;
-        for (int i = 0; i < sameTypes.size() && merge; ++i)
-            if (varsUsingId(sameTypes[i]->id()).isEmpty())
-                merge = false;
-        if (!merge)
+        int usedByStructs = 0;
+        varsUsingType.clear();
+        for (int j = 0; j < sameTypes.size() /*&& usedByStructs <= 1*/; ++j) {
+            // Count no. of structs/unions using that type
+            structsUsingType = typesUsingId(sameTypes[j]->id());
+            for (int k = 0; k < structsUsingType.size(); ++k) {
+                if (structsUsingType[k]->type() & StructOrUnion)
+                    ++usedByStructs;
+            }
+
+            varsUsingType += varsUsingId(sameTypes[j]->id());
+        }
+        if (usedByStructs > 1) {
+#ifdef DEBUG_MERGE_TYPES_AFTER_PARSING
+            debugmsg(QString("Not merging copy %1%2%3%4 of type %1%2%5 %6%4, is used by %7%8%4 "
+                             "types (and %7%9%4 variables)")
+                     .arg(shell->color(ctTypeId))
+                     .arg("0x")
+                     .arg((uint)type->id(), 0, 16)
+                     .arg(shell->color(ctReset))
+                     .arg((uint)(origType ? origType->id() : 0), 0, 16)
+                     .arg(shell->prettyNameInColor(type))
+                     .arg(shell->color(ctErrorLight))
+                     .arg(usedByStructs)
+                     .arg(varsUsingType.size()));
+#endif
             continue;
+        }
+        else {
+#ifdef DEBUG_MERGE_TYPES_AFTER_PARSING
+            if (origType)
+                sameTypes.prepend(origType);
+
+            QString s = QString("Merging %1%2%3 copies of type %4%5%6 %7%3:")
+                    .arg(shell->color(ctErrorLight))
+                    .arg(sameTypes.size())
+                    .arg(shell->color(ctReset))
+                    .arg(shell->color(ctTypeId))
+                    .arg("0x")
+                    .arg((uint)type->id(), 0, 16)
+                    .arg(shell->prettyNameInColor(type));
+
+            for (int j = 0; j < sameTypes.size(); ++j) {
+                const BaseType* t = sameTypes[j];
+                VariableList vlist = varsUsingId(t->id());
+                BaseTypeList tlist = typesUsingId(t->id());
+
+                s += QString("\n    %1%2%3 %4%5")
+                        .arg(shell->color(ctTypeId))
+                        .arg("0x")
+                        .arg((uint)t->id(), -8, 16)
+                        .arg(shell->prettyNameInColor(t, 30))
+                        .arg(shell->color(ctReset));
+
+                bool first = true;
+                for (int k = 0; k < tlist.size(); ++k) {
+                    if (!(tlist[k]->type() & StructOrUnion))
+                        continue;
+
+                    s += first ? "used by " : ", ";
+                    first = false;
+
+                    s += QString("%1%2%3 %4%5")
+                            .arg(shell->color(ctTypeId))
+                            .arg("0x")
+                            .arg((uint)tlist[k]->id(), 0, 16)
+                            .arg(shell->prettyNameInColor(tlist[k]))
+                            .arg(shell->color(ctReset));
+                }
+                for (int k = 0; k < vlist.size(); ++k) {
+                    s += first ? " used by " : ", ";
+                    first = false;
+
+                    s += QString("%1%2%3 %4%5%6")
+                            .arg(shell->color(ctTypeId))
+                            .arg("0x")
+                            .arg((uint)vlist[k]->id(), 0, 16)
+                            .arg(shell->color(ctVariable))
+                            .arg(vlist[k]->name())
+                            .arg(shell->color(ctReset));
+                }
+            }
+
+            debugmsg(s);
+#endif
+        }
 
         // Replace all sameTypes with origType
-        VariableList vars;
-        for (int i = 0; i < sameTypes.size() && merge; ++i) {
-            vars = varsUsingId(sameTypes[i]->id());
-            /// @todo implement me
-        }
+//        for (int i = 0; i < sameTypes.size() && merge; ++i) {
+//            vars = varsUsingId(sameTypes[i]->id());
+//            /// @todo implement me
+//        }
     }
 
     shell->out() << "Statistics:" << endl;
@@ -2094,7 +2178,7 @@ void SymFactory::typeAlternateUsageStructMember(const TypeEvalDetails *ed,
 												ASTTypeEvaluator *eval)
 {
     // Find context base types
-    FoundBaseTypes ctxTypeRet = findBaseTypesForAstType(ed->ctxType, eval, true);
+    FoundBaseTypes ctxTypeRet = findBaseTypesForAstType(ed->ctxType, eval, false);
     typeAlternateUsageStructMember2(ed, targetBaseType, ctxTypeRet.typesNonPtr, eval);
 }
 
@@ -2298,18 +2382,6 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
 
                 member->addAltRefType(targetBaseType->id(),
                                       expr->clone(_expressions));
-
-                if (ctxBaseTypes[i]->name() == "task_struct" &&
-                    targetBaseType->prettyName().contains("task_struct"))
-                {
-                    debugmsg(QString("Changed member %1 of type 0x%2 to "
-                                     "target type 0x%3: %4")
-                             .arg(trans.toString(ctxBaseTypes[i]->prettyName()))
-                             .arg((uint)ctxBaseTypes[i]->id(), 0, 16)
-                             .arg((uint)targetBaseType->id(), 0, 16)
-                             .arg(targetBaseType->prettyName()));
-
-                }
             }
         }
     }
@@ -2353,9 +2425,9 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
 }
 
 
-void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
+void SymFactory::typeAlternateUsageVar(const TypeEvalDetails* ed,
                                        const BaseType* targetBaseType,
-                                       ASTTypeEvaluator * eval)
+                                       ASTTypeEvaluator* eval)
 {
     VariableList vars = _varsByName.values(ed->sym->name());
     int varsFound = 0;
@@ -2437,24 +2509,16 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails *ed,
         else {
             BaseType* t = vars[i]->refType();
             assert(t != 0);
-            // If this is not a type copy, create a copy now
-            if (t->id() > 0) {
+
+            // If this is a type change usage for a non-nested struct/union and
+            // is not already a copy, then create a copy now
+            if (t->id() > 0 && ed->transformations.memberCount() <= 1) {
 #ifdef DEBUG_APPLY_USED_AS
                 int origRefTypeId = vars[i]->refTypeId();
 #endif
                 // Clear all existing alternative types on the copy
                 t = makeDeepTypeCopy(t, true);
                 ++_typesCopied;
-
-                if (vars[i]->name() == "init_task") {
-                    debugmsg(QString("Created copy (0x%1 -> 0x%2) of type \"%3\" "
-                                     "for global variable \"%4\" (0x%5).")
-                             .arg((uint)vars[i]->refTypeId(), 0, 16)
-                             .arg((uint)t->id(), 0, 16)
-                             .arg(t->prettyName(), 0, 16)
-                             .arg(vars[i]->name())
-                             .arg((uint)vars[i]->id(), 0, 16));
-                }
 
                 _usedByVars.remove(vars[i]->refTypeId(), vars[i]);
                 vars[i]->setRefTypeId(t->id());
