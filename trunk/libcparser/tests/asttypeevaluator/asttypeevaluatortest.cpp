@@ -19,7 +19,7 @@ class ASTTypeEvaluatorTester: public ASTTypeEvaluator
 {
 public:
 	ASTTypeEvaluatorTester(AbstractSyntaxTree* ast)
-		: ASTTypeEvaluator(ast, 4) { reset(); }
+		: ASTTypeEvaluator(ast, 4, 4) { reset(); }
 
 	void reset()
 	{
