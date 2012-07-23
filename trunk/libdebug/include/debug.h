@@ -37,6 +37,10 @@ extern const char* userMailingList;
 #endif /* __cplusplus */
 
 
+// Enabled the code for memory map building (requires the X window system)
+//#define CONFIG_MEMORY_MAP 1
+
+
 #if (DEBUG == 1) && defined(__cplusplus)
 
 // Activate for detailed node evaluation tracking
@@ -57,6 +61,13 @@ extern const char* userMailingList;
 // (mostly in insightd/symfactory.cpp)
 #undef DEBUG_APPLY_USED_AS
 //#define DEBUG_APPLY_USED_AS 1
+
+// Enable debug output for type merging after parsing the kernel source code
+// (mostly in insightd/symfactory.cpp)
+//#undef DEBUG_MERGE_TYPES_AFTER_PARSING
+#define DEBUG_MERGE_TYPES_AFTER_PARSING 1
+
+
 
 // #	include <QTime>
 #	include <iomanip>
