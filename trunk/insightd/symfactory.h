@@ -643,7 +643,7 @@ private:
      * @param oldType the BaseType to be replaced
      * @param newType the BaseType to replace \a oldType
      */
-    void replaceType(BaseType* oldType, BaseType* newType);
+    void replaceType(const BaseType *oldType, BaseType* newType);
 
     /**
      * Inserts all external variable declarations into the factory's symbols
