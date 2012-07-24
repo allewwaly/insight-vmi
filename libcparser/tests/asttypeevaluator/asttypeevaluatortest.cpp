@@ -11,6 +11,7 @@
 #include <astbuilder.h>
 #include <debug.h>
 #include <genericexception.h>
+#include <bugreport.h>
 #include <QtTest>
 #include <iostream>
 
@@ -80,7 +81,7 @@ protected:
 
 
 ASTTypeEvaluatorTest::ASTTypeEvaluatorTest(QObject* parent)
-	: QObject(parent), _ast(0), _builder(0)
+    : QObject(parent), _ast(0), _builder(0)
 {
 }
 
@@ -96,6 +97,8 @@ void ASTTypeEvaluatorTest::init()
     _ast = new AbstractSyntaxTree();
     _builder = new ASTBuilder(_ast);
     _tester = new ASTTypeEvaluatorTester(_ast);
+    _err.setString(&_err_str);
+    BugReport::setErr(&_err);
 }
 
 
@@ -111,6 +114,8 @@ void ASTTypeEvaluatorTest::cleanup()
 	safe_delete(_tester);
 	safe_delete(_builder);
 	safe_delete(_ast);
+	_err_str.clear();
+	BugReport::setErr(0);
 }
 
 #define DEF_LIST_HEAD \
