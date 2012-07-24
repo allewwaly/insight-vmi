@@ -1439,8 +1439,7 @@ void SymFactory::sourceParcingFinished()
         const BaseType *type = _types[i];
         BaseType *origType = 0;
         // Skip non-artificial and non-struct/union types
-        if (type->id() >= 0 ||
-            !(type->dereferencedType(BaseType::trLexical) & StructOrUnion))
+        if (type->id() >= 0 || !(type->type() & StructOrUnion))
             continue;
 
         sameTypes.clear();
@@ -1461,6 +1460,7 @@ void SymFactory::sourceParcingFinished()
         }
 
         assert(origType != 0);
+
         // If all artificial types are used by global variables, then merge them
         int usedByStructs = 0;
         varsUsingType.clear();
@@ -1492,6 +1492,7 @@ void SymFactory::sourceParcingFinished()
         }
         else {
 #ifdef DEBUG_MERGE_TYPES_AFTER_PARSING
+            // Preprend origType for output
             if (origType)
                 sameTypes.prepend(origType);
 
@@ -1546,10 +1547,27 @@ void SymFactory::sourceParcingFinished()
             }
 
             debugmsg(s);
+
+            // Remove previously preprended origType again
+            if (!sameTypes.isEmpty() && sameTypes.first() == origType)
+                sameTypes.pop_front();
 #endif
         }
 
-        // Replace all sameTypes with origType
+        // Merge alternative types of all types into origType
+        Structured* orig_s = dynamic_cast<Structured*>(origType);
+        assert(orig_s != 0);
+        for (int j = 0; j < sameTypes.size(); ++j) {
+            const Structured* copy_s =
+                    dynamic_cast<const Structured*>(sameTypes[j]);
+            assert(copy_s != 0);
+
+            mergeAlternativeTypes(copy_s, orig_s);
+        }
+
+        /// @todo implement me
+
+//        // Replace all sameTypes with origType
 //        for (int i = 0; i < sameTypes.size() && merge; ++i) {
 //            vars = varsUsingId(sameTypes[i]->id());
 //            /// @todo implement me
@@ -2763,4 +2781,84 @@ int SymFactory::getUniqueTypeId()
         --_artificialTypeId;
 
     return _artificialTypeId--;
+}
+
+
+void SymFactory::mergeAlternativeTypes(const Structured* src,
+                                       Structured* dst)
+{
+    if (!src || !dst || src == dst)
+        return;
+
+    if (src->hash() != dst->hash())
+        factoryError(QString("Called %1 for different types 0x%1 and 0x%2")
+                     .arg(__PRETTY_FUNCTION__)
+                     .arg((uint)src->id(), 0, 16)
+                     .arg((uint)dst->id(), 0, 16));
+
+    for (int i = 0; i < src->members().size(); ++i) {
+        StructuredMember* dst_m = dst->members().at(i);
+        const StructuredMember* src_m = src->members().at(i);
+
+        if (dst_m->refTypeId() == src_m->refTypeId())
+            continue;
+
+        const BaseType* src_mrt = 0;
+        BaseType* dst_mrt = 0;
+
+        // If the source's member has a custom type, use that one
+        if (src_m->refTypeId() < 0 && dst_m->refTypeId() >= 0) {
+            // Use original destination's member for further merging
+            src_mrt = dst_m->refTypeDeep(BaseType::trLexical);
+
+            _usedByStructMembers.remove(dst_m->refTypeId(), dst_m);
+            dst_m->setRefTypeId(src_m->refTypeId());
+            insertUsedBy(dst_m);
+        }
+
+        // Now merge the alternative types
+        dst_mrt = dst_m->refTypeDeep(BaseType::trLexical);
+        if (!src_mrt)
+            // Only use source's member if we haven't previously selected
+            // the destination's member
+            src_mrt = src_m->refTypeDeep(BaseType::trLexical);
+        // Make sure the types are still different
+        if (dst_mrt->id() == src_mrt->id())
+            continue;
+
+        // Merge embedded structs/unions recursively
+        if (dst_mrt->type() & src_mrt->type() & StructOrUnion)
+            mergeAlternativeTypes(dynamic_cast<const Structured*>(src_mrt),
+                                  dynamic_cast<Structured*>(dst_mrt));
+        // Merge RefBaseTypes directly
+        else if (dst_mrt->type() & src_mrt->type() & RefBaseTypes)
+            mergeAlternativeTypes(dynamic_cast<const RefBaseType*>(src_mrt),
+                                  dynamic_cast<RefBaseType*>(dst_mrt));
+    }
+}
+
+
+void SymFactory::mergeAlternativeTypes(const ReferencingType* src,
+                                       ReferencingType* dst)
+{
+    if (!src || !dst)
+        return;
+
+    // Check all alternative types of source
+    for (int i = 0; i < src->altRefTypes().size(); ++i) {
+        const ReferencingType::AltRefType& src_art = src->altRefTypes().at(i);
+
+        // Compare to all alternative types of destination
+        bool found = false;
+        for (int j = 0; !found && j < dst->altRefTypes().size(); ++j) {
+            const ReferencingType::AltRefType& dst_art = dst->altRefTypes().at(j);
+            if (dst_art.expr() && dst_art.expr()->equals(src_art.expr()) &&
+                dst_art.id() == src_art.id())
+                found = true;
+        }
+
+        // Add source alternative type to destination, if not found
+        if (!found)
+            dst->altRefTypes().append(src_art);
+    }
 }

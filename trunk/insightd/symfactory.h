@@ -414,6 +414,8 @@ protected:
 							   const BaseType *targetBaseType,
 							   ASTTypeEvaluator *eval);
 
+	void mergeAlternativeTypes(const Structured* src, Structured* dst);
+	void mergeAlternativeTypes(const ReferencingType *src, ReferencingType *dst);
 
 	/**
 	 * Creates or retrieves a BaseType based on the information provided in
