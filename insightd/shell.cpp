@@ -181,7 +181,7 @@ Shell::Shell(bool listenOnSocket)
 				"                              a member of a struct should be dumped."
 #ifdef CONFIG_MEMORY_MAP
                 "\n"
-                "  memory revmap [index] build|visualize [pmem|vmem]\n"
+                "  memory revmap [index] build|visualize\n"
                 "                              Build or visualize a reverse mapping for \n"
                 "                              dump <index>\n"
                 "  memory diff [index1] build <index2>|visualize\n"
