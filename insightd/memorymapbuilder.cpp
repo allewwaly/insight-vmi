@@ -217,46 +217,24 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
                 // Do nothing
             }
         }
-        // Multiple candidates, so find the most likely one
-        else {
-            Instance likely;
-            float l_prob = 0.0;
-            for (int j = 0; j < candidateCnt; ++j) {
-                try {
-                    const BaseType* type = inst->memberCandidateType(i, j);
-                    type = type ? type->dereferencedBaseType(BaseType::trLexical) : 0;
-                    // Skip invalid and void* candidates
-                    if (!type ||
-                        ((type->type() & (rtPointer|rtArray)) &&
-                         !dynamic_cast<const Pointer*>(type)->refType()))
-                        continue;
-                    // Try this candidate
-                    Instance m = inst->memberCandidate(i, j);
-                    if (_map->addressIsWellFormed(m)) {
-                        float m_prob = _map->calculateNodeProbability(
-                                    &m, node->probability());
-                        // Compare probabilities
-                        if (m_prob > l_prob || likely.isNull()) {
-                            l_prob = m_prob;
-                            likely = m;
-                        }
+        // Only follow candidates if there is a single one
+        else if (candidateCnt == 1) {
+            try {
+                Instance m = inst->memberCandidate(i, 0);
+                if (_map->addressIsWellFormed(m) && m.type()) {
+                    int cnt = 1;
+                    if (m.type()->type() == rtPointer)
+                        m = m.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
+                    if (cnt || (m.type()->type() & StructOrUnion)) {
+                        // Adjust instance name to reflect full path
+                        if (node->name() != inst->name())
+                            m.setName(inst->name() + "." + m.name());
+                        _map->addChildIfNotExistend(m, node, _index);
                     }
                 }
-                catch (GenericException& e) {
-                    // Do nothing
-                }
             }
-            // Add the most likely candidate
-            if (!likely.isNull() && likely.type()) {
-                int cnt = 1;
-                if (likely.type()->type() == rtPointer)
-                    likely = likely.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
-                if (cnt || (likely.type()->type() & StructOrUnion)) {
-                    // Adjust instance name to reflect full path
-                    if (node->name() != inst->name())
-                        likely.setName(inst->name() + "." + likely.name());
-                    _map->addChildIfNotExistend(likely, node, _index);
-                }
+            catch (GenericException&) {
+                // do nothing
             }
         }
     }
