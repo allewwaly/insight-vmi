@@ -64,8 +64,8 @@ extern const char* userMailingList;
 
 // Enable debug output for type merging after parsing the kernel source code
 // (mostly in insightd/symfactory.cpp)
-//#undef DEBUG_MERGE_TYPES_AFTER_PARSING
-#define DEBUG_MERGE_TYPES_AFTER_PARSING 1
+#undef DEBUG_MERGE_TYPES_AFTER_PARSING
+//#define DEBUG_MERGE_TYPES_AFTER_PARSING 1
 
 
 

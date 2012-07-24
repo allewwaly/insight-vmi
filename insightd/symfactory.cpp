@@ -1145,22 +1145,22 @@ bool SymFactory::resolveReferences(Structured* s)
 }
 
 
-void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
+void SymFactory::replaceType(const BaseType* oldType, BaseType* newType)
 {
     assert(oldType != 0);
 
     if (!oldType->name().isEmpty())
-        _typesByName.remove(oldType->name(), oldType);
+        _typesByName.remove(oldType->name(), const_cast<BaseType*>(oldType));
     if (oldType->hashIsValid())
-        _typesByHash.remove(oldType->hash(), oldType);
+        _typesByHash.remove(oldType->hash(), const_cast<BaseType*>(oldType));
 
-    RefBaseType* rbt = dynamic_cast<RefBaseType*>(oldType);
+    const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(oldType);
     if (rbt) {
         if (rbt->refTypeId() && !rbt->refType())
-            removePostponed(rbt);
-        _usedByRefTypes.remove(rbt->refTypeId(), rbt);
+            removePostponed(const_cast<RefBaseType*>(rbt));
+        _usedByRefTypes.remove(rbt->refTypeId(), const_cast<RefBaseType*>(rbt));
 
-        FuncPointer* fp = dynamic_cast<FuncPointer*>(rbt);
+        const FuncPointer* fp = dynamic_cast<const FuncPointer*>(rbt);
         if (fp) {
             for (int i = 0; i < fp->params().size(); ++i) {
                 FuncParam* param = fp->params().at(i);
@@ -1170,10 +1170,10 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
         }
     }
 
-    Structured* s = dynamic_cast<Structured*>(oldType);
+    const Structured* s = dynamic_cast<const Structured*>(oldType);
     if (s) {
         if (s->size() == 0)
-            _zeroSizeStructs.removeAll(s);
+            _zeroSizeStructs.removeAll(const_cast<Structured*>(s));
         for (int i = 0; i < s->members().size(); ++i) {
             StructuredMember* m = s->members().at(i);
             if (m->refTypeId())
@@ -1181,7 +1181,7 @@ void SymFactory::replaceType(BaseType* oldType, BaseType* newType)
         }
     }
 
-    _types.removeAll(oldType);
+    _types.removeAll(const_cast<BaseType*>(oldType));
     ++_changeClock;
 
     // Update all old equivalent types as well
@@ -1298,7 +1298,7 @@ int SymFactory::replaceZeroSizeStructs()
 
 inline bool idLessThan(const BaseType* t1, const BaseType* t2)
 {
-    return t1->id() < t2->id();
+    return uint(t1->id()) < uint(t2->id());
 }
 
 
@@ -1435,6 +1435,8 @@ void SymFactory::sourceParcingFinished()
     // all type copies belong to global variables and not to any struct/union.
     BaseTypeList sameTypes, structsUsingType;
     VariableList varsUsingType;
+    int uniqueTypesMerged = 0, totalTypesMerged = 0;
+
     for (int i = _types.size() - 1; i >= 0; --i) {
         const BaseType *type = _types[i];
         BaseType *origType = 0;
@@ -1490,8 +1492,8 @@ void SymFactory::sourceParcingFinished()
 #endif
             continue;
         }
-        else {
 #ifdef DEBUG_MERGE_TYPES_AFTER_PARSING
+        else {
             // Preprend origType for output
             if (origType)
                 sameTypes.prepend(origType);
@@ -1551,8 +1553,8 @@ void SymFactory::sourceParcingFinished()
             // Remove previously preprended origType again
             if (!sameTypes.isEmpty() && sameTypes.first() == origType)
                 sameTypes.pop_front();
-#endif
         }
+#endif
 
         // Merge alternative types of all types into origType
         Structured* orig_s = dynamic_cast<Structured*>(origType);
@@ -1562,16 +1564,25 @@ void SymFactory::sourceParcingFinished()
                     dynamic_cast<const Structured*>(sameTypes[j]);
             assert(copy_s != 0);
 
+            // Merge alternative types from copy_s into orig_s
             mergeAlternativeTypes(copy_s, orig_s);
+            // Replace all references to copy_s with orig_s
+            replaceType(copy_s, orig_s);
+            delete copy_s;
         }
 
-        /// @todo implement me
+        // Replace references by global variables manually
+        for (int j = 0; j < varsUsingType.size(); ++j) {
+            Variable* var = varsUsingType[j];
+            _usedByVars.remove(var->refTypeId(), var);
+            var->setRefTypeId(origType->id());
+            _usedByVars.insertMulti(var->refTypeId(), var);
+        }
 
-//        // Replace all sameTypes with origType
-//        for (int i = 0; i < sameTypes.size() && merge; ++i) {
-//            vars = varsUsingId(sameTypes[i]->id());
-//            /// @todo implement me
-//        }
+        if (!sameTypes.isEmpty()) {
+            uniqueTypesMerged++;
+            totalTypesMerged += sameTypes.size();
+        }
     }
 
     shell->out() << "Statistics:" << endl;
@@ -1580,6 +1591,8 @@ void SymFactory::sourceParcingFinished()
     shell->out() << "  | Type changes of variables:      " << _varTypeChanges << endl;
     shell->out() << "  | Total type changes:             " << _totalTypesChanged << endl;
     shell->out() << "  | Types copied:                   " << _typesCopied << endl;
+    shell->out() << "  | Unique types merged:            " << uniqueTypesMerged << endl;
+    shell->out() << "  | Total types merged:             " << totalTypesMerged << endl;
     shell->out() << "  | Ambigues types:                 " << _ambiguesAltTypes << endl;
     shell->out() << "  `-------------------------------------------" << endl;
     shell->out() << qSetFieldWidth(0) << left;
@@ -2800,40 +2813,32 @@ void SymFactory::mergeAlternativeTypes(const Structured* src,
         StructuredMember* dst_m = dst->members().at(i);
         const StructuredMember* src_m = src->members().at(i);
 
-        if (dst_m->refTypeId() == src_m->refTypeId())
-            continue;
-
-        const BaseType* src_mrt = 0;
-        BaseType* dst_mrt = 0;
-
         // If the source's member has a custom type, use that one
         if (src_m->refTypeId() < 0 && dst_m->refTypeId() >= 0) {
-            // Use original destination's member for further merging
-            src_mrt = dst_m->refTypeDeep(BaseType::trLexical);
-
             _usedByStructMembers.remove(dst_m->refTypeId(), dst_m);
             dst_m->setRefTypeId(src_m->refTypeId());
             insertUsedBy(dst_m);
         }
+        // Now only merge alternative types if either non or both are custom
+        else if ((src_m->refTypeId() < 0 && dst_m->refTypeId() < 0) ||
+                 (src_m->refTypeId() >= 0 && dst_m->refTypeId() >= 0))
+        {
+            // Merge the struct members directly
+            if (src_m->hasAltRefTypes())
+                mergeAlternativeTypes(src_m, dst_m);
 
-        // Now merge the alternative types
-        dst_mrt = dst_m->refTypeDeep(BaseType::trLexical);
-        if (!src_mrt)
-            // Only use source's member if we haven't previously selected
-            // the destination's member
-            src_mrt = src_m->refTypeDeep(BaseType::trLexical);
-        // Make sure the types are still different
-        if (dst_mrt->id() == src_mrt->id())
-            continue;
+            const BaseType* src_mrt = src_m->refTypeDeep(BaseType::trLexical);
+            BaseType* dst_mrt = dst_m->refTypeDeep(BaseType::trLexical);
 
-        // Merge embedded structs/unions recursively
-        if (dst_mrt->type() & src_mrt->type() & StructOrUnion)
-            mergeAlternativeTypes(dynamic_cast<const Structured*>(src_mrt),
-                                  dynamic_cast<Structured*>(dst_mrt));
-        // Merge RefBaseTypes directly
-        else if (dst_mrt->type() & src_mrt->type() & RefBaseTypes)
-            mergeAlternativeTypes(dynamic_cast<const RefBaseType*>(src_mrt),
-                                  dynamic_cast<RefBaseType*>(dst_mrt));
+            // Merge embedded structs/unions recursively
+            if (dst_mrt->type() & src_mrt->type() & StructOrUnion)
+                mergeAlternativeTypes(dynamic_cast<const Structured*>(src_mrt),
+                                      dynamic_cast<Structured*>(dst_mrt));
+            // Merge RefBaseTypes directly
+            else if (dst_mrt->type() & src_mrt->type() & RefBaseTypes)
+                mergeAlternativeTypes(dynamic_cast<const RefBaseType*>(src_mrt),
+                                      dynamic_cast<RefBaseType*>(dst_mrt));
+        }
     }
 }
 
