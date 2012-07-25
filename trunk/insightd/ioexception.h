@@ -10,6 +10,8 @@
 
 #include <genericexception.h>
 
+#define ioError(x) do { throw IOException((x), __FILE__, __LINE__); } while (0)
+
 /**
  * Exception class for I/O operations
  */
