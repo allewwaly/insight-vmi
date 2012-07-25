@@ -20,6 +20,7 @@
 #include "priorityqueue.h"
 #include "memorymaprangetree.h"
 #include "memorydifftree.h"
+#include "slubobjects.h"
 #include <debug.h>
 
 class SymFactory;
@@ -56,7 +57,8 @@ typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
  */
 struct BuilderSharedState
 {
-    BuilderSharedState()
+    BuilderSharedState(const SymFactory* factory, VirtualMemory* vmem)
+        : slubs(factory, vmem)
     {
         reset();
     }
@@ -69,6 +71,7 @@ struct BuilderSharedState
         lastNode = 0;
         for (int i = 0; i < MAX_BUILDER_THREADS; ++i)
             currAddresses[i] = 0;
+        slubs.clear();
     }
 
     float minProbability;
@@ -84,6 +87,7 @@ struct BuilderSharedState
         typeInstancesLock, pointersToLock, vmemReadingLock, vmemWritingLock,
         mapNodeLock;
     QWaitCondition vmemReadingDone, vmemWritingDone;
+    SlubObjects slubs;
 };
 
 
@@ -131,7 +135,8 @@ public:
 	 * @param minProbability stop building when the node's probability drops
 	 *  below this threshold
 	 */
-	void build(float minProbability = 0.0);
+	void build(float minProbability = 0.0,
+			   const QString &slubObjFile = QString());
 
 	bool dump(const QString& fileName) const;
 

@@ -17,6 +17,7 @@
 #include "varsetter.h"
 #include "memorymapbuilder.h"
 #include <debug.h>
+#include <expressionevalexception.h>
 
 
 // static variable
@@ -38,7 +39,7 @@ const QString& MemoryMap::insertName(const QString& name)
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
       _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
-      _isBuilding(false), _shared(new BuilderSharedState)
+      _isBuilding(false), _shared(new BuilderSharedState(factory, vmem))
 {
 	clear();
 }
@@ -97,7 +98,7 @@ bool MemoryMap::fitsInVmem(quint64 addr, quint64 size) const
 }
 
 
-void MemoryMap::build(float minProbability)
+void MemoryMap::build(float minProbability, const QString& slubObjFile)
 {
     // Set _isBuilding to true now and to false later
     VarSetter<bool> building(&_isBuilding, true, false);
@@ -114,6 +115,20 @@ void MemoryMap::build(float minProbability)
 
     // NON-PARALLEL PART OF BUILDING PROCESS
 
+    // Read slubs object file, if given
+    if (!slubObjFile.isEmpty()) {
+        _shared->slubs.parsePreproc(slubObjFile);
+
+        debugmsg("Read slub objects from file " << slubObjFile << ":");
+        for (int i = 0; i < _shared->slubs.caches().size(); ++i) {
+            debugmsg(QString("%1. %2 objSize = %3, count = %4")
+                     .arg(i+1, 3)
+                     .arg(_shared->slubs.caches().at(i).name, -30)
+                     .arg(_shared->slubs.caches().at(i).objSize, 4)
+                     .arg(_shared->slubs.caches().at(i).objects.size(), 4));
+        }
+    }
+
     // How many threads to create?
     _shared->threadCount =
             qMin(qMax(QThread::idealThreadCount(), 1), MAX_BUILDER_THREADS);
@@ -125,18 +140,22 @@ void MemoryMap::build(float minProbability)
     for (VariableList::const_iterator it = _factory->vars().constBegin();
             it != _factory->vars().constEnd(); ++it)
     {
-        // For testing now only start with this one variable
-        if ((*it)->name() != "init_task")
-            continue;
-        /// @todo consider alternative types for variables
-//        const Variable* v = *it;
+        const Variable* v = *it;
+//        // For testing now only start with this one variable
+//        if (v->name() != "init_task")
+//            continue;
+
 //        if (v->hasAltRefTypes())
 //            debugmsg(QString("Variable \"%1\" (0x%2) has %3 candidate types.")
 //                     .arg(v->name())
 //                     .arg(v->id(), 0, 16)
 //                     .arg(v->altRefTypeCount()));
         try {
-            Instance inst = (*it)->toInstance(_vmem, BaseType::trLexical);
+            // Use a variable's alternative type if it has exactly one
+            Instance inst = (v->altRefTypeCount() == 1) ?
+                        v->altRefTypeInstance(_vmem, 0) :
+                        v->toInstance(_vmem, BaseType::trLexical);
+
             if (!inst.isNull() && fitsInVmem(inst.address(), inst.size())) {
                 MemoryMapNode* node = new MemoryMapNode(this, inst);
                 _roots.append(node);
@@ -145,9 +164,12 @@ void MemoryMap::build(float minProbability)
                 _shared->queue.insert(node->probability(), node);
             }
         }
+        catch (ExpressionEvalException& e) {
+            // Do nothing
+        }
         catch (GenericException& e) {
-            debugerr("Caught exception for variable " << (*it)->name()
-                    << " at " << e.file << ":" << e.line << ":" << e.message);
+            debugerr("Caught exception for variable " << v->name()
+                    << " at " << e.file << ":" << e.line << ": " << e.message);
         }
     }
 
@@ -736,7 +758,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst,
         degForUserlandAddrCnt++;
     }
     // Check validity
-    if (! _vmem->safeSeek((qint64) inst->address()) ) {
+    else if (! _vmem->safeSeek((qint64) inst->address()) ) {
         prob *= degForInvalidAddr;
         degForInvalidAddrCnt++;
     }
