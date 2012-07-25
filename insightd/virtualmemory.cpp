@@ -118,7 +118,11 @@
 
 VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
                              int memDumpIndex)
-    : _tlb(50000), _physMem(physMem), _physMemSize(-1), _specs(specs), _pos(-1),
+    :
+#ifdef ENABLE_TLB
+      _tlb(50000),
+#endif
+      _physMem(physMem), _physMemSize(-1), _specs(specs), _pos(-1),
       _memDumpIndex(memDumpIndex), _threadSafe(false),
       _userland(false), _userPGD(0), _userlandMutex(QMutex::Recursive)
 {
@@ -354,11 +358,13 @@ void VirtualMemory::setPhysMem(QIODevice* physMem)
 
     if (doLock) _physMemMutex.lock();
 
+#ifdef ENABLE_TLB
     if (_physMem != physMem) {
         if (doLock) _tlbMutex.lock();
         _tlb.clear();
         if (doLock) _tlbMutex.unlock();
     }
+#endif
     _physMem = physMem;
     _physMemSize = _physMem ? _physMem->size() : -1;
 
@@ -403,6 +409,7 @@ T VirtualMemory::extractFromPhysMem(quint64 physaddr, bool enableExceptions,
 }
 
 
+#ifdef ENABLE_TLB
 inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 {
 //    // Disable TLB for now
@@ -426,12 +433,15 @@ inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 
     return result;
 }
+#endif
 
 
 quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
         bool enableExceptions)
 {
+#ifdef ENABLE_TLB
     bool doLock = _threadSafe;
+#endif
     quint64 pgd_addr;  // page global directory address
     quint64 pgd;
     quint64 pmd_paddr; // page middle directory address (only for PAE)
@@ -555,12 +565,14 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
         }
     }
 
+#ifdef ENABLE_TLB
     // Create TLB entry. Always use small page size (4k) as key into cache.
     if (doLock) _tlbMutex.lock();
     _tlb.insert(
             vaddr & PAGEMASK,
             new TLBEntry(physaddr & ~((*pageSize) - 1), *pageSize));
     if (doLock) _tlbMutex.unlock();
+#endif
 
     return physaddr;
 }
@@ -570,7 +582,9 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
 quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
         bool enableExceptions)
 {
+#ifdef ENABLE_TLB
     bool doLock = _threadSafe;
+#endif
     quint64 pgd_addr;  // page global directory address
     quint64 pgd;
     quint64 pud_paddr; // page upper directory address
@@ -683,6 +697,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 
 
 
+#ifdef ENABLE_TLB
     if(!_userland){
     	// Create TLB entry. Always use small page size (4k) as key into cache.
     	if (doLock) _tlbMutex.lock();
@@ -694,6 +709,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
     // never create a TLB entry outside kernelspace as InSight will never now about a contextswitch
     // if we connect it to a real machine
     // performance improvement: save last known _userPGD and flushTLB() on an new value
+#endif
 
 
     return physaddr;
@@ -768,8 +784,10 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
         *pageSize = -1;
     }
     else {
+#ifdef ENABLE_TLB
         // Check the TLB first.
         if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
+#endif
             // No hit, so use the address lookup function
             physaddr = pageLookup32(vaddr, pageSize, enableExceptions);
     }
@@ -829,8 +847,10 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
         *pageSize = -1;
     }
     else {
+#ifdef ENABLE_TLB
         // Check the TLB first.
         if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
+#endif
             // No hit, so use one of the address lookup functions
             physaddr = pageLookup64(vaddr, pageSize, enableExceptions);
     }
@@ -839,6 +859,7 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
 }
 
 
+#ifdef ENABLE_TLB
 void VirtualMemory::flushTlb()
 {
     bool doLock = _threadSafe;
@@ -847,4 +868,5 @@ void VirtualMemory::flushTlb()
     _tlb.clear();
     if (doLock) _tlbMutex.unlock();
 }
+#endif
 

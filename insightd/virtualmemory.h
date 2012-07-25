@@ -8,8 +8,15 @@
 #ifndef VIRTUALMEMORY_H_
 #define VIRTUALMEMORY_H_
 
-#include <QIODevice>
+// Enabling the TLB is actually slower than without due to the used QCache
+//#define ENABLE_TLB 1
+#undef ENABLE_TLB
+
+#ifdef ENABLE_TLB
 #include <QCache>
+#endif
+
+#include <QIODevice>
 #include <QMutex>
 #include <genericexception.h>
 #include "memspecs.h"
@@ -132,10 +139,12 @@ public:
      */
     bool setThreadSafety(bool safe);
 
+#ifdef ENABLE_TLB
     /**
      * Removes all cache entries from the TLB.
      */
     void flushTlb();
+#endif
 
 protected:
     // Pure virtual functions of QIODevice
@@ -143,6 +152,7 @@ protected:
     virtual qint64 writeData (const char* data, qint64 maxSize);
 
 private:
+#ifdef ENABLE_TLB
     /**
      * Looks up a virtual address in the translation look-aside buffer (TLB)
      * and returns the physical address. This is independent of the architecture
@@ -152,6 +162,7 @@ private:
      * @return physical address, if TLB hit, \c 0 otherwise.
      */
     quint64 tlbLookup(quint64 vaddr, int* pageSize);
+#endif
 
     /**
      * Looks up a virtual address in the x86_64 page table and returns the
@@ -226,6 +237,7 @@ private:
     inline T extractFromPhysMem(quint64 physaddr, bool enableExceptions,
             bool* ok);
 
+#ifdef ENABLE_TLB
     struct TLBEntry {
         TLBEntry(quint64 addr = 0, int size = 0)
             : addr(addr), size(size) {}
@@ -234,6 +246,8 @@ private:
     };
 
     QCache<quint64, TLBEntry> _tlb;
+    QMutex _tlbMutex;
+#endif
 
     QIODevice* _physMem;
     qint64 _physMemSize;
@@ -243,7 +257,6 @@ private:
     quint64 _pos;
     int _memDumpIndex;
     bool _threadSafe;
-    QMutex _tlbMutex;
     QMutex _physMemMutex;
 
     bool _userland; // <! switch to change change from kernelspace reading to userland reading.
