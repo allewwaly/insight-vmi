@@ -169,6 +169,7 @@ bool MemoryMapVerifier::lastVerification() const
 void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
 {
     // Add an memory map interval watcher node to the init_task
+    /*
     if(currentNode->name() == "init_task") {
         MemoryMapNodeIntervalWatcher *mw = new MemoryMapNodeIntervalWatcher(currentNode,
                                                                            (*this),
@@ -177,16 +178,40 @@ void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
                                                                            false);
         _watchNodes.append((MemoryMapNodeWatcher *)mw);
     }
+    else if(currentNode->fullName() == "init_task.fs.root") {
+        MemoryMapNodeIntervalWatcher *mw = new MemoryMapNodeIntervalWatcher(currentNode,
+                                                                           (*this),
+                                                                           0.05,
+                                                                           true,
+                                                                           false);
+        _watchNodes.append((MemoryMapNodeWatcher *)mw);
+    }
+    */
+    // exclude strange nodes that we hope the probability will take care of them
+    if(!currentNode->fullName().contains("init_task.nsproxy.net_ns.proc_net.parent.subdir.next.subdir.proc_fops.owner.waiter")) {
+        MemoryMapNodeIntervalWatcher *mw = new MemoryMapNodeIntervalWatcher(currentNode,
+                                                                           (*this),
+                                                                           0.30,
+                                                                           true,
+                                                                           false);
+        _watchNodes.append((MemoryMapNodeWatcher *)mw);
+   }
 }
 
 bool MemoryMapVerifier::performChecks(MemoryMapNode *lastNode)
 {
-    if(!verifyAddress(lastNode->address())) {
-        // If this node has no parent it was initiated based on a global var
-        // We do not print violations in those.
-        if(lastNode->parent() && lastNode->parent()->parent())
-            _log.warning(QString("Node '%1' with type %2 is not within the slub!")
+    // Only verify the address if this is a struct that is not embedded
+    // in another struct
+    if((lastNode->type()->type() & rtStruct) &&
+            lastNode->address() != lastNode->addrInParent() &&
+            !verifyAddress(lastNode->address())) {
+        // If this node has an address that begins with 0xc, it is not contained
+        // with the slub, so the search is unnecessary.
+        /// todo: this works for 32-bit. 64-bit?
+        if((lastNode->address() >> 28) != 0xc)
+            _log.warning(QString("Node '%1' with address 0x%2 and type %3 is not within the slub!")
                          .arg(lastNode->fullName())
+                         .arg(lastNode->address(), 0, 16)
                          .arg(lastNode->type()->prettyName()));
     }
 

@@ -631,11 +631,18 @@ bool MemoryMap::addressIsWellFormed(quint64 address) const
         	return false;
     }
 
-//    // Throw out user-land addresses
-//    if (address < _vmem->memSpecs().pageOffset)
-//        return false;
+   // Throw out user-land addresses
+   if (address < _vmem->memSpecs().pageOffset)
+       return false;
 
-    return address > 0;
+   // Check for invalid addresses
+   if(address == 0 ||
+      address == 0xffffffff ||
+        address == 0xffffffffffffffff ||
+        (address & 0x3) != 0)
+       return false;
+
+    return true;
 }
 
 
@@ -683,6 +690,8 @@ bool MemoryMap::objectIsSane(const Instance& inst,
         {
             isSane = false;
         }
+
+        /*
         else {
 
             // Is this an overlapping object with a significantly higher
@@ -692,7 +701,7 @@ bool MemoryMap::objectIsSane(const Instance& inst,
             if (instProb + prob_significance_delta <= otherNode->probability())
                 isSane = false;
         }
-
+        */
 
     }
 #endif
@@ -828,7 +837,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst) const
 
     // Degradation of 90% for an invalid list_head within this node
     // static const float degForInvalidListHead = 0.1;
-    static const float degForInvalidListHead = 0.5;
+    static const float degForInvalidListHead = 0.8;
 
     // Max. degradation of 30% for non-aligned pointer childen the type of this
     // node has
@@ -854,7 +863,7 @@ float MemoryMap::calculateNodeProbability(const Instance* inst) const
         degForUserlandAddrCnt++;
     }
     // Check validity
-    if (!_vmem->safeSeek((qint64) inst->address()) ) {
+    else if (!_vmem->safeSeek((qint64) inst->address()) ) {
         prob *= degForInvalidAddr;
         degForInvalidAddrCnt++;
     }
