@@ -20,6 +20,7 @@
 #include "priorityqueue.h"
 #include "memorymaprangetree.h"
 #include "memorydifftree.h"
+#include "memorymapverifier.h"
 #include <debug.h>
 
 class SymFactory;
@@ -241,6 +242,11 @@ public:
      */
     static const QString& insertName(const QString& name);
 
+    /**
+     *  Returns the MemoryMapVerifier that is used by this map.
+     */
+    MemoryMapVerifier& getVerifier();
+
 #ifdef DEBUG
 	mutable quint32 degPerGenerationCnt;
 	mutable quint32 degForUnalignedAddrCnt;
@@ -306,6 +312,12 @@ private:
     MemoryMapNode * addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,
             int threadIndex, quint64 addrInParent, bool hasCandidates = false);
 
+    /**
+     * Check if at least one builder is still runnning.
+     * @returns true if there is an active MemoryMapBuilder, false otherwise.
+     */
+    bool builderRunning(MemoryMapBuilder **threads);
+
     const SymFactory* _factory;  ///< holds the SymFactory to operate on
     VirtualMemory* _vmem;        ///< the virtual memory object this map is being built for
 	NodeList _roots;             ///< the nodes of the global kernel variables
@@ -317,6 +329,10 @@ private:
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
     BuilderSharedState* _shared; ///< all variables that are shared amount the builder threads
+
+#if MEMORY_MAP_VERIFICATION == 1
+    MemoryMapVerifier _verifier; ///< provides debug checks for the creation of the memory map
+#endif
 };
 
 //------------------------------------------------------------------------------
@@ -386,6 +402,13 @@ inline quint64 MemoryMap::paddrSpaceEnd() const
     return _vmem && _vmem->physMem() && _vmem->physMem()->size() > 0 ?
             _vmem->physMem()->size() - 1 : VADDR_SPACE_X86;
 }
+
+#ifdef MEMORY_MAP_VERIFICATION
+inline MemoryMapVerifier& MemoryMap::getVerifier()
+{
+    return _verifier;
+}
+#endif
 
 
 #endif /* MEMORYMAP_H_ */

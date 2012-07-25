@@ -151,6 +151,11 @@ public:
     bool hasCandidates() const;
 
     /**
+     * Get the list of candidates for this node.
+     */
+    const NodeList& getCandidates() const;
+
+    /**
      * Has the list of canidadates for this node been completed?
      */
     bool getCandidatesComplete() const;
@@ -231,6 +236,11 @@ public:
      * @return the highest probability of all candidates for this node.
      */
     float getCandidateProbability() const;
+
+    /**
+     * @return all parent nodes of this node.
+     */
+    QList<MemoryMapNode *> * getParents();
 
 	/**
 	 * Generates an Instance object from this node. The parameter
@@ -371,6 +381,11 @@ inline const BaseType* MemoryMapNode::type() const
 inline bool MemoryMapNode::hasCandidates() const
 {
     return _hasCandidates;
+}
+
+inline const NodeList& MemoryMapNode::getCandidates() const
+{
+    return _candidates;
 }
 
 inline bool MemoryMapNode::getCandidatesComplete() const

@@ -34,7 +34,16 @@ const QString& MemoryMap::insertName(const QString& name)
 
 //------------------------------------------------------------------------------
 
-
+#if MEMORY_MAP_VERIFICATION == 1
+MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
+    : _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
+      _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
+      _isBuilding(false), _shared(new BuilderSharedState),
+      _verifier("/home/vogls/doc/projects/insight/slub/objects-20120502-135300.txt")
+{
+    clear();
+}
+#else
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
       _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
@@ -42,7 +51,7 @@ MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
 {
 	clear();
 }
-
+#endif
 
 MemoryMap::~MemoryMap()
 {
@@ -94,6 +103,16 @@ bool MemoryMap::fitsInVmem(quint64 addr, quint64 size) const
         return addr + size > addr;
     else
         return addr + size <= (1ULL << 32);
+}
+
+bool MemoryMap::builderRunning(MemoryMapBuilder **threads)
+{
+    for (int i = 0; i < _shared->threadCount; ++i) {
+        if(threads[i]->isRunning())
+            return true;
+    }
+
+    return false;
 }
 
 
@@ -169,7 +188,8 @@ void MemoryMap::build(float minProbability)
     while (!shell->interrupted() &&
            !_shared->queue.isEmpty() &&
            (!_shared->lastNode ||
-            _shared->lastNode->probability() >= _shared->minProbability) )
+            _shared->lastNode->probability() >= _shared->minProbability) &&
+           builderRunning(threads))
     {
 
         if (firstLoop || timer.elapsed() > 1000) {
@@ -189,7 +209,6 @@ void MemoryMap::build(float minProbability)
 //                    << ", pmemMap = " << _pmemMap.size()
 //                    << ", queue = " << queue_size << " " << indicator
 //                    << ", probability = " << (node ? node->probability() : 1.0));
-
             shell->out()
                     << "\rProcessed " << _shared->processed << " instances"
                     << ", vmemAddr = " << _vmemAddresses.size()
@@ -647,7 +666,7 @@ bool MemoryMap::objectIsSane(const Instance& inst,
 
     bool isSane = true;
 
-    /*
+#if MEMORY_MAP_PROCESS_NODES_WITH_ALT == 0
     // Check if the list contains an object within the same memory region with a
     // significantly higher probability
     MemMapSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
@@ -676,7 +695,7 @@ bool MemoryMap::objectIsSane(const Instance& inst,
 
 
     }
-    */
+#endif
 
     // Decrease the reading counter again
     _shared->vmemReadingLock.lock();
