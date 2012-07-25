@@ -12,6 +12,8 @@
 #include "virtualmemory.h"
 #include "virtualmemoryexception.h"
 
+#include <QList>
+
 
 MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
         quint64 address, const BaseType* type, int id, MemoryMapNode* parent,
@@ -280,6 +282,7 @@ void MemoryMapNode::updateProbability(MemoryMapNode *initiator)
         debugmsg("prob: " << prob);
         */
 
+
         // Only update if this is the last candidate
         if((_hasCandidates && _candidatesComplete) || !_hasCandidates) {
 
@@ -320,6 +323,19 @@ quint64 MemoryMapNode::endAddress() const
             return _address + size() - 1;
     }
     return _address;
+}
+
+QList<MemoryMapNode *> * MemoryMapNode::getParents()
+{
+    QList<MemoryMapNode *> *result = new QList<MemoryMapNode *>();
+    MemoryMapNode *tmp = _parent;
+
+    while(tmp) {
+        result->append(tmp);
+        tmp = tmp->parent();
+    }
+
+    return result;
 }
 
 

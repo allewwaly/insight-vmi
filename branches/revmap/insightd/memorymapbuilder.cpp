@@ -13,6 +13,7 @@
 #include "virtualmemory.h"
 #include "virtualmemoryexception.h"
 #include "array.h"
+#include "memorymapverifier.h"
 #include <debug.h>
 
 
@@ -51,13 +52,46 @@ void MemoryMapBuilder::run()
     QMutexLocker queueLock(&shared->queueLock);
     while ( !_interrupted && !shared->queue.isEmpty() &&
             (!shared->lastNode ||
-             shared->lastNode->probability() >= shared->minProbability) )
+             shared->lastNode->probability() >= shared->minProbability) &&
+            _map->getVerifier().lastVerification())
     {
         // Take element with highest probability
         node = shared->queue.takeLargest();
         shared->lastNode = node;
         ++shared->processed;
         queueLock.unlock();
+
+#if MEMORY_MAP_VERIFICATION == 1
+        _map->getVerifier().newNode(node);
+#endif
+
+        // Verify address
+        /*
+        if(!verifier.verifyAddress(node->address())) {
+            // The node is not valid
+            // Does it have a valid candidate?
+            NodeList cand = node->getCandidates();
+            int i = 0;
+
+            for(i = 0; i < cand.size(); ++i) {
+                if(verifier.verifyAddress(cand.at(i)->address()))
+                    break;
+            }
+
+            if(i == cand.size())
+                if(node->parent()) {
+                    debugmsg("Adr (" << node->address() << ") of node "
+                             << node->fullName() << " ("
+                            << node->type()->prettyName() << ", "
+                             << node->parent()->type()->prettyName() << ") invalid!");
+                }
+                else {
+                    debugmsg("Adr (" << node->address() << ") of node "
+                             << node->fullName() << " ("
+                            << node->type()->prettyName() << ") invalid!");
+                }
+        }
+        */
 
         // Insert in non-critical (non-exception prone) mappings
         shared->typeInstancesLock.lock();
@@ -159,6 +193,10 @@ void MemoryMapBuilder::run()
             addMembers(&inst, node);
         }
 
+#if MEMORY_MAP_VERIFICATION == 1
+        _map->getVerifier().performChecks(node);
+#endif
+
         // Lock the mutex again before we jump to the loop condition checking
         queueLock.relock();
     }
@@ -207,8 +245,8 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
              if((quint64)m.toPointer() == inst->address())
                  continue;
         }
-
-        if (!candidateCnt) {
+        // Only one candidate and no unions.
+        if (!candidateCnt && !(node->type()->type() & rtUnion)) {
             try {
                 Instance m = inst->member(i, BaseType::trLexical, -1, true);
                 // Only add pointer members with valid address
@@ -231,6 +269,11 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
         }
         // Multiple candidates, add all that make sense at first glance
         else {
+#if MEMORY_MAP_PROCESS_NODES_WITH_ALT == 0
+            continue;
+        }
+#elif MEMORY_MAP_PROCESS_NODES_WITH_ALT == 1
+
             MemoryMapNode *lastNode = NULL;
             float penalize = 0.0;
 
@@ -391,5 +434,6 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
         // In case of a list_head we just consider the next pointer
         if(inst->isListHead())
             break;
+#endif
     }
 }
