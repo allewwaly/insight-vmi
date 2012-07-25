@@ -553,9 +553,9 @@ QString MemoryDump::dump(const QString& type, quint64 address,
 
 #ifdef CONFIG_MEMORY_MAP
 
-void MemoryDump::setupRevMap(float minProbability)
+void MemoryDump::setupRevMap(float minProbability, const QString& slubObjFile)
 {
-    _map->build(minProbability);
+    _map->build(minProbability, slubObjFile);
 }
 
 

@@ -241,7 +241,8 @@ public:
      * @param minProbability stop building when the node's probability drops
      *  below this threshold
      */
-    void setupRevMap(float minProbability = 0.0);
+    void setupRevMap(float minProbability = 0.0,
+                     const QString& slubObjFile = QString());
 
     /**
      * Calculates the differences with MemoryDump \a other.

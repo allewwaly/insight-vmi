@@ -1979,13 +1979,17 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
     if (!args.isEmpty()) {
         bool ok;
         prob = args[0].toFloat(&ok);
-        if (!ok) {
+        if (ok) {
+            args.pop_front();
+        }
+        // Assume it's the slub object file, check for existence
+        else if (!QDir::current().exists(args[0])) {
             cmdHelp(QStringList("memory"));
             return 1;
         }
     }
 
-    _memDumps[index]->setupRevMap(prob);
+    _memDumps[index]->setupRevMap(prob, args.isEmpty() ? QString() : args[0]);
 
     int elapsed = timer.elapsed();
     int min = (elapsed / 1000) / 60;
@@ -2366,7 +2370,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
     int cnt = 1;
     while ( (r = dynamic_cast<const RefBaseType*>(t)) ) {
         _out << color(ctColHead) << "  " << cnt << ". Ref. type:   "
-             << color(ctTypeId) << "0x" << hex << (uint)r->refTypeId() << dec
+             << color(ctTypeId) << QString("0x%1").arg((uint)r->refTypeId(), -8, 16)
              << color(ctReset) << " " <<  (r->refType() ? prettyNameInColor(r->refType(), 0, 0) :
                                  QString(r->refTypeId() ? "(unresolved)" : "void"))
              << endl;
@@ -2613,7 +2617,7 @@ int Shell::cmdShowVariable(const Variable* v)
 
     const BaseType* rt = v->refType();
     _out << color(ctColHead) << "  Type:           "
-         << color(ctTypeId) << "0x" << hex << (uint)v->refTypeId() << dec << " ";
+         << color(ctTypeId) << QString("0x%1 ").arg((uint)v->refTypeId(), -8, 16);
     if (rt)
         _out << prettyNameInColor(rt, 0, 0);
     else if (v->refTypeId())
@@ -2626,9 +2630,9 @@ int Shell::cmdShowVariable(const Variable* v)
         const BaseType* t = v->altRefBaseType(i);
         _out << qSetFieldWidth(18) << right
              << QString("<%1> ").arg(i+1)
+             << qSetFieldWidth(0) << left
              << color(ctTypeId)
              << QString("0x%2 ").arg((uint)t->id(), -8, 16)
-             << qSetFieldWidth(0) << left
              << prettyNameInColor(t) << color(ctReset) << ": "
              << v->altRefType(i).expr()->toString(true) << endl;
     }
