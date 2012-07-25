@@ -163,8 +163,8 @@ void MemoryMapBuilder::run()
 //                inst = inst.dereference(BaseType::trLexical, &cnt);
 
                 // Check for NULL Pointer or Pointer that have a value of -1
-                if (cnt && _map->addressIsWellFormed(inst) && addr != 0 &&
-                        addr != 0xffffffff && addr != 0xffffffffffffffff)
+                // Further all pointers must be 4 byte aligned
+                if (cnt && _map->addressIsWellFormed(inst))
                     _map->addChildIfNotExistend(inst, node, _index, node->address());
             }
             catch (GenericException& e) {
@@ -221,7 +221,9 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
             continue;
 
         // Consider the members of nested structs recurisvely
-        if (mBaseType->type() & StructOrUnion) {
+        // Ignore Unions for now
+        // if (mBaseType->type() & StructOrUnion) {
+        if (mBaseType->type() & rtStruct) {
             Instance mi = inst->member(i, BaseType::trLexical, -1, true);
             // Adjust instance name to reflect full path
             if (node->name() != inst->name())
@@ -238,11 +240,13 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
         if (!candidateCnt && !(mBaseType->type() & ptrTypes))
             continue;
 
-        // Skip self pointers
+        // Skip self and invalid pointers
         if(mBaseType->type() & rtPointer) {
              Instance m = inst->member(i, BaseType::trLexical, -1, true);
 
-             if((quint64)m.toPointer() == inst->address())
+             if((quint64)m.toPointer() == (inst->address() + inst->memberAddress(i, true)) ||
+                 (quint64)m.toPointer() == inst->address() ||
+                 !_map->addressIsWellFormed((quint64)m.toPointer()))
                  continue;
         }
         // Only one candidate and no unions.
