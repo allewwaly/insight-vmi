@@ -168,7 +168,7 @@ void MemoryMapBuilder::addMembers(const Instance *inst, MemoryMapNode* node)
 
     // Possible pointer types: Pointer and integers of pointer size
     const int ptrTypes = rtPointer | rtFuncPointer |
-            ((_map->vmem()->memSpecs().arch & MemSpecs::ar_i386) ?
+            ((_map->vmem()->memSpecs().sizeofPointer == 4) ?
                  (rtInt32 | rtUInt32) :
                  (rtInt64 | rtUInt64));
 
