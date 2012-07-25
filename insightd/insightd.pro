@@ -96,7 +96,8 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     astexpression.cpp \
     expressionresult.cpp \
     kernelsymbolstream.cpp \
-    colorpalette.cpp
+    colorpalette.cpp \
+    slubobjects.cpp
 
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
@@ -152,7 +153,8 @@ HEADERS += kernelsourcetypeevaluator.h \
     astexpression.h \
     expressionresult.h \
     kernelsymbolstream.h \
-    colorpalette.h
+    colorpalette.h \
+    slubobjects.h
 
 # Things to do when the memory map builder and widget is to be built. Enabling
 # this feature requires InSight to run on an X server.
