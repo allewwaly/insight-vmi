@@ -50,7 +50,8 @@ HEADERS += astexpressionevaluatortester.h \
     ../../memorydump.h \
     ../../memorydumpsclass.h \
     ../../colorpalette.h \
-    ../../expressionresult.h
+    ../../expressionresult.h \
+    ../../slubobjects.h
 SOURCES += astexpressionevaluatortester.cpp \
     ../../array.cpp \
     ../../volatiletype.cpp \
@@ -98,7 +99,8 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../memorydump.cpp \
     ../../memorydumpsclass.cpp \
     ../../colorpalette.cpp \
-    ../../expressionresult.cpp
+    ../../expressionresult.cpp \
+    ../../slubobjects.cpp
 QT += core \
     script \
     network \
