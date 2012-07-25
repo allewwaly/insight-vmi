@@ -13,10 +13,12 @@ CONFIG += debug_and_release staticlib create_prl
 INCLUDEPATH += ./include
 
 SOURCES += src/debug.cpp \
-    src/bugreport.cpp
+    src/bugreport.cpp \
+    src/log.cpp
 
 HEADERS += include/debug.h \
-    include/bugreport.h
+    include/bugreport.h \
+    include/log.h
 
 # Compiler defines for the version information
 SVN_REVISION = exported
