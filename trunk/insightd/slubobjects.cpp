@@ -83,9 +83,9 @@ void SlubObjects::postproc()
                 int index = _indices[name];
                 _caches[index].objSize = size;
             }
-//            else if (name != "NULL") {
-//                debugmsg("Did not find cache \"" << name << "\" in my list.");
-//            }
+            else if (name != "NULL") {
+                debugmsg("Did not find cache \"" << name << "\" in my list.");
+            }
 
             // Proceed to next cache
             inst = inst.findMember("list", BaseType::trLexical);

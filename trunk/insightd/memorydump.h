@@ -13,6 +13,7 @@
 #include "virtualmemory.h"
 #include "instance.h"
 #include "basetype.h"
+#include "memorymapbuilder.h"
 
 // forward declarations
 class QFile;
@@ -241,7 +242,7 @@ public:
      * @param minProbability stop building when the node's probability drops
      *  below this threshold
      */
-    void setupRevMap(float minProbability = 0.0,
+    void setupRevMap(MemoryMapBuilderType type, float minProbability = 0.0,
                      const QString& slubObjFile = QString());
 
     /**

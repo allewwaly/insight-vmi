@@ -1954,6 +1954,10 @@ int Shell::cmdMemoryRevmap(QStringList args)
             args.pop_front();
             return cmdMemoryRevmapDump(index, args);
         }
+        else if (QString("dumpInit").startsWith(args[0])) {
+            args.pop_front();
+            return cmdMemoryRevmapDumpInit(index, args);
+        }
         else if (QString("visualize").startsWith(args[0])) {
             if (args.size() > 1)
                 return cmdMemoryRevmapVisualize(index, args[1]);
@@ -1975,6 +1979,24 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
     QTime timer;
     timer.start();
     float prob = 0.0;
+
+    // First argument must be builder type
+    if (args.isEmpty()) {
+        cmdHelp(QStringList("memory"));
+        return 1;
+    }
+
+    MemoryMapBuilderType type;
+    if (QString("sibi").startsWith(args[0]))
+        type = btSibi;
+    else if (QString("chrschn").startsWith(args[0]))
+        type = btChrschn;
+    else {
+        _err << "Valid builder types are: sibi, chrschn" << endl;
+        return 2;
+    }
+    args.pop_front();
+
     // Did the user specify a threshold probability?
     if (!args.isEmpty()) {
         bool ok;
@@ -1989,7 +2011,7 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
         }
     }
 
-    _memDumps[index]->setupRevMap(prob, args.isEmpty() ? QString() : args[0]);
+    _memDumps[index]->setupRevMap(type, prob, args.isEmpty() ? QString() : args[0]);
 
     int elapsed = timer.elapsed();
     int min = (elapsed / 1000) / 60;
@@ -2029,6 +2051,43 @@ int Shell::cmdMemoryRevmapDump(int index, QStringList args)
     }
 
     _memDumps[index]->map()->dump(fileName);
+    return ecOk;
+}
+
+int Shell::cmdMemoryRevmapDumpInit(int index, QStringList args)
+{
+    if (args.size() < 1 || args.size() > 2) {
+        cmdHelp(QStringList("memory"));
+        return ecInvalidArguments;
+    }
+
+    const QString& fileName = args.front();
+    // Check file for existence
+    if (QFile::exists(fileName) && _interactive) {
+        QString reply;
+        do {
+            reply = readLine("Ok to overwrite existing file? [Y/n] ").toLower();
+            if (reply.isEmpty())
+                reply = "y";
+            else if (reply == "n")
+                return ecOk;
+        } while (reply != "y");
+    }
+
+    // Get level param
+    if(args.size() == 2) {
+        bool ok;
+        quint32 level = args[1].toInt(&ok);
+        if (!ok) {
+            cmdHelp(QStringList("memory"));
+            return 1;
+        }
+
+        _memDumps[index]->map()->dumpInit(fileName, level);
+    }
+    else
+        _memDumps[index]->map()->dumpInit(fileName);
+
     return ecOk;
 }
 

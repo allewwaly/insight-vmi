@@ -21,6 +21,9 @@
 #include "memorymaprangetree.h"
 #include "memorydifftree.h"
 #include "slubobjects.h"
+#include "memorymapverifier.h"
+#include "memorymapbuildercs.h"
+#include "memorymapbuildersv.h"
 #include <debug.h>
 
 class SymFactory;
@@ -49,10 +52,10 @@ typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
 
 
-#define MAX_BUILDER_THREADS 2
+#define MAX_BUILDER_THREADS 1
 
 /**
- * Holds all variables that are shared amount the builder threads.
+ * Holds all variables that are shared among the builder threads.
  * \sa MemoryMapBuilder
  */
 struct BuilderSharedState
@@ -88,6 +91,16 @@ struct BuilderSharedState
         mapNodeLock;
     QWaitCondition vmemReadingDone, vmemWritingDone;
     SlubObjects slubs;
+
+#ifdef DEBUG
+	mutable quint32 degPerGenerationCnt;
+	mutable quint32 degForUnalignedAddrCnt;
+	mutable quint32 degForUserlandAddrCnt;
+	mutable quint32 degForInvalidAddrCnt;
+	mutable quint32 degForNonAlignedChildAddrCnt;
+	mutable quint32 degForInvalidChildAddrCnt;
+	mutable quint32 degForInvalidListHeadCnt;
+#endif
 };
 
 
@@ -98,7 +111,8 @@ struct BuilderSharedState
  */
 class MemoryMap
 {
-    friend class MemoryMapBuilder;
+    friend class MemoryMapBuilderCS;
+    friend class MemoryMapBuilderSV;
 public:
 	/**
 	 * Constructor
@@ -132,13 +146,16 @@ public:
 	 * Builds up the memory mapping for the virtual memory object previously
 	 * specified in the constructor.
 	 * \note This might take a while.
+	 * @param type which builder type to use
 	 * @param minProbability stop building when the node's probability drops
 	 *  below this threshold
 	 */
-	void build(float minProbability = 0.0,
+	void build(MemoryMapBuilderType type, float minProbability = 0.0,
 			   const QString &slubObjFile = QString());
 
 	bool dump(const QString& fileName) const;
+    void dumpInitHelper(QTextStream &out, MemoryMapNode *node, quint32 curLvl, const quint32 level) const;
+    bool dumpInit(const QString &fileName, const quint32 level = 3) const;
 
 	/**
 	 * Finds the differences in physical memory between this and another memory
@@ -228,17 +245,6 @@ public:
     bool isBuilding() const;
 
     /**
-     * Calculates the probability for the given Instance \a inst and
-     * \a parentProbabilty.
-     * @param inst Instance to calculate probability for
-     * @param parentProbability the anticipated probability of the parent node.
-     * Passing a negative number means that \a inst has no parent.
-     * @return calculated probability
-     */
-    float calculateNodeProbability(const Instance* inst,
-            float parentProbability = -1.0) const;
-
-    /**
      * Inserts the given name \a name in the static list of names and returns
      * a reference to it. This static function was introduced to only hold one
      * copy of any kernel object name in memory, thus saving memory.
@@ -247,14 +253,14 @@ public:
      */
     static const QString& insertName(const QString& name);
 
-#ifdef DEBUG
-	mutable quint32 degPerGenerationCnt;
-	mutable quint32 degForUnalignedAddrCnt;
-	mutable quint32 degForUserlandAddrCnt;
-	mutable quint32 degForInvalidAddrCnt;
-	mutable quint32 degForNonAlignedChildAddrCnt;
-	mutable quint32 degForInvalidChildAddrCnt;
-#endif
+    /**
+     *  Returns the MemoryMapVerifier that is used by this map.
+     */
+    MemoryMapVerifier& verifier();
+
+    float calculateNodeProbability(const Instance *inst,
+                                   float parentProbability = 0) const;
+
 
 private:
     /// Holds the static list of kernel object names. \sa insertName()
@@ -302,12 +308,22 @@ private:
 	 * added, it is also appended to the queue \a queue for further processing.
 	 * @param inst the instance to create a new node from
 	 * @param parent the parent node of the new node to be created
-	 * @return \c true if a new node was added, \c false if that instance
-	 * already existed in the virtual memory mapping
+     * @param addrInParent the address of the member within the parent
+     * @param hasCandidates specifies if the node has candidates that will be
+     * added next
+     * @return \c A pointer to the new node if the node could be added, \c NULL
+     * if that instance already existed in the virtual memory mapping
 	 */
-	bool addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,
-	        int threadIndex);
+    MemoryMapNode * addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,
+            int threadIndex, quint64 addrInParent, bool hasCandidates = false);
 
+    /**
+     * Check if at least one builder is still runnning.
+     * @returns true if there is an active MemoryMapBuilder, false otherwise.
+     */
+    bool builderRunning() const;
+
+    MemoryMapBuilder** _threads;
     const SymFactory* _factory;  ///< holds the SymFactory to operate on
     VirtualMemory* _vmem;        ///< the virtual memory object this map is being built for
 	NodeList _roots;             ///< the nodes of the global kernel variables
@@ -319,6 +335,10 @@ private:
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
     BuilderSharedState* _shared; ///< all variables that are shared amount the builder threads
+
+#if MEMORY_MAP_VERIFICATION == 1
+    MemoryMapVerifier _verifier; ///< provides debug checks for the creation of the memory map
+#endif
 };
 
 //------------------------------------------------------------------------------
@@ -389,5 +409,20 @@ inline quint64 MemoryMap::paddrSpaceEnd() const
             _vmem->physMem()->size() - 1 : VADDR_SPACE_X86;
 }
 
+#ifdef MEMORY_MAP_VERIFICATION
+inline MemoryMapVerifier& MemoryMap::verifier()
+{
+    return _verifier;
+}
+
+
+#endif
+
+inline float MemoryMap::calculateNodeProbability(const Instance *inst, float parentProbability) const
+{
+    if (_threads && _threads[0])
+        return _threads[0]->calculateNodeProbability(inst, parentProbability);
+    return 1.0;
+}
 
 #endif /* MEMORYMAP_H_ */
