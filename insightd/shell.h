@@ -317,6 +317,7 @@ private:
     int cmdMemoryRevmapBuild(int index, QStringList args);
     int cmdMemoryRevmapVisualize(int index, QString type = "v");
     int cmdMemoryRevmapDump(int index, QStringList args);
+    int cmdMemoryRevmapDumpInit(int index, QStringList args);
     int cmdMemoryDiff(QStringList args);
     int cmdMemoryDiffBuild(int index1, int index2);
     int cmdMemoryDiffVisualize(int index);

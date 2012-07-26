@@ -178,6 +178,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	QString typeString, symbol, offsetString, candidate, arrayIndexString;
 	size_t address;
 	bool okay;
+    quint32 compatibleCnt = 0;
 
 	// A component should have the form (symbol(-offset)?)?symbol(<candidate>)?([index])?
 #define SYMBOL "[A-Za-z0-9_]+"
@@ -238,7 +239,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 			// alternative type
 			if (candidateIndex < 0 && v->altRefTypeCount() == 1)
 				result = v->altRefTypeInstance(_vmem, 0);
-			else
+            else
 				result = v->toInstance(_vmem, BaseType::trLexical);
 		}
 	}
@@ -269,10 +270,25 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
             if (candidateIndex < 0 &&
                 instance.memberCandidatesCount(symbol) == 1)
                 result = instance.memberCandidate(symbol, 0);
-            else
-                result = instance.findMember(symbol,
+            else {
+                // If there is only one compatible candidate return that one.
+                for(int i = 0; i < instance.memberCandidatesCount(symbol); i++) {
+                    if(instance.memberCandidateCompatible(instance.indexOfMember(symbol), i)) {
+                        compatibleCnt++;
+
+                        if(compatibleCnt == 1)
+                            result = instance.memberCandidate(symbol, i);
+                        else
+                            break;
+                    }
+
+                }
+
+                if(compatibleCnt != 1)
+                    result = instance.findMember(symbol,
                                              BaseType::trLexical,
                                              true);
+            }
         }
 
         if (!result.isValid()) {
@@ -388,7 +404,7 @@ Instance MemoryDump::queryInstance(const QString& queryString) const
 		result = getNextInstance(components.first(), result);
 		components.pop_front();
 	}
-	
+
 	return result;
 }
 
@@ -462,7 +478,7 @@ QString MemoryDump::query(const QString& queryString,
                 .arg(col.color(ctBold))
                 .arg(queryString)
                 .arg(col.color(ctReset));
-        if (instance.isValid()) {
+        if (instance.isValid()) { 
             s += QString("%1%2%3 (ID%4 0x%5%6)")
                     .arg(col.color(ctType))
                     .arg(instance.typeName())
@@ -474,6 +490,7 @@ QString MemoryDump::query(const QString& queryString,
         }
         else
             s += "(unresolved type)";
+
         s += QString(" @%1 0x%2%3\n")
                 .arg(col.color(ctAddress))
                 .arg(instance.address(), _specs.sizeofPointer << 1, 16, QChar('0'))
@@ -481,6 +498,7 @@ QString MemoryDump::query(const QString& queryString,
 
         ret = s + ret;
     }
+
 
     return ret;
 }
@@ -553,9 +571,10 @@ QString MemoryDump::dump(const QString& type, quint64 address,
 
 #ifdef CONFIG_MEMORY_MAP
 
-void MemoryDump::setupRevMap(float minProbability, const QString& slubObjFile)
+void MemoryDump::setupRevMap(MemoryMapBuilderType type, float minProbability,
+                             const QString& slubObjFile)
 {
-    _map->build(minProbability, slubObjFile);
+    _map->build(type, minProbability, slubObjFile);
 }
 
 

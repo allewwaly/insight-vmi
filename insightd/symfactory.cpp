@@ -2413,6 +2413,18 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
 
                 member->addAltRefType(targetBaseType->id(),
                                       expr->clone(_expressions));
+
+                if (ctxBaseTypes[i]->name() == "task_struct" &&
+                    targetBaseType->prettyName().contains("task_struct"))
+                {
+                    debugmsg(QString("Changed member %1 of type 0x%2 to "
+                                     "target type 0x%3: %4")
+                             .arg(trans.toString(ctxBaseTypes[i]->prettyName()))
+                             .arg((uint)ctxBaseTypes[i]->id(), 0, 16)
+                             .arg((uint)targetBaseType->id(), 0, 16)
+                             .arg(targetBaseType->prettyName()));
+
+                }
             }
         }
     }

@@ -157,7 +157,7 @@ public:
 	 */
 	Instance toInstance(bool includeParentNameComponents = true) const;
 
-private:
+protected:
 	/**
 	 * Re-calculates the probability of this node being "sane" and used by the
 	 * operating system.
@@ -211,7 +211,7 @@ public:
                 _physAddrStart == other._physAddrStart;
     }
 
-private:
+protected:
     const MemoryMapNode* _memoryMapNode;
     quint64 _physAddrStart;
     quint64 _physAddrEnd;

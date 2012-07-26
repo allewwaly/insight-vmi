@@ -51,7 +51,11 @@ HEADERS += astexpressionevaluatortester.h \
     ../../memorydumpsclass.h \
     ../../colorpalette.h \
     ../../expressionresult.h \
-    ../../slubobjects.h
+    ../../slubobjects.h \
+    ../../memorymapbuildercs.h \
+    ../../memorymapbuildersv.h \
+    ../../memorymapverifier.h \
+    ../../memorymapnodesv.h
 SOURCES += astexpressionevaluatortester.cpp \
     ../../array.cpp \
     ../../volatiletype.cpp \
@@ -100,7 +104,11 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../memorydumpsclass.cpp \
     ../../colorpalette.cpp \
     ../../expressionresult.cpp \
-    ../../slubobjects.cpp
+    ../../slubobjects.cpp \
+    ../../memorymapbuildercs.cpp \
+    ../../memorymapbuildersv.cpp \
+    ../../memorymapverifier.cpp \
+    ../../memorymapnodesv.cpp
 QT += core \
     script \
     network \
