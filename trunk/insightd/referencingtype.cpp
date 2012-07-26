@@ -400,10 +400,8 @@ bool ReferencingType::AltRefType::compatible(const Instance *inst) const
     if (!inst)
         return false;
     for (int i = 0; i < _varExpr.size(); ++i) {
-        if (!_varExpr[i]->compatible(inst)) {
-            //debugmsg("Inst " << inst->fullName()  << " with type " << inst->type()->prettyName() << " is incompatible to " << _varExpr[i]->toString());
+        if (!_varExpr[i]->compatible(inst))
             return false;
-        }
     }
     return true;
 }
