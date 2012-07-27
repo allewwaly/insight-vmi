@@ -142,14 +142,6 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     if (!slubObjFile.isEmpty()) {
         _shared->slubs.parsePreproc(slubObjFile);
 
-        debugmsg("Read slub objects from file " << slubObjFile << ":");
-        for (int i = 0; i < _shared->slubs.caches().size(); ++i) {
-            debugmsg(QString("%1. %2 objSize = %3, count = %4")
-                     .arg(i+1, 3)
-                     .arg(_shared->slubs.caches().at(i).name, -30)
-                     .arg(_shared->slubs.caches().at(i).objSize, 4)
-                     .arg(_shared->slubs.caches().at(i).objects.size(), 4));
-        }
     }
 
     // How many threads to create?
