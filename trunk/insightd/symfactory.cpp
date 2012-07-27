@@ -2879,3 +2879,21 @@ void SymFactory::mergeAlternativeTypes(const ReferencingType* src,
             dst->altRefTypes().append(src_art);
     }
 }
+
+
+BaseTypeList SymFactory::findBaseTypesByName(const QString &pattern,
+                                             QRegExp::PatternSyntax syntax,
+                                             Qt::CaseSensitivity sensitivity) const
+{
+    QRegExp re(pattern, sensitivity, syntax);
+    BaseTypeList list;
+
+    for (int i = 0; i < _types.size(); ++i) {
+        BaseType* t = _types[i];
+        if (re.exactMatch(t->name()))
+            list.append(t);
+    }
+
+    return list;
+}
+
