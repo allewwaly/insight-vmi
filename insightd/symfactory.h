@@ -198,6 +198,18 @@ public:
 	BaseType* findBaseTypeByName(const QString& name) const;
 
     /**
+     * Searches for types based on wildcards or regular expressions
+     * @param pattern the pattern to match the types' name against
+     * @param syntax the pattern syntax that was used
+     * @param sensitivity case sensitivity for name match
+     * @return a list of types matching \a pattern
+     */
+    BaseTypeList findBaseTypesByName(
+            const QString& pattern,
+            QRegExp::PatternSyntax syntax = QRegExp::WildcardUnix,
+            Qt::CaseSensitivity sensitivity = Qt::CaseSensitive) const;
+
+    /**
      * Retrieves a variable by its name.
      * @param name the name of the variable to retrieve
      * @return the requested variable, if found, \c null otherwise
