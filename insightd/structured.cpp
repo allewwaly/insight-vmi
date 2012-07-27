@@ -125,6 +125,15 @@ const StructuredMember* Structured::findMember(const QString& memberName,
 }
 
 
+const StructuredMember *Structured::memberAtOffset(size_t offset) const
+{
+    for (int i = 0; i < _members.size() && _members[i]->offset() <= offset; ++i)
+        if (_members[i]->offset() == offset)
+            return _members[i];
+    return 0;
+}
+
+
 void Structured::readFrom(KernelSymbolStream& in)
 {
     BaseType::readFrom(in);

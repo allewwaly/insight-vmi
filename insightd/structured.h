@@ -98,6 +98,15 @@ public:
                                        bool recursive = true) const;
 
     /**
+     * Obtain the member that has the given offset. The offset must match
+     * exactly, otherwise \c null is returned.
+     *
+     * @param offset the offset of the member that we are looking for
+     * @return the member at offset \a offset, if found, \c null otherwise
+     */
+     const StructuredMember* memberAtOffset(size_t offset) const;
+
+    /**
      * Reads a serialized version of this object from \a in.
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
