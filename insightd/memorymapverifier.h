@@ -1,7 +1,9 @@
 #ifndef MEMORYMAPVERIFIER_H
 #define MEMORYMAPVERIFIER_H
 
+#include "memorymap.h"
 #include "memorymapnodesv.h"
+#include "slubobjects.h"
 
 #include <log.h>
 
@@ -24,7 +26,7 @@ class MemoryMapVerifier;
 class MemoryMapNodeWatcher
 {
 public:
-    MemoryMapNodeWatcher(MemoryMapNode *node, MemoryMapVerifier &verifier,
+    MemoryMapNodeWatcher(MemoryMapNodeSV *node, MemoryMapVerifier &verifier,
                          bool forcesHalt = false);
 
     /**
@@ -46,10 +48,10 @@ public:
      * @param lastNode the lastNode that was processed during the memory map creation
      * and may therefore be responsible for failing the check of the node.
      */
-    virtual const QString failMessage(MemoryMapNode *lastNode);
+    virtual const QString failMessage(MemoryMapNodeSV *lastNode);
 
 protected:
-    MemoryMapNode *_node;
+    MemoryMapNodeSV *_node;
     MemoryMapVerifier &_verifier;
     bool _forcesHalt;
 };
@@ -76,7 +78,7 @@ public:
      * node must not change by more than the given interval in each round, but may change
      * by an arbitrary amount over an infinite number of rounds.
      */
-    MemoryMapNodeIntervalWatcher(MemoryMapNode *node, MemoryMapVerifier &verifier,
+    MemoryMapNodeIntervalWatcher(MemoryMapNodeSV *node, MemoryMapVerifier &verifier,
                                  float changeInterval, bool forcesHalt = false,
                                  bool flexibleInterval = false);
     bool check();
@@ -95,17 +97,8 @@ private:
 class MemoryMapVerifier
 {
 public:
-    MemoryMapVerifier();
-    MemoryMapVerifier(const char *slubFile);
-
-    /**
-     * Verifiy the virtual address of a node. Currently this is realized with the help
-     * of a slub file.
-     *
-     * @param address the virtual address to verify
-     * @returns true in case the address is valid, false otherwise
-     */
-    bool verifyAddress(quint64 address);
+    MemoryMapVerifier(MemoryMap *map);
+    MemoryMapVerifier(MemoryMap *map, const char *slubFile);
 
     /**
      * Called every time a new node is fetched from the queue during the memory map
@@ -139,17 +132,17 @@ public:
      */
     bool lastVerification() const;
 
-private:
     /**
-     * Parses the slub data that can be used to verify addresses of node from the
-     * given file.
+     * Destroy the existing watch nodes.
      */
-    void parseSlubFile(const char *slubFile);
+    void resetWatchNodes();
 
-    QHash<quint64, QString> _slubData;
+private:
+    MemoryMap *_map;
     QList<MemoryMapNodeWatcher *> _watchNodes;
     Log _log;
     bool _lastVerification;
+    SlubObjects _slub;
 };
 
 #endif // MEMORYMAPVERIFIER_H

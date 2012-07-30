@@ -12,7 +12,7 @@
 /*
  * ===================================> MemoryMapNodeWatcher
  */
-MemoryMapNodeWatcher::MemoryMapNodeWatcher(MemoryMapNode *node,
+MemoryMapNodeWatcher::MemoryMapNodeWatcher(MemoryMapNodeSV *node,
                                            MemoryMapVerifier &verifier,
                                            bool forcesHalt) :
     _node(node), _verifier(verifier), _forcesHalt(forcesHalt)
@@ -25,7 +25,7 @@ bool MemoryMapNodeWatcher::getForceHalt() const
     return _forcesHalt;
 }
 
-const QString MemoryMapNodeWatcher::failMessage(MemoryMapNode *lastNode)
+const QString MemoryMapNodeWatcher::failMessage(MemoryMapNodeSV *lastNode)
 {
     MemoryMapNode *lca = _verifier.leastCommonAncestor(lastNode, _node);
 
@@ -81,7 +81,7 @@ const QString MemoryMapNodeWatcher::failMessage(MemoryMapNode *lastNode)
 /*
  * ===================================> MemoryMapNodeIntervalWatcher
  */
-MemoryMapNodeIntervalWatcher::MemoryMapNodeIntervalWatcher(MemoryMapNode *node,
+MemoryMapNodeIntervalWatcher::MemoryMapNodeIntervalWatcher(MemoryMapNodeSV *node,
                                                            MemoryMapVerifier &verifier,
                                                            float changeInterval,
                                                            bool forcesHalt,
@@ -112,53 +112,21 @@ bool MemoryMapNodeIntervalWatcher::check()
 /*
  * ===================================> MemoryMapVerifier
  */
-MemoryMapVerifier::MemoryMapVerifier() :
+MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map) :
+    _map(map),
     _log("memory_map", true),
-    _lastVerification(true)
+    _lastVerification(true),
+    _slub(map->symfactory(), map->vmem())
 {
 }
 
-MemoryMapVerifier::MemoryMapVerifier(const char *slubFile) :
+MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map, const char *slubFile) :
+    _map(map),
     _log("memory_map", true),
-    _lastVerification(true)
+    _lastVerification(true),
+    _slub(map->symfactory(), map->vmem())
 {
-    parseSlubFile(slubFile);
-}
-
-void MemoryMapVerifier::parseSlubFile(const char *slubFile)
-{
-    QRegExp adr("0x([a-fA-F0-9]+)");
-    QFile slub(slubFile);
-    bool err = false;
-
-    _log.debug("Parsing slub data... ");
-
-    if(!slub.open(QIODevice::ReadOnly)) {
-        _log.error(QString("Could not open file '%1'").arg(slubFile));
-        return;
-    }
-
-    QTextStream in(&slub);
-
-    while(!in.atEnd()) {
-        QString line = in.readLine();
-        QStringList lineParts = line.split(" ", QString::SkipEmptyParts);
-
-        if(lineParts.size() == 2 && adr.exactMatch(lineParts.at(1).trimmed())) {
-            _slubData[lineParts.at(1).trimmed().toULongLong(&err, 16)] = lineParts.at(0).trimmed();
-
-            if(!err)
-                _log.error(QString("Conversion of '%1' to ULongLong failed!").arg(lineParts.at(1)));
-        }
-    }
-
-    _log.debug(QString("Parsed %1 slub entries").arg(_slubData.size()));
-}
-
-
-bool MemoryMapVerifier::verifyAddress(quint64 address)
-{
-    return _slubData.contains(address);
+    _slub.parsePreproc(QString(slubFile));
 }
 
 bool MemoryMapVerifier::lastVerification() const
@@ -166,8 +134,19 @@ bool MemoryMapVerifier::lastVerification() const
     return _lastVerification;
 }
 
+void MemoryMapVerifier::resetWatchNodes()
+{
+    for(int i = 0; i < _watchNodes.size(); ++i) {
+        delete _watchNodes.at(i);
+    }
+
+    _watchNodes.clear();
+}
+
 void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
 {
+    MemoryMapNodeSV *cur =  dynamic_cast<MemoryMapNodeSV*>(currentNode);
+
     // Add an memory map interval watcher node to the init_task
     /*
     if(currentNode->name() == "init_task") {
@@ -189,7 +168,7 @@ void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
     */
     // exclude strange nodes that we hope the probability will take care of them
     if(!currentNode->fullName().contains("init_task.nsproxy.net_ns.proc_net.parent.subdir.next.subdir.proc_fops.owner.waiter")) {
-        MemoryMapNodeIntervalWatcher *mw = new MemoryMapNodeIntervalWatcher(currentNode,
+        MemoryMapNodeIntervalWatcher *mw = new MemoryMapNodeIntervalWatcher(cur,
                                                                            (*this),
                                                                            0.30,
                                                                            true,
@@ -204,19 +183,50 @@ bool MemoryMapVerifier::performChecks(MemoryMapNode *n)
     if (!lastNode)
         return false;
 
-    // Only verify the address if this is a struct that is not embedded
-    // in another struct
-    if((lastNode->type()->type() & rtStruct) &&
-            lastNode->address() != lastNode->addrInParent() &&
-            !verifyAddress(lastNode->address())) {
-        // If this node has an address that begins with 0xc, it is not contained
-        // with the slub, so the search is unnecessary.
-        /// todo: this works for 32-bit. 64-bit?
-        if((lastNode->address() >> 28) != 0xc)
-            _log.warning(QString("Node '%1' with address 0x%2 and type %3 is not within the slub!")
-                         .arg(lastNode->fullName())
-                         .arg(lastNode->address(), 0, 16)
-                         .arg(lastNode->type()->prettyName()));
+    Instance lastNodei = lastNode->toInstance();
+
+    SlubObjects::ObjectValidity v = _slub.objectValid(&lastNodei);
+
+    switch(v) {
+        case SlubObjects::ovValid:
+            // Thats fine
+            break;
+        case SlubObjects::ovEmbedded:
+            _log.debug(QString("SLUB ! Node '%1' with address 0x%2 and type %3 is embedded!")
+                     .arg(lastNode->fullName())
+                     .arg(lastNode->address(), 0, 16)
+                     .arg(lastNode->type()->prettyName()));
+            break;
+        case SlubObjects::ovMaybeValid:
+            _log.info(QString("SLUB ! Node '%1' with address 0x%2 and type %3 may be valid!")
+                     .arg(lastNode->fullName())
+                     .arg(lastNode->address(), 0, 16)
+                     .arg(lastNode->type()->prettyName()));
+            break;
+        case SlubObjects::ovConflict:
+                _log.warning(QString("SLUB! Node '%1' with address 0x%2 and type %3 is in CONFLICT!")
+                     .arg(lastNode->fullName())
+                     .arg(lastNode->address(), 0, 16)
+                     .arg(lastNode->type()->prettyName()));
+            break;
+        case SlubObjects::ovNotFound:
+            _log.warning(QString("SLUB ! Node '%1' with address 0x%2 and type %3 was not FOUND!")
+                     .arg(lastNode->fullName())
+                     .arg(lastNode->address(), 0, 16)
+                     .arg(lastNode->type()->prettyName()));
+            break;
+        case SlubObjects::ovNoSlabType:
+            _log.warning(QString("SLUB ! Node '%1' with address 0x%2 and type %3 is no SLUB TYPE!")
+                     .arg(lastNode->fullName())
+                     .arg(lastNode->address(), 0, 16)
+                     .arg(lastNode->type()->prettyName()));
+            break;
+        case SlubObjects::ovInvalid:
+            _log.warning(QString("SLUB ! Node '%1' with address 0x%2 and type %3 is INVALID!")
+                     .arg(lastNode->fullName())
+                     .arg(lastNode->address(), 0, 16)
+                     .arg(lastNode->type()->prettyName()));
+            break;
     }
 
     for(int i = 0; i < _watchNodes.size(); ++i) {
