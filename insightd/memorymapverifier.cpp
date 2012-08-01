@@ -5,6 +5,7 @@
 #include <QStringList>
 #include <QTextStream>
 #include <debug.h>
+#include "ioexception.h"
 
 #include <math.h>
 
@@ -116,7 +117,7 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map) :
     _map(map),
     _log("memory_map", true),
     _lastVerification(true),
-    _slub(map->symfactory(), map->vmem())
+    _slub(map->factory(), map->vmem())
 {
 }
 
@@ -124,9 +125,15 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map, const char *slubFile) :
     _map(map),
     _log("memory_map", true),
     _lastVerification(true),
-    _slub(map->symfactory(), map->vmem())
+    _slub(map->factory(), map->vmem())
 {
-    _slub.parsePreproc(QString(slubFile));
+    try {
+        _slub.parsePreproc(QString(slubFile));
+    }
+    catch (IOException& e) {
+        debugerr("Caught a " << e.className() << " in " << __PRETTY_FUNCTION__
+                 << ": " << e.message);
+    }
 }
 
 bool MemoryMapVerifier::lastVerification() const

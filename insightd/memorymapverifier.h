@@ -1,6 +1,8 @@
 #ifndef MEMORYMAPVERIFIER_H
 #define MEMORYMAPVERIFIER_H
 
+class MemoryMapVerifier;
+
 #include "memorymap.h"
 #include "memorymapnodesv.h"
 #include "slubobjects.h"
@@ -14,7 +16,6 @@
 // Do we process members with multiple candidate types?
 #define MEMORY_MAP_PROCESS_NODES_WITH_ALT 0
 
-class MemoryMapVerifier;
 
 /**
  * A watch node is added to a particularly \sa MemoryMapNode. During the memory map

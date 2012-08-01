@@ -258,6 +258,8 @@ public:
      */
     MemoryMapVerifier& verifier();
 
+    const SymFactory* factory() const;
+
     float calculateNodeProbability(const Instance *inst,
                                    float parentProbability = 0) const;
 
@@ -409,14 +411,19 @@ inline quint64 MemoryMap::paddrSpaceEnd() const
             _vmem->physMem()->size() - 1 : VADDR_SPACE_X86;
 }
 
+
 #ifdef MEMORY_MAP_VERIFICATION
 inline MemoryMapVerifier& MemoryMap::verifier()
 {
     return _verifier;
 }
-
-
 #endif
+
+
+inline const SymFactory *MemoryMap::factory() const
+{
+    return _factory;
+}
 
 inline float MemoryMap::calculateNodeProbability(const Instance *inst, float parentProbability) const
 {

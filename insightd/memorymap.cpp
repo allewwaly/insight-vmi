@@ -40,7 +40,7 @@ MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _threads(0), _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
       _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
       _isBuilding(false), _shared(new BuilderSharedState(factory, vmem)),
-      _verifier("/home/vogls/doc/projects/insight/slub/objects-20120502-135300.txt")
+      _verifier(this, "/home/vogls/doc/projects/insight/slub/objects-20120502-135300.txt")
 {
     clear();
 }
