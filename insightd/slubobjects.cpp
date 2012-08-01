@@ -4,6 +4,7 @@
 #include <QStringList>
 #include <debug.h>
 #include "ioexception.h"
+#include "filenotfoundexception.h"
 #include "symfactory.h"
 #include "virtualmemory.h"
 #include "instance.h"
@@ -104,6 +105,10 @@ bool SlubObjects::isInstanceEmbedded(const Instance *inst,
 void SlubObjects::parsePreproc(const QString &fileName)
 {
     QFile in(fileName);
+    if (!in.exists())
+        fileNotFoundError(QString("File \"%1\" does not exist")
+                          .arg(fileName));
+
     if (!in.open(QIODevice::ReadOnly))
         ioError(QString("Error opening file \"%1\" for reading")
                 .arg(fileName));
