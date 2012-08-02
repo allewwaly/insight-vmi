@@ -15,27 +15,32 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
     list.append(KernelMemSpec(
             "SIZEOF_LONG",
             "sizeof(long)",
+            "unsigned long long",
             "%lld"));
     // Both i386 and x86_64
     list.append(KernelMemSpec(
                     "SIZEOF_POINTER",
                     "sizeof(void*)",
+                    "unsigned long long",
                     "%lld"));
     // See <linux/include/asm-x86/page_32.h>
     // See <linux/include/asm-x86/page_64.h>
     list.append(KernelMemSpec(
             "PAGE_OFFSET",
             "__PAGE_OFFSET",
+            "unsigned long long",
             "%16llx"));
     // See <linux/include/asm-x86/pgtable_32.h>
     // See <linux/include/asm-x86/pgtable_64.h>
     list.append(KernelMemSpec(
             "VMALLOC_START",
             "VMALLOC_START",
+            "unsigned long long",
             "%16llx"));
     list.append(KernelMemSpec(
             "VMALLOC_END",
             "VMALLOC_END",
+            "unsigned long long",
             "%16llx"));
 
     // i386 only
@@ -43,6 +48,7 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
     list.append(KernelMemSpec(
             "VMALLOC_OFFSET",
             "VMALLOC_OFFSET",
+            "unsigned long long",
             "%16llx",
             "defined(VMALLOC_OFFSET)"));
 
@@ -52,11 +58,13 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
     list.append(KernelMemSpec(
             "MODULES_VADDR",
             "MODULES_VADDR",
+            "unsigned long long",
             "%16llx",
             "defined(MODULES_VADDR)"));
     list.append(KernelMemSpec(
             "MODULES_END",
             "MODULES_END",
+            "unsigned long long",
             "%16llx",
             "defined(MODULES_VADDR) && defined(MODULES_END)"));
 
@@ -65,18 +73,44 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
     list.append(KernelMemSpec(
             "START_KERNEL_map",
             "__START_KERNEL_map",
+            "unsigned long long",
             "%16llx",
             "defined(__START_KERNEL_map)"));
     list.append(KernelMemSpec(
             "VMEMMAP_START",
             "VMEMMAP_START",
+            "unsigned long long",
             "%16llx",
             "defined(VMEMMAP_START)"));
     list.append(KernelMemSpec(
             "VMEMMAP_END",
             "VMEMMAP_END",
+            "unsigned long long",
             "%16llx",
             "defined(VMEMMAP_START) && defined(VMEMMAP_END)"));
+
+    // Linux kernel version information
+    // See <init/version.c>
+    list.append(KernelMemSpec(
+            "UTS_SYSNAME",
+            "UTS_SYSNAME",
+            "const char*",
+            "%s"));
+    list.append(KernelMemSpec(
+            "UTS_RELEASE",
+            "UTS_RELEASE",
+            "const char*",
+            "%s"));
+    list.append(KernelMemSpec(
+            "UTS_VERSION",
+            "UTS_VERSION",
+            "const char*",
+            "%s"));
+    list.append(KernelMemSpec(
+            "UTS_MACHINE",
+            "UTS_MACHINE",
+            "const char*",
+            "%s"));
 
     return list;
 }
@@ -116,6 +150,14 @@ bool MemSpecs::setFromKeyValue(const QString& key, const QString& value)
         else
             ok = false;
     }
+    else if (key == "UTS_SYSNAME")
+        version.sysname = value;
+    else if (key == "UTS_RELEASE")
+        version.release = value;
+    else if (key == "UTS_VERSION")
+        version.version = value;
+    else if (key == "UTS_MACHINE")
+        version.machine = value;
     else
         ok = false;
 
@@ -158,6 +200,14 @@ QString MemSpecs::toString() const
         ret += QString("%1 = 0x%2\n").arg("high_memory", key_w).arg(highMemory, val_w, 16, QChar('0'));
     if (vmallocEarlyreserve > 0)
         ret += QString("%1 = 0x%2\n").arg("vmalloc_earlyreserve", key_w).arg(vmallocEarlyreserve, val_w, 16, QChar('0'));
+    if (!version.sysname.isEmpty())
+        ret += QString("%1 = 0x%2\n").arg("UTS_SYSNAME", key_w).arg(version.sysname);
+    if (!version.release.isEmpty())
+        ret += QString("%1 = 0x%2\n").arg("UTS_RELEASE", key_w).arg(version.release);
+    if (!version.version.isEmpty())
+        ret += QString("%1 = 0x%2\n").arg("UTS_VERSION", key_w).arg(version.version);
+    if (!version.machine.isEmpty())
+        ret += QString("%1 = 0x%2\n").arg("UTS_MACHINE", key_w).arg(version.machine);
     return ret;
 }
 
@@ -184,6 +234,14 @@ KernelSymbolStream& operator>>(KernelSymbolStream& in, MemSpecs& specs)
     else
         specs.sizeofLong = specs.sizeofPointer;
 
+    // Kernel version information was added in v14
+    if (in.kSymVersion() >= kSym::VERSION_14) {
+        in >> specs.version.sysname
+           >> specs.version.release
+           >> specs.version.version
+           >> specs.version.machine;
+    }
+
     return in;
 }
 
@@ -208,5 +266,32 @@ KernelSymbolStream& operator<<(KernelSymbolStream& out, const MemSpecs& specs)
     if (out.kSymVersion() >= kSym::VERSION_13)
         out << specs.sizeofLong;
 
+    // Kernel version information was added in v14
+    if (out.kSymVersion() >= kSym::VERSION_14) {
+        out << specs.version.sysname
+            << specs.version.release
+            << specs.version.version
+            << specs.version.machine;
+    }
+
     return out;
+}
+
+
+bool MemSpecs::Version::equals(const MemSpecs::Version &other) const
+{
+    return this->version == other.version &&
+//            this->machine == other.machine &&
+            this->release == other.release &&
+            this->sysname == other.sysname;
+}
+
+
+QString MemSpecs::Version::toString() const
+{
+    return QString("%1 %2, %3, %4")
+            .arg(sysname)
+            .arg(release)
+            .arg(machine)
+            .arg(version);
 }

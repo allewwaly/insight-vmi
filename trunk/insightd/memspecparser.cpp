@@ -18,6 +18,11 @@
 #define MEMSPEC_C_BODY "%MEMSPEC_BODY%"
 const char* memspec_c_file = "memspec.c";
 const char* memspec_c_src =
+    "#include <linux/compile.h>\n"
+    "#include <linux/uts.h>\n"
+    "#include <linux/utsname.h>\n"
+    "#include <linux/utsrelease.h>\n"
+    "#include <linux/version.h>\n"
     "#include <linux/kernel.h>\n"
     "#include <linux/module.h>\n"
     "#include <linux/mm.h>\n"
@@ -63,12 +68,12 @@ const char* memprint_h_src =
     "#define MEMPRINT_H 1\n"
     "\n"
     "enum Defines {\n"
-    MEMPRINT_H_ENUM
+    MEMPRINT_H_ENUM    // this placeholder gets replaced later on
     "};\n"
     "\n"
     "struct MemVars {\n"
     "    int defines;\n"
-    MEMPRINT_H_STRUCT
+    MEMPRINT_H_STRUCT  // this placeholder gets replaced later on
     "};\n"
     "\n"
     "extern struct MemVars " MEMPRINT_STRUCT_NAME ";\n"
@@ -96,7 +101,7 @@ const char* memprint_c_src =
     "\n"
     "void mt_printmem(void)\n"
     "{\n"
-    MEMPRINT_C_BODY
+    MEMPRINT_C_BODY  // this placeholder gets replaced later on
     "}\n"
     "\n"
     ;
@@ -216,7 +221,8 @@ void MemSpecParser::setupBuildDir()
     int shmt = 0;
     KernelMemSpecList list = MemSpecs::supportedMemSpecs();
     for (int i = 0; i < list.size(); ++i) {
-        pm_struct += QString("  unsigned long long %1;\n")
+        pm_struct += QString("  %1 %2;\n")
+                    .arg(list[i].valueType.toLower())
                     .arg(list[i].keyFmt.toLower());
 
         if (list[i].macroCond.isEmpty()) {
@@ -333,7 +339,7 @@ void MemSpecParser::parseHelperProg(MemSpecs* specs)
     while (!proc.atEnd() && proc.readLine(buf, bufsize) > 0) {
         if (re.exactMatch(buf))
             // Update the given MemSpecs object with the parsed key-value pair
-            specs->setFromKeyValue(re.cap(1), re.cap(2));
+            specs->setFromKeyValue(re.cap(1), re.cap(2).trimmed());
     }
 }
 

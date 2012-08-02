@@ -168,6 +168,7 @@ void KernelSymbols::loadSymbols(QIODevice* from)
         genericError("Received a null device to read the data from");
 
     _factory.clear();
+    _memSpecs = MemSpecs();
 
     KernelSymbolReader reader(from, &_factory, &_memSpecs);
     try {

@@ -54,9 +54,11 @@ struct KernelMemSpec
     KernelMemSpec() {}
 
     /// Constructor
-    KernelMemSpec(QString keyFmt, QString valueFmt, QString outputFmt, QString macroCond = QString()) :
+    KernelMemSpec(QString keyFmt, QString valueFmt, QString valueType,
+                  QString outputFmt, QString macroCond = QString()) :
         keyFmt(keyFmt),
         valueFmt(valueFmt),
+        valueType(valueType),
         outputFmt(outputFmt),
         macroCond(macroCond)
     {}
@@ -66,6 +68,9 @@ struct KernelMemSpec
 
     /// A valid expression in C syntax to calcluate the value of a key-value pair.
     QString valueFmt;
+
+    /// The dat atype of the value, e.g., <tt>long long</tt> or <tt>char*</tt>
+    QString valueType;
 
     /// The output format in which the value should be printed (printf syntax).
     QString outputFmt;
@@ -92,6 +97,20 @@ struct MemSpecs
         ar_x86_64       = (1 << 1), ///< architecture is AMD64
         ar_pae_enabled  = (1 << 2), ///< flag that indicates if PAE is enabled in i386 mode
         ar_i386_pae     = ar_i386 & ar_pae_enabled ///< architecture is i386 with PAE enabled
+    };
+
+    /**
+     * Linux kernel version information, see Linux type "struct new_utsname"
+     * in <include/linux/utsname.h>
+     */
+    struct Version
+    {
+        QString sysname;
+        QString release;
+        QString version;
+        QString machine;
+        bool equals(const Version& other) const;
+        QString toString() const;
     };
 
     /// Constructor
@@ -167,6 +186,7 @@ struct MemSpecs
     qint32 sizeofLong;
     qint32 sizeofPointer;
     qint32 arch;                 ///< An Architecture value
+    struct Version version;      ///< Linux kernel version information
     bool initialized;            ///< \c true after MemoryDump::init() is complete, \c false otherwise
 };
 
