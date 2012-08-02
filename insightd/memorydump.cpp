@@ -154,8 +154,8 @@ void MemoryDump::init()
 
             if (!_specs.version.equals(ver)) {
                 shell->err()
-                        << shell->color(ctWarningLight) << "Warning: "
-                        << shell->color(ctWarning) << "The memory in "
+                        << shell->color(ctWarningLight) << "WARNING:"
+                        << shell->color(ctWarning) << " The memory in "
                         << shell->color(ctWarningLight) << _fileName
                         << shell->color(ctWarning) << " belongs to a different "
                            "kernel version than the loaded symbols!" << endl
