@@ -23,6 +23,8 @@ enum ColorType {
     ctKeyword,
     ctErrorLight,
     ctError,
+    ctWarningLight,
+    ctWarning,
     ctSrcFile,
     ctNoName,
     ctColHead,
