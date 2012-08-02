@@ -106,6 +106,8 @@ const char *ColorPalette::color(ColorType ct) const
         C_MGT,   // ctKeyword
         C_RED_B, // ctErrorLight
         C_RED,   // ctError
+        C_YLW_B, // ctWarningLight
+        C_YLW,   // ctWarning
         C_RST,   // ctSrcFile
         C_BLK_B, // ctNoName
         C_BLK_B, // ctColHead
@@ -132,6 +134,8 @@ const char *ColorPalette::color(ColorType ct) const
         C_MGT,   // ctKeyword
         C_RED_B, // ctErrorLight
         C_RED,   // ctError
+        C_MGT_B, // ctWarningLight
+        C_MGT,   // ctWarning
         C_RST,   // ctSrcFile
         C_BLK_B, // ctNoName
         C_WHT,   // ctColHead
