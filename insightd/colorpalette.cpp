@@ -4,14 +4,23 @@
 #include "funcpointer.h"
 
 // ANSI color codes
-#define COLOR_BLACK   "30"
-#define COLOR_RED     "31"
-#define COLOR_GREEN   "32"
-#define COLOR_YELLOW  "33"
-#define COLOR_BLUE    "34"
-#define COLOR_MAGENTA "35"
-#define COLOR_CYAN    "36"
-#define COLOR_WHITE   "37"
+#define COLOR_BLACK    "30"
+#define COLOR_RED      "31"
+#define COLOR_GREEN    "32"
+#define COLOR_YELLOW   "33"
+#define COLOR_BLUE     "34"
+#define COLOR_MAGENTA  "35"
+#define COLOR_CYAN     "36"
+#define COLOR_WHITE    "37"
+
+#define COLOR_LBLACK   "90"
+#define COLOR_LRED     "91"
+#define COLOR_LGREEN   "92"
+#define COLOR_LYELLOW  "93"
+#define COLOR_LBLUE    "94"
+#define COLOR_LMAGENTA "95"
+#define COLOR_LCYAN    "96"
+#define COLOR_LWHITE   "97"
 
 #define S_NONE      "0"
 #define S_BOLD      "1"
@@ -27,41 +36,49 @@
 #define C_INV DEFSTYLE(S_INV)
 
 #define C_BLK   DEFCOLOR(COLOR_BLACK, S_NONE)
+#define C_BLK_L DEFCOLOR(COLOR_LBLACK, S_NONE)
 #define C_BLK_B DEFCOLOR(COLOR_BLACK, S_BOLD)
 #define C_BLK_U DEFCOLOR(COLOR_BLACK, S_UNDERLINE)
 #define C_BLK_I DEFCOLOR(COLOR_BLACK, S_INV)
 
 #define C_RED   DEFCOLOR(COLOR_RED, S_NONE)
+#define C_RED_L DEFCOLOR(COLOR_LRED, S_NONE)
 #define C_RED_B DEFCOLOR(COLOR_RED, S_BOLD)
 #define C_RED_U DEFCOLOR(COLOR_RED, S_UNDERLINE)
 #define C_RED_I DEFCOLOR(COLOR_RED, S_INV)
 
 #define C_GRN   DEFCOLOR(COLOR_GREEN, S_NONE)
+#define C_GRN_L DEFCOLOR(COLOR_LGREEN, S_NONE)
 #define C_GRN_B DEFCOLOR(COLOR_GREEN, S_BOLD)
 #define C_GRN_U DEFCOLOR(COLOR_GREEN, S_UNDERLINE)
 #define C_GRN_I DEFCOLOR(COLOR_GREEN, S_INV)
 
 #define C_YLW   DEFCOLOR(COLOR_YELLOW, S_NONE)
+#define C_YLW_L DEFCOLOR(COLOR_LYELLOW, S_NONE)
 #define C_YLW_B DEFCOLOR(COLOR_YELLOW, S_BOLD)
 #define C_YLW_U DEFCOLOR(COLOR_YELLOW, S_UNDERLINE)
 #define C_YLW_I DEFCOLOR(COLOR_YELLOW, S_INV)
 
 #define C_BLU   DEFCOLOR(COLOR_BLUE, S_NONE)
+#define C_BLU_L DEFCOLOR(COLOR_LBLUE, S_NONE)
 #define C_BLU_B DEFCOLOR(COLOR_BLUE, S_BOLD)
 #define C_BLU_U DEFCOLOR(COLOR_BLUE, S_UNDERLINE)
 #define C_BLU_I DEFCOLOR(COLOR_BLUE, S_INV)
 
 #define C_MGT   DEFCOLOR(COLOR_MAGENTA, S_NONE)
+#define C_MGT_L DEFCOLOR(COLOR_LMAGENTA, S_NONE)
 #define C_MGT_B DEFCOLOR(COLOR_MAGENTA, S_BOLD)
 #define C_MGT_U DEFCOLOR(COLOR_MAGENTA, S_UNDERLINE)
 #define C_MGT_I DEFCOLOR(COLOR_MAGENTA, S_INV)
 
 #define C_CYN   DEFCOLOR(COLOR_CYAN, S_NONE)
+#define C_CYN_L DEFCOLOR(COLOR_LCYAN, S_NONE)
 #define C_CYN_B DEFCOLOR(COLOR_CYAN, S_BOLD)
 #define C_CYN_U DEFCOLOR(COLOR_CYAN, S_UNDERLINE)
 #define C_CYN_I DEFCOLOR(COLOR_CYAN, S_INV)
 
 #define C_WHT   DEFCOLOR(COLOR_WHITE, S_NONE)
+#define C_WHT_L DEFCOLOR(COLOR_LWHITE, S_NONE)
 #define C_WHT_B DEFCOLOR(COLOR_WHITE, S_BOLD)
 #define C_WHT_U DEFCOLOR(COLOR_WHITE, S_UNDERLINE)
 #define C_WHT_I DEFCOLOR(COLOR_WHITE, S_INV)
@@ -100,20 +117,20 @@ const char *ColorPalette::color(ColorType ct) const
         C_BLU_B, // ctBuiltinType
         C_BLK_B, // ctRealType
         C_GRN_B, // ctMember
-        C_RED,   // ctAddress
-        C_RED,   // ctOffset
-        C_YLW,   // ctTypeId
-        C_MGT,   // ctKeyword
+        C_RED_L, // ctAddress
+        C_RED_L, // ctOffset
+        C_YLW_L, // ctTypeId
+        C_MGT_L, // ctKeyword
         C_RED_B, // ctErrorLight
-        C_RED,   // ctError
+        C_RED_L, // ctError
         C_YLW_B, // ctWarningLight
-        C_YLW,   // ctWarning
+        C_YLW_L, // ctWarning
         C_RST,   // ctSrcFile
         C_BLK_B, // ctNoName
         C_BLK_B, // ctColHead
         C_RST,   // ctFuncParams
-        C_CYN,   // ctNumber
-        C_GRN,   // ctString
+        C_CYN_L, // ctNumber
+        C_GRN_L, // ctString
     };
 
     static const char* colors_light[COLOR_TYPE_SIZE] = {
