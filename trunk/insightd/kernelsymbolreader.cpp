@@ -51,10 +51,26 @@ void KernelSymbolReader::read()
         readerWriterError(QString("The given file magic number 0x%1 is invalid.")
                                   .arg(magic, 0, 16));
     if (qt_stream_version > in.version()) {
-        std::cerr << "WARNING: This file was created with a newer version of "
+        shell->err()
+            << shell->color(ctWarningLight) << "WARNING:"
+            << shell->color(ctWarning)
+            << " This file was created with a newer version of "
             << "the Qt libraries, your system is running version " << qVersion()
-            << ". We will continue, but the result is undefined!" << std::endl;
+            << ". We will continue, but the result is undefined!"
+            << shell->color(ctReset) << endl;
     }
+
+    // Warn for deprecated symbol versions
+    if (version < kSym::VERSION_MAX) {
+        shell->err()
+            << shell->color(ctWarningLight) << "WARNING:"
+            << shell->color(ctWarning)
+            << " The kernel symbols were parsed with an older version of "
+            << ProjectInfo::projectName << ". You may want to consider "
+               "re-creating the symbols to benefit from all features."
+            << shell->color(ctReset) << endl;
+    }
+
     // Try to apply the version in any case
     in.setVersion(qt_stream_version);
 
