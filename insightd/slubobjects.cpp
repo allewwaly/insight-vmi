@@ -168,8 +168,8 @@ void SlubObjects::resolveObjSize()
     // Start with one arbitrary slub cache
     Variable* var = _factory->findVarByName("task_struct_cachep");
     if (!var) {
-        debugerr("Could not find variable task_struct_cachep, skipping post-"
-                 "processing.");
+        debugerr("ERROR: Could not find variable task_struct_cachep, skipping "
+                 "post-processing.");
         return;
     }
 
@@ -177,10 +177,17 @@ void SlubObjects::resolveObjSize()
         QString name;
         Instance start = var->toInstance(_vmem, BaseType::trLexicalAndPointers);
         Instance inst = start;
+
+        if (!start.isAccessible()) {
+            debugerr("ERROR: Cannot access variable " << start.name() << ".");
+            return;
+        }
+
         do {
             // Read name and size from memory
             name = inst.findMember("name", BaseType::trLexical).toString();
             name = name.remove('"');
+            debugmsg("name = " << name);
             int size =
                     inst.findMember("objsize", BaseType::trLexical).toInt32();
 
@@ -192,10 +199,12 @@ void SlubObjects::resolveObjSize()
 
             // Proceed to next cache
             inst = inst.findMember("list", BaseType::trLexical);
-            if (inst.memberCandidatesCount("next") == 1)
+            if (inst.memberCandidatesCount("next") == 1) {
                 inst = inst.memberCandidate("next", 0);
+            }
             else {
-                debugerr("Candidate for \"next\" is ambiguous.");
+                debugerr("ERROR: Candidate for \"(" << name << ").list.next\" "
+                         "is ambiguous.");
                 return;
             }
         } while (start.address() != inst.address() && !inst.isNull());
