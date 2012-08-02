@@ -78,6 +78,14 @@ MemoryDump::~MemoryDump()
 }
 
 
+QString trimQuotes(const QString& s)
+{
+    if (s.startsWith(QChar('"')) && s.endsWith(QChar('"')))
+        return s.mid(1, s.size() - 2);
+    return s;
+}
+
+
 void MemoryDump::init()
 {
     // Open virtual memory for reading
@@ -115,6 +123,51 @@ void MemoryDump::init()
         }
         else
             _specs.vmallocEarlyreserve = 0;
+    }
+
+    // Compare the Linux kernel version to the parsed symbols
+    QString uts_ns_name("init_uts_ns");
+    if (!_specs.version.release.isEmpty() &&
+        _factory->findVarByName(uts_ns_name))
+    {
+        try {
+            struct MemSpecs::Version ver;
+            Instance uts_ns = queryInstance(uts_ns_name);
+            uts_ns = getNextInstance("name", uts_ns);
+            // Read in all version information
+            if (!_specs.version.machine.isEmpty())
+                ver.machine = trimQuotes(
+                            uts_ns.findMember("machine",
+                                              BaseType::trLexical).toString());
+            if (!_specs.version.release.isEmpty())
+                ver.release = trimQuotes(
+                            uts_ns.findMember("release",
+                                              BaseType::trLexical).toString());
+            if (!_specs.version.sysname.isEmpty())
+                ver.sysname = trimQuotes(
+                            uts_ns.findMember("sysname",
+                                              BaseType::trLexical).toString());
+            if (!_specs.version.version.isEmpty())
+                ver.version = trimQuotes(
+                            uts_ns.findMember("version",
+                                              BaseType::trLexical).toString());
+
+            if (!_specs.version.equals(ver)) {
+                shell->err()
+                        << shell->color(ctWarningLight) << "Warning: "
+                        << shell->color(ctWarning) << "The memory in "
+                        << shell->color(ctWarningLight) << _fileName
+                        << shell->color(ctWarning) << " belongs to a different "
+                           "kernel version than the loaded symbols!" << endl
+                        << "  Kernel symbols: " << _specs.version.toString() << endl
+                        << "  Memory file:    " << ver.toString()
+                        << shell->color(ctReset) << endl;
+            }
+        }
+        catch (QueryException& e) {
+            genericError("Failed to retrieve kernel version information of "
+                         "this memory dump. Error was: " + e.message);
+        }
     }
 
     // Initialization done
