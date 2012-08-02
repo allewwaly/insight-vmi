@@ -147,9 +147,9 @@ public:
     const QStringList& memberNames() const;
 
     /**
-     * Gives access to all members if this instance. If a member has exactly
+     * Gives access to all members of this instance. If a member has exactly
      * one candidate type, this type will be used instead of the originally
-     * declared type of the mamber. To have the declared types instead, set
+     * declared type of the member. To have the declared types instead, set
      * \a declaredTypes to \c true.
      * @param declaredTypes selects if candidate types or declared types should
      * be used, where applicable

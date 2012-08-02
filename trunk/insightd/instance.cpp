@@ -449,7 +449,7 @@ Instance Instance::memberByOffset(quint64 off) const
 {
     const Structured* s = dynamic_cast<const Structured*>(_d.type);
 
-    for(int i = 0; i < s->members().size(); i++) {
+    for(int i = 0; s && i < s->members().size(); i++) {
         StructuredMember* m = s->members().at(i);
 
         if(m->offset() == off)
