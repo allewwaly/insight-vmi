@@ -28,6 +28,7 @@
 
 class SymFactory;
 class VirtualMemory;
+class MemoryMapVerifier;
 class MemoryMapBuilder;
 
 /// A set of strings
@@ -254,11 +255,14 @@ public:
     static const QString& insertName(const QString& name);
 
     /**
-     *  Returns the MemoryMapVerifier that is used by this map.
+     * Returns the MemoryMapVerifier that is used by this map.
      */
     MemoryMapVerifier& verifier();
 
-    const SymFactory* factory() const;
+    /**
+     * Returns the SymFactory used by this map.
+     */
+    const SymFactory * symfactory() const;
 
     float calculateNodeProbability(const Instance *inst,
                                    float parentProbability = 0) const;
@@ -411,6 +415,10 @@ inline quint64 MemoryMap::paddrSpaceEnd() const
             _vmem->physMem()->size() - 1 : VADDR_SPACE_X86;
 }
 
+inline const SymFactory * MemoryMap::symfactory() const
+{
+    return _factory;
+}
 
 #ifdef MEMORY_MAP_VERIFICATION
 inline MemoryMapVerifier& MemoryMap::verifier()
@@ -418,12 +426,6 @@ inline MemoryMapVerifier& MemoryMap::verifier()
     return _verifier;
 }
 #endif
-
-
-inline const SymFactory *MemoryMap::factory() const
-{
-    return _factory;
-}
 
 inline float MemoryMap::calculateNodeProbability(const Instance *inst, float parentProbability) const
 {

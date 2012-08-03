@@ -143,6 +143,8 @@ private:
     QList<MemoryMapNodeWatcher *> _watchNodes;
     Log _log;
     bool _lastVerification;
+    QString _slubFile;
+    bool _parseSlub;
     SlubObjects _slub;
 };
 
