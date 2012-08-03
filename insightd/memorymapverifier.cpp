@@ -117,7 +117,9 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map) :
     _map(map),
     _log("memory_map", true),
     _lastVerification(true),
-    _slub(map->factory(), map->vmem())
+    _slubFile(),
+    _parseSlub(false),
+    _slub(map->symfactory(), map->vmem())
 {
 }
 
@@ -125,15 +127,10 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map, const char *slubFile) :
     _map(map),
     _log("memory_map", true),
     _lastVerification(true),
-    _slub(map->factory(), map->vmem())
+    _slubFile(slubFile),
+    _parseSlub(true),
+    _slub(map->symfactory(), map->vmem())
 {
-    try {
-        _slub.parsePreproc(QString(slubFile));
-    }
-    catch (IOException& e) {
-        debugerr("Caught a " << e.className() << " in " << __PRETTY_FUNCTION__
-                 << ": " << e.message);
-    }
 }
 
 bool MemoryMapVerifier::lastVerification() const
@@ -152,6 +149,20 @@ void MemoryMapVerifier::resetWatchNodes()
 
 void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
 {
+
+    if(_parseSlub) {
+        try {
+            _slub.parsePreproc(_slubFile);
+        }
+
+        catch (IOException& e) {
+            debugerr("Caught a " << e.className() << " in " << __PRETTY_FUNCTION__
+                     << ": " << e.message);
+        }
+	
+	_parseSlub = false;
+     }
+
     MemoryMapNodeSV *cur =  dynamic_cast<MemoryMapNodeSV*>(currentNode);
 
     // Add an memory map interval watcher node to the init_task
