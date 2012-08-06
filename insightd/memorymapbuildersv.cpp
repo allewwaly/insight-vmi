@@ -14,6 +14,7 @@
 #include "virtualmemoryexception.h"
 #include "array.h"
 #include "memorymapverifier.h"
+#include "memorymapheuristics.h"
 #include <debug.h>
 
 
@@ -34,7 +35,7 @@ void MemoryMapBuilderSV::run()
     // Holds the data that is shared among all threads
     BuilderSharedState* shared = _map->_shared;
 
-    MemoryMapNode* node = 0;
+    MemoryMapNodeSV* node = 0;
 
     // Now work through the whole stack
     QMutexLocker queueLock(&shared->queueLock);
@@ -44,7 +45,13 @@ void MemoryMapBuilderSV::run()
             _map->verifier().lastVerification())
     {
         // Take element with highest probability
-        node = shared->queue.takeLargest();
+        node = dynamic_cast<MemoryMapNodeSV *>(shared->queue.takeLargest());
+
+        if(!node) {
+            debugerr("Could not cast the node within the queue to MemoryMapNodeSV!");
+            return;
+        }
+
         shared->lastNode = node;
         ++shared->processed;
         queueLock.unlock();
@@ -195,7 +202,85 @@ void MemoryMapBuilderSV::run()
 
 }
 
-void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNode* node)
+bool MemoryMapBuilderSV::existsNode(Instance &inst)
+{
+    MemMapSet nodes = _map->vmemMapsInRange(inst.address(), inst.endAddress());
+
+    for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
+        const MemoryMapNode* otherNode = *it;
+        // Is the the same object already contained?
+        bool ok1 = false, ok2 = false;
+        if (otherNode && otherNode->address() == inst.address() &&
+                otherNode->type() && inst.type() &&
+                otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
+                ok1 && ok2)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void MemoryMapBuilderSV::processList(MemoryMapNodeSV *listHead,
+                                     Instance &firstMember)
+{
+    // Inital checks
+    if(!listHead || firstMember.isNull() || !(firstMember.type()->type() & rtStruct))
+        return;
+
+    Instance tmp = listHead->toInstance();
+
+    // Is this is an invalid list head or if we already processed this
+    // member return
+    if(!MemoryMapHeuristics::validListHead(&tmp) ||
+            listHead->memberProcessed(listHead->address(), firstMember.address()))
+        return;
+
+    // Calculate the offset of the member within the struct
+    quint64 listHeadNext = (quint64)tmp.member(0, 0, -1, true).toPointer();
+    quint64 memOffset = listHeadNext - firstMember.address();
+
+    // Check if the identified member is a list_head
+    tmp = firstMember.memberByOffset(memOffset);
+    if(!MemoryMapHeuristics::isListHead(&tmp)) {
+        debugmsg("Identfied member is no list_head!");
+        return;
+    }
+
+    // Init variables.
+    MemoryMapNodeSV *currentNode = listHead;
+    tmp = firstMember;
+
+
+    // Iterate over the list
+    while(listHeadNext != listHead->address()) {
+        // Get the next instance
+        tmp.setAddress(listHeadNext - memOffset);
+
+        // Only add non existing instances
+        if(!existsNode(tmp))
+            currentNode = dynamic_cast<MemoryMapNodeSV *>(_map->addChildIfNotExistend(tmp, currentNode,
+                                                    _index, (currentNode->address() + memOffset)));
+
+        // Verify cast
+        if(!currentNode) {
+            debugerr("Could not cast the created child to MemoryMapNodeSV!");
+            continue;
+        }
+
+        // Update vars
+        if(tmp.memberByOffset(memOffset).isNull()) {
+            debugmsg("Next list member could not be retrieved!");
+            return;
+        }
+
+        listHeadNext = (quint64)tmp.memberByOffset(memOffset).member(0, 0, -1, true).toPointer();
+    }
+
+}
+
+void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
 {
     if (!inst->memberCount())
         return;
@@ -206,8 +291,15 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNode* node)
                  (rtInt32 | rtUInt32) :
                  (rtInt64 | rtUInt64));
 
+    // Is this a list_head?
+    bool listHead = MemoryMapHeuristics::isListHead(inst);
+
     // Add all struct members to the stack that haven't been visited
     for (int i = 0; i < inst->memberCount(); ++i) {
+        // We only consider the next member for list_heads
+        if(listHead && i > 0)
+            break;
+
         // Get declared type of this member
         const BaseType* mBaseType = inst->memberType(i, BaseType::trLexical, true);
         if (!mBaseType)
@@ -239,7 +331,7 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNode* node)
 
              if((quint64)m.toPointer() == (inst->address() + inst->memberAddress(i, true)) ||
                  (quint64)m.toPointer() == inst->address() ||
-                 !_map->addressIsWellFormed((quint64)m.toPointer()))
+                 !MemoryMapHeuristics::validPointerAddress(&m))
                  continue;
         }
         // Only one candidate and no unions.
@@ -252,11 +344,16 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNode* node)
                 {
                     int cnt = 1;
 
-                    if(candidateCnt == 1)
+                    if(candidateCnt == 1 && inst->memberCandidateCompatible(i, 0))
                         m = inst->member(i, BaseType::trLexicalAndPointers, -1);
                     else
                         m = m.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
-                    if (cnt && !m.isNull()) {
+
+                    // Handle list_heads seperately
+                    if(listHead && !m.isNull()) {
+                        processList(node, m);
+                    }
+                    else if (cnt && !m.isNull()) {
                         // Adjust instance name to reflect full path
                         if (node->name() != inst->name())
                             m.setName(inst->name() + "." + m.name());
@@ -327,74 +424,10 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNode* node)
                     // Try this candidate
                     Instance m = inst->memberCandidate(i, j);
 
-                    if(_map->addressIsWellFormed(m)) {
-                        // We handle list_head instances seperately.
-                        if(inst->isListHead()) {
-                            // The candidate type must be a structure
-                            if(!(m.type()->type() & StructOrUnion)) {
-                                //debugmsg("Out 1: " << m.fullName());
+                    // Check compatability using heuristics
+                    if(MemoryMapHeuristics::compatibleCandidate(inst, cand)) {
 
-                                // Penalty of 90%
-                                penalize = 0.9;
-                            }
-                            else {
-                                // Get the instance of the 'next' member within the list_head
-                                void *memberNext = inst->member(i, 0, -1, true).toPointer();
-
-                                // If this list head points to itself, we do not need to consider it
-                                // anymore.
-                                if((quint64)memberNext == inst->member(i, 0, -1, true).address())
-                                    continue;
-
-                                // The pointer can be NULL
-                                if((quint64)memberNext != 0) {
-                                    // Get the offset of the list_head struct within the candidate type
-                                    quint64 candOffset = (quint64)memberNext - m.address();
-
-                                    // Find the member based on the calculated offset within the candidate type
-                                    Instance candListHead = m.memberByOffset(candOffset);
-
-                                    // The member within the candidate type that the next pointer points to
-                                    // must be a list_head.
-                                    if(!candListHead.isNull() && candListHead.isListHead())
-                                    {
-                                        // Sanity check: The prev pointer of the list_head must point back to the
-                                        // original list_head
-                                        void *candListHeadPrev = candListHead.member(1, 0, -1, true).toPointer();
-
-                                        if((quint64)candListHeadPrev == (quint64)memberNext)
-                                        {
-                                            // At this point we know that the list_head struct within the candidate
-                                            // points indeed back to the list_head struct of the instance. However,
-                                            // if the offset of the list_head struct within the candidate is by chance
-                                            // equal to the real candidate or if the offset is zero, we will pass the
-                                            // check even though this may be the wrong candidate. This is why we use
-                                            // back propagation to calculate the final probabilities.
-                                            // _map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i));
-                                        }
-                                        else {
-                                            //debugmsg("Out 2: " << m.fullName());
-                                            // Penalty of 90%
-                                            penalize = 0.9;
-                                        }
-                                    }
-                                    else
-                                    {
-
-                                        //debugmsg("Out 3: " << m.fullName() << " (" << candListHead.typeName() << ")");
-                                        // Penalty of 90%
-                                        penalize = 0.9;
-                                    }
-                                }
-                            }
-
-
-                        }
-
-                        /*
-                        if(inst->fullName().compare("tasks") == 0)
-                           debugmsg("sibling Candidate: " << m.name());
-                        */
+                        /// todo: Handle list heads seperately.
 
                         // add node
                         int cnt = 1;
@@ -431,10 +464,6 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNode* node)
             //else
                 ///debugmsg(inst->fullName() << " (" << inst->memberCandidatesCount(i) << ")");
         }
-
-        // In case of a list_head we just consider the next pointer
-        if(inst->isListHead())
-            break;
 #endif
     }
 }
@@ -557,50 +586,13 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance* inst,
                     invalidChildAddrCnt++;
                 }
             }
-            else if(!mi.isNull() && mi.isListHead())
+            else if(!mi.isNull() && MemoryMapHeuristics::isListHead(&mi))
             {
+                // Check for list_heads
                 listHeads++;
 
-                // Check if a inst.list_head.next.prev pointer points to inst.list_head
-                // as it should.
-                Instance iListHeadNext = mi.member(0, 0, -1, true);
-                if(!iListHeadNext.isNull() && iListHeadNext.type()
-                        && _map->_vmem->safeSeek(iListHeadNext.address()))
-                {
-                    const BaseType *mNext = iListHeadNext.type();
-                    quint64 listHeadNext =
-                            (quint64)mNext->toPointer(_map->_vmem,
-                                                      iListHeadNext.address());
-
-                    // A list_head.next pointer may be NULL
-                    /// todo: Check if this condition is already handled by !iListHeadNext.isNull()
-                    /// in this case the else clause of the above if statement needs to be updated.
-                    if(listHeadNext == 0)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        // Check above mentioned condition
-                        if(_map->_vmem->safeSeek(listHeadNext + mNext->size()))
-                        {
-                            quint64 listHeadNextPrev =
-                                    (quint64)mNext->toPointer(_map->_vmem, listHeadNext + mNext->size());
-
-                            if(mi.address() != listHeadNextPrev)
-                            {
-                                invalidListHeadCnt++;
-                            }
-                        }
-                        else {
-                            invalidListHeadCnt++;
-                        }
-                    }
-
-                }
-                else {
+                if(!MemoryMapHeuristics::validListHead(&mi))
                     invalidListHeadCnt++;
-                }
             }
         }
 

@@ -47,7 +47,6 @@ MemoryMapNodeSV::MemoryMapNodeSV(MemoryMap* belongsTo, const Instance& inst,
     updateProbabilitySV();
 }
 
-
 void MemoryMapNodeSV::setCandidatesComplete(bool value) {
     _candidatesComplete = value;
 }
@@ -55,11 +54,8 @@ void MemoryMapNodeSV::setCandidatesComplete(bool value) {
 void MemoryMapNodeSV::addCandidate(MemoryMapNodeSV* cand)
 {
     // Add the node to the internal candidate list if it is not already in it.
-    _mutex.lock();
     if(!_candidates.contains(cand))
         _candidates.append(cand);
-
-    _mutex.unlock();
 }
 
 void MemoryMapNodeSV::updateCandidates()
@@ -137,22 +133,16 @@ float MemoryMapNodeSV::getCandidateProbability() const
 
 void MemoryMapNodeSV::calculateInitialProbability(const Instance* givenInst)
 {
-    _mutex.lock();
-
     if (givenInst)
         _initialProb = _belongsTo->calculateNodeProbability(givenInst);
     else {
         Instance inst = toInstance(false);
        _initialProb = _belongsTo->calculateNodeProbability(&inst);
     }
-
-    _mutex.unlock();
 }
 
 void MemoryMapNodeSV::updateProbabilitySV(MemoryMapNodeSV *initiator)
 {
-    _mutex.lock();
-
     float prob = 0;
     float parentProb = 1.0;
     float childrenProb = 0.0;
@@ -191,9 +181,6 @@ void MemoryMapNodeSV::updateProbabilitySV(MemoryMapNodeSV *initiator)
     if(prob != _probability) {
         _probability = prob;
 
-        // Unlock before the update is propagated
-        _mutex.unlock();
-
         /*
         debugmsg(fullName() << " (" << type()->prettyName() << ")");
         debugmsg("parentProb: " << parentProb);
@@ -226,9 +213,6 @@ void MemoryMapNodeSV::updateProbabilitySV(MemoryMapNodeSV *initiator)
 
         }
     }
-    else {
-        _mutex.unlock();
-    }
 
     /*
     if(_name.compare("init_task") == 0)
@@ -249,4 +233,34 @@ QList<MemoryMapNodeSV *> * MemoryMapNodeSV::getParents()
     return result;
 }
 
+const QMultiMap<quint64, MemoryMapNodeSV*> * MemoryMapNodeSV::returningEdges() const
+{
+    return &_returningEdges;
+}
+
+void MemoryMapNodeSV::addReturningEdge(quint64 memberAddress, MemoryMapNodeSV *target)
+{
+    _returningEdges.insertMulti(memberAddress, target);
+}
+
+bool MemoryMapNodeSV::memberProcessed(quint64 addressInParent, quint64 address)
+{
+    // Is there already a child for the given address?
+    for(int i = 0; i < _children.size(); ++i) {
+        MemoryMapNodeSV *cast = dynamic_cast<MemoryMapNodeSV*>(_children.at(i));
+
+        if(cast && cast->_addrInParent == addressInParent && cast->address() == address)
+            return true;
+    }
+
+    // Is there a returning edge for the given address?
+    QList<MemoryMapNodeSV *> m = _returningEdges.values(addressInParent);
+
+    for(int i = 0; i < m.size(); ++i) {
+        if(m.at(i)->address() == address)
+            return true;
+    }
+
+    return false;
+}
 

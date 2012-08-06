@@ -146,6 +146,28 @@ public:
      */
     QList<MemoryMapNodeSV*> * getParents();
 
+    /**
+     * Add a returing edge for this node.
+     * @param memberAddress the address of the member of this node from whom
+     * the retruning edge originates
+     * @param target the target node that this returing edge points to
+     */
+    void addReturningEdge(quint64 memberAddress, MemoryMapNodeSV* target);
+
+    /**
+     * @return all the returing edges for this node.
+     */
+    const QMultiMap<quint64, MemoryMapNodeSV*> * returningEdges() const;
+
+    /**
+     * Has a member of the instance that this node represents already been
+     * processed? If so there must be a child node that has the given address
+     * within its parent.
+     * @param addressinParent the address of the member within its parent
+     * @param address the address of the structure that the member points to
+     * @returns true if the member has already been processed, false otherwise
+     **/
+    bool memberProcessed(quint64 addressInParent, quint64 address);
 private:
     /**
      * Calculate the intial probability of this node. This function should only
@@ -160,13 +182,16 @@ private:
 
     float _initialProb;      ///< the initial probability of the node
 
-    QList<MemoryMapNodeSV*> _candidates;    ///< list of candidate nodes for this node
-    quint64 _addrInParent;   ///< the address of the node within the parent
-    bool _hasCandidates;     ///< specifies if the node has candidates
-    bool _candidatesComplete;///< specifies if all canidates for this node have
-                             ///  been added
-
-    mutable QMutex _mutex;           ///< a mutex to synchronize critical sections
+    QList<MemoryMapNodeSV*> _candidates;                    ///< list of candidate nodes for this node
+    quint64 _addrInParent;                                  ///< the address of the node within the parent
+    bool _hasCandidates;                                    ///< specifies if the node has candidates
+    bool _candidatesComplete;                               ///< specifies if all canidates for this node have
+                                                            ///  been added
+    QMultiMap<quint64, MemoryMapNodeSV*> _returningEdges;   ///< Contains all returning edges of the node. A
+                                                            ///  returning edge is an edge that points back
+                                                            ///  to an already existing node. This list is
+                                                            ///  necessary to have a graph structure, while
+                                                            ///  keeping our single parent paradigm.
 };
 
 

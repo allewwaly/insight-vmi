@@ -87,7 +87,7 @@ public:
         ovConflict,      ///< Instance type or address conflicts with object in the slabs
         ovEmbedded,      ///< Instance is embedded within a larger object in the slabs
         ovMaybeValid,    ///< Instance lies within reserved slab memory for which no type information is available
-        ovValid          ///< Instance was either found in he slabs or in a global variable
+        ovValid          ///< Instance was either found in the slabs or in a global variable
     };
 
     SlubObjects(const SymFactory* factory, VirtualMemory* vmem);

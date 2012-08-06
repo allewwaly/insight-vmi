@@ -711,15 +711,3 @@ ExpressionResult Instance::toExpressionResult() const
 	}
 }
 
-
-bool Instance::isListHead() const
-{
-    /// @todo There is probably a more elegant way to achieve that...
-    if(memberCount() == 2 && typeName().compare("struct list_head") == 0)
-    {
-        return true;
-    }
-
-    return false;
-}
-

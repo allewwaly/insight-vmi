@@ -222,6 +222,11 @@ inline QString Instance::derefUserLand(const QString &pgd) const
     return ret;
 }
 
+inline VirtualMemory* Instance::vmem() const
+{
+    return _d.vmem;
+}
+
 
 
 template<class T>
