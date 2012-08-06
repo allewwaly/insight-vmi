@@ -188,6 +188,11 @@ void MemoryMapBuilderSV::run()
         // Lock the mutex again before we jump to the loop condition checking
         queueLock.relock();
     }
+
+#if MEMORY_MAP_VERIFICATION == 1
+        _map->verifier().statistics();
+#endif
+
 }
 
 void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNode* node)

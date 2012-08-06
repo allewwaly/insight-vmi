@@ -138,14 +138,41 @@ public:
      */
     void resetWatchNodes();
 
+    /**
+     * Parse the given slub file. In case no slub file is given, this function will try
+     * to parse the slub file that was provided to the constructor if any.
+     * @param slubFile the full path to the slub file that should be parsed
+     * @returns true if the slub file could be parsed, false otherwise.
+     */
+    bool parseSlubData(const char *slubFile = 0);
+
+    /**
+     * Collect and print statistics about the current memory map.
+     */
+    void statistics();
 private:
+    /**
+     * Internal helper function for the statistics function.
+     */
+    void statisticsHelper(MemoryMapNode *node);
+
+    /**
+     * Collects statistics about a single node
+     */
+    void statisticsCountNode(MemoryMapNode *node);
+
     MemoryMap *_map;
     QList<MemoryMapNodeWatcher *> _watchNodes;
     Log _log;
     bool _lastVerification;
     QString _slubFile;
-    bool _parseSlub;
+    bool _slubDataParsed;
+    bool _slubDataAvailable;
     SlubObjects _slub;
+
+    quint64 _validObjects;
+    quint64 _invalidObjects;
+    quint64 _maybeValidObjects;
 };
 
 #endif // MEMORYMAPVERIFIER_H
