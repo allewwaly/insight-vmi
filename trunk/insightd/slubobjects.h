@@ -136,6 +136,11 @@ public:
      */
     ObjectValidity objectValid(const Instance* inst) const;
 
+    /**
+     * Returns the number of objects contained within the slubs
+     */
+    quint64 numberOfObjects() const;
+
 private:
     bool isInstanceEmbedded(const Instance* inst, const SlubObject& obj) const;
     void postproc();

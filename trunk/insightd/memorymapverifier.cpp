@@ -6,6 +6,8 @@
 #include <QTextStream>
 #include <debug.h>
 #include "ioexception.h"
+#include "shell.h"
+#include "colorpalette.h"
 
 #include <math.h>
 
@@ -118,7 +120,8 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map) :
     _log("memory_map", true),
     _lastVerification(true),
     _slubFile(),
-    _parseSlub(false),
+    _slubDataParsed(false),
+    _slubDataAvailable(false),
     _slub(map->symfactory(), map->vmem())
 {
 }
@@ -128,7 +131,8 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map, const char *slubFile) :
     _log("memory_map", true),
     _lastVerification(true),
     _slubFile(slubFile),
-    _parseSlub(true),
+    _slubDataParsed(false),
+    _slubDataAvailable(true),
     _slub(map->symfactory(), map->vmem())
 {
 }
@@ -147,22 +151,35 @@ void MemoryMapVerifier::resetWatchNodes()
     _watchNodes.clear();
 }
 
-void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
+bool MemoryMapVerifier::parseSlubData(const char *slubFile)
 {
-
-    if(_parseSlub) {
+    if(_slubDataAvailable || slubFile) {
         try {
-            _slub.parsePreproc(_slubFile);
+            if(slubFile)
+                _slub.parsePreproc(slubFile);
+            else
+                _slub.parsePreproc(_slubFile);
+
+            _slubDataParsed = true;
+            _slubDataAvailable = true;
+
+            return true;
         }
 
         catch (IOException& e) {
             debugerr("Caught a " << e.className() << " in " << __PRETTY_FUNCTION__
                      << ": " << e.message);
+
+            _slubDataParsed = false;
+            _slubDataAvailable = false;
         }
-	
-	_parseSlub = false;
      }
 
+    return false;
+}
+
+void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
+{    
     MemoryMapNodeSV *cur =  dynamic_cast<MemoryMapNodeSV*>(currentNode);
 
     // Add an memory map interval watcher node to the init_task
@@ -197,7 +214,15 @@ void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
 
 bool MemoryMapVerifier::performChecks(MemoryMapNode *n)
 {
+    if(!_slubDataAvailable)
+        return false;
+
+    if(!_slubDataParsed)
+        if(!parseSlubData())
+            return false;
+
     MemoryMapNodeSV* lastNode = dynamic_cast<MemoryMapNodeSV*>(n);
+
     if (!lastNode)
         return false;
 
@@ -312,6 +337,122 @@ MemoryMapNode * MemoryMapVerifier::leastCommonAncestor(MemoryMapNode *aa, Memory
     delete parentsB;
 
     return result;
+}
+
+void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
+{
+    Instance i = node->toInstance();
+    SlubObjects::ObjectValidity v = _slub.objectValid(&i);
+
+    switch(v) {
+        case SlubObjects::ovValid:
+            _validObjects++;
+            break;
+        case SlubObjects::ovEmbedded:
+            _validObjects++;
+            break;
+        case SlubObjects::ovMaybeValid:
+            _maybeValidObjects++;
+            break;
+        case SlubObjects::ovConflict:
+            _invalidObjects++;
+            break;
+        case SlubObjects::ovNotFound:
+            _invalidObjects++;
+            break;
+        case SlubObjects::ovNoSlabType:
+            _maybeValidObjects++;
+            break;
+        case SlubObjects::ovInvalid:
+            _invalidObjects++;
+            break;
+    }
+}
+
+void MemoryMapVerifier::statisticsHelper(MemoryMapNode *node)
+{
+    QList<MemoryMapNode *> children = node->children();
+
+    statisticsCountNode(node);
+
+    for(int i = 0; i < children.size(); ++i) {
+        statisticsHelper(children.at(i));
+    }
+}
+
+void MemoryMapVerifier::statistics()
+{
+    // We can only created statistics if we have access to slub information
+    if(!_slubDataAvailable)
+        return;
+
+    if(!_slubDataParsed)
+        if(!parseSlubData())
+            return;
+
+    // Reset stats
+    _validObjects = 0;
+    _invalidObjects = 0;
+    _maybeValidObjects = 0;
+
+    QList<MemoryMapNode *> rootNodes = _map->roots();
+
+    for(int i = 0; i < rootNodes.size(); ++i) {
+        statisticsHelper(rootNodes.at(i));
+    }
+
+    quint64 totalObjs = (_validObjects + _invalidObjects + _maybeValidObjects);
+
+    shell->out() << "\nMap Statistics:\n"
+                 << qSetFieldWidth(50)
+                 << "\t| No. of objects in map:"
+                 << right << qSetFieldWidth(8)
+                 << totalObjs << "\n"
+                 << left << qSetFieldWidth(50)
+                 << "\t| No. of valid objects:"
+                 << qSetFieldWidth(0) << shell->color(ctType) << right << qSetFieldWidth(8)
+                 << _validObjects
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << " ("
+                 << shell->color(ctType)
+                 << ((float)_validObjects) * 100 / totalObjs << shell->color(ctType)
+                 << shell->color(ctReset)
+                 << "%)\n"
+                 << qSetFieldWidth(50)
+                 <<"\t| No. of invalid objects:"
+                 << right << qSetFieldWidth(0) << shell->color(ctError) << qSetFieldWidth(8)
+                 << _invalidObjects
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << " ("
+                 << shell->color(ctError)
+                 << ((float)_invalidObjects) * 100 / totalObjs
+                 << shell->color(ctReset)
+                 << "%)\n"
+                 << qSetFieldWidth(50)
+                 << "\t| No. of objects whose status is unknown:"
+                 << right << qSetFieldWidth(8) << _maybeValidObjects
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left
+                 << " (" << ((float)_maybeValidObjects) * 100 / totalObjs << "%)\n"
+                 << "\t|\n"
+                 << qSetFieldWidth(50)
+                 << "\t| Coverage of slub objects:"
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << shell->color(ctBold)
+                 << qSetFieldWidth(8) << right
+                 << ((float)_validObjects) * 100 / _slub.numberOfObjects()
+                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << "%\n"
+                 << qSetFieldWidth(50)
+                 << "\t| Estimation of map correctness:"
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << shell->color(ctBold)
+                 << shell->color(ctWarning) << qSetFieldWidth(8) << right
+                 << ((float)_validObjects) * 100 / totalObjs
+                 << qSetFieldWidth(0) << left
+                 << "-" << ((float)_maybeValidObjects + _validObjects) * 100 / totalObjs
+                 << shell->color(ctReset)
+                 << "%\n"
+                 << "\t`-----------------------------------------------------------------\n";
+
+
 }
 
 /*
