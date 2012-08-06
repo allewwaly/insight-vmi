@@ -131,6 +131,9 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     _shared->reset();
     _shared->minProbability = minProbability;
 
+    if(type == btSibi)
+        _verifier.resetWatchNodes();
+
     QTime timer, totalTimer;
     timer.start();
     totalTimer.start();

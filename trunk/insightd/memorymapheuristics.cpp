@@ -25,7 +25,7 @@ bool MemoryMapHeuristics::validPointerAddress(Instance *p)
     return true;
 }
 
-bool MemoryMapHeuristics::isListHead(Instance *i)
+bool MemoryMapHeuristics::isListHead(const Instance *i)
 {
     if(!i)
         return false;

@@ -206,13 +206,6 @@ public:
     bool isAccessible() const;
 
     /**
-     * Checks if this instance is of type 'struct list_head'.
-     * @return \c true if this object is of type 'struct list_head', \c false
-     * otherwise
-     */
-    bool isListHead() const;
-
-    /**
      * Compares this Instance with \a other on a value basis. Two instances
      * must have the same BaseType as returned by type() to potentially be
      * equal. In addition, their following contents is compared to determine
@@ -608,6 +601,11 @@ public:
      * @return the size of a pointer for this instance in bytes
      */
     int pointerSize() const;
+
+    /**
+      * Get the VirtualMemory object that is used by this instance
+      */
+    VirtualMemory* vmem() const;
 
 private:
     typedef QSet<quint64> VisitedSet;

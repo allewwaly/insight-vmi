@@ -101,7 +101,8 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     memorymapbuildersv.cpp \
     memorymapbuildercs.cpp \
     memorymapverifier.cpp \
-    memorymapnodesv.cpp
+    memorymapnodesv.cpp \
+    memorymapheuristics.cpp
 
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
@@ -162,7 +163,8 @@ HEADERS += kernelsourcetypeevaluator.h \
     memorymapbuildersv.h \
     memorymapbuildercs.h \
     memorymapverifier.h \
-    memorymapnodesv.h
+    memorymapnodesv.h \
+    memorymapheuristics.h
 
 # Things to do when the memory map builder and widget is to be built. Enabling
 # this feature requires InSight to run on an X server.

@@ -14,7 +14,7 @@ public:
      * @return \c true if this object is of type 'struct list_head', \c false
      * otherwise
      */
-    static bool isListHead(Instance *i);
+    static bool isListHead(const Instance *i);
 
     /**
      * Checks if the given pointer points to a valid address.
