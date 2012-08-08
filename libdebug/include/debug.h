@@ -79,11 +79,11 @@ extern const char* userMailingList;
 							<< " Assertion failed: " << #x << std::endl
 #	endif
 
-#	define debugerr(x) std::cerr << "(" << __FILE__ << ":" << __LINE__ << ") " \
+#	define debugerr(x) std::cerr << std::dec << "(" << __FILE__ << ":" << __LINE__ << ") " \
 								<< x << std::endl << std::flush
-#	define debugmsg(x) std::cout << "(" __FILE__ ":" << __LINE__ << ") " \
+#	define debugmsg(x) std::cout << std::dec << "(" __FILE__ ":" << __LINE__ << ") " \
 								<< x << std::endl << std::flush
-/*#	define debugmsg(x) std::cout << "(" << QTime::currentTime().toString("mm:ss.zzz").toStdString() << " " <<  __FILE__ << ":" << __LINE__ << ") " \
+/*#	define debugmsg(x) std::cout << std::dec << "(" << QTime::currentTime().toString("mm:ss.zzz").toStdString() << " " <<  __FILE__ << ":" << __LINE__ << ") " \
 								<< x << std::endl << std::flush*/
 #	define debugenter() debugmsg("entering " << __PRETTY_FUNCTION__)
 #	define debugleave() debugmsg("leaving  " << __PRETTY_FUNCTION__)
