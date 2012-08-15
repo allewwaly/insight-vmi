@@ -178,7 +178,7 @@
      #endif
 
 
-#ifdef	WIN32
+#if defined(WIN32) && defined(_MSC_VER)
 // Disable: Unreferenced parameter,                - Rules with parameters that are not used
 //          constant conditional,                  - ANTLR realizes that a prediction is always true (synpred usually)
 //          initialized but unused variable        - tree rewrite vairables declared but not needed
