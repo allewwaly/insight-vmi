@@ -90,6 +90,18 @@ ColorPalette::ColorPalette()
 }
 
 
+ColorMode ColorPalette::colorMode() const
+{
+    if (_allowColor) {
+        if (programOptions.activeOptions() & opColorDarkBg)
+            return cmDarkBg;
+        else if (programOptions.activeOptions() & opColorLightBg)
+            return cmLightBg;
+    }
+    return cmOff;
+}
+
+
 bool ColorPalette::allowColor() const
 {
     return _allowColor;
@@ -163,12 +175,14 @@ const char *ColorPalette::color(ColorType ct) const
 
     static const char* empty = "";
 
+    if ((ct < 0) || (ct >= COLOR_TYPE_SIZE))
+        return empty;
+
     // Which color mode is enabled?
-    if (_allowColor && (ct >= 0) && (ct < COLOR_TYPE_SIZE)) {
-        if (programOptions.activeOptions() & opColorDarkBg)
-            return colors_dark[ct];
-        else if (programOptions.activeOptions() & opColorLightBg)
-            return colors_light[ct];
+    switch (colorMode()) {
+    case cmDarkBg:  return colors_dark[ct];
+    case cmLightBg: return colors_light[ct];
+    default:        return empty;
     }
 
     return empty;
