@@ -5,7 +5,6 @@
 #include <QList>
 #include <QPair>
 
-
 enum ColorType {
     ctReset = 0,
     ctBold,
@@ -34,6 +33,12 @@ enum ColorType {
     COLOR_TYPE_SIZE
 };
 
+enum ColorMode {
+    cmOff,
+    cmDarkBg,
+    cmLightBg
+};
+
 typedef QPair<QString, const char*> NamePart;
 typedef QList<NamePart> NamePartList;
 
@@ -53,6 +58,12 @@ public:
      * Constructor
      */
     ColorPalette();
+
+    /**
+     * @return the current enabled color mode
+     * \sa ColorMode
+     */
+    ColorMode colorMode() const;
 
     /**
      * @return \c true of color mode is currently enabled, \c false otherwise
