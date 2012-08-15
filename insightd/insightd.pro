@@ -1,3 +1,5 @@
+TEMPLATE = app
+
 # Global configuration file
 include(../config.pri)
 
@@ -21,10 +23,6 @@ INSTALLS += target scripts tools
 CONFIG += console \
     debug_and_release
 
-# Enable high optimization
-QMAKE_CFLAGS_RELEASE += -O3
-QMAKE_CXXFLAGS_RELEASE += -O3
-
 QT += script \
     network
 QT -= webkit
@@ -35,10 +33,10 @@ LIBS += \
     -l$$DEBUG_LIB \
     -L../libinsight$$BUILD_DIR \
     -l$$INSIGHT_LIB \
-    -L../libantlr3c$$BUILD_DIR \
-    -l$$ANTLR_LIB \
     -L../libcparser$$BUILD_DIR \
-    -l$$CPARSER_LIB
+    -l$$CPARSER_LIB \
+    -L../libantlr3c$$BUILD_DIR \
+    -l$$ANTLR_LIB
 
 # Inter-project include paths
 INCLUDEPATH += ../libinsight/include \

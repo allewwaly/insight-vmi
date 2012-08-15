@@ -6,10 +6,8 @@ TARGET = cparser
 VERSION = 1.0.0
 CONFIG += debug_and_release \
     staticlib \
-    create_prl
-QMAKE_CFLAGS_DEBUG += -w
-QMAKE_CFLAGS_RELEASE += -O3 -w
-QMAKE_CXXFLAGS_RELEASE += -O3
+    create_prl \
+    warn_off
 QT += core
 QT -= gui webkit
 HEADERS += include/ast_interface.h \
@@ -48,7 +46,7 @@ SOURCES += src/astscopemanager.cpp \
 LIBS += -L../libantlr3c$$BUILD_DIR \
     -l$$ANTLR_LIB \
     -L../libdebug$$BUILD_DIR \
-    -ldebug
+    -l$$DEBUG_LIB
 INCLUDEPATH += ./antlr_generated \
     ./src \
     ./include \
