@@ -18,14 +18,22 @@ win32 {
     CONFIG(debug): BUILD_DIR = /debug
 }
 
+# Enable high optimization
+QMAKE_CFLAGS_RELEASE += -O3
+QMAKE_CXXFLAGS_RELEASE += -O3
+
 # Names of the libs
 INSIGHT_LIB = insight
 CPARSER_LIB = cparser
 ANTLR_LIB = antlr3c
 DEBUG_LIB = debug
 
+# Windows specific configuration
 win32 {
     # Dynamically linked libs have a version suffix
     INSIGHT_LIB = insight1
-    ANTLR_LIB = antlr3c3
+
+    # Avoid compiler warnings from MinGW
+    QMAKE_LFLAGS_DEBUG += --enable-auto-import
+    QMAKE_LFLAGS_RELEASE += --enable-auto-import
 }

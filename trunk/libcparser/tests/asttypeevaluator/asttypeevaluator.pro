@@ -15,12 +15,6 @@ INCLUDEPATH += ../../src \
 	../../antlr_generated \
 	../../../libantlr3c/include 
 
-BUILD_DIR =
-win32 {
-    BUILD_DIR = /release
-    CONFIG(debug): BUILD_DIR = /debug
-}
-
-LIBS += -L ../..$$BUILD_DIR -l$$CPARSER_LIB \
+LIBS += -L../..$$BUILD_DIR -l$$CPARSER_LIB \
         -L../../../libdebug$$BUILD_DIR -l$$DEBUG_LIB \
         -L../../../libantlr3c$$BUILD_DIR -l$$ANTLR_LIB

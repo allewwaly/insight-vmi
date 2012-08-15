@@ -72,7 +72,18 @@
 #include    <sys/stat.h>
 #include    <stdarg.h>
 
-#define	ANTLR3_API  __declspec(dllexport)
+
+/*
+#ifndef __GNUC__
+# define ANTLR3_API __declspec(dllimport)
+#else
+# define ANTLR3_API __attribute__((dllimport)) extern
+#endif
+*/
+
+/* chrschn: No need for dllimport, we link this lib statically */
+#define ANTLR3_API extern
+
 #define	ANTLR3_CDECL __cdecl
 #define ANTLR3_FASTCALL __fastcall
 

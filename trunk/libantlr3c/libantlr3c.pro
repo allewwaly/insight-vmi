@@ -4,12 +4,11 @@ include(../config.pri)
 TEMPLATE = lib
 TARGET = antlr3c
 VERSION = 3.0.1
-CONFIG += debug_and_release create_prl warn_off
-# Building currently fails with static ANTLR lib on Windows
-!win32:CONFIG += staticlib
+CONFIG += debug_and_release \
+    create_prl \
+    warn_off \
+    staticlib
 
-QMAKE_CFLAGS_RELEASE += -O3
-QMAKE_CXXFLAGS_RELEASE += -O3
 QT -= core gui webkit
 SOURCES = src/antlr3baserecognizer.c \
     src/antlr3basetree.c \
