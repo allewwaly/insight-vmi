@@ -1,3 +1,6 @@
+# Global configuration file
+include(../../../config.pri)
+
 TEMPLATE = app
 TARGET = memoryrangetreetester
 HEADERS = memoryrangetreetester.h ../../memoryrangetree.h
@@ -8,4 +11,4 @@ QT -= webkit
 CONFIG += qtestlib debug_and_release
 
 INCLUDEPATH +=  ../../../libdebug/include
-LIBS += -L../../../libdebug -ldebug
+LIBS += -L../../../libdebug$$BUILD_DIR -l$$DEBUG_LIB

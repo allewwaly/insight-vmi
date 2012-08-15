@@ -1,7 +1,13 @@
+# Global configuration file
+include(../config.pri)
+
 TEMPLATE = lib
 TARGET = antlr3c
 VERSION = 3.0.1
-CONFIG += debug_and_release staticlib create_prl warn_off
+CONFIG += debug_and_release create_prl warn_off
+# Building currently fails with static ANTLR lib on Windows
+!win32:CONFIG += staticlib
+
 QMAKE_CFLAGS_RELEASE += -O3
 QMAKE_CXXFLAGS_RELEASE += -O3
 QT -= core gui webkit

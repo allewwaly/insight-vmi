@@ -1,3 +1,6 @@
+# Global configuration file
+include(../config.pri)
+
 TEMPLATE = lib
 TARGET = insight
 

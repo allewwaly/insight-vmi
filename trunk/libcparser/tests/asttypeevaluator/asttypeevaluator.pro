@@ -1,3 +1,6 @@
+# Global configuration file
+include(../../../config.pri)
+
 TEMPLATE = app
 TARGET = asttypeevaluator
 QT += core \
@@ -11,6 +14,13 @@ INCLUDEPATH += ../../src \
 	../../../libdebug/include \
 	../../antlr_generated \
 	../../../libantlr3c/include 
-LIBS += -L ../.. -lcparser \
-	-L../../../libdebug -ldebug \
-	-L../../../libantlr3c -lantlr3c
+
+BUILD_DIR =
+win32 {
+    BUILD_DIR = /release
+    CONFIG(debug): BUILD_DIR = /debug
+}
+
+LIBS += -L ../..$$BUILD_DIR -l$$CPARSER_LIB \
+        -L../../../libdebug$$BUILD_DIR -l$$DEBUG_LIB \
+        -L../../../libantlr3c$$BUILD_DIR -l$$ANTLR_LIB
