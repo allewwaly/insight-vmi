@@ -145,15 +145,15 @@ public:
     virtual uint hash(bool* isValid = 0) const
     {
         if (!NumericBaseType<T, realType>::_hashValid) {
-            BaseType::_hash =
+            NumericBaseType<T, realType>::_hash =
                     NumericBaseType<T, realType>::hash(0) ^
                     _bitSize ^
                     rotl32(_bitOffset, 16);
-            BaseType::_hashValid = true;
+            NumericBaseType<T, realType>::_hashValid = true;
         }
         if (isValid)
-            *isValid = BaseType::_hashValid;
-        return BaseType::_hash;
+            *isValid = NumericBaseType<T, realType>::_hashValid;
+        return NumericBaseType<T, realType>::_hash;
     }
 
     /**
