@@ -680,8 +680,8 @@ bool MemoryMap::addressIsWellFormed(quint64 address) const
 
    // Check for invalid addresses
    if(address == 0 ||
-      address == 0xffffffff ||
-        address == 0xffffffffffffffff ||
+      address == 0xffffffffULL ||
+        address == 0xffffffffffffffffULL ||
         (address & 0x3) != 0)
        return false;
 
