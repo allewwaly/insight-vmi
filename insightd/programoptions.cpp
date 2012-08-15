@@ -242,9 +242,11 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
     if (_activeOptions & opForeground)
         _activeOptions |= opDaemonize;
 
+#ifndef _WIN32
     // Enable color output for dark terminals per default on interactive shells
     if (!colorForced)
         _activeOptions |= opColorDarkBg;
+#endif
 
     return true;
 }
