@@ -1,15 +1,18 @@
 
 #include "shell.h"
-#include <readline/readline.h>
-#include <readline/history.h>
 #include <QDir>
 #include <QLocalSocket>
 #include <insight/constdefs.h>
 #include <debug.h>
 
+#ifdef CONFIG_READLINE
+#   include <readline/readline.h>
+#   include <readline/history.h>
+#endif
 
 void Shell::prepareReadline()
 {
+#ifdef CONFIG_READLINE
     // Enable readline history
     using_history();
 
@@ -21,11 +24,13 @@ void Shell::prepareReadline()
             debugerr("Error #" << ret << " occured when trying to read the "
                      "history data from \"" << histFile << "\"");
     }
+#endif
 }
 
 
 void Shell::saveShellHistory()
 {
+#ifdef CONFIG_READLINE
     // Save the history for the next launch
     QString histFile = QDir::home().absoluteFilePath(mt_history_file);
     QByteArray ba = histFile.toLocal8Bit();
@@ -33,19 +38,24 @@ void Shell::saveShellHistory()
     if (ret)
         debugerr("Error #" << ret << " occured when trying to save the "
                  "history data to \"" << histFile << "\"");
+#endif
 }
 
 
 QString Shell::readLine(const QString& prompt)
 {
     QString ret;
-    QString p = prompt.isEmpty() ?
-                // Wrap color codes in \001...\002 so readline ignores them
-                // when calculating the line length
-                QString("\001%1\002>>>\001%2\002 ")
+    QString p = prompt;
+    if (p.isEmpty()) {
+        if (_color.colorMode() == cmOff)
+            p = ">>> ";
+        else
+            // Wrap color codes in \001...\002 so readline ignores them
+            // when calculating the line length
+            p = QString("\001%1\002>>>\001%2\002 ")
                     .arg(color(ctPrompt))
-                    .arg(color(ctReset)) :
-                prompt;
+                    .arg(color(ctReset));
+    }
 
     // Read input from stdin or from socket?
     if (_listenOnSocket) {
@@ -61,6 +71,7 @@ QString Shell::readLine(const QString& prompt)
         }
     }
     else {
+#ifdef CONFIG_READLINE
         // Read input from stdin
         char* line = readline(p.toLocal8Bit().constData());
 
@@ -76,6 +87,12 @@ QString Shell::readLine(const QString& prompt)
 
         ret = QString::fromLocal8Bit(line, strlen(line)).trimmed();
         free(line);
+#else
+        // Print prompt in interactive mode
+        if (_interactive)
+            _out << p << flush;
+        ret = _stdin.readLine().trimmed();
+#endif
     }
 
     return ret;
