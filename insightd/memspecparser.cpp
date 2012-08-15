@@ -13,6 +13,7 @@
 #include <QFile>
 #include <QProcess>
 #include <QRegExp>
+#include <QDateTime>
 #include <debug.h>
 
 #define MEMSPEC_C_BODY "%MEMSPEC_BODY%"
@@ -209,12 +210,16 @@ void MemSpecParser::writeSrcFile(const QString& fileName, const QString& src)
 
 void MemSpecParser::setupBuildDir()
 {
-    char buf[] = "/tmp/insight.XXXXXX";
-    if (!mkdtemp(buf)) {
-        int e = errno;
-        memSpecParserError(QString("Error creating temporary directory: %1").arg(strerror(e)));
-    }
-    _buildDir = QString(buf);
+    QDir tmp = QDir::temp();
+    QString tmpDir;
+    uint ctr = QDateTime::currentDateTime().toTime_t();
+    do {
+        tmpDir = QString("insight.%1").arg(ctr++, 0, 16);
+    } while (tmp.exists(tmpDir));
+
+    if (!tmp.mkdir(tmpDir))
+        memSpecParserError(QString("Error creating temporary directory: %1").arg(tmpDir));
+    _buildDir = tmp.absoluteFilePath(tmpDir);
 
     // Prepare the source files
     QString ms_body, pm_enum, pm_struct, pm_body;
