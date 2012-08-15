@@ -117,6 +117,8 @@ void log_message(const QString& msg)
         << " " << msg << std::endl;
 }
 
+// Daemon mode only supported on Unix systems
+#ifndef _WIN32
 
 /**
  * Signal handler for the Linux signals sent to daemon process, for more
@@ -275,6 +277,8 @@ void init_daemon()
     }
 }
 
+#endif /* _WIN32 */
+
 
 /**
  * Entry point function that sets up the environment, parses the command line
@@ -295,12 +299,18 @@ int main(int argc, char* argv[])
     bool daemonize = (programOptions.activeOptions() & opDaemonize);
 
 	try {
-	    init_signals();
+#ifndef _WIN32
+        init_signals();
+#endif
 
 		if (daemonize) {
+#ifdef _WIN32
+            log_message("Daemon mode not supported for Windows.");
+#else
 			init_daemon();
 		    // Start a new logging session
 			log_message(QString("InSight started with PID %1.").arg(getpid()));
+#endif
 		}
 
 		// Delay creation of QApplication until AFTER possible fork()!
