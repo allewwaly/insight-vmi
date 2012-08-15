@@ -1,3 +1,6 @@
+# Global configuration file
+include(../config.pri)
+
 TEMPLATE = lib
 TARGET = cparser
 VERSION = 1.0.0
@@ -42,9 +45,9 @@ SOURCES += src/astscopemanager.cpp \
     antlr_generated/CLexer.c \
     antlr_generated/CParser.c \
     src/astsourceprinter.cpp
-LIBS += -L../libantlr3c \
-    -lantlr3c \
-    -L../libdebug \
+LIBS += -L../libantlr3c$$BUILD_DIR \
+    -l$$ANTLR_LIB \
+    -L../libdebug$$BUILD_DIR \
     -ldebug
 INCLUDEPATH += ./antlr_generated \
     ./src \

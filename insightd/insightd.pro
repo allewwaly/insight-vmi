@@ -1,5 +1,5 @@
-# Set PREFIX, if not set
-isEmpty(PREFIX):PREFIX = /usr/local
+# Global configuration file
+include(../config.pri)
 
 # Path for target
 target.path += $$PREFIX/bin
@@ -18,9 +18,6 @@ tools.files = ../tools/gcc_pp \
 # What to install
 INSTALLS += target scripts tools
 
-# Should the memory_map feature be built? Disabled by default.
-CONFIG += memory_map
-
 CONFIG += console \
     debug_and_release
 
@@ -33,15 +30,15 @@ QT += script \
 QT -= webkit
 
 # Required libraries for building
-LIBS += -lreadline \
-    -L../libdebug \
-    -ldebug \
-    -L../libinsight \
-    -linsight \
-    -L../libantlr3c \
-    -lantlr3c \
-    -L../libcparser \
-    -lcparser
+LIBS += \
+    -L../libdebug$$BUILD_DIR \
+    -l$$DEBUG_LIB \
+    -L../libinsight$$BUILD_DIR \
+    -l$$INSIGHT_LIB \
+    -L../libantlr3c$$BUILD_DIR \
+    -l$$ANTLR_LIB \
+    -L../libcparser$$BUILD_DIR \
+    -l$$CPARSER_LIB
 
 # Inter-project include paths
 INCLUDEPATH += ../libinsight/include \
@@ -169,7 +166,7 @@ HEADERS += kernelsourcetypeevaluator.h \
 # Things to do when the memory map builder and widget is to be built. Enabling
 # this feature requires InSight to run on an X server.
 CONFIG(memory_map) {
-    warning(Enabled compilation of the memory_map features. The resulting binary will must be run on an X windows system!)
+    unix:warning(Enabled compilation of the memory_map features. The resulting binary will must be run on an X windows system!)
 
     DEFINES += CONFIG_MEMORY_MAP
     QT += gui
@@ -197,3 +194,8 @@ CONFIG(memory_map) {
     QT -= gui
 }
 
+# Enable or disable libreadline support
+CONFIG(with_readline) {
+    DEFINES += CONFIG_READLINE
+    LIBS += -lreadline
+}
