@@ -17,10 +17,9 @@
 #include <bugreport.h>
 #include <QStringList>
 #include <unistd.h>
-#include <sys/wait.h>
 #include <astsourceprinter.h>
 #include <bitop.h>
-
+#include <QProcess>
 
 #define checkNodeType(node, expected_type) \
     if ((node)->type != (expected_type)) { \
@@ -4423,40 +4422,33 @@ void ASTTypeEvaluator::genDotGraphForNode(const ASTNode *node) const
 
     debugmsg("Created file " << dotFile);
 
-    int ret = 0;
-
     // Invoke dot if no more than 1k nodes
     if (nodes > 0 && nodes < 1000) {
         QString pngFile = dotFile.split('.').first() + ".png";
 
         debugmsg("Generating graph image");
-        pid_t pid = fork();
-        if (!pid) {
-            QString o = "-o" + pngFile;
-            const char* dot = "/usr/bin/dot";
-            ret = execlp(dot, dot, "-Tpng", o.toAscii().constData(), dotFile.toAscii().constData(), NULL);
-            exit(ret);
-        }
-        else {
-            waitpid(pid, &ret, 0);
-            if (!WIFEXITED(ret) || WEXITSTATUS(ret)) {
-                debugerr("Running dot failed, error code is " << WEXITSTATUS(ret) << ".");
-            }
+        QProcess proc;
+        QString cmd("/usr/bin/dot");
+        QStringList args;
+        args << "-o" + pngFile << dotFile;
+
+        proc.start(cmd, args);
+        proc.waitForFinished(-1);
+        if (proc.exitStatus() != QProcess::NormalExit || proc.exitCode() != 0) {
+            debugerr("Running " << cmd << "failed, error code is " << proc.exitCode() << ".");
+            return;
         }
 
         debugmsg("Launching image viewer");
-        pid = fork();
-        if (!pid) {
-            const char* gv = "/usr/bin/gwenview";
-            ret = execlp(gv, gv, pngFile.toAscii().constData(), NULL);
-            exit(ret);
-        }
-        else {
-            waitpid(pid, &ret, 0);
-            if (!WIFEXITED(ret) || WEXITSTATUS(ret)) {
-                debugerr("Running gwenview, error code is " << WEXITSTATUS(ret) << ".");
-            }
-        }
+        proc.reset();
+        args.clear();
+        cmd = "/usr/bin/gwenview";
+        args << pngFile;
+
+        proc.start(cmd, args);
+        proc.waitForFinished(-1);
+        if (proc.exitStatus() != QProcess::NormalExit || proc.exitCode() != 0)
+            debugerr("Running " << cmd << "failed, error code is " << proc.exitCode() << ".");
     }
 }
 
