@@ -14,8 +14,8 @@ bool MemoryMapHeuristics::validPointerAddress(Instance *p)
     quint64 targetAdr = (quint64)p->toPointer();
 
     // Is the pointer null or -1?
-    if(targetAdr == 0 || targetAdr == 0xffffffff ||
-            targetAdr == 0xffffffffffffffff)
+    if(targetAdr == 0 || targetAdr == 0xffffffffULL ||
+            targetAdr == 0xffffffffffffffffULL)
         return false;
 
     // Is the pointer 4byte aligned?
@@ -59,8 +59,8 @@ bool MemoryMapHeuristics::validListHead(Instance *i)
 
     // Check for possible default values.
     // We allow that a pointer can be 0, -1, or next == prev
-    if(nextAdr == 0 || nextAdr == 0xffffffff ||
-            nextAdr == 0xffffffffffffffff ||
+    if(nextAdr == 0 || nextAdr == 0xffffffffULL ||
+            nextAdr == 0xffffffffffffffffULL ||
             nextAdr == prevAdr)
         return true;
 
@@ -91,8 +91,8 @@ bool MemoryMapHeuristics::validCandidateBasedOnListHead(Instance *listHead, Inst
     // If this list head points to itself, or is 0/-1 we do not need
     // to consider it anymore.
     if(memberNext == listHead->member(0, 0, -1, true).address() ||
-            memberNext == 0 || memberNext == 0xffffffff ||
-            memberNext == 0xffffffffffffffff)
+            memberNext == 0 || memberNext == 0xffffffffULL ||
+            memberNext == 0xffffffffffffffffULL)
         return false;
 
     // Get the offset of the list_head struct within the candidate type
