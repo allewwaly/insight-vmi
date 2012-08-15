@@ -10,7 +10,9 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <unistd.h>
+#ifndef _WIN32
 #include <sys/ioctl.h>
+#endif
 #include <insight/constdefs.h>
 #include <insight/devicemuxer.h>
 #include <insight/insight.h>
@@ -534,7 +536,6 @@ void Shell::run()
 {
     _lastStatus = 0;
     _finished = false;
-    QString line, cmd;
 
     // Handle the command line params
     for (int i = 0; i < programOptions.memFileNames().size(); ++i) {
@@ -881,12 +882,17 @@ int Shell::cmdColor(QStringList args)
 {
     // Show cmdHelp, of an invalid number of arguments is given
     if (args.isEmpty()) {
-        if (programOptions.activeOptions() & opColorDarkBg)
-            _out << "Color palette: dark background" << endl;
-        else if (programOptions.activeOptions() & opColorLightBg)
-            _out << "Color palette: light background" << endl;
-        else
+        switch (_color.colorMode()) {
+        case cmDarkBg:
+             _out << "Color palette: dark background" << endl;
+             break;
+        case cmLightBg:
+             _out << "Color palette: light background" << endl;
+             break;
+        default:
             _out << "Color output disabled." << endl;
+            break;
+        }
         return ecOk;
     }
 
@@ -1823,11 +1829,15 @@ QString Shell::prettyNameInColor(const BaseType *t, int minLen, int maxLen) cons
 
 QSize Shell::termSize() const
 {
+#ifdef _WIN32
+    return QSize(80, 24);
+#else
     struct winsize w;
     int ret = ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     int r = (ret != -1 && w.ws_row > 0) ? w.ws_row : 24;
     int c = (ret != -1 && w.ws_col > 0) ? w.ws_col : 80;
     return QSize(c, r);
+#endif
 }
 
 
