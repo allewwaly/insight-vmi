@@ -71,11 +71,11 @@ KernelSourceParser::~KernelSourceParser()
 void KernelSourceParser::operationProgress()
 {
     QMutexLocker lock(&_progressMutex);
-    int percent = (_filesIndex / (float) _factory->sources().size()) * 100;
+    int percent = (_filesIndex / (float) _fileNames.size()) * 100;
     QString fileName = _currentFile;
     QString s = QString("\rParsing file %1/%2 (%3%), %4 elapsed%6: %5")
             .arg(_filesIndex)
-            .arg(_factory->sources().size())
+            .arg(_fileNames.size())
             .arg(percent)
             .arg(elapsedTime())
             .arg(fileName);
