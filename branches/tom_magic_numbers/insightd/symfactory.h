@@ -412,6 +412,8 @@ public:
 	 */
 	quint32 changeClock() const;
 
+    QList<StructuredMember*> seenMagicNumbers;
+
 protected:
 	void typeAlternateUsageStructMember(const TypeEvalDetails *ed,
 										const BaseType *targetBaseType,

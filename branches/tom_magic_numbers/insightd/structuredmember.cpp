@@ -13,14 +13,20 @@
 #include <debug.h>
 
 StructuredMember::StructuredMember(SymFactory* factory)
-	: Symbol(factory), _offset(0), _belongsTo(0)
+	: Symbol(factory), _offset(0), _belongsTo(0), 
+      _seenInEvaluateMagicNumber(false), 
+      _hasConstIntValue(false), _hasConstStringValue(false),
+      _hasStringValue(false)
 {
 }
 
 
 StructuredMember::StructuredMember(SymFactory* factory, const TypeInfo& info)
 	: Symbol(factory, info), ReferencingType(info), SourceRef(info),
-	  _offset(info.dataMemberLocation()), _belongsTo(0)
+	  _offset(info.dataMemberLocation()), _belongsTo(0),
+      _seenInEvaluateMagicNumber(false),
+      _hasConstIntValue(false), _hasConstStringValue(false),
+      _hasStringValue(false)
 {
     // This happens for members of unions
     if (info.dataMemberLocation() < 0)
@@ -104,3 +110,62 @@ KernelSymbolStream& operator<<(KernelSymbolStream& out,
     return out;
 }
 
+bool StructuredMember::evaluateMagicNumberFoundNotConstant()
+{
+    bool seen = _seenInEvaluateMagicNumber;
+    _hasConstIntValue = false;
+    _constIntValue.clear();
+    _hasStringValue = false;
+    _hasConstStringValue = false;
+    _constStringValue.clear();
+    _seenInEvaluateMagicNumber = true;
+    return seen;
+}
+    
+bool StructuredMember::evaluateMagicNumberFoundInt(qint64 constant)
+{
+    bool seen = _seenInEvaluateMagicNumber;
+    if (_seenInEvaluateMagicNumber)
+    {
+        if (_hasConstStringValue)
+        {
+            this->evaluateMagicNumberFoundNotConstant();
+        }
+        else if (_hasConstIntValue && !_constIntValue.contains(constant))
+        {
+            _constIntValue.append(constant);
+        }
+    }
+    else
+    {
+        _constIntValue.append(constant);
+        _hasConstIntValue = true;
+    }
+    _seenInEvaluateMagicNumber = true;
+    return seen;
+}
+    
+bool StructuredMember::evaluateMagicNumberFoundString(QString constant)
+{
+    bool seen = _seenInEvaluateMagicNumber;
+    _hasStringValue = true;
+    if (_seenInEvaluateMagicNumber)
+    {
+        if (_hasConstIntValue)
+        {
+            this->evaluateMagicNumberFoundNotConstant();
+        }
+        else if (_hasConstStringValue && !_constStringValue.contains(constant))
+        {
+            _constStringValue.append(constant);
+        }
+        
+    }
+    else
+    {
+        _constStringValue.append(constant);
+        _hasConstStringValue = true; 
+    }
+    _seenInEvaluateMagicNumber = true;
+    return seen;
+}
