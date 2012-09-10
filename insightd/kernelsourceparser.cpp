@@ -165,6 +165,40 @@ void KernelSourceParser::parse()
 
     _factory->sourceParcingFinished();
 
+    QString buffer;
+    qint32 counter = 0;
+    for (QList<StructuredMember*>::iterator i = _factory->seenMagicNumbers.begin(); 
+            i != _factory->seenMagicNumbers.end(); ++i)
+    {
+        if ((*i)->hasConstantIntValue())
+        {
+            counter++;
+            QList<qint64> constInt = (*i)->getConstantIntValue();
+            for (QList<qint64>::iterator j = constInt.begin();
+                                j != constInt.end(); ++j)
+                buffer.append(QString("Found Constant int %1.%2 = %3\n")
+                        .arg((*i)->belongsTo()->name())
+                        .arg((*i)->prettyName())
+                        .arg((*j))
+                        );
+        }
+        else if ((*i)->hasConstantStringValue())
+        {
+            counter++;
+            QList<QString> constString = (*i)->getConstantStringValue();
+            for (QList<QString>::iterator j = constString.begin();
+                                j != constString.end(); ++j)
+                buffer.append(QString("Found Constant string %1.%2 = %3\n")
+                        .arg((*i)->belongsTo()->name())
+                        .arg((*i)->prettyName())
+                        .arg((*j))
+                        );
+        }
+    }
+    buffer.append(QString("Found %1 constants\n").arg(counter));
+    debugmsg(buffer);
+
+
     // In case there were errors, show the user some information
     if (BugReport::log()) {
         if (BugReport::log()->entries()) {
