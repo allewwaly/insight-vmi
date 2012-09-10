@@ -1,0 +1,15 @@
+--- mm/slub.c.orig	2009-12-03 04:51:21.000000000 +0100
++++ mm/slub.c	2012-05-02 00:07:33.000000000 +0200
+@@ -802,10 +802,10 @@
+ 			object, page->inuse,
+ 			page->freelist);
+ 
+-		if (!alloc)
++/*		if (!alloc)
+ 			print_section("Object", (void *)object, s->objsize);
+ 
+-		dump_stack();
++		dump_stack();*/
+ 	}
+ }
+ 

@@ -1,0 +1,17 @@
+Makefile*
+
+debug/
+release/
+
+libinsight.so*
+
+cscope.files
+cscope.out
+tags
+*.swp
+screenrc
+.vimrc
+
+
+
+temp

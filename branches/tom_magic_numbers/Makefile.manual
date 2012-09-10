@@ -1,0 +1,51 @@
+SOURCEDIR ?= .
+DESTDIR ?= .
+PREFIX ?= /usr
+
+SUBDIRS = libdebug libantlr3c libcparser libinsight insightd insight
+
+# Where to put binary on 'make install'?
+BIN     = $(DESTDIR)$(PREFIX)/bin
+LIB     = $(DESTDIR)$(PREFIX)/lib
+INCLUDE = $(DESTDIR)$(PREFIX)/include
+SHARE   = $(DESTDIR)$(PREFIX)/share
+
+all: build
+
+clean:
+	@make clean
+	
+distclean:
+	@make distclean
+
+makefiles: insight-vmi.pro
+	@qmake -makefile -recursive
+
+debug: makefiles
+	@make debug
+
+build: makefiles
+	@make release
+
+install: build
+	@##create install directory
+	@install -v -d $(DESTDIR)
+	@## libinsight
+	@install -v -Dp libinsight/libinsight.so.1.0.0 $(LIB)/libinsight.so.1.0.0
+	@ln -sv ./libinsight.so.1.0.0   $(LIB)/libinsight.so
+	@ln -sv ./libinsight.so.1.0.0   $(LIB)/libinsight.so.1
+	@ln -sv ./libinsight.so.1.0.0   $(LIB)/libinsight.so.1.0
+	@install -v -d $(INCLUDE)/insight
+	@install -v -Dp libinsight/include/insight/*.h     $(INCLUDE)/insight
+	@##insightd
+	@install -v -Dp insightd/insightd  $(BIN)/insightd
+	@install -v -d $(SHARE)/insight/examples
+	@install -v -Dp insightd/scripts/*.js   	$(SHARE)/insight/examples
+	@install -v -d $(SHARE)/insight/tools
+	@install -v -Dp tools/{gcc_pp,make-debug-kpkg,{,u}mount-img} $(SHARE)/insight/tools
+	@##insight
+	@install -v -Dp insight/insight    $(BIN)/insight
+
+documentation:
+	@for dir in $(SUBDIRS) ; do cd $$dir ; test -f Doxyfile && doxygen ; cd $(PWD) ; done
+	
