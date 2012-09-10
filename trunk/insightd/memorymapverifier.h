@@ -30,6 +30,7 @@ public:
     MemoryMapNodeWatcher(MemoryMapNodeSV *node, MemoryMapVerifier &verifier,
                          bool forcesHalt = false);
 
+    virtual ~MemoryMapNodeWatcher();
     /**
      * Returns whether the watcher node will halt the memory map generation in
      * case its condition is not met.
@@ -173,6 +174,8 @@ private:
     quint64 _validObjects;
     quint64 _invalidObjects;
     quint64 _maybeValidObjects;
+
+    QMutex verifierMutex;
 };
 
 #endif // MEMORYMAPVERIFIER_H
