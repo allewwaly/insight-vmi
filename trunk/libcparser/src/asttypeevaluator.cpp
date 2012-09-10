@@ -2544,7 +2544,7 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
                 evaluateIdentifierPointsTo(node);
             else if (_phase == epPointsToRev)
                 evaluateIdentifierPointsToRev(node);
-            else
+            else if (_phase == epUsedAs)
                 evaluateIdentifierUsedAs(node);
             break;
 
