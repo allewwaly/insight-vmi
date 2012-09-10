@@ -22,6 +22,8 @@ MemoryMapNodeWatcher::MemoryMapNodeWatcher(MemoryMapNodeSV *node,
 {
 
 }
+    
+MemoryMapNodeWatcher::~MemoryMapNodeWatcher(){};
 
 bool MemoryMapNodeWatcher::getForceHalt() const
 {
@@ -122,7 +124,8 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map) :
     _slubFile(),
     _slubDataParsed(false),
     _slubDataAvailable(false),
-    _slub(map->symfactory(), map->vmem())
+    _slub(map->symfactory(), map->vmem()),
+    verifierMutex(QMutex::Recursive)
 {
 }
 
@@ -133,7 +136,8 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map, const char *slubFile) :
     _slubFile(slubFile),
     _slubDataParsed(false),
     _slubDataAvailable(true),
-    _slub(map->symfactory(), map->vmem())
+    _slub(map->symfactory(), map->vmem()),
+    verifierMutex(QMutex::Recursive)
 {
 }
 
@@ -144,6 +148,7 @@ bool MemoryMapVerifier::lastVerification() const
 
 void MemoryMapVerifier::resetWatchNodes()
 {
+    QMutexLocker(&this->verifierMutex);
     for(int i = 0; i < _watchNodes.size(); ++i) {
         delete _watchNodes.at(i);
     }
@@ -153,6 +158,7 @@ void MemoryMapVerifier::resetWatchNodes()
 
 bool MemoryMapVerifier::parseSlubData(const char *slubFile)
 {
+    QMutexLocker(&this->verifierMutex);
     if(_slubDataAvailable || slubFile) {
         try {
             if(slubFile)
@@ -180,6 +186,7 @@ bool MemoryMapVerifier::parseSlubData(const char *slubFile)
 
 void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
 {    
+    QMutexLocker(&this->verifierMutex);
     MemoryMapNodeSV *cur =  dynamic_cast<MemoryMapNodeSV*>(currentNode);
 
     // Add an memory map interval watcher node to the init_task
@@ -214,6 +221,7 @@ void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
 
 bool MemoryMapVerifier::performChecks(MemoryMapNode *n)
 {
+    QMutexLocker(&this->verifierMutex);
     if(!_slubDataAvailable)
         return false;
 
@@ -290,6 +298,7 @@ bool MemoryMapVerifier::performChecks(MemoryMapNode *n)
 
 MemoryMapNode * MemoryMapVerifier::leastCommonAncestor(MemoryMapNode *aa, MemoryMapNode *bb)
 {
+    QMutexLocker(&this->verifierMutex);
     MemoryMapNodeSV* a = dynamic_cast<MemoryMapNodeSV*>(aa);
     MemoryMapNodeSV* b = dynamic_cast<MemoryMapNodeSV*>(bb);
     if (!a || !b)
@@ -341,6 +350,7 @@ MemoryMapNode * MemoryMapVerifier::leastCommonAncestor(MemoryMapNode *aa, Memory
 
 void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
 {
+    QMutexLocker(&this->verifierMutex);
     Instance i = node->toInstance();
     SlubObjects::ObjectValidity v = _slub.objectValid(&i);
 
@@ -371,6 +381,7 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
 
 void MemoryMapVerifier::statisticsHelper(MemoryMapNode *node)
 {
+    QMutexLocker(&this->verifierMutex);
     QList<MemoryMapNode *> children = node->children();
 
     statisticsCountNode(node);
@@ -382,6 +393,7 @@ void MemoryMapVerifier::statisticsHelper(MemoryMapNode *node)
 
 void MemoryMapVerifier::statistics()
 {
+    QMutexLocker(&this->verifierMutex);
     // We can only created statistics if we have access to slub information
     if(!_slubDataAvailable)
         return;
