@@ -126,7 +126,7 @@ bool ASTTypeEvaluator::evaluateTypes()
 	if (_stopWalking)
 		return false;
 
-	// Phase 4: used-as analsis
+	// Phase 4: used-as analysis
 	_phase = epUsedAs;
 	walkTree();
 	
