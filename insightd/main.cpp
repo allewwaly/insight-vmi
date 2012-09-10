@@ -314,7 +314,7 @@ int main(int argc, char* argv[])
 		}
 
 		// Delay creation of QApplication until AFTER possible fork()!
-#ifdef CONFIG_MEMORY_MAP
+#ifdef CONFIG_WITH_X_SUPPORT
 		QApplication app(argc, argv);
 
 		if (!daemonize) {
