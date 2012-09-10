@@ -129,6 +129,13 @@ bool ASTTypeEvaluator::evaluateTypes()
 	// Phase 4: used-as analsis
 	_phase = epUsedAs;
 	walkTree();
+	
+    if (_stopWalking)
+		return false;
+
+	// Phase 5: magic number analysis
+	_phase = epMagicNumbers;
+	walkTree();
 	return !_stopWalking;
 }
 
@@ -2548,6 +2555,11 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
                 evaluateIdentifierUsedAs(node);
             break;
 
+        case nt_assignment_expression:
+            if (_phase == epMagicNumbers)
+                evaluateMagicNumbers(node);
+            break;
+        
         default:
             break;
         }
@@ -2571,6 +2583,11 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
     }
 }
 
+void ASTTypeEvaluator::evaluateMagicNumbers(const ASTNode * /*node*/)
+{
+    // The default implementation does nothing.
+    return;
+}
 
 void ASTTypeEvaluator::reportErr(const GenericException& e, const ASTNode* node,
                                  const TypeEvalDetails* ed) const

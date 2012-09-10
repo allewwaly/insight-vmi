@@ -216,6 +216,7 @@ public:
     RealType realTypeOfConstFloat(const ASTNode* node, double* value = 0) const;
     RealType realTypeOfConstInt(const ASTNode* node, quint64* value = 0) const;
     virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
+    virtual void evaluateMagicNumbers(const ASTNode *node);
 
     /**
      * @return a string with details about the given type change.
@@ -228,10 +229,11 @@ public:
 
 protected:
     enum EvalPhase {
-        epFindSymbols = (1 << 0),
-        epPointsTo    = (1 << 1),
-        epPointsToRev = (1 << 2),
-        epUsedAs      = (1 << 3)
+        epFindSymbols  = (1 << 0),
+        epPointsTo     = (1 << 1),
+        epPointsToRev  = (1 << 2),
+        epUsedAs       = (1 << 3),
+        epMagicNumbers = (1 << 4)
     };
 
     enum EvalResult {
