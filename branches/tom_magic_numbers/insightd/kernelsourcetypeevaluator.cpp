@@ -196,7 +196,6 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
 #ifdef DEBUGMAGICNUMBERS
             string.append(QString("\nCurrent Node: %1 \n")
                     .arg(printer.toString(localNode, false).trimmed()));
-            if (printer.toString(localNode, false).contains("boot_params")) debugmsg(string);
 #endif /* DEBUGMAGICNUMBERS */
                 if (localNode->u.lvalue.unary_expression)
                 {
