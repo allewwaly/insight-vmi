@@ -3141,6 +3141,8 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
             }
 
             const ASTSymbol* funcSym = embeddingFuncSymbol(es->root);
+            // funcSym could be null here so return (although that triggers an assert)
+            if(!funcSym) return assignments;
             // Do not insert links for recursive expressions, we cannot
             // resolve them anyway.
             if (_symbolsBelowNode[assigned].contains(funcSym))
