@@ -320,16 +320,28 @@ int InstancePrototype::MemberCandidatesCount(int index) const
 Instance InstancePrototype::MemberCandidate(int mbrIndex, int cndtIndex) const
 {
 	Instance* inst;
-	return ((inst = thisInstance())) ?
-				inst->memberCandidate(mbrIndex, cndtIndex) : Instance();
+	try {
+		return ((inst = thisInstance())) ?
+					inst->memberCandidate(mbrIndex, cndtIndex) : Instance();
+	}
+	catch (GenericException& e) {
+		injectScriptError(e);
+	}
+	return Instance();
 }
 
 
 Instance InstancePrototype::MemberCandidate(const QString &name, int cndtIndex) const
 {
 	Instance* inst;
-	return ((inst = thisInstance())) ?
-				inst->memberCandidate(name, cndtIndex) : Instance();
+	try {
+		return ((inst = thisInstance())) ?
+					inst->memberCandidate(name, cndtIndex) : Instance();
+	}
+	catch (GenericException& e) {
+		injectScriptError(e);
+	}
+	return Instance();
 }
 
 
@@ -383,8 +395,8 @@ void InstancePrototype::ChangeType(const QString& typeName)
     const BaseType* t = shell->symbols().factory().findBaseTypeByName(typeName);
     if (t)
         inst->setType(t);
-    else if (context())
-        context()->throwError(QString("Type not found: \"%1\"").arg(typeName));
+    else
+        injectScriptError(QString("Type not found: \"%1\"").arg(typeName));
 }
 
 
@@ -396,8 +408,8 @@ void InstancePrototype::ChangeType(int typeId)
     const BaseType* t = shell->symbols().factory().findBaseTypeById(typeId);
     if (t)
         inst->setType(t);
-    else if (context())
-        context()->throwError(QString("Type ID not found: 0x%1").arg(typeId, 0, 16));
+    else
+        injectScriptError(QString("Type ID not found: 0x%1").arg(typeId, 0, 16));
 }
 
 
@@ -596,14 +608,15 @@ Instance* InstancePrototype::thisInstance() const
 
 void InstancePrototype::injectScriptError(const GenericException& e) const
 {
+    QString msg = QString("%1: %2")
+                        .arg(e.className())
+                        .arg(e.message);
     if (context())
-        context()->throwError(
-                QString("%1:%2: %3")
-                    .arg(e.file)
-                    .arg(e.line)
-                    .arg(e.message));
-    else
+        context()->throwError(msg);
+    else {
+        debugerr(msg);
         throw e;
+    }
 }
 
 
@@ -611,8 +624,10 @@ void InstancePrototype::injectScriptError(const QString& msg) const
 {
     if (context())
         context()->throwError(msg);
-    else
+    else {
+        debugerr(msg);
         genericError(msg);
+    }
 }
 
 

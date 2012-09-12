@@ -68,7 +68,7 @@ fi
 if ! mount | grep -q $DEV; then
 	if ! $SUDO mount -o ro $DEV "$MNT"; then
 		ret=$?
-		echo "Error invoking the following command:\n mount $DEV \"$MNT\"" >&2
+		echo -e "Error invoking the following command:\n mount $DEV \"$MNT\"" >&2
 		exit $ret
 	else
 		echo "Image sucessfully mounted:"

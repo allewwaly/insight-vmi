@@ -29,7 +29,20 @@ function printList(p)
 	}
 	
 	var it = p;
+
+	// Find the candidate index for tasks.next that is compatible to a
+	// task_struct instance
+	var cndIdx = -1;
+	var cnt = p.tasks.MemberCandidatesCount("next");
+	for (var i = 0; i < cnt && cndIdx < 0; ++i) {
+		if (p.tasks.MemberCandidateCompatible("next", i)) {
+			cndIdx = i;
+		}
+	}
+//	print("Using candidate", cndIdx, "for \"tasks.next\"");
 	
+	printHdr();
+
 	do {
 		var uid, gid;
 
@@ -53,7 +66,12 @@ function printList(p)
 
 		print(line);
 		
-		it = it.tasks.next;
+		// Explicitely use the candidate index, if we have to
+		if (cndIdx < 0)
+			it = it.tasks.next;
+		else
+			it = it.tasks.MemberCandidate("next", cndIdx);
+
 	} while (it.pid.toUInt32() != 0);
 }
 
@@ -62,5 +80,4 @@ var init = new Instance("init_task");
 if (init.tasks.MemberCandidatesCount("next") < 1)
 	throw new Error("\"" + init.Name() + "\" does not have any candidate types for member \"tasks.next\"");
 
-printHdr();
 printList(init);
