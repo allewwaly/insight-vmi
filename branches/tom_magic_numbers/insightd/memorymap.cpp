@@ -280,7 +280,8 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     for (int i = 0; i < _shared->threadCount; ++i)
         _threads[i]->interrupt();
     // Now wait for all threads and free them again
-    for (int i = 0; i < _shared->threadCount; ++i) {
+    // Threads need calculateNodeProbability of thread[0] so delete that at last
+    for (int i = _shared->threadCount - 1; i >= 0; i--) {
         if (_threads[i]->isRunning())
         {
             _threads[i]->wait();
