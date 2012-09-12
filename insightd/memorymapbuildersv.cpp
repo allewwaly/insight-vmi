@@ -18,6 +18,9 @@
 #include <debug.h>
 
 
+QMutex MemoryMapBuilderSV::builderMutex(QMutex::Recursive);
+bool MemoryMapBuilderSV::statisticsShown = false;
+
 MemoryMapBuilderSV::MemoryMapBuilderSV(MemoryMap* map, int index)
     : MemoryMapBuilder(map, index)
 {
@@ -188,22 +191,33 @@ void MemoryMapBuilderSV::run()
             addMembers(&inst, node);
         }
 
-#if MEMORY_MAP_VERIFICATION == 1
-        _map->verifier().performChecks(node);
-#endif
 
         // Lock the mutex again before we jump to the loop condition checking
         queueLock.relock();
+#if MEMORY_MAP_VERIFICATION == 1
+        _map->verifier().performChecks(node);
+#endif
     }
 
 #if MEMORY_MAP_VERIFICATION == 1
+    builderMutex.lock();
+    if(!statisticsShown)
+    {
+        statisticsShown = true;
         _map->verifier().statistics();
+    }
+    builderMutex.unlock();
 #endif
 
 }
 
 bool MemoryMapBuilderSV::existsNode(Instance &inst)
 {
+  // Increase the reading counter
+  _map->_shared->vmemReadingLock.lock();
+  _map->_shared->vmemReading++;
+  _map->_shared->vmemReadingLock.unlock();
+
     MemMapSet nodes = _map->vmemMapsInRange(inst.address(), inst.endAddress());
 
     for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
@@ -215,11 +229,25 @@ bool MemoryMapBuilderSV::existsNode(Instance &inst)
                 otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
                 ok1 && ok2)
         {
-            return true;
+          // Decrease the reading counter again
+          _map->_shared->vmemReadingLock.lock();
+          _map->_shared->vmemReading--;
+          _map->_shared->vmemReadingLock.unlock();
+          // Wake up any sleeping thread
+          _map->_shared->vmemReadingDone.wakeAll();
+          
+          return true;
         }
     }
 
-    return false;
+  // Decrease the reading counter again
+  _map->_shared->vmemReadingLock.lock();
+  _map->_shared->vmemReading--;
+  _map->_shared->vmemReadingLock.unlock();
+  // Wake up any sleeping thread
+  _map->_shared->vmemReadingDone.wakeAll();
+  
+  return false;
 }
 
 void MemoryMapBuilderSV::processList(MemoryMapNodeSV *listHead,
@@ -254,14 +282,17 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *listHead,
 
 
     // Iterate over the list
-    while(listHeadNext != listHead->address()) {
+    // TK: Added currentNode, as adding member segfaults
+    while(currentNode && listHeadNext != listHead->address()) {
         // Get the next instance
         tmp.setAddress(listHeadNext - memOffset);
 
         // Only add non existing instances
         if(!existsNode(tmp))
-            currentNode = dynamic_cast<MemoryMapNodeSV *>(_map->addChildIfNotExistend(tmp, currentNode,
+        {
+          currentNode = dynamic_cast<MemoryMapNodeSV *>(_map->addChildIfNotExistend(tmp, currentNode,
                                                     _index, (currentNode->address() + memOffset)));
+        }
 
         // Verify cast
         if(!currentNode) {
