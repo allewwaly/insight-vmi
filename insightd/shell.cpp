@@ -25,7 +25,6 @@
 #include <QTimer>
 #include <QBitArray>
 #include <bugreport.h>
-#include <expressionevalexception.h>
 #include "compileunit.h"
 #include "variable.h"
 #include "array.h"
