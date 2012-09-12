@@ -697,6 +697,46 @@ bool MemoryMap::addressIsWellFormed(const Instance& inst) const
 }
 
 
+MemoryMapNode* MemoryMap::existsNode(const Instance& inst)
+{
+  // Increase the reading counter
+  _shared->vmemReadingLock.lock();
+  _shared->vmemReading++;
+  _shared->vmemReadingLock.unlock();
+
+  MemMapSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
+
+  for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
+      const MemoryMapNode* otherNode = *it;
+      // Is the the same object already contained?
+      bool ok1 = false, ok2 = false;
+      if (otherNode && otherNode->address() == inst.address() &&
+         otherNode->type() && inst.type() &&
+          otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
+          ok1 && ok2)
+        {
+          // Decrease the reading counter again
+          _shared->vmemReadingLock.lock();
+          _shared->vmemReading--;
+          _shared->vmemReadingLock.unlock();
+          // Wake up any sleeping thread
+          _shared->vmemReadingDone.wakeAll();
+          
+          return const_cast<MemoryMapNode*>(otherNode);
+        }
+  }
+
+  // Decrease the reading counter again
+  _shared->vmemReadingLock.lock();
+  _shared->vmemReading--;
+  _shared->vmemReadingLock.unlock();
+  // Wake up any sleeping thread
+  _shared->vmemReadingDone.wakeAll();
+
+  return NULL;
+}
+
+
 bool MemoryMap::objectIsSane(const Instance& inst,
         const MemoryMapNode* parent)
 {
