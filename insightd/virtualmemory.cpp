@@ -603,7 +603,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 
     // First translate the virtual address of the base page directory to a
     // physical address
-    if(!_userland){
+    if (!_userland) {
 		if (_specs.initLevel4Pgt >= _specs.startKernelMap) {
 			pgd_addr = ((_specs.initLevel4Pgt)
 					- (quint64) _specs.startKernelMap);
@@ -614,7 +614,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 		else {
 			pgd_addr = _specs.initLevel4Pgt;
 		}
-    }else{
+	} else {
     	if (vaddr >= _specs.pageOffset) {
     		virtualMemoryOtherError("vaddr >= PAGE_OFFSET, not a user-land address\n",
     		                enableExceptions);
@@ -755,20 +755,22 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
 
+#ifdef DEBUG
     // We don't expect to use _specs.vmemmapStart here, should be null!
     assert(_specs.vmemmapStart == 0 && _specs.vmemmapEnd == 0);
     // If _specs.modulesVaddr is set, it should equal _specs.vmallocStart
     if (_specs.modulesVaddr)
         assert(_specs.modulesVaddr == _specs.vmallocStart &&
                _specs.modulesEnd == _specs.vmallocEnd);
+#endif
 
     // During initialization, the VMALLOC_START might be incorrect (i.e., less
     // than PAGE_OFFSET). This is reflected in the _specs.initialized variable.
     // In that case we always assume linear translation.
-    if (!(_specs.initialized) )//&&
-//         ((vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) /*||
-//          (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
-//          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd)*/)) )
+    if (!_specs.initialized ||
+        !((vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) /*||
+          (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
+          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd)*/) )
     {
         if (vaddr >= _specs.pageOffset) {
             physaddr = ((vaddr) - _specs.pageOffset);
@@ -802,25 +804,23 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
 {
     quint64 physaddr = 0;
 
-    if(!_specs.initialized){
-    	virtualMemoryOtherError(
-			QString("_specs not initialized"),
-			enableExceptions);
+    if (_userland && !_specs.initialized) {
+        virtualMemoryOtherError(
+            QString("_specs not initialized"),
+            enableExceptions);
     }
 
-    if(_userland){
+    if (_userland) {
     	//std::cout << "reading userland mem pgd:" << std::hex << _userPGD << std::endl;
     	return pageLookup64(vaddr, pageSize, enableExceptions);
-    }else{
-    	//std::cout << "reading kernel mem" << std::endl;
     }
 
-    // If we can do the job with a simple linear translation subtract the
+    // If we can do the job with a simple linear translation, subtract the
     // adequate constant from the virtual address
-    if(!(_specs.initialized &&
-         ((vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) ||
+    if (!_specs.initialized ||
+        !((vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) ||
           (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
-          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd))) )
+          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd)) )
     {
         if (vaddr >= _specs.startKernelMap) {
             physaddr = ((vaddr) - _specs.startKernelMap);

@@ -204,7 +204,8 @@ Shell::Shell(bool listenOnSocket)
                 "Executes a QtScript script file",
                 "This command executes a given QtScript script file in the current "
                 "shell's context. All output is printed to the screen.\n"
-                "  script <file_name>     Interprets the script in <file_name>"));
+                "  script [-v] <file_name>   Evaluates the script in <file_name>\n"
+                "  script [-v] eval <code>   Evaluates <code> directly"));
 
     _commands.insert("show",
             Command(
@@ -2229,6 +2230,12 @@ int Shell::cmdScript(QStringList args)
         return 1;
     }
 
+    bool timing = false;
+    if (args.first() == "-v") {
+        timing = true;
+        args.pop_front();
+    }
+
     QString fileName = args[0];
     QFile file(fileName);
     QFileInfo includePathFileInfo(file);
@@ -2262,8 +2269,11 @@ int Shell::cmdScript(QStringList args)
 	}
 
 	// Execute the script
+	QTime timer;
+	if (timing)
+		timer.start();
 	QScriptValue result = _engine->evaluate(scriptCode, args,
-			includePathFileInfo.absolutePath());
+											includePathFileInfo.absolutePath());
 
 	if (_engine->hasUncaughtException()) {
 		_err << color(ctError) << "Exception occured on ";
@@ -2283,6 +2293,13 @@ int Shell::cmdScript(QStringList args)
 	else if (result.isError()) {
 		errMsg(result.toString());
 		return 5;
+	} else if (timing) {
+		int elapsed = timer.elapsed();
+		_out << "Execution time: "
+			 << (elapsed / 1000) << "."
+			 << QString("%1").arg(elapsed % 1000, 3, 10, QChar('0'))
+			 << " seconds"
+			 << endl;
 	}
 
     return ecOk;
