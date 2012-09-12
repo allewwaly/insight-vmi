@@ -105,10 +105,10 @@ void StructuredMember::writeTo(KernelSymbolStream& out) const
     out << (quint64) _offset;
     
     // Since KSYM VERSION 15:
-    out << (quint32) _seenInEvaluateMagicNumber;
-    out << (quint32) _hasConstIntValue;
-    out << (quint32) _hasConstStringValue;
-    out << (quint32) _hasStringValue;
+    out << _seenInEvaluateMagicNumber;
+    out << _hasConstIntValue;
+    out << _hasConstStringValue;
+    out << _hasStringValue;
     out << _constIntValue;
     out << _constStringValue;
 }
