@@ -53,7 +53,7 @@ typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
 
 
-#define MAX_BUILDER_THREADS 1
+#define MAX_BUILDER_THREADS 32
 
 /**
  * Holds all variables that are shared among the builder threads.
