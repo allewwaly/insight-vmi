@@ -211,7 +211,7 @@ void MemoryMapBuilderSV::run()
 
 }
 
-bool MemoryMapBuilderSV::existsNode(Instance &inst)
+MemoryMapNode* MemoryMapBuilderSV::existsNode(Instance &inst)
 {
   // Increase the reading counter
   _map->_shared->vmemReadingLock.lock();
@@ -236,7 +236,7 @@ bool MemoryMapBuilderSV::existsNode(Instance &inst)
           // Wake up any sleeping thread
           _map->_shared->vmemReadingDone.wakeAll();
           
-          return true;
+          return const_cast<MemoryMapNode*>(otherNode);
         }
     }
 
@@ -247,7 +247,7 @@ bool MemoryMapBuilderSV::existsNode(Instance &inst)
   // Wake up any sleeping thread
   _map->_shared->vmemReadingDone.wakeAll();
   
-  return false;
+  return NULL;
 }
 
 void MemoryMapBuilderSV::processList(MemoryMapNodeSV *listHead,
