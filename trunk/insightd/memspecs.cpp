@@ -177,7 +177,9 @@ QString MemSpecs::toString() const
     ret += QString("%1 = %2\n").arg("sizeof(void*)", key_w).arg(sizeofPointer);
     ret += QString("%1 = 0x%2\n").arg("PAGE_OFFSET", key_w).arg(pageOffset, val_w, 16, QChar('0'));
     if (vmallocStart > 0)
-        ret += QString("%1 = 0x%2\n").arg("VMALLOC_START", key_w).arg(realVmallocStart(), val_w, 16, QChar('0'));
+        ret += QString("%1 = 0x%2\n").arg("VMALLOC_START", key_w).arg(vmallocStart, val_w, 16, QChar('0'));
+    if (initialized)
+        ret += QString("%1 = 0x%2\n").arg("realVmallocStart()", key_w).arg(realVmallocStart(), val_w, 16, QChar('0'));
     if (vmallocEnd > 0)
         ret += QString("%1 = 0x%2\n").arg("VMALLOC_END", key_w).arg(vmallocEnd, val_w, 16, QChar('0'));
     if (vmallocOffset > 0)
@@ -201,13 +203,13 @@ QString MemSpecs::toString() const
     if (vmallocEarlyreserve > 0)
         ret += QString("%1 = 0x%2\n").arg("vmalloc_earlyreserve", key_w).arg(vmallocEarlyreserve, val_w, 16, QChar('0'));
     if (!version.sysname.isEmpty())
-        ret += QString("%1 = 0x%2\n").arg("UTS_SYSNAME", key_w).arg(version.sysname);
+        ret += QString("%1 = %2\n").arg("UTS_SYSNAME", key_w).arg(version.sysname);
     if (!version.release.isEmpty())
-        ret += QString("%1 = 0x%2\n").arg("UTS_RELEASE", key_w).arg(version.release);
+        ret += QString("%1 = %2\n").arg("UTS_RELEASE", key_w).arg(version.release);
     if (!version.version.isEmpty())
-        ret += QString("%1 = 0x%2\n").arg("UTS_VERSION", key_w).arg(version.version);
+        ret += QString("%1 = %2\n").arg("UTS_VERSION", key_w).arg(version.version);
     if (!version.machine.isEmpty())
-        ret += QString("%1 = 0x%2\n").arg("UTS_MACHINE", key_w).arg(version.machine);
+        ret += QString("%1 = %2\n").arg("UTS_MACHINE", key_w).arg(version.machine);
     return ret;
 }
 
