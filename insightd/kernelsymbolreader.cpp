@@ -78,20 +78,15 @@ void KernelSymbolReader::read()
     in.setKSymVersion(version);
 //    debugmsg(QString("Symbol version: %1").arg(version));
     // Call the appropirate reader function
-    switch (version) {
-    case kSym::VERSION_11:
-        readVersion11(in);
-        break;
-    case kSym::VERSION_12:
-    case kSym::VERSION_13:
-    case kSym::VERSION_14:
-        readVersion12(in);
-        break;
-    default:
-        readerWriterError(QString("Don't know how to read symbol file verison "
-                                  "%1 (our max. version is %2).")
-                                  .arg(version)
-                                  .arg(kSym::VERSION_MAX));
+    if (version == kSym::VERSION_11){
+      readVersion11(in);
+    } else if (version >= kSym::VERSION_12 && version <= kSym::VERSION_MAX){
+      readVersion12(in);
+    } else {
+      readerWriterError(QString("Don't know how to read symbol file verison "
+            "%1 (our max. version is %2).")
+          .arg(version)
+          .arg(kSym::VERSION_MAX));
     }
 }
 

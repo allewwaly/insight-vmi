@@ -116,21 +116,13 @@ void ReferencingType::readFrom(KernelSymbolStream& in)
     QList<int> altRefTypeIds;
     _altRefTypes.clear();
 
-    switch (in.kSymVersion()) {
-    case kSym::VERSION_11:
+    if (in.kSymVersion() == kSym::VERSION_11){
         in >> _refTypeId >> altRefTypeIds;
         for (int i = 0; i < altRefTypeIds.size(); ++i)
             _altRefTypes.append(AltRefType(altRefTypeIds[i]));
-        break;
-
-    case kSym::VERSION_12:
-    case kSym::VERSION_13:
-    case kSym::VERSION_14:
-    case kSym::VERSION_15:
+    } else if (in.kSymVersion() >= kSym::VERSION_12 && in.kSymVersion() <= kSym::VERSION_MAX) {
         in >> _refTypeId;
-        break;
-
-    default:
+    } else {
         genericError(QString("Unsupported symbol version: %1")
                      .arg(in.kSymVersion()));
     }
@@ -141,21 +133,13 @@ void ReferencingType::writeTo(KernelSymbolStream& out) const
 {
     QList<int> altRefTypeIds;
 
-    switch (out.kSymVersion()) {
-    case kSym::VERSION_11:
+    if (out.kSymVersion() == kSym::VERSION_11){
         for (int i = 0; i < _altRefTypes.size(); ++i)
             altRefTypeIds.append(_altRefTypes[i].id());
         out << _refTypeId << altRefTypeIds;
-        break;
-
-    case kSym::VERSION_12:
-    case kSym::VERSION_13:
-    case kSym::VERSION_14:
-    case kSym::VERSION_15:
+    } else if (out.kSymVersion() >= kSym::VERSION_12 && out.kSymVersion() <= kSym::VERSION_MAX) {
         out << _refTypeId;
-        break;
-
-    default:
+    } else {
         genericError(QString("Unsupported symbol version: %1")
                      .arg(out.kSymVersion()));
     }
