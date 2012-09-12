@@ -1784,7 +1784,7 @@ void SymFactory::insertUsedBy(FuncParam* param)
 
 BaseTypeList SymFactory::typedefsOfType(BaseType* type)
 {
-    BaseTypeList ret, temp;
+    BaseTypeList ret;
 
     if (!type)
         return ret;
@@ -1796,11 +1796,11 @@ BaseTypeList SymFactory::typedefsOfType(BaseType* type)
         // Recursively add all futher typedefs
         else {
             ret += rbtList[i];
-            temp += typedefsOfType(rbtList[i]);
+            ret += typedefsOfType(rbtList[i]);
         }
     }
 
-    return ret + temp;
+    return ret;
 }
 
 
@@ -1854,8 +1854,8 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                         if (baseTypes[i]->type() == astTypeNonPtr->type())
                             // Add all typedefs of that type to a separate list
                             temp += typedefsOfType(baseTypes[i]);
-                        // Remove non-matching types
                         else
+                            // Remove non-matching types
                             baseTypes.removeAt(i);
                     }
                     // Join the lists
