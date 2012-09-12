@@ -123,6 +123,12 @@ Shell::Shell(bool listenOnSocket)
                 &Shell::cmdExit,
                 "Exits the program",
                 "This command exists the program."));
+    
+    _commands.insert("quit",
+            Command(
+                &Shell::cmdExit,
+                "Exits the program",
+                "This command exists the program. (Alias for \"exit\")"));
 
     _commands.insert("help",
             Command(
