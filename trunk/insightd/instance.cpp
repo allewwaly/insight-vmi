@@ -701,7 +701,7 @@ ExpressionResult Instance::toExpressionResult() const
 		return ExpressionResult(ert, esDouble, t->toDouble(_d.vmem, _d.address));
 	case rtFuncPointer:
 	case rtPointer:
-		return pointerSize() == 4 ?
+		return sizeofPointer() == 4 ?
 					ExpressionResult(ert, esUInt32,
 									 (quint64)t->toUInt32(_d.vmem, _d.address)) :
 					ExpressionResult(ert, esUInt64,
