@@ -123,9 +123,15 @@ inline QString Instance::toString(const ColorPalette* col) const
 }
 
 
-inline int Instance::pointerSize() const
+inline int Instance::sizeofPointer() const
 {
     return _d.vmem ? _d.vmem->memSpecs().sizeofPointer : sizeof(void*);
+}
+
+
+inline int Instance::sizeofLong() const
+{
+    return _d.vmem ? _d.vmem->memSpecs().sizeofLong : sizeof(long);
 }
 
 
@@ -174,6 +180,26 @@ inline qint64 Instance::toInt64() const
 inline quint64 Instance::toUInt64() const
 {
     return _d.isNull ? 0 : _d.type->toUInt64(_d.vmem, _d.address);
+}
+
+
+inline qint64 Instance::toLong() const
+{
+    if (_d.isNull)
+        return 0;
+    return sizeofLong() == 4 ?
+                (qint64) _d.type->toInt32(_d.vmem, _d.address) :
+                (qint64) _d.type->toInt64(_d.vmem, _d.address);
+}
+
+
+inline quint64 Instance::toULong() const
+{
+    if (_d.isNull)
+        return 0;
+    return sizeofLong() == 4 ?
+                (qint64) _d.type->toUInt32(_d.vmem, _d.address) :
+                (qint64) _d.type->toUInt64(_d.vmem, _d.address);
 }
 
 
