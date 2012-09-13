@@ -14,13 +14,12 @@
 
 #include <QList>
 
-
 MemoryMapNodeSV::MemoryMapNodeSV(MemoryMap* belongsTo, const QString& name,
         quint64 address, const BaseType* type, int id, MemoryMapNodeSV* parent,
         quint64 addrInParent, bool hasCandidates)
     : MemoryMapNode(belongsTo, name, address, type, id, parent),
-       _addrInParent(addrInParent), _hasCandidates(hasCandidates),
-      _candidatesComplete(false)
+       _addrInParent(addrInParent), _hasCandidates(hasCandidates), 
+      _candidatesComplete(false), nodeMutex(QMutex::Recursive)
 {
     calculateInitialProbability();
 
@@ -36,7 +35,7 @@ MemoryMapNodeSV::MemoryMapNodeSV(MemoryMap* belongsTo, const Instance& inst,
         MemoryMapNodeSV* parent, quint64 addrInParent, bool hasCandidates)
     : MemoryMapNode(belongsTo, inst, parent),
       _addrInParent(addrInParent), _hasCandidates(hasCandidates),
-      _candidatesComplete(false)
+      _candidatesComplete(false), nodeMutex(QMutex::Recursive)
 {
     calculateInitialProbability(&inst);
 
@@ -48,11 +47,13 @@ MemoryMapNodeSV::MemoryMapNodeSV(MemoryMap* belongsTo, const Instance& inst,
 }
 
 void MemoryMapNodeSV::setCandidatesComplete(bool value) {
+    QMutexLocker(&this->nodeMutex);
     _candidatesComplete = value;
 }
 
 void MemoryMapNodeSV::addCandidate(MemoryMapNodeSV* cand)
 {
+    QMutexLocker(&this->nodeMutex);
     // Add the node to the internal candidate list if it is not already in it.
     if(!_candidates.contains(cand))
         _candidates.append(cand);
@@ -60,6 +61,7 @@ void MemoryMapNodeSV::addCandidate(MemoryMapNodeSV* cand)
 
 void MemoryMapNodeSV::updateCandidates()
 {
+    QMutexLocker(&this->nodeMutex);
     /// @todo Are there global variables that have multiple candidate types?
     /// in this case this will not suffice, since there is no parent.
     if(!_parent || _addrInParent == 0)
@@ -84,6 +86,7 @@ void MemoryMapNodeSV::updateCandidates()
 
 void MemoryMapNodeSV::completeCandidates()
 {
+    QMutexLocker(&this->nodeMutex);
     for(int i = 0; i < _candidates.size(); ++i) {
         _candidates.at(i)->setCandidatesComplete(true);
     }
@@ -95,6 +98,7 @@ void MemoryMapNodeSV::completeCandidates()
 MemoryMapNodeSV* MemoryMapNodeSV::addChild(const Instance& inst, quint64 addrInParent,
                                        bool hasCandidates)
 {
+    QMutexLocker(&this->nodeMutex);
     MemoryMapNodeSV* child = new MemoryMapNodeSV(_belongsTo, inst, this, addrInParent,
                                              hasCandidates);
     MemoryMapNode::addChild((MemoryMapNode*)child);
@@ -104,6 +108,7 @@ MemoryMapNodeSV* MemoryMapNodeSV::addChild(const Instance& inst, quint64 addrInP
 
 void MemoryMapNodeSV::setInitialProbability(float value)
 {
+    QMutexLocker(&this->nodeMutex);
     _initialProb = value;
 }
 
@@ -133,6 +138,7 @@ float MemoryMapNodeSV::getCandidateProbability() const
 
 void MemoryMapNodeSV::calculateInitialProbability(const Instance* givenInst)
 {
+    QMutexLocker(&this->nodeMutex);
     if (givenInst)
         _initialProb = _belongsTo->calculateNodeProbability(givenInst);
     else {
@@ -143,6 +149,7 @@ void MemoryMapNodeSV::calculateInitialProbability(const Instance* givenInst)
 
 void MemoryMapNodeSV::updateProbabilitySV(MemoryMapNodeSV *initiator)
 {
+    QMutexLocker(&this->nodeMutex);
     float prob = 0;
     float parentProb = 1.0;
     float childrenProb = 0.0;
@@ -223,6 +230,7 @@ void MemoryMapNodeSV::updateProbabilitySV(MemoryMapNodeSV *initiator)
 
 QList<MemoryMapNodeSV *> * MemoryMapNodeSV::getParents()
 {
+    QMutexLocker(&this->nodeMutex);
     QList<MemoryMapNodeSV *> *result = new QList<MemoryMapNodeSV *>();
     MemoryMapNodeSV *tmp = dynamic_cast<MemoryMapNodeSV*>(_parent);
     while(tmp) {
@@ -240,11 +248,13 @@ const QMultiMap<quint64, MemoryMapNodeSV*> * MemoryMapNodeSV::returningEdges() c
 
 void MemoryMapNodeSV::addReturningEdge(quint64 memberAddress, MemoryMapNodeSV *target)
 {
+    QMutexLocker(&this->nodeMutex);
     _returningEdges.insertMulti(memberAddress, target);
 }
 
 bool MemoryMapNodeSV::memberProcessed(quint64 addressInParent, quint64 address)
 {
+    QMutexLocker(&this->nodeMutex);
     // Is there already a child for the given address?
     for(int i = 0; i < _children.size(); ++i) {
         MemoryMapNodeSV *cast = dynamic_cast<MemoryMapNodeSV*>(_children.at(i));

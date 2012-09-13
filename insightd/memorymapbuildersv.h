@@ -8,6 +8,8 @@
 #ifndef MEMORYMAPBUILDERSV_H_
 #define MEMORYMAPBUILDERSV_H_
 
+#include <QMutex>
+
 #include "memorymapbuilder.h"
 #include "memorymapnodesv.h"
 
@@ -57,6 +59,9 @@ private:
      * offset as the first member.
      */
     void processList(MemoryMapNodeSV *listHead, Instance &firstMember);
+
+    static QMutex builderMutex;
+    static bool statisticsShown;
 };
 
 #endif /* MEMORYMAPBUILDERSV_H_ */
