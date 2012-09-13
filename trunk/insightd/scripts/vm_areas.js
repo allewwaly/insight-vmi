@@ -3,10 +3,11 @@ include("lib_string.js");
 include("lib_util.js");
 
 
-var c_addr = 2+16;
+var c_addr = 2; // + 2*sizeof(void*)
 var c_size = 8;
-var c_io = 5;
-var c_type = 10;
+var c_pages = 8;
+var c_type = 12;
+var c_io = 4; // + 2*sizeof(void*)
 
 var flags_list = [
     ["VM_IOREMAP",  0x00000001],      /* ioremap() and friends */
@@ -26,7 +27,7 @@ function flagsToStr(flags)
         if (flags == flags_list[i][1])
             return flags_list[i][0];
     }
-    return "0x" + flags.toString(16);
+    return "<unknown 0x" + flags.toString(16) + ">";
 }
 
 
@@ -38,7 +39,25 @@ function printVmAreas()
         throw "Could not find variable 'vmlist'";
 	}
 
-    c_addr = 2 + (item.SizeofPointer() * 2);
+    c_addr += item.SizeofPointer() * 2;
+    c_io += item.SizeofPointer() * 2;
+    var c_total = c_addr + 3 +
+                  c_addr + 2 +
+                  c_size + 2 +
+                  c_pages + 2 +
+                  c_type + 2 +
+                  c_io;
+
+    // Print header
+    print(lalign("Start vaddr", c_addr + 3));
+    print(lalign("End vaddr", c_addr + 2));
+    print(ralign("Size", c_size));
+    print("  ");
+    print(ralign("Nr.pages", c_pages));
+    print("  ");
+    print(lalign("Type", c_type + 2));
+    print(lalign("I/O paddr.", c_io));
+    println();
 
     var tmp = new Instance("vmlist");
 
@@ -55,11 +74,13 @@ function printVmAreas()
             ralign("0x" + addr_start, c_addr) +
             " - " +
             ralign("0x" + addr_end, c_addr) +
-            ", " +
+            "  " +
             ralign(size, c_size) +
-            " " +
+            "  " +
+            ralign(item.nr_pages, c_pages) +
+            "  " +
             lalign(type, c_type) +
-            " " + io;
+            "  " + io;
 
         println(line);
 		
