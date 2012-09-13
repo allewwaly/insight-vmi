@@ -8,6 +8,8 @@
 #ifndef MEMORYMAPNODESV_H_
 #define MEMORYMAPNODESV_H_
 
+#include <QMutex>
+
 #include "memorymapnode.h"
 
 /**
@@ -192,6 +194,8 @@ private:
                                                             ///  to an already existing node. This list is
                                                             ///  necessary to have a graph structure, while
                                                             ///  keeping our single parent paradigm.
+
+    QMutex nodeMutex;
 };
 
 
