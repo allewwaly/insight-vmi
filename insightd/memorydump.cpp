@@ -441,7 +441,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		
 	}
 	// Try to dereference this instance as deep as possible
-	return result.dereference(BaseType::trAny);
+	return result.dereference(BaseType::trAnyNonNull);
 }
 
 Instance MemoryDump::queryInstance(const QString& queryString) const

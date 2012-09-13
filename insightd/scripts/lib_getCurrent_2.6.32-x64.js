@@ -45,18 +45,18 @@ function getCurrentTask(gs_base)
 	current_task.SetAddress(gs_base)
 	
 	// current_task.Address() is the address of the beginning of the segment pointed to by the gs register
-	//print(current_task.Address())
+    //println(current_task.Address())
 	
 	var offset = new Instance("per_cpu__current_task")
-	//print(offset.Address())
+    //println(offset.Address())
 	
 	current_task.SetAddress(__hex_add(gs_base, offset.Address()));
 	
 	// current_task.Address() now contains the Adress of the memory are where gs:per_cpu__current_task points
-	//print(current_task.Address())
+    //println(current_task.Address())
 	
 	// current_task now contains the Adress of the struct task_struct currently executing on the cpu
-	//print(current_task)
+    //println(current_task)
 	
 	// convert current_task from its uint64_t decimal representation to hexadecimal representation
 	// only work on bytes here becaus javascript cannot handle unsigne 64 bit integers!
@@ -72,13 +72,13 @@ function getCurrentTask(gs_base)
 	}
 	
 	// current_task_hex now contains the adress of the struct task_struct currently executing
-	//print(current_task_hex)
+    //println(current_task_hex)
 	
 	current_task.ChangeType("task_struct")
 	current_task.SetAddress(current_task_hex)
-	//print("->"+current_task.Address())
-	//print("->"+__hex_add(gs_base, offset.Address()))
-	//print("->"+gs_base+" + "+offset.Address())
+    //println("->"+current_task.Address())
+    //println("->"+__hex_add(gs_base, offset.Address()))
+    //println("->"+gs_base+" + "+offset.Address())
 	
 	
 	return current_task

@@ -19,7 +19,7 @@ function printHdr()
 		lalign("COMMAND", cmd_size) +
 		lalign("ADDRESS", addr_size);
 
-	print(hdr);
+    println(hdr);
 }
 
 function printList(p)
@@ -39,7 +39,7 @@ function printList(p)
 			cndIdx = i;
 		}
 	}
-//	print("Using candidate", cndIdx, "for \"tasks.next\"");
+//	println("Using candidate", cndIdx, "for \"tasks.next\"");
 	
 	printHdr();
 
@@ -64,7 +64,7 @@ function printList(p)
 			lalign(it.comm.toString(), cmd_size) +
 			lalign("0x" + it.Address(), addr_size);
 
-		print(line);
+        println(line);
 		
 		// Explicitely use the candidate index, if we have to
 		if (cndIdx < 0)
