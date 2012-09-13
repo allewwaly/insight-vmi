@@ -635,6 +635,36 @@ public:
       * Get the VirtualMemory object that is used by this instance
       */
     VirtualMemory* vmem() const;
+    
+    /**
+     * Function to compare two Instances.
+     * @param inst instance to compare to
+     * @param embedded \c true if one instance is embedded inside the other
+     * @param overlap \c true if instances overlap (not embedded)
+     * @param thisParent \c true if \a this instance contains \a inst
+     *                  (\c false if \a inst contains \a this instance)
+     * @return \c true if instances do not conflict with each other
+     */
+    bool compareInstance(const Instance& inst,
+        bool &embedded, bool &overlap, bool &thisParent) const;
+  
+    /**
+     * Function to compare two Instances, where one is a rtUnion.
+     * Used in compareInstances
+     * @param inst instance to compare to 
+     * @param thisParent \c true if \a this instance contains \a inst
+     *                  (\c false if \a inst contains \a this instance)
+     * @return \c true if instances do not conflict with each other
+     */
+    bool compareUnionInstances(const Instance& inst, bool &thisParent) const;
+
+    /**
+     * Function to compare two Instances Types.
+     * Used in compareInstance.
+     * @param inst instance to compare to
+     * @return \c true if instances types do not conflict with each other
+     */
+    bool compareInstanceType(const Instance& inst) const ;
 
 private:
     typedef QSet<quint64> VisitedSet;
