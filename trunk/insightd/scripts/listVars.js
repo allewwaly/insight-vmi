@@ -9,7 +9,7 @@ else {
 	for (var i = 0; i < ARGV.length; ++i) {
 		var list = Symbols.listVariables(ARGV[i]);
 		for (var j in list) {
-			print(
+            println(
 				ralign(uhex(list[j].TypeId()), 8) + " " +
 				lalign(
 					lalign(list[j].Name() + ": ", 25) +

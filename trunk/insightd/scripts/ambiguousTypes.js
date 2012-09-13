@@ -6,14 +6,14 @@ var w_type = 15;
 var w_size = 15;
 var w_total = w_name + w_type + w_size + 2;
 
-print("Checking for types with the same name but different, non-null sizes.");
-print();
-print(
+println("Checking for types with the same name but different, non-null sizes.");
+println();
+println(
 	lalign("Type name", w_name) + " " +
 	lalign("Base type", w_type) + " " +
 	ralign("Sizes", w_size)
 );
-print(hline(w_total));
+println(hline(w_total));
 
 // Get all type names
 var typeNames = Symbols.typeNames();
@@ -45,7 +45,7 @@ for (var i in typeNames) {
 
 	if (sizes.length > 1) {
 		sizes.sort();
-		print(
+        println(
 			lalign(types[0].TypeName(), w_name) + " " +
 			lalign(types[0].Type(), w_type) + " " +
 			ralign(sizes.join(", "), w_size)
@@ -54,5 +54,5 @@ for (var i in typeNames) {
 	}
 }
 
-print(hline(w_total));
-print("Total: " + count + " ambiguous types");
+println(hline(w_total));
+println("Total: " + count + " ambiguous types");

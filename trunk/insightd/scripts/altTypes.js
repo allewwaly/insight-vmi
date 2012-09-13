@@ -10,15 +10,15 @@ var w_total = w_id + w_name + w_member + w_alt + 3;
 var minAlt = (ARGV.length > 1) ? ARGV[1] : 1;
 
 
-print("Searching struct members with at least " + minAlt.toString() + " candidates.");
-print();
-print(
+println("Searching struct members with at least " + minAlt.toString() + " candidates.");
+println();
+println(
 	lalign("ID", w_id) + " " +
 	lalign("Type name", w_name) + " " +
 	lalign("Member", w_member) + " " +
 	ralign("Alt.", w_alt)
 );
-print(hline(w_total));
+println(hline(w_total));
 
 // Get all type names
 var types = Symbols.listTypes();
@@ -51,7 +51,7 @@ for (var i in types) {
 			typeNames.push(type.TypeHash());
 		}
 
-		print(
+        println(
 			lalign(uhex(type.TypeId()), w_id) + " " +
 			lalign(type.TypeName(), w_name) + " " +
 			lalign(type.MemberNames()[j], w_member) + " " +
@@ -61,5 +61,5 @@ for (var i in types) {
 	}
 }
 
-print(hline(w_total));
-print("Total: " + mcount + " members in " + tcount + " types, " + typeNameCount + " unique types");
+println(hline(w_total));
+println("Total: " + mcount + " members in " + tcount + " types, " + typeNameCount + " unique types");

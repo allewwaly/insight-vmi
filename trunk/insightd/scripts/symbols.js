@@ -1,37 +1,37 @@
 
 function usage()
 {
-	print("Usage: " + ARGV[0] + " v|t [<filter>]");
+    println("Usage: " + ARGV[0] + " v|t [<filter>]");
 }
 
 
 function queryTypes(filter)
 {
-	print("Retrieving types for: " + filter);
+    println("Retrieving types for: " + filter);
 	var ret = Symbols.listTypes(filter);
 
 	for (var i in ret) {
-		print(i + ". " + ret[i].TypeName() + 
+        println(i + ". " + ret[i].TypeName() +
 				", size=" + ret[i].Size() +
 				", id=0x" + ret[i].TypeId().toString(16));
 	}
 
-	print("Total types: " + ret.length);
+    println("Total types: " + ret.length);
 }
 
 function queryVars(filter)
 {
-	print("Retrieving variables for: " + filter);
+    println("Retrieving variables for: " + filter);
 	var ret = Symbols.listVariables(filter);
 
 	for (var i in ret) {
-		print(i + ". " + ret[i].Name() + " : " + ret[i].TypeName() +
+        println(i + ". " + ret[i].Name() + " : " + ret[i].TypeName() +
 				" @ 0x" + ret[i].Address() +
 				", size=" + ret[i].Size() + 
 				", id=0x" + ret[i].Id().toString(16));
 	}
 
-	print("Total variables: " + ret.length);
+    println("Total variables: " + ret.length);
 }
 
 var query = "";

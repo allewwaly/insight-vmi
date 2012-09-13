@@ -98,16 +98,16 @@ function __printSocketMsgHdr(inst, userPGD){
 	var data = inst;
 	data.ChangeType("char");
 	
-	//print(data.toStringUserLand(userPGD));
+    //println(data.toStringUserLand(userPGD));
 	
 	inst.AddToAddress(4);
 	inst.ChangeType("__kernel_size_t");
 	var len = inst.toStringUserLand(userPGD);
-	//print(len)
+    //println(len)
 	
 	len = parseInt(len, 10);
 	
-	//print(len)
+    //println(len)
 	
 	ret += "\t\t buffer @ 0x" + data.Address() + " length: "+len+"\n";
 	
