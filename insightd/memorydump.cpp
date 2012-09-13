@@ -88,6 +88,12 @@ QString trimQuotes(const QString& s)
 
 void MemoryDump::init()
 {
+#define memDumpInitError(e) \
+    genericError("Failed to initialize this MemoryDump instance with " \
+                 "required run-time values from the dump. Error was: " + \
+                 e.message)
+
+
     // Open virtual memory for reading
     if (!_vmem->open(QIODevice::ReadOnly))
         throw IOException(
@@ -95,20 +101,31 @@ void MemoryDump::init()
                 __FILE__,
                 __LINE__);
 
-    // In i386 mode, the virtual address translation depends on the runtime
+    // The virtual address translation depends on the runtime
     // value of "high_memory". We need to query its value and add it to
     // _specs.vmallocStart before we can translate paged addresses.
-    if (_specs.arch & MemSpecs::ar_i386) {
-        // This symbol must exist
-        try {
-            Instance highMem = queryInstance("high_memory");
-            _specs.highMemory = highMem.toUInt32();
+    try {
+        Instance highMem = queryInstance("high_memory");
+        _specs.highMemory = (_specs.sizeofPointer == 4) ?
+                    (quint64)highMem.toUInt32() : highMem.toUInt64();
+    }
+    catch (QueryException& e) {
+        if (!_factory->findVarByName("high_memory")) {
+            // This is a failure for 32-bit systems
+            if (_specs.arch & MemSpecs::ar_i386)
+                memDumpInitError(e);
+            // Resort to the failsafe value for 64-bit systems
+            else {
+                debugmsg("Variable \"high_memory\" not found, resorting to "
+                         "failsafe default value");
+                _specs.highMemory = HIGH_MEMORY_FAILSAFE_X86_64;
+            }
         }
-        catch (QueryException& e) {
-            genericError("Failed to initialize this MemoryDump instance with "
-                    "required run-time values from the dump. Error was: " + e.message);
-        }
+        else
+            memDumpInitError(e);
+    }
 
+    if (_specs.arch & MemSpecs::ar_i386) {
         // This symbol only exists depending on the kernel version
         QString ve_name("vmalloc_earlyreserve");
         if (_factory->findVarByName(ve_name)) {
