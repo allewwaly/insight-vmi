@@ -44,7 +44,7 @@ function printList(p)
 			"\n" +
 			lalign("DEBUG REGISTER: " + debugString, register_size);
 
-		print(line);
+        println(line);
 		
 		it = it.tasks.next;
 	} while (it.pid.toUInt32() != 0);
@@ -57,8 +57,8 @@ function printHdr()
 		"  " + 
 		lalign("COMMAND", cmd_size) +
 		lalign("ADDRESS", addr_size);
-	print(hdr);
-	print("===============================================================");
+    println(hdr);
+    println("===============================================================");
 }
 
 var init = new Instance("init_task");

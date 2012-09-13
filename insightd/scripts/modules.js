@@ -13,7 +13,7 @@ function printModuleList()
         throw new Error("\"" + head.Name() + "\" does not have any candidate types for member \"next\"");
 
     var w_mod = 20;
-    print(lalign("Module [Args]", w_mod) + " Used by");
+    println(lalign("Module [Args]", w_mod) + " Used by");
 
 	// Iterate over all modules
 	var m = head.next;
@@ -33,9 +33,9 @@ function printModuleList()
 			name += " [" + m.args.toString() + "]";
 
 		if (usedList.length > 0)
-			print(lalign(name, w_mod) + " " + usedList);
+            println(lalign(name, w_mod) + " " + usedList);
 		else
-			print(name);
+            println(name);
 
 		m = m.list.next;
 	}

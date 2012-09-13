@@ -47,7 +47,7 @@ function printLine(task)
 			lalign(task.comm.toString(), cmd_size) +
 			lalign("0x" + task.Address(), addr_size);
 
-		print(line);
+        println(line);
 }
 
 function printList(list, address, boolFree)
@@ -66,9 +66,9 @@ function printList(list, address, boolFree)
 			break;
 		
 		/*
-		print(it.Address());
-		print(it.free.toString());
-		print(it.s_mem.toString());
+        println(it.Address());
+        println(it.free.toString());
+        println(it.s_mem.toString());
 		*/
 	
 		// Print only empty items
@@ -117,8 +117,8 @@ function printHdr()
 		lalign("COMMAND", cmd_size) +
 		lalign("ADDRESS", addr_size);
 	
-	print(hdr);
-	print("========================================================");
+    println(hdr);
+    println("========================================================");
 }
 
 var cacheList = new Instance("cache_chain.next");

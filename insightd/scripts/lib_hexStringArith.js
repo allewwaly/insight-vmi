@@ -26,7 +26,7 @@ function __hex_add(a, b){
 	} 
 	if(a.length != b.length) throw("a and b must have same length, a:"+a+" b:"+b);
 	
-	//print(a.length)
+    //println(a.length)
 	
 	var result_hex = ""
 	var carry = 0;
@@ -55,8 +55,8 @@ function __hex_add(a, b){
 
 POINTER_SIZE=8
 
-//print(__hex_add("ffff","1234f"));
-//print(__hex_add("f", "f"));
+//println(__hex_add("ffff","1234f"));
+//println(__hex_add("f", "f"));
 
 
 /**
