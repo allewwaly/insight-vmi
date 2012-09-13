@@ -44,10 +44,10 @@ private:
     /**
      * Is there already a node that represents the given instance.
      * @param inst the instance to check for
-     * @returns true if a node for this instance already exists,
-     * false otherwise
+     * @returns a pointer to the node if a node for this instance already exists,
+     * null otherwise
      */
-     bool existsNode(Instance &inst);
+    MemoryMapNode* existsNode(Instance &inst);
 
     /**
      * If we encounter a list we process the complete list before we continue.
