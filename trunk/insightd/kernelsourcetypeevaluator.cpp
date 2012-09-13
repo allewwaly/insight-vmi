@@ -325,7 +325,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
                                     {
 #ifdef DEBUGMAGICNUMBERS
                                         string.append("Invalid Member!!");
-                                        debugmsg(string);
+                                        //debugmsg(string);
 #endif /* DEBUGMAGICNUMBERS */
                                         return;
                                     }
