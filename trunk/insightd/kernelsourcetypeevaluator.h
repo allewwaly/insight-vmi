@@ -14,6 +14,8 @@
 class SymFactory;
 class ASTExpressionEvaluator;
 
+class StructuredMember;
+
 /**
  * Exception class for KernelSourceTypeEvaluator operations
  */
@@ -55,6 +57,7 @@ public:
     }
 
     virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
+    virtual void evaluateMagicNumbers(const ASTNode *node);
 
 protected:
     virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed);
