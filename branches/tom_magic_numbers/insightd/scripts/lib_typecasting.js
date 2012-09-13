@@ -30,7 +30,7 @@ function __tryChangeType(inst, type){
 		inst.ChangeType(type) ;
 		return;
 	}catch(e){
-		//print("-->"+type);
+        //println("-->"+type);
 		
 		if(type=="unsigned long" || type=="unsigned" || type=="long"){
 			if(__changeType(inst, "uint64_t")) return;
@@ -49,9 +49,9 @@ function __tryChangeType(inst, type){
 				testType += typeList[i] + " "
 			}
 			testType = testType.substr(0, testType.length-1);
-			//print("trying \""+testType+"\"");
+            //println("trying \""+testType+"\"");
 			if(!__changeType(inst, testType)){
-				//print("fail");
+                //println("fail");
 			}else{
 				foundMatchingType = true;
 				break;

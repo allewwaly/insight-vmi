@@ -537,6 +537,24 @@ public:
     quint64 toUInt64() const;
 
     /**
+     * Explicit representation of this instance as <tt>long int</tt>. The value
+     * will be read with the storage size of the guest system (32 or 64 bit),
+     * but will be returned as 64 bit integer.
+     * @return the value of this type as a <tt>long int</tt>
+     * \sa sizeofLong()
+     */
+    qint64 toLong() const;
+
+    /**
+     * Explicit representation of this instance as <tt>unsigned long int</tt>.
+     * The value will be read with the storage size of the guest system (32 or
+     * 64 bit), but will be returned as 64 bit integer.
+     * @return the value of this type as a <tt>unsigned long int</tt>
+     * \sa sizeofLong()
+     */
+    quint64 toULong() const;
+
+    /**
      * Explicit representation of this instance as float.
      * @return the value of this type as a float
      */
@@ -552,8 +570,10 @@ public:
      * Explicit representation of this instance as a pointer.
      * @return the value of this type as a variant
      * @warning This function should only be called for a pointer type!
-     * @warning The pointer has the bit size of the host system! Use
-     * pointerSize() to retrieve the pointer size of the guest system.
+     * @warning The pointer will be read with the size of the guest, but the
+     * return value has the pointer size of the host system! So a 32-bit guest
+     * reading a pointer from a 64-bit host will lose information! Use
+     * sizeofPointer() to retrieve the pointer size of the guest system.
      */
     void* toPointer() const;
 
@@ -598,9 +618,18 @@ public:
     QString derefUserLand(const QString &pgd) const;
 
     /**
-     * @return the size of a pointer for this instance in bytes
+     * @return the storage size of a pointer for the guest platform,
+     * given in byte
+     * \sa toPointer()
      */
-    int pointerSize() const;
+    int sizeofPointer() const;
+
+    /**
+     * @return the storage size of a <tt>long int</tt> for the guest platform,
+     * given in byte
+     * \sa toLong(), toULong()
+     */
+    int sizeofLong() const;
 
     /**
       * Get the VirtualMemory object that is used by this instance

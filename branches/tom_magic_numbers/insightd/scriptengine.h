@@ -106,6 +106,7 @@ private:
 
     static QScriptValue scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng, void* arg);
     static QScriptValue scriptPrint(QScriptContext* ctx, QScriptEngine* eng);
+    static QScriptValue scriptPrintLn(QScriptContext* ctx, QScriptEngine* eng);
     static QScriptValue scriptInclude(QScriptContext *context, QScriptEngine *engine);
 };
 

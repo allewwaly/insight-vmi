@@ -234,7 +234,7 @@ inline Instance ReferencingType::createRefInstance(size_t address,
             if (maxPtrDeref != 0 && vmem->safeSeek(addr)) {
                 addr = (size_t)p->toPointer(vmem, addr);
                 // Avoid instances with NULL addresses
-                if (!addr)
+                if (!addr && !(BaseType::trNullPointers & resolveTypes))
                     return Instance(address, p, name, parentNames, vmem, id);
 
                 if (derefCount)
@@ -253,7 +253,7 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 
     const RefBaseType* rbt = 0;
 
-    while ( !done && (b->type() & resolveTypes) &&
+    while ( !done && addr && (b->type() & resolveTypes) &&
             (rbt = dynamic_cast<const RefBaseType*>(b)) )
     {
         // If this is an unresolved type, don't resolve it anymore
@@ -278,7 +278,7 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 				if (maxPtrDeref != 0 && vmem->safeSeek(addr)) {
 					size_t newAddr = (size_t)rbt->toPointer(vmem, addr);
 					// Avoid instances with NULL addresses
-					if (!newAddr)
+					if (!newAddr && !(BaseType::trNullPointers & resolveTypes))
 						break;
 					addr = newAddr;
 					if (derefCount)

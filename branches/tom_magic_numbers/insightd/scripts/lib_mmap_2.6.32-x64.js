@@ -86,7 +86,7 @@ function getMemoryMap(task_struct){
 
 //include("lib_getCurrent_2.6.32-x64.js")
 //var mmap = getMemoryMap(getCurrentTask(GS_BASE_2632x64), 123)
-//print(mmap)
+//println(mmap)
 
 
 /* returns the human readable flags of a mmap syscall of signature 

@@ -16,29 +16,29 @@ function printCurrentTask(gs_base)
 	current_task = getCurrentTask(gs_base)
 	
 	try{
-		print(current_task.cred.uid.toString());
+        println(current_task.cred.uid.toString());
 	}catch(e){
-		print("unknown");
+        println("unknown");
 	}
 	try{
-		print(current_task.cred.euid.toString());
+        println(current_task.cred.euid.toString());
 	}catch(e){
-		print("unknown");
+        println("unknown");
 	}
-	print(current_task.pid.toString());
+    println(current_task.pid.toString());
 	try{
-		print(current_task.cred.gid.toString());
+        println(current_task.cred.gid.toString());
 	}catch(e){
-		print("unknown");
+        println("unknown");
 	}
 	try{
-		print(current_task.cred.egid.toString());
+        println(current_task.cred.egid.toString());
 	}catch(e){
-		print("unknown");
+        println("unknown");
 	}
-	print(current_task.state.toString());
-	print(current_task.comm.toString());
-	print("0x" + current_task.Address());
+    println(current_task.state.toString());
+    println(current_task.comm.toString());
+    println("0x" + current_task.Address());
 	
 	
 }
@@ -46,8 +46,8 @@ function printCurrentTask(gs_base)
 try{
 	printCurrentTask(GS_BASE_2632x64); // %gs register hardcoded as string!
 }catch(e){
-	print("Exception in printCurrentTask")
-	print(e)
+    println("Exception in printCurrentTask")
+    println(e)
 	// pipe exceptions to caller, as there shouldn't be any
 	throw(e)
 }

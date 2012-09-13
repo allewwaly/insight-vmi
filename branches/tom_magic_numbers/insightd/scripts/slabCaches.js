@@ -18,7 +18,7 @@ function printList(p)
 			lalign(it.name.toString(), name_size) + 
 			lalign("0x" + it.Address(), addr_size);
 
-		print(line);
+        println(line);
 		
 		it = it.next.next;
 	} while (it.Address() != first);
@@ -30,8 +30,8 @@ function printHdr()
 		lalign("Name", name_size) +
 		lalign("ADDRESS", addr_size);
 	
-	print(hdr);
-	print("===================================================");
+    println(hdr);
+    println("===================================================");
 }
 
 var cacheList = new Instance("cache_chain.next");
