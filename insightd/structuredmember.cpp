@@ -84,6 +84,16 @@ void StructuredMember::readFrom(KernelSymbolStream& in)
     in >> offset;
     // Fix old symbol informations
     _offset = (((qint64)offset) < 0) ? 0 : offset;
+    
+    if(in.kSymVersion() >= kSym::VERSION_15)
+    {
+        in >> _seenInEvaluateMagicNumber;
+        in >> _hasConstIntValue;
+        in >> _hasConstStringValue;
+        in >> _hasStringValue;
+        in >> _constIntValue;
+        in >> _constStringValue;
+    }
 }
 
 
@@ -93,6 +103,14 @@ void StructuredMember::writeTo(KernelSymbolStream& out) const
     ReferencingType::writeTo(out);
     SourceRef::writeTo(out);
     out << (quint64) _offset;
+    
+    // Since KSYM VERSION 15:
+    out << (quint32) _seenInEvaluateMagicNumber;
+    out << (quint32) _hasConstIntValue;
+    out << (quint32) _hasConstStringValue;
+    out << (quint32) _hasStringValue;
+    out << _constIntValue;
+    out << _constStringValue;
 }
 
 
