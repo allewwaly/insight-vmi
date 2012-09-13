@@ -741,7 +741,7 @@ bool MemoryMap::objectIsSane(const Instance& inst,
         const MemoryMapNode* parent)
 {
     // We consider a difference in probability of 10% or more to be significant
-//    static const float prob_significance_delta = 0.1;
+    //    static const float prob_significance_delta = 0.1;
 
     // Don't add null pointers
     if (inst.isNull() || !parent)
@@ -750,54 +750,24 @@ bool MemoryMap::objectIsSane(const Instance& inst,
     if (_vmemMap.isEmpty())
         return true;
 
-    // Increase the reading counter
-    _shared->vmemReadingLock.lock();
-    _shared->vmemReading++;
-    _shared->vmemReadingLock.unlock();
+    //do not analyze trFuncPointers
+    //TODO how to cope with trFuncPointer types?
+    if(inst.type()->type() & rtFuncPointer)
+        return false;
+   
+    //do not analyze instances with no size
+    //TODO how to cope with those? eg: struct lock_class_key
+    if(!inst.size())
+        return false;
 
     bool isSane = true;
 
 #if MEMORY_MAP_PROCESS_NODES_WITH_ALT == 0
     // Check if the list contains an object within the same memory region with a
     // significantly higher probability
-    MemMapSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
+    isSane = ! existsNode(inst);
 
-
-    for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
-        const MemoryMapNode* otherNode = *it;
-        // Is the the same object already contained?
-        bool ok1 = false, ok2 = false;
-        if (otherNode && otherNode->address() == inst.address() &&
-                otherNode->type() && inst.type() &&
-                otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
-                ok1 && ok2)
-        {
-            isSane = false;
-        }
-
-        /*
-        else {
-
-            // Is this an overlapping object with a significantly higher
-            // probability?
-            float instProb =
-                    calculateNodeProbability(&inst);
-            if (instProb + prob_significance_delta <= otherNode->probability())
-                isSane = false;
-        }
-        */
-
-    }
 #endif
-
-    // Decrease the reading counter again
-    _shared->vmemReadingLock.lock();
-    _shared->vmemReading--;
-    _shared->vmemReadingLock.unlock();
-    // Wake up any sleeping thread
-    _shared->vmemReadingDone.wakeAll();
-
-
     return isSane;
 }
 
@@ -806,6 +776,10 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
         MemoryMapNode* parent, int threadIndex, quint64 addrInParent,
         bool hasCandidates)
 {
+    MemoryMapNode *child = existsNode(inst);
+    // Return child if it already exists in virtual memory.
+    if(child) return child;
+
     static const int interestingTypes =
             BaseType::trLexical |
             rtArray |
@@ -817,8 +791,6 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
     // Dereference, if required
     const Instance i = (inst.type()->type() & BaseType::trLexical) ?
             inst.dereference(BaseType::trLexical) : inst;
-
-    MemoryMapNode *child = NULL;
 
     if (!i.isNull() && i.type() && (i.type()->type() & interestingTypes))
     {
@@ -846,6 +818,7 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
 
         _shared->currAddressesLock.unlock();
 
+        // Check if object conflicts previously given objects
         if (objectIsSane(i, parent)) {
 
             _shared->mapNodeLock.lock();
