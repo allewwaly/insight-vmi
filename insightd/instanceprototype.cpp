@@ -44,7 +44,7 @@ QString InstancePrototype::Address() const
 {
 	Instance* inst;
     return ((inst = thisInstance())) ?
-            QString("%1").arg(inst->address(), inst->pointerSize() << 1, 16, QChar('0')) :
+            QString("%1").arg(inst->address(), inst->sizeofPointer() << 1, 16, QChar('0')) :
             QString("0");
 }
 
@@ -380,10 +380,17 @@ QString InstancePrototype::MemberAddress(const QString &name,
 }
 
 
-int InstancePrototype::PointerSize() const
+int InstancePrototype::SizeofPointer() const
 {
     Instance* inst;
-    return ((inst = thisInstance())) ? inst->pointerSize() : 8;
+    return ((inst = thisInstance())) ? inst->sizeofPointer() : 8;
+}
+
+
+int InstancePrototype::SizeofLong() const
+{
+    Instance* inst;
+    return ((inst = thisInstance())) ? inst->sizeofLong() : 8;
 }
 
 
@@ -545,6 +552,34 @@ quint32 InstancePrototype::toUInt64Low() const
 }
 
 
+QString InstancePrototype::toLong(int base) const
+{
+    try {
+        Instance* inst;
+        return ((inst = thisInstance())) ?
+                QString::number(inst->toLong(), base) : QString("0");
+    }
+    catch (GenericException& e) {
+        injectScriptError(e);
+    }
+    return "0";
+}
+
+
+QString InstancePrototype::toULong(int base) const
+{
+    try {
+        Instance* inst;
+        return ((inst = thisInstance())) ?
+                QString::number(inst->toULong(), base) : QString("0");
+    }
+    catch (GenericException& e) {
+        injectScriptError(e);
+    }
+    return "0";
+}
+
+
 float InstancePrototype::toFloat() const
 {
     try {
@@ -587,6 +622,21 @@ QString InstancePrototype::toString() const
         injectScriptError(e);
     }
     return QString();
+}
+
+
+QString InstancePrototype::toPointer(int base) const
+{
+    try {
+        Instance* inst;
+        return ((inst = thisInstance())) ?
+                    QString::number((quint64)inst->toPointer(), base) :
+                    QString("0");
+    }
+    catch (GenericException& e) {
+        injectScriptError(e);
+    }
+    return "0";
 }
 
 
