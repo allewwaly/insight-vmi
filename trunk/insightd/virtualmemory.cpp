@@ -95,6 +95,9 @@
 #define pmd_index_x86_64(address)  (((address) >> PMD_SHIFT_X86_64) & (PTRS_PER_PMD_X86_64 - 1))
 #define pte_index_x86_64(address)  (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE_X86_64 - 1))
 
+// End of user space in x86_64
+#define VIRTUAL_USERSPACE_END_X86_64    0x00007fffffffffffULL
+
 #define virtualMemoryPageError(vaddr, level, throwExceptions) \
     do { \
         if (throwExceptions) \
@@ -767,12 +770,21 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
     // During initialization, the VMALLOC_START might be incorrect (i.e., less
     // than PAGE_OFFSET). This is reflected in the _specs.initialized variable.
     // In that case we always assume linear translation.
-    if (!_specs.initialized ||
-        !((vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) /*||
-          (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
-          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd)*/) )
+    if (_specs.initialized &&
+        (vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) )
     {
-        if (vaddr >= _specs.pageOffset) {
+#ifdef ENABLE_TLB
+        // Check the TLB first.
+        if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
+#endif
+            // No hit, so use the address lookup function
+            physaddr = pageLookup32(vaddr, pageSize, enableExceptions);
+    }
+    else {
+        // First 896MB of phys. memory are mapped between PAGE_OFFSET and
+        // high_memory (the latter requires initialization)
+        if (vaddr >= _specs.pageOffset &&
+            (!_specs.initialized || vaddr < _specs.highMemory)) {
             physaddr = ((vaddr) - _specs.pageOffset);
         }
         else {
@@ -784,14 +796,6 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
                             enableExceptions);
         }
         *pageSize = -1;
-    }
-    else {
-#ifdef ENABLE_TLB
-        // Check the TLB first.
-        if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
-#endif
-            // No hit, so use the address lookup function
-            physaddr = pageLookup32(vaddr, pageSize, enableExceptions);
     }
 
     return physaddr;
@@ -816,16 +820,30 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
     }
 
     // If we can do the job with a simple linear translation, subtract the
-    // adequate constant from the virtual address
-    if (!_specs.initialized ||
-        !((vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) ||
-          (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
-          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd)) )
+    // adequate constant from the virtual address, otherwise use page table
+    // based translation
+    if (_specs.initialized &&
+        ((vaddr >= _specs.realVmallocStart() && vaddr < _specs.vmallocEnd) ||
+         (vaddr >= _specs.vmemmapStart && vaddr < _specs.vmemmapEnd) ||
+         (vaddr >= _specs.modulesVaddr && vaddr < _specs.modulesEnd)) )
     {
+#ifdef ENABLE_TLB
+        // Check the TLB first.
+        if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
+#endif
+            // No hit, so use one of the address lookup functions
+            physaddr = pageLookup64(vaddr, pageSize, enableExceptions);
+    }
+    else {
+        // First 512MB of phys. memory are mapped starting from
+        // __START_KERNEL_map (ffffffff80000000 - ffffffffa0000000)
         if (vaddr >= _specs.startKernelMap) {
             physaddr = ((vaddr) - _specs.startKernelMap);
         }
-        else if (vaddr >= _specs.pageOffset) {
+        // All phys. memory (up to 64TB) are mapped between PAGE_OFFSET and
+        // high_memory (the latter requires initialization)
+        else if (vaddr >= _specs.pageOffset &&
+                 (!_specs.initialized || vaddr < _specs.highMemory)) {
             physaddr = ((vaddr) - _specs.pageOffset);
         }
         else {
@@ -835,24 +853,21 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
                 virtualMemoryOtherError(
                                 QString("Virtual address 0x%1 is not in canonical form")
                                     .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
-                                enableExceptions);
+                                        enableExceptions);
 
-            virtualMemoryOtherError(
-                            QString("Error reading from virtual address 0x%1: "
-                                    "address below linear offsets, seems to be "
-                                    "user-land memory")
+            if (vaddr <= VIRTUAL_USERSPACE_END_X86_64)
+                virtualMemoryOtherError(
+                            QString("Virtual address 0x%1 points to user space")
                                 .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
-                            enableExceptions);
+                                    enableExceptions);
+            else
+                virtualMemoryOtherError(
+                            QString("Virtual address 0x%1 not in any known address range")
+                                .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
+                                    enableExceptions);
+
         }
         *pageSize = -1;
-    }
-    else {
-#ifdef ENABLE_TLB
-        // Check the TLB first.
-        if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
-#endif
-            // No hit, so use one of the address lookup functions
-            physaddr = pageLookup64(vaddr, pageSize, enableExceptions);
     }
 
     return physaddr;

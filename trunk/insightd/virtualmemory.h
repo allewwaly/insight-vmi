@@ -21,7 +21,15 @@
 #include <genericexception.h>
 #include "memspecs.h"
 
+/**
+ * Error code returned by VirtualMemory::virtualToPhysical() in case address
+ * translation failes and exceptions are disabled.
+ */
 static const quint64 PADDR_ERROR = 0xFFFFFFFFFFFFFFFFULL;
+
+// Used to initialize MemSpecs::highMemory in case no "high_memory" instance
+// exists in 64-bit mode
+static const quint64 HIGH_MEMORY_FAILSAFE_X86_64 = 0xffffc7ffffffffffULL;
 
 /**
  * This class provides read access to a virtual address space and performs
