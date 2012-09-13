@@ -6,6 +6,7 @@
  */
 
 #include "instance.h"
+#include "variable.h"
 #include "instancedata.h"
 #include "structured.h"
 #include "refbasetype.h"
@@ -709,5 +710,198 @@ ExpressionResult Instance::toExpressionResult() const
 	default:
 		return ExpressionResult(erUndefined);
 	}
+}
+
+bool Instance::compareInstance(const Instance& inst, 
+    bool &embedded, bool &overlap, bool &thisParent) const
+{
+  bool isSane = false;
+      
+  // Are the two instances the same
+  bool ok1 = false, ok2 = false;
+  if (this->address() == inst.address() &&
+      this->type() && inst.type() &&
+      this->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
+      ok1 && ok2)
+  {
+    //debugmsg("Object already found");
+    isSane = true;
+    embedded = overlap = thisParent = false;
+  }
+  // If inst begins before instA or inst is bigger than instA
+  // call this function with the instances exchanged
+  else if (this->address() > inst.address() || 
+           ( this->address() == inst.address() &&
+             this->endAddress() < inst.endAddress() ))
+  {
+    thisParent = !thisParent;
+    isSane = inst.compareInstance(*this,
+                    embedded, overlap, thisParent);
+  }
+  // If the start address is not the same and inst ends after instA
+  // both instances overlap
+  else if (this->address() != inst.address() &&
+      this->endAddress() < inst.endAddress())
+  {
+    // Possible overlap
+    // Check for kmem_cache because of "wrong" size (true size in kmem_size, see slub.c)
+    quint32 kmem_size = this->type()->factory()->findVarByName("kmem_size")->toInstance(_d.vmem, BaseType::trLexical).toUInt32(); 
+    if( // instA is kmem_cache and is placed before otherNode
+        ( (this->address() - inst.address() > kmem_size) &&
+          this->typeName().compare("kmem_cache") &&
+          ! this->memberByOffset(0x54).toString().startsWith("kmalloc-") ) 
+      ){
+      isSane = true;
+      overlap = embedded = thisParent = false;
+    }else{
+      // debugmsg("Objects overlap");
+      overlap = true;
+      isSane = embedded = thisParent = false;
+    }
+  }
+  // Here inst is embedded inside of instA
+  else
+  {
+    embedded = true;
+    thisParent = true;
+    overlap = false;
+
+    // check if instA is an Array or Pointer
+    if( this->type()->type() & rtArray ||
+        this->type()->type() & rtPointer )
+    {
+        isSane = this->compareInstanceType(inst); 
+    }
+    else if ( ( this->address() == inst.address() &&
+                this->size() == inst.size() ) && 
+              ( inst.type()->type() & rtArray ||
+                inst.type()->type() & rtPointer ) )
+    {
+        thisParent = ! thisParent;
+        isSane = inst.compareInstanceType(*this); 
+    }
+    // Handle UnionTypes
+    else if (this->type()->type() & rtUnion || 
+             inst.type()->type() & rtUnion)
+    {
+      isSane = this->compareUnionInstances(inst, thisParent);
+      embedded = isSane;
+    }
+    else
+    {
+      Instance member = (this->type()->type() & BaseType::trLexical) ?
+            this->dereference(BaseType::trLexical) : inst;
+      Instance searchMember;
+      while(!member.isNull() && member.size() > inst.size())
+      {
+        searchMember = member.memberByOffset(inst.address() - member.address());
+        if(!searchMember.isNull()) member = searchMember;
+        else
+        {
+          int i = 1;
+          for(; member.memberAddress(i) < inst.address() && i < member.memberCount(); i++);
+          member = member.member(i-1);
+        }
+        
+        member = (member.type() && member.type()->type() & BaseType::trLexical) ?
+            member.dereference(BaseType::trLexical) : member;
+      }
+      if(!member.isNull())
+      {
+        isSane = member.compareInstanceType(inst);
+      }
+      if(!isSane && 
+         (this->address() == inst.address() &&
+          this->size() == inst.size()))
+      {
+        member = inst.memberByOffset(0);
+        if(!member.isNull())
+          thisParent = ! thisParent;
+          isSane = member.compareInstanceType(*this);
+      }
+      
+      if(!isSane)
+      {
+        //Type mismatch
+        //debugmsg("Conflict found:\n" << 
+        //    "\tInstance: " << this->fullName() << 
+        //    "\tType: " << std::hex << this->type()->id() << 
+        //    "\tAddress: " << std::hex << this->address() << 
+        //    "\tEndAddress: " << std::hex << this->endAddress() << 
+        //    "\tSize: " << std::dec << this->size() << "\n" <<
+        //    "\tInstance: " << inst.fullName() << 
+        //    "\tType: " << std::hex << inst.type()->id() << 
+        //    "\tAddress: " << std::hex << inst.address() << 
+        //    "\tEndAddress: " << std::hex << inst.endAddress() << 
+        //    "\tSize: " << std::dec << inst.size() <<
+        //    "\tOffset: " << std::hex << (inst.address() - this->address()));
+      }
+    }
+  }
+  return isSane;
+}
+
+bool Instance::compareUnionInstances(const Instance& inst, bool &thisParent) const
+{
+  bool isSane = false;
+  
+  if (inst.type()->type() & rtUnion)
+  {
+    thisParent = !thisParent;
+    for (int i = 0 ; i < inst.memberCount() ; i++ )
+    {
+      if (inst.member(i).type()->id() == this->type()->id())
+      {
+        thisParent = ! thisParent;
+        isSane = true;
+      }
+    }
+  }
+
+  if (this->type()->type() & rtUnion)
+  {
+    for (int i = 0 ; i < this->memberCount() ; i++ )
+    {
+      if (this->member(i).type()->id() == inst.type()->id())
+      {
+        isSane = true;
+      }
+    }
+  }
+
+  return isSane;
+}
+
+bool Instance::compareInstanceType(const Instance& inst) const
+{
+  // Dereference type
+  const RefBaseType* refType = dynamic_cast<const RefBaseType*>(this->type());
+
+  // Check for plausible offset and same type
+  if(this->type() && inst.type() && 
+     this->type()->hash() == inst.type()->hash())
+  {
+    return true;
+  }
+
+  if ( ( inst.address() - this->address() ) % inst.size() == 0 ){
+    while ( refType && refType->refType() ) {
+      // Try to dereference the found type until it is compatible with the given instance
+      if (inst.type()->id() == refType->refType()->id() || 
+          inst.type()->hash() == refType->refType()->hash())
+      {
+        return true;
+      }
+      // TODO Workarround! Otherwise SEGFAULT when dereferencing long unsigned int
+      if (refType->refType()->type() & RefBaseTypes )
+        refType = dynamic_cast<const RefBaseType*>(refType->refType());
+      else
+      {
+        break;
+      }
+    };
+  }
+
+  return false;
 }
 
