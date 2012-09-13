@@ -91,6 +91,10 @@ void ScriptEngine::initScriptEngine()
     		_engine->newFunction(scriptPrint),
     		roFlags|QScriptValue::SkipInEnumeration);
 
+    _engine->globalObject().setProperty("println",
+                                        _engine->newFunction(scriptPrintLn),
+                                        roFlags|QScriptValue::SkipInEnumeration);
+
     _engine->globalObject().setProperty("getInstance",
     		_engine->newFunction(scriptGetInstance, this),
     		roFlags);
@@ -123,8 +127,7 @@ void ScriptEngine::initScriptEngine()
 QScriptValue ScriptEngine::evaluate(const QString& program,
 		const QStringList& args, const QString &includePath)
 {
-	if (!_engine)
-		initScriptEngine();
+	initScriptEngine();
 
     // Export parameters to the script
     _engine->globalObject().setProperty("ARGV", _engine->toScriptValue(args),
@@ -138,24 +141,10 @@ QScriptValue ScriptEngine::evaluate(const QString& program,
 
 	QScriptValue ret;
 
-    // Push execution context
-	_engine->pushContext();
-
-	try {
-		if (args.isEmpty())
-			ret = _engine->evaluate(program);
-		else
-			ret = _engine->evaluate(program, args.first());
-	}
-	catch(...) {
-		// Exceptional cleanup
-		_engine->popContext();
-		throw;
-	}
-
-	// Regular cleanup
-	_engine->popContext();
-	_engine->collectGarbage();
+	if (args.isEmpty())
+		ret = _engine->evaluate(program);
+	else
+		ret = _engine->evaluate(program, args.first());
 
 	return ret;
 }
@@ -229,9 +218,17 @@ QScriptValue ScriptEngine::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
             shell->out() << " ";
         shell->out() << ctx->argument(i).toString();
     }
-    shell->out() << endl;
 
     return eng->undefinedValue();
+}
+
+
+QScriptValue ScriptEngine::scriptPrintLn(QScriptContext* ctx, QScriptEngine* eng)
+{
+    QScriptValue ret = scriptPrint(ctx, eng);
+    shell->out() << endl;
+
+    return ret;
 }
 
 
