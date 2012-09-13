@@ -167,7 +167,6 @@ CONFIG(memory_map) {
     unix:warning(Enabled compilation of the memory_map features. The resulting binary will must be run on an X windows system!)
 
     DEFINES += CONFIG_MEMORY_MAP
-    QT += gui
 
     FORMS += memorymapwindow.ui
 
@@ -188,9 +187,16 @@ CONFIG(memory_map) {
         memorymapnode.h \
         memorymap.h
 }
-!CONFIG(memory_map) {
-    QT -= gui
+CONFIG(WITH_X_SUPPORT){
+    unix:warning(Enabled X support. Needed for example for some memory_map features.)
+    
+    DEFINES += CONFIG_WITH_X
+    QT += gui
 }
+
+#!CONFIG(WITH_X_SUPPORT) {
+#    QT -= gui
+#}
 
 # Enable or disable libreadline support
 CONFIG(with_readline) {
