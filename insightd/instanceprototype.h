@@ -634,6 +634,7 @@ public slots:
      * than 10, the value is treated as an unsigned integer.
      * @param base numeric base to convert this string to
      * @return the value of this type as a qint64, converted to a string
+     * \sa toUInt64()
      */
     QString toInt64(int base = 10) const;
 
@@ -644,6 +645,7 @@ public slots:
      * than 10, the value is treated as an unsigned integer.
      * @param base numeric base to convert this string to
      * @return the value of this type as a quint64, converted to a string
+     * \sa toUInt64Low(), toUInt64High()
      */
     QString toUInt64(int base = 10) const;
 
@@ -651,6 +653,7 @@ public slots:
      * Explicit representation of this instance as quint64, returning only the
      * 32 most significant bits.
      * @return the 32 most significant bits of this type as a quint64
+     * \sa toUInt64Low()
      */
     quint32 toUInt64High() const;
 
@@ -658,6 +661,7 @@ public slots:
      * Explicit representation of this instance as quint64, returning only the
      * 32 least significant bits.
      * @return the 32 least significant bits of this type as a quint64
+     * \sa toUInt64High()
      */
     quint32 toUInt64Low() const;
 
@@ -669,6 +673,7 @@ public slots:
      * than 10, the value is treated as an unsigned integer.
      * @param base numeric base to convert this string to
      * @return the value of this type as a qint64, converted to a string
+     * \sa toULong(), SizeofLong()
      */
     QString toLong(int base = 10) const;
 
@@ -681,6 +686,7 @@ public slots:
      * than 10, the value is treated as an unsigned integer.
      * @param base numeric base to convert this string to
      * @return the value of this type as a qint64, converted to a string
+     * \sa toLong(), SizeofLong()
      */
     QString toULong(int base = 10) const;
 
@@ -691,6 +697,7 @@ public slots:
      * The base is 16 by default and must be between 2 and 36.
      * @param base numeric base to convert this string to
      * @return the value of this type as a pointer, converted to a string
+     * \sa SizeofPointer()
      */
     QString toPointer(int base = 16) const;
 
@@ -713,7 +720,7 @@ public slots:
 
     /**
      * Returns a toString() representation of this instance using the page
-     * global directory (i. e., page table) specified as \a pgd for
+     * global directory (that is, page table) specified as \a pgd for
      * virtual-to-physical address translation. This allows to read an instance
      * that is located in user-land address space.
      *
