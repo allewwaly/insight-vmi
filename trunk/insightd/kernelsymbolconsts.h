@@ -9,8 +9,10 @@
 #define KERNELSYMBOLCONSTS_H_
 
   /*
-   * If another Version is added, adapt new Version in referencetype
-   * and structuredmember implementation.
+   * If another Version is added, adapt new Version in:
+   *  * referencetype
+   *  * structuredmember
+   *  * memspecs
    */
 
 namespace kSym {
