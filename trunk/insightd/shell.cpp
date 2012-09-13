@@ -2113,6 +2113,11 @@ int Shell::cmdMemoryRevmapVisualize(int index, QString type)
         return 1;
     }
 
+#ifndef CONFIG_WITH_X_SUPPORT
+    _err << "No X Support configured!" << endl;
+    return 1;
+#endif
+
     int ret = 0;
     /*if (QString("physical").startsWith(type) || QString("pmem").startsWith(type))
         memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->pmemMap(),
@@ -2195,6 +2200,11 @@ int Shell::cmdMemoryDiffVisualize(int index)
                 << endl;
         return 1;
     }
+
+#ifndef CONFIG_WITH_X_SUPPORT
+    _err << "No X Support configured!" << endl;
+    return 1;
+#endif
 
    memMapWindow->mapWidget()->setDiff(&_memDumps[index]->map()->pmemDiff());
 
