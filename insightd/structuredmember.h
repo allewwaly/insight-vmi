@@ -89,6 +89,47 @@ public:
                         int resolveTypes = BaseType::trLexical,
                         int maxPtrDeref = -1) const;
 
+    /*
+      * Function to save result of magic number investigation.
+      * @returns true if object has already been seen
+      */
+    bool evaluateMagicNumberFoundNotConstant();
+    
+    /*
+      * Function to save result of magic number investigation.
+      * Should be called if constant integer type is found.
+      * @returns true if object has already been seen
+      */
+    bool evaluateMagicNumberFoundInt(qint64 constant);
+    
+    /*
+      * Function to save result of magic number investigation.
+      * Should be called if constant string is found.
+      * @returns true if object has already been seen
+      */
+    bool evaluateMagicNumberFoundString(QString constant);
+
+    inline bool hasConstantIntValue()
+    {
+        return _hasConstIntValue;
+    }
+    inline bool hasConstantStringValue()
+    {
+        return _hasConstStringValue;
+    }
+    inline bool hasStringValue()
+    {
+        return _hasStringValue;
+    }
+    inline QList<qint64> getConstantIntValue()
+    {
+        return _constIntValue;
+    }
+    inline QList<QString> getConstantStringValue()
+    {
+        return _constStringValue;
+    }
+
 protected:
     /**
      * Access function to the factory this symbol belongs to.
@@ -103,6 +144,13 @@ protected:
 private:
 	size_t _offset;          ///< the member's offset within the struct;
 	Structured* _belongsTo;  ///< Struct or Union this member belongs to
+    
+    bool _seenInEvaluateMagicNumber;
+    QList<qint64> _constIntValue;
+    QList<QString> _constStringValue;
+    bool _hasConstIntValue;
+    bool _hasConstStringValue;
+    bool _hasStringValue;
 };
 
 
