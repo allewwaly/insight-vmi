@@ -117,6 +117,7 @@ void KernelSourceParser::parse()
         BugReport::setLog(new BugReport("insightd"));
 
     cleanUpThreads();
+    _factory->seenMagicNumbers.clear();
 
     operationStarted();
 
