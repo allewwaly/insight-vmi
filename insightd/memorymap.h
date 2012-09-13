@@ -302,10 +302,17 @@ private:
      * BaseType::hash() of the instance's type is compared. Only if address and
      * hash match, the instance is considered to be already existent.
      * @param inst the Instance object to check for existence
-     * @param parent the parent node of \a inst
-     * @return \c true if an instance already exists at the address of \a inst
-     * and the hash of both types are equal, \c false otherwise
+     * @return existing Node if an instance already exists at the address of \a inst
+     * and the hash of both types are equal, null otherwise
      */
+  MemoryMapNode* existsNode(const Instance& inst);
+
+  /**
+    * Check is existance of \a inst is plausible with current virtual memory mapping.
+    * @param inst the Instance object to check for existence
+    * @param parent the parent node of \a inst
+    * @return true if object inst is plausible, false otherwise
+    */
 	bool objectIsSane(const Instance& inst, const MemoryMapNode* parent);
 
 	/**
@@ -318,7 +325,8 @@ private:
      * @param hasCandidates specifies if the node has candidates that will be
      * added next
      * @return \c A pointer to the new node if the node could be added, \c NULL
-     * if that instance already existed in the virtual memory mapping
+     * if that instance is in conflict to already existing nodes and a pointer to
+     * the existing node, if it already existed in the virtual memory mapping
 	 */
     MemoryMapNode * addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,
             int threadIndex, quint64 addrInParent, bool hasCandidates = false);
