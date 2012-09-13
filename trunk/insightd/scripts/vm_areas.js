@@ -49,7 +49,7 @@ function printVmAreas()
         tmp.AddToAddress(size - 1);
         var addr_end = tmp.Address();
         var type = flagsToStr(item.flags.toLong());
-        var io = item.phys_addr.toString() == "0" ? "(I/O)" : "";
+        var io = item.phys_addr.toString() != "0" ? "(0x" + item.phys_addr.toPointer() + ")" : "";
 
 		var line =            
             ralign("0x" + addr_start, c_addr) +
