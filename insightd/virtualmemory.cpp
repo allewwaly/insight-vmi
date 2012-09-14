@@ -837,7 +837,7 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
     else {
         // First 512MB of phys. memory are mapped starting from
         // __START_KERNEL_map (ffffffff80000000 - ffffffffa0000000)
-        if (vaddr >= _specs.startKernelMap) {
+        if (vaddr >= _specs.startKernelMap && vaddr < _specs.modulesVaddr) {
             physaddr = ((vaddr) - _specs.startKernelMap);
         }
         // All phys. memory (up to 64TB) are mapped between PAGE_OFFSET and
