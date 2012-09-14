@@ -767,35 +767,32 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
                _specs.modulesEnd == _specs.vmallocEnd);
 #endif
 
-    // During initialization, the VMALLOC_START might be incorrect (i.e., less
-    // than PAGE_OFFSET). This is reflected in the _specs.initialized variable.
-    // In that case we always assume linear translation.
-    if (_specs.initialized &&
-        (vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) )
-    {
-#ifdef ENABLE_TLB
-        // Check the TLB first.
-        if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
-#endif
-            // No hit, so use the address lookup function
-            physaddr = pageLookup32(vaddr, pageSize, enableExceptions);
-    }
-    else {
+    // Is this a kernel space address?
+    if (vaddr >= _specs.pageOffset) {
+
         // First 896MB of phys. memory are mapped between PAGE_OFFSET and
         // high_memory (the latter requires initialization)
-        if (vaddr >= _specs.pageOffset &&
-            (!_specs.initialized || vaddr < _specs.highMemory)) {
+        if (!_specs.initialized || vaddr < _specs.highMemory) {
             physaddr = ((vaddr) - _specs.pageOffset);
+            *pageSize = -1;
         }
-        else {
-            virtualMemoryOtherError(
-                            QString("Error reading from virtual address 0x%1: "
-                                    "address below linear offsets, seems to be "
-                                    "user-land memory")
-                                .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
-                            enableExceptions);
+        // Dynamic memory mapping
+        else  {
+#ifdef ENABLE_TLB
+            // Check the TLB first.
+            if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
+#endif
+                // No hit, so use the address lookup function
+                physaddr = pageLookup32(vaddr, pageSize, enableExceptions);
         }
-        *pageSize = -1;
+    }
+    else {
+        virtualMemoryOtherError(
+                    QString("Error reading from virtual address 0x%1: "
+                            "address below linear offsets, seems to be "
+                            "user-land memory")
+                    .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
+                    enableExceptions);
     }
 
     return physaddr;
@@ -819,55 +816,72 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
     	return pageLookup64(vaddr, pageSize, enableExceptions);
     }
 
-    // If we can do the job with a simple linear translation, subtract the
-    // adequate constant from the virtual address, otherwise use page table
-    // based translation
-    if (_specs.initialized &&
-        ((vaddr >= _specs.realVmallocStart() && vaddr < _specs.vmallocEnd) ||
-         (vaddr >= _specs.vmemmapStart && vaddr < _specs.vmemmapEnd) ||
-         (vaddr >= _specs.modulesVaddr && vaddr < _specs.modulesEnd)) )
-    {
-#ifdef ENABLE_TLB
-        // Check the TLB first.
-        if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
-#endif
-            // No hit, so use one of the address lookup functions
-            physaddr = pageLookup64(vaddr, pageSize, enableExceptions);
-    }
-    else {
-        // First 512MB of phys. memory are mapped starting from
-        // __START_KERNEL_map (ffffffff80000000 - ffffffffa0000000)
+    /*
+     * Address space x86_64 <Documentation/x86/x86_64/mm.txt>
+     * 00000000 00000000 - 00007fff ffffffff (=47 bits) user space, different per mm
+     * hole caused by [48:63] sign extension
+     * ffff8000 00000000 - ffff80ff ffffffff (=40 bits) guard hole
+     * ffff8800 00000000 - ffffc7ff ffffffff (=64 TB)   direct mapping of all phys. memory
+     * ffffc800 00000000 - ffffc8ff ffffffff (=40 bits) hole
+     * ffffc900 00000000 - ffffe8ff ffffffff (=45 bits) vmalloc/ioremap space
+     * ffffe900 00000000 - ffffe9ff ffffffff (=40 bits) hole
+     * ffffea00 00000000 - ffffeaff ffffffff (=40 bits) virtual memory map (1TB)
+     * ... unused hole ...
+     * ffffffff 80000000 - ffffffff a0000000 (=512 MB)  kernel text mapping, from phys 0
+     * ffffffff a0000000 - ffffffff ff000000 (=1536 MB) module mapping space
+     */
+
+    // Is address in kernel space?
+    if (vaddr >= _specs.pageOffset) {
+        // First 512MB of phys. memory are linearly mapped here:
+        // __START_KERNEL_map - MODULES_VADDR
+        // (ffffffff80000000 - ffffffffa0000000)
         if (vaddr >= _specs.startKernelMap && vaddr < _specs.modulesVaddr) {
             physaddr = ((vaddr) - _specs.startKernelMap);
+            *pageSize = -1;
         }
-        // All phys. memory (up to 64TB) are mapped between PAGE_OFFSET and
-        // high_memory (the latter requires initialization)
-        else if (vaddr >= _specs.pageOffset &&
-                 (!_specs.initialized || vaddr < _specs.highMemory)) {
+        // All phys. memory (up to 64TB) is linearly mapped here:
+        // PAGE_OFFSET       - high_memory (requires initialization)
+        // (ffff880000000000 - (ffff8800 00000000 + phys.mem.size))
+        else if (!_specs.initialized || vaddr < _specs.highMemory) {
             physaddr = ((vaddr) - _specs.pageOffset);
+            *pageSize = -1;
         }
-        else {
-            // Is the 64 bit address in canonical form?
-            quint64 high_bits = vaddr >> 47;
-            if (high_bits != 0 && high_bits != 0x1FFFFUL)
-                virtualMemoryOtherError(
-                                QString("Virtual address 0x%1 is not in canonical form")
-                                    .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
-                                        enableExceptions);
-
-            if (vaddr <= VIRTUAL_USERSPACE_END_X86_64)
-                virtualMemoryOtherError(
-                            QString("Virtual address 0x%1 points to user space")
-                                .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
-                                    enableExceptions);
-            else
-                virtualMemoryOtherError(
-                            QString("Virtual address 0x%1 not in any known address range")
-                                .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
-                                    enableExceptions);
-
+        // Is address whithin any known dynamically mapped region?
+        // Note: We COULD disable this check here and a use the page table.
+        else /*if ((vaddr >= _specs.realVmallocStart() && vaddr < _specs.vmallocEnd) ||
+                 (vaddr >= _specs.vmemmapStart && vaddr < _specs.vmemmapEnd) ||
+                 (vaddr >= _specs.modulesVaddr && vaddr < _specs.modulesEnd))*/
+        {
+#ifdef ENABLE_TLB
+            // Check the TLB first.
+            if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
+#endif
+                // No hit, so use one of the address lookup functions
+                physaddr = pageLookup64(vaddr, pageSize, enableExceptions);
         }
-        *pageSize = -1;
+        /*else {
+            virtualMemoryOtherError(
+                        QString("Virtual address 0x%1 not in any known address range")
+                        .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
+                        enableExceptions);
+
+        }*/
+    }
+    // Is address in user space?
+    else if (vaddr <= VIRTUAL_USERSPACE_END_X86_64) {
+        virtualMemoryOtherError(
+                    QString("Virtual address 0x%1 points to user space")
+                        .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
+                            enableExceptions);
+    }
+    // Addresses must be in canonical form, bit 47 of address must be
+    // extended to bits 48:63, i.e., bist 47:63 must all be either 0 or 1.
+    else {
+        virtualMemoryOtherError(
+                        QString("Virtual address 0x%1 is not in canonical form")
+                            .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
+                                enableExceptions);
     }
 
     return physaddr;
