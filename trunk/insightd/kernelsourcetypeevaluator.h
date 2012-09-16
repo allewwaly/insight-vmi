@@ -59,11 +59,18 @@ public:
     virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
     virtual void evaluateMagicNumbers(const ASTNode *node);
 
+
+
 protected:
     virtual void primaryExpressionTypeChange(const TypeEvalDetails &ed);
     virtual bool interrupted() const;
 
 private:
+    virtual void evaluateMagicNumbers_constant(const ASTNode *node, 
+            bool *intConst, qint64 *resultInt, 
+            bool *stringConst, QString *resultString,
+            QString *string);
+    
     SymFactory* _factory;
     ASTExpressionEvaluator* _eval;
 };

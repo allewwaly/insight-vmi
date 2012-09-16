@@ -2553,13 +2553,10 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
                 evaluateIdentifierPointsToRev(node);
             else if (_phase == epUsedAs)
                 evaluateIdentifierUsedAs(node);
-            break;
-
-        case nt_assignment_expression:
-            if (_phase == epMagicNumbers)
+            else if (_phase == epMagicNumbers)
                 evaluateMagicNumbers(node);
             break;
-        
+
         default:
             break;
         }

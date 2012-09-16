@@ -162,19 +162,463 @@ int KernelSourceTypeEvaluator::evaluateIntExpression(const ASTNode* node, bool* 
 
 #define DEBUGMAGICNUMBERS   1
 
+
+void KernelSourceTypeEvaluator::evaluateMagicNumbers_constant(const ASTNode *node, 
+            bool *intConst, qint64 *resultInt, 
+            bool *stringConst, QString *resultString,
+            QString *string)
+{
+    ASTSourcePrinter printer(_ast);
+
+    *intConst = false;
+    *stringConst = false;
+
+    switch(node->type){
+    
+        case nt_unary_expression_op:
+        case nt_unary_expression_builtin: //TODO Maybe implement?
+            return;
+        
+        case nt_conditional_expression:
+        case nt_logical_or_expression:
+        case nt_logical_and_expression:
+        case nt_inclusive_or_expression:
+        case nt_exclusive_or_expression:
+        case nt_and_expression:
+        case nt_equality_expression:
+        case nt_relational_expression:
+        case nt_shift_expression:
+        case nt_additive_expression:
+        case nt_multiplicative_expression:
+            evaluateMagicNumbers_constant(node->u.binary_expression.left, intConst, resultInt,
+                    stringConst, resultString, string);
+            if (!node->u.binary_expression.right) 
+                return;
+            else if (*stringConst){
+#ifdef DEBUGMAGICNUMBERS
+                string->append(QString("Stringconstant with operation?\n"));
+                string->append(QString("Node was: %1\n").arg(printer.toString(node, false).trimmed()));
+                debugmsg(*string);
+#endif /* DEBUGMAGICNUMBERS */
+                return;
+            }else if (*intConst){
+                //TODO Evaluate right side and calculate operation
+                
+                bool rightIntConst = false;
+                qint64 rightResultInt = 0;
+                evaluateMagicNumbers_constant(node->u.binary_expression.right, &rightIntConst, &rightResultInt,
+                        stringConst, resultString, string);
+                if (!rightIntConst){
+                    *intConst = false;
+                    return;
+                }
+
+                QString op;
+
+                switch (node->type) {
+                    case nt_logical_or_expression:
+                        *resultInt = *resultInt || rightResultInt;
+                        break;
+                    case nt_logical_and_expression:
+                        *resultInt = *resultInt && rightResultInt;
+                        break;
+                    case nt_inclusive_or_expression:
+                        *resultInt = *resultInt | rightResultInt;
+                        break;
+                    case nt_exclusive_or_expression:
+                        *resultInt = *resultInt ^ rightResultInt;
+                        break;
+                    case nt_and_expression:
+                        *resultInt = *resultInt & rightResultInt;
+                        break;
+                    case nt_shift_expression:
+                        op = antlrTokenToStr(node->u.binary_expression.op);
+                        if (op == "<<")
+                            *resultInt = *resultInt << rightResultInt;
+                        else
+                            *resultInt = *resultInt >> rightResultInt;
+                        break;
+                    case nt_additive_expression:
+                        op = antlrTokenToStr(node->u.binary_expression.op);
+                        if (op == "+")
+                            *resultInt = *resultInt + rightResultInt;
+                        else
+                            *resultInt = *resultInt - rightResultInt;
+                        break;
+                    case nt_multiplicative_expression:
+                        op = antlrTokenToStr(node->u.binary_expression.op);
+                        if (op == "*")
+                            *resultInt = *resultInt * rightResultInt;
+                        else if (op == "/")
+                            *resultInt = *resultInt / rightResultInt;
+                        else
+                            *resultInt = *resultInt % rightResultInt;
+                        break;
+                    default:
+                        string->append(QString("Type represents no binary expression\n"));
+                }
+                return;
+            }
+            return;
+        case nt_cast_expression:
+            if (node->u.cast_expression.unary_expression)
+                evaluateMagicNumbers_constant(node->u.cast_expression.unary_expression, intConst, resultInt,
+                    stringConst, resultString, string);
+            else if (node->u.cast_expression.cast_expression)
+                evaluateMagicNumbers_constant(node->u.cast_expression.cast_expression, intConst, resultInt,
+                    stringConst, resultString, string);
+            return;
+        case nt_unary_expression:
+            evaluateMagicNumbers_constant(node->u.unary_expression.postfix_expression, intConst, resultInt,
+                    stringConst, resultString, string);
+            return;
+        case nt_postfix_expression:
+            evaluateMagicNumbers_constant(node->u.postfix_expression.primary_expression, intConst, resultInt,
+                    stringConst, resultString, string);
+            return;
+        case nt_primary_expression:
+            
+            if (node->u.primary_expression.constant)
+            {
+                QString constant = printer.toString(node->u.primary_expression.constant,false).trimmed();
+                if (!constant.isNull())
+                {
+                    ASTType* constantType = typeofNode(node);
+                    if(constantType->type() == rtArray && 
+                            constantType->next() &&
+                            constantType->next()->type() == rtInt8)
+                    {
+                        //Interesting as this could be names of modules/structs
+#ifdef DEBUGMAGICNUMBERS
+                        string->append(QString("Found string constant!!"));
+                        *stringConst = true;
+#endif /* DEBUGMAGICNUMBERS */
+                        *resultString = constant;
+                        return;
+                    }
+                    else if (constantType->type() & IntegerTypes)
+                    {
+                        //Try to parse integer as it could be interesting
+                        //Cut off L
+                        if(constant.indexOf("U", 0, Qt::CaseInsensitive) > -1)
+                            constant.truncate(constant.indexOf("U", 0, Qt::CaseInsensitive));
+                        if(constant.indexOf("L", 0, Qt::CaseInsensitive) > -1)
+                            constant.truncate(constant.indexOf("L", 0, Qt::CaseInsensitive));
+
+                        *resultInt = constant.toInt( intConst, 0 );
+
+#ifdef DEBUGMAGICNUMBERS
+                        string->append(QString("Found int32 constant: %1\n").arg(*resultInt));
+#endif /* DEBUGMAGICNUMBERS */
+                    }
+                    //TODO also parse (u)int[16|64] (LL/ULL)
+#ifdef DEBUGMAGICNUMBERS
+                    else
+                    {
+                        RealType type = constantType->type();
+                        string->append(QString("Found constant!! %1 : %2 : %3.")
+                                .arg(realTypeToStr(type))
+                                .arg(constantType->identifier())
+                                .arg((constantType->next()) ? realTypeToStr(constantType->next()->type()): "?")
+                                );
+                    }
+#endif /* DEBUGMAGICNUMBERS */
+                }
+            }
+            return;
+
+        default:
+#ifdef DEBUGMAGICNUMBERS
+            string->append(QString("Unknown ASTType while going downwards: %1\n").arg(ast_node_type_to_str(node)));
+            string->append(QString("Node was: %1\n").arg(printer.toString(node, false).trimmed()));
+            debugmsg(*string);
+#endif /* DEBUGMAGICNUMBERS */
+            return;
+    }
+}
+
 void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
 {
     if(!node) return;
 
     ASTSourcePrinter printer(_ast);
+    //Search for type // struct
+    StructuredMember* member = 0;
+
 
 #ifdef DEBUGMAGICNUMBERS
     QString string;
 #endif /* DEBUGMAGICNUMBERS */
 
-    if(node->type == nt_assignment_expression)
+    if (node->type == nt_primary_expression &&
+        node->parent &&
+        node->parent->type == nt_postfix_expression)
+    {
+#ifdef DEBUGMAGICNUMBERS
+        string.append(QString("\nCurrent Node: %1 \n")
+                .arg(printer.toString(node, false).trimmed()));
+#endif /* DEBUGMAGICNUMBERS */
+
+        ASTType* constantType = typeofNode(node);
+
+        while ((constantType->type() & RefBaseTypes) && 
+                constantType->next())
+        {
+            constantType = constantType->next();
+#ifdef DEBUGMAGICNUMBERS
+            string.append(QString("ReferenceType with identifier: %1\n")
+                    .arg(constantType->identifier()));
+#endif /* DEBUGMAGICNUMBERS */
+        }
+
+        if (constantType->type() & (IntegerTypes | rtVoid))
+        {
+            //Not interesting
+            return;
+        }
+        else if (constantType->type() == rtStruct || constantType->type() == rtUnion)
+        {
+#ifdef DEBUGMAGICNUMBERS
+            string.append(QString("Found Struct to %1\n")
+                    .arg(constantType->identifier().trimmed()));
+#endif /* DEBUGMAGICNUMBERS */
+
+            const Structured* structured = 0;
+            const ASTNodeList* list;
+
+            if (!constantType->identifier().isEmpty())
+            {
+                QString memberName;
+
+                //Find member in primaryNode to identify structured member
+                //Handle Expression suffixes
+                if (node->parent->u.postfix_expression.postfix_expression_suffix_list)
+                {
+
+                    list = node->parent->u.postfix_expression.postfix_expression_suffix_list;
+                    while(list){
+                        if (list && list->next && list->item->type == nt_postfix_expression_parens)
+                            list = list->next;
+                        else if (list && list->next && list->item->type == nt_postfix_expression_brackets)
+                            list = list->next;
+                        else if (list &&
+                                (list->item->type == nt_postfix_expression_arrow ||
+                                 list->item->type == nt_postfix_expression_dot) && 
+                                !antlrTokenToStr(list->item->u.postfix_expression_suffix.identifier).isEmpty())
+                        {
+                            memberName = antlrTokenToStr(list->item->u.postfix_expression_suffix.identifier);
+#ifdef DEBUGMAGICNUMBERS
+                            string.append(QString("Found Membername: %1\n")
+                                    .arg(memberName.trimmed()));
+                            if (printer.toString(node, false).contains("orig_video_isVGA")) debugmsg(string); 
+#endif /* DEBUGMAGICNUMBERS */
+                            if(!structured){
+                                BaseTypeList baseTypes = _factory->findBaseTypesByName(constantType->identifier());
+                                BaseTypeList::iterator i;
+
+                                for (i = baseTypes.begin(); i != baseTypes.end(); ++i)
+                                {
+                                    if((*i)->type() == rtStruct || (*i)->type() ==rtUnion)
+                                    {
+                                        structured = dynamic_cast<const Structured*>(*i);
+                                        member = (StructuredMember*) structured->findMember(memberName);
+                                        if (member){
+                                            if (member->refType()->type() == rtStruct || member->refType()->type() ==rtUnion)
+                                                structured = dynamic_cast<const Structured*>(member->refType());
+                                            break;
+                                        }
+                                    }
+                                }
+                            } else {
+                                member = (StructuredMember*) structured->findMember(memberName);
+                                if (member){
+                                    if (member->refType()->type() == rtStruct || member->refType()->type() ==rtUnion)
+                                        structured = dynamic_cast<const Structured*>(member->refType());
+                                }
+                            }
+                            if (list->next)
+                                list = list->next;
+                            else
+                                break;
+                        }else break;
+                    }
+                }
+                else
+                {
+#ifdef DEBUGMAGICNUMBERS
+                    string.append(QString("Struct without member?\n"));
+                    //debugmsg(string); //TODO Maybe handle
+#endif /* DEBUGMAGICNUMBERS */
+                    return;
+                }
+                if (!structured)
+                {
+#ifdef DEBUGMAGICNUMBERS
+                    string.append(QString("UNKNOWN STRUCT: %1 with member %2 - BUG?")
+                            .arg(constantType->identifier())
+                            .arg(memberName)
+                            );
+#endif /* DEBUGMAGICNUMBERS */
+                    return;
+                }
+
+                if (!member)
+                {
+#ifdef DEBUGMAGICNUMBERS
+                    string.append("Invalid Member!!");
+                    //debugmsg(string);
+#endif /* DEBUGMAGICNUMBERS */
+                    return;
+                }
+
+#ifdef DEBUGMAGICNUMBERS
+                if (member->refType()->type() == typeofNode(list->item)->type() || 
+                        ((member->refType()->type() == rtTypedef ||
+                          member->refType()->type() == rtVolatile) &&
+                         member->refType()->dereferencedBaseType()->type() == typeofNode(list->item)->type())
+                   )
+                {
+                    string.append(QString("Found Assignment: \"%1->(%2)\" (%3)\n")
+                            .arg(structured->name())
+                            .arg(member->prettyName())
+                            .arg(printer.toString(node, false).trimmed())
+                            );
+                }
+#endif /* DEBUGMAGICNUMBERS */
+            }
+            else
+            {
+                //Struct got no identifier, so we do not know the type
+#ifdef DEBUGMAGICNUMBERS
+                string.append(QString("Struct without name?"));
+                // debugmsg(string);
+#endif /* DEBUGMAGICNUMBERS */
+                return;
+            }
+        }
+#ifdef DEBUGMAGICNUMBERS
+        else
+        {
+            string.append(QString("Found Type: %1\n").arg(realTypeToStr(constantType->type())));
+        }
+#endif /* DEBUGMAGICNUMBERS */
+
+        const ASTNode* localNode = node->parent;
+        bool findAssignment = true;
+        while (findAssignment && localNode->parent)
+        {
+            switch(localNode->type)
+            {
+                case nt_postfix_expression:
+                case nt_unary_expression:
+                case nt_cast_expression:
+                case nt_lvalue:
+                    localNode = localNode->parent;
+                    continue;
+                
+                case nt_assignment_expression:
+                    if (localNode == localNode->parent->u.assignment_expression.lvalue)
+                    string.append(QString("Assignment is: %1\n").arg(printer.toString(localNode, false).trimmed()));
+                    findAssignment = false;
+                    break;
+
+                case nt_multiplicative_expression:
+                    //Expression is part of calculation
+                case nt_builtin_function_offsetof:
+                case nt_unary_expression_op:
+                    return;
+
+                case nt_unary_expression_dec:
+                case nt_unary_expression_inc:
+                    member->evaluateMagicNumberFoundNotConstant();
+                    return;
+                
+                default:
+#ifdef DEBUGMAGICNUMBERS
+                    string.append(QString("Unknown ASTType while going upwards: %1\n").arg(ast_node_type_to_str(localNode)));
+                    string.append(QString("Node was: %1\n").arg(printer.toString(localNode, false).trimmed()));
+                    debugmsg(string);
+#endif /* DEBUGMAGICNUMBERS */
+                    localNode = localNode->parent;
+                    return;
+            }
+        }
+        
+#ifdef DEBUGMAGICNUMBERS
+        string.append(QString("Final Node Found was: %1\n").arg(printer.toString(localNode, false).trimmed()));
+#endif /* DEBUGMAGICNUMBERS */
+        
+        if (antlrTokenToStr(localNode->u.assignment_expression.assignment_operator) != "=")
+        {
+            member->evaluateMagicNumberFoundNotConstant();
+            return;
+        }
+
+        //bool constantValue = false;
+        //int constantInt = evaluateIntExpression(localNode->u.assignment_expression.assignment_expression, &constantValue);
+
+        //if(constantValue)
+        //{
+        //    member->evaluateMagicNumberFoundInt(constantInt);
+#ifdef DEBUGMAGICNUMBERS
+        //    string.append(QString("Found constant: %1\n").arg(constantInt));
+        //    return;
+#endif /* DEBUGMAGICNUMBERS */
+        //}
+        //else
+        //{
+        //    //Try to find String Value!
+        //    member->evaluateMagicNumberFoundNotConstant();
+        //    return;
+        //}
+
+        if (localNode->u.assignment_expression.assignment_expression && 
+            localNode->u.assignment_expression.assignment_expression->u.assignment_expression.conditional_expression &&
+            localNode->u.assignment_expression.assignment_expression->u.assignment_expression.conditional_expression
+                ->u.conditional_expression.logical_or_expression->u.binary_expression.left)
+        {
+            bool intConst = false;
+            qint64 resultInt = 0;
+            bool stringConst = false;
+            QString resultString;
+
+            evaluateMagicNumbers_constant(localNode->u.assignment_expression.assignment_expression
+                    ->u.assignment_expression.conditional_expression
+                    ->u.conditional_expression.logical_or_expression,
+                    &intConst, &resultInt, 
+                    &stringConst, &resultString,
+                    &string);
+
+            if ((!intConst && !stringConst)){
+                member->evaluateMagicNumberFoundNotConstant();
+#ifdef DEBUGMAGICNUMBERS
+                string.append(QString("Found not constant\n"));
+#endif /* DEBUGMAGICNUMBERS */
+            } else if(intConst){
+                member->evaluateMagicNumberFoundInt(resultInt);
+#ifdef DEBUGMAGICNUMBERS
+                string.append(QString("Found constant Int: %1\n").arg(resultInt));
+#endif /* DEBUGMAGICNUMBERS */
+            } else if (stringConst) {
+                member->evaluateMagicNumberFoundString(resultString);
+#ifdef DEBUGMAGICNUMBERS
+                string.append(QString("Found constant String: %1\n").arg(resultString));
+#endif /* DEBUGMAGICNUMBERS */
+            }
+
+        }
+
+
+
+#ifdef DEBUGMAGICNUMBERS
+        //debugmsg(string);
+#endif /* DEBUGMAGICNUMBERS */
+    }
+
+    else if(false && node->type == nt_assignment_expression)
     {
 
+        ASTNode* localNode;
         if (node->u.assignment_expression.assignment_expression && 
                 node->u.assignment_expression.assignment_expression->u.assignment_expression.conditional_expression &&
                 node->u.assignment_expression.assignment_expression->u.assignment_expression.conditional_expression
@@ -188,7 +632,6 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
 
             //Search for type // struct
             StructuredMember* member = 0;
-            ASTNode* localNode;
 
             if (node->u.assignment_expression.lvalue)
             {
@@ -266,29 +709,51 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
                                     {
 
                                         list = localNode->u.postfix_expression.postfix_expression_suffix_list;
-                                        if (list && list->item->type == nt_postfix_expression_parens)
-                                            list = list->next;
-                                        if (list && list->item->type == nt_postfix_expression_brackets)
-                                            list = list->next;
-                                        if (list &&
-                                                (list->item->type == nt_postfix_expression_arrow ||
-                                                 list->item->type == nt_postfix_expression_dot) && 
-                                                !antlrTokenToStr(list->item->u.postfix_expression_suffix.identifier).isEmpty())
-                                        {
-                                            BaseTypeList baseTypes = _factory->findBaseTypesByName(constantType->identifier());
-                                            BaseTypeList::iterator i;
-                                            
-                                            memberName = antlrTokenToStr(list->item->u.postfix_expression_suffix.identifier);
-                                            for (i = baseTypes.begin(); i != baseTypes.end(); ++i)
+                                        while(list){
+                                            if (list && list->next && list->item->type == nt_postfix_expression_parens)
+                                                list = list->next;
+                                            else if (list && list->next && list->item->type == nt_postfix_expression_brackets)
+                                                list = list->next;
+                                            else if (list &&
+                                                    (list->item->type == nt_postfix_expression_arrow ||
+                                                     list->item->type == nt_postfix_expression_dot) && 
+                                                    !antlrTokenToStr(list->item->u.postfix_expression_suffix.identifier).isEmpty())
                                             {
-                                                if((*i)->type() == rtStruct || (*i)->type() ==rtUnion)
-                                                {
-                                                    structured = dynamic_cast<const Structured*>(*i);
+                                                memberName = antlrTokenToStr(list->item->u.postfix_expression_suffix.identifier);
+#ifdef DEBUGMAGICNUMBERS
+                                                string.append(QString("Found Membername: %1\n")
+                                                    .arg(memberName.trimmed()));
+                                                if (printer.toString(node, false).contains("orig_video_isVGA")) debugmsg(string); 
+#endif /* DEBUGMAGICNUMBERS */
+                                                if(!structured){
+                                                    BaseTypeList baseTypes = _factory->findBaseTypesByName(constantType->identifier());
+                                                    BaseTypeList::iterator i;
+                                                    
+                                                    for (i = baseTypes.begin(); i != baseTypes.end(); ++i)
+                                                    {
+                                                        if((*i)->type() == rtStruct || (*i)->type() ==rtUnion)
+                                                        {
+                                                            structured = dynamic_cast<const Structured*>(*i);
+                                                            member = (StructuredMember*) structured->findMember(memberName);
+                                                            if (member){
+                                                                if (member->refType()->type() == rtStruct || member->refType()->type() ==rtUnion)
+                                                                  structured = dynamic_cast<const Structured*>(member->refType());
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
                                                     member = (StructuredMember*) structured->findMember(memberName);
-                                                    if (member) 
-                                                        break;
+                                                    if (member){
+                                                        if (member->refType()->type() == rtStruct || member->refType()->type() ==rtUnion)
+                                                            structured = dynamic_cast<const Structured*>(member->refType());
+                                                    }
                                                 }
-                                            }
+                                                if (list->next)
+                                                    list = list->next;
+                                                else
+                                                    break;
+                                            }else break;
                                         }
                                     }
                                     else
@@ -337,7 +802,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
                                        )
                                     {
 #ifdef DEBUGMAGICNUMBERS
-                                        string.append(QString("Found Assignment: \"%1->(%2)\" (%4)\n")
+                                        string.append(QString("Found Assignment: \"%1->(%2)\" (%3)\n")
                                                 .arg(structured->name())
                                                 .arg(member->prettyName())
                                                 .arg(printer.toString(node, false).trimmed())
@@ -363,7 +828,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
                                     //Maybe ask Christian
 #ifdef DEBUGMAGICNUMBERS
                                     string.append(QString("Struct without name?"));
-                                    //debugmsg(string);
+                                   // debugmsg(string);
 #endif /* DEBUGMAGICNUMBERS */
                                     return;
                                 }
@@ -464,7 +929,10 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
             
 
             if (antlrTokenToStr(node->u.assignment_expression.assignment_operator) != "=")
+            {
                 member->evaluateMagicNumberFoundNotConstant();
+                return;
+            }
 
             //Search for constant
                 
