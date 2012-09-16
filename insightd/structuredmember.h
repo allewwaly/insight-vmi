@@ -121,11 +121,11 @@ public:
     {
         return _hasStringValue;
     }
-    inline QList<qint64> getConstantIntValue()
+    inline QList<qint64> constantIntValue()
     {
         return _constIntValue;
     }
-    inline QList<QString> getConstantStringValue()
+    inline QList<QString> constantStringValue()
     {
         return _constStringValue;
     }
