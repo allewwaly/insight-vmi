@@ -35,6 +35,7 @@ MemoryMapBuilderSV::~MemoryMapBuilderSV()
 void MemoryMapBuilderSV::run()
 {
     _interrupted = false;
+    statisticsShown = false;
     // Holds the data that is shared among all threads
     BuilderSharedState* shared = _map->_shared;
 
