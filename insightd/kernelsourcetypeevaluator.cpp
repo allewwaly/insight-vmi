@@ -177,6 +177,9 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers_constant(const ASTNode *nod
     
         case nt_unary_expression_op:
         case nt_unary_expression_builtin: //TODO Maybe implement?
+        case nt_builtin_function_sizeof:
+        case nt_unary_expression_inc:
+        case nt_unary_expression_dec:
             return;
         
         case nt_conditional_expression:
@@ -290,7 +293,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers_constant(const ASTNode *nod
                     {
                         //Interesting as this could be names of modules/structs
 #ifdef DEBUGMAGICNUMBERS
-                        string->append(QString("Found string constant!!"));
+                        string->append(QString("Found string constant!! \"%1\"").arg(constant));
                         *stringConst = true;
 #endif /* DEBUGMAGICNUMBERS */
                         *resultString = constant;
