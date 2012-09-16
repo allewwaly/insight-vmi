@@ -507,6 +507,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 #endif
 
 #endif // SHOW_STATISTICS
+    debugmsg("Processed " << std::dec << _shared->processed << " instances");
 }
 
 
@@ -758,6 +759,9 @@ bool MemoryMap::objectIsSane(const Instance& inst,
     //do not analyze instances with no size
     //TODO how to cope with those? eg: struct lock_class_key
     if(!inst.size())
+        return false;
+
+    if(!inst.isValidConcerningMagicNumbers())
         return false;
 
     bool isSane = true;

@@ -905,3 +905,133 @@ bool Instance::compareInstanceType(const Instance& inst) const
   return false;
 }
 
+bool Instance::isValidConcerningMagicNumbers() const 
+{
+    //Check if type is structured
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
+        return true;
+
+    bool isValid = true;
+
+    MemberList members = dynamic_cast<const Structured*>(_d.type)->members();
+
+    MemberList::iterator memberIterator;
+    for (memberIterator = members.begin(); 
+            memberIterator != members.end(); ++memberIterator)
+    {
+        QString debugString;
+
+        Instance memberInstance = 
+            (*memberIterator)->toInstance(_d.address, _d.vmem, this);
+        bool memberValid = false;
+        if((*memberIterator)->hasConstantIntValue())
+        {
+            if(memberInstance.name() == "refcount"){
+                memberValid = true;
+                continue;
+            }
+            qint64 constInt = 0;
+            switch (memberInstance.type()->type()) {
+                case rtBool8:
+                case rtInt8:
+                case rtUInt8:
+                    constInt = memberInstance.toUInt8();
+                    break;
+
+                case rtBool16:
+                case rtInt16:
+                case rtUInt16:
+                    constInt = memberInstance.toUInt16();
+                    break;
+
+                case rtBool32:
+                case rtInt32:
+                case rtUInt32:
+                    constInt = memberInstance.toUInt32();
+                    break;
+
+                case rtBool64:
+                case rtInt64:
+                case rtUInt64:
+                    constInt = memberInstance.toUInt64();
+                    break;
+
+                case rtEnum:
+                    switch (memberInstance.size()) {
+                        case 8: 
+                            constInt = memberInstance.toUInt64();
+                            break;
+                        case 4: 
+                            constInt = memberInstance.toUInt32();
+                            break;
+                        case 2: 
+                            constInt = memberInstance.toUInt16();
+                            break;
+                        default: 
+                            constInt = memberInstance.toUInt8();
+                            break;
+                    }
+
+                default:
+                    break;
+            }
+            debugString.append(QString("%1 -> %2 : %3 (%4)\n%5\n")
+                    .arg(this->name())
+                    .arg(memberInstance.name())
+                    .arg(constInt)
+                    .arg(memberInstance.typeName())
+                    .arg(memberInstance.fullName())
+                    );
+            if ((*memberIterator)->constantIntValue().size() == 1 &&
+                    (*memberIterator)->constantIntValue().first() == 0)
+            {
+                memberValid = true;
+                continue;
+            }
+            debugString.append(QString("Number of candidates: %1\n").
+                    arg((*memberIterator)->constantIntValue().size()));
+            QList<qint64> constantList = (*memberIterator)->constantIntValue();
+            QList<qint64>::iterator constant;
+            for (constant = constantList.begin();
+                    constant != constantList.end();
+                    ++constant)
+            {
+                if(constInt == (*constant)) memberValid = true;
+                debugString.append(QString("Possible Value: %1\n").arg(*constant));
+            }
+        }
+//        else if ((*memberIterator)->hasConstantStringValue())
+//        {
+//            debugString.append(QString("Found String: \"%1\"\n").arg(memberInstance.toString()));
+//            QList<QString> constantList = (*memberIterator)->constantStringValue();
+//            QList<QString>::iterator constant;
+//            for (constant = constantList.begin();
+//                    constant != constantList.end();
+//                    ++constant)
+//            {
+//                if(memberInstance.toString() == (*constant)) memberValid = true;
+//                debugString.append(QString("Possible Value: %1\n").arg(*constant));
+//            }
+//            //TODO StringConstants do not seem to be a good indicator.
+//            //Maybe enough if we see any string
+//        }
+        else if ((*memberIterator)->hasStringValue())
+        {
+            //TODO check if type is String (Contains only ASCII Characters)
+            if(memberInstance.toString() == "NULL")
+                memberValid = false;
+            else {
+                debugString.append(QString("Found String: \"%1\"\n").arg(memberInstance.toString()));
+                memberValid = true;
+            }
+        }else 
+            memberValid = true;
+        if (!memberValid)
+        {
+            isValid = false;
+            debugmsg(debugString);
+        }
+    }
+
+    return isValid;
+}

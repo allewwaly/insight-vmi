@@ -665,6 +665,15 @@ public:
      * @return \c true if instances types do not conflict with each other
      */
     bool compareInstanceType(const Instance& inst) const ;
+    
+    /**
+     * Function to check consistency by considering const / enum members.
+     * This function is only useful for structured types.
+     * Used in compareInstance.
+     * @return \c true if instance is considered as consistent. Also
+     *         \c true if instance is not a structured type.
+     */
+    bool isValidConcerningMagicNumbers() const ;
 
 private:
     typedef QSet<quint64> VisitedSet;
