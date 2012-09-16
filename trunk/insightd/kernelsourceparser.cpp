@@ -210,7 +210,7 @@ void KernelSourceParser::parse()
         if ((*i)->hasConstantIntValue())
         {
             counter++;
-            QList<qint64> constInt = (*i)->getConstantIntValue();
+            QList<qint64> constInt = (*i)->constantIntValue();
             for (QList<qint64>::iterator j = constInt.begin();
                                 j != constInt.end(); ++j)
                 buffer.append(QString("Found Constant int %1.%2 = %3\n")
@@ -222,7 +222,7 @@ void KernelSourceParser::parse()
         else if ((*i)->hasConstantStringValue())
         {
             counter++;
-            QList<QString> constString = (*i)->getConstantStringValue();
+            QList<QString> constString = (*i)->constantStringValue();
             for (QList<QString>::iterator j = constString.begin();
                                 j != constString.end(); ++j)
                 buffer.append(QString("Found Constant string %1.%2 = %3\n")
