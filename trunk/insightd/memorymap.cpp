@@ -814,7 +814,7 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
 
         // No conflicts anymore, so we lock our current address
         _shared->currAddresses[threadIndex] = i.address();
-        _shared->perThreadLock[threadIndex].lock();
+        QMutexLocker threadLock(&_shared->perThreadLock[threadIndex]);
 
         _shared->currAddressesLock.unlock();
 
@@ -834,7 +834,6 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
 
                 // Release locks and return
                 _shared->currAddresses[threadIndex] = 0;
-                _shared->perThreadLock[threadIndex].unlock();
                 _shared->mapNodeLock.unlock();
 
                 return child;
@@ -873,7 +872,6 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
 
         // Done, release our current address (no need to hold currAddressesLock)
         _shared->currAddresses[threadIndex] = 0;
-        _shared->perThreadLock[threadIndex].unlock();
 //        // Wake up a waiting thread (if it exists)
 //        _shared->threadDone[threadIndex].wakeOne();
 
