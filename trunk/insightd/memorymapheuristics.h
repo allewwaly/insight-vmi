@@ -34,7 +34,7 @@ public:
      * @param p the pointer instance to verify
      * @returns true if the pointer is valid, false otherwise
      */
-    static bool validPointerAddress(Instance *p);
+    static bool validPointerAddress(const Instance *p);
 
     /**
      * Checks if the given instance is a valid 'struct list_head'.
@@ -43,7 +43,7 @@ public:
      * @param i the list_head instance to verify
      * @returns true of the instance is a valid list_head false otherwise.
      */
-    static bool validListHead(Instance *i);
+    static bool validListHead(const Instance *i);
 
     /**
      * Check if the given candidate is a valid candidate for the given list head.
@@ -55,7 +55,7 @@ public:
      * to the given list head
      * @returns true if the candidate is compatbible false otherwise
      */
-    static bool validCandidateBasedOnListHead(Instance *listHead, Instance *cand);
+    static bool validCandidateBasedOnListHead(const Instance *listHead, const Instance *cand);
 
     /**
      * Use all the available heuristics to check whether the given candidate is
@@ -65,7 +65,7 @@ public:
      * @param cand the candidate that we want to check for compatability.
      * @returns true if the candidate is compatible, false otherwise
      */
-    static bool compatibleCandidate(Instance *parent, Instance *cand);
+    static bool compatibleCandidate(const Instance *parent, const Instance *cand);
 
     /**
      * Call all Heuristics which allow to exclude an object
@@ -73,7 +73,7 @@ public:
      * @param eh ExclusionHeuristics to use in test.
      * @returns true if the instances existence is plausible, false otherwise
      */
-    static bool callExclusionHeuristics(Instance *instance, int eh);
+    static bool callExclusionHeuristics(const Instance *instance, int eh);
 };
 
 #endif // MEMORYMAPHEURISTICS_H
