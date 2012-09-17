@@ -377,6 +377,18 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
             _invalidObjects++;
             break;
     }
+
+    bool hasConst = false;
+    if (i.isValidConcerningMagicNumbers(&hasConst)){
+        _magicNumberValid++;
+        if (hasConst){
+            _magicNumberValid_withConst++;
+            if (v == SlubObjects::ovMaybeValid ||
+                    v == SlubObjects::ovNoSlabType)
+                _magicNumberValid_notSlub++;
+        }
+    }
+    else _magicNumberInvalid++;
 }
 
 void MemoryMapVerifier::statisticsHelper(MemoryMapNode *node)
@@ -406,6 +418,10 @@ void MemoryMapVerifier::statistics()
     _validObjects = 0;
     _invalidObjects = 0;
     _maybeValidObjects = 0;
+    _magicNumberValid = 0;
+    _magicNumberInvalid = 0;
+    _magicNumberValid_withConst = 0;
+    _magicNumberValid_notSlub = 0;
 
     QList<MemoryMapNode *> rootNodes = _map->roots();
 
@@ -416,6 +432,7 @@ void MemoryMapVerifier::statistics()
     quint64 totalObjs = (_validObjects + _invalidObjects + _maybeValidObjects);
 
     shell->out() << "\nMap Statistics:\n"
+                 << "Slubs:\n"
                  << qSetFieldWidth(50)
                  << "\t| No. of objects in map:"
                  << right << qSetFieldWidth(8)
@@ -453,6 +470,48 @@ void MemoryMapVerifier::statistics()
                  << ((float)_validObjects) * 100 / _slub.numberOfObjects()
                  << qSetFieldWidth(0) << left << shell->color(ctReset)
                  << "%\n"
+                 << qSetFieldWidth(0)
+                 << "\t|\n"
+                 << "MagicNumbers\n"
+                 << "\t| No. of valid objects:"
+                 << qSetFieldWidth(0) << shell->color(ctType) << right << qSetFieldWidth(8)
+                 << _magicNumberValid
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << " ("
+                 << shell->color(ctType)
+                 << ((float)_magicNumberValid) * 100 / totalObjs << shell->color(ctType)
+                 << shell->color(ctReset)
+                 << "%)\n"
+                 << qSetFieldWidth(50)
+                 << "\t| Number of valid objects with MagicNumbers:"
+                 << right << qSetFieldWidth(0) << shell->color(ctError) << qSetFieldWidth(8)
+                 << _magicNumberValid_withConst
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << " ("
+                 << shell->color(ctError)
+                 << ((float)_magicNumberValid_withConst) * 100 / _magicNumberValid
+                 << shell->color(ctReset)
+                 << "%)\n"
+                 << qSetFieldWidth(50)
+                 << "\t| Number of valid objects not in slub:"
+                 << right << qSetFieldWidth(0) << shell->color(ctError) << qSetFieldWidth(8)
+                 << _magicNumberValid_notSlub
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << " ("
+                 << shell->color(ctError)
+                 << ((float)_magicNumberValid_notSlub) * 100 / _magicNumberValid
+                 << shell->color(ctReset)
+                 << "%)\n"
+                 << qSetFieldWidth(50)
+                 <<"\t| No. of invalid objects:"
+                 << right << qSetFieldWidth(0) << shell->color(ctError) << qSetFieldWidth(8)
+                 << _magicNumberInvalid
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << " ("
+                 << shell->color(ctError)
+                 << ((float)_magicNumberInvalid) * 100 / totalObjs
+                 << shell->color(ctReset)
+                 << "%)\n"
                  << qSetFieldWidth(50)
                  << "\t| Estimation of map correctness:"
                  << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << shell->color(ctBold)
