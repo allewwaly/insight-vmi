@@ -673,7 +673,7 @@ public:
      * @return \c true if instance is considered as consistent. Also
      *         \c true if instance is not a structured type.
      */
-    bool isValidConcerningMagicNumbers() const ;
+    bool isValidConcerningMagicNumbers(bool *constants = 0) const ;
 
 private:
     typedef QSet<quint64> VisitedSet;
