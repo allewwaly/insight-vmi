@@ -4,7 +4,7 @@ MemoryMapHeuristics::MemoryMapHeuristics()
 {
 }
 
-bool MemoryMapHeuristics::validPointerAddress(Instance *p)
+bool MemoryMapHeuristics::validPointerAddress(const Instance *p)
 {
     // Is this even a pointer
     if(!p || p->isNull() || !(p->type()->type() & rtPointer))
@@ -36,7 +36,7 @@ bool MemoryMapHeuristics::isListHead(const Instance *i)
     return false;
 }
 
-bool MemoryMapHeuristics::validListHead(Instance *i)
+bool MemoryMapHeuristics::validListHead(const Instance *i)
 {
     // Is this even a list_head?
     if(!i || i->isNull() || !isListHead(i))
@@ -79,7 +79,7 @@ bool MemoryMapHeuristics::validListHead(Instance *i)
     return true;
 }
 
-bool MemoryMapHeuristics::validCandidateBasedOnListHead(Instance *listHead, Instance *cand)
+bool MemoryMapHeuristics::validCandidateBasedOnListHead(const Instance *listHead, const Instance *cand)
 {
     // Did we receive a valid list_head?
     if(!validListHead(listHead))
@@ -122,7 +122,7 @@ bool MemoryMapHeuristics::validCandidateBasedOnListHead(Instance *listHead, Inst
     return true;
 }
 
-bool MemoryMapHeuristics::compatibleCandidate(Instance *parent, Instance *cand)
+bool MemoryMapHeuristics::compatibleCandidate(const Instance *parent, const Instance *cand)
 {
     // Check the heuristics that we have
     if(isListHead(parent))
@@ -132,7 +132,7 @@ bool MemoryMapHeuristics::compatibleCandidate(Instance *parent, Instance *cand)
     return true;
 }
 
-bool MemoryMapHeuristics::callExclusionHeuristics(Instance *instance, int eh){
+bool MemoryMapHeuristics::callExclusionHeuristics(const Instance *instance, int eh){
     if (eh & ehMagicNumber && !instance->isValidConcerningMagicNumbers())
         return false;
     if (eh & ehListHead    && isListHead(instance) && !validListHead(instance))
