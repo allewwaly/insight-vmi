@@ -175,6 +175,11 @@ private:
     quint64 _invalidObjects;
     quint64 _maybeValidObjects;
 
+    quint64 _magicNumberValid;
+    quint64 _magicNumberValid_withConst;
+    quint64 _magicNumberValid_notSlub;
+    quint64 _magicNumberInvalid;
+
     QMutex verifierMutex;
 };
 
