@@ -4,6 +4,17 @@
 #include "instance_def.h"
 #include "memorymap.h"
 
+enum ExclusionHeuristics
+{
+	ehMagicNumber = 0,          //!< MagicNumber Evaluation
+	ehListHead    = (1 <<  0),  //!< ListHead Evaluation
+};
+
+/// Bitmask with all signed integer-based RealType's
+static const int AllExclusionHeuristics =
+    ehMagicNumber |
+    ehListHead;
+
 class MemoryMapHeuristics
 {
 public:
@@ -55,6 +66,14 @@ public:
      * @returns true if the candidate is compatible, false otherwise
      */
     static bool compatibleCandidate(Instance *parent, Instance *cand);
+
+    /**
+     * Call all Heuristics which allow to exclude an object
+     * @param instance the instance that we want to check for plausibility.
+     * @param eh ExclusionHeuristics to use in test.
+     * @returns true if the instances existence is plausible, false otherwise
+     */
+    static bool callExclusionHeuristics(Instance *instance, int eh);
 };
 
 #endif // MEMORYMAPHEURISTICS_H

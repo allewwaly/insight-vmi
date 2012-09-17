@@ -132,4 +132,11 @@ bool MemoryMapHeuristics::compatibleCandidate(Instance *parent, Instance *cand)
     return true;
 }
 
-
+bool MemoryMapHeuristics::callExclusionHeuristics(Instance *instance, int eh){
+    if (eh & ehMagicNumber && !instance->isValidConcerningMagicNumbers())
+        return false;
+    if (eh & ehListHead    && isListHead(instance) && !validListHead(instance))
+        return false;
+    
+    return true;
+}
