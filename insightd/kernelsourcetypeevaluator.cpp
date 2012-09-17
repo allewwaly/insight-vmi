@@ -527,6 +527,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
 
                 case nt_multiplicative_expression:
                     //Expression is part of calculation
+                case nt_builtin_function_sizeof:
                 case nt_builtin_function_offsetof:
                 case nt_unary_expression_op:
                     return;
