@@ -800,6 +800,7 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
     {
         // Is any other thread currently searching for the same address?
         _shared->currAddressesLock.lock();
+        _shared->currAddresses[threadIndex] = 0;
         int idx = 0;
         while (idx < _shared->threadCount) {
             if (_shared->currAddresses[idx] == i.address()) {
