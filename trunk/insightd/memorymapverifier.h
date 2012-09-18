@@ -180,6 +180,16 @@ private:
     quint64 _magicNumberValid_notSlub;
     quint64 _magicNumberInvalid;
 
+    quint64 _slubValidDistribution[10];
+    quint64 _slubInvalidDistribution[10];
+
+    quint64 _magicnumberValidDistribution[10];
+    quint64 _magicnumberInvalidDistribution[10];
+
+
+    float _minValidProbability;
+    float _maxInvalidProbability;
+
     QMutex verifierMutex;
 };
 
