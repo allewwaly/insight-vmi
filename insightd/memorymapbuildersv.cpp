@@ -298,7 +298,7 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *listHead,
         // Verify cast
         if(!currentNode) {
             debugerr("Could not cast the created child to MemoryMapNodeSV!");
-            continue;
+            return;
         }
 
         // Update vars
@@ -404,7 +404,7 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
         }
 #elif MEMORY_MAP_PROCESS_NODES_WITH_ALT == 1
 
-            MemoryMapNode *lastNode = NULL;
+            MemoryMapNodeSV *lastNode = NULL;
             float penalize = 0.0;
 
             // Lets first try to add the original type of the member
@@ -425,7 +425,7 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
                             m.setName(inst->name() + "." + m.name());
 
                        // Member has condidates
-                       lastNode = _map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i), true);
+                       lastNode = dynamic_cast<MemoryMapNodeSV*>(_map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i), true));
                     }
                 }
             }
@@ -457,7 +457,8 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
                     Instance m = inst->memberCandidate(i, j);
 
                     // Check compatability using heuristics
-                    if(MemoryMapHeuristics::compatibleCandidate(inst, cand)) {
+                    //if(MemoryMapHeuristics::compatibleCandidate(inst, cand)) {
+                    if(MemoryMapHeuristics::compatibleCandidate(inst, &m)) {
 
                         /// todo: Handle list heads seperately.
 
@@ -470,7 +471,7 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
                             if (node->name() != inst->name())
                                 m.setName(inst->name() + "." + m.name());
 
-                            lastNode = _map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i), true);
+                            lastNode = dynamic_cast<MemoryMapNodeSV*>(_map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i), true));
 
                             if(lastNode != NULL)
                             {

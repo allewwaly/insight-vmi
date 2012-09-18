@@ -351,30 +351,55 @@ MemoryMapNode * MemoryMapVerifier::leastCommonAncestor(MemoryMapNode *aa, Memory
 void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
 {
     QMutexLocker(&this->verifierMutex);
+    
+    qint32 nodeProbability = 0;
+    MemoryMapNodeSV* node_sv = dynamic_cast<MemoryMapNodeSV*>(node);
+    if(node_sv) nodeProbability = node_sv->getCandidateProbability() * 10;
+    if(nodeProbability == 10) nodeProbability = 9;
+
+    
     Instance i = node->toInstance();
     SlubObjects::ObjectValidity v = _slub.objectValid(&i);
 
     switch(v) {
         case SlubObjects::ovValid:
             _validObjects++;
+            if(node_sv && _minValidProbability > node_sv->getCandidateProbability())
+                _minValidProbability = node_sv->getCandidateProbability();
+                _slubValidDistribution[nodeProbability]++;
             break;
         case SlubObjects::ovEmbedded:
             _validObjects++;
+            if(node_sv && _minValidProbability > node_sv->getCandidateProbability())
+                _minValidProbability = node_sv->getCandidateProbability();
+                _slubValidDistribution[nodeProbability]++;
             break;
         case SlubObjects::ovMaybeValid:
             _maybeValidObjects++;
             break;
         case SlubObjects::ovConflict:
             _invalidObjects++;
+            if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
+                _maxInvalidProbability = node_sv->getCandidateProbability();
+                _slubInvalidDistribution[nodeProbability]++;
+                if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (conflict) object with prob 1: %1").arg(i.fullName()));
             break;
         case SlubObjects::ovNotFound:
             _invalidObjects++;
+            if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
+                _maxInvalidProbability = node_sv->getCandidateProbability();
+                _slubInvalidDistribution[nodeProbability]++;
+                if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (notfound) object with prob 1: %1").arg(i.fullName()));
             break;
         case SlubObjects::ovNoSlabType:
             _maybeValidObjects++;
             break;
         case SlubObjects::ovInvalid:
             _invalidObjects++;
+            if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
+                _maxInvalidProbability = node_sv->getCandidateProbability();
+                _slubInvalidDistribution[nodeProbability]++;
+                if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (invalid ) object with prob 1: %1").arg(i.fullName()));
             break;
     }
 
@@ -387,8 +412,15 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
                     v == SlubObjects::ovNoSlabType)
                 _magicNumberValid_notSlub++;
         }
+        _magicnumberValidDistribution[nodeProbability]++; 
     }
-    else _magicNumberInvalid++;
+    else {
+        _magicNumberInvalid++;
+        if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
+            _maxInvalidProbability = node_sv->getCandidateProbability();
+        _magicnumberInvalidDistribution[nodeProbability]++; 
+        if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (magicnum) object with prob 1: %1").arg(i.fullName()));
+    }
 }
 
 void MemoryMapVerifier::statisticsHelper(MemoryMapNode *node)
@@ -418,10 +450,21 @@ void MemoryMapVerifier::statistics()
     _validObjects = 0;
     _invalidObjects = 0;
     _maybeValidObjects = 0;
+    
     _magicNumberValid = 0;
     _magicNumberInvalid = 0;
     _magicNumberValid_withConst = 0;
     _magicNumberValid_notSlub = 0;
+
+    _minValidProbability = 1;
+    _maxInvalidProbability = 0;
+
+    for(int i = 0 ; i < 10; i++){
+        _slubValidDistribution[i] = 0;
+        _slubInvalidDistribution[i] = 0;
+        _magicnumberValidDistribution[i] = 0;
+        _magicnumberInvalidDistribution[i] = 0;
+    }
 
     QList<MemoryMapNode *> rootNodes = _map->roots();
 
@@ -432,7 +475,7 @@ void MemoryMapVerifier::statistics()
     quint64 totalObjs = (_validObjects + _invalidObjects + _maybeValidObjects);
 
     shell->out() << "\nMap Statistics:\n"
-                 << "Slubs:\n"
+                 << "\tSlubs:\n"
                  << qSetFieldWidth(50)
                  << "\t| No. of objects in map:"
                  << right << qSetFieldWidth(8)
@@ -464,6 +507,36 @@ void MemoryMapVerifier::statistics()
                  << " (" << ((float)_maybeValidObjects) * 100 / totalObjs << "%)\n"
                  << "\t|\n"
                  << qSetFieldWidth(50)
+                 << "\t| Min Valid Probability:"
+                 << right << qSetFieldWidth(8)
+                 << _minValidProbability * 100
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << "%\n"
+                 << "\t| Distribution: "
+                 << right 
+                 << _slubValidDistribution[0] << " - " << _slubValidDistribution[1] << " - " 
+                 << _slubValidDistribution[2] << " - " << _slubValidDistribution[3] << " - " 
+                 << _slubValidDistribution[4] << " - " << _slubValidDistribution[5] << " - " 
+                 << _slubValidDistribution[6] << " - " << _slubValidDistribution[7] << " - " 
+                 << _slubValidDistribution[8] << " - " << _slubValidDistribution[9]  
+                 << qSetFieldWidth(0) << left
+                 << "\n"
+                 << qSetFieldWidth(50)
+                 << "\t| Max Invalid Probability:"
+                 << right << qSetFieldWidth(8)
+                 << _maxInvalidProbability * 100
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << "%\n"
+                 << "\t| Distribution: "
+                 << right
+                 << _slubInvalidDistribution[0] << " - " << _slubInvalidDistribution[1] << " - " 
+                 << _slubInvalidDistribution[2] << " - " << _slubInvalidDistribution[3] << " - " 
+                 << _slubInvalidDistribution[4] << " - " << _slubInvalidDistribution[5] << " - " 
+                 << _slubInvalidDistribution[6] << " - " << _slubInvalidDistribution[7] << " - " 
+                 << _slubInvalidDistribution[8] << " - " << _slubInvalidDistribution[9]  
+                 << qSetFieldWidth(0) << left
+                 << "\n"
+                 << qSetFieldWidth(50)
                  << "\t| Coverage of slub objects:"
                  << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << shell->color(ctBold)
                  << qSetFieldWidth(8) << right
@@ -472,7 +545,8 @@ void MemoryMapVerifier::statistics()
                  << "%\n"
                  << qSetFieldWidth(0)
                  << "\t|\n"
-                 << "MagicNumbers\n"
+                 << "\tMagicNumbers\n"
+                 << qSetFieldWidth(50)
                  << "\t| No. of valid objects:"
                  << qSetFieldWidth(0) << shell->color(ctType) << right << qSetFieldWidth(8)
                  << _magicNumberValid
@@ -521,6 +595,24 @@ void MemoryMapVerifier::statistics()
                  << "-" << ((float)_maybeValidObjects + _validObjects) * 100 / totalObjs
                  << shell->color(ctReset)
                  << "%\n"
+                 << "\t| Valid Distribution: "
+                 << right 
+                 << _magicnumberValidDistribution[0] << " - " << _magicnumberValidDistribution[1] << " - " 
+                 << _magicnumberValidDistribution[2] << " - " << _magicnumberValidDistribution[3] << " - " 
+                 << _magicnumberValidDistribution[4] << " - " << _magicnumberValidDistribution[5] << " - " 
+                 << _magicnumberValidDistribution[6] << " - " << _magicnumberValidDistribution[7] << " - " 
+                 << _magicnumberValidDistribution[8] << " - " << _magicnumberValidDistribution[9]  
+                 << qSetFieldWidth(0) << left
+                 << "\n"
+                 << "\t| Invalid Distribution: "
+                 << right
+                 << _magicnumberInvalidDistribution[0] << " - " << _magicnumberInvalidDistribution[1] << " - " 
+                 << _magicnumberInvalidDistribution[2] << " - " << _magicnumberInvalidDistribution[3] << " - " 
+                 << _magicnumberInvalidDistribution[4] << " - " << _magicnumberInvalidDistribution[5] << " - " 
+                 << _magicnumberInvalidDistribution[6] << " - " << _magicnumberInvalidDistribution[7] << " - " 
+                 << _magicnumberInvalidDistribution[8] << " - " << _magicnumberInvalidDistribution[9]  
+                 << qSetFieldWidth(0) << left
+                 << "\n"
                  << "\t`-----------------------------------------------------------------\n";
 
 
