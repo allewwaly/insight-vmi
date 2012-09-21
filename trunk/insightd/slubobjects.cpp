@@ -73,32 +73,70 @@ SlubObjects::ObjectValidity SlubObjects::objectValid(const Instance *inst) const
              obj.baseType->hash() == inst->type()->hash())
         return ovValid;
     // Check if inst is embedded within obj
-    else if (isInstanceEmbedded(inst, obj))
-        return ovEmbedded;
-    else
-        return ovConflict;
+    return isInstanceEmbedded(inst, obj);
 }
 
+SlubObjects::ObjectValidity SlubObjects::isInstanceEmbeddedHelper(const BaseType *it,
+                                                                  const StructuredMember *mem,
+                                                                  quint64 offset) const
+{
+    ObjectValidity ret = ovEmbedded;
+    const Structured *s = NULL;
+    const StructuredMember *m = mem;
+    quint64 currentOffset = offset;
 
-bool SlubObjects::isInstanceEmbedded(const Instance *inst,
+    // Consider all nested structs and unions and try to find a match.
+    while(m)
+    {
+        currentOffset = offset - m->offset();
+
+        const BaseType *mt;
+        // Find final base type and compare them
+        if ((mt = m->refTypeDeep(BaseType::trLexical)) &&
+            it->hash() == mt->hash())
+            return ovEmbedded;
+
+        // Get nested struct or union if any
+        s = dynamic_cast<const Structured *>(m->refType());
+
+        if(s && s->type() & rtUnion)
+        {
+            // In case of unions we explore every possible path
+            for(int i = 0; i < s->members().size() ; ++i)
+            {
+                ret = isInstanceEmbeddedHelper(it, s->members().at(i), currentOffset);
+
+                // We found a match in a union.
+                if(ret != ovConflict)
+                    return ovEmbeddedUnion;
+            }
+
+            // We could not find a match.
+            return ovConflict;
+        }
+        else
+        {
+            // In case of a struct we try to find the next member
+            s ? m = s->memberAtOffset(currentOffset, false) : m = NULL;
+        }
+    }
+
+    return ovConflict;
+}
+
+SlubObjects::ObjectValidity SlubObjects::isInstanceEmbedded(const Instance *inst,
                                      const SlubObject &obj) const
 {
     if (!inst || obj.isNull || !obj.baseType)
-        return false;
+        return ovConflict;
     // Find base type at the expected offset
-    quint64 offset = obj.address - inst->address();
-    const StructuredMember* m = obj.baseType->memberAtOffset(offset);
+    quint64 offset = inst->address() - obj.address;
 
-    if (m) {
-        const BaseType *it, *mt;
-        // Find final base type and compare them
-        if ((it = inst->type()->dereferencedBaseType(BaseType::trLexical)) &&
-            (mt = m->refTypeDeep(BaseType::trLexical)) &&
-            it->hash() == mt->hash())
-            return true;
-    }
+    // We need to find the member at the given offset.
+    const StructuredMember *m = obj.baseType->memberAtOffset(offset, false);
+    const BaseType *it = inst->type()->dereferencedBaseType(BaseType::trLexical);
 
-    return false;
+    return isInstanceEmbeddedHelper(it, m, offset);
 }
 
 

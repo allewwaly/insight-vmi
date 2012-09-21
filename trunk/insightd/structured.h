@@ -98,13 +98,17 @@ public:
                                        bool recursive = true) const;
 
     /**
-     * Obtain the member that has the given offset. The offset must match
-     * exactly, otherwise \c null is returned.
+     * Obtain the member that has the given offset. If \a exactMatch is true
+     * the function will only return a member if it can find a member within
+     * the struct that has the exact offset \a offset. In case exactMatch is false,
+     * the function will return the member that ecompasses the given offset \a offset.
      *
      * @param offset the offset of the member that we are looking for
+     * @param exactMatch should the function only return a member if it has the exact
+     * offset \a offset.
      * @return the member at offset \a offset, if found, \c null otherwise
      */
-     const StructuredMember* memberAtOffset(size_t offset) const;
+     const StructuredMember* memberAtOffset(size_t offset, bool exactMatch) const;
 
     /**
      * Reads a serialized version of this object from \a in.

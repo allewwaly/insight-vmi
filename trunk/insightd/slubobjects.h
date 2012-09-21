@@ -5,6 +5,8 @@
 #include <QHash>
 #include <QMap>
 
+#include "structuredmember.h"
+
 class SymFactory;
 class VirtualMemory;
 class BaseType;
@@ -86,6 +88,7 @@ public:
         ovNotFound,      ///< Instance not found, even though base type is managed in slabs
         ovConflict,      ///< Instance type or address conflicts with object in the slabs
         ovEmbedded,      ///< Instance is embedded within a larger object in the slabs
+        ovEmbeddedUnion, ///< Instance may be embedded within a larger object in the slabs
         ovMaybeValid,    ///< Instance lies within reserved slab memory for which no type information is available
         ovValid          ///< Instance was either found in the slabs or in a global variable
     };
@@ -142,7 +145,9 @@ public:
     quint64 numberOfObjects() const;
 
 private:
-    bool isInstanceEmbedded(const Instance* inst, const SlubObject& obj) const;
+    ObjectValidity isInstanceEmbeddedHelper(const BaseType *it, const StructuredMember *mem,
+                                            quint64 offset) const;
+    ObjectValidity isInstanceEmbedded(const Instance* inst, const SlubObject& obj) const;
     void postproc();
     void resolveObjSize();
     void resolveBaseType();
