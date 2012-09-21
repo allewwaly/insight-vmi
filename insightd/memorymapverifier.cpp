@@ -243,6 +243,8 @@ bool MemoryMapVerifier::performChecks(MemoryMapNode *n)
             // Thats fine
             break;
         case SlubObjects::ovEmbedded:
+            /* Fall through */
+        case SlubObjects::ovEmbeddedUnion:
             _log.debug(QString("SLUB ! Node '%1' with address 0x%2 and type %3 is embedded!")
                      .arg(lastNode->fullName())
                      .arg(lastNode->address(), 0, 16)
@@ -357,7 +359,6 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
     if(node_sv) nodeProbability = node_sv->getCandidateProbability() * 10;
     if(nodeProbability == 10) nodeProbability = 9;
 
-    
     Instance i = node->toInstance();
     SlubObjects::ObjectValidity v = _slub.objectValid(&i);
 
@@ -369,6 +370,8 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
                 _slubValidDistribution[nodeProbability]++;
             break;
         case SlubObjects::ovEmbedded:
+        /* Fall through */
+        case SlubObjects::ovEmbeddedUnion:
             _validObjects++;
             if(node_sv && _minValidProbability > node_sv->getCandidateProbability())
                 _minValidProbability = node_sv->getCandidateProbability();
@@ -379,6 +382,9 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
             break;
         case SlubObjects::ovConflict:
             _invalidObjects++;
+            debugmsg("Type: " << _slub.objectAt(i.address()).baseType->name() << " (" << _slub.objectAt(i.address()).baseType->id() << ")");
+            debugmsg("Instance Type: " << i.type()->prettyName() << " (" << i.type()->id() << ")");
+
             if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
                 _maxInvalidProbability = node_sv->getCandidateProbability();
                 _slubInvalidDistribution[nodeProbability]++;
