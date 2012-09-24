@@ -30,6 +30,7 @@ enum ColorType {
     ctFuncParams,
     ctNumber,
     ctString,
+    ctParamName,
     COLOR_TYPE_SIZE
 };
 

@@ -2455,8 +2455,29 @@ int Shell::cmdShowBaseType(const BaseType* t)
 				 QString("(unnamed)") : prettyNameInColor(t, 0, 0)) << endl;
 	_out << color(ctColHead) << "  Type:           "
 		 << color(ctReset) << realTypeToStr(t->type()) << endl;
-	_out << color(ctColHead) << "  Size:           "
-		 << color(ctReset) << t->size() << endl;
+	const Function* func = dynamic_cast<const Function*>(t);
+	if (func) {
+		_out << color(ctColHead) << "  Start Address:  "
+			 << color(ctAddress) << QString("0x%1").arg(
+										func->pcLow(),
+										_sym.memSpecs().sizeofPointer << 1,
+										16,
+										QChar('0'))
+			 << endl;
+		_out << color(ctColHead) << "  End Address:    "
+			 << color(ctAddress) << QString("0x%1").arg(
+										func->pcHigh(),
+										_sym.memSpecs().sizeofPointer << 1,
+										16,
+										QChar('0'))
+			 << endl;
+		_out << color(ctColHead) << "  Inlined:        "
+			 << color(ctReset) << (func->inlined() ? "yes" : "no") << endl;
+	}
+	else {
+		_out << color(ctColHead) << "  Size:           "
+			 << color(ctReset) << t->size() << endl;
+	}
 #ifdef DEBUG
 	_out << color(ctColHead) << "  Hash:           "
 		 << color(ctReset) << "0x" << hex << t->hash() << dec << endl;
@@ -2467,6 +2488,8 @@ int Shell::cmdShowBaseType(const BaseType* t)
 			 << color(ctReset) << _sym.factory().sources().value(t->srcFile())->name()
 			 << ":" << t->srcLine() << endl;
 	}
+
+    const FuncPointer* fp = dynamic_cast<const FuncPointer*>(t);
 
     const RefBaseType* r;
     int cnt = 1;
@@ -2517,64 +2540,42 @@ int Shell::cmdShowBaseType(const BaseType* t)
         }
     }
 
-	const FuncPointer* fp = dynamic_cast<const FuncPointer*>(t);
 	if (fp) {
-		const Function* func = dynamic_cast<const Function*>(fp);
-		if (func) {
-			_out << color(ctColHead) << "  Inlined:        "
-				 << color(ctReset) << func->inlined() << endl;
-			_out << color(ctColHead) << "  PC low:         "
-				 << color(ctReset) << QString("0x%1")
-					.arg(func->pcLow(),
-						 _sym.memSpecs().sizeofPointer << 1,
-						 16,
-						 QChar('0'))
-				 << endl;
-			_out << color(ctColHead) << "  PC high:        "
-				 << color(ctReset) << QString("0x%1")
-					.arg(func->pcHigh(),
-						 _sym.memSpecs().sizeofPointer << 1,
-						 16,
-						 QChar('0'))
-				 << endl;
-		}
-
 		_out << color(ctColHead) << "  Parameters:     "
 			 << color(ctReset) << fp->params().size() << endl;
 
+		// Find out max. lengths
+		int maxNameLen = 9;
 		for (int i = 0; i < fp->params().size(); i++) {
 			FuncParam* param = fp->params().at(i);
-			const BaseType* rt = (param->altRefTypeCount() == 1) ?
-						param->altRefBaseType() :
-						param->refType();
+			if (param->name().size() > maxNameLen)
+				maxNameLen = param->name().size();
+		}
+
+		for (int i = 0; i < fp->params().size(); i++) {
+			FuncParam* param = fp->params().at(i);
+			const BaseType* rt = param->refType();
 
 			QString pretty = rt ?
-						rt->prettyName() :
+						prettyNameInColor(rt) :
 						QString("(unresolved type, 0x%1)")
 							.arg((uint)param->refTypeId(), 0, 16);
-
-			if (param->altRefTypeCount() == 1)
-				pretty = "<" + pretty + ">";
-			else if (param->altRefTypeCount() > 1) {
-				BaseType* tmp;
-				pretty += " <";
-				for (int j = 0; j < param->altRefTypeCount(); ++j) {
-					if (! (tmp = param->altRefBaseType(j)))
-						continue;
-					if (j > 0)
-						pretty += ", ";
-					pretty += tmp->prettyName();
-				}
-				pretty += ">";
-			}
 
 			_out << "    "
 				 << (i + 1)
 					<< ". "
-					<< qSetFieldWidth(16) << left << (param->name() + ": ")
-					<< qSetFieldWidth(12)
-					<< QString("0x%1, ").arg((uint)param->refTypeId(), 0, 16)
+					<< color(ctParamName)
+					<< param->name()
+					<< color(ctReset)
+					<< qSetFieldWidth(maxNameLen - param->name().size() + 2)
+					<< left << ": "
 					<< qSetFieldWidth(0)
+					<< color(ctTypeId)
+					<< qSetFieldWidth(12)
+					<< QString("0x%1").arg((uint)param->refTypeId(), 0, 16)
+					<< qSetFieldWidth(0)
+					<< color(ctReset)
+					<< " "
 					<< pretty
 					<< endl;
 		}

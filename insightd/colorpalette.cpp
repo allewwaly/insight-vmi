@@ -143,6 +143,7 @@ const char *ColorPalette::color(ColorType ct) const
         C_RST,   // ctFuncParams
         C_CYN_L, // ctNumber
         C_GRN_L, // ctString
+        C_GRN,   // ctParamName
     };
 
     static const char* colors_light[COLOR_TYPE_SIZE] = {
@@ -171,6 +172,7 @@ const char *ColorPalette::color(ColorType ct) const
         C_RST,   // ctFuncParams
         C_BLU,   // ctNumber
         C_GRN,   // ctString
+        C_BLU,   // ctParamName
     };
 
     static const char* empty = "";
