@@ -65,18 +65,22 @@ uint Structured::hashMembers(quint32 memberIndex, quint32 nrMembers, bool *isVal
     if(this->members().size() <= memberIndex ||
             this->members().size() < (memberIndex + nrMembers))
     {
-        (*isValid) = false;
+        if(isValid)
+            (*isValid) = false;
         return 0;
     }
 
     uint hash = 0;
-    (*isValid) = true;
+    bool valid = true;
 
-    for(int i = memberIndex; i < (memberIndex + nrMembers) && isValid; ++i)
+    for(int i = memberIndex; i < (memberIndex + nrMembers) && valid; ++i)
     {
-        hash ^= members().at(i)->refType()->hash(isValid);
+        hash ^= members().at(i)->refType()->hash(&valid);
         hash ^= qHash(members().at(i)->name());
     }
+
+    if(isValid)
+        (*isValid) = valid;
 
     return hash;
 }
