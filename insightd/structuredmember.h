@@ -48,6 +48,28 @@ public:
     void setOffset(size_t offset);
 
     /**
+     * @return the bit size of this bit-split integer declaration
+     */
+    inline int bitSize() const;
+
+    /**
+     * Sets the bit size of this bit-split integer declaration
+     * @param size new bit size of bit-split integer declaration
+     */
+    inline void setBitSize(int size);
+
+    /**
+     * @return the bit offset of this bit-split integer declaration
+     */
+    int bitOffset() const;
+
+    /**
+     * Sets the bit offset of this bit-split integer declaration
+     * @param offset new bit offset of bit-split integer declaration
+     */
+    inline void setBitOffset(int offset);
+
+    /**
      * This gives a pretty name of that type which may involve referencing
      * types.
      * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
@@ -156,6 +178,8 @@ private:
     bool _hasConstIntValue;
     bool _hasConstStringValue;
     bool _hasStringValue;
+    qint8 _bitSize;
+    qint8 _bitOffset;
 };
 
 
@@ -168,6 +192,48 @@ inline const SymFactory* StructuredMember::fac() const
 inline SymFactory* StructuredMember::fac()
 {
     return _factory;
+}
+
+
+inline size_t StructuredMember::offset() const
+{
+    return _offset;
+}
+
+
+inline void StructuredMember::setOffset(size_t offset)
+{
+    _offset = offset;
+}
+
+
+inline Structured* StructuredMember::belongsTo() const
+{
+    return _belongsTo;
+}
+
+
+inline int StructuredMember::bitSize() const
+{
+    return _bitSize;
+}
+
+
+inline void StructuredMember::setBitSize(int size)
+{
+    _bitSize = size;
+}
+
+
+inline int StructuredMember::bitOffset() const
+{
+    return _bitOffset;
+}
+
+
+inline void StructuredMember::setBitOffset(int offset)
+{
+    _bitOffset = offset;
 }
 
 
