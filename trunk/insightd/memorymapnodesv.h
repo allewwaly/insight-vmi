@@ -171,13 +171,21 @@ public:
      **/
     bool memberProcessed(quint64 addressInParent, quint64 address);
 
+    /**
+     * This function increases the encountered variable. Every time the node is
+     * encountered during the map generation this function should be called. This
+     * will increase the probability of the node. The idea behind this approach is
+     * that if a node is referenced multiple time in the map it is more likely to
+     * be valid.
+     */
+    void encountered();
+
     void setSeemsValid();
 
     inline bool seemsValid()
     {
         return _seemsValid;
     }
-
 private:
     /**
      * Calculate the intial probability of this node. This function should only
@@ -190,7 +198,9 @@ private:
 
 //	MemoryMapNodeSV* _parentSV;  ///< parent node, if any, otherwise null
 
-    float _initialProb;      ///< the initial probability of the node
+    float _initialProb;                                     ///< the initial probability of the node
+    quint32 _encountered;                                   ///< how often did we encounter the node while
+                                                            ///  we build the map
 
     QList<MemoryMapNodeSV*> _candidates;                    ///< list of candidate nodes for this node
     quint64 _addrInParent;                                  ///< the address of the node within the parent

@@ -12,6 +12,7 @@
 
 #include "memorymapbuilder.h"
 #include "memorymapnodesv.h"
+#include "referencingtype.h"
 
 // Forward declaration
 class Instance;
@@ -47,18 +48,27 @@ private:
      * @returns a pointer to the node if a node for this instance already exists,
      * null otherwise
      */
-    MemoryMapNode* existsNode(Instance &inst);
+    MemoryMapNodeSV* existsNode(Instance &inst);
 
     /**
      * If we encounter a list we process the complete list before we continue.
      * This function will iterate through the given list and add all member to the
      * queue.
      * @param listHead the pointer to the list_head
-     * @param firstMember the instance of the first member of the listHead
-     * (listHead.next). All members of the list will have the same type and
+     * @param firstMember the instance of the first member of the list where the
+     * listHead.next points to. All members of the list will have the same type and
      * offset as the first member.
      */
-    void processList(MemoryMapNodeSV *listHead, Instance &firstMember);
+    void processList(MemoryMapNodeSV *listHead, Instance &firstListMember);
+
+    void processListHead(MemoryMapNodeSV *node, Instance *inst);
+    void processCandidates(Instance *inst, const ReferencingType *ref);
+    void processPointer(MemoryMapNodeSV *node, Instance *inst, const ReferencingType *ref);
+    void processArray(MemoryMapNodeSV *node, Instance *inst);
+    void processStruct(MemoryMapNodeSV *node, Instance *inst);
+    void processUnion(MemoryMapNodeSV *node, Instance *inst);
+    void processNode(MemoryMapNodeSV *node, Instance *inst = NULL,
+                     const ReferencingType *ref = NULL);
 
     static QMutex builderMutex;
     static bool statisticsShown;

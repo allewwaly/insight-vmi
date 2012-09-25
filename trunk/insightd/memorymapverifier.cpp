@@ -209,14 +209,15 @@ void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
     }
     */
     // exclude strange nodes that we hope the probability will take care of them
-    if(!currentNode->fullName().contains("init_task.nsproxy.net_ns.proc_net.parent.subdir.next.subdir.proc_fops.owner.waiter")) {
-        MemoryMapNodeIntervalWatcher *mw = new MemoryMapNodeIntervalWatcher(cur,
-                                                                           (*this),
-                                                                           0.30,
-                                                                           true,
-                                                                           false);
-        _watchNodes.append((MemoryMapNodeWatcher *)mw);
-   }
+
+//    if(!currentNode->fullName().contains("init_task.nsproxy.net_ns.proc_net.parent.subdir.next.subdir.proc_fops.owner.waiter")) {
+//        MemoryMapNodeIntervalWatcher *mw = new MemoryMapNodeIntervalWatcher(cur,
+//                                                                           (*this),
+//                                                                           0.30,
+//                                                                           true,
+//                                                                           false);
+//        _watchNodes.append((MemoryMapNodeWatcher *)mw);
+//   }
 }
 
 bool MemoryMapVerifier::performChecks(MemoryMapNode *n)
@@ -394,6 +395,7 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
             if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (conflict) object with prob 1: %1").arg(i.fullName()));
             break;
         case SlubObjects::ovNotFound:
+            debugmsg("Instance Type: " << i.type()->prettyName() << " (" << i.type()->id() << ")");
             _invalidObjects++;
             if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
                 _maxInvalidProbability = node_sv->getCandidateProbability();
@@ -425,6 +427,8 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
         _magicnumberValidDistribution[nodeProbability]++; 
     }
     else {
+        debugmsg("Instance " << i.name() << " @ 0x" << std::hex << i.address() << std::dec << " with type " << i.type()->prettyName() << " is invalid according to magic!");
+
         _magicNumberInvalid++;
         if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
             _maxInvalidProbability = node_sv->getCandidateProbability();
