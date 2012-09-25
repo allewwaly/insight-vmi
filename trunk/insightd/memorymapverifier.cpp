@@ -354,20 +354,22 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
 {
     QMutexLocker(&this->verifierMutex);
     
+    Instance i = node->toInstance();
+    SlubObjects::ObjectValidity v = _slub.objectValid(&i);
+
     qint32 nodeProbability = 0;
     MemoryMapNodeSV* node_sv = dynamic_cast<MemoryMapNodeSV*>(node);
     if(node_sv) nodeProbability = node_sv->getCandidateProbability() * 10;
+    else debugmsg(QString("Uncastable node: %1").arg(i.fullName()));
     if(nodeProbability == 10) nodeProbability = 9;
-
-    Instance i = node->toInstance();
-    SlubObjects::ObjectValidity v = _slub.objectValid(&i);
 
     switch(v) {
         case SlubObjects::ovValid:
             _validObjects++;
             if(node_sv && _minValidProbability > node_sv->getCandidateProbability())
                 _minValidProbability = node_sv->getCandidateProbability();
-                _slubValidDistribution[nodeProbability]++;
+            _slubValidDistribution[nodeProbability]++;
+            if(node_sv) node_sv->setSeemsValid();
             break;
         case SlubObjects::ovEmbedded:
         /* Fall through */
@@ -375,7 +377,8 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
             _validObjects++;
             if(node_sv && _minValidProbability > node_sv->getCandidateProbability())
                 _minValidProbability = node_sv->getCandidateProbability();
-                _slubValidDistribution[nodeProbability]++;
+            _slubValidDistribution[nodeProbability]++;
+            if(node_sv) node_sv->setSeemsValid();
             break;
         case SlubObjects::ovMaybeValid:
             _maybeValidObjects++;
@@ -387,15 +390,15 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
 
             if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
                 _maxInvalidProbability = node_sv->getCandidateProbability();
-                _slubInvalidDistribution[nodeProbability]++;
-                if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (conflict) object with prob 1: %1").arg(i.fullName()));
+            _slubInvalidDistribution[nodeProbability]++;
+            if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (conflict) object with prob 1: %1").arg(i.fullName()));
             break;
         case SlubObjects::ovNotFound:
             _invalidObjects++;
             if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
                 _maxInvalidProbability = node_sv->getCandidateProbability();
-                _slubInvalidDistribution[nodeProbability]++;
-                if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (notfound) object with prob 1: %1").arg(i.fullName()));
+            _slubInvalidDistribution[nodeProbability]++;
+            if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (notfound) object with prob 1: %1").arg(i.fullName()));
             break;
         case SlubObjects::ovNoSlabType:
             _maybeValidObjects++;
@@ -404,8 +407,8 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
             _invalidObjects++;
             if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
                 _maxInvalidProbability = node_sv->getCandidateProbability();
-                _slubInvalidDistribution[nodeProbability]++;
-                if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (invalid ) object with prob 1: %1").arg(i.fullName()));
+            _slubInvalidDistribution[nodeProbability]++;
+            if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (invalid ) object with prob 1: %1").arg(i.fullName()));
             break;
     }
 
@@ -414,6 +417,7 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
         _magicNumberValid++;
         if (hasConst){
             _magicNumberValid_withConst++;
+            if(node_sv) node_sv->setSeemsValid();
             if (v == SlubObjects::ovMaybeValid ||
                     v == SlubObjects::ovNoSlabType)
                 _magicNumberValid_notSlub++;
@@ -439,6 +443,9 @@ void MemoryMapVerifier::statisticsHelper(MemoryMapNode *node)
     for(int i = 0; i < children.size(); ++i) {
         statisticsHelper(children.at(i));
     }
+
+    MemoryMapNodeSV* node_sv = dynamic_cast<MemoryMapNodeSV*>(node);
+    if(node_sv && node_sv->seemsValid()) _seemValidObjects++; 
 }
 
 void MemoryMapVerifier::statistics()
@@ -456,6 +463,8 @@ void MemoryMapVerifier::statistics()
     _validObjects = 0;
     _invalidObjects = 0;
     _maybeValidObjects = 0;
+
+    _seemValidObjects = 0;
     
     _magicNumberValid = 0;
     _magicNumberInvalid = 0;
@@ -490,6 +499,16 @@ void MemoryMapVerifier::statistics()
                  << "\t| No. of valid objects:"
                  << qSetFieldWidth(0) << shell->color(ctType) << right << qSetFieldWidth(8)
                  << _validObjects
+                 << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << " ("
+                 << shell->color(ctType)
+                 << ((float)_validObjects) * 100 / totalObjs << shell->color(ctType)
+                 << shell->color(ctReset)
+                 << "%)\n"
+                 << qSetFieldWidth(50)
+                 << "\t| No. of apparently valid objects:"
+                 << qSetFieldWidth(0) << shell->color(ctType) << right << qSetFieldWidth(8)
+                 << _seemValidObjects
                  << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
                  << " ("
                  << shell->color(ctType)
@@ -563,7 +582,7 @@ void MemoryMapVerifier::statistics()
                  << shell->color(ctReset)
                  << "%)\n"
                  << qSetFieldWidth(50)
-                 << "\t| Number of valid objects with MagicNumbers:"
+                 << "\t| No. of valid objects with MagicNumbers:"
                  << right << qSetFieldWidth(0) << shell->color(ctError) << qSetFieldWidth(8)
                  << _magicNumberValid_withConst
                  << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
@@ -573,7 +592,7 @@ void MemoryMapVerifier::statistics()
                  << shell->color(ctReset)
                  << "%)\n"
                  << qSetFieldWidth(50)
-                 << "\t| Number of valid objects not in slub:"
+                 << "\t| No. of valid objects not in slub:"
                  << right << qSetFieldWidth(0) << shell->color(ctError) << qSetFieldWidth(8)
                  << _magicNumberValid_notSlub
                  << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
@@ -596,7 +615,7 @@ void MemoryMapVerifier::statistics()
                  << "\t| Estimation of map correctness:"
                  << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << shell->color(ctBold)
                  << shell->color(ctWarning) << qSetFieldWidth(8) << right
-                 << ((float)_validObjects) * 100 / totalObjs
+                 << ((float)_seemValidObjects) * 100 / totalObjs
                  << qSetFieldWidth(0) << left
                  << "-" << ((float)_maybeValidObjects + _validObjects) * 100 / totalObjs
                  << shell->color(ctReset)

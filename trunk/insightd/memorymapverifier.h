@@ -174,6 +174,8 @@ private:
     quint64 _validObjects;
     quint64 _invalidObjects;
     quint64 _maybeValidObjects;
+    
+    quint64 _seemValidObjects;
 
     quint64 _magicNumberValid;
     quint64 _magicNumberValid_withConst;
