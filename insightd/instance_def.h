@@ -93,6 +93,28 @@ public:
     quint64 endAddress() const;
 
     /**
+     * @return the bit size of this bit-field integer declaration
+     */
+    int bitSize() const;
+
+    /**
+     * Sets the bit size of this bit-field integer declaration.
+     * @param size new bit size of bit-field integer declaration
+     */
+    void setBitSize(qint8 size);
+
+    /**
+     * @return the bit offset of this bit-field integer declaration
+     */
+    int bitOffset() const;
+
+    /**
+     * Sets the bit offset of this bit-field integer declaration.
+     * @param offset new bit offset of bit-field integer declaration
+     */
+    void setBitOffset(qint8 offset);
+
+    /**
      * This gives the (short) name of this Instance, i. e., its name its
      * parent's struct. For example, if you have accessed this Instance via
      * \c init_task.children.next, this will return \c next.
