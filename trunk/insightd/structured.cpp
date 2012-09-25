@@ -62,10 +62,10 @@ uint Structured::hash(bool* isValid) const
 uint Structured::hashMembers(quint32 memberIndex, quint32 nrMembers, bool *isValid) const
 {
     // Check error cases
-    if(this->members().size() <= memberIndex ||
-            this->members().size() < (memberIndex + nrMembers))
+    if ( (uint)this->members().size() <= memberIndex ||
+         (uint)this->members().size() < (memberIndex + nrMembers) )
     {
-        if(isValid)
+        if (isValid)
             (*isValid) = false;
         return 0;
     }
@@ -73,13 +73,13 @@ uint Structured::hashMembers(quint32 memberIndex, quint32 nrMembers, bool *isVal
     uint hash = 0;
     bool valid = true;
 
-    for(int i = memberIndex; i < (memberIndex + nrMembers) && valid; ++i)
+    for (int i = memberIndex; i < (memberIndex + nrMembers) && valid; ++i)
     {
         hash ^= members().at(i)->refType()->hash(&valid);
         hash ^= qHash(members().at(i)->name());
     }
 
-    if(isValid)
+    if (isValid)
         (*isValid) = valid;
 
     return hash;
