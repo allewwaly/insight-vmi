@@ -84,11 +84,25 @@ protected:
 };
 
 
+class IntegerBitField
+{
+public:
+    quint64 toIntBitField(QIODevice* mem, size_t offset,
+                          const Instance* inst) const;
+
+    quint64 toIntBitField(QIODevice* mem, size_t offset,
+                          const StructuredMember* m) const;
+
+    virtual quint64 toIntBitField(QIODevice* mem, size_t offset,
+                                  qint8 bitSize, qint8 bitOffset) const = 0;
+};
+
+
 /**
  * Generic template class for all integer types
  */
 template<class T, const RealType realType>
-class IntegerBaseType: public NumericBaseType<T, realType>
+class IntegerBaseType: public NumericBaseType<T, realType>, public IntegerBitField
 {
 public:
     /**
@@ -138,6 +152,24 @@ public:
             qint32 i;
             in >> i >> i;
         }
+    }
+
+    virtual quint64 toIntBitField(QIODevice* mem, size_t offset,
+                                  qint8 bitSize, qint8 bitOffset) const
+    {
+        T n = BaseType::value<T>(mem, offset);
+        if (bitSize > 0) {
+            // The offset is specified from the most significant bit of the
+            // integer that embeds the bit field. For little-endian systems
+            // such as x86, the offset specifies the bits on the right we need
+            // to discard.
+            // See http://dwarfstd.org/doc/Dwarf3.pdf, p. 75
+            n >>= (sizeof(T) << 3) - bitOffset - bitSize;
+            n &= ~(-1LL << bitSize);
+        }
+        else if (bitSize == 0)
+            return 0;
+        return n;
     }
 };
 
