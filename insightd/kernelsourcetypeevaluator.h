@@ -10,6 +10,7 @@
 
 #include <asttypeevaluator.h>
 #include <genericexception.h>
+#include "structured.h"
 
 class SymFactory;
 class ASTExpressionEvaluator;
@@ -44,7 +45,6 @@ public:
     }
 };
 
-
 class KernelSourceTypeEvaluator: public ASTTypeEvaluator
 {
 public:
@@ -69,7 +69,9 @@ private:
     virtual void evaluateMagicNumbers_constant(const ASTNode *node, 
             bool *intConst, qint64 *resultInt, 
             bool *stringConst, QString *resultString,
-            QString *string);
+            QString &string);
+    virtual void evaluateMagicNumbers_initializer(const ASTNode *node, 
+            const Structured *structured, QString &string);
     
     SymFactory* _factory;
     ASTExpressionEvaluator* _eval;

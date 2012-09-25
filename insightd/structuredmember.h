@@ -109,6 +109,11 @@ public:
       */
     bool evaluateMagicNumberFoundString(QString constant);
 
+    inline bool hasNotConstValue()
+    {
+        return (_seenInEvaluateMagicNumber) ? !(_hasConstIntValue || _hasConstStringValue) : false;
+    }
+    
     inline bool hasConstantIntValue()
     {
         return _hasConstIntValue;
