@@ -56,6 +56,30 @@ inline void Instance::addToAddress(quint64 offset)
 }
 
 
+inline int Instance::bitSize() const
+{
+    return _d.bitSize;
+}
+
+
+inline void Instance::setBitSize(qint8 size)
+{
+    _d.bitSize = size;
+}
+
+
+inline int Instance::bitOffset() const
+{
+    return _d.bitOffset;
+}
+
+
+inline void Instance::setBitOffset(qint8 offset)
+{
+    _d.bitOffset = offset;
+}
+
+
 inline QString Instance::name() const
 {
     return _d.name;
@@ -113,13 +137,6 @@ inline bool Instance::isValid() const
 inline bool Instance::isAccessible() const
 {
     return !_d.isNull && _d.vmem->safeSeek(_d.address);
-}
-
-
-inline QString Instance::toString(const ColorPalette* col) const
-{
-    return _d.isNull ?
-                QString("NULL") : _d.type->toString(_d.vmem, _d.address, col);
 }
 
 

@@ -28,6 +28,8 @@ public:
 
     int id;
     size_t address;
+    qint8 bitSize;
+    qint8 bitOffset;
     const BaseType* type;
     VirtualMemory* vmem;
     QString name;
