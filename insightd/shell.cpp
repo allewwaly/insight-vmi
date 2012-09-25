@@ -2596,6 +2596,13 @@ int Shell::memberNameLenth(const Structured* s, int indent) const
 	for (int i = 0; i < s->members().size(); ++i) {
 		const StructuredMember* m = s->members().at(i);
 		int tmp = m->name().size() + indent;
+		rt = m->refType();
+		// Integer type with bit size/offset?
+		if (m->bitSize() >= 0) {
+			tmp += 2; // appends ":n"
+			if (m->bitSize() >= 10) // appends ":nn"
+				tmp++;
+		}
 		// Anonymous struct/union?
 		if (tmp == indent && (rt = m->refType()) && (rt->type() & StructOrUnion))
 			tmp = memberNameLenth(dynamic_cast<const Structured*>(rt),
@@ -2661,9 +2668,16 @@ void Shell::printStructMembers(const Structured* s, int indent, int id_width,
         _out << "  ";
         if (m->name().isEmpty())
             _out << qSetFieldWidth(w_name) << QString();
-        else
-            _out << color(ctMember) << m->name() << color(ctReset)
-                 << qSetFieldWidth(w_name_fill) << left << ": ";
+        else {
+            _out << color(ctMember) << m->name() << color(ctReset);
+            // bit-field with size/offset?
+            if (m->bitSize() >= 0) {
+                QString bits = QString::number(m->bitSize());
+                _out << ":" << color(ctOffset) << bits << color(ctReset);
+                w_name_fill -= 1 + bits.size();
+            }
+            _out << qSetFieldWidth(w_name_fill) << left << ": ";
+        }
         _out << qSetFieldWidth(0) << color(ctTypeId)
              << qSetFieldWidth(id_width) << left
              << QString("0x%1").arg((uint)m->refTypeId(), 0, 16)
