@@ -11,6 +11,7 @@
 #include "genericexception.h"
 #include "virtualmemory.h"
 #include "virtualmemoryexception.h"
+#include "memorymapheuristics.h"
 
 #include <QList>
 
@@ -19,7 +20,8 @@ MemoryMapNodeSV::MemoryMapNodeSV(MemoryMap* belongsTo, const QString& name,
         quint64 addrInParent, bool hasCandidates)
     : MemoryMapNode(belongsTo, name, address, type, id, parent),
        _addrInParent(addrInParent), _hasCandidates(hasCandidates), 
-      _candidatesComplete(false), nodeMutex(QMutex::Recursive)
+      _candidatesComplete(false), nodeMutex(QMutex::Recursive),
+      _seemsValid(false)
 {
     calculateInitialProbability();
 
@@ -274,3 +276,12 @@ bool MemoryMapNodeSV::memberProcessed(quint64 addressInParent, quint64 address)
     return false;
 }
 
+void MemoryMapNodeSV::setSeemsValid()
+{
+    const Instance i = this->toInstance();
+    if(!_seemsValid && dynamic_cast<MemoryMapNodeSV*>(_parent) &&
+            !MemoryMapHeuristics::isListHead(&i)){
+        _seemsValid = true;
+        (dynamic_cast<MemoryMapNodeSV*>(_parent))->setSeemsValid();
+    }
+}

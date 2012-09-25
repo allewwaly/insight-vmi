@@ -170,6 +170,14 @@ public:
      * @returns true if the member has already been processed, false otherwise
      **/
     bool memberProcessed(quint64 addressInParent, quint64 address);
+
+    void setSeemsValid();
+
+    inline bool seemsValid()
+    {
+        return _seemsValid;
+    }
+
 private:
     /**
      * Calculate the intial probability of this node. This function should only
@@ -196,6 +204,7 @@ private:
                                                             ///  keeping our single parent paradigm.
 
     QMutex nodeMutex;
+    bool _seemsValid;
 };
 
 
