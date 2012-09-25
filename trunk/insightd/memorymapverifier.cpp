@@ -184,10 +184,10 @@ bool MemoryMapVerifier::parseSlubData(const char *slubFile)
     return false;
 }
 
-void MemoryMapVerifier::newNode(MemoryMapNode *currentNode)
+void MemoryMapVerifier::newNode(MemoryMapNode */*currentNode*/)
 {    
-    QMutexLocker(&this->verifierMutex);
-    MemoryMapNodeSV *cur =  dynamic_cast<MemoryMapNodeSV*>(currentNode);
+//    QMutexLocker(&this->verifierMutex);
+//    MemoryMapNodeSV *cur =  dynamic_cast<MemoryMapNodeSV*>(currentNode);
 
     // Add an memory map interval watcher node to the init_task
     /*
