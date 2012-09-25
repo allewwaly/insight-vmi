@@ -146,58 +146,13 @@ void MemoryMapBuilderSV::run()
             continue;
         }
 
-        // Create an instance from the node
-        Instance inst = node->toInstance(false);
+        processNode(node);
 
-        // If this is a pointer, add where it's pointing to
-        if (node->type()->type() & rtPointer) {
-            try {
-                quint64 addr = (quint64) inst.toPointer();
-                shared->pointersToLock.lock();
-                _map->_pointersTo.insert(addr, node);
-                shared->pointersToLock.unlock();
-                // Add dereferenced type to the stack, if not already visited
-                int cnt = 0;
-                inst = inst.dereference(BaseType::trLexicalAndPointers, -1, &cnt);
-//                inst = inst.dereference(BaseType::trLexical, &cnt);
-
-                // Check for NULL Pointer or Pointer that have a value of -1
-                // Further all pointers must be 4 byte aligned
-                if (cnt && _map->addressIsWellFormed(inst))
-                    _map->addChildIfNotExistend(inst, node, _index, node->address());
-            }
-            catch (GenericException& e) {
-                // Do nothing
-            }
-        }
-        // If this is an array, add all elements
-        else if (node->type()->type() & rtArray) {
-            const Array* a = dynamic_cast<const Array*>(node->type());
-            if (a->length() > 0) {
-                // Add all elements to the stack that haven't been visited
-                for (int i = 0; i < a->length(); ++i) {
-                    try {
-                        Instance e = inst.arrayElem(i);
-                        if (_map->addressIsWellFormed(e))
-                            _map->addChildIfNotExistend(e, node, _index, node->address() + (i * e.size()));
-                    }
-                    catch (GenericException& e) {
-                        // Do nothing
-                    }
-                }
-            }
-        }
-        // If this is a struct, add all pointer members
-        else if (inst.memberCount() > 0) {
-            addMembers(&inst, node);
-        }
-
-
-        // Lock the mutex again before we jump to the loop condition checking
-        queueLock.relock();
 #if MEMORY_MAP_VERIFICATION == 1
         _map->verifier().performChecks(node);
 #endif
+        // Lock the mutex again before we jump to the loop condition checking
+        queueLock.relock();
     }
 
 #if MEMORY_MAP_VERIFICATION == 1
@@ -212,7 +167,7 @@ void MemoryMapBuilderSV::run()
 
 }
 
-MemoryMapNode* MemoryMapBuilderSV::existsNode(Instance &inst)
+MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance &inst)
 {
   // Increase the reading counter
   _map->_shared->vmemReadingLock.lock();
@@ -221,8 +176,9 @@ MemoryMapNode* MemoryMapBuilderSV::existsNode(Instance &inst)
 
     MemMapSet nodes = _map->vmemMapsInRange(inst.address(), inst.endAddress());
 
+    /*
     for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
-        const MemoryMapNode* otherNode = *it;
+        MemoryMapNodeSV* otherNode = const_cast<MemoryMapNodeSV*>((*it));
         // Is the the same object already contained?
         bool ok1 = false, ok2 = false;
         if (otherNode && otherNode->address() == inst.address() &&
@@ -236,10 +192,14 @@ MemoryMapNode* MemoryMapBuilderSV::existsNode(Instance &inst)
           _map->_shared->vmemReadingLock.unlock();
           // Wake up any sleeping thread
           _map->_shared->vmemReadingDone.wakeAll();
+
+          // We encountered an existing node
+          // otherNode->encountered();
           
-          return const_cast<MemoryMapNode*>(otherNode);
+          return const_cast<MemoryMapNodeSV*>(otherNode);
         }
     }
+    */
 
   // Decrease the reading counter again
   _map->_shared->vmemReadingLock.lock();
@@ -252,10 +212,10 @@ MemoryMapNode* MemoryMapBuilderSV::existsNode(Instance &inst)
 }
 
 void MemoryMapBuilderSV::processList(MemoryMapNodeSV *listHead,
-                                     Instance &firstMember)
+                                     Instance &firstListMember)
 {
     // Inital checks
-    if(!listHead || firstMember.isNull() || !(firstMember.type()->type() & rtStruct))
+    if(!listHead || firstListMember.isNull() || !(firstListMember.type()->type() & rtStruct))
         return;
 
     Instance tmp = listHead->toInstance();
@@ -263,15 +223,15 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *listHead,
     // Is this is an invalid list head or if we already processed this
     // member return
     if(!MemoryMapHeuristics::validListHead(&tmp) ||
-            listHead->memberProcessed(listHead->address(), firstMember.address()))
+            listHead->memberProcessed(listHead->address(), firstListMember.address()))
         return;
 
     // Calculate the offset of the member within the struct
     quint64 listHeadNext = (quint64)tmp.member(0, 0, -1, true).toPointer();
-    quint64 memOffset = listHeadNext - firstMember.address();
+    quint64 memOffset = listHeadNext - firstListMember.address();
 
     // Check if the identified member is a list_head
-    tmp = firstMember.memberByOffset(memOffset);
+    tmp = firstListMember.memberByOffset(memOffset);
     if(!MemoryMapHeuristics::isListHead(&tmp)) {
         debugmsg("Identfied member is no list_head!");
         return;
@@ -279,11 +239,10 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *listHead,
 
     // Init variables.
     MemoryMapNodeSV *currentNode = listHead;
-    tmp = firstMember;
+    tmp = firstListMember;
 
 
     // Iterate over the list
-    // TK: Added currentNode, as adding member segfaults
     while(currentNode && listHeadNext != listHead->address()) {
         // Get the next instance
         tmp.setAddress(listHeadNext - memOffset);
@@ -312,6 +271,184 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *listHead,
 
 }
 
+void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
+{
+
+}
+
+void MemoryMapBuilderSV::processCandidates(Instance *inst, const ReferencingType *ref)
+{
+#if MEMORY_MAP_PROCESS_NODES_WITH_ALT == 1
+    const RefBaseType type = dynamic_cast<const RefBaseType*>(inst->type());
+
+    if(!type)
+    {
+        debugmsg("Instance %s is no referencing type!\n", inst->name());
+        return;
+    }
+
+    // Process each candidate
+    for(int i = 0; i < type.altRefTypeCount(); ++i)
+    {
+        // Skip incompatible candidates?
+        if(!type.altRefType(i).compatible(inst))
+            continue;
+
+        // Skip candidates based on heuristics
+        const ReferencingType::AltRefType& alt = type->altRefType(i);
+        //Instance cand = alt.toInstance(inst->vmem(), inst, inst->,
+        //                      m->name(), fullNameComponents());
+    }
+
+#endif
+}
+
+void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst,
+                                        const ReferencingType *ref)
+{
+    if (inst->type()->type() & rtPointer &&
+            MemoryMapHeuristics::validPointer(inst) &&
+            !(inst->type()->type() & rtFuncPointer) &&
+            !MemoryMapHeuristics::userLandPointer(inst) &&
+            inst->address() != (quint64)inst->toPointer())
+    {
+        if(ref && ref->hasAltRefTypes())
+        {
+            processCandidates(inst, ref);
+            return;
+        }
+
+        try
+        {
+            // Add pointer to the _pointerTo map
+            quint64 addr = (quint64) inst->toPointer();
+
+            _map->_shared->pointersToLock.lock();
+            _map->_pointersTo.insert(addr, node);
+            _map->_shared->pointersToLock.unlock();
+
+            // Add dereferenced type to the map, if not already in it
+            int cnt = 0;
+            Instance i = inst->dereference(BaseType::trLexicalAndPointers, -1, &cnt);
+
+            if (cnt)
+                _map->addChildIfNotExistend(i, node, _index, inst->address());
+        }
+        catch (GenericException& e)
+        {
+            // Do nothing
+        }
+
+    }
+    else
+    {
+        // Do nothing
+    }
+}
+
+void MemoryMapBuilderSV::processArray(MemoryMapNodeSV *node, Instance *inst)
+{
+    const Array* a = dynamic_cast<const Array*>(inst->type());
+
+    if (a->length() > 0)
+    {
+        // Add all elements to the stack that haven't been visited
+        for (int i = 0; i < a->length(); ++i)
+        {
+            try
+            {
+                Instance e = inst->arrayElem(i);
+
+                if (MemoryMapHeuristics::validAddress(e.address(), e.vmem()))
+                    processNode(node, &e, a);
+
+                   // _map->addChildIfNotExistend(e, node, _index, node->address() + (i * e.size()));
+            }
+            catch (GenericException& e)
+            {
+                // Do nothing
+            }
+        }
+    }
+}
+
+void MemoryMapBuilderSV::processStruct(MemoryMapNodeSV *node, Instance *inst)
+{
+    // Struct without members?
+    if (!inst->memberCount())
+        return;
+
+    // Add all struct members to the stack that haven't been visited
+    for (int i = 0; i < inst->memberCount(); ++i)
+    {
+        // Process each member
+        // Notice that the performance could be improved if we do not try to create
+        // an instance for each member, but just for interesting members like structs,
+        // poiters, etc.
+        Instance mi = inst->member(i, 0, -1, true);
+
+        // Adjust instance name to reflect full path
+        if (node->name() != inst->name())
+            mi.setName(inst->name() + "." + mi.name());
+
+        if(!mi.isNull())
+        {
+            // Get the structured member for the instance
+            const Structured* s = dynamic_cast<const Structured*>(inst->type());
+            processNode(node, &mi, dynamic_cast<const ReferencingType*>(s->members().at(i)));
+        }
+
+     }
+}
+
+void MemoryMapBuilderSV::processUnion(MemoryMapNodeSV *node, Instance *inst)
+{
+    // Ignore Unions for now.
+}
+
+void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
+                                     const ReferencingType *ref)
+{
+    // Create an instance from the node if necessary
+    if(!inst)
+    {
+        Instance i = node->toInstance(false);
+        inst = &i;
+    }
+
+    // Is this a pointer?
+    if (inst->type()->type() & rtPointer)
+    {
+        processPointer(node, inst, ref);
+    }
+    // If this is an array, add all elements
+    else if (inst->type()->type() & rtArray)
+    {
+        processArray(node, inst);
+    }
+    // Is this a struct or union?
+    else if (inst->memberCount() > 0)
+    {
+        // Is this a list_head?
+        if(MemoryMapHeuristics::isListHead(inst))
+            processListHead(node, inst);
+        else if(MemoryMapHeuristics::isHListHead(inst) ||
+                MemoryMapHeuristics::isHListNode(inst))
+            // Ignore for now
+            return;
+        else if(inst->type()->type() & rtStruct)
+            processStruct(node, inst);
+        else if(inst->type()->type() & rtUnion)
+            processUnion(node, inst);
+    }
+    else
+    {
+        //debugmsg("" << inst->name() << " is Nothing!\n");
+    }
+
+}
+
+/*
 void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
 {
     if (!inst->memberCount())
@@ -500,7 +637,7 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
 #endif
     }
 }
-
+*/
 
 float MemoryMapBuilderSV::calculateNodeProbability(const Instance* inst,
                                                    float /*parentProbability*/) const

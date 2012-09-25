@@ -19,7 +19,7 @@ MemoryMapNodeSV::MemoryMapNodeSV(MemoryMap* belongsTo, const QString& name,
         quint64 address, const BaseType* type, int id, MemoryMapNodeSV* parent,
         quint64 addrInParent, bool hasCandidates)
     : MemoryMapNode(belongsTo, name, address, type, id, parent),
-       _addrInParent(addrInParent), _hasCandidates(hasCandidates), 
+       _encountered(1), _addrInParent(addrInParent), _hasCandidates(hasCandidates),
       _candidatesComplete(false), nodeMutex(QMutex::Recursive),
       _seemsValid(false)
 {
@@ -36,7 +36,7 @@ MemoryMapNodeSV::MemoryMapNodeSV(MemoryMap* belongsTo, const QString& name,
 MemoryMapNodeSV::MemoryMapNodeSV(MemoryMap* belongsTo, const Instance& inst,
         MemoryMapNodeSV* parent, quint64 addrInParent, bool hasCandidates)
     : MemoryMapNode(belongsTo, inst, parent),
-      _addrInParent(addrInParent), _hasCandidates(hasCandidates),
+      _encountered(1), _addrInParent(addrInParent), _hasCandidates(hasCandidates),
       _candidatesComplete(false), nodeMutex(QMutex::Recursive)
 {
     calculateInitialProbability(&inst);
@@ -155,6 +155,7 @@ void MemoryMapNodeSV::updateProbabilitySV(MemoryMapNodeSV *initiator)
     float prob = 0;
     float parentProb = 1.0;
     float childrenProb = 0.0;
+    float encounterProb = 0.0;
 
     // Parent probability
     if(_parent)
@@ -171,8 +172,15 @@ void MemoryMapNodeSV::updateProbabilitySV(MemoryMapNodeSV *initiator)
     else
         childrenProb = 1.0;
 
+    // The more we encounter the node the more likely it is
+    encounterProb = 1.5 * _encountered;
+
     // New probability
-    prob = _initialProb * parentProb * childrenProb;
+    prob = _initialProb * parentProb * childrenProb * encounterProb;
+
+    // Make sure that prob is below or equal to 1
+    if(prob > 1.0)
+        prob = 1.0;
 
     /*
     if(fullName().compare("init_task.active_mm.exe_file.f_mapping") == 0) {
@@ -274,6 +282,11 @@ bool MemoryMapNodeSV::memberProcessed(quint64 addressInParent, quint64 address)
     }
 
     return false;
+}
+
+void MemoryMapNodeSV::encountered()
+{
+    _encountered++;
 }
 
 void MemoryMapNodeSV::setSeemsValid()

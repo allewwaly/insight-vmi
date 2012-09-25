@@ -148,9 +148,9 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     }
 
     // How many threads to create?
-    _shared->threadCount =
-            qMin(qMax(QThread::idealThreadCount(), 1), MAX_BUILDER_THREADS);
-//    _shared->threadCount = 1;
+//    _shared->threadCount =
+//            qMin(qMax(QThread::idealThreadCount(), 1), MAX_BUILDER_THREADS);
+    _shared->threadCount = 1;
 
 //    debugmsg("Building reverse map with " << _shared->threadCount << " threads.");
 
@@ -175,9 +175,9 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
             it != _factory->vars().constEnd(); ++it)
     {
         const Variable* v = *it;
-//        // For testing now only start with this one variable
-        if (v->name() != "init_task")
-            continue;
+        // For testing now only start with this one variable
+//         if (v->name() != "init_task")
+//            continue;
 
 //        if (v->hasAltRefTypes())
 //            debugmsg(QString("Variable \"%1\" (0x%2) has %3 candidate types.")

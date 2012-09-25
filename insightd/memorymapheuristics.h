@@ -28,13 +28,54 @@ public:
     static bool isListHead(const Instance *i);
 
     /**
+     * Checks if this instance is of type 'struct hlist_head'.
+     * @return \c true if this object is of type 'struct hlist_head', \c false
+     * otherwise
+     */
+    static bool isHListHead(const Instance *i);
+
+    /**
+     * Checks if this instance is of type 'struct hlist_node'.
+     * @return \c true if this object is of type 'struct hlist_node', \c false
+     * otherwise
+     */
+    static bool isHListNode(const Instance *i);
+
+    /**
+     * Checks if the given is address is valid based on heuristics.
+     * Notice that this function checks if the address if 4 Byte aligned. This
+     * is not the case for all pointers, but should be true for all pointers that
+     * point to the first element. For instance, a char * should be 4 byte aligned
+     * if it points to the first character in a string, but it may not be 4 byte aligned
+     * if it points to the n-th character in a string.
+     * @param address the address to verify
+     * @param vmem a pointer to the VirtualMemory that the address is part of
+     * @return true if the address seems to be valid, false otherwise
+     */
+    static bool validAddress(quint64 address, const VirtualMemory *vmem);
+
+    /**
      * Checks if the given pointer points to a valid address.
      * Notice that this check is based on heuristics and may therefore return
      * incorrect results.
      * @param p the pointer instance to verify
      * @returns true if the pointer is valid, false otherwise
      */
-    static bool validPointerAddress(const Instance *p);
+    static bool validPointer(const Instance *p);
+
+    /**
+     * Checks if the diven pointer is a userland pointer.
+     * @param p the pointer instance to verify
+     * @returns true if the pointer is a userland pointer, false otherwise
+     */
+    static bool userLandPointer(const Instance *p);
+
+    /**
+     * Checks if the given pointer is a valid userland pointer.
+     * @param p the pointer instance to verify
+     * @returns true if the pointer is a valid userland pointer, false otherwise
+     */
+    static bool validUserLandPointer(const Instance *p);
 
     /**
      * Checks if the given instance is a valid 'struct list_head'.
