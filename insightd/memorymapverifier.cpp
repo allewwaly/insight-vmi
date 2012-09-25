@@ -512,7 +512,7 @@ void MemoryMapVerifier::statistics()
                  << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << left << shell->color(ctReset)
                  << " ("
                  << shell->color(ctType)
-                 << ((float)_validObjects) * 100 / totalObjs << shell->color(ctType)
+                 << ((float)_seemValidObjects) * 100 / totalObjs << shell->color(ctType)
                  << shell->color(ctReset)
                  << "%)\n"
                  << qSetFieldWidth(50)
