@@ -48,26 +48,26 @@ public:
     void setOffset(size_t offset);
 
     /**
-     * @return the bit size of this bit-split integer declaration
+     * @return the bit size of this bit-field integer declaration
      */
-    inline int bitSize() const;
+    int bitSize() const;
 
     /**
-     * Sets the bit size of this bit-split integer declaration
-     * @param size new bit size of bit-split integer declaration
+     * Sets the bit size of this bit-field integer declaration.
+     * @param size new bit size of bit-field integer declaration
      */
-    inline void setBitSize(int size);
+    void setBitSize(qint8 size);
 
     /**
-     * @return the bit offset of this bit-split integer declaration
+     * @return the bit offset of this bit-field integer declaration
      */
     int bitOffset() const;
 
     /**
-     * Sets the bit offset of this bit-split integer declaration
-     * @param offset new bit offset of bit-split integer declaration
+     * Sets the bit offset of this bit-field integer declaration.
+     * @param offset new bit offset of bit-field integer declaration
      */
-    inline void setBitOffset(int offset);
+    void setBitOffset(qint8 offset);
 
     /**
      * This gives a pretty name of that type which may involve referencing
@@ -219,7 +219,7 @@ inline int StructuredMember::bitSize() const
 }
 
 
-inline void StructuredMember::setBitSize(int size)
+inline void StructuredMember::setBitSize(qint8 size)
 {
     _bitSize = size;
 }
@@ -231,7 +231,7 @@ inline int StructuredMember::bitOffset() const
 }
 
 
-inline void StructuredMember::setBitOffset(int offset)
+inline void StructuredMember::setBitOffset(qint8 offset)
 {
     _bitOffset = offset;
 }
