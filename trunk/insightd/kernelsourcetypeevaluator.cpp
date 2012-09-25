@@ -19,7 +19,6 @@
 
 #define typeEvaluatorError(x) do { throw SourceTypeEvaluatorException((x), __FILE__, __LINE__); } while (0)
 
-
 KernelSourceTypeEvaluator::KernelSourceTypeEvaluator(AbstractSyntaxTree* ast,
         SymFactory* factory)
     : ASTTypeEvaluator(ast,
@@ -299,7 +298,12 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers_constant(const ASTNode *nod
                 QString constant = printer.toString(node->u.primary_expression.constant,false).trimmed();
                 if (!constant.isNull())
                 {
-                    ASTType* constantType = typeofNode(node);
+                    ASTType* constantType;
+                    try{
+                        constantType = typeofNode(node);
+                    }catch(...){
+                        return;
+                    }
                     if(constantType->type() == rtArray && 
                             constantType->next() &&
                             constantType->next()->type() == rtInt8)
@@ -439,27 +443,41 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
     if (node->type == nt_init_declarator &&
         node->parent)
     {
+#ifdef DEBUGMAGICNUMBERS
+        string.append(QString("\nCurrent Node: %1 \n")
+                .arg(printer.toString(node, false).trimmed()));
+#endif /* DEBUGMAGICNUMBERS */
         ASTNode* declarator = node->u.init_declarator.declarator;
-        ASTType* constantType = typeofNode(declarator);
-        
+        ASTType* constantType;
+        try{
+            constantType = typeofNode(declarator);
+        }catch(...){
+            return;
+        }
+
+        while ((constantType->type() & RefBaseTypes) && 
+                constantType->next())
+        {
+            constantType = constantType->next();
+#ifdef DEBUGMAGICNUMBERS
+            string.append(QString("ReferenceType with identifier: %1\n")
+                    .arg(constantType->identifier()));
+#endif /* DEBUGMAGICNUMBERS */
+        }
+
         if (constantType->identifier().isEmpty()) return;
 
         BaseType* baseType = _factory->findBaseTypeByName(constantType->identifier());
-        if (!baseType){
+        if (!baseType || !(baseType->type() & (rtStruct | rtUnion))){
             return;
         }
                 
-        if(baseType->type() & (rtStruct | rtUnion))
-        {
-            structured = dynamic_cast<const Structured*>(baseType);
-        }
-
+        structured = dynamic_cast<const Structured*>(baseType);
         
         ASTNode* initializer = node->u.init_declarator.initializer;
-        if (!initializer) return;
+        if (!initializer || initializer->type != nt_initializer) return;
 
-        if(initializer->type == nt_initializer && 
-           initializer->u.initializer.initializer_list){
+        if(initializer->u.initializer.initializer_list){
             ASTNodeList* initList = initializer->u.initializer.initializer_list;
             while(initList){
                 if(initList->item->u.initializer.assignment_expression){
@@ -491,7 +509,12 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
                 .arg(printer.toString(node, false).trimmed()));
 #endif /* DEBUGMAGICNUMBERS */
 
-        ASTType* constantType = typeofNode(node);
+        ASTType* constantType;
+        try{
+            constantType = typeofNode(node);
+        }catch(...){
+            return;
+        }
 
         while ((constantType->type() & RefBaseTypes) && 
                 constantType->next())
@@ -600,22 +623,6 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
 #endif /* DEBUGMAGICNUMBERS */
                     return;
                 }
-
-                member->refType()->dereferencedBaseType();
-#ifdef DEBUGMAGICNUMBERS
-                if (member->refType()->type() == typeofNode(list->item)->type() || 
-                        ((member->refType()->type() == rtTypedef ||
-                          member->refType()->type() == rtVolatile) &&
-                         member->refType()->dereferencedBaseType()->type() == typeofNode(list->item)->type())
-                   )
-                {
-                    string.append(QString("Found Assignment: \"%1->(%2)\" (%3)\n")
-                            .arg(structured->name())
-                            .arg(member->prettyName())
-                            .arg(printer.toString(node, false).trimmed())
-                            );
-                }
-#endif /* DEBUGMAGICNUMBERS */
             }
             else
             {
