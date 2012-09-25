@@ -2557,6 +2557,11 @@ void ASTTypeEvaluator::afterChildren(const ASTNode *node, int /* flags */)
                 evaluateMagicNumbers(node);
             break;
 
+        case nt_init_declarator:
+            if (_phase == epMagicNumbers)
+                evaluateMagicNumbers(node);
+            break;
+
         default:
             break;
         }
