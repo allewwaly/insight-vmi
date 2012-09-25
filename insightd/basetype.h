@@ -82,9 +82,9 @@ public:
         trLexicalAndPointers = trLexical|rtPointer, ///< resolve as for trLexical plus rtPointer
         trPointersAndArrays = rtPointer|rtArray,    ///< resolve rtPointer and rtArray
         trLexicalPointersArrays = trLexicalAndPointers|rtArray, ///< resolve as for trLexicalAndPointers plus rtArray
-        trAnyNonNull   = 0x7FFFFFFF,                ///< resolve all types, but no null pointers
+        trAnyNonNull   = trLexicalPointersArrays,   ///< resolve all types, but no null pointers
         trNullPointers = 0x80000000,                ///< resolve rtPointer even with null address
-        trAny          = 0xFFFFFFFF                 ///< resolve all types, incl. null pointers
+        trAny          = trNullPointers|trAnyNonNull ///< resolve all types, incl. null pointers
     };
 
     /**
