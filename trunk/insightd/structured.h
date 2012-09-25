@@ -57,7 +57,7 @@ public:
      * @return a hash value for the given number of members (\c nrMembers) starting from the
      * given \c memberIndex
      */
-    virtual uint hashMembers(quint32 memberIndex, quint32 nrMembers, bool *isValid) const;
+    virtual uint hashMembers(quint32 memberIndex, quint32 nrMembers, bool *isValid = 0) const;
 
     /**
      * @return the list of members of this struct or union
