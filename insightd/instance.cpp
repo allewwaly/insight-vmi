@@ -979,14 +979,15 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
                         break;
                 }
                 debugString.append(QString("%1 -> %2 : %3 (%4)\n%5\n")
-                        .arg(this->name())
+                        .arg(this->fullName())
                         .arg(memberInstance.name())
                         .arg(constInt)
                         .arg(memberInstance.typeName())
                         .arg(memberInstance.fullName())
                         );
-                if ((*memberIterator)->constantIntValue().size() == 1 &&
-                        (*memberIterator)->constantIntValue().first() == 0)
+                if (constInt == 0 || 
+                        ((*memberIterator)->constantIntValue().size() == 1 &&
+                        (*memberIterator)->constantIntValue().first() == 0))
                 {
                     memberValid = true;
                     continue;
