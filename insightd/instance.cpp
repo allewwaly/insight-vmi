@@ -397,10 +397,20 @@ Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCoun
     if (isNull())
         return *this;
 
-    if (_d.type && (_d.type->type() & resolveTypes))
-        return _d.type->toInstance(_d.address, _d.vmem, _d.name,
-                _d.parentNames, resolveTypes, maxPtrDeref, derefCount);
-
+    if (_d.type && (_d.type->type() & resolveTypes)) {
+        int dcnt = 0;
+        Instance ret = _d.type->toInstance(_d.address, _d.vmem, _d.name,
+                                           _d.parentNames, resolveTypes,
+                                           maxPtrDeref, &dcnt);
+        // If only lexical types were dereferenced, preserve the bit-field location
+        if (dcnt == 0) {
+            ret.setBitSize(_d.bitSize);
+            ret.setBitOffset(_d.bitOffset);
+        }
+        else if (derefCount)
+            *derefCount = dcnt;
+        return ret;
+    }
     return *this;
 }
 
@@ -446,14 +456,15 @@ Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
 	return Instance();
 }
 
+
 Instance Instance::memberByOffset(quint64 off) const
 {
     const Structured* s = dynamic_cast<const Structured*>(_d.type);
 
-    for(int i = 0; s && i < s->members().size(); i++) {
+    for (int i = 0; s && i < s->members().size(); i++) {
         StructuredMember* m = s->members().at(i);
 
-        if(m->offset() == off)
+        if (m->offset() == off)
             return member(i);
     }
 
@@ -712,6 +723,7 @@ ExpressionResult Instance::toExpressionResult() const
 	}
 }
 
+
 bool Instance::compareInstance(const Instance& inst, 
     bool &embedded, bool &overlap, bool &thisParent) const
 {
@@ -841,6 +853,7 @@ bool Instance::compareInstance(const Instance& inst,
   return isSane;
 }
 
+
 bool Instance::compareUnionInstances(const Instance& inst, bool &thisParent) const
 {
   bool isSane = false;
@@ -871,6 +884,7 @@ bool Instance::compareUnionInstances(const Instance& inst, bool &thisParent) con
 
   return isSane;
 }
+
 
 bool Instance::compareInstanceType(const Instance& inst) const
 {
@@ -904,6 +918,7 @@ bool Instance::compareInstanceType(const Instance& inst) const
 
   return false;
 }
+
 
 bool Instance::isValidConcerningMagicNumbers(bool * constants) const
 {
@@ -1044,3 +1059,29 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
     }
     return isValid;
 }
+
+
+QString Instance::toString(const ColorPalette* col) const
+{
+    static const QString nullStr("NULL");
+    if (_d.isNull)
+        return nullStr;
+
+    const BaseType* bt;
+    if (_d.bitSize >= 0 &&
+        (bt = _d.type->dereferencedBaseType(BaseType::trLexical)) &&
+        (bt->type() & IntegerTypes))
+    {
+        const IntegerBitField* ibf = dynamic_cast<const IntegerBitField*>(bt);
+        quint64 val = ibf->toIntBitField(_d.vmem, _d.address, _d.bitSize, _d.bitOffset);
+        QString s = QString::number(val);
+        if (col)
+            return col->color(ctNumber) + s + col->color(ctReset);
+        else
+            return s;
+    }
+
+    return _d.type->toString(_d.vmem, _d.address, col);
+}
+
+
