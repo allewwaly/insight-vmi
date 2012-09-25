@@ -85,74 +85,10 @@ protected:
 
 
 /**
- * Provides additional type information for all integer types
- */
-class IntegerTypeProps
-{
-public:
-    /**
-     * Constructor
-     * @param factory the factory that created this symbol
-     */
-    IntegerTypeProps() : _bitSize(-1), _bitOffset(-1)
-    {
-    }
-
-    /**
-     * Constructor
-     * @param factory the factory that created this symbol
-     * @param info the type information to construct this type from
-     */
-    IntegerTypeProps(const TypeInfo& info)
-        : _bitSize(info.bitSize()), _bitOffset(info.bitOffset())
-    {
-    }
-
-    /**
-     * @return the bit size of this bit-split integer declaration
-     */
-    inline int bitSize() const
-    {
-        return _bitSize;
-    }
-
-    /**
-     * Sets the bit size of this bit-split integer declaration
-     * @param size new bit size of bit-split integer declaration
-     */
-    inline void setBitSize(int size)
-    {
-        _bitSize = size;
-    }
-
-    /**
-     * @return the bit offset of this bit-split integer declaration
-     */
-    inline int bitOffset() const
-    {
-        return _bitOffset;
-    }
-
-    /**
-     * Sets the bit offset of this bit-split integer declaration
-     * @param offset new bit offset of bit-split integer declaration
-     */
-    inline void setBitOffset(int offset)
-    {
-        _bitOffset = offset;
-    }
-
-protected:
-    int _bitSize;
-    int _bitOffset;
-};
-
-
-/**
  * Generic template class for all integer types
  */
 template<class T, const RealType realType>
-class IntegerBaseType: public NumericBaseType<T, realType>, public IntegerTypeProps
+class IntegerBaseType: public NumericBaseType<T, realType>
 {
 public:
     /**
@@ -170,7 +106,7 @@ public:
      * @param info the type information to construct this type from
      */
     IntegerBaseType(SymFactory* factory, const TypeInfo& info)
-        : NumericBaseType<T, realType>(factory, info), IntegerTypeProps(info)
+        : NumericBaseType<T, realType>(factory, info)
     {
     }
 
@@ -179,43 +115,14 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const
+    virtual QString toString(QIODevice* mem, size_t offset,
+                             const ColorPalette* col = 0) const
     {
         T n = BaseType::value<T>(mem, offset);
-        // Take bit size and bit offset into account
-        if (_bitSize > 0 && _bitOffset >= 0) {
-            // Construct the bit mask
-            T mask = 0;
-            for (int i = 0; i < _bitSize; i++)
-                mask = (mask << 1) | 1;
-            // Extract the bits
-            n = (n >> _bitOffset) & mask;
-        }
         QString s = QString::number(n);
         if (col)
             s = col->color(ctNumber) + s + col->color(ctReset);
         return s;
-    }
-
-    /**
-     * Create a hash of that type based on BaseType::hash(), bitSize() and
-     * bitOffset().
-     * @param isValid indicates if the hash is valid, for example, if all
-     * referencing types could be resolved
-     * @return a hash value of this type
-     */
-    virtual uint hash(bool* isValid = 0) const
-    {
-        if (!NumericBaseType<T, realType>::_hashValid) {
-            NumericBaseType<T, realType>::_hash =
-                    NumericBaseType<T, realType>::hash(0) ^
-                    _bitSize ^
-                    rotl32(_bitOffset, 16);
-            NumericBaseType<T, realType>::_hashValid = true;
-        }
-        if (isValid)
-            *isValid = NumericBaseType<T, realType>::_hashValid;
-        return NumericBaseType<T, realType>::_hash;
     }
 
     /**
@@ -225,19 +132,12 @@ public:
      */
     virtual void readFrom(KernelSymbolStream& in)
     {
-        BaseType::readFrom(in);
-        in >> _bitSize >> _bitOffset;
-    }
-
-    /**
-     * Writes a serialized version of this object to \a out
-     * \sa readFrom()
-     * @param out the data stream to write the data to, must be ready to write
-     */
-    virtual void writeTo(KernelSymbolStream& out) const
-    {
-        BaseType::writeTo(out);
-        out << _bitSize << _bitOffset;
+        NumericBaseType<T, realType>::readFrom(in);
+        // Read obsolete values from older versions
+        if (in.kSymVersion() <= kSym::VERSION_15) {
+            qint32 i;
+            in >> i >> i;
+        }
     }
 };
 
@@ -274,7 +174,8 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const
+    virtual QString toString(QIODevice* mem, size_t offset,
+                             const ColorPalette* col = 0) const
     {
         QString s = QString::number(BaseType::value<T>(mem, offset));
         if (col)
