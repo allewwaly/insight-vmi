@@ -78,7 +78,7 @@ void KernelSourceParser::operationProgress()
     if (_duration > _prevDuration + 2000) {
         _prevDuration = _duration;
         _remainingSec = _filesIndex > 0 ?
-                    (_prevDuration / (float)_filesIndex) * (_fileNames.size() - _filesIndex) / 1000 : -1;
+                    ((_prevDuration / (float)_filesIndex) * (_fileNames.size() - _filesIndex)) / 1000 : -1;
     }
     QString remaining = _remainingSec > 0 ?
                 QString("%1:%2").arg(_remainingSec / 60).arg(_remainingSec % 60, 2, 10, QChar('0')) :
