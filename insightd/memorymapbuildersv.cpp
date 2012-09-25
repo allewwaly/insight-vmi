@@ -271,12 +271,12 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *listHead,
 
 }
 
-void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
+void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV */*node*/, Instance */*inst*/)
 {
 
 }
 
-void MemoryMapBuilderSV::processCandidates(Instance *inst, const ReferencingType *ref)
+void MemoryMapBuilderSV::processCandidates(Instance */*inst*/, const ReferencingType */*ref*/)
 {
 #if MEMORY_MAP_PROCESS_NODES_WITH_ALT == 1
     const RefBaseType type = dynamic_cast<const RefBaseType*>(inst->type());
@@ -401,7 +401,7 @@ void MemoryMapBuilderSV::processStruct(MemoryMapNodeSV *node, Instance *inst)
      }
 }
 
-void MemoryMapBuilderSV::processUnion(MemoryMapNodeSV *node, Instance *inst)
+void MemoryMapBuilderSV::processUnion(MemoryMapNodeSV */*node*/, Instance */*inst*/)
 {
     // Ignore Unions for now.
 }
