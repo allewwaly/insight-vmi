@@ -219,6 +219,8 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
     QString s;
     int index_len = 0, offset_len = 1, name_len = 1, type_len = 1;
     quint32 i = _size;
+    bool invalidAdr = false;
+    QString errMsg;
 
     while ( (i >>= 4) )
         offset_len++;
@@ -255,8 +257,18 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
                 while ( addr && !(t->type() & StructOrUnion) ) {
                     const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
                     if (rbt->type() & rtPointer) {
-                        addr = (quint64) rbt->toPointer(mem, addr);
-                        wasPointer = true;
+                        try
+                        {
+                            addr = (quint64) rbt->toPointer(mem, addr);
+                            wasPointer = true;
+                            invalidAdr = false;
+                        }
+                        catch(VirtualMemoryException &e)
+                        {
+                            addr = offset + m->offset();
+                            invalidAdr = true;
+                            errMsg = e.message;
+                        }
                     }
                     t = rbt->refType();
                 }
@@ -268,9 +280,14 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
                     addrStr = QString("0x%1").arg(addr, 0, 16);
                     if (col)
                         addrStr = col->color(ctAddress) + addrStr + col->color(ctReset);
-                    addrStr.prepend("... @ ");
-                    if (addr == offset)
-                        addrStr += " (self)";
+                    if(invalidAdr)
+                        addrStr += QString(" (%1)").arg(errMsg);
+                    else
+                    {
+                        addrStr.prepend("... @ ");
+                        if (addr == offset)
+                            addrStr += " (self)";
+                    }
                 }
                 else {
                     addrStr = "NULL";

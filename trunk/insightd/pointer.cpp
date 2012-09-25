@@ -132,10 +132,12 @@ QString Pointer::readString(QIODevice* mem, size_t offset, const int len, QStrin
         return QString(buf);
     }
     catch (VirtualMemoryException& e) {
-        *errMsg = e.message;
+        if(errMsg)
+            *errMsg = e.message;
     }
     catch (MemAccessException& e) {
-        *errMsg = e.message;
+        if(errMsg)
+            *errMsg = e.message;
     }
 
     return QString();
