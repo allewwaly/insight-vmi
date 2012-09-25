@@ -564,21 +564,16 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
                             string.append(QString("Found Membername: %1\n")
                                     .arg(memberName.trimmed()));
 #endif /* DEBUGMAGICNUMBERS */
-                            if(!structured){
-                                BaseTypeList baseTypes = _factory->findBaseTypesByName(constantType->identifier());
-                                BaseTypeList::iterator i;
-
-                                for (i = baseTypes.begin(); i != baseTypes.end(); ++i)
+                            if (!structured) {
+                                const BaseType* baseType = _factory->findBaseTypeByName(constantType->identifier());
+                                if (baseType && baseType->type() & (rtStruct|rtUnion))
                                 {
-                                    if((*i)->type() & (rtStruct |rtUnion))
-                                    {
-                                        structured = dynamic_cast<const Structured*>(*i);
-                                        member = (StructuredMember*) structured->findMember(memberName);
-                                        if (member){
-                                            if (member->refType()->type() == rtStruct || member->refType()->type() ==rtUnion)
-                                                structured = dynamic_cast<const Structured*>(member->refType());
-                                            break;
-                                        }
+                                    structured = dynamic_cast<const Structured*>(baseType);
+                                    member = (StructuredMember*) structured->findMember(memberName);
+                                    if (member){
+                                        if (member->refType()->type() == rtStruct || member->refType()->type() ==rtUnion)
+                                            structured = dynamic_cast<const Structured*>(member->refType());
+                                        break;
                                     }
                                 }
                             } else {
