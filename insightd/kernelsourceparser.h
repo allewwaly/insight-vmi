@@ -79,6 +79,8 @@ private:
     QList<WorkerThread*> _threads;
     QMutex _filesMutex;
     QMutex _progressMutex;
+    int _prevDuration;
+    int _remainingSec;
 };
 
 #endif /* KERNELSOURCEPARSER_H_ */

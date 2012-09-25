@@ -74,12 +74,23 @@ void KernelSourceParser::operationProgress()
 {
     QMutexLocker lock(&_progressMutex);
     int percent = (_filesIndex / (float) _fileNames.size()) * 100;
+    // Avoid too noisy timer updates
+    if (_duration > _prevDuration + 2000) {
+        _prevDuration = _duration;
+        _remainingSec = _filesIndex > 0 ?
+                    (_prevDuration / (float)_filesIndex) * (_fileNames.size() - _filesIndex) / 1000 : -1;
+    }
+    QString remaining = _remainingSec > 0 ?
+                QString("%1:%2").arg(_remainingSec / 60).arg(_remainingSec % 60, 2, 10, QChar('0')) :
+                QString("n/a");
+
     QString fileName = _currentFile;
-    QString s = QString("\rParsing file %1/%2 (%3%), %4 elapsed%6: %5")
+    QString s = QString("\rParsing file %1/%2 (%3%), %4 elapsed, %5 remaining%7: %6")
             .arg(_filesIndex)
             .arg(_fileNames.size())
             .arg(percent)
             .arg(elapsedTime())
+            .arg(remaining)
             .arg(fileName);
     // Show no. of errors
     if (BugReport::log() && BugReport::log()->entries())
@@ -122,6 +133,8 @@ void KernelSourceParser::parse()
     _factory->seenMagicNumbers.clear();
 
     operationStarted();
+    _prevDuration = _duration;
+    _remainingSec = -1;
 
     // Collect files to process
 
