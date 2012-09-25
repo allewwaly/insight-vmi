@@ -203,6 +203,10 @@ public:
      * @param syntax the pattern syntax that was used
      * @param sensitivity case sensitivity for name match
      * @return a list of types matching \a pattern
+     *
+     * \warning This function uses regular expressions which are costly to
+     * evaluate. If you are searching one particular type, use the regular
+     * findBaseTypeByName() method instead.
      */
     BaseTypeList findBaseTypesByName(
             const QString& pattern,
