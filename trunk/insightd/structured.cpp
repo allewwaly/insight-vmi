@@ -52,12 +52,17 @@ uint Structured::hash(bool* isValid) const
             rot = (rot + 3) % 32;
             _hash ^= rotl32(qHash(member->name()), rot);
             rot = (rot + 3) % 32;
+            _hash ^= rotl32((qint32)member->bitSize(), rot);
+            rot = (rot + 3) % 32;
+            _hash ^= rotl32((qint32)member->bitOffset(), rot);
+            rot = (rot + 3) % 32;
         }
     }
     if (isValid)
         *isValid = _hashValid;
     return _hash;
 }
+
 
 uint Structured::hashMembers(quint32 memberIndex, quint32 nrMembers, bool *isValid) const
 {
@@ -72,11 +77,20 @@ uint Structured::hashMembers(quint32 memberIndex, quint32 nrMembers, bool *isVal
 
     uint hash = 0;
     bool valid = true;
+    // To place the member hashes at different bit positions
+    uint rot = 0;
 
     for (int i = memberIndex; i < (memberIndex + nrMembers) && valid; ++i)
     {
-        hash ^= members().at(i)->refType()->hash(&valid);
-        hash ^= qHash(members().at(i)->name());
+        const StructuredMember* member = _members[i];
+        hash ^= rotl32(member->refType()->hash(&valid), rot);
+        rot = (rot + 3) % 32;
+        hash ^= rotl32(qHash(member->name()), rot);
+        rot = (rot + 3) % 32;
+        hash ^= rotl32((qint32)member->bitSize(), rot);
+        rot = (rot + 3) % 32;
+        hash ^= rotl32((qint32)member->bitOffset(), rot);
+        rot = (rot + 3) % 32;
     }
 
     if (isValid)
