@@ -85,10 +85,74 @@ protected:
 
 
 /**
+ * Provides additional type information for all integer types
+ */
+class IntegerTypeProps
+{
+public:
+    /**
+     * Constructor
+     * @param factory the factory that created this symbol
+     */
+    IntegerTypeProps() : _bitSize(-1), _bitOffset(-1)
+    {
+    }
+
+    /**
+     * Constructor
+     * @param factory the factory that created this symbol
+     * @param info the type information to construct this type from
+     */
+    IntegerTypeProps(const TypeInfo& info)
+        : _bitSize(info.bitSize()), _bitOffset(info.bitOffset())
+    {
+    }
+
+    /**
+     * @return the bit size of this bit-split integer declaration
+     */
+    inline int bitSize() const
+    {
+        return _bitSize;
+    }
+
+    /**
+     * Sets the bit size of this bit-split integer declaration
+     * @param size new bit size of bit-split integer declaration
+     */
+    inline void setBitSize(int size)
+    {
+        _bitSize = size;
+    }
+
+    /**
+     * @return the bit offset of this bit-split integer declaration
+     */
+    inline int bitOffset() const
+    {
+        return _bitOffset;
+    }
+
+    /**
+     * Sets the bit offset of this bit-split integer declaration
+     * @param offset new bit offset of bit-split integer declaration
+     */
+    inline void setBitOffset(int offset)
+    {
+        _bitOffset = offset;
+    }
+
+protected:
+    int _bitSize;
+    int _bitOffset;
+};
+
+
+/**
  * Generic template class for all integer types
  */
 template<class T, const RealType realType>
-class IntegerBaseType: public NumericBaseType<T, realType>
+class IntegerBaseType: public NumericBaseType<T, realType>, public IntegerTypeProps
 {
 public:
     /**
@@ -96,7 +160,7 @@ public:
      * @param factory the factory that created this symbol
      */
     IntegerBaseType(SymFactory* factory)
-        : NumericBaseType<T, realType>(factory), _bitSize(-1), _bitOffset(-1)
+        : NumericBaseType<T, realType>(factory)
     {
     }
 
@@ -106,9 +170,7 @@ public:
      * @param info the type information to construct this type from
      */
     IntegerBaseType(SymFactory* factory, const TypeInfo& info)
-        : NumericBaseType<T, realType>(factory, info),
-          _bitSize(info.bitSize()),
-          _bitOffset(info.bitOffset())
+        : NumericBaseType<T, realType>(factory, info), IntegerTypeProps(info)
     {
     }
 
@@ -157,40 +219,6 @@ public:
     }
 
     /**
-     * @return the bit size of this bit-split integer declaration
-     */
-    inline int bitSize() const
-    {
-        return _bitSize;
-    }
-
-    /**
-     * Sets the bit size of this bit-split integer declaration
-     * @param size new bit size of bit-split integer declaration
-     */
-    inline void setBitSize(int size)
-    {
-        _bitSize = size;
-    }
-
-    /**
-     * @return the bit offset of this bit-split integer declaration
-     */
-    inline int bitOffset() const
-    {
-        return _bitOffset;
-    }
-
-    /**
-     * Sets the bit offset of this bit-split integer declaration
-     * @param offset new bit offset of bit-split integer declaration
-     */
-    inline void setBitOffset(int offset)
-    {
-        _bitOffset = offset;
-    }
-
-    /**
      * Reads a serialized version of this object from \a in.
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
@@ -211,10 +239,6 @@ public:
         BaseType::writeTo(out);
         out << _bitSize << _bitOffset;
     }
-
-protected:
-    int _bitSize;
-    int _bitOffset;
 };
 
 
