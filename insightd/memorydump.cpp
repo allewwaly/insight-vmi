@@ -354,7 +354,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 
                 }
 
-                if(compatibleCnt != 1)
+                if (compatibleCnt != 1)
                     result = instance.findMember(symbol,
                                              BaseType::trLexical,
                                              true);
@@ -548,7 +548,11 @@ QString MemoryDump::query(const QString& queryString,
                 .arg(col.color(ctBold))
                 .arg(queryString)
                 .arg(col.color(ctReset));
-        if (instance.isValid()) { 
+        if (instance.isValid()) {
+            // Can we access the instance's memory? If not, an exception is
+            // thrown.
+            _vmem->seek(instance.address());
+
             s += QString("%1%2%3 (ID%4 0x%5%6)")
                     .arg(col.color(ctType))
                     .arg(instance.typeName())
@@ -561,12 +565,22 @@ QString MemoryDump::query(const QString& queryString,
         else
             s += "(unresolved type)";
 
-        s += QString(" @%1 0x%2%3\n")
+        s += QString(" @%1 0x%2%3")
                 .arg(col.color(ctAddress))
                 .arg(instance.address(), _specs.sizeofPointer << 1, 16, QChar('0'))
                 .arg(col.color(ctReset));
 
-        ret = s + ret;
+        if (instance.bitSize() >= 0) {
+            s += QString("[%1%3%2:%1%4%2]")
+                    .arg(col.color(ctOffset))
+                    .arg(col.color(ctReset))
+                    .arg((instance.size() << 3) - instance.bitOffset() - 1)
+                    .arg((instance.size() << 3) - instance.bitOffset() -
+                         instance.bitSize());
+
+        }
+
+        ret = s + "\n" + ret;
     }
 
 
