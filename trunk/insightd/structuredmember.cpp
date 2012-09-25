@@ -53,9 +53,16 @@ Instance StructuredMember::toInstance(size_t structAddress,
 		VirtualMemory* vmem, const Instance* parent,
 		int resolveTypes, int maxPtrDeref) const
 {
-	return createRefInstance(structAddress + _offset, vmem, _name,
+	Instance inst = createRefInstance(structAddress + _offset, vmem, _name,
 			parent ? parent->fullNameComponents() : QStringList(),
 			resolveTypes, maxPtrDeref);
+	// Is this a bit-field with bit-size/offset?
+	if (_bitSize >= 0) {
+		inst.setBitSize(_bitSize);
+		inst.setBitOffset(_bitOffset);
+	}
+
+	return inst;
 }
 
 
