@@ -16,7 +16,7 @@ StructuredMember::StructuredMember(SymFactory* factory)
 	: Symbol(factory), _offset(0), _belongsTo(0), 
       _seenInEvaluateMagicNumber(false), 
       _hasConstIntValue(false), _hasConstStringValue(false),
-      _hasStringValue(false)
+      _hasStringValue(false), _bitSize(-1), _bitOffset(-1)
 {
 }
 
@@ -26,30 +26,14 @@ StructuredMember::StructuredMember(SymFactory* factory, const TypeInfo& info)
 	  _offset(info.dataMemberLocation()), _belongsTo(0),
       _seenInEvaluateMagicNumber(false),
       _hasConstIntValue(false), _hasConstStringValue(false),
-      _hasStringValue(false)
+      _hasStringValue(false), _bitSize(info.bitSize()),
+      _bitOffset(info.bitOffset())
 {
     // This happens for members of unions
     if (info.dataMemberLocation() < 0)
         _offset = 0;
 }
 
-
-size_t StructuredMember::offset() const
-{
-	return _offset;
-}
-
-
-void StructuredMember::setOffset(size_t offset)
-{
-    _offset = offset;
-}
-
-
-Structured* StructuredMember::belongsTo() const
-{
-    return _belongsTo;
-}
 
 
 QString StructuredMember::prettyName() const
@@ -85,14 +69,17 @@ void StructuredMember::readFrom(KernelSymbolStream& in)
     // Fix old symbol informations
     _offset = (((qint64)offset) < 0) ? 0 : offset;
     
-    if(in.kSymVersion() >= kSym::VERSION_15)
-    {
+    if (in.kSymVersion() >= kSym::VERSION_15) {
         in >> _seenInEvaluateMagicNumber;
         in >> _hasConstIntValue;
         in >> _hasConstStringValue;
         in >> _hasStringValue;
         in >> _constIntValue;
         in >> _constStringValue;
+    }
+
+    if (in.kSymVersion() >= kSym::VERSION_16) {
+        in >> _bitSize >> _bitOffset;
     }
 }
 
@@ -111,6 +98,9 @@ void StructuredMember::writeTo(KernelSymbolStream& out) const
     out << _hasStringValue;
     out << _constIntValue;
     out << _constStringValue;
+
+    // Since KSYM VERSION 16:
+    out << _bitSize << _bitOffset;
 }
 
 
