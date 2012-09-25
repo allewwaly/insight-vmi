@@ -230,11 +230,12 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
 {
 //    static RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
 
-    QString s;
+    QString s, name;
     int index_len = 0, offset_len = 1, name_len = 1, type_len = 1;
     quint32 i = _size;
     bool invalidAdr = false;
     QString errMsg;
+    QString valueStr;
 
     while ( (i >>= 4) )
         offset_len++;
@@ -243,10 +244,18 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
         index_len++;
 
     for (int i = 0; i < _members.size(); ++i) {
-        if (name_len < _members[i]->name().length())
-            name_len = _members[i]->name().length();
-        if (_members[i]->refType() && type_len < _members[i]->refType()->prettyName().length())
-            type_len = _members[i]->refType()->prettyName().length();
+        const StructuredMember* m = _members[i];
+        int len = m->name().length();
+        // Is it a bit-field with a bit size and offset?
+        if (m->bitSize() >= 0) {
+            len += 2;
+            if (m->bitSize() >= 10)
+                len++;
+        }
+        if (name_len < len)
+            name_len = len;
+        if (m->refType() && type_len < m->refType()->prettyName().length())
+            type_len = m->refType()->prettyName().length();
     }
 
     // Output all members
@@ -271,14 +280,12 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
                 while ( addr && !(t->type() & StructOrUnion) ) {
                     const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
                     if (rbt->type() & rtPointer) {
-                        try
-                        {
+                        try {
                             addr = (quint64) rbt->toPointer(mem, addr);
                             wasPointer = true;
                             invalidAdr = false;
                         }
-                        catch(VirtualMemoryException &e)
-                        {
+                        catch (VirtualMemoryException &e) {
                             addr = offset + m->offset();
                             invalidAdr = true;
                             errMsg = e.message;
@@ -287,138 +294,87 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
                     t = rbt->refType();
                 }
 
-                QString addrStr;
                 if (!wasPointer)
-                    addrStr = "...";
+                    valueStr = "...";
                 else if (addr) {
-                    addrStr = QString("0x%1").arg(addr, 0, 16);
+                    valueStr = QString("0x%1").arg(addr,
+                                                   factory()->memSpecs().sizeofPointer << 1,
+                                                   16,
+                                                   QChar('0'));
                     if (col)
-                        addrStr = col->color(ctAddress) + addrStr + col->color(ctReset);
-                    if(invalidAdr)
-                        addrStr += QString(" (%1)").arg(errMsg);
-                    else
-                    {
-                        addrStr.prepend("... @ ");
+                        valueStr = col->color(ctAddress) + valueStr + col->color(ctReset);
+
+                    if (invalidAdr)
+                        valueStr += QString(" (%1)").arg(errMsg);
+                    else {
+                        valueStr.prepend("... @ ");
                         if (addr == offset)
-                            addrStr += " (self)";
+                            valueStr += " (self)";
                     }
                 }
                 else {
-                    addrStr = "NULL";
+                    valueStr = "NULL";
                     if (col)
-                        addrStr = col->color(ctAddress) + addrStr + col->color(ctReset);
-                }
-
-                if (col) {
-                    s += QString("%0%1. 0x%2  %3%4%5 : %6 = %7")
-                            .arg(col->color(ctReset))
-                            .arg(i, index_len)
-                            .arg(m->offset(), offset_len, 16, QChar('0'))
-                            .arg(col->color(ctMember))
-                            .arg(m->name(), -name_len)
-                            .arg(col->color(ctReset))
-                            .arg(col->prettyNameInColor(m->refType(), type_len))
-                            .arg(addrStr);
-
-
-                    if(m->altRefTypeCount() > 1) {
-                        for (int j = 0; j < m->altRefTypeCount(); ++j) {
-                            const BaseType* t = m->altRefBaseType(j);
-                            s += QString("\n\t<%1>%2 0x%3 %4 : %5")
-                                    .arg(j+1)
-                                    .arg(col->color(ctTypeId))
-                                    .arg((uint)t->id(), -8, 16)
-                                    .arg(col->prettyNameInColor(t, t->prettyName().length()))
-                                    .arg(m->altRefType(j).expr()->toString(true));
-                       }
-                    }
-                }
-                else {
-                    s += QString("%0.  0x%1  %2 : %3 = %4")
-                            .arg(i, index_len)
-                            .arg(m->offset(), offset_len, 16, QChar('0'))
-                            .arg(m->name(), -name_len)
-                            .arg(m->refType()->prettyName(), -type_len)
-                            .arg(addrStr);
-
-                    if(m->altRefTypeCount() > 1) {
-                        for (int j = 0; j < m->altRefTypeCount(); ++j) {
-                            const BaseType* t = m->altRefBaseType(j);
-                            s += QString("\n\t<%1> 0x%2 %3 : %4")
-                                    .arg(j+1)
-                                    .arg((uint)t->id(), -8, 16)
-                                    .arg(t->prettyName())
-                                    .arg(m->altRefType(j).expr()->toString(true));
-                        }
-                    }
+                        valueStr = col->color(ctAddress) + valueStr + col->color(ctReset);
                 }
             }
+            else if (m->bitSize() >= 0) {
+                const IntegerBitField* ibf =
+                        dynamic_cast<const IntegerBitField*>(
+                            m->refTypeDeep(BaseType::trLexical));
+                assert(ibf != 0);
+                valueStr = QString::number(ibf->toIntBitField(mem, offset + m->offset(), m));
+                if (col)
+                    valueStr = col->color(ctNumber) + valueStr + col->color(ctReset);
+            }
             else {
-                if (col) {
-                    s += QString("%0%1. 0x%2  %3%4%5 : %6 = %7")
-                            .arg(col->color(ctReset))
-                            .arg(i, index_len)
-                            .arg(m->offset(), offset_len, 16, QChar('0'))
-                            .arg(col->color(ctMember))
-                            .arg(m->name(), -name_len)
-                            .arg(col->color(ctReset))
-                            .arg(col->prettyNameInColor(m->refType(), type_len))
-                            .arg(m->refType()->toString(mem, offset + m->offset(), col));
-
-                    if(m->altRefTypeCount() > 1) {
-                        for (int j = 0; j < m->altRefTypeCount(); ++j) {
-                            const BaseType* t = m->altRefBaseType(j);
-                            s += QString("\n\t<%1>%2 0x%3 %4 : %5")
-                                    .arg(j+1)
-                                    .arg(col->color(ctTypeId))
-                                    .arg((uint)t->id(), -8, 16)
-                                    .arg(col->prettyNameInColor(t, t->prettyName().length()))
-                                    .arg(m->altRefType(j).expr()->toString(true));
-                       }
-                    }
-
-                }
-                else {
-                    s += QString("%0.  0x%1  %2 : %3 = %4")
-                            .arg(i, index_len)
-                            .arg(m->offset(), offset_len, 16, QChar('0'))
-                            .arg(m->name(), -name_len)
-                            .arg(m->refType()->prettyName(), -type_len)
-                            .arg(m->refType()->toString(mem, offset + m->offset()));
-
-                    if(m->altRefTypeCount() > 1) {
-                        for (int j = 0; j < m->altRefTypeCount(); ++j) {
-                            const BaseType* t = m->altRefBaseType(j);
-                            s += QString("\n\t<%1> 0x%2 %3 : %4")
-                                    .arg(j+1)
-                                    .arg((uint)t->id(), -8, 16)
-                                    .arg(t->prettyName())
-                                    .arg(m->altRefType(j).expr()->toString(true));
-                        }
-                    }
-                }
+                valueStr = m->refType()->toString(mem, offset + m->offset(), col);
             }
         }
         else {
-            if (col) {
-                s += QString("%0%1. 0x%2  %3%4%5 : %6 = (unresolved type 0x%7)")
-                        .arg(col->color(ctReset))
-                        .arg(i, index_len)
-                        .arg(m->offset(), offset_len, 16, QChar('0'))
-                        .arg(col->color(ctMember))
-                        .arg(m->name(), -name_len)
-                        .arg(col->color(ctReset))
-                        .arg(col->prettyNameInColor(m->refType(), type_len))
-                        .arg((uint)m->refTypeId(), 0, 16);
-            }
-            else {
-                s += QString("%0.  0x%1  %2 : %3 = (unresolved type 0x%3)")
-                        .arg(i, index_len)
-                        .arg(m->offset(), offset_len, 16, QChar('0'))
-                        .arg(m->name(), -name_len)
-                        .arg(m->refType()->prettyName(), -type_len)
-                        .arg((uint)m->refTypeId(), 0, 16);
+            valueStr = QString("(unresolved type 0x%1)")
+                            .arg((uint)m->refTypeId(), 0, 16);
+        }
 
+        // Write member name as "name[:<bitOffset]" with colors
+        int curNameLen = m->name().size();
+        name = col ? QString("%1%2%3")
+                     .arg(col->color(ctMember))
+                     .arg(m->name())
+                     .arg(col->color(ctReset))
+                   : m->name();
+        if (m->bitSize() >= 0) {
+            QString bitSize = QString::number(m->bitSize());
+            name += QString(":%1%2%3")
+                    .arg(col ? col->color(ctOffset) : "")
+                    .arg(bitSize)
+                    .arg(col ? col->color(ctReset) : "");
+            curNameLen += 1 + bitSize.size();
+        }
+        // Pad string to the column width
+        if (name_len > curNameLen)
+            name += QString(name_len - curNameLen, QChar(' '));
+
+        s += QString("%0%1. 0x%2  %3 : %4 = %5")
+                .arg(col ? col->color(ctReset) : "")
+                .arg(i, index_len)
+                .arg(m->offset(), offset_len, 16, QChar('0'))
+                .arg(name)
+                .arg(col ? col->prettyNameInColor(m->refType(), type_len)
+                         : m->refType()->prettyName(),
+                     -type_len)
+                .arg(valueStr);
+
+        if (m->altRefTypeCount() > 0) {
+            for (int j = 0; j < m->altRefTypeCount(); ++j) {
+                const BaseType* t = m->altRefBaseType(j);
+                s += QString("\n\t<%1>%2 0x%3 %4 : %5")
+                        .arg(j+1)
+                        .arg(col ? col->color(ctTypeId) : "")
+                        .arg((uint)t->id(), -8, 16)
+                        .arg(col ? col->prettyNameInColor(t, t->prettyName().length())
+                                 : t->prettyName())
+                        .arg(m->altRefType(j).expr()->toString(true));
             }
         }
     }
