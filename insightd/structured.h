@@ -48,6 +48,18 @@ public:
     virtual uint hash(bool* isValid = 0) const;
 
     /**
+     * Create a hash of a number of consecutive members of the structure. The hash thereby
+     * consists of the name and the BaseType::hash of each selected member.
+     * @param memberIndex the index of the first member that will be part of the hash
+     * @param nrMembers the number of members that will be part of the hash starting from
+     * the given \c memberIndex
+     * @param isValid indicates if the hash is valid
+     * @return a hash value for the given number of members (\c nrMembers) starting from the
+     * given \c memberIndex
+     */
+    virtual uint hashMembers(quint32 memberIndex, quint32 nrMembers, bool *isValid) const;
+
+    /**
      * @return the list of members of this struct or union
      */
     inline const MemberList& members() const
@@ -129,8 +141,7 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const;
-
+     virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const;
 protected:
 	MemberList _members;
 	QStringList _memberNames;

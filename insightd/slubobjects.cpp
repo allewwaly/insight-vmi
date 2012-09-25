@@ -82,8 +82,10 @@ SlubObjects::ObjectValidity SlubObjects::isInstanceEmbeddedHelper(const BaseType
 {
     ObjectValidity ret = ovEmbedded;
     const Structured *s = NULL;
+    const Structured *sInst = NULL;
     const StructuredMember *m = mem;
     quint64 currentOffset = offset;
+    bool validA, validB;
 
     // Consider all nested structs and unions and try to find a match.
     while(m)
@@ -92,13 +94,38 @@ SlubObjects::ObjectValidity SlubObjects::isInstanceEmbeddedHelper(const BaseType
 
         const BaseType *mt;
         // Find final base type and compare them
-        if ((mt = m->refTypeDeep(BaseType::trLexical)) &&
+        if ((mt = m->refTypeDeep(BaseType::trLexicalAndArrays)) &&
             it->hash() == mt->hash())
             return ovEmbedded;
 
-        // Get nested struct or union if any
-        s = dynamic_cast<const Structured *>(m->refType());
 
+        // Are both types that we consider structs?
+        s = dynamic_cast<const Structured *>(m->refType());
+        sInst = dynamic_cast<const Structured *>(it);
+
+        if(s != NULL && sInst != NULL)
+        {
+            // Yep. Check if one of the structs is simply a "smaller" version
+            // of the other as in the case of "raw_prio_tree_node" and "prio_tree_node".
+            // For this purpose we compare the hash of the smaller struct with the hash of the
+            // beginning of the larger struct.
+            if(sInst->members().size() <= s->members().size())
+            {
+                if(sInst->hashMembers(0, sInst->members().size(), &validA) ==
+                        s->hashMembers(0, sInst->members().size(), &validB) &&
+                        validA && validB)
+                    return ovEmbedded;
+            }
+            else
+            {
+                if(sInst->hashMembers(0, s->members().size(), &validA) ==
+                        s->hashMembers(0, s->members().size(), &validB) &&
+                        validA && validB)
+                    return ovEmbedded;
+            }
+        }
+
+        // Consider nested structs and unions
         if(s && s->type() & rtUnion)
         {
             // In case of unions we explore every possible path
@@ -134,7 +161,7 @@ SlubObjects::ObjectValidity SlubObjects::isInstanceEmbedded(const Instance *inst
 
     // We need to find the member at the given offset.
     const StructuredMember *m = obj.baseType->memberAtOffset(offset, false);
-    const BaseType *it = inst->type()->dereferencedBaseType(BaseType::trLexical);
+    const BaseType *it = inst->type()->dereferencedBaseType(BaseType::trLexicalAndArrays);
 
     return isInstanceEmbeddedHelper(it, m, offset);
 }
