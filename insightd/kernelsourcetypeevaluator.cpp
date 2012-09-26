@@ -301,7 +301,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers_constant(const ASTNode *nod
                     ASTType* constantType;
                     try{
                         constantType = typeofNode(node);
-                    }catch(...){
+                    } catch (GenericException&) {
                         return;
                     }
                     if(constantType->type() == rtArray && 
