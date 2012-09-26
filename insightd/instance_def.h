@@ -334,17 +334,21 @@ public:
 
     /**
      * Obtain the member of this instance that has the given offset provided that
-     * this instance is a structure. In case this instance is not a structure or
-     * if there is no member that has the given offset, a null Instance is returned.
+     * this instance is a structure. If \a exactMatch is true the function will only
+     * return a member if it can find a member within the struct that has the exact
+     * offset \a offset. In case exactMatch is false, the function will return the
+     * member that ecompasses the given offset \a offset.
      *
      * \note Make sure to check Instance::isNull() on the returned object to
      * see if it is valid or not.
      *
      * @param off The offset of the member that we are looking for
+     * @param exactMatch should the function only return a member if it has the exact
+     * offset \a offset.
      * @return Instance object of the member at offset off or a null Instance
      * \sa BaseType::TypeResolution
      */
-     Instance memberByOffset(quint64 off) const;
+     Instance memberByOffset(size_t off, bool exactMatch = true) const;
 
     /**
      * Gives access to the BaseType's of a member, if this is a struct or union.
