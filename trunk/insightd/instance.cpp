@@ -457,18 +457,20 @@ Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
 }
 
 
-Instance Instance::memberByOffset(quint64 off) const
+Instance Instance::memberByOffset(size_t off, bool exactMatch) const
 {
+    // Is this an struct?
     const Structured* s = dynamic_cast<const Structured*>(_d.type);
 
-    for (int i = 0; s && i < s->members().size(); i++) {
-        StructuredMember* m = s->members().at(i);
+    if (!s)
+        return Instance();
 
-        if (m->offset() == off)
-            return member(i);
-    }
+    const StructuredMember *sm = s->memberAtOffset(off, exactMatch);
 
-    return Instance();
+    if (!sm)
+        return Instance();
+
+    return sm->toInstance(this->address() + sm->offset(), this->vmem(), this);
 }
 
 
