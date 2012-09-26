@@ -470,7 +470,7 @@ Instance Instance::memberByOffset(size_t off, bool exactMatch) const
     if (!sm)
         return Instance();
 
-    return sm->toInstance(this->address() + sm->offset(), this->vmem(), this);
+    return sm->toInstance(this->address(), this->vmem(), this);
 }
 
 
