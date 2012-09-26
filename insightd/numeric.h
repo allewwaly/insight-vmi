@@ -157,6 +157,11 @@ public:
     virtual quint64 toIntBitField(QIODevice* mem, size_t offset,
                                   qint8 bitSize, qint8 bitOffset) const
     {
+        // This won't work on big-endian architectures
+#if defined(Q_BYTE_ORDER) && Q_BYTE_ORDER != Q_LITTLE_ENDIAN
+#   error "This code only works for little endian architectures"
+#endif
+
         T n = BaseType::value<T>(mem, offset);
         if (bitSize > 0) {
             // The offset is specified from the most significant bit of the
