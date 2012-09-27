@@ -215,38 +215,57 @@ void KernelSourceParser::parse()
 
     _factory->sourceParcingFinished();
 
-    QString buffer;
     qint32 counter = 0;
-    for (QList<StructuredMember*>::iterator i = _factory->seenMagicNumbers.begin(); 
+    for (QMultiHash<int, int>::iterator i = _factory->seenMagicNumbers.begin();
             i != _factory->seenMagicNumbers.end(); ++i)
     {
-        if ((*i)->hasConstantIntValue())
-        {
-            counter++;
-            QList<qint64> constInt = (*i)->constantIntValue();
-            for (QList<qint64>::iterator j = constInt.begin();
-                                j != constInt.end(); ++j)
-                buffer.append(QString("Found Constant int %1.%2 = %3\n")
-                        .arg((*i)->belongsTo()->name())
-                        .arg((*i)->prettyName())
-                        .arg((*j))
-                        );
+        const BaseType* bt = _factory->findBaseTypeById(i.key());
+        if (!bt) {
+            debugerr(QString("It seems type 0x%1 does not exist (anymore)")
+                       .arg((uint)i.key(), 0, 16));
+            continue;
         }
-        else if ((*i)->hasConstantStringValue())
+        // Just to be save...
+        assert(bt->type() & StructOrUnion);
+        const Structured* str = dynamic_cast<const Structured*>(bt);
+        assert(i.value() >= 0 && i.value() < str->members().size());
+        const StructuredMember* m = str->members().at(i.value());
+
+        if (m->hasConstantIntValue())
         {
             counter++;
-            QList<QString> constString = (*i)->constantStringValue();
-            for (QList<QString>::iterator j = constString.begin();
-                                j != constString.end(); ++j)
-                buffer.append(QString("Found Constant string %1.%2 = %3\n")
-                        .arg((*i)->belongsTo()->name())
-                        .arg((*i)->prettyName())
-                        .arg((*j))
-                        );
+            s.clear();
+            QList<qint64> constInt = m->constantIntValue();
+            for (int j = 0; j < constInt.size(); ++j) {
+                if (j > 0)
+                    s += ", ";
+                s += QString::number(constInt[j]);
+            }
+            debugmsg(QString("Found Constant: %0 %1.%2 = {%3}")
+                     .arg(m->refType() ? m->refType()->prettyName() : QString("(unknown)"))
+                     .arg(m->belongsTo()->name())
+                     .arg(m->name())
+                     .arg(s));
+        }
+        else if (m->hasConstantStringValue())
+        {
+            counter++;
+            s.clear();
+            QList<QString> constString = (m->constantStringValue());
+            for (int j = 0; j < constString.size(); ++j) {
+                if (j > 0)
+                    s += ", ";
+                s += constString[j];
+            }
+
+            debugmsg(QString("Found Constant: %0 %1.%2 = {%3}")
+                     .arg(m->refType() ? m->refType()->prettyName() : QString("(unknown)"))
+                     .arg(m->belongsTo()->name())
+                     .arg(m->name())
+                     .arg(s));
         }
     }
-    buffer.append(QString("Found %1 constants\n").arg(counter));
-    debugmsg(buffer);
+    debugmsg(QString("Found %1 constants").arg(counter));
 
 
     // In case there were errors, show the user some information

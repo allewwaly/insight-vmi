@@ -125,6 +125,7 @@ KernelSymbolStream& operator<<(KernelSymbolStream& out,
     return out;
 }
 
+
 bool StructuredMember::evaluateMagicNumberFoundNotConstant()
 {
     bool seen = _seenInEvaluateMagicNumber;
@@ -136,7 +137,8 @@ bool StructuredMember::evaluateMagicNumberFoundNotConstant()
     _seenInEvaluateMagicNumber = true;
     return seen;
 }
-    
+
+
 bool StructuredMember::evaluateMagicNumberFoundInt(qint64 constant)
 {
     bool seen = _seenInEvaluateMagicNumber;
@@ -155,12 +157,19 @@ bool StructuredMember::evaluateMagicNumberFoundInt(qint64 constant)
     {
         _constIntValue.append(constant);
         _hasConstIntValue = true;
-        _factory->seenMagicNumbers.append(this);
+        // What is this member's index?
+        int i = 0;
+        while ( (_belongsTo->members().at(i) != this) &&
+                (i < _belongsTo->members().size()) )
+            ++i;
+        // Add struct's ID and member index
+        _factory->seenMagicNumbers.insertMulti(_belongsTo->id(), i);
     }
     _seenInEvaluateMagicNumber = true;
     return seen;
 }
-    
+
+
 bool StructuredMember::evaluateMagicNumberFoundString(const QString &constant)
 {
     bool seen = _seenInEvaluateMagicNumber;
@@ -181,7 +190,13 @@ bool StructuredMember::evaluateMagicNumberFoundString(const QString &constant)
     {
         _constStringValue.append(constant);
         _hasConstStringValue = true; 
-        _factory->seenMagicNumbers.append(this);
+        // What is this member's index?
+        int i = 0;
+        while ( (_belongsTo->members().at(i) != this) &&
+                (i < _belongsTo->members().size()) )
+            ++i;
+        // Add struct's ID and member index
+        _factory->seenMagicNumbers.insertMulti(_belongsTo->id(), i);
     }
     _seenInEvaluateMagicNumber = true;
     return seen;
