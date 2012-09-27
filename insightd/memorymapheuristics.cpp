@@ -77,6 +77,57 @@ bool MemoryMapHeuristics::isHListHead(const Instance *i)
     return false;
 }
 
+bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct, const Instance *i)
+{
+    if (!i || !parentStruct)
+        return false;
+
+    if (!isListHead(i))
+        return false;
+
+    // Offset of the list_head struct within its parent struct
+    quint64 offsetListHeadParent = i->address() - parentStruct->address();
+
+    // Get the next pointer.
+    Instance next = i->member(0, 0, -1, true);
+    Instance nextDeref;
+
+    // Is the next pointer valid?
+    if (next.isNull())
+        return false;
+
+    // Are there candidates?
+    switch(i->memberCandidatesCount(0)) {
+        case 0:
+            nextDeref = next.dereference(BaseType::trLexicalPointersArrays);
+            break;
+        case 1:
+            nextDeref = i->memberCandidate(0, 0);
+            break;
+        default:
+            /// todo: Consider candidates
+            return false;
+    }
+
+    // verify
+    if(!validInstance(&nextDeref))
+        return false;
+
+    // Get the offset of the list_head in the next member
+    quint64 nextAdr = (quint64)next.toPointer();
+    quint64 offsetInNextMember = nextAdr - nextDeref.address();
+
+    // If this is the head of the list either the type of the instances
+    // should defer or/and the offset
+    if(offsetListHeadParent == offsetInNextMember) {
+        // The offset is the same, what about the type?
+        if(parentStruct->type() == nextDeref.type())
+            return false;
+    }
+
+    return true;
+}
+
 bool MemoryMapHeuristics::isHListNode(const Instance *i)
 {
     if(!i)
@@ -169,6 +220,22 @@ bool MemoryMapHeuristics::validCandidateBasedOnListHead(const Instance *listHead
     // if the offset of the list_head struct within the candidate is by chance
     // equal to the real candidate or if the offset is zero, we will pass the
     // check even though this may be the wrong candidate.
+    return true;
+}
+
+bool MemoryMapHeuristics::validInstance(const Instance *i)
+{
+    if(!i)
+        return false;
+
+    if(i->isNull() || !i->isValid())
+        return false;
+
+    if(!validAddress(i->address(), i->vmem()))
+        return false;
+
+    /// todo: We could also test the heuristics at this point
+
     return true;
 }
 
