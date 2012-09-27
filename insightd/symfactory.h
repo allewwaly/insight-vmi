@@ -416,7 +416,7 @@ public:
 	 */
 	quint32 changeClock() const;
 
-    QList<StructuredMember*> seenMagicNumbers;
+	QMultiHash<int, int> seenMagicNumbers;
 
 protected:
 	void typeAlternateUsageStructMember(const TypeEvalDetails *ed,
