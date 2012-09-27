@@ -161,7 +161,7 @@ bool StructuredMember::evaluateMagicNumberFoundInt(qint64 constant)
     return seen;
 }
     
-bool StructuredMember::evaluateMagicNumberFoundString(QString constant)
+bool StructuredMember::evaluateMagicNumberFoundString(const QString &constant)
 {
     bool seen = _seenInEvaluateMagicNumber;
     _hasStringValue = true;
