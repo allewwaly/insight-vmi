@@ -129,30 +129,30 @@ public:
       * Should be called if constant string is found.
       * @returns true if object has already been seen
       */
-    bool evaluateMagicNumberFoundString(QString constant);
+    bool evaluateMagicNumberFoundString(const QString& constant);
 
-    inline bool hasNotConstValue()
+    inline bool hasNotConstValue() const
     {
         return (_seenInEvaluateMagicNumber) ? !(_hasConstIntValue || _hasConstStringValue) : false;
     }
     
-    inline bool hasConstantIntValue()
+    inline bool hasConstantIntValue() const
     {
         return _hasConstIntValue;
     }
-    inline bool hasConstantStringValue()
+    inline bool hasConstantStringValue() const
     {
         return _hasConstStringValue;
     }
-    inline bool hasStringValue()
+    inline bool hasStringValue() const
     {
         return _hasStringValue;
     }
-    inline QList<qint64> constantIntValue()
+    inline  const QList<qint64>& constantIntValue() const
     {
         return _constIntValue;
     }
-    inline QList<QString> constantStringValue()
+    inline const QList<QString>& constantStringValue() const
     {
         return _constStringValue;
     }
