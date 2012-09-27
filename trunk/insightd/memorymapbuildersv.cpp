@@ -167,14 +167,14 @@ void MemoryMapBuilderSV::run()
 
 }
 
-MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance &inst)
+MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance *inst)
 {
   // Increase the reading counter
   _map->_shared->vmemReadingLock.lock();
   _map->_shared->vmemReading++;
   _map->_shared->vmemReadingLock.unlock();
 
-    MemMapSet nodes = _map->vmemMapsInRange(inst.address(), inst.endAddress());
+    MemMapSet nodes = _map->vmemMapsInRange(inst->address(), inst->endAddress());
 
     /*
     for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
@@ -211,72 +211,190 @@ MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance &inst)
   return NULL;
 }
 
-void MemoryMapBuilderSV::processList(MemoryMapNodeSV *listHead,
-                                     Instance &firstListMember)
+QList<Instance *> * MemoryMapBuilderSV::resolveStructs(const Instance *inst, quint64 offset)
+{
+    QList<Instance *> *result = new QList<Instance *>();
+    QList<Instance *> *tmpResult = 0;
+    Instance *tmp = 0;
+    Instance next;
+    Instance last;
+
+    const Structured *sTmp = 0;
+
+    if (!inst || inst->isNull() || !inst->isValid() || offset > inst->size())
+        return result;
+
+    sTmp = dynamic_cast<const Structured *>(inst->type());
+    next = (*inst);
+    last = (*inst);
+
+    while (sTmp && !next.isNull() && next.isValid()) {
+        if (sTmp->type() & rtUnion) {
+            // This is a union. Thus we consider every struct contained within it
+            for (int i = 0; i < sTmp->members().size(); ++i) {
+                if (sTmp->members().at(i)->refType()->type() & ( rtStruct | rtUnion)) {
+                    last = sTmp->members().at(i)->toInstance(next.address(),
+                                                             next.vmem(), &next);
+                    tmpResult = resolveStructs(&last, offset - (last.address() - inst->address()));
+
+                    // Process results, add valid ones, delete the rest
+                    if (tmpResult && tmpResult->size() > 0) {
+                        for (int j = tmpResult->size(); j > 0; --j) {
+                            tmp = tmpResult->takeFirst();
+
+                            if (tmp && tmp->isValid() && !tmp->isNull())
+                                result->append(tmp);
+                            else
+                                delete tmp;
+                        }
+                    }
+
+                    delete tmpResult;
+                }
+            }
+
+            // After we considered each member within the union, we are done.
+            return result;
+        }
+        else {
+            last = next;
+            next = next.memberByOffset(offset - (next.address() - inst->address()), false);
+            sTmp = dynamic_cast<const Structured *>(next.type());
+        }
+    }
+
+    result->append(new Instance(last.address(), last.type(), last.name(),
+                                last.fullNameComponents(), last.vmem()));
+
+    return result;
+}
+
+
+void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
+                                     Instance *listHead,
+                                     Instance *firstListMember)
 {
     // Inital checks
-    if(!listHead || firstListMember.isNull() || !(firstListMember.type()->type() & rtStruct))
+    if (!listHead || !firstListMember ||
+            !MemoryMapHeuristics::validInstance(listHead) ||
+            !MemoryMapHeuristics::validInstance(firstListMember))
         return;
-
-    Instance tmp = listHead->toInstance();
 
     // Is this is an invalid list head or if we already processed this
     // member return
-    if(!MemoryMapHeuristics::validListHead(&tmp) ||
-            listHead->memberProcessed(listHead->address(), firstListMember.address()))
+    if (!MemoryMapHeuristics::validListHead(listHead) ||
+            node->memberProcessed(listHead->address(), firstListMember->address()))
+        return;
+
+    // Do not consider lists that just consist of list_heads, since we cannot
+    // learn anything from them
+    if(MemoryMapHeuristics::isListHead(firstListMember))
         return;
 
     // Calculate the offset of the member within the struct
-    quint64 listHeadNext = (quint64)tmp.member(0, 0, -1, true).toPointer();
-    quint64 memOffset = listHeadNext - firstListMember.address();
+    quint64 listHeadNext = (quint64)listHead->member(0, 0, -1, true).toPointer();
+    quint64 memOffset = listHeadNext - firstListMember->address();
 
-    // Check if the identified member is a list_head
-    tmp = firstListMember.memberByOffset(memOffset);
-    if(!MemoryMapHeuristics::isListHead(&tmp)) {
-        debugmsg("Identfied member is no list_head!");
-        return;
-    }
+    Instance *listMember = firstListMember;
+    MemoryMapNodeSV *currentNode = node;
+    Instance *tmp = 0;
+    QList<Instance *> *member = 0;
+    Instance *memP = 0;
+    bool valid = false;
 
-    // Init variables.
-    MemoryMapNodeSV *currentNode = listHead;
-    tmp = firstListMember;
+    do {
+        // Verify that this is indeed a list_head, for this purpose we have to consider
+        // nested structs as well.
+        if (tmp)
+            delete tmp;
 
+        valid = false;
+        member = resolveStructs(listMember, memOffset);
 
-    // Iterate over the list
-    while(currentNode && listHeadNext != listHead->address()) {
-        // Get the next instance
-        tmp.setAddress(listHeadNext - memOffset);
+        for (int i = member->size(); i > 0 ; --i) {
+            memP = member->takeFirst();
 
-        // Only add non existing instances
-        if(!existsNode(tmp))
-        {
-          currentNode = dynamic_cast<MemoryMapNodeSV *>(_map->addChildIfNotExistend(tmp, currentNode,
+            if (memP && MemoryMapHeuristics::isListHead(memP)) {
+                valid = true;
+                tmp = memP;
+            }
+            else
+                // Cleanup
+                delete memP;
+        }
+
+        // Cleanup
+        delete member;
+
+        // If tmp is not valid it is not a list_head
+        if (!valid) {
+            debugerr("Identfied member in struct "
+                     << listMember->name() << " @ 0x" << std::hex <<
+                     listMember->address() << std::dec << " is no list_head!");
+            return;
+        }
+
+        // Only valid add non existing instances
+        if (MemoryMapHeuristics::validInstance(listMember) && !existsNode(listMember)) {
+          currentNode = dynamic_cast<MemoryMapNodeSV *>(_map->addChildIfNotExistend((*listMember), currentNode,
                                                     _index, (currentNode->address() + memOffset)));
         }
 
         // Verify cast
-        if(!currentNode) {
+        if (!currentNode) {
             debugerr("Could not cast the created child to MemoryMapNodeSV!");
             return;
         }
 
         // Update vars
-        if(tmp.memberByOffset(memOffset).isNull()) {
-            debugmsg("Next list member could not be retrieved!");
-            return;
+        listHeadNext = (quint64)tmp->member(0, 0, -1, true).toPointer();
+        listMember->setAddress(listHeadNext - memOffset);
+    }
+    while (listMember && listHeadNext != listHead->address());
+}
+
+void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
+{
+    if (!MemoryMapHeuristics::validListHead(inst))
+        return;
+
+    // Get the next and prev pointer.
+    Instance next = inst->member(0, 0, -1, true);
+    Instance prev = inst->member(1, 0, -1, true);
+
+    // Check pointers
+    if (!MemoryMapHeuristics::validPointer(&next) ||
+            !MemoryMapHeuristics::validPointer(&prev) ||
+            next.toPointer() == prev.toPointer())
+        return;
+
+    // Is this the head of the list?
+    if (MemoryMapHeuristics::isHeadOfList(node, inst)) {
+        // Handle candidates
+        Instance nextDeref;
+
+        // Are there candidates?
+        switch (inst->memberCandidatesCount(0)) {
+            case 0:
+                nextDeref = next.dereference(BaseType::trLexicalPointersArrays);
+                break;
+            case 1:
+                nextDeref = inst->memberCandidate(0, 0);
+                break;
+            default:
+                /// todo: Consider candidates
+                return;
         }
 
-        listHeadNext = (quint64)tmp.memberByOffset(memOffset).member(0, 0, -1, true).toPointer();
+        // verify
+        if (!MemoryMapHeuristics::validInstance(&nextDeref))
+            return;
+
+        processList(node, inst, &nextDeref);
     }
-
 }
 
-void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV */*node*/, Instance */*inst*/)
-{
-
-}
-
-void MemoryMapBuilderSV::processCandidates(Instance */*inst*/, const ReferencingType */*ref*/)
+void MemoryMapBuilderSV::processCandidates(Instance *inst, const ReferencingType *ref)
 {
 #if MEMORY_MAP_PROCESS_NODES_WITH_ALT == 1
     const RefBaseType type = dynamic_cast<const RefBaseType*>(inst->type());
@@ -299,12 +417,13 @@ void MemoryMapBuilderSV::processCandidates(Instance */*inst*/, const Referencing
         //Instance cand = alt.toInstance(inst->vmem(), inst, inst->,
         //                      m->name(), fullNameComponents());
     }
-
+#else
+    Q_UNUSED(inst);
+    Q_UNUSED(ref);
 #endif
 }
 
-void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst,
-                                        const ReferencingType *ref)
+void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst)
 {
     if (inst->type()->type() & rtPointer &&
             MemoryMapHeuristics::validPointer(inst) &&
@@ -312,12 +431,6 @@ void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst,
             !MemoryMapHeuristics::userLandPointer(inst) &&
             inst->address() != (quint64)inst->toPointer())
     {
-        if(ref && ref->hasAltRefTypes())
-        {
-            processCandidates(inst, ref);
-            return;
-        }
-
         try
         {
             // Add pointer to the _pointerTo map
@@ -416,10 +529,17 @@ void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
         inst = &i;
     }
 
+    // Handle instance with multiple candidates
+    if(ref && ref->altRefTypeCount() > 1)
+    {
+        processCandidates(inst, ref);
+        return;
+    }
+
     // Is this a pointer?
     if (inst->type()->type() & rtPointer)
     {
-        processPointer(node, inst, ref);
+        processPointer(node, inst);
     }
     // If this is an array, add all elements
     else if (inst->type()->type() & rtArray)

@@ -43,7 +43,7 @@ public:
 
     /**
      * Checks if the given is address is valid based on heuristics.
-     * Notice that this function checks if the address if 4 Byte aligned. This
+     * \note that this function checks if the address if 4 Byte aligned. This
      * is not the case for all pointers, but should be true for all pointers that
      * point to the first element. For instance, a char * should be 4 byte aligned
      * if it points to the first character in a string, but it may not be 4 byte aligned
@@ -56,7 +56,7 @@ public:
 
     /**
      * Checks if the given pointer points to a valid address.
-     * Notice that this check is based on heuristics and may therefore return
+     * \note that this check is based on heuristics and may therefore return
      * incorrect results.
      * @param p the pointer instance to verify
      * @returns true if the pointer is valid, false otherwise
@@ -79,7 +79,7 @@ public:
 
     /**
      * Checks if the given instance is a valid 'struct list_head'.
-     * Notice that this check is based on heuritics. Thus the result
+     * \note that this check is based on heuritics. Thus the result
      * of this function may be incorrect.
      * @param i the list_head instance to verify
      * @returns true of the instance is a valid list_head false otherwise.
@@ -88,7 +88,7 @@ public:
 
     /**
      * Check if the given candidate is a valid candidate for the given list head.
-     * Notice that this check is based on heuristics and may therefore return
+     * \note that this check is based on heuristics and may therefore return
      * incorrect results.
      * @param listHead a pointer to the list head instance whose next pointer has
      * multiple possible candidates
@@ -97,6 +97,28 @@ public:
      * @returns true if the candidate is compatbible false otherwise
      */
     static bool validCandidateBasedOnListHead(const Instance *listHead, const Instance *cand);
+
+    /**
+     * Check if the given list_head is the HEAD of the list or a member of the list.
+     * The idea behind the check is that the head of the list usually has an offset
+     * within its parent struct that is differnt from the offset of the next member
+     * within the list within its parent struct.
+     * \note that this function will return incorrects results if the above described
+     * condition is not valid. This could for instance be the case if there is no real
+     * head of the list and all members have the same type and same offset.
+     * @param parentStruct the parent struct that the list_head is embedded in
+     * @param i an instance of a list_head struct that should be considered as head of
+     * the list
+     * @return \c true if \a i is considered to be the head of the list, \c false otherwise
+     */
+    static bool isHeadOfList(const MemoryMapNode *parentStruct, const Instance *i);
+
+    /**
+     * Checks if the given instance is valid.
+     * @param i the instance to verify
+     * @return \c true if the instance \a is considered to be valid, \c false otherwise
+     */
+    static bool validInstance(const Instance *i);
 
     /**
      * Use all the available heuristics to check whether the given candidate is
