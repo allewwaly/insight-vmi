@@ -77,10 +77,24 @@ bool MemoryMapHeuristics::isHListHead(const Instance *i)
     return false;
 }
 
+bool MemoryMapHeuristics::isHListNode(const Instance *i)
+{
+    if(!i)
+        return false;
+
+    if(i->memberCount() == 2 && i->typeName().compare("struct hlist_node") == 0)
+        return true;
+
+    return false;
+}
+
 bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct, const Instance *i)
 {
     if (!i || !parentStruct)
         return false;
+
+    if(isHListHead(i))
+        return true;
 
     if (!isListHead(i))
         return false;
@@ -128,22 +142,10 @@ bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct, const 
     return true;
 }
 
-bool MemoryMapHeuristics::isHListNode(const Instance *i)
-{
-    if(!i)
-        return false;
-
-    if(i->memberCount() == 2 && i->typeName().compare("struct hlist_node") == 0)
-        return true;
-
-    return false;
-}
-
-
 bool MemoryMapHeuristics::validListHead(const Instance *i)
 {
     // Is this even a list_head?
-    if(!i || i->isNull() || !isListHead(i))
+    if(!i || i->isNull() || (!isListHead(i) && !isHListHead(i)))
         return false;
 
     // Check if a list_head.next.prev pointer points to list_head
@@ -162,7 +164,8 @@ bool MemoryMapHeuristics::validListHead(const Instance *i)
                                                        next.type()->size());
 
     // Check for possible default values.
-    // We allow that a pointer can be 0, -1, or next == prev
+    // We allow that a pointer can be 0, -1, or next == prev since this
+    // are actually valid values.
     if(nextAdr == 0 || MINUS_ONE(nextAdr) || nextAdr == prevAdr)
         return true;
 

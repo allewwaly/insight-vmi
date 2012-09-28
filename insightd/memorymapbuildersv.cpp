@@ -253,10 +253,11 @@ QList<Instance *> * MemoryMapBuilderSV::resolveStructs(const Instance *inst, qui
                 }
             }
 
-            // After we considered each member within the union, we are done.
+            // After we considered each member within the union we are done.
             return result;
         }
         else {
+            // In the case of a struct we just try to go a level deeper
             last = next;
             next = next.memberByOffset(offset - (next.address() - inst->address()), false);
             sTmp = dynamic_cast<const Structured *>(next.type());
@@ -286,9 +287,10 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
             node->memberProcessed(listHead->address(), firstListMember->address()))
         return;
 
-    // Do not consider lists that just consist of list_heads, since we cannot
-    // learn anything from them
-    if(MemoryMapHeuristics::isListHead(firstListMember))
+    // Do not consider lists that just consist of list_heads or list_node, since we
+    // cannot learn anything from them
+    if(MemoryMapHeuristics::isListHead(firstListMember) ||
+            MemoryMapHeuristics::isHListNode(firstListMember))
         return;
 
     // Calculate the offset of the member within the struct
@@ -301,6 +303,20 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
     QList<Instance *> *member = 0;
     Instance *memP = 0;
     bool valid = false;
+    bool nameUpdated = false;
+    bool hlist = false;
+
+    // Are we handling a hlist or a list
+    if (MemoryMapHeuristics::isHListHead(listHead))
+        hlist = true;
+
+    // Fix initial path, since MemoryMapNode only takes the name of the member, but does not
+    // consider its fullname
+    // First save the original name, since we need later on to fix the name of the list members
+    QString origName = listMember->name();
+
+    if (node->name() != listHead->name())
+        listMember->setName(listHead->name() + "." + origName);
 
     do {
         // Verify that this is indeed a list_head, for this purpose we have to consider
@@ -309,12 +325,18 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
             delete tmp;
 
         valid = false;
+        // Get all structs thay may encompass the member we are looking for
         member = resolveStructs(listMember, memOffset);
 
         for (int i = member->size(); i > 0 ; --i) {
             memP = member->takeFirst();
 
-            if (memP && MemoryMapHeuristics::isListHead(memP)) {
+            // Is one of the structs either a list_head in case we process a list
+            // or an hlist_node in case we process a Hlist.
+            // Notice that if multiple structs are returnded the last struct that
+            // fulfills the criteria below is considered!
+            if (memP && ((MemoryMapHeuristics::isListHead(memP) && !hlist) ||
+                         (MemoryMapHeuristics::isHListNode(memP) && hlist))) {
                 valid = true;
                 tmp = memP;
             }
@@ -349,8 +371,16 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
         // Update vars
         listHeadNext = (quint64)tmp->member(0, 0, -1, true).toPointer();
         listMember->setAddress(listHeadNext - memOffset);
+
+        // We have to update the name once
+        if (!nameUpdated) {
+                listMember->setName(tmp->name() + "." + origName);
+                nameUpdated = true;
+        }
     }
-    while (listMember && listHeadNext != listHead->address());
+    // listHeadNext must either point to the beginning of the list in case of a
+    // "normal" list or it must be 0 in case of an hlist.
+    while (listMember && listHeadNext != listHead->address() && listHeadNext);
 }
 
 void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
@@ -360,13 +390,21 @@ void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
 
     // Get the next and prev pointer.
     Instance next = inst->member(0, 0, -1, true);
-    Instance prev = inst->member(1, 0, -1, true);
 
-    // Check pointers
-    if (!MemoryMapHeuristics::validPointer(&next) ||
-            !MemoryMapHeuristics::validPointer(&prev) ||
-            next.toPointer() == prev.toPointer())
+    // Is the next pointer valid e.g. not Null
+    if (!MemoryMapHeuristics::validPointer(&next))
         return;
+
+    // For Lists we can also verify the prev pointer in contrast
+    // to HLists
+    if (MemoryMapHeuristics::isListHead(inst)) {
+        Instance prev = inst->member(1, 0, -1, true);
+
+        // Filter invalid or default pointers (next == prev)
+        if (!MemoryMapHeuristics::validPointer(&prev) ||
+                next.toPointer() == prev.toPointer())
+            return;
+    }
 
     // Is this the head of the list?
     if (MemoryMapHeuristics::isHeadOfList(node, inst)) {
@@ -500,10 +538,6 @@ void MemoryMapBuilderSV::processStruct(MemoryMapNodeSV *node, Instance *inst)
         // poiters, etc.
         Instance mi = inst->member(i, 0, -1, true);
 
-        // Adjust instance name to reflect full path
-        if (node->name() != inst->name())
-            mi.setName(inst->name() + "." + mi.name());
-
         if(!mi.isNull())
         {
             // Get the structured member for the instance
@@ -549,12 +583,12 @@ void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
     // Is this a struct or union?
     else if (inst->memberCount() > 0)
     {
-        // Is this a list_head?
-        if(MemoryMapHeuristics::isListHead(inst))
+        // Is this a (h)list_head?
+        if(MemoryMapHeuristics::isListHead(inst) ||
+                MemoryMapHeuristics::isHListHead(inst))
             processListHead(node, inst);
-        else if(MemoryMapHeuristics::isHListHead(inst) ||
-                MemoryMapHeuristics::isHListNode(inst))
-            // Ignore for now
+        else if(MemoryMapHeuristics::isHListNode(inst))
+            // Ignore hlist_nodes for now
             return;
         else if(inst->type()->type() & rtStruct)
             processStruct(node, inst);

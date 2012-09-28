@@ -56,8 +56,8 @@ public:
 
     /**
      * Checks if the given pointer points to a valid address.
-     * \note that this check is based on heuristics and may therefore return
-     * incorrect results.
+     * \note that this function does not consider 0, -1 as valid values for a
+     * pointer and will return false if a pointer is 0 or -1.
      * @param p the pointer instance to verify
      * @returns true if the pointer is valid, false otherwise
      */
@@ -79,8 +79,11 @@ public:
 
     /**
      * Checks if the given instance is a valid 'struct list_head'.
-     * \note that this check is based on heuritics. Thus the result
-     * of this function may be incorrect.
+     * \note that this functions verifies if the list_head itself is valid.
+     * This means that the next pointer of a list_head could be 0 or -1 and would
+     * be considered to be valid, since this are actucally valid values for a
+     * list_head. The caller has to check for these values before dereferencing a
+     * list_head that is valid according to this function.
      * @param i the list_head instance to verify
      * @returns true of the instance is a valid list_head false otherwise.
      */
