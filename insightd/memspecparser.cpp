@@ -329,12 +329,13 @@ void MemSpecParser::parseHelperProg(MemSpecs* specs)
     proc.start(cmd);
     proc.waitForFinished(-1);
 
-    if (proc.exitCode() != 0) {
+    if (proc.exitStatus() || proc.exitCode() != 0) {
         _errorOutput = proc.readAllStandardError();
         memSpecParserError(
-                QString("Command failed with exit code %2: %1")
+                QString("Command failed with exit code %2 and exit status \"%3\": %1")
                     .arg(cmd)
-                    .arg(proc.exitCode()));
+                    .arg(proc.exitCode())
+                    .arg((proc.exitStatus()) ? "crashed" : "normal"));
     }
 
     const int bufsize = 1024;
