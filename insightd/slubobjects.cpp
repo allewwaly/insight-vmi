@@ -156,12 +156,28 @@ SlubObjects::ObjectValidity SlubObjects::isInstanceEmbedded(const Instance *inst
 {
     if (!inst || obj.isNull || !obj.baseType)
         return ovConflict;
+
+    ObjectValidity ret = ovEmbedded;
+    const BaseType *it = inst->type()->dereferencedBaseType(BaseType::trLexicalAndArrays);
+    const StructuredMember *m = 0;
+
     // Find base type at the expected offset
     quint64 offset = inst->address() - obj.address;
 
-    // We need to find the member at the given offset.
-    const StructuredMember *m = obj.baseType->memberAtOffset(offset, false);
-    const BaseType *it = inst->type()->dereferencedBaseType(BaseType::trLexicalAndArrays);
+    // If the first element is a union we have to consider all paths
+    if (obj.baseType->type() & rtUnion) {
+        for (int i = 0; i < obj.baseType->members().size(); ++i) {
+            m = obj.baseType->members().at(i);
+
+            if ((ret = isInstanceEmbeddedHelper(it, m, offset)) != ovConflict)
+                return ret;
+        }
+
+        return ret;
+    }
+
+    // Othwise we try to find the member.
+    m = obj.baseType->memberAtOffset(offset, false);
 
     return isInstanceEmbeddedHelper(it, m, offset);
 }
