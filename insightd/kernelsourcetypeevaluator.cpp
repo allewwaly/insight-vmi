@@ -497,10 +497,9 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
             debugmsg(string);
 #endif /* DEBUGMAGICNUMBERS */
         }
-        return;
     }
 
-    if (node->type == nt_primary_expression &&
+    else if (node->type == nt_primary_expression &&
         node->parent &&
         node->parent->type == nt_postfix_expression)
     {
@@ -550,44 +549,53 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
 
                     list = node->parent->u.postfix_expression.postfix_expression_suffix_list;
                     while(list){
-                        if (list && list->next && list->item->type == nt_postfix_expression_parens)
-                            list = list->next;
-                        else if (list && list->next && list->item->type == nt_postfix_expression_brackets)
-                            list = list->next;
-                        else if (list &&
-                                (list->item->type == nt_postfix_expression_arrow ||
-                                 list->item->type == nt_postfix_expression_dot) && 
-                                !antlrTokenToStr(list->item->u.postfix_expression_suffix.identifier).isEmpty())
-                        {
-                            memberName = antlrTokenToStr(list->item->u.postfix_expression_suffix.identifier);
+                        switch(list->item->type){
+                            case nt_postfix_expression_arrow:
+                            case nt_postfix_expression_dot:
+                                if(!antlrTokenToStr(list->item->u.postfix_expression_suffix.identifier).isEmpty()){
+                                    memberName = antlrTokenToStr(list->item->u.postfix_expression_suffix.identifier).trimmed();
 #ifdef DEBUGMAGICNUMBERS
-                            string.append(QString("Found Membername: %1\n")
-                                    .arg(memberName.trimmed()));
+                                    string.append(QString("Found Membername: %1\n")
+                                            .arg(memberName));
 #endif /* DEBUGMAGICNUMBERS */
-                            if (!structured) {
-                                const BaseType* baseType = _factory->findBaseTypeByName(constantType->identifier());
-                                if (baseType && baseType->type() & (rtStruct|rtUnion))
-                                {
-                                    structured = dynamic_cast<const Structured*>(baseType);
-                                    member = (StructuredMember*) structured->findMember(memberName);
-                                    if (member){
-                                        if (member->refType()->type() == rtStruct || member->refType()->type() ==rtUnion)
-                                            structured = dynamic_cast<const Structured*>(member->refType());
-                                        break;
+                                    if(!structured){
+                                        const BaseType* baseType = _factory->findBaseTypeByName(constantType->identifier());
+                                        if (baseType && baseType->type() & (rtStruct|rtUnion))
+                                        {
+                                            structured = dynamic_cast<const Structured*>(baseType);
+                                            member = (StructuredMember*) structured->findMember(memberName);
+                                            if (member){
+                                                if (member->refType()->type() == rtStruct || member->refType()->type() ==rtUnion)
+                                                    structured = dynamic_cast<const Structured*>(member->refType());
+                                                break;
+                                            }
+                                        }
+                                    } else {
+                                        member = (StructuredMember*) structured->findMember(memberName);
+                                        if (member){
+                                            if (member->refType()->type() & (rtStruct | rtUnion))
+                                                structured = dynamic_cast<const Structured*>(member->refType());
+                                        }
                                     }
-                                }
-                            } else {
-                                member = (StructuredMember*) structured->findMember(memberName);
-                                if (member){
-                                    if (member->refType()->type() & (rtStruct | rtUnion))
-                                        structured = dynamic_cast<const Structured*>(member->refType());
-                                }
-                            }
-                            if (list->next)
+                                }else return;
+                                // Fall through intentional!
+                            case nt_postfix_expression_parens:
+                            case nt_postfix_expression_brackets:
                                 list = list->next;
-                            else
                                 break;
-                        }else break;
+
+                            case nt_postfix_expression_inc:
+                            case nt_postfix_expression_dec:
+                                if (member) member->evaluateMagicNumberFoundNotConstant();
+                                return;
+
+                            default:
+#ifdef DEBUGMAGICNUMBERS
+                                string.append(QString("Unknown Type: %1\n").arg(ast_node_type_to_str(list->item)));
+                                debugmsg(string);
+                                return;
+#endif /* DEBUGMAGICNUMBERS */
+                        }
                     }
                     if (!structured)
                     {
@@ -728,11 +736,10 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
 #endif /* DEBUGMAGICNUMBERS */
             }
         }
-
+    }
 
 
 #ifdef DEBUGMAGICNUMBERS
-        //debugmsg(string);
+    //debugmsg(string);
 #endif /* DEBUGMAGICNUMBERS */
-    }
 }
