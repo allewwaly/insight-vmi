@@ -26,7 +26,7 @@ Found variable with name shm_mnt:
 
 http://lxr.linux.no/#linux+v3.4.4/mm/rmap.c#L1002
 
-Base on the result of function [http://lxr.linux.no/linux+*/include/linux/mm.h#L806 PageAnon], `page.mapping` can be used as `struct anon_vma` or `struct address_space`:
+Base on the result of function [http://lxr.linux.no/linux+v3.4.4/include/linux/mm.h#L806 PageAnon], `page.mapping` can be used as `struct anon_vma` or `struct address_space`:
 
 {{{
 Found type with name page:
