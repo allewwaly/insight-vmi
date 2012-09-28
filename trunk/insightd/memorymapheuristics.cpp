@@ -5,6 +5,11 @@
 
 #define MINUS_ONE(x) (((x) == MINUS_ONE_32 || (x) == MINUS_ONE_64) ? true : false)
 
+// Same as in the kernel
+#define MAX_ERRNO 4095
+#define IS_ERR(x) (((x) > (MINUS_ONE_32 - MAX_ERRNO) && (x) <= MINUS_ONE_32) ||       \
+                          (x) > (MINUS_ONE_64 - MAX_ERRNO))
+
 MemoryMapHeuristics::MemoryMapHeuristics()
 {
 }
@@ -23,7 +28,7 @@ bool MemoryMapHeuristics::validAddress(quint64 address, const VirtualMemory *vme
     }
 
     // Is the adress 0 or -1?
-    if(address == 0 || MINUS_ONE(address))
+    if(address == 0 || MINUS_ONE(address) || IS_ERR(address))
         return false;
 
     // Is the pointer 4byte aligned?
