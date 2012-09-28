@@ -170,7 +170,8 @@ const StructuredMember *Structured::memberAtOffset(size_t offset, bool exactMatc
     int i;
 
     for (i = 0; i < _members.size() && _members[i]->offset() <= offset; ++i)
-        if (_members[i]->offset() == offset)
+        // Ignore members that have a size of 0
+        if (_members[i]->offset() == offset && _members[i]->refType()->size() > 0)
             return _members[i];
 
     if(exactMatch)
