@@ -16,8 +16,9 @@
 #include "shell.h"
 #include "astexpressionevaluator.h"
 #include "expressionevalexception.h"
+#include "typeevaluatorexception.h"
 
-#define typeEvaluatorError(x) do { throw SourceTypeEvaluatorException((x), __FILE__, __LINE__); } while (0)
+#define sourceTypeEvaluatorError(x) do { throw SourceTypeEvaluatorException((x), __FILE__, __LINE__); } while (0)
 
 KernelSourceTypeEvaluator::KernelSourceTypeEvaluator(AbstractSyntaxTree* ast,
         SymFactory* factory)
@@ -145,7 +146,7 @@ int KernelSourceTypeEvaluator::evaluateIntExpression(const ASTNode* node, bool* 
         else if (! (value.resultType & (erRuntime|erUndefined|erGlobalVar|erLocalVar)) )
         {
             ASTSourcePrinter printer(_ast);
-            typeEvaluatorError(
+            sourceTypeEvaluatorError(
                         QString("Failed to evaluate constant expression "
                                 "\"%1\" at %2:%3:%4")
                         .arg(printer.toString(node)
@@ -301,7 +302,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers_constant(const ASTNode *nod
                     ASTType* constantType;
                     try{
                         constantType = typeofNode(node);
-                    } catch (GenericException&) {
+                    } catch (TypeEvaluatorException&) {
                         return;
                     }
                     if(constantType->type() == rtArray && 
@@ -451,7 +452,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
         ASTType* constantType;
         try{
             constantType = typeofNode(declarator);
-        }catch(...){
+        }catch(TypeEvaluatorException&){
             return;
         }
 
@@ -511,7 +512,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
         ASTType* constantType;
         try{
             constantType = typeofNode(node);
-        }catch(...){
+        }catch(TypeEvaluatorException&){
             return;
         }
 
