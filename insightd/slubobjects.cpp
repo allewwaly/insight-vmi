@@ -90,7 +90,7 @@ SlubObjects::ObjectValidity SlubObjects::isInstanceEmbeddedHelper(const BaseType
     // Consider all nested structs and unions and try to find a match.
     while(m)
     {
-        currentOffset = offset - m->offset();
+        currentOffset -= m->offset();
 
         const BaseType *mt;
         // Find final base type and compare them
