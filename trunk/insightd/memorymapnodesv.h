@@ -186,6 +186,7 @@ public:
     {
         return _seemsValid;
     }
+
 private:
     /**
      * Calculate the intial probability of this node. This function should only
