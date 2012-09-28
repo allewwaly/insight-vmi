@@ -1,0 +1,123 @@
+#summary Collection of mean kernel pointer tricks
+
+= Introduction =
+
+This page shows a collection of mean pointer tricks that the kernel uses. All of these examples cause some headaches for !InSight.
+
+
+= Pointers as error codes =
+
+http://lxr.linux.no/#linux+v2.6.32.58/mm/shmem.c#L2626
+
+Global variable `shm_mnt` of type `struct vfsmount *` is returned as an error code (checked by macro `IS_ERR(shm_mnt)`):
+
+As a result, a candidate is detected for `shm_mnt` that should not be there:
+{{{
+Found variable with name shm_mnt:
+  ID:             0xb4d49b
+  Name:           shm_mnt
+  Address:        0xc1496cc0
+  Type:           0xb3e347   struct vfsmount *
+              <1> 0xa5d4     struct file *: (struct vfsmount *)
+  Source file:    mm/shmem.c:34
+}}}
+
+= Type cast based on internal flag =
+
+http://lxr.linux.no/#linux+v3.4.4/mm/rmap.c#L1002
+
+Base on the result of function [http://lxr.linux.no/linux+*/include/linux/mm.h#L806 PageAnon], `page.mapping` can be used as `struct anon_vma` or `struct address_space`:
+
+{{{
+Found type with name page:
+  ID:             0x6043
+  Name:           struct page
+  Type:           Struct
+  Size:           32
+  Source file:    arch/x86/kernel/init_task.c:18
+  Members:        6
+    0x0c                0xa377     union (anon.)
+    {
+      0x0c              0xa24f     struct (anon.)
+      {
+        ...
+        0x10  mapping:  0xa371     struct address_space *
+                    <1> 0xdd13     struct inode *: ((struct page *)->mapping - 176)
+                    <2> 0x1c47c    struct anon_vma *: ((struct page *)->mapping - 1)
+                    <3> 0x603d     struct page *: (struct page *)->mapping
+      }
+      ...
+    }
+   ...
+}}}
+
+= Fields initialized with wrong types =
+
+http://lxr.linux.no/#linux+v2.6.32.58/fs/file.c#L294
+
+In this example, `fdtable.open_fds` is of type `fd_set*`. Both `fd_set` and `embedded_fd_set` have only one field, namely `fds_bits`. However, one is declared as `long[1]`, the other as `long[32]`:
+
+{{{
+>>> show files_struct
+Found type with name files_struct:
+  ID:             0x4ed474
+  Name:           struct files_struct
+  Type:           Struct
+  Size:           224
+  Source file:    kernel/fork.c:1027
+  Members:        8
+    ...
+    0x4c  open_fds_init:      0x4f0c19 struct embedded_fd_set
+    0x50  fd_array:           0x4f0ca6 struct file *[32]
+}}}
+
+{{{
+>>> show files_struct.open_fds_init
+Found type with name files_struct, showing files_struct.open_fds_init:
+  ID:             0x4f0c19
+  Name:           struct embedded_fd_set
+  Type:           Struct
+  Size:           4
+  Source file:    kernel/fork.c:27
+  Members:        1
+    0x0  fds_bits: 0x4e6d4a long unsigned int[1]
+}}}
+
+{{{
+>>> show fdtable.open_fds
+Found type with name fdtable, showing fdtable.open_fds:
+  ID:             0x102666
+  Name:           fd_set *
+  Type:           Pointer
+  Size:           4
+  Hash:           0xcd5932
+  1. Ref. type:   0xf8818    fd_set
+  2. Ref. type:   0xf8733    __kernel_fd_set
+  3. Ref. type:   0xf870c    struct (anon.)
+  Members:        1
+    0x0  fds_bits: 0xf8723 long unsigned int[32]
+}}}
+
+The code in [http://lxr.linux.no/#linux+v2.6.32.58/fs/file.c#L313 line 313] assigns the 1-array-field to a 32-array-pointer. However, if we were to access `new_fdt->open_fds->fds_bits[1]` afterwards, we would not be accessing `newf->open_fds_init[1]`, but instead `newf->fd_array[0]`.
+
+= Implicitely included data structures =
+
+http://lxr.linux.no/#linux+v2.6.32/include/linux/prio_tree.h#L14
+
+{{{
+struct raw_prio_tree_node {
+    struct prio_tree_node   *left;
+    struct prio_tree_node   *right;
+    struct prio_tree_node   *parent;
+};
+
+struct prio_tree_node {
+    struct prio_tree_node   *left;
+    struct prio_tree_node   *right;
+    struct prio_tree_node   *parent;
+    unsigned long           start;
+    unsigned long           last; 
+}
+}}}
+
+In the above example, `struct prio_tree_node` implicitely includes `struct raw_prio_tree_node`, but not as a field directly, but only implicitely through by starting with the same three members as the other type.
