@@ -84,7 +84,6 @@ make-kpkg --us --uc $ROOTCMD --append-to-version $APPEND_VER --initrd kernel_ima
 if [ -x "$GCC_PP" ]; then
 	GCC_ORIG=$(grep '^CC' Makefile.orig | sed "s@^CC\\s*=\(.*\)\$@\1@")
 	sed -i "s@^\(CC\\s*=\).*\$@\1 $GCC_ORIG@" Makefile
-	break
 fi
 
 if [ -r vmlinux ]; then
@@ -99,6 +98,6 @@ if [ -r vmlinux ]; then
 	#cp -v vmlinux ../vmlinux-${VER}${APPEND} &&
 #	echo -e "\nGenerating object dump for vmlinux-${VER}${APPEND}..." &&
 #	objdump -W vmlinux 2>/dev/null | bzip2 -z -c --best > ../objdump-${VER}${APPEND}.bz2 &&
-#	echo "Done." || echo "Error generating objdump."
+	echo "Done." || echo "Error generating objdump."
 fi
 
