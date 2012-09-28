@@ -310,14 +310,6 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
     if (MemoryMapHeuristics::isHListHead(listHead))
         hlist = true;
 
-    // Fix initial path, since MemoryMapNode only takes the name of the member, but does not
-    // consider its fullname
-    // First save the original name, since we need later on to fix the name of the list members
-    QString origName = listMember->name();
-
-    if (node->name() != listHead->name())
-        listMember->setName(listHead->name() + "." + origName);
-
     do {
         // Verify that this is indeed a list_head, for this purpose we have to consider
         // nested structs as well.
@@ -374,7 +366,7 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
 
         // We have to update the name once
         if (!nameUpdated) {
-                listMember->setName(tmp->name() + "." + origName);
+                listMember->setName(tmp->name() + "." + listMember->name());
                 nameUpdated = true;
         }
     }
@@ -556,10 +548,14 @@ void MemoryMapBuilderSV::processUnion(MemoryMapNodeSV */*node*/, Instance */*ins
 void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
                                      const ReferencingType *ref)
 {
+    Instance i;
+
     // Create an instance from the node if necessary
     if(!inst)
     {
-        Instance i = node->toInstance(false);
+        // We need the fullName for debugging. Could be removed later on
+        // to improve performance.
+        i = node->toInstance();
         inst = &i;
     }
 

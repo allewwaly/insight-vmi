@@ -30,12 +30,13 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
 MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
         MemoryMapNode* parent)
     : _belongsTo(belongsTo), _parent(parent),
-      _name(MemoryMap::insertName(inst.name())), _address(inst.address()),
+      _name(getNameFromInstance(parent, inst)), _address(inst.address()),
       _type(inst.type()), _id(inst.id()), _probability(1.0)
 {
     if (_belongsTo && _address > _belongsTo->vmem()->memSpecs().vaddrSpaceEnd())
             genericError(QString("Address 0x%1 exceeds 32 bit address space")
                     .arg(_address, 0, 16));
+
     updateProbability(&inst);
 }
 
@@ -44,6 +45,31 @@ MemoryMapNode::~MemoryMapNode()
 {
     for (NodeList::iterator it = _children.begin(); it != _children.end(); ++it)
         delete *it;
+}
+
+const QString & MemoryMapNode::getNameFromInstance(MemoryMapNode* parent, const Instance &inst)
+{
+    // Consider to the full name of the instance to get the correct name for the node
+    const QString instFullName = inst.fullName();
+
+    if (!parent)
+        // The node has no parent => take the full name
+        return MemoryMap::insertName(instFullName);
+    else {
+        // Take the part of the name that is not covered by the parents
+        const QString parentFullName = parent->fullName();
+        int position = instFullName.indexOf(parentFullName);
+
+        if (!position &&
+                instFullName.size() > parentFullName.size()) {
+            // The name of the parent chain is contained within the fullName as expected
+            // Take the missing parts
+            return MemoryMap::insertName(instFullName.right(instFullName.size() -
+                                                           parentFullName.size() - 1));
+        }
+    }
+
+    return MemoryMap::insertName(inst.name());
 }
 
 
@@ -55,7 +81,7 @@ QString MemoryMapNode::parentName() const
 
 QStringList MemoryMapNode::parentNameComponents() const
 {
-	return _parent ? _parent->fullNameComponents() : QStringList();
+    return _parent ? _parent->fullNameComponents() : QStringList();
 }
 
 
