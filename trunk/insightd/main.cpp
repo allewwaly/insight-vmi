@@ -166,6 +166,7 @@ void signal_handler(int sig_num, siginfo_t * info, void * ucontext)
             else
                 exit(0);
             break;
+        case SIGABRT:
         case SIGSEGV:
             void * array[100];
             void * caller_address;
@@ -241,6 +242,7 @@ void init_signals()
     sigaction(SIGTERM, &signal_action, NULL); // catch terminal interrupt
     sigaction(SIGINT, &signal_action, NULL); // catch terminal interrupt
     sigaction(SIGQUIT, &signal_action, NULL); // catch terminal quit
+    sigaction(SIGABRT, &signal_action, NULL); // catch calls to abort() eg. uncaught exceptions
     sigaction(SIGSEGV, &signal_action, NULL); // catch segfaults
 
 //    signal(SIGCHLD, SIG_IGN);       // ignore child
