@@ -155,8 +155,7 @@ public:
 	 * or set it to \c false otherwise
 	 * @return an Instance object based on this node
 	 */
-	Instance toInstance(bool includeParentNameComponents = true) const;
-
+    Instance toInstance(bool includeParentNameComponents = true) const;
 protected:
 	/**
 	 * Re-calculates the probability of this node being "sane" and used by the
@@ -167,11 +166,20 @@ protected:
 	 */
 	void updateProbability(const Instance* givenInst = 0);
 
+    /**
+     * Identifies the correct name of the node based on its parent and the instance
+     * it is created from.
+     * @parent the parent node of this node
+     * @inst the instance that the node is created from
+     * @return the part of the name that belong to this node
+     */
+    const QString &getNameFromInstance(MemoryMapNode *parent, const Instance &inst);
+
 	MemoryMap* _belongsTo;   ///< the MemoryMap this node belongs to
 	NodeList _children;      ///< list of all children
 	MemoryMapNode* _parent;  ///< parent node, if any, otherwise null
 
-	const QString& _name;    ///< name of this node
+    const QString& _name;    ///< name of this node
 	quint64 _address;        ///< virtual address of this node
 	const BaseType* _type;   ///< type of this node
     int _id;                 ///< ID of this node, if based on a variable
