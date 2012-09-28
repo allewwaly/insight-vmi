@@ -93,6 +93,15 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+
+// Print backtrace
+// Test this function under windows
+#ifndef _WIN32
+#include <execinfo.h>
+#include <ucontext.h>
+#include <cxxabi.h>
+#endif /* _WIN32 */
+
 #include <stdlib.h>
 #include <insight/constdefs.h>
 
@@ -125,39 +134,92 @@ void log_message(const QString& msg)
  * signals, refer to
  * http://www.comptechdoc.org/os/linux/programming/linux_pgsignals.html
  */
-void signal_handler(int sig)
+void signal_handler(int sig_num, siginfo_t * info, void * ucontext)
 {
-	switch (sig) {
+    switch (sig_num) {
 
-	case SIGHUP:
-		break;
+        case SIGHUP:
+            break;
 
-	// Terminal interrupt
-    case SIGINT:
-        // Try to terminate a script
-        if (shell) {
-            if (shell->interactive()) {
-                shell->interrupt();
+            // Terminal interrupt
+        case SIGINT:
+            // Try to terminate a script
+            if (shell) {
+                if (shell->interactive()) {
+                    shell->interrupt();
+                }
+                else {
+                    shell->shutdown();
+                    shell->wait();
+                }
             }
-            else {
+            break;
+
+            // Terminal quit
+        case SIGQUIT:
+            // Termination
+        case SIGTERM:
+            if (shell) {
                 shell->shutdown();
                 shell->wait();
             }
-        }
-        break;
+            else
+                exit(0);
+            break;
+        case SIGSEGV:
+            void * array[100];
+            void * caller_address;
+            char ** messages;
+            int size, i;
+            struct ucontext * uc;
 
-    // Terminal quit
-    case SIGQUIT:
-    // Termination
-    case SIGTERM:
-	    if (shell) {
-	        shell->shutdown();
-	        shell->wait();
-	    }
-	    else
-	        exit(0);
-		break;
-	}
+            uc = (struct ucontext *) ucontext;
+
+            /* Get the address at the time the signal was raised from the EIP (x86) */
+#if __WORDSIZE == 64
+            caller_address = (void *) uc->uc_mcontext.gregs[REG_RIP];
+#else /* __WORDSIZE == 32 */
+            caller_address = (void *) uc->uc_mcontext.gregs[REG_EIP];
+#endif /* __WORDSIZE == 32 */
+
+            fprintf(stderr, "signal %d (%s), address is %p from %p\n", sig_num,
+                    strsignal(sig_num), info->si_addr, (void *) caller_address);
+
+            size = backtrace(array, 50);
+            messages = backtrace_symbols(array, size);
+
+            /* skip first stack frame (points here) */
+            for (i = 2; i < size && messages != NULL; ++i) {
+                std::string trace(messages[i]);
+                // attempt to demangle
+                {
+                    std::string::size_type begin, end;
+
+                    // find the beginning and the end of the useful part of the trace
+                    begin = trace.find_first_of('(') + 1;
+                    end = trace.find_last_of('+');
+
+                    // if they were found, we'll go ahead and demangle
+                    if (begin != std::string::npos && end != std::string::npos) {
+                        std::string functionName = trace.substr(begin, end - begin);
+
+                        int demangleStatus;
+                        char* demangledName;
+                        if ((demangledName = abi::__cxa_demangle(
+                                        functionName.c_str(), 0, 0, &demangleStatus))
+                                && demangleStatus == 0) {
+                            trace.replace(begin, end - begin, demangledName); // the demangled name is now in our trace string
+                        }
+                        free(demangledName);
+                    }
+                }
+                fprintf(stderr, "[bt]: (%d) %s\n", i - 1, trace.c_str());
+            }
+
+            free(messages);
+            exit(1);
+            break;
+    }
 }
 
 
@@ -167,14 +229,24 @@ void signal_handler(int sig)
 void init_signals()
 {
     // Register signal handler for interesting signals
+
+    struct sigaction signal_action;
+
+    /* Set up the structure to specify the new action. */
+    signal_action.sa_sigaction = signal_handler;
+    sigemptyset(&signal_action.sa_mask);
+    signal_action.sa_flags = SA_RESTART | SA_SIGINFO;
+
+    sigaction(SIGHUP, &signal_action, NULL); // catch hangup signal
+    sigaction(SIGTERM, &signal_action, NULL); // catch terminal interrupt
+    sigaction(SIGINT, &signal_action, NULL); // catch terminal interrupt
+    sigaction(SIGQUIT, &signal_action, NULL); // catch terminal quit
+    sigaction(SIGSEGV, &signal_action, NULL); // catch segfaults
+
 //    signal(SIGCHLD, SIG_IGN);       // ignore child
 //    signal(SIGTSTP, SIG_IGN);       // ignore tty signals
 //    signal(SIGTTOU, SIG_IGN);       // ignore writes from background child processes
 //    signal(SIGTTIN, SIG_IGN);       // ignore reads from background child processes
-    signal(SIGHUP, signal_handler);   // catch hangup signal
-    signal(SIGTERM, signal_handler);  // catch kill signal
-    signal(SIGINT, signal_handler);   // catch terminal interrupt
-    signal(SIGQUIT, signal_handler);  // catch terminal quit
 }
 
 
