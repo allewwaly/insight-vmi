@@ -951,49 +951,60 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
                 }
                 if(constants) *constants = true;
                 qint64 constInt = 0;
-                switch (memberInstance.type()->type()) {
-                    case rtBool8:
-                    case rtInt8:
-                    case rtUInt8:
-                        constInt = memberInstance.toUInt8();
-                        break;
+                constInt = memberInstance.toString().toLong();
+                const BaseType* bt;
+                if (memberInstance.bitSize() >= 0 &&
+                        (bt = memberInstance.type()->dereferencedBaseType(BaseType::trLexical)) &&
+                        (bt->type() & IntegerTypes))
+                {
+                    const IntegerBitField* ibf = dynamic_cast<const IntegerBitField*>(bt);
+                    constInt = ibf->toIntBitField(memberInstance._d.vmem, memberInstance._d.address, memberInstance._d.bitSize, memberInstance._d.bitOffset);
+                }
+                else{
+                    switch (memberInstance.type()->type()) {
+                        case rtBool8:
+                        case rtInt8:
+                        case rtUInt8:
+                            constInt = memberInstance.toUInt8();
+                            break;
 
-                    case rtBool16:
-                    case rtInt16:
-                    case rtUInt16:
-                        constInt = memberInstance.toUInt16();
-                        break;
+                        case rtBool16:
+                        case rtInt16:
+                        case rtUInt16:
+                            constInt = memberInstance.toUInt16();
+                            break;
 
-                    case rtBool32:
-                    case rtInt32:
-                    case rtUInt32:
-                        constInt = memberInstance.toUInt32();
-                        break;
+                        case rtBool32:
+                        case rtInt32:
+                        case rtUInt32:
+                            constInt = memberInstance.toUInt32();
+                            break;
 
-                    case rtBool64:
-                    case rtInt64:
-                    case rtUInt64:
-                        constInt = memberInstance.toUInt64();
-                        break;
+                        case rtBool64:
+                        case rtInt64:
+                        case rtUInt64:
+                            constInt = memberInstance.toUInt64();
+                            break;
 
-                    case rtEnum:
-                        switch (memberInstance.size()) {
-                            case 8: 
-                                constInt = memberInstance.toUInt64();
-                                break;
-                            case 4: 
-                                constInt = memberInstance.toUInt32();
-                                break;
-                            case 2: 
-                                constInt = memberInstance.toUInt16();
-                                break;
-                            default: 
-                                constInt = memberInstance.toUInt8();
-                                break;
-                        }
+                        case rtEnum:
+                            switch (memberInstance.size()) {
+                                case 8: 
+                                    constInt = memberInstance.toUInt64();
+                                    break;
+                                case 4: 
+                                    constInt = memberInstance.toUInt32();
+                                    break;
+                                case 2: 
+                                    constInt = memberInstance.toUInt16();
+                                    break;
+                                default: 
+                                    constInt = memberInstance.toUInt8();
+                                    break;
+                            }
 
-                    default:
-                        break;
+                        default:
+                            break;
+                    }
                 }
                 debugString.append(QString("%1 -> %2 : %3 (%4)\n%5\n")
                         .arg(this->fullName())
