@@ -492,11 +492,6 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
         }
         else if (initializer->u.initializer.assignment_expression){
             evaluateMagicNumbers_initializer(initializer, structured, string);
-#ifdef DEBUGMAGICNUMBERS
-        } else {
-            string.append("TODO DEBUG!");
-            debugmsg(string);
-#endif /* DEBUGMAGICNUMBERS */
         }
     }
 
@@ -661,7 +656,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
                 case nt_assignment_expression:
                     if (localNode == localNode->parent->u.assignment_expression.lvalue){
 #ifdef DEBUGMAGICNUMBERS
-                        string.append(QString("Assignment is: %1\n").arg(printer.toString(localNode, false).trimmed()));
+                    string.append(QString("Assignment is: %1\n").arg(printer.toString(localNode->parent, false).trimmed()));
 #endif /* DEBUGMAGICNUMBERS */
                         findAssignment = false;
                         localNode = localNode->parent;
@@ -672,7 +667,16 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
                     //Expression is part of calculation
                 case nt_builtin_function_sizeof:
                 case nt_builtin_function_offsetof:
+                    return;
+                
                 case nt_unary_expression_op:
+                    while(localNode->parent){
+                        if (localNode->parent->type == nt_postfix_expression_parens){
+                            member->evaluateMagicNumberFoundNotConstant();
+                            return;
+                        }
+                        localNode = localNode->parent;
+                    }
                     return;
 
                 case nt_unary_expression_dec:
