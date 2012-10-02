@@ -257,7 +257,7 @@ bool VirtualMemory::safeSeek(qint64 pos)
 
         return seekOk;
     }
-    catch (VirtualMemoryException) {
+    catch (VirtualMemoryException&) {
         return false;
     }
 }
