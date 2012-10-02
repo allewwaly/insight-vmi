@@ -1052,11 +1052,46 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
             {
                 if(constants) *constants = true;
                 //TODO check if type is String (Contains only ASCII Characters)
-                if(memberInstance.toString() == "NULL")
+                //Do not use toString Method, as is gives non-ascii charackers as dot.
+                if(memberInstance._d.isNull){
+                    //There should be a string (at least a pointer to an address that contains 0x0)
                     memberValid = false;
+                }
                 else {
-                    debugString.append(QString("Found String: \"%1\"\n").arg(memberInstance.toString()));
-                    memberValid = true;
+                    const int len = 255;
+                    // Setup a buffer, at most 'len' bytes long
+                    // Read the data such that the result is always null-terminated
+                    char buf[len + 1];
+                    memset(buf, 0, len + 1);
+                    // We expect exceptions here
+                    try {
+                        qint64 ret;
+                        if (!memberInstance._d.vmem->seek(memberInstance._d.address) ||
+                            (ret = memberInstance._d.vmem->read(buf, len)) != len ) {
+                            memberValid = false;
+                        }
+                        else {
+                        // Limit to ASCII characters
+                            for (int i = 0; i < len; i++) {
+                                if (buf[i] == 0){
+                                    memberValid = true;
+                                    break;
+                                }
+                                else if ( (buf[i] & 0x80) || !(buf[i] & 0x60) || i == len ){ // buf[i] >= 128 || buf[i] < 32 || last character not 0
+                                    memberValid = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    catch (VirtualMemoryException& e) {
+                        memberValid = false;
+                    }
+                    catch (MemAccessException& e) {
+                        memberValid = false;
+                    }
+
+                    //debugString.append(QString("Found String: \"%1\"\n").arg(buf));
                 }
             }else 
                 memberValid = true;
