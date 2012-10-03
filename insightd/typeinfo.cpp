@@ -10,7 +10,8 @@
 #include "funcparam.h"
 #include <QtAlgorithms>
 
-TypeInfo::TypeInfo()
+TypeInfo::TypeInfo(int threadIndex)
+	: _fileIndex(threadIndex)
 {
 	clear();
 }
@@ -48,6 +49,18 @@ void TypeInfo::deleteParams()
 	for (int i = 0; i < _params.size(); ++i)
 		delete _params[i];
 	_params.clear();
+}
+
+
+int TypeInfo::fileIndex() const
+{
+	return _fileIndex;
+}
+
+
+void TypeInfo::setFileIndex(int index)
+{
+	_fileIndex = index;
 }
 
 
@@ -350,7 +363,7 @@ const ParamList& TypeInfo::params() const
 }
 
 
-QString TypeInfo::dump() const
+QString TypeInfo::dump(const QStringList& symFiles) const
 {
 	static HdrSymMap hdrMap = getHdrSymMap();
 	QString symType;
@@ -385,8 +398,10 @@ QString TypeInfo::dump() const
 	if (_pcLow)                 ret += QString("  pcLow:         %1\n").arg(_pcLow);
 	if (_pcHigh)                ret += QString("  pcHigh:        %1\n").arg(_pcHigh);
 	if (!_srcDir.isEmpty())     ret += QString("  srcDir:        %1\n").arg(_srcDir);
-	if (_srcFileId != 0)        ret += QString("  srcFile:       %1\n").arg(_srcFileId);
+	if (_srcFileId != 0)        ret += QString("  srcFile:       0x%1\n").arg(_srcFileId, 0, 16);
 	if (_srcLine >= 0)          ret += QString("  srcLine:       %1\n").arg(_srcLine);
+	if (_fileIndex >= 0 && _fileIndex < symFiles.size())
+		ret +=                         QString("  symFile:       %1\n").arg(symFiles[_fileIndex]);
 	if (_sibling >= 0)          ret += QString("  sibling:       %1\n").arg(_sibling);
 	if (!_enumValues.isEmpty()) {
 	  ret +=                           QString("  enumValues:    ");

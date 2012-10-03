@@ -43,6 +43,11 @@ extern const char* userMailingList;
 
 #if (DEBUG == 1) && defined(__cplusplus)
 
+// Enable debug output for symbol parsing
+// (mostly in insightd/kernelsymbolparser.cpp)
+#undef DEBUG_SYM_PARSING
+//#define DEBUG_SYM_PARSING 1
+
 // Activate for detailed node evaluation tracking
 #undef DEBUG_NODE_EVAL
 //#define DEBUG_NODE_EVAL 1

@@ -265,8 +265,8 @@ void ASTExpressionEvaluatorTester::initTestCase()
     buf.open(QIODevice::ReadOnly);
 
     // Parse the object dump
-    KernelSymbolParser parser(&buf, _factory);
-    parser.parse();
+    KernelSymbolParser parser(_factory);
+    parser.parse(&buf);
 }
 
 

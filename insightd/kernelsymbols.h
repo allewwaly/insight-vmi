@@ -34,30 +34,10 @@ public:
 	~KernelSymbols();
 
 	/**
-	 * Parses the kernel debugging symbols from the given device.
-	 * @param from device to parse the symbols from
-     * @param kernelSrc path to kernel source or header tree
-     * @param systemMap path and file name to \c System.map file
-	 */
-	void parseSymbols(QIODevice* from, const QString& kernelSrc,
-	        const QString systemMap);
-
-	/**
-	 * Parses the kernel debugging symbols from the file given by \a objdump
-	 * and the memory specifications from \a kernelSrc and \a systemMap and
-     * stores the result in _factory and _memSpecs.
-	 * @param objdump the name of the objdump file to parse the symbols from
-     * @param kernelSrc path to kernel source or header tree
-     * @param systemMap path and file name to \c System.map file
-	 */
-	void parseSymbols(const QString& objdump, const QString& kernelSrc,
-	        const QString systemMap);
-
-	/**
 	 * Parses the kernel debugging symbols from the kernel source tree
 	 * \a kernelSrc. The Linux kernel \c vmlinux with debugging symbols and the
 	 * \c System.map file must be directly located in \a kernelSrc.
-     * @param kernelSrc path to configured and built kernel source
+	 * @param kernelSrc path to configured and built kernel source
 	 */
 	void parseSymbols(const QString& kernelSrc);
 

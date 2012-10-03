@@ -142,6 +142,37 @@ struct FoundBaseTypes
 typedef QPair<qint32, const Enum*> IntEnumPair;
 typedef QHash<QString, IntEnumPair> EnumStringHash;
 
+/**
+ * This struct describes a symbol reference to debugging symbols. *
+ */
+struct IdMapResult {
+    IdMapResult() : fileIndex(-1), symId(0) {}
+    IdMapResult(int fileIndex, int symId) : fileIndex(fileIndex), symId(symId) {}
+
+    bool operator==(const IdMapResult& other) const
+    {
+        return (other.fileIndex == fileIndex) && (other.symId == symId);
+    }
+
+    int fileIndex; ///< index of the file in which the symbol was found
+    int symId;     ///< the original symbol ID within that file
+};
+
+/**
+ * Hashes an IdMapResult object for usage in a QHash.
+ * @param key
+ */
+inline uint qHash (const IdMapResult &key)
+{
+    return qHash((((quint64)key.fileIndex) << 32) | key.symId);
+}
+
+/// Maps internal to original symbol IDs
+typedef QHash<int, IdMapResult> IdMapping;
+/// Maps original to internal symbol IDs
+typedef QHash<IdMapResult, int> IdRevMapping;
+
+
 #define SYMFACTORY_DEFINED 1
 
 /**
@@ -234,6 +265,13 @@ public:
 	 * @return \c true if valid, \c false otherwise
 	 */
 	bool static isSymbolValid(const TypeInfo& info);
+
+	/**
+	 * Maps the original IDs in \a info to internal ones and replaces their
+	 * occurences in \a info
+	 * @param info
+	 */
+	void mapToInternalIds(TypeInfo& info);
 
 	/**
 	 * Creates a new symbol based on the information provided in \a info and
@@ -415,6 +453,59 @@ public:
 	 * @return the value of the realtive change clock
 	 */
 	quint32 changeClock() const;
+
+	/**
+	 * Returns the list of executable files the debugging symbols were
+	 * originally parsed from. The index into these files corresponds the
+	 * index used by _origSymFiles.
+	 */
+	const QStringList& origSymFiles() const;
+
+	/**
+	 * Sets the list of files the debugging symbols were parsed from.
+	 * @param list relative file names
+	 */
+	void setOrigSymFiles(const QStringList& list);
+
+    /**
+     * Retrieves or generates a unique, internal type ID (> 0) for usage in
+     * multi-dimensional arrays.
+     * @param localId the local ID assigned to the Array type
+     * @param boundsIndex the dimonsion index
+     * @return a unique ID > 0, computed with: localId + boundsIndex
+     * \sa getInternalTypeId()
+     */
+    int mapToInternalArrayId(int localId, int boundsIndex);
+
+    /**
+     * Retrieves the internal type ID (> 0) for the given combination of
+     * \a origSymId and \a fileIndex. If that mapping does not yet exist, a new
+     * unique ID is generated for it.
+     * @param fileIndex the index of the file the symbol was found in
+     * @param origSymId the original symbol ID of that symbol
+     * @return a unique ID > 0
+     * \sa mapToOriginalId(), mapToInternalArrayId()
+     */
+    int mapToInternalId(int fileIndex, int origSymId);
+
+    /**
+     * Retrieves the internal type ID (> 0) for the given combination of
+     * original ID and file index in \a mapping. If that mapping does not yet
+     * exist, a new unique ID is generated for it.
+     * @param mapping the original symbol ID and index of the file it was found
+     * @return a unique ID > 0
+     * \sa mapToOriginalId(), mapToInternalArrayId()
+     */
+    int mapToInternalId(const IdMapResult& mapping);
+
+    /**
+     * Retrieve the original symbol ID and file index that the symbol identified
+     * by \a internalId was mapped to.
+     * @param internalId the internal ID of a symbol
+     * @return the original symbol ID and file index
+     * \sa mapToInternalId(), mapToInternalArrayId()
+     */
+    IdMapResult mapToOriginalId(int internalId);
 
 	QMultiHash<int, int> seenMagicNumbers;
 
@@ -646,7 +737,12 @@ private:
 
     BaseTypeList typedefsOfType(BaseType* type);
 
-    int getUniqueTypeId();
+    /**
+     * Generates a unique, artificial type ID (< 0) and returns it.
+     * @return a unique ID < 0
+     * \sa getInternalTypeId()
+     */
+    int getArtificialTypeId();
 
     /**
      * Goes to the list of zero-sized structs/unions and tries to find the
@@ -700,6 +796,9 @@ private:
 	FuncParamMultiHash _usedByFuncParams;///< Holds all FuncParam objects that hold a reference to another type
 	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
 	ASTExpressionList _expressions;
+	IdMapping _idMapping;             ///< Maps internal to original symbol IDs
+	IdRevMapping _idRevMapping;       ///< Maps original to internal IDs
+	QStringList _origSymFiles;        ///< List of executable files the symbols were obtained from
 
 	int _typeFoundByHash;
 	int _uniqeTypesChanged;
@@ -708,6 +807,7 @@ private:
 	int _varTypeChanges;
 	int _ambiguesAltTypes;
 	int _artificialTypeId;
+	int _internalTypeId;
 	quint32 _changeClock;
 	quint32 _maxTypeSize;
 	QMutex _typeAltUsageMutex;
@@ -741,6 +841,18 @@ inline Variable* SymFactory::findVarByName(const QString & name) const
 inline quint32 SymFactory::changeClock() const
 {
 	return _changeClock;
+}
+
+
+inline const QStringList &SymFactory::origSymFiles() const
+{
+	return _origSymFiles;
+}
+
+
+inline void SymFactory::setOrigSymFiles(const QStringList &list)
+{
+	_origSymFiles = list;
 }
 
 #endif /* SYMFACTORY_H_ */

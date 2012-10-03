@@ -2483,6 +2483,15 @@ int Shell::cmdShowBaseType(const BaseType* t)
 		 << color(ctReset) << "0x" << hex << t->hash() << dec << endl;
 #endif
 
+    IdMapResult mapping = _sym.factory().mapToOriginalId(t->id());
+    if (mapping.fileIndex >= 0 &&
+        mapping.fileIndex < _sym.factory().origSymFiles().size())
+    {
+        _out << color(ctColHead) << "  Orig. sym. ID:  " << color(ctReset)
+             << _sym.factory().origSymFiles().at(mapping.fileIndex)
+             << ":0x" << hex << mapping.symId << dec << endl;
+    }
+
 	if (t->srcFile() >= 0 && _sym.factory().sources().contains(t->srcFile())) {
 		_out << color(ctColHead) << "  Source file:    "
 			 << color(ctReset) << _sym.factory().sources().value(t->srcFile())->name()
@@ -2754,6 +2763,15 @@ int Shell::cmdShowVariable(const Variable* v)
              << v->altRefType(i).expr()->toString(true) << endl;
     }
 
+    IdMapResult mapping = _sym.factory().mapToOriginalId(v->id());
+    if (mapping.fileIndex >= 0 &&
+        mapping.fileIndex < _sym.factory().origSymFiles().size())
+    {
+        _out << color(ctColHead) << "  Orig. sym. ID:  " << color(ctReset)
+             << _sym.factory().origSymFiles().at(mapping.fileIndex)
+             << ":0x" << hex << mapping.symId << dec << endl;
+    }
+
 	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {
 		_out << color(ctColHead) << "  Source file:    "
 			 << color(ctReset) << _sym.factory().sources().value(v->srcFile())->name()
@@ -2882,24 +2900,13 @@ int Shell::cmdSymbolsSource(QStringList args)
 int Shell::cmdSymbolsParse(QStringList args)
 {
     QString objdump, sysmap, kernelSrc;
-    enum Mode { mObjdump, mDbgKernel };
-    Mode mode;
 
     // If we only got one argument, it must be the directory of a compiled
     // kernel source, and we extract the symbols from the kernel on-the-fly
     if (args.size() == 1) {
-    	mode = mDbgKernel;
     	kernelSrc = args[0];
     	objdump = kernelSrc + (kernelSrc.endsWith('/') ? "vmlinux" : "/vmlinux");
     	sysmap = kernelSrc + (kernelSrc.endsWith('/') ? "System.map" : "/System.map");
-    }
-    // Otherwise the user has to specify the objdump, System.map and kernel
-    // headers directory separately
-    else if (args.size() == 3) {
-    	mode = mObjdump;
-    	objdump = args[0];
-    	sysmap = args[1];
-    	kernelSrc = args[2];
     }
     else {
         // Show cmdHelp, of an invalid number of arguments is given
@@ -2927,35 +2934,30 @@ int Shell::cmdSymbolsParse(QStringList args)
         BugReport::setLog(new BugReport());
 
     try {
-        // Either use the given objdump file, or create it on the fly
-        if (mode == mDbgKernel) {
-            // Offer the user to parse the source, if found
-            bool parseSources = false;
-            QString ppSrc = kernelSrc + (kernelSrc.endsWith('/') ? "" : "/") + "__PP__";
-            QFileInfo ppSrcDir(ppSrc);
-            if (ppSrcDir.exists() && ppSrcDir.isDir()) {
-                if (_interactive) {
-                    QString reply;
-                    do {
-                        reply = readLine("Directory with pre-processed source "
-                                         "files detected. Process them as well? "
-                                         "[Y/n] ")
-                                .toLower();
-                        if (reply.isEmpty())
-                            reply = "y";
-                    } while (reply != "y" && reply != "n");
-                    parseSources = (reply == "y");
-                }
-                else
-                    parseSources = true;
+        // Offer the user to parse the source, if found
+        bool parseSources = false;
+        QString ppSrc = kernelSrc + (kernelSrc.endsWith('/') ? "" : "/") + "__PP__";
+        QFileInfo ppSrcDir(ppSrc);
+        if (ppSrcDir.exists() && ppSrcDir.isDir()) {
+            if (_interactive) {
+                QString reply;
+                do {
+                    reply = readLine("Directory with pre-processed source "
+                                     "files detected. Process them as well? "
+                                     "[Y/n] ")
+                            .toLower();
+                    if (reply.isEmpty())
+                        reply = "y";
+                } while (reply != "y" && reply != "n");
+                parseSources = (reply == "y");
             }
-
-            _sym.parseSymbols(kernelSrc);
-            if (parseSources && !interrupted())
-                cmdSymbolsSource(QStringList(ppSrc));
+            else
+                parseSources = true;
         }
-        else
-            _sym.parseSymbols(objdump, kernelSrc, sysmap);
+
+        _sym.parseSymbols(kernelSrc);
+        if (parseSources && !interrupted())
+            cmdSymbolsSource(QStringList(ppSrc));
     }
     catch (MemSpecParserException& e) {
         // Write log file
