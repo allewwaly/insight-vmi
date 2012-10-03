@@ -39,7 +39,7 @@
 
 SymFactory::SymFactory(const MemSpecs& memSpecs)
 	: _memSpecs(memSpecs), _typeFoundByHash(0), _artificialTypeId(-1),
-	  _changeClock(0), _maxTypeSize(0)
+	  _internalTypeId(1), _changeClock(0), _maxTypeSize(0)
 {
 }
 
@@ -113,6 +113,7 @@ void SymFactory::clear()
 	_typesCopied = 0;
 	_ambiguesAltTypes = 0;
 	_artificialTypeId = -1;
+	_internalTypeId = 1;
 	_changeClock = 0;
 }
 
@@ -583,6 +584,7 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
 
     // Insert new ID/type relation into lookup tables
     assert(_typesById.contains(new_id) == false);
+
     _typesById.insert(new_id, target);
     _equivalentTypes.insertMulti(target->id(), new_id);
     ++_changeClock;
@@ -773,7 +775,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
 {
 	if (!isSymbolValid(info))
 		factoryError(QString("Type information for the following symbol is "
-							 "incomplete:\n%1").arg(info.dump()));
+							 "incomplete:\n%1").arg(info.dump(_origSymFiles)));
 
 	ReferencingType* ref = 0;
 	Structured* str = 0;
@@ -899,7 +901,7 @@ BaseType* SymFactory::getNumericInstance(const ASTType* astType)
                      realTypeToStr(astType->type()));
     }
 
-    TypeInfo info;
+    TypeInfo info(-1);
     info.setSymType(hsBaseType);
     info.setName(astType->identifier());
 
@@ -1090,7 +1092,7 @@ BaseType* SymFactory::makeDeepTypeCopy(BaseType* source, bool clearAltTypes)
     dest->readFrom(data);
 
     // Set the special ID
-    dest->setId(getUniqueTypeId());
+    dest->setId(getArtificialTypeId());
 
     // Recurse for referencing types
     RefBaseType *rbt;
@@ -2094,7 +2096,7 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                 default: factoryError("Unexpected type: " +
                                       realTypeToStr(preceedingPtrs[j]->type()));
                 }
-                ptr->setId(getUniqueTypeId());
+                ptr->setId(getArtificialTypeId());
                 // For void pointers, targetBaseType is null
                 if (ptrBaseType)
                     ptr->setRefTypeId(ptrBaseType->id());
@@ -2800,12 +2802,85 @@ SymFactory::TypeConflicts SymFactory::compareConflictingTypes(
 }
 
 
-int SymFactory::getUniqueTypeId()
+int SymFactory::getArtificialTypeId()
 {
     while (_typesById.contains(_artificialTypeId))
         --_artificialTypeId;
 
     return _artificialTypeId--;
+}
+
+
+int SymFactory::mapToInternalArrayId(int localId, int boundsIndex)
+{
+    // For bounds index 0, the ID must match the local ID! See Array::Array().
+    if (boundsIndex == 0)
+        return localId;
+
+    if (!_idMapping.contains(localId))
+        factoryError(QString("Local ID 0x%1 does not exist.")
+                        .arg(localId, 0, 16));
+
+    IdMapResult mapping = _idMapping[localId];
+
+    // We add boundsIndex to orig. ID to derive new ID
+    mapping.symId += boundsIndex;
+
+    return mapToInternalId(mapping);
+}
+
+
+int SymFactory::mapToInternalId(int fileIndex, int origSymId)
+{
+    return mapToInternalId(IdMapResult(fileIndex, origSymId));
+}
+
+
+int SymFactory::mapToInternalId(const IdMapResult& mapping)
+{
+    // Map zero to zero
+    if (!mapping.symId)
+        return 0;
+
+    // Is this ID already mapped?
+    IdRevMapping::const_iterator it = _idRevMapping.find(mapping);
+    if ( it != _idRevMapping.constEnd() )
+        return it.value();
+
+    // New combination of fileIndx/symId, find a new internal ID
+    while (_idMapping.contains(_internalTypeId))
+        ++_internalTypeId;
+
+    _idMapping.insert(_internalTypeId, mapping);
+    _idRevMapping.insert(mapping, _internalTypeId);
+
+    return _internalTypeId++;
+}
+
+
+IdMapResult SymFactory::mapToOriginalId(int internalId)
+{
+    IdMapping::const_iterator it = _idMapping.find(internalId);
+    if (it != _idMapping.constEnd())
+        return it.value();
+    return IdMapResult();
+}
+
+
+void SymFactory::mapToInternalIds(TypeInfo &info)
+{
+    // Map own ID
+    if (info.id()) {
+        info.setId(mapToInternalId(info.fileIndex(), info.id()));
+    }
+    // Map referencing type's ID
+    if (info.refTypeId()) {
+        info.setRefTypeId(mapToInternalId(info.fileIndex(), info.refTypeId()));
+    }
+    // Map source file's ID
+    if (info.srcFileId()) {
+        info.setSrcFileId(mapToInternalId(info.fileIndex(), info.srcFileId()));
+    }
 }
 
 

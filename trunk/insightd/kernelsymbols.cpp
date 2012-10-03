@@ -41,13 +41,12 @@ KernelSymbols::~KernelSymbols()
 }
 
 
-void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
-        const QString systemMap)
+void KernelSymbols::parseSymbols(const QString& kernelSrc)
 {
-	if (!from)
-		parserError("Received a null device to read the data from");
-
 	_factory.clear();
+
+	QString systemMap(kernelSrc + (kernelSrc.endsWith('/') ?
+									   "System.map" : "/System.map"));
 
     QTime timer;
     timer.start();
@@ -95,70 +94,10 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
         throw;
     }
 
-    KernelSymbolParser symParser(from, &_factory);
+    KernelSymbolParser symParser(kernelSrc, &_factory);
 
-    try {
-	    // Parse the debugging symbols
-		symParser.parse();
-	    _factory.symbolsFinished(SymFactory::rtParsing);
-
-	}
-    catch (GenericException& e) {
-        shell->err()
-            << endl
-            << "Caught a " << e.className() << " at " << e.file << ":" << e.line
-            << " at input line " << symParser.line() << " of the debug symbols"
-            << endl
-            << "Message: " << e.message << endl;
-		throw;
-	}
-}
-
-
-void KernelSymbols::parseSymbols(const QString& objdump,
-        const QString& kernelSrc, const QString systemMap)
-{
-	QFile file(objdump);
-	if (!file.open(QIODevice::ReadOnly))
-	    genericError(QString("Error opening file %1 for reading").arg(objdump));
-
-	parseSymbols(&file, kernelSrc, systemMap);
-
-	file.close();
-}
-
-
-void KernelSymbols::parseSymbols(const QString& kernelSrc)
-{
-	QString kernel = kernelSrc + (kernelSrc.endsWith('/') ? "vmlinux" : "/vmlinux");
-	QString sysmap = kernelSrc + (kernelSrc.endsWith('/') ? "System.map" : "/System.map");
-
-	QProcess proc;
-	proc.setReadChannel(QProcess::StandardOutput);
-
-	QString cmd = "objdump";
-	QStringList args;
-	args << "-W" << kernel;
-
-	// Start objdump process
-	proc.start(cmd, args, QIODevice::ReadOnly);
-	if (proc.waitForStarted(-1))
-		// Parse its output
-		parseSymbols(&proc, kernelSrc, sysmap);
-	else {
-		genericError(
-				QString("Could not execute \"%1\". Make sure the "
-					"%1 utility is installed and can be found through "
-				    "the PATH variable.").arg(cmd));
-	}
-	// Did the process exit normally?
-	if (proc.exitCode()) {
-		genericError(
-				QString("Error encountered executing \"%1 %2\":\n%3")
-					.arg(cmd)
-					.arg(args.join(" "))
-					.arg(QString::fromLocal8Bit(proc.readAllStandardError())));
-	}
+	// Parse the debugging symbols
+	symParser.parse();
 }
 
 

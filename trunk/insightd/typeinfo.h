@@ -200,8 +200,10 @@ public:
 
 	/**
 	 * Constructor
+	 * @param fileIndex index of the symbol file where this information was
+	 * collected from
 	 */
-	TypeInfo();
+	TypeInfo(int fileIndex);
 
 	/**
 	 * Resets all data to their default (empty) values
@@ -209,6 +211,9 @@ public:
 	void clear();
 
 	void deleteParams();
+
+	int fileIndex() const;
+	void setFileIndex(int index);
 
 	bool isRelevant() const;
 	void setIsRelevant(bool value);
@@ -284,9 +289,10 @@ public:
     ParamList& params();
     const ParamList& params() const;
 
-    QString dump() const;
+    QString dump(const QStringList &symFiles) const;
 
 private:
+	int _fileIndex;          ///< index of the object dump containing the info
 	bool _isRelevant;
 	QString _name;           ///< holds the name of this symbol
 	QString _srcDir;         ///< holds the directory of the compile unit
