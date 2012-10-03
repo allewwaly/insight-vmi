@@ -74,13 +74,11 @@ QString LongOperation::elapsedTimeVerbose() const
 
 void LongOperation::shellOut(const QString &s, bool newline)
 {
-    if (_lastLen > 0) {
-        int w = shell->out().fieldWidth();
-        shell->out() << qSetFieldWidth(_lastLen) << qPrintable(s)
-                     << qSetFieldWidth(w);
-    }
-    else
-        shell->out() << qPrintable(s);
+
+    shell->out() << qPrintable(s);
+    int len = s.size();
+    if (_lastLen > len)
+        shell->out() << qPrintable(QString(_lastLen - len, QChar(' ')));
 
     if (newline) {
         shell->out() << endl;
@@ -88,7 +86,7 @@ void LongOperation::shellOut(const QString &s, bool newline)
     }
     else {
         shell->out() << flush;
-        _lastLen = s.length();
+        _lastLen = len;
     }
 }
 
