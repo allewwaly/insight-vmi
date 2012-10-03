@@ -760,7 +760,7 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 	case hsUnionType:
 		return info.id() != 0;
 	case hsTypedef:
-		return info.id() != 0 && info.refTypeId() != 0 && !info.name().isEmpty();
+		return info.id() != 0 && !info.name().isEmpty();
 	case hsVariable:
 		return info.id() != 0 && (info.location() > 0 || info.external());
 	case hsVolatileType:
