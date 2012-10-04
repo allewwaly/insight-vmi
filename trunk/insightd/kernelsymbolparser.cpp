@@ -351,6 +351,7 @@ void KernelSymbolParser::WorkerThread::parseParam(const ParamSymbolType param,
     case psInline: {
         if (!rxBound.exactMatch(value))
             parserError(QString(str::regexErrorMsg).arg(rxBound.pattern()).arg(value));
+
         parseInt(i, rxBound.cap(1), &ok);
         _info->setInlined(i != 0);
         break;
@@ -380,8 +381,12 @@ void KernelSymbolParser::WorkerThread::parseParam(const ParamSymbolType param,
         // This can be decimal or integer encoded
         else if (!rxBound.exactMatch(value))
             parserError(QString(str::regexErrorMsg).arg(rxBound.pattern()).arg(value));
-        parseInt(i, rxBound.cap(1), &ok);
-        _info->addUpperBound(i);
+        if (rxBound.cap(1).startsWith("0x"))
+            parseInt16(i, rxBound.cap(1), &ok);
+        else
+            parseInt(i, rxBound.cap(1), &ok);
+        if (i > 0)
+            _info->addUpperBound(i);
         break;
     }
     case psExternal: {
@@ -466,6 +471,7 @@ void KernelSymbolParser::WorkerThread::parse(QIODevice* from)
         delete _infos.pop();
     _info = _infos.top();
     _info->clear();
+    _parentInfo = 0;
 
     _hdrSym = hsUnknownSymbol;
 
@@ -624,7 +630,7 @@ void KernelSymbolParser::parse()
     operationStarted();
     _durationLastFileFinished = _duration;
 
-    shell->out() << "Collecting list of files to process: " << flush;
+    shellOut("Collecting list of files to process: ", false);
 
 //#define DEBUG_SYM_PARSING 1
 
@@ -666,7 +672,7 @@ void KernelSymbolParser::parse()
 
     _factory->setOrigSymFiles(_fileNames);
 
-    shell->out() << _fileNames.size() << " files found." << endl;
+    shellOut(QString("%1 files found.").arg(_fileNames.size()), true);
 
     // Create worker threads, limited to single-threading for debugging
 #if defined(DEBUG_SYM_PARSING)
@@ -701,7 +707,10 @@ void KernelSymbolParser::parse()
             .arg(elapsedTimeVerbose());
     shellOut(s, true);
 
+
+    shellOut("Post-processing symbols... ", false);
     _factory->symbolsFinished(SymFactory::rtParsing);
+    shellOut("done.", true);
 
     // In case there were errors, show the user some information
     if (BugReport::log()) {
