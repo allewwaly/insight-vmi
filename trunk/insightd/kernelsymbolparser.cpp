@@ -127,7 +127,9 @@ KernelSymbolParser::WorkerThread::~WorkerThread()
 void KernelSymbolParser::WorkerThread::run()
 {
     QString currentFile;
-    QMutexLocker lock(&_parser->_filesMutex);
+    QMutexLocker filesLock(&_parser->_filesMutex);
+    QMutexLocker facLock(&_parser->_factoryMutex);
+    facLock.unlock();
     _stopExecution = false;
 
     while (!_stopExecution && !shell->interrupted() &&
@@ -142,13 +144,20 @@ void KernelSymbolParser::WorkerThread::run()
             _parser->operationProgress();
         else
             _parser->checkOperationProgress();
-        lock.unlock();
+        filesLock.unlock();
 
         _infos.top()->setFileIndex(_curFileIndex);
         parseFile(_parser->_srcDir.absoluteFilePath(currentFile));
         _parser->_binBytesRead += QFileInfo(_parser->_srcDir, currentFile).size();
+        _parser->_durationLastFileFinished = _parser->_duration;
 
-        lock.relock();
+        // Remove externally declared variables, for which we have full
+        // declarations
+        facLock.relock();
+        _parser->_factory->scanExternalVars(false);
+        facLock.unlock();
+
+        filesLock.relock();
     }
 }
 
@@ -554,14 +563,15 @@ void KernelSymbolParser::WorkerThread::parse(QIODevice* from)
 /******************************************************************************/
 
 KernelSymbolParser::KernelSymbolParser(SymFactory *factory)
-    : _factory(factory)
+    : _factory(factory), _durationLastFileFinished(0)
 {
 }
 
 
 KernelSymbolParser::KernelSymbolParser(const QString& srcPath,
                                        SymFactory* factory)
-    : _srcPath(srcPath), _factory(factory), _srcDir(srcPath), _filesIndex(0)
+    : _srcPath(srcPath), _factory(factory), _srcDir(srcPath), _filesIndex(0),
+      _durationLastFileFinished(0)
 {
 }
 
@@ -612,30 +622,45 @@ void KernelSymbolParser::parse()
     cleanUpThreads();
 
     operationStarted();
-    _prevDuration = _duration;
-    _remainingSec = -1;
+    _durationLastFileFinished = _duration;
 
     shell->out() << "Collecting list of files to process: " << flush;
+
+//#define DEBUG_SYM_PARSING 1
 
     // Collect files to process along with their size
     _filesIndex = 0;
     _fileNames.clear();
+#if defined(DEBUG_SYM_PARSING)
+    _binBytesTotal = 0;
+#else
     _fileNames.append(_srcDir.relativeFilePath("vmlinux"));
     _binBytesTotal = QFileInfo(_srcDir, "vmlinux").size();
+#endif
     _binBytesRead = 0;
 
     QDirIterator dit(_srcPath, QDir::Files|QDir::NoSymLinks|QDir::NoDotAndDotDot,
                      QDirIterator::Subdirectories);
 
-    while (dit.hasNext()) {
+    while (!shell->interrupted() && dit.hasNext()) {
         dit.next();
         // Find all modules outside the lib/modules/ directory
         if (dit.fileInfo().suffix() == "ko" &&
-            !dit.fileInfo().filePath().contains("/lib/modules/")) {
+            !dit.fileInfo().filePath().contains("/lib/modules/")
+#if defined(DEBUG_SYM_PARSING)
+            && dit.fileInfo().baseName() == "gspca_ov534"
+#endif
+            )
+        {
             _fileNames.append(
                         _srcDir.relativeFilePath(
                             dit.fileInfo().absoluteFilePath()));
             _binBytesTotal += dit.fileInfo().size();
+
+#if defined(DEBUG_SYM_PARSING)
+            if (_fileNames.size() >= 4)
+                break;
+#endif
         }
     }
 
@@ -667,10 +692,7 @@ void KernelSymbolParser::parse()
 
     cleanUpThreads();
 
-    _factory->symbolsFinished(SymFactory::rtParsing);
-
     operationStopped();
-
     QString s = QString("\rParsed debugging symbols in %1 of %2 files "
                         "(%3 MB) in %4.")
             .arg(_filesIndex)
@@ -678,6 +700,8 @@ void KernelSymbolParser::parse()
             .arg(_binBytesRead >> 20)
             .arg(elapsedTimeVerbose());
     shellOut(s, true);
+
+    _factory->symbolsFinished(SymFactory::rtParsing);
 
     // In case there were errors, show the user some information
     if (BugReport::log()) {
@@ -698,14 +722,14 @@ void KernelSymbolParser::operationProgress()
 {
     QMutexLocker lock(&_progressMutex);
     float percent = _binBytesRead / (float) _binBytesTotal;
-    // Avoid too noisy timer updates
-    if (_duration > _prevDuration + 2000) {
-        _prevDuration = _duration;
-        _remainingSec = _binBytesRead > 0 ?
-                    (_prevDuration / percent * (1.0 - percent)) / 1000 : -1;
+    int remaining = -1;
+    if (percent > 0) {
+        remaining = _durationLastFileFinished / percent * (1.0 - percent);
+        remaining = (remaining - (_duration - _durationLastFileFinished)) / 1000;
     }
-    QString remaining = _remainingSec > 0 ?
-                QString("%1:%2").arg(_remainingSec / 60).arg(_remainingSec % 60, 2, 10, QChar('0')) :
+
+    QString remStr = remaining > 0 ?
+                QString("%1:%2").arg(remaining / 60).arg(remaining % 60, 2, 10, QChar('0')) :
                 QString("n/a");
 
     QString fileName = _currentFile;
@@ -714,7 +738,7 @@ void KernelSymbolParser::operationProgress()
             .arg(_fileNames.size())
             .arg((int)(percent * 100))
             .arg(elapsedTime())
-            .arg(remaining)
+            .arg(remStr)
             .arg(fileName);
     // Show no. of errors
     if (BugReport::log() && BugReport::log()->entries())

@@ -10,6 +10,7 @@
 
 #include <QPair>
 #include <QList>
+#include <QLinkedList>
 #include <QHash>
 #include <QMultiHash>
 #include <exception>
@@ -76,6 +77,9 @@ typedef QList<BaseType*> BaseTypeList;
 
 /// List of Variable elements
 typedef QList<Variable*> VariableList;
+
+/// Linked list of Variable elements
+typedef QLinkedList<Variable*> VariableLList;
 
 /// List of Structured elements
 typedef QList<Structured*> StructuredList;
@@ -507,6 +511,17 @@ public:
      */
     IdMapResult mapToOriginalId(int internalId);
 
+    /**
+     * Scans all external variable declarations in _externalVars for variables
+     * for which we have found a declaration. Those variables are removed then.
+     * If \æ insertRemaining is set to \c true, then all remaining variables
+     * will be inserted into the \vars list and the _externalVars list is
+     * cleared afterwards.
+     * @param insertRemaining inserts the remaining variables that have not yet
+     * been found into the _vars list
+     */
+    void scanExternalVars(bool insertRemaining);
+
 	QMultiHash<int, int> seenMagicNumbers;
 
 protected:
@@ -713,6 +728,14 @@ private:
      */
     bool resolveReferences(Structured* s);
 
+    /**
+     * Checks if the (externally declared) variable \a v is already contained
+     * in the list of variables.
+     * @param v variable to check
+     * @return \c true if found, \c false otherwise
+     */
+    bool varDeclAvailable(Variable* v) const;
+
     void insertUsedBy(ReferencingType* ref);
     void insertUsedBy(RefBaseType* rbt);
     void insertUsedBy(Variable* var);
@@ -760,13 +783,6 @@ private:
     void replaceType(const BaseType *oldType, BaseType* newType);
 
     /**
-     * Inserts all external variable declarations into the factory's symbols
-     * for which we do not have a declaration. Afterwards all remaining
-     * external variables are deleted and the _externalVars list is cleared.
-     */
-    void insertNewExternalVars();
-
-    /**
      * Tries to find a type equal to \a t based on its hash and the comparison
      * operator.
      * \note This function will \b not return \a t itself, only another type
@@ -778,7 +794,7 @@ private:
 
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
-	VariableList _externalVars;       ///< Holds all external Variable declarations
+	VariableLList _externalVars;      ///< Holds all external Variable declarations
 	VariableStringHash _varsByName;   ///< Holds all Variable objects, indexed by name
 	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
 	EnumStringHash _enumsByName;         ///< Holds all enumerator values, indexed by name

@@ -67,7 +67,7 @@ void SymFactory::clear()
 	_vars.clear();
 
 	// Delete all external variables
-	for (VariableList::iterator it = _externalVars.begin();
+	for (VariableLList::iterator it = _externalVars.begin();
 		 it != _externalVars.end(); ++it)
 	{
 		delete *it;
@@ -457,8 +457,11 @@ Variable* SymFactory::getVarInstance(const TypeInfo& info)
 {
 	Variable* var = new Variable(this, info);
 	// Do not add external declarations to the global lists
-	if (info.location() <= 0 && info.external()) {
-		_externalVars.append(var);
+	if (info.location() <= 0 && info.external()) {		
+		if (varDeclAvailable(var))
+			delete var;
+		else
+			_externalVars.append(var);
 		return 0;
 	}
 	else {
@@ -1304,29 +1307,44 @@ inline bool idLessThan(const BaseType* t1, const BaseType* t2)
 }
 
 
-void SymFactory::insertNewExternalVars()
+bool SymFactory::varDeclAvailable(Variable* v) const
 {
-    for (int i = 0; i < _externalVars.size(); ++i) {
-        Variable* v = _externalVars[i];
-        bool found = false;
-        if (!v->name().isEmpty()) {
-            VariableStringHash::const_iterator it = _varsByName.find(v->name());
-            for (; it != _varsByName.end() && it.key() == v->name(); ++it) {
-                Variable* other = it.value();
-                if (v->refType() && other->refType() &&
-                    *v->refType() == *other->refType())
-                {
-                    found = true;
-                    break;
-                }
+    if (!v->name().isEmpty()) {
+        VariableStringHash::const_iterator vit, ve = _varsByName.end();
+        for (vit = _varsByName.find(v->name()); vit != ve &&
+             vit.key() == v->name(); ++vit)
+        {
+            Variable* other = vit.value();
+            if (v->refType() && other->refType() &&
+                *v->refType() == *other->refType())
+            {
+                return true;
             }
         }
-        if (found)
-            delete v;
-        else
-            insert(v);
     }
-    _externalVars.clear();
+
+    return false;
+}
+
+
+void SymFactory::scanExternalVars(bool insertRemaining)
+{
+    VariableLList::iterator it = _externalVars.begin(), e = _externalVars.end();
+    while (it != e) {
+        Variable* v = *it;
+        if (varDeclAvailable(v)) {
+            delete v;
+            it = _externalVars.erase(it);
+        }
+        else {
+            if (insertRemaining)
+                insert(v);
+            ++it;
+        }
+    }
+
+    if (insertRemaining)
+        _externalVars.clear();
 }
 
 
@@ -1370,7 +1388,7 @@ void SymFactory::symbolsFinished(RestoreType rt)
 
     // Add all external variable declarations for which we don't have a
     // definition
-    insertNewExternalVars();
+    scanExternalVars(true);
 
     // Sort the types by ID
     qSort(_types.begin(), _types.end(), idLessThan);
