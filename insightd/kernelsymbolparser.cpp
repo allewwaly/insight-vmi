@@ -151,10 +151,12 @@ void KernelSymbolParser::WorkerThread::run()
         _parser->_binBytesRead += QFileInfo(_parser->_srcDir, currentFile).size();
         _parser->_durationLastFileFinished = _parser->_duration;
 
+        facLock.relock();
         // Remove externally declared variables, for which we have full
         // declarations
-        facLock.relock();
         _parser->_factory->scanExternalVars(false);
+        // Delete the reverse mappings for the finished file
+        _parser->_factory->clearIdRevMap(_curFileIndex);
         facLock.unlock();
 
         filesLock.relock();
@@ -381,8 +383,10 @@ void KernelSymbolParser::WorkerThread::parseParam(const ParamSymbolType param,
         // This can be decimal or integer encoded
         else if (!rxBound.exactMatch(value))
             parserError(QString(str::regexErrorMsg).arg(rxBound.pattern()).arg(value));
-        if (rxBound.cap(1).startsWith("0x"))
-            parseInt16(i, rxBound.cap(1), &ok);
+        if (rxBound.cap(1).startsWith("0x")) {
+            QString s = rxBound.cap(1);
+            parseInt16(i, s.right(s.size() - 2), &ok);
+        }
         else
             parseInt(i, rxBound.cap(1), &ok);
         if (i > 0)
@@ -652,11 +656,7 @@ void KernelSymbolParser::parse()
         dit.next();
         // Find all modules outside the lib/modules/ directory
         if (dit.fileInfo().suffix() == "ko" &&
-            !dit.fileInfo().filePath().contains("/lib/modules/")
-#if defined(DEBUG_SYM_PARSING)
-            && dit.fileInfo().baseName() == "gspca_ov534"
-#endif
-            )
+            !dit.fileInfo().filePath().contains("/lib/modules/"))
         {
             _fileNames.append(
                         _srcDir.relativeFilePath(
@@ -664,8 +664,8 @@ void KernelSymbolParser::parse()
             _binBytesTotal += dit.fileInfo().size();
 
 #if defined(DEBUG_SYM_PARSING)
-            if (_fileNames.size() >= 4)
-                break;
+//            if (_fileNames.size() >= 4)
+//                break;
 #endif
         }
     }
