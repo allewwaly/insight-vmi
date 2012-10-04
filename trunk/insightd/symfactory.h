@@ -172,7 +172,7 @@ inline uint qHash (const IdMapResult &key)
 }
 
 /// Maps internal to original symbol IDs
-typedef QHash<int, IdMapResult> IdMapping;
+typedef QList<IdMapResult> IdMapping;
 /// Maps original to internal symbol IDs
 typedef QHash<IdMapResult, int> IdRevMapping;
 
