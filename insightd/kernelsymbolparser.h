@@ -121,8 +121,7 @@ private:
     QMutex _filesMutex;
     QMutex _progressMutex;
     QMutex _factoryMutex;
-    int _prevDuration;
-    int _remainingSec;
+    int _durationLastFileFinished;
 };
 
 #endif /* KERNELSYMBOLPARSER_H_ */
