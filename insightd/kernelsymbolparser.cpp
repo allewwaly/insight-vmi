@@ -463,7 +463,7 @@ void KernelSymbolParser::WorkerThread::parse(QIODevice* from)
     bool ok;
     _curSrcID = -1;
     while (_infos.size() > 1)
-        delete _infos.top();
+        delete _infos.pop();
     _info = _infos.top();
     _info->clear();
 
