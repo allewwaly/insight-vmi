@@ -587,6 +587,14 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
 
     // Insert new ID/type relation into lookup tables
     assert(_typesById.contains(new_id) == false);
+    if (_typesById.contains(new_id)) {
+        IdMapResult idm = _idMapping[new_id];
+        debugmsg(QString("Double type: 0x%1, mapped to %2:0x%3")
+                 .arg(new_id, 0, 16)
+                 .arg(_origSymFiles[idm.fileIndex])
+                 .arg(idm.symId, 0, 16));
+//        debugmsg("foo");
+    }
 
     _typesById.insert(new_id, target);
     _equivalentTypes.insertMulti(target->id(), new_id);
