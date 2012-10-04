@@ -2835,7 +2835,7 @@ int SymFactory::mapToInternalArrayId(int localId, int boundsIndex)
     if (boundsIndex == 0)
         return localId;
 
-    if (!_idMapping.contains(localId))
+    if (localId <= 0 || localId >= _idMapping.size())
         factoryError(QString("Local ID 0x%1 does not exist.")
                         .arg(localId, 0, 16));
 
@@ -2865,22 +2865,22 @@ int SymFactory::mapToInternalId(const IdMapResult& mapping)
     if ( it != _idRevMapping.constEnd() )
         return it.value();
 
-    // New combination of fileIndx/symId, find a new internal ID
-    while (_idMapping.contains(_internalTypeId))
-        ++_internalTypeId;
+    // New combination of fileIndx/symId, find a new internal ID, but skip 0
+    if (_idMapping.isEmpty())
+        _idMapping.append(IdMapResult());
+    _internalTypeId = _idMapping.size();
 
-    _idMapping.insert(_internalTypeId, mapping);
+    _idMapping.append(mapping);
     _idRevMapping.insert(mapping, _internalTypeId);
 
-    return _internalTypeId++;
+    return _internalTypeId;
 }
 
 
 IdMapResult SymFactory::mapToOriginalId(int internalId)
 {
-    IdMapping::const_iterator it = _idMapping.find(internalId);
-    if (it != _idMapping.constEnd())
-        return it.value();
+    if (internalId > 0 && internalId < _idMapping.size())
+        return _idMapping[internalId];
     return IdMapResult();
 }
 
