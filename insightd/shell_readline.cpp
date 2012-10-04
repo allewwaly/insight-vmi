@@ -81,8 +81,9 @@ QString Shell::readLine(const QString& prompt)
             return QString();
         }
 
-        // Add the line to the history in interactive sessions
-        if (strlen(line) > 0)
+        // Add the line to the history in interactive sessions, if it was no
+        // emtpy line and no custom prompt
+        if (prompt.isEmpty() && strlen(line) > 0)
             add_history(line);
 
         ret = QString::fromLocal8Bit(line, strlen(line)).trimmed();
