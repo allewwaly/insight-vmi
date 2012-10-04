@@ -147,34 +147,39 @@ typedef QPair<qint32, const Enum*> IntEnumPair;
 typedef QHash<QString, IntEnumPair> EnumStringHash;
 
 /**
- * This struct describes a symbol reference to debugging symbols. *
+ * This struct describes a symbol reference to debugging symbols.
  */
-struct IdMapResult {
-    IdMapResult() : fileIndex(-1), symId(0) {}
-    IdMapResult(int fileIndex, int symId) : fileIndex(fileIndex), symId(symId) {}
-
-    bool operator==(const IdMapResult& other) const
-    {
-        return (other.fileIndex == fileIndex) && (other.symId == symId);
-    }
+struct IdMapBucket
+{
+    IdMapBucket() : fileIndex(-1), symId(0) {}
+    IdMapBucket(int fileIndex, int symId) : fileIndex(fileIndex), symId(symId) {}
 
     int fileIndex; ///< index of the file in which the symbol was found
     int symId;     ///< the original symbol ID within that file
 };
 
+typedef QHash<int, int> IdIdMapping;
+
 /**
- * Hashes an IdMapResult object for usage in a QHash.
- * @param key
+ * This struct holds the original-to-local ID mappings for one particular symbol
+ * file, referenced by IdRevMapBucket::fileIndex.
  */
-inline uint qHash (const IdMapResult &key)
+struct IdRevMapBucket
 {
-    return qHash((((quint64)key.fileIndex) << 32) | key.symId);
-}
+    /// Constructor
+    IdRevMapBucket() : fileIndex(-1) {}
+
+    /// Deletes all local data and resets to default values.
+    void clear() { fileIndex = -1; map.clear(); }
+
+    int fileIndex;    ///< index of file where this symbol was read from
+    IdIdMapping map;  ///< maps original to local IDs for this file
+};
 
 /// Maps internal to original symbol IDs
-typedef QList<IdMapResult> IdMapping;
+typedef QList<IdMapBucket> IdMapping;
 /// Maps original to internal symbol IDs
-typedef QHash<IdMapResult, int> IdRevMapping;
+typedef QVector<IdRevMapBucket> IdRevMapping;
 
 
 #define SYMFACTORY_DEFINED 1
@@ -276,6 +281,14 @@ public:
 	 * @param info
 	 */
 	void mapToInternalIds(TypeInfo& info);
+
+	/**
+	 * Deletes all original-to-local ID mappings parsed from the given file.
+	 * Call this function after all symbols have been parsed for a particular
+	 * file to reduce memory consumption.
+	 * @param fileIndex index of the symbol file to clear the mappings
+	 */
+	void clearIdRevMap(int fileIndex);
 
 	/**
 	 * Creates a new symbol based on the information provided in \a info and
@@ -500,7 +513,7 @@ public:
      * @return a unique ID > 0
      * \sa mapToOriginalId(), mapToInternalArrayId()
      */
-    int mapToInternalId(const IdMapResult& mapping);
+    int mapToInternalId(const IdMapBucket& mapping);
 
     /**
      * Retrieve the original symbol ID and file index that the symbol identified
@@ -509,7 +522,7 @@ public:
      * @return the original symbol ID and file index
      * \sa mapToInternalId(), mapToInternalArrayId()
      */
-    IdMapResult mapToOriginalId(int internalId);
+    IdMapBucket mapToOriginalId(int internalId);
 
     /**
      * Scans all external variable declarations in _externalVars for variables
@@ -823,7 +836,6 @@ private:
 	int _varTypeChanges;
 	int _ambiguesAltTypes;
 	int _artificialTypeId;
-	int _internalTypeId;
 	quint32 _changeClock;
 	quint32 _maxTypeSize;
 	QMutex _typeAltUsageMutex;

@@ -39,7 +39,7 @@
 
 SymFactory::SymFactory(const MemSpecs& memSpecs)
 	: _memSpecs(memSpecs), _typeFoundByHash(0), _artificialTypeId(-1),
-	  _internalTypeId(1), _changeClock(0), _maxTypeSize(0)
+	  _changeClock(0), _maxTypeSize(0)
 {
 }
 
@@ -103,6 +103,9 @@ void SymFactory::clear()
 	_zeroSizeStructs.clear();
 	_varsByName.clear();
 	_varsById.clear();
+	_idMapping.clear();
+	_idRevMapping.clear();
+	_idRevMapping.reserve(QThread::idealThreadCount());
 
 	// Reset other vars
 	_typeFoundByHash = 0;
@@ -113,7 +116,6 @@ void SymFactory::clear()
 	_typesCopied = 0;
 	_ambiguesAltTypes = 0;
 	_artificialTypeId = -1;
-	_internalTypeId = 1;
 	_changeClock = 0;
 }
 
@@ -588,11 +590,12 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
     // Insert new ID/type relation into lookup tables
     assert(_typesById.contains(new_id) == false);
     if (_typesById.contains(new_id)) {
-        IdMapResult idm = _idMapping[new_id];
-        debugmsg(QString("Double type: 0x%1, mapped to %2:0x%3")
-                 .arg(new_id, 0, 16)
+        IdMapBucket idm = _idMapping[new_id];
+        debugmsg(QString("Double type: %1, mapped to %2:0x%3 (latest ID is %4)")
+                 .arg(new_id)
                  .arg(_origSymFiles[idm.fileIndex])
-                 .arg(idm.symId, 0, 16));
+                 .arg(idm.symId, 0, 16)
+                 .arg(_idMapping.size()));
 //        debugmsg("foo");
     }
 
@@ -2847,7 +2850,7 @@ int SymFactory::mapToInternalArrayId(int localId, int boundsIndex)
         factoryError(QString("Local ID 0x%1 does not exist.")
                         .arg(localId, 0, 16));
 
-    IdMapResult mapping = _idMapping[localId];
+    IdMapBucket mapping = _idMapping[localId];
 
     // We add boundsIndex to orig. ID to derive new ID
     mapping.symId += boundsIndex;
@@ -2858,38 +2861,59 @@ int SymFactory::mapToInternalArrayId(int localId, int boundsIndex)
 
 int SymFactory::mapToInternalId(int fileIndex, int origSymId)
 {
-    return mapToInternalId(IdMapResult(fileIndex, origSymId));
+    return mapToInternalId(IdMapBucket(fileIndex, origSymId));
 }
 
 
-int SymFactory::mapToInternalId(const IdMapResult& mapping)
+int SymFactory::mapToInternalId(const IdMapBucket& mapping)
 {
     // Map zero to zero
     if (!mapping.symId)
         return 0;
 
+    int i = 0, freeIdx = -1;
+    // Find the revmap bucket for the given file index
+    while (i < _idRevMapping.size()) {
+        if (_idRevMapping[i].fileIndex == mapping.fileIndex)
+            break;
+        else if (_idRevMapping[i].fileIndex < 0)
+            freeIdx = i;
+        ++i;
+    }
+    // If we did not find the bucket, we have to create it
+    if (i >= _idRevMapping.size()) {
+        // Can we reuse a bucket?
+        if (freeIdx >= 0)
+            i = freeIdx;
+        // No, so enlarge the vector
+        else
+            _idRevMapping.resize(i + 1);
+        // Set the file index
+        _idRevMapping[i].fileIndex = mapping.fileIndex;
+    }
+
     // Is this ID already mapped?
-    IdRevMapping::const_iterator it = _idRevMapping.find(mapping);
-    if ( it != _idRevMapping.constEnd() )
+    IdIdMapping::const_iterator it = _idRevMapping[i].map.find(mapping.symId);
+    if (it != _idRevMapping[i].map.constEnd())
         return it.value();
 
     // New combination of fileIndx/symId, find a new internal ID, but skip 0
     if (_idMapping.isEmpty())
-        _idMapping.append(IdMapResult());
-    _internalTypeId = _idMapping.size();
+        _idMapping.append(IdMapBucket());
+    int internalTypeId = _idMapping.size();
 
     _idMapping.append(mapping);
-    _idRevMapping.insert(mapping, _internalTypeId);
+    _idRevMapping[i].map.insert(mapping.symId, internalTypeId);
 
-    return _internalTypeId;
+    return internalTypeId;
 }
 
 
-IdMapResult SymFactory::mapToOriginalId(int internalId)
+IdMapBucket SymFactory::mapToOriginalId(int internalId)
 {
     if (internalId > 0 && internalId < _idMapping.size())
         return _idMapping[internalId];
-    return IdMapResult();
+    return IdMapBucket();
 }
 
 
@@ -2906,6 +2930,18 @@ void SymFactory::mapToInternalIds(TypeInfo &info)
     // Map source file's ID
     if (info.srcFileId()) {
         info.setSrcFileId(mapToInternalId(info.fileIndex(), info.srcFileId()));
+    }
+}
+
+
+void SymFactory::clearIdRevMap(int fileIndex)
+{
+    // Find the revmap bucket for the given file index
+    for (int i = 0; i < _idRevMapping.size(); ++i) {
+        if (_idRevMapping[i].fileIndex == fileIndex) {
+            _idRevMapping[i].clear();
+            return;
+        }
     }
 }
 

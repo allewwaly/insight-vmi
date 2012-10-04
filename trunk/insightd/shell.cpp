@@ -2483,7 +2483,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
 		 << color(ctReset) << "0x" << hex << t->hash() << dec << endl;
 #endif
 
-    IdMapResult mapping = _sym.factory().mapToOriginalId(t->id());
+    IdMapBucket mapping = _sym.factory().mapToOriginalId(t->id());
     if (mapping.fileIndex >= 0 &&
         mapping.fileIndex < _sym.factory().origSymFiles().size())
     {
@@ -2763,7 +2763,7 @@ int Shell::cmdShowVariable(const Variable* v)
              << v->altRefType(i).expr()->toString(true) << endl;
     }
 
-    IdMapResult mapping = _sym.factory().mapToOriginalId(v->id());
+    IdMapBucket mapping = _sym.factory().mapToOriginalId(v->id());
     if (mapping.fileIndex >= 0 &&
         mapping.fileIndex < _sym.factory().origSymFiles().size())
     {
