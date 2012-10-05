@@ -148,8 +148,11 @@ void KernelSymbolParser::WorkerThread::run()
 
         _infos.top()->setFileIndex(_curFileIndex);
         parseFile(_parser->_srcDir.absoluteFilePath(currentFile));
+
+        filesLock.relock();
         _parser->_binBytesRead += QFileInfo(_parser->_srcDir, currentFile).size();
         _parser->_durationLastFileFinished = _parser->_duration;
+        filesLock.unlock();
 
         facLock.relock();
         // Remove externally declared variables, for which we have full
@@ -333,7 +336,6 @@ void KernelSymbolParser::WorkerThread::parseParam(const ParamSymbolType param,
         // If the regex did not match, it must be a local variable
         else if (_hdrSym == hsVariable) {
             _info->clear();
-            _isRelevant = false;
         }
         // Ignore location for parameters
         else if (_hdrSym == hsFormalParameter) {
@@ -505,69 +507,83 @@ void KernelSymbolParser::WorkerThread::parse(QIODevice* from)
             if (len < 30 || line.isEmpty() || (line[0] != '<' && (line[0] != 'D' && line[1] != 'W')))
                 continue;
 
-            // First see if a new header starts
-            if (rxHdr.exactMatch(line)) {
+            try {
+                // First see if a new header starts
+                if (rxHdr.exactMatch(line)) {
 
-                // If the symbol does not exist in the hash, it will return 0, which
-                // corresponds to hsUnknownSymbol.
-                _hdrSym = hdrMap.value(rxHdr.cap(2));
-                if (_hdrSym == hsUnknownSymbol)
-                    parserError(QString("Unknown debug symbol type encountered: %1").arg(rxHdr.cap(2)));
-                parseInt16(_nextId, rxHdr.cap(1), &ok);
+                    // If the symbol does not exist in the hash, it will return 0, which
+                    // corresponds to hsUnknownSymbol.
+                    _hdrSym = hdrMap.value(rxHdr.cap(2));
+                    if (_hdrSym == hsUnknownSymbol)
+                        parserError(QString("Unknown debug symbol type "
+                                            "encountered: %1").arg(rxHdr.cap(2)));
+                    parseInt16(_nextId, rxHdr.cap(1), &ok);
 
-                // Finish the last symbol before we continue parsing
-                finishLastSymbol();
+                    // Finish the last symbol before we continue parsing
+                    try {
+                        finishLastSymbol();
+                    }
+                    catch (...) {
+                        // Don't process this symbol again
+                        _info->setIsRelevant(false);
+                        throw;
+                    }
 
-                switch(_parentInfo ? _parentInfo->symType() : hsUnknownSymbol) {
-                // For functions parse parameters but ignore local variables
-                case hsSubprogram:
-                    _info->setIsRelevant(_hdrSym & ~hsVariable &
-                                         (RelevantHdr|hsFormalParameter));
-                    break;
-                    // For inlined functions ignore parameters and local variables
-                case hsInlinedSubroutine:
-                    _info->setIsRelevant(_hdrSym & ~hsVariable & RelevantHdr);
-                    break;
-                    // For functions pointers parse the parameters
-                case hsSubroutineType:
-                    _info->setIsRelevant(_hdrSym &
-                                         (RelevantHdr|hsFormalParameter));
-                    break;
-                    // Default parsing
-                default:
-                    _info->setIsRelevant(_hdrSym & RelevantHdr);
-                    break;
+                    switch(_parentInfo ? _parentInfo->symType() : hsUnknownSymbol) {
+                    // For functions parse parameters but ignore local variables
+                    case hsSubprogram:
+                        _info->setIsRelevant(_hdrSym & ~hsVariable &
+                                             (RelevantHdr|hsFormalParameter));
+                        break;
+                        // For inlined functions ignore parameters and local variables
+                    case hsInlinedSubroutine:
+                        _info->setIsRelevant(_hdrSym & ~hsVariable & RelevantHdr);
+                        break;
+                        // For functions pointers parse the parameters
+                    case hsSubroutineType:
+                        _info->setIsRelevant(_hdrSym &
+                                             (RelevantHdr|hsFormalParameter));
+                        break;
+                        // Default parsing
+                    default:
+                        _info->setIsRelevant(_hdrSym & RelevantHdr);
+                        break;
+                    }
+
+                    // Are we interested in this symbol?
+                    if (_info->isRelevant()) {
+                        _info->setSymType(_hdrSym);
+                        parseInt16(i, rxHdr.cap(1), &ok);
+                        _info->setId(i);
+                        _info->setOrigId(i);
+                        // If this is a compile unit, save its ID locally
+                        if (_hdrSym == hsCompileUnit)
+                            _curSrcID = _info->id();
+                    }
                 }
+                // Next see if this matches a parameter
+                else if (_info->isRelevant() && rxParam.exactMatch(line)) {
+                    paramSym = paramMap.value(rxParam.cap(1));
 
-                // Are we interested in this symbol?
-                if (_info->isRelevant()) {
-                    _info->setSymType(_hdrSym);
-                    parseInt16(i, rxHdr.cap(1), &ok);
-                    _info->setId(i);
-                    _info->setOrigId(i);
-                    // If this is a compile unit, save its ID locally
-                    if (_hdrSym == hsCompileUnit)
-                        _curSrcID = _info->id();
+                    // Are we interested in this parameter?
+                    if (paramSym & RelevantParam)
+                        parseParam(paramSym, rxParam.cap(2));
                 }
             }
-            // Next see if this matches a parameter
-            else if (_info->isRelevant() && rxParam.exactMatch(line)) {
-                paramSym = paramMap.value(rxParam.cap(1));
-
-                // Are we interested in this parameter?
-                if (paramSym & RelevantParam)
-                    parseParam(paramSym, rxParam.cap(2));
+            catch (GenericException& e) {
+                QString msg = QString("%0: %1\n\n").arg(e.className()).arg(e.message);
+                BugReport::reportErr(msg, e.file, e.line);
             }
         }
+
+        // Finish the last symbol, if required
+        if (_info->isRelevant())
+            finishLastSymbol();
     }
     catch (GenericException& e) {
         QString msg = QString("%0: %1\n\n").arg(e.className()).arg(e.message);
         BugReport::reportErr(msg, e.file, e.line);
     }
-
-    // Finish the last symbol, if required
-    if (_isRelevant)
-        finishLastSymbol();
 }
 
 
@@ -692,7 +708,7 @@ void KernelSymbolParser::parse()
     // Show progress while parsing is not finished
     for (int i = 0; i < THREAD_COUNT; ++i)
         while (!_threads[i]->wait(250))
-            checkOperationProgress();   s
+            checkOperationProgress();
 
     cleanUpThreads();
 
