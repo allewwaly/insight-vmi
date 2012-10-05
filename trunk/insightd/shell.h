@@ -218,6 +218,11 @@ public:
     QString prettyNameInColor(const BaseType* t, int minLen = 0,
                               int maxLen = 0) const;
 
+    /**
+     * Saves the command line history to the history file.
+     */
+    void saveShellHistory();
+
 protected:
     /**
      * Starts the interactive shell and does not return until the user invokes
@@ -284,7 +289,6 @@ private:
                             bool printAlt = true, size_t offset = 0);
     void prepare();
     void prepareReadline();
-    void saveShellHistory();
     void cleanupPipedProcs();
     QStringList splitIntoPipes(QString command) const;
     QStringList splitIntoWords(QString command) const;
