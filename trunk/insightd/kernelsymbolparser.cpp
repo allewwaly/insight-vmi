@@ -387,7 +387,8 @@ void KernelSymbolParser::WorkerThread::parseParam(const ParamSymbolType param,
             parserError(QString(str::regexErrorMsg).arg(rxBound.pattern()).arg(value));
         if (rxBound.cap(1).startsWith("0x")) {
             QString s = rxBound.cap(1);
-            parseInt16(i, s.right(s.size() - 2), &ok);
+            parseULongLong16(ul, s.right(s.size() - 2), &ok);
+            i = (ul > 0x7FFFFFFFUL) ? -1 : ul;
         }
         else
             parseInt(i, rxBound.cap(1), &ok);
