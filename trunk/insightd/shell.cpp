@@ -2486,7 +2486,7 @@ int Shell::cmdShowBaseType(const BaseType* t)
     if (t->origFileIndex() >= 0) {
         _out << color(ctColHead) << "  Orig. sym. ID:  " << color(ctReset)
              << t->origFileName()
-             << ":0x" << hex << (uint)t->origId() << dec << endl;
+             << " <" << hex << (uint)t->origId() << dec << ">" << endl;
     }
 
 	if (t->srcFile() >= 0 && _sym.factory().sources().contains(t->srcFile())) {
@@ -2763,7 +2763,7 @@ int Shell::cmdShowVariable(const Variable* v)
     if (v->origFileIndex() >= 0) {
         _out << color(ctColHead) << "  Orig. sym. ID:  " << color(ctReset)
              << v->origFileName()
-             << ":0x" << hex << (uint)v->origId() << dec << endl;
+             << " <" << hex << (uint)v->origId() << dec << ">" << endl;
     }
 
 	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {
