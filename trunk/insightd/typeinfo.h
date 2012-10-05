@@ -233,6 +233,9 @@ public:
     int id() const;
     void setId(int id);
 
+    int origId() const;
+    void setOrigId(int id);
+
     int refTypeId() const;
     void setRefTypeId(int refTypeID);
 
@@ -299,6 +302,7 @@ private:
 	int _srcFileId;          ///< holds the ID of the source file
 	int _srcLine;            ///< holds the line number within the source file
 	int _id;                 ///< holds the ID of this symbol
+	int _origId;             ///< holds the original ID of this symbol
 	int _refTypeId;          ///< holds the ID of the referenced symbol
 	quint32 _byteSize;       ///< holds the size in byte of this symbol
 	int _bitSize;            ///< holds the number of bits for a bit-split struct

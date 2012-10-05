@@ -141,22 +141,9 @@ struct FoundBaseTypes
     const ASTType* astTypeNonPtr;
 };
 
-//typedef QList<FoundBaseType> FoundBaseTypes;
 
 typedef QPair<qint32, const Enum*> IntEnumPair;
 typedef QHash<QString, IntEnumPair> EnumStringHash;
-
-/**
- * This struct describes a symbol reference to debugging symbols.
- */
-struct IdMapBucket
-{
-    IdMapBucket() : fileIndex(-1), symId(0) {}
-    IdMapBucket(int fileIndex, int symId) : fileIndex(fileIndex), symId(symId) {}
-
-    int fileIndex; ///< index of the file in which the symbol was found
-    int symId;     ///< the original symbol ID within that file
-};
 
 typedef QHash<int, int> IdIdMapping;
 
@@ -176,8 +163,6 @@ struct IdRevMapBucket
     IdIdMapping map;  ///< maps original to local IDs for this file
 };
 
-/// Maps internal to original symbol IDs
-typedef QList<IdMapBucket> IdMapping;
 /// Maps original to internal symbol IDs
 typedef QVector<IdRevMapBucket> IdRevMapping;
 
@@ -487,12 +472,15 @@ public:
     /**
      * Retrieves or generates a unique, internal type ID (> 0) for usage in
      * multi-dimensional arrays.
+     * @param origId the original ID assigned to the Array type
+     * @param origFileIndex the index of the file this the array was found in
      * @param localId the local ID assigned to the Array type
      * @param boundsIndex the dimonsion index
      * @return a unique ID > 0, computed with: localId + boundsIndex
      * \sa getInternalTypeId()
      */
-    int mapToInternalArrayId(int localId, int boundsIndex);
+    int mapToInternalArrayId(int origId, int origFileIndex,
+                             int localId, int boundsIndex);
 
     /**
      * Retrieves the internal type ID (> 0) for the given combination of
@@ -504,25 +492,6 @@ public:
      * \sa mapToOriginalId(), mapToInternalArrayId()
      */
     int mapToInternalId(int fileIndex, int origSymId);
-
-    /**
-     * Retrieves the internal type ID (> 0) for the given combination of
-     * original ID and file index in \a mapping. If that mapping does not yet
-     * exist, a new unique ID is generated for it.
-     * @param mapping the original symbol ID and index of the file it was found
-     * @return a unique ID > 0
-     * \sa mapToOriginalId(), mapToInternalArrayId()
-     */
-    int mapToInternalId(const IdMapBucket& mapping);
-
-    /**
-     * Retrieve the original symbol ID and file index that the symbol identified
-     * by \a internalId was mapped to.
-     * @param internalId the internal ID of a symbol
-     * @return the original symbol ID and file index
-     * \sa mapToInternalId(), mapToInternalArrayId()
-     */
-    IdMapBucket mapToOriginalId(int internalId);
 
     /**
      * Scans all external variable declarations in _externalVars for variables
@@ -825,7 +794,6 @@ private:
 	FuncParamMultiHash _usedByFuncParams;///< Holds all FuncParam objects that hold a reference to another type
 	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
 	ASTExpressionList _expressions;
-	IdMapping _idMapping;             ///< Maps internal to original symbol IDs
 	IdRevMapping _idRevMapping;       ///< Maps original to internal IDs
 	QStringList _origSymFiles;        ///< List of executable files the symbols were obtained from
 
@@ -836,6 +804,7 @@ private:
 	int _varTypeChanges;
 	int _ambiguesAltTypes;
 	int _artificialTypeId;
+	int _internalTypeId;
 	quint32 _changeClock;
 	quint32 _maxTypeSize;
 	QMutex _typeAltUsageMutex;

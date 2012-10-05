@@ -328,6 +328,10 @@ void KernelSymbolWriter::write()
 #endif
             checkOperationProgress();
         }
+
+        // Since version 17: Write file names containing the orig. symbols
+        if (out.kSymVersion() >= kSym::VERSION_17)
+            out <<_factory->origSymFiles();
     }
     catch (...) {
         // Exceptional cleanup

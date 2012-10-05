@@ -2483,13 +2483,10 @@ int Shell::cmdShowBaseType(const BaseType* t)
 		 << color(ctReset) << "0x" << hex << t->hash() << dec << endl;
 #endif
 
-    IdMapBucket mapping = _sym.factory().mapToOriginalId(t->id());
-    if (mapping.fileIndex >= 0 &&
-        mapping.fileIndex < _sym.factory().origSymFiles().size())
-    {
+    if (t->origFileIndex() >= 0) {
         _out << color(ctColHead) << "  Orig. sym. ID:  " << color(ctReset)
-             << _sym.factory().origSymFiles().at(mapping.fileIndex)
-             << ":0x" << hex << mapping.symId << dec << endl;
+             << t->origFileName()
+             << ":0x" << hex << (uint)t->origId() << dec << endl;
     }
 
 	if (t->srcFile() >= 0 && _sym.factory().sources().contains(t->srcFile())) {
@@ -2763,13 +2760,10 @@ int Shell::cmdShowVariable(const Variable* v)
              << v->altRefType(i).expr()->toString(true) << endl;
     }
 
-    IdMapBucket mapping = _sym.factory().mapToOriginalId(v->id());
-    if (mapping.fileIndex >= 0 &&
-        mapping.fileIndex < _sym.factory().origSymFiles().size())
-    {
+    if (v->origFileIndex() >= 0) {
         _out << color(ctColHead) << "  Orig. sym. ID:  " << color(ctReset)
-             << _sym.factory().origSymFiles().at(mapping.fileIndex)
-             << ":0x" << hex << mapping.symId << dec << endl;
+             << v->origFileName()
+             << ":0x" << hex << (uint)v->origId() << dec << endl;
     }
 
 	if (v->srcFile() > 0 && _sym.factory().sources().contains(v->srcFile())) {

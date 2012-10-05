@@ -452,6 +452,13 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
             v->readAltRefTypesFrom(in, _factory);
             checkOperationProgress();
         }
+
+        // Since version 17: Read file names containing the orig. symbols
+        if (in.kSymVersion() >= kSym::VERSION_17) {
+            QStringList fileNames;
+            in >> fileNames;
+            _factory->setOrigSymFiles(fileNames);
+        }
     }
     catch (...) {
         // Exceptional cleanup
