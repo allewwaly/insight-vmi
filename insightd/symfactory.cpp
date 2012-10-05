@@ -540,7 +540,7 @@ QList<BaseType*> SymFactory::typesUsingId(int id) const
     QList<int> typeIds = equivalentTypes(id);
     if (typeIds.isEmpty())
         typeIds += id;
-    QList<BaseType*> ret;
+    QSet<BaseType*> ret;
 
     for (int i = 0; i < typeIds.size(); ++i) {
         for (RefBaseTypeMultiHash::const_iterator it = _usedByRefTypes.find(typeIds[i]);
@@ -552,7 +552,7 @@ QList<BaseType*> SymFactory::typesUsingId(int id) const
             ret += it.value()->belongsTo();
     }
 
-    return ret;
+    return ret.toList();
 }
 
 
@@ -1792,7 +1792,7 @@ void SymFactory::insertUsedBy(ReferencingType* ref)
 
 void SymFactory::insertUsedBy(RefBaseType* rbt)
 {
-    if (!rbt || _usedByRefTypes.contains(rbt->refTypeId(), rbt))
+    if (!rbt)
         return;
     _usedByRefTypes.insertMulti(rbt->refTypeId(), rbt);
 }
@@ -1800,7 +1800,7 @@ void SymFactory::insertUsedBy(RefBaseType* rbt)
 
 void SymFactory::insertUsedBy(Variable* var)
 {
-    if (!var || _usedByVars.contains(var->refTypeId(), var))
+    if (!var)
         return;
     _usedByVars.insertMulti(var->refTypeId(), var);
 }
@@ -1808,7 +1808,7 @@ void SymFactory::insertUsedBy(Variable* var)
 
 void SymFactory::insertUsedBy(StructuredMember* m)
 {
-    if (!m || _usedByStructMembers.contains(m->refTypeId(), m))
+    if (!m)
         return;
     _usedByStructMembers.insertMulti(m->refTypeId(), m);
 }
@@ -1816,7 +1816,7 @@ void SymFactory::insertUsedBy(StructuredMember* m)
 
 void SymFactory::insertUsedBy(FuncParam* param)
 {
-    if (!param || _usedByFuncParams.contains(param->refTypeId(), param))
+    if (!param)
         return;
     _usedByFuncParams.insertMulti(param->refTypeId(), param);
 }
