@@ -98,3 +98,15 @@ void LongOperation::shellErr(const QString &s)
 }
 
 
+QString LongOperation::bytesToString(qint64 byteSize)
+{
+    static const int MAX_UNIT = 4;
+    static const char* units[MAX_UNIT+1] = { " byte", " kB", " MB", " GB", " TB" };
+    int unit = 0;
+    while (byteSize > (1UL << 12) && unit < MAX_UNIT) {
+        byteSize >>= 10;
+        ++unit;
+    }
+
+    return QString::number(byteSize) + units[unit];
+}

@@ -341,22 +341,21 @@ void KernelSymbolWriter::write()
     }
 
     operationStopped();
-    shell->out() << "\rWriting symbols finished";
+
+    QString s("\rReading symbols finished");
     if (!_to->isSequential())
-        shell->out() << " ("
-        << _to->pos() << " bytes written)";
-    shell->out() << "." << endl;
+        s += QString(" (%1 read)").arg(bytesToString(_to->pos()));
+    s += ".";
+    shellOut(s, true);
 }
 
 
 // Show some progress information
 void KernelSymbolWriter::operationProgress()
 {
-    shell->out() << "\rWriting symbols";
-
-    qint64 pos = _to->pos();
-    if (!_to->isSequential() && pos > 0)
-        shell->out()
-            << " (" << pos << " bytes)";
-    shell->out() << ", " << elapsedTime() << " elapsed" << flush;
+    QString s("\rWriting symbols");
+    if (!_to->isSequential())
+        s += QString(" (%1 read)").arg(bytesToString(_to->pos()));
+    s += ", " + elapsedTime() + " elapsed";
+    shellOut(s, false);
 }

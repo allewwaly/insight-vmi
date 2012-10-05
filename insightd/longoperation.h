@@ -86,6 +86,13 @@ protected:
      */
     void shellErr(const QString &s);
 
+    /**
+     * Convertes an amount of bytes to a String such as "4 kB", "12 MB" etc.
+     * @param byteSize size in bytes
+     * @return formated string
+     */
+    static QString bytesToString(qint64 byteSize);
+
     QTime _elapsedTime; ///< use _elapsedTime.elapsed() to get the elapsed
                         ///< time since operationStarted() was called
     int _duration;      ///< holds the elapsed time after operationStopped()
