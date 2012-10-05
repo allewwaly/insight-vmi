@@ -39,14 +39,14 @@ public:
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
      */
-    virtual void readFrom(QDataStream& in);
+    virtual void readFrom(KernelSymbolStream& in);
 
     /**
      * Writes a serialized version of this object to \a out
      * \sa readFrom()
      * @param out the data stream to write the data to, must be ready to write
      */
-    virtual void writeTo(QDataStream& out) const;
+    virtual void writeTo(KernelSymbolStream& out) const;
 
 private:
     QString _dir; ///< Holds the directory name of this compilation unit
@@ -65,7 +65,7 @@ inline const QString& CompileUnit::dir() const
  * @param unit object to store the serialized data to
  * @return the data stream \a in
  */
-QDataStream& operator>>(QDataStream& in, CompileUnit& unit);
+KernelSymbolStream& operator>>(KernelSymbolStream& in, CompileUnit& unit);
 
 
 /**
@@ -74,7 +74,7 @@ QDataStream& operator>>(QDataStream& in, CompileUnit& unit);
  * @param unit object to serialize
  * @return the data stream \a out
  */
-QDataStream& operator<<(QDataStream& out, const CompileUnit& unit);
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const CompileUnit& unit);
 
 
 #endif /* COMPILEUNIT_H_ */

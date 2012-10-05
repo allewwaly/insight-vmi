@@ -19,28 +19,28 @@ CompileUnit::CompileUnit(SymFactory* factory, const TypeInfo& info)
 }
 
 
-void CompileUnit::readFrom(QDataStream& in)
+void CompileUnit::readFrom(KernelSymbolStream& in)
 {
     Symbol::readFrom(in);
     in >> _dir;
 }
 
 
-void CompileUnit::writeTo(QDataStream& out) const
+void CompileUnit::writeTo(KernelSymbolStream& out) const
 {
     Symbol::writeTo(out);
     out << _dir;
 }
 
 
-QDataStream& operator>>(QDataStream& in, CompileUnit& unit)
+KernelSymbolStream& operator>>(KernelSymbolStream& in, CompileUnit& unit)
 {
     unit.readFrom(in);
     return in;
 }
 
 
-QDataStream& operator<<(QDataStream& out, const CompileUnit& unit)
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const CompileUnit& unit)
 {
     unit.writeTo(out);
     return out;
