@@ -474,7 +474,7 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
 
     QString s("\rReading symbols finished");
     if (!_from->isSequential())
-        s += QString(" (%1 bytes read)").arg(_from->pos());
+        s += QString(" (%1 read)").arg(bytesToString(_from->pos()));
     s += ".";
     shellOut(s, true);
 }
