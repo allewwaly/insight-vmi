@@ -31,6 +31,19 @@ void Shell::prepareReadline()
 void Shell::saveShellHistory()
 {
 #ifdef CONFIG_READLINE
+	// Only save history for interactive sessions
+	if (_listenOnSocket)
+		return;
+
+	// Construct the path name of the history file
+	QStringList pathList = QString(mt_history_file).split("/", QString::SkipEmptyParts);
+	pathList.pop_back();
+	QString path = pathList.join("/");
+
+    // Create history path, if it does not exist
+    if (!QDir::home().exists(path) && !QDir::home().mkpath(path))
+        debugerr("Error creating path for saving the history");
+
     // Save the history for the next launch
     QString histFile = QDir::home().absoluteFilePath(mt_history_file);
     QByteArray ba = histFile.toLocal8Bit();
