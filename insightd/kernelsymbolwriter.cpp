@@ -355,7 +355,7 @@ void KernelSymbolWriter::operationProgress()
 {
     QString s("\rWriting symbols");
     if (!_to->isSequential())
-        s += QString(" (%1 read)").arg(bytesToString(_to->pos()));
+        s += QString(" (%1 written)").arg(bytesToString(_to->pos()));
     s += ", " + elapsedTime() + " elapsed";
     shellOut(s, false);
 }
