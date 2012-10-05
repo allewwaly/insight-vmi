@@ -1066,7 +1066,30 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
                     // We expect exceptions here
                     try {
                         qint64 ret;
-                        if (!memberInstance._d.vmem->seek(memberInstance._d.address) ||
+                        qint64 address;
+                        
+                        //Get correct address of string
+                        if (memberInstance._d.type->type() == rtArray){
+                            address = memberInstance._d.address;
+                        }else if(memberInstance._d.type->type() == rtPointer){
+                            // We have to consider the size of the pointer
+                            if (memberInstance._d.type->size() == 4) {
+                                address = memberInstance.toUInt32();
+                            }
+                            else if (memberInstance._d.type->size() == 8) {
+                                address = memberInstance.toUInt64();
+                            }
+                            else {
+                                throw BaseTypeException(
+                                        "Illegal conversion of a non-pointer type to a pointer",
+                                        __FILE__,
+                                        __LINE__);
+                            }
+                        }else if (memberInstance._d.type->type() == rtStruct){
+                        }
+
+                        //TODO This must not be threaded
+                        if (!memberInstance._d.vmem->seek(address) ||
                             (ret = memberInstance._d.vmem->read(buf, len)) != len ) {
                             memberValid = false;
                         }
