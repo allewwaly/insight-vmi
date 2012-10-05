@@ -38,9 +38,9 @@
 //------------------------------------------------------------------------------
 
 SymFactory::SymFactory(const MemSpecs& memSpecs)
-	: _memSpecs(memSpecs), _typeFoundByHash(0), _artificialTypeId(-1),
-	  _internalTypeId(1), _changeClock(0), _maxTypeSize(0)
+	: _memSpecs(memSpecs)
 {
+	clear();
 }
 
 
@@ -105,8 +105,10 @@ void SymFactory::clear()
 	_varsById.clear();
 	_idRevMapping.clear();
 	_idRevMapping.reserve(QThread::idealThreadCount());
+	_origSymFiles.clear();
 
 	// Reset other vars
+	_origSymKernelFileIndex = -1;
 	_typeFoundByHash = 0;
 	_maxTypeSize = 0;
 	_uniqeTypesChanged = 0;
@@ -3024,3 +3026,9 @@ BaseTypeList SymFactory::findBaseTypesByName(const QString &pattern,
     return list;
 }
 
+
+void SymFactory::setOrigSymFiles(const QStringList &list)
+{
+	_origSymFiles = list;
+	_origSymKernelFileIndex = _origSymFiles.indexOf("vmlinux");
+}

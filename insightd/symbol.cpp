@@ -59,3 +59,10 @@ const QString& Symbol::origFileName() const
     else
         return _factory->origSymFiles().at(_origFileIndex);
 }
+
+
+SymbolSource Symbol::symbolSource() const
+{
+    return (_factory && _factory->origSymKernelFileIndex() != _origFileIndex) ?
+                ssModule : ssKernel;
+}
