@@ -460,8 +460,15 @@ public:
 	 * Returns the list of executable files the debugging symbols were
 	 * originally parsed from. The index into these files corresponds the
 	 * index used by _origSymFiles.
+	 *\sa origSymKernelFileIndex()
 	 */
 	const QStringList& origSymFiles() const;
+
+	/**
+	 * Returns the index of file "vmlinux" within origSymFiles().
+	 *\sa origSymFiles()
+	 */
+	int origSymKernelFileIndex() const;
 
 	/**
 	 * Sets the list of files the debugging symbols were parsed from.
@@ -796,6 +803,7 @@ private:
 	ASTExpressionList _expressions;
 	IdRevMapping _idRevMapping;       ///< Maps original to internal IDs
 	QStringList _origSymFiles;        ///< List of executable files the symbols were obtained from
+	int _origSymKernelFileIndex;      ///< Index of the kernel file within _origSymFiles
 
 	int _typeFoundByHash;
 	int _uniqeTypesChanged;
@@ -847,9 +855,9 @@ inline const QStringList &SymFactory::origSymFiles() const
 }
 
 
-inline void SymFactory::setOrigSymFiles(const QStringList &list)
+inline int SymFactory::origSymKernelFileIndex() const
 {
-	_origSymFiles = list;
+	return _origSymKernelFileIndex;
 }
 
 #endif /* SYMFACTORY_H_ */

@@ -14,6 +14,12 @@
 // forward declaration
 class SymFactory;
 
+/// Where was this symbol original obtained from?
+enum SymbolSource {
+    ssKernel,   ///< symbol was obtained from the kernel itself
+    ssModule    ///< symbol was obtained from some kernel module
+};
+
 /**
  * This class represents a generic debugging symbol read from the objdump output.
  */
@@ -102,6 +108,11 @@ public:
      * \sa origFileIndex()
      */
     const QString& origFileName() const;
+
+    /**
+     * Returns whether this symbol was obtained from the kernel or some module.
+     */
+    SymbolSource symbolSource() const;
 
     /**
      * Reads a serialized version of this object from \a in.
