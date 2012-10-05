@@ -137,24 +137,7 @@ void KernelSourceParser::parse()
     _remainingSec = -1;
 
     // Collect files to process
-
-    // TK: To discuss!
-    // For PointsTo and MagicNumber analysis it is not enough to parse CompileUnits
-    // referenced while parsing the objectdump, as files and functions could have
-    // been inlined.
-
-    // Example: Variable is set to a specific value in a file in /arch/x64/boot
-    //          This file is not in the CompileUnitHash
-    //          In the MemDump the Variable is set to that specific value.
-
-    // As the "__PP__" directory only contains the preprocessed source code, all
-    // "*.c.i" files should be parsed. This new version is currently guarded by 
-    // preprocessor macros
-
-#define PARSEALLFILES 1
-
     _fileNames.clear();
-#ifndef PARSEALLFILES
     CompileUnitIntHash::const_iterator it = _factory->sources().begin();
     while (it != _factory->sources().end() && !shell->interrupted()) {
         const CompileUnit* unit = it.value();
@@ -163,23 +146,6 @@ void KernelSourceParser::parse()
             _fileNames.append(unit->name() + ".i");
         ++it;
     }
-#else /* PARSEALLFILES */
-
-    QDirIterator directory_walker(_srcPath, QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
-
-    while(directory_walker.hasNext())
-    {
-        // then we tell our directory_walker object to explicitly take next element until the loop finishes
-        directory_walker.next();
-
-        if(directory_walker.fileInfo().suffix() == "i")
-        {
-            // All files should be added maybe throw error, if other files exist.
-            
-            _fileNames.append(_srcDir.relativeFilePath(directory_walker.fileInfo().absoluteFilePath()));
-        }
-    }
-#endif /* PARSEALLFILES */
     
     // Create worker threads, limited to single-threading for debugging
 #if defined(DEBUG_APPLY_USED_AS) || defined(DEBUG_USED_AS) || defined(DEBUG_POINTS_TO)
