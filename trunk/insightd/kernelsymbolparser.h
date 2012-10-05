@@ -61,7 +61,6 @@ class KernelSymbolParser: public LongOperation
         TypeInfo* _info;
         TypeInfo* _parentInfo;
         HdrSymbolType _hdrSym;
-        bool _isRelevant;
         int _curSrcID;
         qint32 _nextId;
         int _curFileIndex;
