@@ -22,7 +22,7 @@ void TypeInfo::clear()
 	_isRelevant = false;
 	_enc = eUndef;
 	_name.clear();
-	_id = _refTypeId = 0;
+	_id = _origId = _refTypeId = 0;
 	_byteSize = 0;
 	_bitSize = _bitOffset = -1;
 	_location = 0;
@@ -132,6 +132,18 @@ int TypeInfo::id() const
 void TypeInfo::setId(int id)
 {
     this->_id = id;
+}
+
+
+int TypeInfo::origId() const
+{
+    return _origId;
+}
+
+
+void TypeInfo::setOrigId(int id)
+{
+    this->_origId = id;
 }
 
 
@@ -383,6 +395,7 @@ QString TypeInfo::dump(const QStringList& symFiles) const
 
 	QString ret;
 	if (_id != 0) 		        ret += QString("  id:            0x%1\n").arg(_id, 0, 16);
+	if (_origId != 0) 		    ret += QString("  origId:        0x%1\n").arg(_origId, 0, 16);
 	if (_symType >= 0)          ret += QString("  symType:       %1 (%2)\n").arg(_symType).arg(symType);
 	if (!_name.isEmpty())       ret += QString("  name:          %1\n").arg(_name);
 	if (_byteSize > 0)          ret += QString("  byteSize:      %1\n").arg(_byteSize);

@@ -544,6 +544,7 @@ void KernelSymbolParser::WorkerThread::parse(QIODevice* from)
                     _info->setSymType(_hdrSym);
                     parseInt16(i, rxHdr.cap(1), &ok);
                     _info->setId(i);
+                    _info->setOrigId(i);
                     // If this is a compile unit, save its ID locally
                     if (_hdrSym == hsCompileUnit)
                         _curSrcID = _info->id();
@@ -689,12 +690,9 @@ void KernelSymbolParser::parse()
     }
 
     // Show progress while parsing is not finished
-    while (!_threads[0]->wait(250))
-        checkOperationProgress();
-
-    // Wait for all threads to finish
     for (int i = 0; i < THREAD_COUNT; ++i)
-        _threads[i]->wait();
+        while (!_threads[i]->wait(250))
+            checkOperationProgress();   s
 
     cleanUpThreads();
 
@@ -739,7 +737,7 @@ void KernelSymbolParser::operationProgress()
 
     QString remStr = remaining > 0 ?
                 QString("%1:%2").arg(remaining / 60).arg(remaining % 60, 2, 10, QChar('0')) :
-                QString("n/a");
+                QString("??");
 
     QString fileName = _currentFile;
     QString s = QString("\rParsing file %1/%2 (%3%), %4 elapsed, %5 remaining%7: %6")

@@ -39,7 +39,7 @@
 
 SymFactory::SymFactory(const MemSpecs& memSpecs)
 	: _memSpecs(memSpecs), _typeFoundByHash(0), _artificialTypeId(-1),
-	  _changeClock(0), _maxTypeSize(0)
+	  _internalTypeId(1), _changeClock(0), _maxTypeSize(0)
 {
 }
 
@@ -103,7 +103,6 @@ void SymFactory::clear()
 	_zeroSizeStructs.clear();
 	_varsByName.clear();
 	_varsById.clear();
-	_idMapping.clear();
 	_idRevMapping.clear();
 	_idRevMapping.reserve(QThread::idealThreadCount());
 
@@ -117,6 +116,7 @@ void SymFactory::clear()
 	_ambiguesAltTypes = 0;
 	_artificialTypeId = -1;
 	_changeClock = 0;
+	_internalTypeId = 1;
 }
 
 
@@ -590,13 +590,11 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
     // Insert new ID/type relation into lookup tables
     assert(_typesById.contains(new_id) == false);
     if (_typesById.contains(new_id)) {
-        IdMapBucket idm = _idMapping[new_id];
         debugmsg(QString("Double type: %1, mapped to %2:0x%3 (latest ID is %4)")
                  .arg(new_id)
-                 .arg(_origSymFiles[idm.fileIndex])
-                 .arg(idm.symId, 0, 16)
-                 .arg(_idMapping.size()));
-//        debugmsg("foo");
+                 .arg(target->origFileName())
+                 .arg(target->origId(), 0, 16)
+                 .arg(_internalTypeId));
     }
 
     _typesById.insert(new_id, target);
@@ -2840,41 +2838,34 @@ int SymFactory::getArtificialTypeId()
 }
 
 
-int SymFactory::mapToInternalArrayId(int localId, int boundsIndex)
+int SymFactory::mapToInternalArrayId(int origId, int origFileIndex,
+                                     int localId, int boundsIndex)
 {
     // For bounds index 0, the ID must match the local ID! See Array::Array().
     if (boundsIndex == 0)
         return localId;
 
-    if (localId <= 0 || localId >= _idMapping.size())
+    if (localId <= 0 || localId >= _internalTypeId)
         factoryError(QString("Local ID 0x%1 does not exist.")
                         .arg(localId, 0, 16));
 
-    IdMapBucket mapping = _idMapping[localId];
-
     // We add boundsIndex to orig. ID to derive new ID
-    mapping.symId += boundsIndex;
+    origId += boundsIndex;
 
-    return mapToInternalId(mapping);
+    return mapToInternalId(origFileIndex, origId);
 }
 
 
 int SymFactory::mapToInternalId(int fileIndex, int origSymId)
 {
-    return mapToInternalId(IdMapBucket(fileIndex, origSymId));
-}
-
-
-int SymFactory::mapToInternalId(const IdMapBucket& mapping)
-{
     // Map zero to zero
-    if (!mapping.symId)
+    if (!origSymId)
         return 0;
 
     int i = 0, freeIdx = -1;
     // Find the revmap bucket for the given file index
     while (i < _idRevMapping.size()) {
-        if (_idRevMapping[i].fileIndex == mapping.fileIndex)
+        if (_idRevMapping[i].fileIndex == fileIndex)
             break;
         else if (_idRevMapping[i].fileIndex < 0)
             freeIdx = i;
@@ -2886,34 +2877,24 @@ int SymFactory::mapToInternalId(const IdMapBucket& mapping)
         if (freeIdx >= 0)
             i = freeIdx;
         // No, so enlarge the vector
-        else
+        else {
+            if (i == QThread::idealThreadCount())
+                debugmsg("About to create bucket " << (i+1));
             _idRevMapping.resize(i + 1);
+        }
         // Set the file index
-        _idRevMapping[i].fileIndex = mapping.fileIndex;
+        _idRevMapping[i].fileIndex = fileIndex;
     }
 
     // Is this ID already mapped?
-    IdIdMapping::const_iterator it = _idRevMapping[i].map.find(mapping.symId);
+    IdIdMapping::const_iterator it = _idRevMapping[i].map.find(origSymId);
     if (it != _idRevMapping[i].map.constEnd())
         return it.value();
 
-    // New combination of fileIndx/symId, find a new internal ID, but skip 0
-    if (_idMapping.isEmpty())
-        _idMapping.append(IdMapBucket());
-    int internalTypeId = _idMapping.size();
+    // New combination of fileIndx/origSymId
+    _idRevMapping[i].map.insert(origSymId, _internalTypeId);
 
-    _idMapping.append(mapping);
-    _idRevMapping[i].map.insert(mapping.symId, internalTypeId);
-
-    return internalTypeId;
-}
-
-
-IdMapBucket SymFactory::mapToOriginalId(int internalId)
-{
-    if (internalId > 0 && internalId < _idMapping.size())
-        return _idMapping[internalId];
-    return IdMapBucket();
+    return _internalTypeId++;
 }
 
 

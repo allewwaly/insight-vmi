@@ -24,10 +24,14 @@ Array::Array(SymFactory *factory, const TypeInfo &info, int boundsIndex)
         // Create a new ID greater than the original one, depending on the
         // boundsIndex. For the first dimension (boundsIndex == 0), the
         // resulting ID must equal info.id()!
-        setId(factory->mapToInternalArrayId(info.id(), boundsIndex));
+        setId(factory->mapToInternalArrayId(info.origId(), info.fileIndex(),
+                                            info.id(), boundsIndex));
         // Only the last dimension of an array refers to info.refTypeId()
         if (boundsIndex + 1 < info.upperBounds().size())
-            setRefTypeId(factory->mapToInternalArrayId(info.id(), boundsIndex + 1));
+            setRefTypeId(factory->mapToInternalArrayId(info.origId(),
+                                                       info.fileIndex(),
+                                                       info.id(),
+                                                       boundsIndex + 1));
     }
 }
 
