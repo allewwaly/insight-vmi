@@ -526,7 +526,10 @@ bool SymFactory::isNewType(const int new_id, BaseType* type) const
 QList<int> SymFactory::equivalentTypes(int id) const
 {
     const BaseType* t = findBaseTypeById(id);
-    return _equivalentTypes.values(t ? t->id() : id);
+    QList<int> ret = _equivalentTypes.values(t ? t->id() : id);
+    if (t)
+        ret.append(t->id());
+    return ret;
 }
 
 
@@ -598,8 +601,13 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
     }
 
     _typesById.insert(new_id, target);
-    _equivalentTypes.insertMulti(target->id(), new_id);
+    if (target->id() != new_id)
+        _equivalentTypes.insertMulti(target->id(), new_id);
     ++_changeClock;
+
+    // Keep track of the largest ID
+    if (new_id >= _internalTypeId)
+        _internalTypeId = new_id + 1;
 
     // Perform certain actions for new types
     if (isNewType(new_id, target)) {
@@ -1211,7 +1219,8 @@ void SymFactory::replaceType(const BaseType* oldType, BaseType* newType)
 
         // Apply the change
         _typesById[equiv[i]] = newType;
-        if (!_equivalentTypes.contains(newType->id(), equiv[i]))
+        if ((newType->id() != equiv[i]) &&
+            !_equivalentTypes.contains(newType->id(), equiv[i]))
             _equivalentTypes.insertMulti(newType->id(), equiv[i]);
 
         // Re-hash all referencing types
