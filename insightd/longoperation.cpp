@@ -103,7 +103,7 @@ QString LongOperation::bytesToString(qint64 byteSize)
     static const int MAX_UNIT = 4;
     static const char* units[MAX_UNIT+1] = { " byte", " kB", " MB", " GB", " TB" };
     int unit = 0;
-    while (byteSize > (1UL << 12) && unit < MAX_UNIT) {
+    while (byteSize > (1L << 12) && unit < MAX_UNIT) {
         byteSize >>= 10;
         ++unit;
     }
