@@ -76,11 +76,12 @@ private:
     QString _currentFile;
     QStringList _fileNames;
     int _filesIndex;
+    qint64 _bytesRead;
+    qint64 _bytesTotal;
     QList<WorkerThread*> _threads;
     QMutex _filesMutex;
     QMutex _progressMutex;
-    int _prevDuration;
-    int _remainingSec;
+    int _durationLastFileFinished;
 };
 
 #endif /* KERNELSOURCEPARSER_H_ */
