@@ -1215,6 +1215,8 @@ void SymFactory::replaceType(const BaseType* oldType, BaseType* newType)
     for (int i = 0; i < equiv.size(); ++i) {
         // Save the hashes of all types referencing the old type
         QList<RefBaseType*> refTypes = _usedByRefTypes.values(equiv[i]);
+        // Make sure elements in the list are unique
+        refTypes = QSet<RefBaseType*>::fromList(refTypes).toList();
         QList<uint> refTypeHashes;
         for (int j = 0; j < refTypes.size(); ++j)
             refTypeHashes += refTypes[j]->hash();
