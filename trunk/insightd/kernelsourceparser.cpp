@@ -58,7 +58,8 @@ public:
 
 KernelSourceParser::KernelSourceParser(SymFactory* factory,
         const QString& srcPath)
-    : _factory(factory), _srcPath(srcPath), _srcDir(srcPath), _filesIndex(0)
+    : _factory(factory), _srcPath(srcPath), _srcDir(srcPath), _filesIndex(0),
+      _bytesRead(0), _bytesTotal(0), _durationLastFileFinished(0)
 {
     assert(_factory);
 }
@@ -73,24 +74,24 @@ KernelSourceParser::~KernelSourceParser()
 void KernelSourceParser::operationProgress()
 {
     QMutexLocker lock(&_progressMutex);
-    int percent = (_filesIndex / (float) _fileNames.size()) * 100;
+    float percent = _bytesRead / (float) (_bytesTotal > 0 ? _bytesTotal : 1);
+    int remaining = -1;
     // Avoid too noisy timer updates
-    if (_duration > _prevDuration + 2000) {
-        _prevDuration = _duration;
-        _remainingSec = _filesIndex > 0 ?
-                    ((_prevDuration / (float)_filesIndex) * (_fileNames.size() - _filesIndex)) / 1000 : -1;
+    if (percent > 0) {
+        remaining = _durationLastFileFinished / percent * (1.0 - percent);
+        remaining = (remaining - (_duration - _durationLastFileFinished)) / 1000;
     }
-    QString remaining = _remainingSec > 0 ?
-                QString("%1:%2").arg(_remainingSec / 60).arg(_remainingSec % 60, 2, 10, QChar('0')) :
-                QString("n/a");
+    QString remStr = remaining > 0 ?
+                QString("%1:%2").arg(remaining / 60).arg(remaining % 60, 2, 10, QChar('0')) :
+                QString("??");
 
     QString fileName = _currentFile;
     QString s = QString("\rParsing file %1/%2 (%3%), %4 elapsed, %5 remaining%7: %6")
             .arg(_filesIndex)
             .arg(_fileNames.size())
-            .arg(percent)
+            .arg((int)(percent * 100))
             .arg(elapsedTime())
-            .arg(remaining)
+            .arg(remStr)
             .arg(fileName);
     // Show no. of errors
     if (BugReport::log() && BugReport::log()->entries())
@@ -133,17 +134,25 @@ void KernelSourceParser::parse()
     _factory->seenMagicNumbers.clear();
 
     operationStarted();
-    _prevDuration = _duration;
-    _remainingSec = -1;
+    _durationLastFileFinished = _duration;
 
     // Collect files to process
     _fileNames.clear();
-    CompileUnitIntHash::const_iterator it = _factory->sources().begin();
+    _bytesTotal = _bytesRead = 0;
+    QString fileName;
+    CompileUnitIntHash::const_iterator it = _factory->sources().begin();    
     while (it != _factory->sources().end() && !shell->interrupted()) {
         const CompileUnit* unit = it.value();
         // Skip assembly files
-        if (!unit->name().endsWith(".S"))
-            _fileNames.append(unit->name() + ".i");
+        if (!unit->name().endsWith(".S")) {
+            fileName = unit->name() + ".i";
+            if (_srcDir.exists(fileName)) {
+                _fileNames.append(fileName);
+                _bytesTotal += QFileInfo(_srcDir, fileName).size();
+            }
+            else
+                shellErr(QString("File not found: %1").arg(fileName));
+        }
         ++it;
     }
     
@@ -257,20 +266,6 @@ void KernelSourceParser::WorkerThread::run()
            _parser->_filesIndex < _parser->_fileNames.size())
     {
         currentFile = _parser->_fileNames[_parser->_filesIndex++];
-
-//        if (//currentFile.startsWith("net/") ||
-//            currentFile.startsWith("fs/") ||
-//            currentFile.startsWith("security/") ||
-//            currentFile.startsWith("drivers/") ||
-//            currentFile.startsWith("block/") ||
-//            currentFile.startsWith("crypto/"))
-//            continue;
-//        if (!currentFile.endsWith("sleep.c.i") &&
-//            !currentFile.endsWith("kill.c.i"))
-//            continue;
-//        if (_parser->_filesIndex != 116 && _parser->_filesIndex != 117)
-//            continue;
-
         _parser->_currentFile = currentFile;
 
         if (_parser->_filesIndex <= 1)
@@ -282,6 +277,8 @@ void KernelSourceParser::WorkerThread::run()
         parseFile(currentFile);
 
         lock.relock();
+        _parser->_bytesRead += QFileInfo(_parser->_srcDir, currentFile).size();
+        _parser->_durationLastFileFinished = _parser->_duration;
     }
 }
 
