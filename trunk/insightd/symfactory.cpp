@@ -2177,6 +2177,7 @@ void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
     else {
         srcBaseType = srcTypeRet.types.first();
 
+#ifdef DEBUG_APPLY_USED_AS
         if (srcTypeRet.types.size() > 1) {
             QString s = QString("Source AST type \"%1\" has %2 base types:")
                                  .arg(ed->srcType->toString())
@@ -2191,6 +2192,7 @@ void SymFactory::typeAlternateUsage(const TypeEvalDetails *ed,
                         .arg(srcTypeRet.typesNonPtr[i]->prettyName());
             debugmsg(s + "\n");
         }
+#endif
     }
 
     // Find the target base types
@@ -2476,6 +2478,7 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
     else if (membersChanged) {
         ++_uniqeTypesChanged;
 
+#ifdef DEBUG_APPLY_USED_AS
         if (membersChanged > 1) {
             QString s = QString("Applied type change from \"%1\" to \"%2\" to "
                                 "%3 of %4 context types:")
@@ -2490,7 +2493,7 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                         .arg(ctxBaseTypes[i]->prettyName());
             debugmsg(s + "\n");
         }
-
+#endif
 
 #ifdef DEBUG_APPLY_USED_AS
         QStringList ctxTypes;
