@@ -745,7 +745,8 @@ void KernelSymbolParser::parse()
 void KernelSymbolParser::operationProgress()
 {
     QMutexLocker lock(&_progressMutex);
-    float percent = _binBytesRead / (float) _binBytesTotal;
+    float percent = _binBytesRead /
+            (float) (_binBytesTotal > 0 ? _binBytesTotal : 1);
     int remaining = -1;
     if (percent > 0) {
         remaining = _durationLastFileFinished / percent * (1.0 - percent);
