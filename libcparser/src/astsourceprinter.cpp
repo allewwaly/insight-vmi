@@ -601,7 +601,11 @@ void ASTSourcePrinter::afterChild(const ASTNode *node, const ASTNode *childNode)
                 _line += " ... ";
             else  {
                 _line += ":";
-                newlineIncIndent();
+                if (node->u.labeled_statement.statement &&
+                    node->u.labeled_statement.statement->type == nt_labeled_statement_case)
+                    newlineIndent();
+                else
+                    newlineIncIndent();
             }
         }
         break;
@@ -720,7 +724,11 @@ void ASTSourcePrinter::afterChildren(const ASTNode *node, int flags)
         break;
     case nt_labeled_statement_case:
     case nt_labeled_statement_default:
-        newlineDecIndent();
+        if (node->u.labeled_statement.statement &&
+            node->u.labeled_statement.statement->type == nt_labeled_statement_case)
+            newlineIndent();
+        else
+            newlineDecIndent();
         break;
     case nt_parameter_type_list:
         if (node->u.parameter_type_list.openArgs)
