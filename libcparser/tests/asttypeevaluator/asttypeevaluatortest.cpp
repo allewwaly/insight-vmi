@@ -738,6 +738,18 @@ TEST_FUNCTION(functionPointerInvocations)
         "foo", "FuncPointer->Pointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int** (**foo)();", "void* p = foo();",
         "foo", "FuncPointer->Pointer->Pointer->Int32", "()", "Pointer->Void");
+
+     // Indirect function invocation through pointer
+    CHANGE_LAST2("int* foo();", "typeof(&foo) f; void* p = f();",
+                 "f", "Pointer->Int32", "()", "Pointer->Void");
+    CHANGE_LAST2("int* foo() { return 0; }", "typeof(&foo) f; void* p = f();",
+                 "f", "Pointer->Int32", "()", "Pointer->Void");
+
+    // Illegal invocation of pointers of function pointer typedefs
+    EXCEPTIONAL("int* foo();", "typeof(& &foo) f; void* p = f();",
+                "Expected a function pointer type here instead of \"Pointer->FuncPointer->Int32\" at :25:17");
+    EXCEPTIONAL("int* foo() { return 0; }", "typeof(& &foo) bf; void* p = f();",
+                "Expected a function pointer type here instead of \"Pointer->FuncPointer->Int32\" at :25:17");
 }
 
 
