@@ -740,7 +740,11 @@ TEST_FUNCTION(functionPointerInvocations)
         "foo", "FuncPointer->Pointer->Pointer->Int32", "()", "Pointer->Void");
 
      // Indirect function invocation through pointer
+    CHANGE_LAST2("int* foo();", "typeof( foo) f; void* p = f();",
+                 "f", "Pointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int* foo();", "typeof(&foo) f; void* p = f();",
+                 "f", "Pointer->Int32", "()", "Pointer->Void");
+    CHANGE_LAST2("int* foo() { return 0; }", "typeof( foo) f; void* p = f();",
                  "f", "Pointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int* foo() { return 0; }", "typeof(&foo) f; void* p = f();",
                  "f", "Pointer->Int32", "()", "Pointer->Void");
