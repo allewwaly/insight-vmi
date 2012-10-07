@@ -1287,7 +1287,10 @@ ASTExpression* ASTExpressionEvaluator::exprOfUnaryExpr(
         if (op == "&" || op == "&&") {
             // Can also be a runtime expression
             if (var) {
-                var->appendTransformation(ttAddress);
+                // See if this address operator was skipped
+                ASTType* type = _eval->typeofNode(node);
+                if (!type->ampersandSkipped())
+                    var->appendTransformation(ttAddress);
                 if (op == "&&")
                     var->appendTransformation(ttAddress);
             }

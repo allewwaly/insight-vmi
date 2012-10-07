@@ -3547,10 +3547,16 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
             if ("!" == op)
                 return erNoAssignmentUse;
             if ("&" == op) {
-                localTrans.append(ttAddress, ed->rootNode);
+                // See if this address operator was skipped
+                ASTType* type = typeofNode(ed->rootNode);
+                if (!type->ampersandSkipped())
+                    localTrans.append(ttAddress, ed->rootNode);
             }
             else if ("&&" == op) {
-                localTrans.append(ttAddress, ed->rootNode);
+                // See if this address operator was skipped
+                ASTType* type = typeofNode(ed->rootNode);
+                if (!type->ampersandSkipped())
+                    localTrans.append(ttAddress, ed->rootNode);
                 localTrans.append(ttAddress, ed->rootNode);
             }
             // Dereferencing is a type usage, so if the type has already been
