@@ -213,8 +213,7 @@ void KernelSymbolParser::WorkerThread::finishLastSymbol()
                 }
                 // Non-external variables without a location belong to inline assembler
                 // statements which we can ignore
-                else if (_info->symType() != hsVariable ||
-                         _info->location() > 0 || _info->external())
+                else if (_info->symType() != hsVariable || _info->hasLocation())
                 {
                     // Do not pass the type name of constant or volatile types to the
                     // factory
@@ -674,6 +673,10 @@ void KernelSymbolParser::parse()
         dit.next();
         // Find all modules outside the lib/modules/ directory
         if (dit.fileInfo().suffix() == "ko" &&
+    #if defined(DEBUG_SYM_PARSING)
+            (dit.fileInfo().baseName() == "mbp_nvidia_bl" ||
+             dit.fileInfo().baseName() == "ibmaem") &&
+    #endif
             !dit.fileInfo().filePath().contains("/lib/modules/"))
         {
             _fileNames.append(
