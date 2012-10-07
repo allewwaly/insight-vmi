@@ -720,8 +720,10 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
     BaseTypeList bt_list = _factory->findBaseTypesForAstType(type, _eval).typesNonPtr;
 
     // Try each type of the list in turn
+    int structTypes = 0;
     for (int i = 0; i < bt_list.size(); ++i) {
         if (bt_list[i]->type() & StructOrUnion) {
+            structTypes++;
             bool exceptions = (i + 1 == bt_list.size());
             expr = exprOfBuiltinFuncOffsetOfSingle(node, bt_list[i], type,
                                                    ptsTo, exceptions);
@@ -732,7 +734,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
 
 
     ASTSourcePrinter printer(_ast);
-    exprEvalError2(QString("Failed to evaluate offsetof() expression for \"%1\" "
+    exprEvalError3(QString("Failed to evaluate offsetof() expression for \"%1\" "
                           "at %2:%3:%4")
                   .arg(printer.toString(
                            node->u.builtin_function_offsetof.postfix_expression)
@@ -740,7 +742,9 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOf(
                   .arg(_ast->fileName())
                   .arg(node->start->line)
                   .arg(node->start->charPosition),
-                   node);
+                   node,
+                   structTypes ? ExpressionEvalException::ecUndefined
+                               : ExpressionEvalException::ecTypeNotFound);
 
     return 0;
 }

@@ -130,7 +130,18 @@ int KernelSourceTypeEvaluator::evaluateIntExpression(const ASTNode* node, bool* 
         *ok = false;
 
     if (node) {
-        ASTExpression* expr = _eval->exprOfNode(node, ASTNodeNodeHash());
+        ASTExpression* expr = 0;
+        try {
+            expr = _eval->exprOfNode(node, ASTNodeNodeHash());
+        }
+        catch (ExpressionEvalException& e) {
+            // Fail silently if a required type could not be found
+            if (e.errorCode == ExpressionEvalException::ecTypeNotFound)
+                return 0;
+            else
+                throw;
+        }
+
         ExpressionResult value = expr->result();
 
         // Return constant value
