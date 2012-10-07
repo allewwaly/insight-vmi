@@ -1660,8 +1660,47 @@ const ASTSymbol* ASTTypeEvaluator::findSymbolOfPrimaryExpression(
                 _symbolOfNode.insert(node, sym);
         }
         // Otherwise do a normal resolution of symbol in scope of node
-        else
+        else {
             sym = node->scope->find(id);
+            // Make sure we did not find a struct member within a sizeof(),
+            // typeof() or other builtin expressions or functions
+            if (sym && sym->type() == stStructMember) {
+                const ASTNode* n = node->parent;
+                bool typeExpected = false;
+                while (n) {
+                    switch (n->type) {
+                    case nt_builtin_function_alignof:
+                    case nt_builtin_function_object_size:
+                    case nt_builtin_function_sizeof:
+                    case nt_builtin_function_types_compatible_p:
+                    case nt_typeof_specification:
+                        typeExpected = true;
+                        n = 0;
+                        break;
+                    default:
+                        n = n->parent;
+                    }
+                }
+
+                // If we are in some builtin expression that expects a type or
+                // variable, search again for symbol in upper scope
+                if (typeExpected) {
+                    ASTScope* scope = node->scope->parent();
+                    const ASTSymbol* nonMbrSym = sym;
+                    while (scope && nonMbrSym &&
+                           nonMbrSym->type() == stStructMember)
+                    {
+                        nonMbrSym = scope->find(id);
+                        scope = scope->parent();
+                    }
+                    // Did we find a different symbol?
+                    if (nonMbrSym &&  nonMbrSym->type() != stStructMember)
+                        sym = nonMbrSym;
+                    // Otherwise, just return the member symbol and see what
+                    // happens...
+                }
+            }
+        }
     }
 
     if (!sym && enableExcpetions) {
