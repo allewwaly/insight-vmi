@@ -9,6 +9,7 @@
 #include <abstractsyntaxtree.h>
 #include <astsymbol.h>
 #include <asttypeevaluator.h>
+#include <typeevaluatorexception.h>
 
 #include <QTextStream>
 #include <QFile>
@@ -517,15 +518,20 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
             printDotGraphString("(", nodeId);
         printDotGraphToken(node->u.primary_expression.identifier, nodeId, TOK_PRIM_EX_IDENTIFIER);
         if (_eval && node->u.primary_expression.identifier) {
-            const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);
-            if (sym && !sym->assignedAstNodes().isEmpty()) {
-                for (AssignedNodeSet::const_iterator it =
-                        sym->assignedAstNodes().begin(),
-                     e = sym->assignedAstNodes().end(); it != e; ++it)
-                {
-                    printDotGraphConnection(
-                                node->u.primary_expression.identifier, &(*it));
+            try {
+                const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);
+                if (sym && !sym->assignedAstNodes().isEmpty()) {
+                    for (AssignedNodeSet::const_iterator it =
+                         sym->assignedAstNodes().begin(),
+                         e = sym->assignedAstNodes().end(); it != e; ++it)
+                    {
+                        printDotGraphConnection(
+                                    node->u.primary_expression.identifier, &(*it));
+                    }
                 }
+            }
+            catch (TypeEvaluatorException&) {
+                // ignore
             }
         }
 
