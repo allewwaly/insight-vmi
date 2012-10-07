@@ -46,9 +46,10 @@ QString ASTType::toString() const
 
 bool ASTType::equalTo(const ASTType* other, bool exactMatch) const
 {
+    static const int ptrMask = rtPointer|rtArray;
+    static const int intTypes = IntegerTypes & ~rtEnum;
+
     const ASTType *a = this, *b = other;
-    const int ptrMask = rtPointer|rtArray;
-    const int intTypes = IntegerTypes & ~rtEnum;
     bool isPointer = false;
     while (a && b) {
         // Consider rtPointer and rtArray to be equal
@@ -59,7 +60,9 @@ bool ASTType::equalTo(const ASTType* other, bool exactMatch) const
                     (!((a->type() & intTypes) && (b->type() & intTypes))))
                 return false;
         }
-        if (a->identifier() != b->identifier())
+        // Compare the type name for non-integer types
+        if (((a->type() | b->type()) & ~intTypes) &&
+            (a->identifier() != b->identifier()))
             return false;
         isPointer = isPointer || ((a->type()|b->type()) & ptrMask);
         a = a->next();
