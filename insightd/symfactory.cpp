@@ -752,7 +752,7 @@ void SymFactory::insert(Variable* var)
 	var->setFactory(this);
 	_vars.append(var);
 	_varsById.insert(var->id(), var);
-	_varsByName.insert(var->name(), var);
+	_varsByName.insertMulti(var->name(), var);
 	insertUsedBy(var);
 }
 
@@ -784,7 +784,7 @@ bool SymFactory::isSymbolValid(const TypeInfo& info)
 	case hsTypedef:
 		return info.id() != 0 && !info.name().isEmpty();
 	case hsVariable:
-		return info.id() != 0 && (info.location() > 0 || info.external());
+		return info.id() != 0 && (info.hasLocation() || info.external());
 	case hsVolatileType:
 		return info.id() != 0;
 	default:

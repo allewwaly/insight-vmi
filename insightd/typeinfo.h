@@ -251,6 +251,8 @@ public:
     quint64 location() const;
     void setLocation(quint64 location);
 
+    bool hasLocation() const;
+
     qint32 dataMemberLocation() const;
     void setDataMemberLocation(qint32 location);
 
@@ -307,14 +309,15 @@ private:
 	quint32 _byteSize;       ///< holds the size in byte of this symbol
 	int _bitSize;            ///< holds the number of bits for a bit-split struct
 	int _bitOffset;          ///< holds the bit offset for a bit-split struct
-	quint64 _location;        ///< holds the absolute offset offset of this symbol
+	quint64 _location;       ///< holds the absolute offset offset of this symbol
+	bool _hasLocation;   ///< is set to true when a location was set
 	int _external;			 ///< holds whether this is an external symbol
 	qint32 _dataMemberLoc;   ///< holds the offset relative offset of this symbol
 	IntVec _upperBounds;     ///< holds the upper bounds for an integer type symbol
 	qint32 _sibling;         ///< holds the sibling for a subprogram type symbol
 	bool _inlined;           ///< was the function inlined?
-	quint64 _pcLow;           ///< low program counter of a function
-	quint64 _pcHigh;          ///< high program counter of a function
+	quint64 _pcLow;          ///< low program counter of a function
+	quint64 _pcHigh;         ///< high program counter of a function
 	QVariant _constValue;    ///< holds the value of an enumerator symbol
 	EnumHash _enumValues; ///< holds the enumeration values, if this symbol is an enumeration
 	HdrSymbolType _symType;  ///< holds the type of this symbol

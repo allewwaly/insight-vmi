@@ -26,6 +26,7 @@ void TypeInfo::clear()
 	_byteSize = 0;
 	_bitSize = _bitOffset = -1;
 	_location = 0;
+	_hasLocation = false;
 	_dataMemberLoc = -1;
 	_upperBounds.clear();
 	_external = 0;
@@ -204,6 +205,13 @@ quint64 TypeInfo::location() const
 void TypeInfo::setLocation(quint64 location)
 {
     this->_location = location;
+    this->_hasLocation = true;
+}
+
+
+bool TypeInfo::hasLocation() const
+{
+    return _hasLocation;
 }
 
 
