@@ -1330,7 +1330,13 @@ ASTType* ASTTypeEvaluator::typeofUnaryExpressionOp(const ASTNode *node)
     // Pointer obtaining
     else if (op == "&") {
     	ASTType* ret = typeofNode(node->u.unary_expression.cast_expression);
-    	_types[node] = createASTType(rtPointer, node, ret);
+        // Obtaining address of a function does not result in another pointer
+        // level
+        if (ret && ret->isFunction() && !ret->ampersandSkipped())
+            ret->setAmpersandSkipped(true);
+        else
+            ret = createASTType(rtPointer, node, ret);
+        _types[node] = ret;
     }
     // Label as value, see http://gcc.gnu.org/onlinedocs/gcc/Labels-as-Values.html
     else if (op == "&&") {
@@ -2381,14 +2387,18 @@ ASTType* ASTTypeEvaluator::preprendArrays(const ASTNode *dd_dad, ASTType* type)
                 .arg(dd_dad->start->line));
 
     const ASTNodeList* list = 0;
+    bool isFuncPtr = false;
     if (dd_dad->type == nt_direct_abstract_declarator) {
     	type = preprendPointersArrays(
     			dd_dad->u.direct_abstract_declarator.abstract_declarator,
     			type);
         list = dd_dad->u.direct_abstract_declarator.abstract_declarator_suffix_list;
     }
-    else /*if (dd_dad->type == nt_direct_declarator)*/
+    else {
         list = dd_dad->u.direct_declarator.declarator_suffix_list;
+        isFuncPtr = dd_dad->u.direct_declarator.declarator &&
+                dd_dad->u.direct_declarator.declarator->u.declarator.isFuncDeclarator;
+    }
 
     // Add one array type node for every pair of brackets in the declaration
     while (list) {
@@ -2412,8 +2422,11 @@ ASTType* ASTTypeEvaluator::preprendArrays(const ASTNode *dd_dad, ASTType* type)
         }
         // Parens lead to a function pointer type
         else if (ds_ads->type == nt_declarator_suffix_parens ||
-        		ds_ads->type == nt_abstract_declarator_suffix_parens)
+                ds_ads->type == nt_abstract_declarator_suffix_parens)
+        {
             type = createASTType(rtFuncPointer, ds_ads, type);
+            type->setIsFunction(!isFuncPtr);
+        }
         else
             typeEvaluatorError(
                     QString("Declarator suffix is of unexpected type %1 at %2:%3")

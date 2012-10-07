@@ -31,22 +31,24 @@ public:
 
 class ASTType
 {
+    enum Flags {
+        flPtrSkipped   = (1 << 0),
+        flIsFunc       = (1 << 1),
+        flAmpSkipped   = (1 << 2)
+    };
+
 public:
     ASTType()
-        : _type(rtUndefined), _next(0), _node(0), _pointerSkipped(false),
-          _arraySize(-1) {}
+        : _type(rtUndefined), _next(0), _node(0), _flags(0), _arraySize(-1) {}
     ASTType(RealType type, ASTType* next = 0)
-        : _type(type), _next(next), _node(0), _pointerSkipped(false),
-          _arraySize(-1) {}
+        : _type(type), _next(next), _node(0), _flags(0), _arraySize(-1) {}
     ASTType(RealType type, const QString& identifier)
     	: _type(type), _next(0), _identifier(identifier), _node(0),
-          _pointerSkipped(false), _arraySize(-1) {}
+          _flags(0), _arraySize(-1) {}
     ASTType(RealType type, const ASTNode* node)
-        : _type(type), _next(0), _node(node), _pointerSkipped(false),
-          _arraySize(-1) {}
+        : _type(type), _next(0), _node(node), _flags(0), _arraySize(-1) {}
     ASTType(RealType type, const ASTNode* node, int arraySize)
-        : _type(type), _next(0), _node(node), _pointerSkipped(false),
-          _arraySize(arraySize) {}
+        : _type(type), _next(0), _node(node), _flags(0), _arraySize(arraySize) {}
 
     inline bool isNull() const { return _type == 0; }
     inline RealType type() const { return _type; }
@@ -57,8 +59,18 @@ public:
     inline void setIdentifier(const QString& id) { _identifier = id; }
     inline const ASTNode* node() const { return _node; }
     inline void setNode(const ASTNode* node) { _node = node; }
-    inline bool pointerSkipped() const { return _pointerSkipped; }
-    inline void setPointerSkipped(bool value) { _pointerSkipped = value; }
+    inline bool pointerSkipped() const { return _flags & flPtrSkipped; }
+    inline void setPointerSkipped(bool value) {
+        _flags = value ? (_flags | flPtrSkipped) : (_flags & ~flPtrSkipped);
+    }
+    inline bool ampersandSkipped() const { return _flags & flAmpSkipped; }
+    inline void setAmpersandSkipped(bool value) {
+        _flags = value ? (_flags | flAmpSkipped) : (_flags & ~flAmpSkipped);
+    }
+    inline bool isFunction() const { return _flags & flIsFunc; }
+    inline void setIsFunction(bool value) {
+        _flags = value ? (_flags | flIsFunc) : (_flags & ~flIsFunc);
+    }
     inline bool isPointer() const {
         return (_type&(rtFuncPointer|rtPointer|rtArray)) || (_next && _next->isPointer());
     }
@@ -73,7 +85,7 @@ private:
     ASTType* _next;
     QString _identifier;
     const ASTNode* _node;
-    bool _pointerSkipped;
+    quint8 _flags;
     int _arraySize;
 };
 
