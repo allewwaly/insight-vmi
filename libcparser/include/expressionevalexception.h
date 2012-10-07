@@ -4,11 +4,17 @@
 #include <genericexception.h>
 
 #define exprEvalError(x) do { \
-        throw ExpressionEvalException((x), 0, __FILE__, __LINE__); \
+        throw ExpressionEvalException((x), 0, \
+            ExpressionEvalException::ecUndefined, __FILE__, __LINE__); \
     } while (0)
 
 #define exprEvalError2(x, n) do { \
-    throw ExpressionEvalException((x), (n), __FILE__, __LINE__); \
+    throw ExpressionEvalException((x), (n), \
+            ExpressionEvalException::ecUndefined, __FILE__, __LINE__); \
+    } while (0)
+
+#define exprEvalError3(x, n, e) do { \
+    throw ExpressionEvalException((x), (n), (e), __FILE__, __LINE__); \
     } while (0)
 
 struct ASTNode;
@@ -16,6 +22,11 @@ struct ASTNode;
 class ExpressionEvalException: public GenericException
 {
 public:
+    enum ErrorCode {
+        ecUndefined,
+        ecTypeNotFound
+    };
+
     /**
       Constructor
       @param msg error message
@@ -25,8 +36,9 @@ public:
       @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
      */
     ExpressionEvalException(QString msg = QString(), const ASTNode* node = 0,
-                            const char* file = 0, int line = -1)
-        : GenericException(msg, file, line), node(node)
+                            ErrorCode error = ecUndefined, const char* file = 0,
+                            int line = -1)
+        : GenericException(msg, file, line), node(node), errorCode(error)
     {
     }
 
@@ -40,6 +52,7 @@ public:
     }
 
     const ASTNode* node;
+    ErrorCode errorCode;
 };
 
 
