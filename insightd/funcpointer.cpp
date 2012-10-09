@@ -6,6 +6,7 @@
  */
 
 #include "funcpointer.h"
+#include "array.h"
 #include "colorpalette.h"
 
 FuncPointer::FuncPointer(SymFactory* factory)
@@ -66,27 +67,104 @@ uint FuncPointer::hash(bool* isValid) const
 
 QString FuncPointer::prettyName() const
 {
-    return prettyName(_name);
+    return prettyName(_name, 0);
 }
 
 
-QString FuncPointer::prettyName(const QString& name) const
+QString FuncPointer::prettyParams() const
 {
-	QString s, rt;
+	QString s;
 	for (int i = 0; i < _params.size(); ++i) {
 		if (i > 0)
 			s += ", ";
 		s += _params[i]->prettyName();
 	}
+	return s;
+}
+
+
+
+QString FuncPointer::prettyName(QString name, const RefBaseType* from) const
+{
+	/*
+	  Declaration: int (* const (*pfunc_t)(void))(char);
+
+	  Result: Var(pfunc_t) -> Ptr -> FuncPtr(void) -> Const -> Ptr -> FuncPtr(char) -> Int32
+
+	  (*pfunc_t)(void)
+
+	 */
+
+	// Return value
+	QString rt;
 	if (_refTypeId) {
-		if (refType())
+		if (refType()) {
+			// If there is a referenced FuncPointer, delegate function to it
+			const BaseType* t = refTypeDeep(trAnyButTypedef);
+			if (t && t->type() == rtFuncPointer)
+				return dynamic_cast<const FuncPointer*>(t)->prettyName(name, from);
 			rt = refType()->prettyName();
+		}
 		else
-			rt = QString("(unresolved type 0x%1)").arg(_refTypeId, 0, 16);
+			rt = QString("(unresolved type 0x%1)").arg((uint)_refTypeId, 0, 16);
 	}
 	else
 		rt = "void";
-	return QString("%1 (*%2)(%3)").arg(rt).arg(name).arg(s);
+
+	// Any pointers or arrays?
+	int ptr = 0, arr = 0;
+	const Array* a;
+	const FuncPointer* fp;
+	while (from && from->id() != this->id()) {
+		switch (from->type()) {
+		case rtArray:
+			// If we preprended pointers, use parens to disambiguate type
+			if (ptr) {
+				name = "(" + name + ")";
+				ptr = 0;
+			}
+			a = dynamic_cast<const Array*>(from);
+			if (a->length() >= 0)
+				name += QString("[%1]").arg(a->length());
+			else
+				name += "[]";
+			++arr;
+			break;
+
+		case rtPointer:
+			// If we aprended brackets, use parens to disambiguate type
+			if (arr) {
+				name = "(" + name + ")";
+				arr = 0;
+			}
+			name = "*" + name;
+			++ptr;
+			break;
+
+		case rtFuncPointer:
+			fp = dynamic_cast<const FuncPointer*>(from);
+			name = "(" + name + ")(" + fp->prettyParams() + ")";
+			arr = ptr = 0;
+			break;
+
+		case rtConst:
+			name = " const " + name;
+			break;
+
+		case rtVolatile:
+			name = " volatile " + name;
+			break;
+
+		default:
+			debugerr(QString("Unhandled referencing type '%1' in '%2'.")
+						 .arg(realTypeToStr(from->type()))
+						 .arg(__PRETTY_FUNCTION__));
+		}
+
+		from = dynamic_cast<const RefBaseType*>(from->refType());
+	}
+
+	return rt + " (" + name + ")(" + prettyParams() + ")";
 }
 
 

@@ -196,7 +196,18 @@ QString ColorPalette::prettyNameInColor(const BaseType* t, int minLen, int maxLe
     if (!t)
         return QString();
 
-    NamePartList parts = prettyNameInColor(t);
+    NamePartList parts = prettyNameInColor(QString(), ctReset, t);
+    return namePartsToString(parts, minLen, maxLen);
+}
+
+
+QString ColorPalette::prettyNameInColor(const QString &name, ColorType nameType,
+                                        const BaseType *t, int minLen, int maxLen) const
+{
+    if (!t)
+        return QString();
+
+    NamePartList parts = prettyNameInColor(name, nameType, t);
     return namePartsToString(parts, minLen, maxLen);
 }
 
@@ -260,7 +271,9 @@ QString ColorPalette::namePartsToString(const NamePartList &parts, int minLen, i
 }
 
 
-NamePartList ColorPalette::prettyNameInColor(const BaseType *t) const
+NamePartList ColorPalette::prettyNameInColor(const QString &name,
+                                             ColorType nameType,
+                                             const BaseType *t) const
 {
     if (!t)
         return NamePartList();
@@ -268,6 +281,13 @@ NamePartList ColorPalette::prettyNameInColor(const BaseType *t) const
     NamePartList parts;
 
     const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
+    const FuncPointer* fp;
+
+	// Do we have a referencing FuncPointer?
+	const BaseType* bt = rbt ? rbt->refTypeDeep(BaseType::trAnyButTypedef) : 0;
+	if (bt && bt->type() == rtFuncPointer)
+		return funcPointerInColor(
+					dynamic_cast<const FuncPointer*>(bt), name, nameType, rbt);
 
     switch (t->type()) {
     case rtInt8:
@@ -317,7 +337,7 @@ NamePartList ColorPalette::prettyNameInColor(const BaseType *t) const
             parts.append(NamePart(" void", color(ctKeyword)));
         else {
             parts.append(NamePart(" ", 0));
-            parts += prettyNameInColor(rbt->refType());
+            parts += prettyNameInColor(name, nameType, rbt->refType());
         }
         break;
 
@@ -326,14 +346,14 @@ NamePartList ColorPalette::prettyNameInColor(const BaseType *t) const
         if (rbt->refTypeId() == 0)
             parts.append(NamePart("void", color(ctKeyword)));
         else
-            parts += prettyNameInColor(rbt->refType());
+            parts += prettyNameInColor(name, nameType, rbt->refType());
         break;
 
     case rtPointer:
         if (rbt->refTypeId() == 0)
             parts.append(NamePart("void", color(ctKeyword)));
         else
-            parts = prettyNameInColor(rbt->refType());
+            parts = prettyNameInColor(name, nameType, rbt->refType());
         parts.append(NamePart(" *", color(ctType)));
         break;
 
@@ -342,7 +362,7 @@ NamePartList ColorPalette::prettyNameInColor(const BaseType *t) const
         if (rbt->refTypeId() == 0)
             parts.append(NamePart("void", color(ctKeyword)));
         else
-            parts = prettyNameInColor(rbt->refType());
+            parts = prettyNameInColor(name, nameType, rbt->refType());
         parts.append(NamePart("[", color(ctReset)));
         parts.append(NamePart(a->length() < 0 ?
                                   QString("?") : QString::number(a->length()),
@@ -351,17 +371,16 @@ NamePartList ColorPalette::prettyNameInColor(const BaseType *t) const
         break;
     }
 
-    case rtFunction:
-    case rtFuncPointer: {
-        const FuncPointer* fp = dynamic_cast<const FuncPointer*>(rbt);
-        QString s;
-        for (int i = 0; i < fp->params().size(); ++i) {
-            if (i > 0)
-                s += ", ";
-            s += fp->params().at(i)->prettyName();
-        }
+    case rtFuncPointer:
+        fp = dynamic_cast<const FuncPointer*>(rbt);
+        parts = funcPointerInColor(fp, name, nameType, 0);
+        break;
+
+    case rtFunction: {
+        fp = dynamic_cast<const FuncPointer*>(rbt);
+        QString s = fp->prettyParams();
         if (fp->refTypeId())
-            parts = prettyNameInColor(fp->refType());
+            parts = prettyNameInColor(name, nameType, fp->refType());
         else
             parts.append(NamePart("void", color(ctKeyword)));
         if (fp->type() & rtFuncPointer) {
@@ -385,4 +404,108 @@ NamePartList ColorPalette::prettyNameInColor(const BaseType *t) const
     }
 
     return parts;
+}
+
+
+NamePartList ColorPalette::funcPointerInColor(const FuncPointer* fp,
+											  const QString& name,
+											  ColorType nameType,
+											  const RefBaseType* from) const
+{
+	/*
+	  Declaration: int (* const (*pfunc_t)(void))(char);
+
+	  Result: Var(pfunc_t) -> Ptr -> FuncPtr(void) -> Const -> Ptr -> FuncPtr(char) -> Int32
+
+	  (*pfunc_t)(void)
+
+	 */
+
+    if (!fp)
+        return NamePartList();
+
+    NamePartList rt, parts;
+
+	// Return value
+	if (fp->refTypeId()) {
+		if (fp->refType()) {
+			// If there is a referenced FuncPointer, delegate function to it
+			const BaseType* t = fp->refTypeDeep(BaseType::trAnyButTypedef);
+			if (t && t->type() == rtFuncPointer)
+				return funcPointerInColor(dynamic_cast<const FuncPointer*>(t),
+										  name, nameType, from);
+		}
+		rt = prettyNameInColor(name, nameType, fp->refType());
+	}
+	else
+		rt.append(NamePart("void", color(ctKeyword)));
+
+	parts.append(NamePart(name, color(nameType)));
+
+	// Any pointers or arrays?
+	int ptr = 0, arr = 0;
+	const Array* a;
+	const FuncPointer* fp2;
+	while (from && from->id() != fp->id()) {
+		switch (from->type()) {
+		case rtArray:
+			// If we preprended pointers, use parens to disambiguate type
+			if (ptr) {
+				parts.prepend(NamePart("(", 0));
+				parts.append(NamePart(")", 0));
+				ptr = 0;
+			}
+			a = dynamic_cast<const Array*>(from);
+			parts.append(NamePart("[", 0));
+			if (a->length() >= 0)
+				parts.append(NamePart(QString::number(a->length()), color(ctNumber)));
+			parts.append(NamePart("]", 0));
+			++arr;
+			break;
+
+		case rtPointer:
+			// If we aprended brackets, use parens to disambiguate type
+			if (arr) {
+				parts.prepend(NamePart("(", 0));
+				parts.append(NamePart(")", 0));
+				arr = 0;
+			}
+			parts.prepend(NamePart("*", color(ctType)));
+			++ptr;
+			break;
+
+		case rtFuncPointer:
+			fp2 = dynamic_cast<const FuncPointer*>(from);
+			parts.prepend(NamePart("(", 0));
+			parts.append(NamePart(")(", 0));
+			parts.append(NamePart(fp2->prettyParams(), color(ctFuncParams)));
+			parts.append(NamePart(")", 0));
+			arr = ptr = 0;
+			break;
+
+		case rtConst:
+			parts.prepend(NamePart(" const ", color(ctKeyword)));
+			break;
+
+		case rtVolatile:
+			parts.prepend(NamePart(" volatile ", color(ctKeyword)));
+			break;
+
+		case rtTypedef:
+			// just ignore
+			break;
+
+		default:
+			debugerr(QString("Unhandled referencing type '%1'")
+						 .arg(realTypeToStr(from->type())));
+		}
+
+		from = dynamic_cast<const RefBaseType*>(from->refType());
+	}
+
+	parts.prepend(NamePart(" (", 0));
+	parts.append(NamePart(")(", 0));
+	parts.append(NamePart(fp->prettyParams(), color(ctFuncParams)));
+	parts.append(NamePart(")", 0));
+	return rt + parts;
 }

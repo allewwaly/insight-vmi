@@ -44,6 +44,8 @@ typedef QPair<QString, const char*> NamePart;
 typedef QList<NamePart> NamePartList;
 
 class BaseType;
+class RefBaseType;
+class FuncPointer;
 
 /**
  * This class produces ANSI color codes and supports the color output for ANSI
@@ -100,9 +102,14 @@ public:
      */
     QString prettyNameInColor(const BaseType* t, int minLen, int maxLen = 0) const;
 
+    QString prettyNameInColor(const QString &name, ColorType nameType,
+                              const BaseType* t, int minLen, int maxLen = 0) const;
+
 private:
     QString namePartsToString(const NamePartList& parts, int minLen = 0, int maxLen = 0) const;
-    NamePartList prettyNameInColor(const BaseType* t) const;
+    NamePartList prettyNameInColor(const QString &name, ColorType nameType, const BaseType* t) const;
+    NamePartList funcPointerInColor(const FuncPointer* fp, const QString &name, ColorType nameType,
+                                    const RefBaseType* from) const;
 
     bool _allowColor;
 };

@@ -27,10 +27,10 @@ QString Variable::prettyName() const
 {
     QString s_typename;
     const BaseType* t = refType();
-    const FuncPointer *fp = dynamic_cast<const FuncPointer*>(t);
-
+    const FuncPointer *fp = dynamic_cast<const FuncPointer*>(
+                refTypeDeep(BaseType::trAnyButTypedef));
     if (fp)
-        return fp->prettyName(_name);
+        return fp->prettyName(_name, dynamic_cast<const RefBaseType*>(t));
     else if (t) {
         if (t->prettyName().isEmpty())
             s_typename = "(anonymous type)";

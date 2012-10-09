@@ -83,6 +83,7 @@ public:
         trPointersAndArrays = rtPointer|rtArray,    ///< resolve rtPointer and rtArray
         trLexicalPointersArrays = trLexicalAndPointers|rtArray, ///< resolve as for trLexicalAndPointers plus rtArray
         trAnyNonNull   = trLexicalPointersArrays,   ///< resolve all types, but no null pointers
+        trAnyButTypedef = rtPointer|rtArray|rtConst|rtVolatile|rtFunction, ///< resolve all referencing types except rtTypedef
         trNullPointers = 0x80000000,                ///< resolve rtPointer even with null address
         trAny          = trNullPointers|trAnyNonNull ///< resolve all types, incl. null pointers
     };

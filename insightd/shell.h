@@ -218,6 +218,10 @@ public:
     QString prettyNameInColor(const BaseType* t, int minLen = 0,
                               int maxLen = 0) const;
 
+    QString prettyNameInColor(const QString& name, ColorType nameType,
+                              const BaseType* t, int minLen = 0,
+                              int maxLen = 0) const;
+
     /**
      * Saves the command line history to the history file.
      */
@@ -328,7 +332,8 @@ private:
 #endif
     int cmdScript(QStringList args);
     int cmdShow(QStringList args);
-    int cmdShowBaseType(const BaseType* t);
+    int cmdShowBaseType(const BaseType* t, const QString& name = QString(),
+                        ColorType nameType = ctReset);
     int cmdShowVariable(const Variable* v);
     int cmdStats(QStringList args);
     int cmdStatsPostponed(QStringList args);
