@@ -54,9 +54,11 @@ struct SlubObject
  *
  * First of all, the monitored kernel has to be configured to use the SLUB
  * allocator (instead of the SLAB allocator). To enable the SLUB debug output,
- * append <tt>slub_debug=U</tt> to the kernel command line. Note that this will
- * slow down the machine by an order of magnitured! For details, check the file
- * <tt>Documentation/vm/slub.txt</tt> in your kernel's source directory.
+ * append <tt>slub_debug=T</tt> to the kernel command line.
+ *
+ * \warning This will slow down the machine by an order of magnitured! For
+ * details, check the file <tt>Documentation/vm/slub.txt</tt> in your kernel's
+ * source directory.
  *
  * The best way to collect the debug output is to have the kernel redirect its
  * output to a serial console and redirect the VMM's serial console to a file.
@@ -65,18 +67,25 @@ struct SlubObject
  *
  * In summary, the steps are as follows:
  *
- * 1. Start KVM:
+ * 1. Start KVM with the serial console redirected to a file:
  * \code
  * kvm -serial file:serial.log <other_params>
  * \endcode
  *
  * 2. Append the following to the kernel command line:
  * \code
- * slub_debug=U console=ttyS0,115200
+ * slub_debug=T console=ttyS0,115200
  * \endcode
  *
- * 3. The file <tt>serial.log</tt> can be used as input to the SlubObjects
- * class.
+ * 3. Process the file <tt>serial.log</tt> with the script
+ * <tt>slub-objects.pl</tt> found in the directory <tt>tools/</tt> of the
+ * InSight distribution:
+ * \code
+ * /path/to/insight-vmi/tools/slub-objects.pl <serial.log >objects.log
+ * \endcode
+ *
+ * 4. The resulting file <tt>objects.log</tt> can be used as input to the
+ * SlubObjects class.
  */
 class SlubObjects
 {
