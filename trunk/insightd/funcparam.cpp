@@ -28,9 +28,10 @@ FuncPointer* FuncParam::belongsTo() const
 QString FuncParam::prettyName() const
 {
     const BaseType* t = refType();
-    const FuncPointer *fp = dynamic_cast<const FuncPointer*>(t);
+    const FuncPointer *fp = dynamic_cast<const FuncPointer*>(
+                refTypeDeep(BaseType::trAnyButTypedef));
     if (fp)
-        return fp->prettyName(_name);
+        return fp->prettyName(_name, dynamic_cast<const RefBaseType*>(t));
     else if (t)
         return _name.isEmpty() ?
                     t->prettyName() :
@@ -41,9 +42,9 @@ QString FuncParam::prettyName() const
     else
         return _name.isEmpty() ?
                     QString("(unresolved type 0x%1) %2")
-                        .arg(_refTypeId, 0, 16) :
+                        .arg((uint)_refTypeId, 0, 16) :
                     QString("(unresolved type 0x%1) %2")
-                        .arg(_refTypeId, 0, 16)
+                        .arg((uint)_refTypeId, 0, 16)
                         .arg(_name);
 }
 

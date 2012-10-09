@@ -6,6 +6,7 @@
  */
 
 #include "pointer.h"
+#include "funcpointer.h"
 #include <string.h>
 #include "virtualmemoryexception.h"
 #include <debug.h>
@@ -39,7 +40,11 @@ RealType Pointer::type() const
 QString Pointer::prettyName() const
 {
     const BaseType* t = refType();
-    if (t)
+    const FuncPointer *fp = dynamic_cast<const FuncPointer*>(
+                refTypeDeep(trAnyButTypedef));
+    if (fp)
+        return fp->prettyName(QString(), this);
+    else if (t)
         return t->prettyName() + " *";
     else if (_refTypeId == 0)
         return "void *";

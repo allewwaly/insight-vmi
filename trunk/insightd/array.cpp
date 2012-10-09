@@ -6,6 +6,7 @@
  */
 
 #include "array.h"
+#include "funcpointer.h"
 #include "virtualmemoryexception.h"
 #include <debug.h>
 #include "colorpalette.h"
@@ -63,7 +64,11 @@ QString Array::prettyName() const
 {
     QString len = (_length >= 0) ? QString::number(_length) : QString();
     const BaseType* t = refType();
-    if (t)
+    const FuncPointer *fp = dynamic_cast<const FuncPointer*>(
+                refTypeDeep(trAnyButTypedef));
+    if (fp)
+        return fp->prettyName(QString(), this);
+    else if (t)
         return QString("%1[%2]").arg(t->prettyName()).arg(len);
     else
         return QString("[%1]").arg(len);

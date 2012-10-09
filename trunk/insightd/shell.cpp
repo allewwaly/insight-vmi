@@ -1819,6 +1819,12 @@ QString Shell::prettyNameInColor(const BaseType *t, int minLen, int maxLen) cons
     return _color.prettyNameInColor(t, minLen, maxLen);
 }
 
+QString Shell::prettyNameInColor(const QString &name, ColorType nameType,
+                                 const BaseType *t, int minLen, int maxLen) const
+{
+    return _color.prettyNameInColor(name, nameType, t, minLen, maxLen);
+}
+
 
 QSize Shell::termSize() const
 {
@@ -2313,18 +2319,22 @@ int Shell::cmdShow(QStringList args)
     const Variable * var = 0;
     QList<IntEnumPair> enums;
     bool exprIsVar = false;
+    bool exprIsId = false;
 
     // Did we parse an ID?
     if (ok) {
     	// Try to find this ID in types and variables
     	if ( (bt = _sym.factory().findBaseTypeById(id)) ) {
-            _out << "Found type with ID " << color(ctTypeId) << "0x"
+            _out << "Found "
+                 << (bt->type() == rtFunction ? "function" : "type")
+                 << " with ID " << color(ctTypeId) << "0x"
                  << hex << (uint)id << dec << color(ctReset);
     	}
     	else if ( (var = _sym.factory().findVarById(id)) ) {
             _out << "Found variable with ID " << color(ctTypeId) << "0x"
                  << hex << (uint)id << dec << color(ctTypeId) ;
     	}
+        exprIsId = var || bt;
     }
 
     // If we did not find a type by that ID, try the names
@@ -2357,9 +2367,11 @@ int Shell::cmdShow(QStringList args)
         }
 
         if (!types.isEmpty()) {
-            _out << "Found type with name "
-                 << color(ctType) << s << color(ctReset);
             bt = types.first();
+            _out << "Found "
+                 << (bt && bt->type() == rtFunction ? "function" : "type")
+                 << " with name "
+                 << color(ctType) << s << color(ctReset);
     	}
     	if (!vars.isEmpty()) {
             exprIsVar = true;
@@ -2420,7 +2432,9 @@ int Shell::cmdShow(QStringList args)
         }
         else
             _out << ":" << endl;
-        return cmdShowBaseType(bt);
+
+        return cmdShowBaseType(bt, exprIsId ? QString() : expr.last(),
+                               expr.size() > 1 ? ctMember : ctType);
     }
     else if (!enums.isEmpty())
         return 0;
@@ -2432,13 +2446,15 @@ int Shell::cmdShow(QStringList args)
 }
 
 
-int Shell::cmdShowBaseType(const BaseType* t)
+int Shell::cmdShowBaseType(const BaseType* t, const QString &name,
+						   ColorType nameType)
 {
 	_out << color(ctColHead) << "  ID:             "
 		 << color(ctTypeId) << "0x" << hex << (uint)t->id() << dec << endl;
 	_out << color(ctColHead) << "  Name:           "
 		 << (t->prettyName().isEmpty() ?
-				 QString("(unnamed)") : prettyNameInColor(t, 0, 0)) << endl;
+				 QString("(unnamed)") :
+				 prettyNameInColor(name, nameType, t, 0, 0)) << endl;
 	_out << color(ctColHead) << "  Type:           "
 		 << color(ctReset) << realTypeToStr(t->type()) << endl;
 	const Function* func = dynamic_cast<const Function*>(t);
@@ -2507,14 +2523,14 @@ int Shell::cmdShowBaseType(const BaseType* t)
     }
 
 	const Structured* s = dynamic_cast<const Structured*>(t);
-	if (s) {
+	if (!fp && s) {
 		_out << color(ctColHead) << "  Members:        "
 			 << color(ctReset) << s->members().size() << endl;
 		printStructMembers(s, 4);
 	}
 
 	const Enum* e = dynamic_cast<const Enum*>(t);
-	if (e) {
+	if (!fp && e) {
 		_out << color(ctColHead) << "  Enumerators:    "
 			 << color(ctReset) << e->enumValues().size() << endl;
 
@@ -2728,7 +2744,7 @@ int Shell::cmdShowVariable(const Variable* v)
     _out << color(ctColHead) << "  Type:           "
          << color(ctTypeId) << QString("0x%1 ").arg((uint)v->refTypeId(), -8, 16);
     if (rt)
-        _out << prettyNameInColor(rt, 0, 0);
+        _out << prettyNameInColor(v->name(), ctVariable, rt, 0, 0);
     else if (v->refTypeId())
         _out << color(ctReset) << "(unresolved)";
     else
@@ -2760,7 +2776,7 @@ int Shell::cmdShowVariable(const Variable* v)
 
 	if (rt) {
 		_out << "Corresponding type information:" << endl;
-		cmdShowBaseType(v->refType());
+		cmdShowBaseType(v->refType(), v->name(), ctVariable);
 	}
 
 	return ecOk;
