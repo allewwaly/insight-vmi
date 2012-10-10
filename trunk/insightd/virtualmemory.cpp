@@ -130,7 +130,7 @@ VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
       _userland(false), _userPGD(0), _userlandMutex(QMutex::Recursive)
 {
     // Make sure the architecture is set
-    if ( !_specs.arch & (MemSpecs::ar_i386|MemSpecs::ar_x86_64) )
+    if ( !(_specs.arch & (MemSpecs::ar_i386|MemSpecs::ar_x86_64)) )
         virtualMemoryError("No architecture set in memory specifications");
 
     if (_physMem)
@@ -198,12 +198,12 @@ bool VirtualMemory::seek(qint64 pos)
 	//prevent any seek while we might be in userLand mode
 	QMutexLocker locker(&_userlandMutex);
 
-	if(!_userland){
+//	if(!_userland){
 		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
-	}else{
+//	}else{
 		//std::cout << "mySeek virtualToPhysicalUserLand pgd: "<<std::hex<<_userPGD<<std::endl;
-		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
-	}
+//		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
+//	}
 
 	locker.unlock();
 

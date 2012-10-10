@@ -15,7 +15,8 @@
 
 
 ASTSourcePrinter::ASTSourcePrinter(AbstractSyntaxTree* ast)
-    : ASTWalker(ast), _indent(0), _lineIndent(0), _currNode(0), _rootNode(0)
+    : ASTWalker(ast), _indent(0), _lineIndent(0), _currNode(0), _rootNode(0),
+      _prefixLineNo(false)
 {
 }
 

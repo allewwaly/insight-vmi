@@ -70,6 +70,7 @@ struct BuilderSharedState
     void reset()
     {
         queue.clear();
+        minProbability = 0;
         processed = threadCount = vmemReading = vmemWriting = 0;
         maxObjSize = 0;
         lastNode = 0;

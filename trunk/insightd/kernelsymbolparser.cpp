@@ -109,6 +109,7 @@ KernelSymbolParser::WorkerThread::WorkerThread(
       _bytesRead(0),
       _info(0),
       _parentInfo(0),
+      _hdrSym(hsUnknownSymbol),
       _curSrcID(-1),
       _nextId(-1),
       _curFileIndex(-1)
@@ -590,7 +591,7 @@ void KernelSymbolParser::WorkerThread::parse(QIODevice* from)
 /******************************************************************************/
 
 KernelSymbolParser::KernelSymbolParser(SymFactory *factory)
-    : _factory(factory), _durationLastFileFinished(0)
+    : _factory(factory), _filesIndex(0), _durationLastFileFinished(0)
 {
 }
 

@@ -81,7 +81,7 @@ protected:
 
 
 ASTTypeEvaluatorTest::ASTTypeEvaluatorTest(QObject* parent)
-    : QObject(parent), _ast(0), _builder(0)
+    : QObject(parent), _ast(0), _builder(0), _tester(0)
 {
 }
 

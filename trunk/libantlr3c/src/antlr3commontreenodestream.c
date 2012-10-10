@@ -116,6 +116,7 @@ antlr3CommonTreeNodeStreamNew(pANTLR3_STRING_FACTORY strFactory, ANTLR3_UINT32 h
 
     if	(stream->adaptor == (pANTLR3_BASE_TREE_ADAPTOR) ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM))
     {
+    ANTLR3_FREE(stream);
 	return	(pANTLR3_COMMON_TREE_NODE_STREAM) ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM);
     }
 

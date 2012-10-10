@@ -37,7 +37,7 @@ antlr3TreeParserNewStream(ANTLR3_UINT32 sizeHint, pANTLR3_COMMON_TREE_NODE_STREA
 
     if	(parser->rec == (pANTLR3_BASE_RECOGNIZER) ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM))
     {
-	parser->free(parser);
+    ANTLR3_FREE(parser);
 	return	(pANTLR3_TREE_PARSER) ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM);
     }
     

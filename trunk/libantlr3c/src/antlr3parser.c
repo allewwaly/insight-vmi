@@ -29,7 +29,7 @@ antlr3ParserNew		(ANTLR3_UINT32 sizeHint)
 
     if	(parser->rec == (pANTLR3_BASE_RECOGNIZER) ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM))
     {
-	parser->free(parser);
+    ANTLR3_FREE(parser);
 	return	(pANTLR3_PARSER) ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM);
     }
 
