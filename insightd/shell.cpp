@@ -766,12 +766,14 @@ int Shell::eval(QString command)
             errMsg(e.message);
     		// Show a list of ambiguous types
     		if (e.errorCode == QueryException::ecAmbiguousType) {
-    			_err << "Select a type by its ID from the following list:"
-    					<< endl << endl;
+                errMsg("Select a type by its ID from the following list:", true);
+
+                TypeListFilter filter;
+                filter.setTypeName(e.errorParam.toString());
 
     			QIODevice* outDev = _out.device();
-    			_out.setDevice(_err.device());
-                cmdListTypes(QStringList(e.errorParam.toString()));
+    			_out.setDevice(_err.device());                
+                printTypeList(filter);
     			_out.setDevice(outDev);
     		}
     	}
