@@ -183,6 +183,17 @@ public slots:
     void AddToAddress(int offset);
 
     /**
+     * If this Instance represents a Pointer or an Array type, this function
+     * can be used to access the corresponding array elements. The difference
+     * between a pointer and an array type is that a pointer will be
+     * dereferenced first before (index * sizeof(T)) is added to the address,
+     * for arrays only (index * sizeof(T)) is added.
+     * @param index array index, starting from 0
+     * @return instance of array element
+     */
+    Instance ArrayElem(int index) const;
+
+    /**
      * @return the ID of this instance, if it was directly instantiated from a
      * global variable, -1 otherwise
      */
