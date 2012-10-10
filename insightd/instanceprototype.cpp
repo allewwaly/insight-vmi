@@ -104,6 +104,13 @@ void InstancePrototype::AddToAddress(int offset)
 }
 
 
+Instance InstancePrototype::ArrayElem(int index) const
+{
+    Instance* inst = thisInstance();
+    return inst ? inst->arrayElem(index) : Instance();
+}
+
+
 bool InstancePrototype::Equals(const Instance& other) const
 {
     try {
