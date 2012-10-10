@@ -22,6 +22,7 @@
 #include "kernelsymbols.h"
 #include "memorydump.h"
 #include "colorpalette.h"
+#include "listfilter.h"
 
 // Forward declaration
 class QProcess;
@@ -300,7 +301,10 @@ private:
     int evalLine();
     void hline(int width = 60);
     int parseMemDumpIndex(QStringList &args, int skip = 0, bool quiet = false);
-    //---------------------------------
+    int printVarList(const VarListFilter& filter);
+    int printTypeList(const TypeListFilter& filter);
+    int printFilterHelp(const QHash<QString, QString> help);
+//---------------------------------
 //    int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
     int cmdHelp(QStringList args);
