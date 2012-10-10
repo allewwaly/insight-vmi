@@ -153,16 +153,16 @@ Shell::Shell(bool listenOnSocket)
                 &Shell::cmdList,
                 "Lists various types of read symbols",
                 "This command lists various types of read symbols.\n"
-                "  list functions [<glob>]   List all functions, optionally filtered by a\n"
-                "                            wildcard expression <glob>\n"
+                "  list functions [<filter>] List all functions, optionally filtered by\n"
+                "                            filters <filter>\n"
                 "  list sources              List all source files\n"
-                "  list types [<glob>]       List all types, optionally filtered by a\n"
-                "                            wildcard expression <glob>\n"
+                "  list types [<filter>]     List all types, optionally filtered by \n"
+                "                            filters <filter>\n"
                 "  list types-using <id>     List the types using type <id>\n"
                 "  list types-by-id          List the types-by-ID hash\n"
                 "  list types-by-name        List the types-by-name hash\n"
-                "  list variables [<glob>]   List all variables, optionally filtered by\n"
-                "                            a wildcard expression <glob>\n"
+                "  list variables [<filter>] List all variables, optionally filtered by\n"
+                "                            filters <filter>\n"
                 "  list vars-using <id>      List the variables of type <id>"));
 
     _commands.insert("memory",
@@ -1017,14 +1017,68 @@ int Shell::cmdListSources(QStringList /*args*/)
 
 int Shell::cmdListTypes(QStringList args, int typeFilter)
 {
+    if (!args.isEmpty() && args.first() == "help")
+        return printFilterHelp(TypeListFilter::filterHelp());
+
+    TypeListFilter filter;
+    try {
+        filter.parseOptions(args);
+        if (filter.filterActive(foRealType))
+            filter.setRealType(filter.realType() & typeFilter);
+        else
+            filter.setRealType(typeFilter);
+        return printTypeList(filter);
+    }
+    catch (ListFilterException& e) {
+        errMsg(e.message, true);
+    }
+    return ecCaughtException;
+}
+
+
+int Shell::printFilterHelp(const QHash<QString, QString> help)
+{
+    QStringList keys(help.uniqueKeys());
+    keys.sort();
+
+    int maxKeySize = 0;
+    for (int i = 0; i < keys.size(); ++i)
+        if (keys[i].size() > maxKeySize)
+            maxKeySize = keys[i].size();
+
+    shell->out() << "Filters can be applied in the form \"key:value\". The "
+                    "following filter options are available:" << endl;
+
+    QSize ts = termSize();
+    for (int i = 0; i < keys.size(); ++i) {
+        QString text = help[keys[i]];
+        QString s = QString("  %1  ").arg(keys[i], -maxKeySize);
+        int j = 0;
+        while (j < text.size()) {
+            if (s.size() < ts.width()) {
+                int rem_t = text.size() - j;
+                int rem_w = ts.width() - s.size();
+                int w = qMin(rem_t, rem_w);
+                s += text.mid(j, w);
+                j += w;
+            }
+            else {
+                shell->out() << s << endl;
+                s = QString(maxKeySize + 4, QChar(' '));
+            }
+        }
+        shell->out() << s << endl;
+        s.clear();
+    }
+
+    return ecOk;
+}
+
+
+int Shell::printTypeList(const TypeListFilter& filter)
+{
     const BaseTypeList* types = &_sym.factory().types();
     CompileUnit* unit = 0;
-
-    // Expect at most one parameter
-    if (args.size() > 1) {
-        cmdHelp(QStringList("list"));
-        return 1;
-    }
 
     if (types->isEmpty()) {
         _out << "There are no type references.\n";
@@ -1045,9 +1099,6 @@ int Shell::cmdListTypes(QStringList args, int typeFilter)
 
     bool headerPrinted = false;
     int typeCount = 0;
-    bool applyFilter = !args.isEmpty();
-    QRegExp rxFilter(args.isEmpty() ? QString() : args.first(),
-    		Qt::CaseSensitive, QRegExp::WildcardUnix);
 
     QString src, srcLine, name;
 
@@ -1055,11 +1106,7 @@ int Shell::cmdListTypes(QStringList args, int typeFilter)
         BaseType* type = types->at(i);
 
         // Skip all types not matching the filter
-        if (! (type->type() & typeFilter) )
-            continue;
-
-        // Apply name filter, if requested
-        if (applyFilter && !rxFilter.exactMatch(type->name()))
+        if (filter.filters() && !filter.match(type))
             continue;
 
         // Print header if not yet done
@@ -1122,8 +1169,8 @@ int Shell::cmdListTypes(QStringList args, int typeFilter)
 			_out << "Total types: " << color(ctBold) << dec << typeCount
 				 << color(ctReset) << endl;
 		}
-		else if (applyFilter)
-			_out << "No types matching that name." << endl;
+		else if (filter.filters())
+			_out << "No types match the specified filters." << endl;
 	}
 
     return ecOk;
@@ -1338,14 +1385,28 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
 
 int Shell::cmdListVars(QStringList args)
 {
+    if (!args.isEmpty() && args.first() == "help")
+        return printFilterHelp(VarListFilter::filterHelp());
+
+    // Parse the filters
+    VarListFilter filter(_sym.factory().origSymFiles());
+    try {
+        filter.parseOptions(args);
+        return printVarList(filter);
+    }
+    catch (ListFilterException& e) {
+        errMsg(e.message, true);
+    }
+
+    return ecCaughtException;
+}
+
+
+int Shell::printVarList(const VarListFilter& filter)
+{
     const VariableList& vars = _sym.factory().vars();
     CompileUnit* unit = 0;
 
-    // Expect at most one parameter
-    if (args.size() > 1) {
-        cmdHelp(QStringList("list"));
-        return 1;
-    }
 
     if (vars.isEmpty()) {
         _out << "There were no variable references.\n";
@@ -1369,17 +1430,13 @@ int Shell::cmdListVars(QStringList args)
 
     bool headerPrinted = false;
     int varCount = 0;
-    bool applyFilter = !args.isEmpty();
-    QRegExp rxFilter(args.isEmpty() ? QString() : args.first(),
-    		Qt::CaseSensitive, QRegExp::WildcardUnix);
-
 
     for (int i = 0; i < vars.size() && !_interrupted; i++) {
         Variable* var = vars[i];
 
-        // Apply name filter, if requested
-        if (applyFilter && !rxFilter.exactMatch(var->name()))
-        	continue;
+        // Apply filter
+        if (filter.filters() && !filter.match(var))
+            continue;
 
         // Print header if not yet done
         if (!headerPrinted) {
@@ -1423,16 +1480,8 @@ int Shell::cmdListVars(QStringList args)
 
         // Shorten the type name, if required
         QString s_typename;
-        if (var->refType()) {
-//            if (var->refType()->name().isEmpty())
-                s_typename = prettyNameInColor(var->refType(), w_typename, w_typename);
-//            else {
-//                s_typename = var->refType()->name();
-//                if (s_typename.length() > w_typename)
-//                    s_typename = s_typename.left(w_typename - 3) + "...";
-//                s_typename = color(ctType) + s_typename;
-//            }
-        }
+        if (var->refType())
+            s_typename = prettyNameInColor(var->refType(), w_typename, w_typename);
         else
             s_typename = QString("%1%2").arg(color(ctKeyword)).arg("void", -w_typename);
 
@@ -1473,8 +1522,8 @@ int Shell::cmdListVars(QStringList args)
             _out << "Total variables: " << color(ctBold) << dec << varCount
                  << color(ctReset) << endl;
         }
-        else if (applyFilter)
-            _out << "No variables matching that name." << endl;
+        else if (filter.filters())
+            _out << "No variable matches the specified filters." << endl;
     }
 
     return ecOk;
@@ -2349,12 +2398,17 @@ int Shell::cmdShow(QStringList args)
                  << "\" is ambiguous:" << endl << endl;
 
     		if (!types.isEmpty()) {
-    			cmdListTypes(QStringList(s));
+                TypeListFilter filter;
+                filter.setTypeName(s);
+                printTypeList(filter);
     			if (!vars.isEmpty())
     				_out << endl;
     		}
-    		if (vars.size() > 0)
-    			cmdListVars(QStringList(s));
+            if (vars.size() > 0) {
+                VarListFilter filter;
+                filter.setVarName(s);
+                printVarList(filter);
+            }
     		return 1;
     	}
 
