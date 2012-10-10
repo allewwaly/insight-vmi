@@ -372,20 +372,37 @@ void Instance::differencesRek(const Instance& other,
 
 Instance Instance::arrayElem(int index) const
 {
-    if (!_d.type || !(_d.type->type() & (rtPointer|rtArray)))
+    if (!_d.type || index < 0)
         return Instance();
 
-    const Pointer* p = dynamic_cast<const Pointer*>(_d.type);
-    if (!p->refType())
+    const Pointer* p = (_d.type->type() & (rtPointer|rtArray)) ?
+                dynamic_cast<const Pointer*>(_d.type) : 0;
+
+    if (p && !p->refType())
         return Instance();
 
-    return Instance(
-                _d.address + (index * p->refType()->size()),
-                p->refType(),
-                _d.name + '[' + QString::number(index) + ']',
-                _d.parentNames,
-                _d.vmem,
-                -1);
+    Instance ret;
+
+    // A pointer we have to dereference first
+    if (_d.type->type() == rtPointer) {
+        int deref;
+        // Dereference exactely once
+        ret = dereference(BaseType::trLexicalAndPointers, 1, &deref);
+        if (deref != 1)
+            return Instance();
+    }
+    else {
+        ret = *this;
+        // For arrays, the resulting type is the referencing type
+        if (_d.type->type() == rtArray)
+            ret._d.type = p->refType();
+    }
+
+    // Update address and name
+    ret._d.address += index * (p ? p->refType()->size() : ret.size());
+    ret._d.name += '[' + QString::number(index) + ']';
+
+    return ret;
 }
 
 
