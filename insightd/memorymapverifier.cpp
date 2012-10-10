@@ -125,6 +125,8 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map) :
     _slubDataParsed(false),
     _slubDataAvailable(false),
     _slub(map->symfactory(), map->vmem()),
+    _minValidProbability(1.0),
+    _maxInvalidProbability(0.0),
     verifierMutex(QMutex::Recursive)
 {
 }
@@ -137,6 +139,8 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map, const char *slubFile) :
     _slubDataParsed(false),
     _slubDataAvailable(true),
     _slub(map->symfactory(), map->vmem()),
+    _minValidProbability(1.0),
+    _maxInvalidProbability(0.0),
     verifierMutex(QMutex::Recursive)
 {
 }

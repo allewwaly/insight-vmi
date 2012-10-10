@@ -246,7 +246,6 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 {
 	Instance result;
 	QString typeString, symbol, offsetString, candidate, arrayIndexString;
-	size_t address;
 	bool okay;
     quint32 compatibleCnt = 0;
 
@@ -315,7 +314,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	}
 	else {
 		// We have a instance therefore we resolve the member
-		if (!instance.type()->type() & StructOrUnion)
+		if (!(instance.type()->type() & StructOrUnion))
             queryError(QString("Member \"%1\" is not a struct or union")
                         .arg(instance.fullName()));
 
@@ -415,6 +414,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		}
 
 		// Get address
+		size_t address;
 		if (result.type()->type() & (rtPointer))
 			address = (size_t)result.toPointer() - offset;
 		else
@@ -630,10 +630,6 @@ QString MemoryDump::dump(const QString& type, quint64 address,
 			components.pop_front();
 		}
 			
-		return QString("%1 (ID 0x%2) @ %3\n")
-					.arg(result.typeName())
-					.arg((uint)result.type()->id(), 0, 16)
-					.arg(result.address(), 0, 16) + result.toString(&col);
 		return QString("%1%2%3 (ID%4 0x%5%6) @%7 0x%8%9\n")
 				.arg(col.color(ctType))
 				.arg(result.typeName())

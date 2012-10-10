@@ -427,7 +427,7 @@ int main(int argc, char* argv[])
 		if (shell->interactive())
 		    shell->out() << "Done, exiting." << endl;
 	}
-	catch (GenericException e) {
+	catch (GenericException& e) {
 		QString msg = QString("Caught a %0 at %1:%2\nMessage: %3")
 				.arg(e.className())
 	            .arg(e.file)

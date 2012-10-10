@@ -23,7 +23,8 @@ Shell* shell = 0;
 
 
 Shell::Shell(bool interactive, QObject* parent)
-    : QThread(parent), _interactive(interactive), _insight(0), _lastStatus(0)
+    : QThread(parent), _interactive(interactive), _insight(0), _finished(false),
+      _lastStatus(0)
 {
     // Open the console devices
     _stdin.open(stdin, QIODevice::ReadOnly);
@@ -192,7 +193,7 @@ void Shell::shellLoop()
 					break;
 				_lastStatus = _insight->eval(line);
 			}
-		    catch (InsightException e) {
+			catch (InsightException& e) {
 		        _err << "Caught exception at " << e.file << ":" << e.line << ":"
 		        	<< endl
 		            << e.message << endl;
@@ -375,7 +376,7 @@ void Shell::run()
         } // end of switch()
 
     }
-    catch (InsightException e) {
+    catch (InsightException& e) {
         _err << "Caught exception at " << e.file << ":" << e.line << ":" << endl
             << e.message << endl;
         _lastStatus = 6;

@@ -76,8 +76,8 @@ bool ASTType::equalTo(const ASTType* other, bool exactMatch) const
 ASTTypeEvaluator::ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong,
                                    int sizeofPointer)
     : ASTWalker(ast), _sizeofLong(sizeofLong), _sizeofPointer(sizeofPointer),
-      _phase(epFindSymbols), _pointsToRound(0), _assignmentsTotal(0),
-      _pointsToDeadEndHits(0)
+      _phase(epFindSymbols), _pointsToRound(0), _assignments(0),
+      _assignmentsTotal(0), _pointsToDeadEndHits(0)
 {
 }
 

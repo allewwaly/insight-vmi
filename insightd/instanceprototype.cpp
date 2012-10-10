@@ -258,7 +258,7 @@ uint InstancePrototype::TypeHash() const
 QString InstancePrototype::Type() const
 {
     Instance* inst;
-    return ( ((inst = thisInstance())) && inst->type() ) ?
+    return ((inst = thisInstance())) && inst->type() ?
             realTypeToStr(inst->type()->type()) : QString("unknown");
 }
 

@@ -266,7 +266,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(
             const ASTNodeList* list = node->u.expression_statement.expression;
             while (list && list->next)
                 list = list->next;
-            expr = exprOfNode(list->item, ptsTo);
+            expr = list ? exprOfNode(list->item, ptsTo) : 0;
         }
         break;
 
@@ -1242,7 +1242,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
                 cbs->u.compound_braces_statement.declaration_or_statement_list;
         while (statements && statements->next)
             statements = statements->next;
-        expr = exprOfNode(statements->item, ptsTo);
+        expr = statements ? exprOfNode(statements->item, ptsTo) : 0;
     }
     else
         exprEvalError2(QString("Unexpected primary expression at %2:%3:%4")
