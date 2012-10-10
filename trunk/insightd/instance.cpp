@@ -406,6 +406,15 @@ Instance Instance::arrayElem(int index) const
 }
 
 
+int Instance::arrayLength() const
+{
+    if (!_d.type || _d.type->type() != rtArray)
+        return -1;
+
+    return dynamic_cast<const Array*>(_d.type)->length();
+}
+
+
 Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCount) const
 {
     if (derefCount)
