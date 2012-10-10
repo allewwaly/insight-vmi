@@ -271,22 +271,35 @@ public:
     QStringList differences(const Instance& other, bool recursive) const;
 
     /**
-     * Treats this Instance as an array instance and returns a new instance
-     * of the same type at the memory position as this instance plus \a index
-     * times the size of the array's value type. If this is not a Pointer or an
-     * Array instance, then an invalid Instance is returned
+     * Treats this Instance as an array and returns a new instance
+     * at index \a index. The behavior depends on the type():
      *
-     * \warning The length() parameter of the underlying Array type is neither
-     * checked against \a index nor modified. Be careful to only use the
-     * length() parameter of the original instance (with array index 0), not on
-     * any Instance object returned by this function.
+     *  * For pointers of type <tt>T*</tt>, the pointer is dereferenced and
+     *    \a index * <tt>sizeof(T)</tt> is added to the resulting address. The
+     *    resulting type is <tt>T</tt>. If the pointer cannot be dereferenced,
+     *    either because it is of type <tt>void*</tt> or the address is not
+     *    accessible, an empty Instance is returned.
+     *  * For arrays of type <tt>T[]</tt>, \a index * <tt>sizeof(T)</tt> is
+     *    added to the current address. The resulting type is <tt>T</tt>.
+     *  * For any other type <tt>T</tt>, only \a index * <tt>sizeof(T)</tt> is
+     *    added to the current address. The type <tt>T</tt> remains unchanged.
+     *
+     * \warning For Array types, the length() parameter is never checked against
+     * \a index!
      *
      * @param index array index to access
-     * @return a Instance at memory position size() + \a index *
-     * type()->refType()->size(), if this is a Pointer or an Array instance,
-     * otherwise an empty Instance object
+     * @return a new Instance as described above
+     * \sa arrayLength()
      */
     Instance arrayElem(int index) const;
+
+    /**
+     * If this Instance represents an Array with a defined length, this length
+     * os returned by this function, otherwise the return value is -1.
+     * @return array length field as described above
+     * \sa arrayElem()
+     */
+    int arrayLength() const;
 
     /**
      * Dereferences this instance as far as possible.

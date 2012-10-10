@@ -111,6 +111,13 @@ Instance InstancePrototype::ArrayElem(int index) const
 }
 
 
+int InstancePrototype::ArrayLength() const
+{
+    Instance* inst = thisInstance();
+    return inst ? inst->arrayLength() : -1;
+}
+
+
 bool InstancePrototype::Equals(const Instance& other) const
 {
     try {

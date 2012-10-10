@@ -183,15 +183,35 @@ public slots:
     void AddToAddress(int offset);
 
     /**
-     * If this Instance represents a Pointer or an Array type, this function
-     * can be used to access the corresponding array elements. The difference
-     * between a pointer and an array type is that a pointer will be
-     * dereferenced first before (index * sizeof(T)) is added to the address,
-     * for arrays only (index * sizeof(T)) is added.
-     * @param index array index, starting from 0
-     * @return instance of array element
+     * Treats this Instance as an array and returns a new instance
+     * at index \a index. The behavior depends on the Type():
+     *
+     *  * For pointers of type <tt>T*</tt>, the pointer is dereferenced and
+     *    \a index * <tt>sizeof(T)</tt> is added to the resulting address. The
+     *    resulting type is <tt>T</tt>. If the pointer cannot be dereferenced,
+     *    either because it is of type <tt>void*</tt> or the address is not
+     *    accessible, an empty Instance is returned.
+     *  * For arrays of type <tt>T[]</tt>, \a index * <tt>sizeof(T)</tt> is
+     *    added to the current address. The resulting type is <tt>T</tt>.
+     *  * For any other type <tt>T</tt>, only \a index * <tt>sizeof(T)</tt> is
+     *    added to the current address. The type <tt>T</tt> remains unchanged.
+     *
+     * \warning For Array types, the ArrayLength() parameter is never checked
+     * against \a index!
+     *
+     * @param index array index to access
+     * @return a new Instance as described above
+     *\sa ArrayLength()
      */
     Instance ArrayElem(int index) const;
+
+    /**
+     * If this Instance represents an Array with a defined length, this length
+     * os returned by this function, otherwise the return value is -1.
+     * @return array length field as described above
+     * \sa ArrayElem()
+     */
+    int ArrayLength() const;
 
     /**
      * @return the ID of this instance, if it was directly instantiated from a
