@@ -59,7 +59,8 @@ HEADERS += astexpressionevaluatortester.h \
     ../../memorymapbuildersv.h \
     ../../memorymapverifier.h \
     ../../memorymapnodesv.h \
-    ../../memorymapheuristics.h
+    ../../memorymapheuristics.h \
+    ../../listfilter.h
 SOURCES += astexpressionevaluatortester.cpp \
     ../../array.cpp \
     ../../volatiletype.cpp \
@@ -113,7 +114,8 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../memorymapbuildersv.cpp \
     ../../memorymapverifier.cpp \
     ../../memorymapnodesv.cpp \
-    ../../memorymapheuristics.cpp
+    ../../memorymapheuristics.cpp \
+    ../../listfilter.cpp
 QT += core \
     script \
     network \
