@@ -52,28 +52,37 @@ public:
      * @param vmem a pointer to the VirtualMemory that the address is part of
      * @return true if the address seems to be valid, false otherwise
      */
-    static bool validAddress(quint64 address, const VirtualMemory *vmem);
+    static bool validAddress(quint64 address, VirtualMemory *vmem);
 
     /**
      * Checks if the given pointer points to a valid address.
      * \note that this function does not consider 0, -1 as valid values for a
      * pointer and will return false if a pointer is 0 or -1.
      * @param p the pointer instance to verify
-     * @returns true if the pointer is valid, false otherwise
+     * @return true if the pointer is valid, false otherwise
      */
     static bool validPointer(const Instance *p);
 
     /**
+     * Checks if the given pointer is a valid function pointer.
+     * \note that this function does not consider 0, -1 as valid values for a
+     * pointer and will return false if a pointer is 0 or -1.
+     * @param p the pointer instance to verify
+     * @return true if the pointer is valid, false otherwise
+     */
+    static bool validFunctionPointer(const Instance *p);
+
+    /**
      * Checks if the diven pointer is a userland pointer.
      * @param p the pointer instance to verify
-     * @returns true if the pointer is a userland pointer, false otherwise
+     * @return true if the pointer is a userland pointer, false otherwise
      */
     static bool userLandPointer(const Instance *p);
 
     /**
      * Checks if the given pointer is a valid userland pointer.
      * @param p the pointer instance to verify
-     * @returns true if the pointer is a valid userland pointer, false otherwise
+     * @return true if the pointer is a valid userland pointer, false otherwise
      */
     static bool validUserLandPointer(const Instance *p);
 
@@ -85,7 +94,7 @@ public:
      * list_head. The caller has to check for these values before dereferencing a
      * list_head that is valid according to this function.
      * @param i the list_head instance to verify
-     * @returns true of the instance is a valid list_head false otherwise.
+     * @return true of the instance is a valid list_head false otherwise.
      */
     static bool validListHead(const Instance *i);
 
@@ -97,7 +106,7 @@ public:
      * multiple possible candidates
      * @param cand a pointer to the candidate that should be check for compatability
      * to the given list head
-     * @returns true if the candidate is compatbible false otherwise
+     * @return true if the candidate is compatbible false otherwise
      */
     static bool validCandidateBasedOnListHead(const Instance *listHead, const Instance *cand);
 
@@ -129,7 +138,7 @@ public:
      * @param parent the parent Instance which contains a member that has multiple
      * candidate types
      * @param cand the candidate that we want to check for compatability.
-     * @returns true if the candidate is compatible, false otherwise
+     * @return true if the candidate is compatible, false otherwise
      */
     static bool compatibleCandidate(const Instance *parent, const Instance *cand);
 
@@ -137,9 +146,16 @@ public:
      * Call all Heuristics which allow to exclude an object
      * @param instance the instance that we want to check for plausibility.
      * @param eh ExclusionHeuristics to use in test.
-     * @returns true if the instances existence is plausible, false otherwise
+     * @return true if the instances existence is plausible, false otherwise
      */
     static bool callExclusionHeuristics(const Instance *instance, int eh);
+
+    /**
+     * Is the given value a default value like 0, -1, or ERR
+     * @param the value to check
+     * @return \c true if the value seems to be a default value, \c false otherwise
+     */
+    static bool defaultValue(quint64 value);
 };
 
 #endif // MEMORYMAPHEURISTICS_H

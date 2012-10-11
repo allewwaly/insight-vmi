@@ -14,10 +14,19 @@ MemoryMapHeuristics::MemoryMapHeuristics()
 {
 }
 
-bool MemoryMapHeuristics::validAddress(quint64 address, const VirtualMemory *vmem)
+bool MemoryMapHeuristics::defaultValue(quint64 value)
+{
+    // Is the given value a default value?
+    if(value == 0 || MINUS_ONE(value) || IS_ERR(value))
+        return true;
+
+    return false;
+}
+
+bool MemoryMapHeuristics::validAddress(quint64 address, VirtualMemory *vmem)
 {
     // Make sure the address is within the virtual address space
-    if ((vmem->memSpecs().arch & MemSpecs::ar_i386) &&
+    if (vmem && (vmem->memSpecs().arch & MemSpecs::ar_i386) &&
         address > VADDR_SPACE_X86)
         return false;
     else {
@@ -28,11 +37,12 @@ bool MemoryMapHeuristics::validAddress(quint64 address, const VirtualMemory *vme
     }
 
     // Is the adress 0 or -1?
-    if(address == 0 || MINUS_ONE(address) || IS_ERR(address))
+    if(defaultValue(address))
         return false;
 
-    // Is the pointer 4byte aligned?
-    if(address & 0x3)
+    // Try to resolve it
+    if (vmem && address > vmem->memSpecs().pageOffset &&
+            !vmem->safeSeek(address))
         return false;
 
     return true;
@@ -41,13 +51,27 @@ bool MemoryMapHeuristics::validAddress(quint64 address, const VirtualMemory *vme
 bool MemoryMapHeuristics::validPointer(const Instance *p)
 {
     // Is this even a pointer
-    if(!p || p->isNull() || !(p->type()->type() & rtPointer))
+    if (!p || p->isNull() || !(p->type()) || !(p->type()->type() & rtPointer))
         return false;
 
     // Get the address where the pointer is pointing to
     quint64 targetAdr = (quint64)p->toPointer();
 
+    // Is the address valid?
     return validAddress(targetAdr, p->vmem());
+}
+
+bool MemoryMapHeuristics::validFunctionPointer(const Instance *p)
+{
+    if (!p || !(p->type()) || !(p->type()->type() & rtFuncPointer))
+        return false;
+
+    // Is the address the pointer points to valid?
+    if(!validAddress(p->address(), p->vmem()))
+        return false;
+
+    // Is the address the pointer points to executable?
+    return p->vmem()->isExecutable(p->address());
 }
 
 bool MemoryMapHeuristics::userLandPointer(const Instance *p)
@@ -171,7 +195,7 @@ bool MemoryMapHeuristics::validListHead(const Instance *i)
     // Check for possible default values.
     // We allow that a pointer can be 0, -1, or next == prev since this
     // are actually valid values.
-    if(nextAdr == 0 || MINUS_ONE(nextAdr) || nextAdr == prevAdr)
+    if(defaultValue(nextAdr) || nextAdr == prevAdr)
         return true;
 
     // Can we obtain the address that the next pointer points to
@@ -201,7 +225,7 @@ bool MemoryMapHeuristics::validCandidateBasedOnListHead(const Instance *listHead
     // If this list head points to itself, or is 0/-1 we do not need
     // to consider it anymore.
     if(memberNext == listHead->member(0, 0, -1, true).address() ||
-            memberNext == 0 || MINUS_ONE(memberNext))
+            defaultValue(memberNext))
         return false;
 
     // Get the offset of the list_head struct within the candidate type
