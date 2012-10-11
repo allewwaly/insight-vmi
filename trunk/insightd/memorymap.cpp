@@ -40,7 +40,7 @@ MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _threads(0), _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
       _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
       _isBuilding(false), _shared(new BuilderSharedState(factory, vmem)),
-      _verifier(this, "/home/vogls/doc/projects/insight/slub/objects-20120502-135300.txt")
+      _verifier(this, "/home/vogls/doc/projects/insight/slub/objects-20121009-181800.log")
 {
     clear();
 }
@@ -178,6 +178,10 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
         // For testing now only start with this one variable
 //         if (v->name() != "init_task")
 //            continue;
+
+        // For now ignore all symbols that have been defined in modules
+        if (v->symbolSource() == ssModule)
+            continue;
 
 //        if (v->hasAltRefTypes())
 //            debugmsg(QString("Variable \"%1\" (0x%2) has %3 candidate types.")

@@ -191,10 +191,19 @@ bool MemoryMapVerifier::parseSlubData(const char *slubFile)
 void MemoryMapVerifier::newNode(MemoryMapNode */*currentNode*/)
 {    
 //    QMutexLocker(&this->verifierMutex);
-//    MemoryMapNodeSV *cur =  dynamic_cast<MemoryMapNodeSV*>(currentNode);
+    /*
+    MemoryMapNodeSV *cur =  dynamic_cast<MemoryMapNodeSV*>(currentNode);
+
+    MemoryMapNodeIntervalWatcher *mw = new MemoryMapNodeIntervalWatcher(cur,
+                                                                       (*this),
+                                                                       0.05,
+                                                                       true,
+                                                                       false);
+    _watchNodes.append((MemoryMapNodeWatcher *)mw);
+
 
     // Add an memory map interval watcher node to the init_task
-    /*
+
     if(currentNode->name() == "init_task") {
         MemoryMapNodeIntervalWatcher *mw = new MemoryMapNodeIntervalWatcher(currentNode,
                                                                            (*this),
@@ -375,6 +384,7 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
                 _minValidProbability = node_sv->getCandidateProbability();
             _slubValidDistribution[nodeProbability]++;
             if(node_sv) node_sv->setSeemsValid();
+            if(node_sv && node_sv->probability() < 0.1) debugmsg(QString("Valid object with prob < 0.1: %1").arg(i.fullName()));
             break;
         case SlubObjects::ovEmbedded:
         /* Fall through */
@@ -392,6 +402,7 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
             _invalidObjects++;
             debugmsg("Type: " << _slub.objectAt(i.address()).baseType->name() << " (" << _slub.objectAt(i.address()).baseType->id() << ")");
             debugmsg("Instance Type: " << i.type()->prettyName() << " (" << i.type()->id() << ")");
+            debugmsg("Instance Name: " << i.fullName());
 
             if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
                 _maxInvalidProbability = node_sv->getCandidateProbability();
@@ -399,12 +410,12 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
             if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (conflict) object with prob 1: %1").arg(i.fullName()));
             break;
         case SlubObjects::ovNotFound:
-            debugmsg("Instance Type: " << i.type()->prettyName() << " (" << i.type()->id() << ")");
+            //debugmsg("Instance Type: " << i.type()->prettyName() << " (" << i.type()->id() << ")");
             _invalidObjects++;
             if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
                 _maxInvalidProbability = node_sv->getCandidateProbability();
             _slubInvalidDistribution[nodeProbability]++;
-            if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (notfound) object with prob 1: %1").arg(i.fullName()));
+            //if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (notfound) object with prob 1: %1").arg(i.fullName()));
             break;
         case SlubObjects::ovNoSlabType:
             _maybeValidObjects++;

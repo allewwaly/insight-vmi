@@ -167,48 +167,48 @@ void MemoryMapBuilderSV::run()
 
 }
 
-MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance *inst)
+MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance * /*inst*/)
 {
-  // Increase the reading counter
-  _map->_shared->vmemReadingLock.lock();
-  _map->_shared->vmemReading++;
-  _map->_shared->vmemReadingLock.unlock();
+    // Increase the reading counter
+    _map->_shared->vmemReadingLock.lock();
+    _map->_shared->vmemReading++;
+    _map->_shared->vmemReadingLock.unlock();
 
+/*
     MemMapSet nodes = _map->vmemMapsInRange(inst->address(), inst->endAddress());
 
-    /*
     for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
         MemoryMapNodeSV* otherNode = const_cast<MemoryMapNodeSV*>((*it));
         // Is the the same object already contained?
         bool ok1 = false, ok2 = false;
         if (otherNode && otherNode->address() == inst.address() &&
-                otherNode->type() && inst.type() &&
-                otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
-                ok1 && ok2)
+            otherNode->type() && inst.type() &&
+            otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
+            ok1 && ok2)
         {
-          // Decrease the reading counter again
-          _map->_shared->vmemReadingLock.lock();
-          _map->_shared->vmemReading--;
-          _map->_shared->vmemReadingLock.unlock();
-          // Wake up any sleeping thread
-          _map->_shared->vmemReadingDone.wakeAll();
+            // Decrease the reading counter again
+            _map->_shared->vmemReadingLock.lock();
+            _map->_shared->vmemReading--;
+            _map->_shared->vmemReadingLock.unlock();
+            // Wake up any sleeping thread
+            _map->_shared->vmemReadingDone.wakeAll();
 
-          // We encountered an existing node
-          // otherNode->encountered();
-          
-          return const_cast<MemoryMapNodeSV*>(otherNode);
+            // We encountered an existing node
+            otherNode->encountered();
+
+            return const_cast<MemoryMapNodeSV*>(otherNode);
         }
     }
-    */
+*/
 
-  // Decrease the reading counter again
-  _map->_shared->vmemReadingLock.lock();
-  _map->_shared->vmemReading--;
-  _map->_shared->vmemReadingLock.unlock();
-  // Wake up any sleeping thread
-  _map->_shared->vmemReadingDone.wakeAll();
-  
-  return NULL;
+    // Decrease the reading counter again
+    _map->_shared->vmemReadingLock.lock();
+    _map->_shared->vmemReading--;
+    _map->_shared->vmemReadingLock.unlock();
+    // Wake up any sleeping thread
+    _map->_shared->vmemReadingDone.wakeAll();
+
+    return NULL;
 }
 
 QList<Instance *> * MemoryMapBuilderSV::resolveStructs(const Instance *inst, quint64 offset)
@@ -455,11 +455,14 @@ void MemoryMapBuilderSV::processCandidates(Instance *inst, const ReferencingType
 
 void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst)
 {
-    if (inst->type()->type() & rtPointer &&
-            MemoryMapHeuristics::validPointer(inst) &&
+    if (inst && inst->type() && inst->type()->type() & rtPointer &&
             !(inst->type()->type() & rtFuncPointer) &&
+            MemoryMapHeuristics::validPointer(inst) &&
             !MemoryMapHeuristics::userLandPointer(inst) &&
-            inst->address() != (quint64)inst->toPointer())
+            // Filter self pointers
+            inst->address() != (quint64)inst->toPointer() &&
+            (node->address() > (quint64)inst->toPointer() ||
+             node->address() + node->size() < (quint64)inst->toPointer()))
     {
         try
         {
@@ -474,7 +477,7 @@ void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst)
             int cnt = 0;
             Instance i = inst->dereference(BaseType::trLexicalAndPointers, -1, &cnt);
 
-            if (cnt)
+            if (cnt && !existsNode(&i))
                 _map->addChildIfNotExistend(i, node, _index, inst->address());
         }
         catch (GenericException& e)
@@ -789,82 +792,89 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
 }
 */
 
-float MemoryMapBuilderSV::calculateNodeProbability(const Instance* inst,
-                                                   float /*parentProbability*/) const
+float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) const
 {
-    // Degradation of 20% for address of this node not being aligned at 4 byte
-    // boundary
-    //static const float degForUnalignedAddr = 0.8;
-    static const float degForUnalignedAddr = 1.0;
+    float p = 1.0;
 
-    // Degradation of 5% for address begin in userland
-    static const float degForUserlandAddr = 0.95;
+    // Invalid Instance degradation - 99%
+    static const float degInvalidInstance = 0.99;
 
-    // Degradation of 90% for an invalid address of this node
-    static const float degForInvalidAddr = 0.1;
+    // Invalid Pointer degradation - 90%
+    static const float degInvalidPointer = 0.90;
 
-    // Degradation of 90% for an invalid list_head within this node
-    // static const float degForInvalidListHead = 0.1;
-    static const float degForInvalidListHead = 0.8;
+    // Invalid List Head degradation - 90%
+    static const float degInvalidListHead = 0.90;
 
-    // Max. degradation of 30% for non-aligned pointer childen the type of this
-    // node has
-//    static const float degForNonAlignedChildAddr = 0.7;
-    // static const float degForNonAlignedChildAddr = 1.0;
+    // Invalid Magic Number degradation - 99%
+    static const float degInvalidMagic = 0.99;
 
-    // Max. degradation of 50% for invalid pointer childen the type of this node
-    // has
-//    static const float degForInvalidChildAddr = 0.5;
-    //static const float degForInvalidChildAddr = 1.0;
-
-    // Stores the final probability value
-    float prob = 1.0;
-
-    // Store the number of children that we verify to calculate a weighted
-    // probability
-    quint32 pointer = 0, listHeads = 0;
-
-
-    // Check userland address
-    if (inst->address() < _map->_vmem->memSpecs().pageOffset) {
-        prob *= degForUserlandAddr;
-        _map->_shared->degForUserlandAddrCnt++;
-    }
-    // Check validity
-    else if (! _map->_vmem->safeSeek((qint64) inst->address()) ) {
-        prob *= degForInvalidAddr;
-        _map->_shared->degForInvalidAddrCnt++;
-    }
-    // Check alignment
-    else if (inst->address() & 0x3ULL) {
-        prob *= degForUnalignedAddr;
-        _map->_shared->degForUnalignedAddrCnt++;
+    // Is the instance valid?
+    if (!inst || !MemoryMapHeuristics::validInstance(inst)) {
+        // Instance is invalid, so do not check futher
+        return (p * (1 - degInvalidInstance));
     }
 
     // Find the BaseType of this instance, dereference any lexical type(s)
     const BaseType* instType = inst->type() ?
             inst->type()->dereferencedBaseType(BaseType::trLexical) : 0;
 
-    // If this a union or struct, we have to consider the pointer members
-    if ( instType &&
-         (instType->type() & StructOrUnion) )
-    {
-        const Structured* structured =
-                dynamic_cast<const Structured*>(instType);
+    // Find the BaseType of the type that is referenced this instance if any
+    // This is necessary to identify function pointers which may be labled as
+    // pointers to a function pointer
+    const BaseType* instRefType = inst->type() ?
+            inst->type()->dereferencedBaseType(BaseType::trLexicalAndPointers) : 0;
 
-        // Store the invalid member count
-        quint32 nonAlignedChildAddrCnt = 0, invalidChildAddrCnt = 0, invalidListHeadCnt = 0;
+    // Function Pointer ?
+    if ((instType && instType->type() & rtFuncPointer) ||
+            (instRefType && instRefType->type() & rtFuncPointer)) {
+        // Since the function pointer that we are considering may be instRefType
+        // the current instance could actually be of type pointer. Thus get the
+        // correct instance before we run the checks.
+        if (instRefType && instRefType->type() & rtFuncPointer) {
+            Instance funcPointer = inst->dereference(BaseType::trLexicalAndPointers);
 
+            if (!MemoryMapHeuristics::validFunctionPointer(&funcPointer) &&
+                     !MemoryMapHeuristics::defaultValue((quint64)inst->toPointer()))
+                // Invalid function pointer that has no default value
+                return (p * (1 - degInvalidPointer));
 
-        // Check address of all descendant pointers
-        for (MemberList::const_iterator it = structured->members().begin(),
-             e = structured->members().end(); it != e; ++it)
+            return p;
+        }
+        else {
+            if (!MemoryMapHeuristics::validFunctionPointer(inst) &&
+                    !MemoryMapHeuristics::defaultValue((quint64)inst->toPointer()))
+                // Invalid function pointer that has no default value
+                return (p * (1 - degInvalidPointer));
+
+            return p;
+        }
+    }
+    // Pointer ?
+    else if (instType && instType->type() & rtPointer) {
+        if (!MemoryMapHeuristics::validPointer(inst) &&
+                !MemoryMapHeuristics::defaultValue((quint64)inst->toPointer()))
+            // Invalid pointer that has no default value
+            return (p * (1 - degInvalidPointer));
+
+        return p;
+    }
+    // Struct
+    else if (instType && instType->type() & rtStruct) {
+        const Structured* s = dynamic_cast<const Structured*>(instType);
+
+        // Check magic
+        if (!inst->isValidConcerningMagicNumbers())
+            p *= (1 - degInvalidMagic);
+
+        // Check all members
+        for (MemberList::const_iterator it = s->members().begin(),
+             e = s->members().end(); it != e; ++it)
         {
             const StructuredMember* m = *it;
-            const BaseType* m_type = m->refTypeDeep(BaseType::trLexical);
 
             // Create an instance if possible
             Instance mi = Instance();
+
             try {
                 mi = m->toInstance(inst->address(), _map->_vmem, inst);
             }
@@ -874,71 +884,18 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance* inst,
                 mi = Instance();
             }
 
-
-            if (m_type && (m_type->type() & rtPointer)) {
-                pointer++;
-
-                try {
-                    quint64 m_addr = inst->address() + m->offset();
-                    // Try a safeSeek first to avoid costly throws of exceptions
-                    if (_map->_vmem->safeSeek(m_addr)) {
-                        m_addr = (quint64)m_type->toPointer(_map->_vmem, m_addr);
-                        // Check validity of non-null addresses
-                        if (m_addr && !_map->_vmem->safeSeek((qint64) m_addr) ) {
-                            invalidChildAddrCnt++;
-                        }
-                        // Check alignment
-                        else if (m_addr & 0x3ULL) {
-                            nonAlignedChildAddrCnt++;
-                        }
-                    }
-                    else {
-                        // Address was invalid
-                        invalidChildAddrCnt++;
-                    }
-                }
-                catch (MemAccessException&) {
-                    // Address was invalid
-                    invalidChildAddrCnt++;
-                }
-                catch (VirtualMemoryException&) {
-                    // Address was invalid
-                    invalidChildAddrCnt++;
-                }
-            }
-            else if(!mi.isNull() && MemoryMapHeuristics::isListHead(&mi))
+            // List Heads
+            if (MemoryMapHeuristics::isListHead(&mi))
             {
-                // Check for list_heads
-                listHeads++;
-
-                if(!MemoryMapHeuristics::validListHead(&mi))
-                    invalidListHeadCnt++;
+                if (!MemoryMapHeuristics::validListHead(&mi))
+                    p *= (1 - degInvalidListHead);
+            }
+            else {
+                // Consider all other member types recursively
+                p *= calculateNodeProbability(&mi);
             }
         }
-
-        // Penalize probabilities, weighted by number of meaningful children
-        /*
-        if (nonAlignedChildAddrCnt) {
-            float invPart = nonAlignedChildAddrCnt / (float) pointer;
-            prob *= invPart * degForNonAlignedChildAddr + (1.0 - invPart);
-            degForNonAlignedChildAddrCnt++;
-        }
-
-        if (invalidChildAddrCnt) {
-            float invPart = invalidChildAddrCnt / (float) pointer;
-            prob *= invPart * degForInvalidChildAddr + (1.0 - invPart);
-            degForInvalidChildAddrCnt++;
-        }
-        */
-
-        // Penalize for invalid list_heads
-        if (invalidListHeadCnt) {
-            float invPart = invalidListHeadCnt / (float) listHeads;
-            prob *= invPart * degForInvalidListHead + (1.0 - invPart);
-            _map->_shared->degForInvalidListHeadCnt++;
-        }
-
-
     }
-    return prob;
+
+    return p;
 }
