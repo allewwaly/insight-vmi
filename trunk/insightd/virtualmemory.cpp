@@ -440,17 +440,17 @@ inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 
 
 quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
-        bool enableExceptions)
+        bool enableExceptions, struct pageTableEntries *ptEntries)
 {
 #ifdef ENABLE_TLB
     bool doLock = _threadSafe;
 #endif
     quint64 pgd_addr;  // page global directory address
-    quint64 pgd;
+    quint64 pgd = 0;
     quint64 pmd_paddr; // page middle directory address (only for PAE)
-    quint64 pmd;
+    quint64 pmd = 0;
     quint64 pte_paddr; // page table address
-    quint64 pte;
+    quint64 pte = 0;
     quint64 physaddr = 0;
     bool ok;
 
@@ -577,25 +577,35 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
     if (doLock) _tlbMutex.unlock();
 #endif
 
+    // Return the page table entries if requested.
+    if (ptEntries) {
+        // Unused Entries will be set to PADDR_ERROR
+        pgd ? ptEntries->pgd = pgd : ptEntries->pgd = PADDR_ERROR;
+        pmd ? ptEntries->pmd = pmd : ptEntries->pmd = PADDR_ERROR;
+        pte ? ptEntries->pte = pte : ptEntries->pte = PADDR_ERROR;
+
+        ptEntries->pud = PADDR_ERROR;
+    }
+
     return physaddr;
 }
 
 
 
 quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
-        bool enableExceptions)
+        bool enableExceptions, struct pageTableEntries *ptEntries)
 {
 #ifdef ENABLE_TLB
     bool doLock = _threadSafe;
 #endif
     quint64 pgd_addr;  // page global directory address
-    quint64 pgd;
+    quint64 pgd = 0;
     quint64 pud_paddr; // page upper directory address
-    quint64 pud;
+    quint64 pud = 0;
     quint64 pmd_paddr; // page middle directory address
-    quint64 pmd;
+    quint64 pmd = 0;
     quint64 pte_paddr; // page table address
-    quint64 pte;
+    quint64 pte = 0;
     quint64 physaddr = 0;
     bool ok;
 
@@ -714,17 +724,25 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
     // performance improvement: save last known _userPGD and flushTLB() on an new value
 #endif
 
+    // Return the page table entries if requested.
+    if (ptEntries) {
+        // Unused Entries will be set to PADDR_ERROR
+        pgd ? ptEntries->pgd = pgd : ptEntries->pgd = PADDR_ERROR;
+        pud ? ptEntries->pud = pud : ptEntries->pud = PADDR_ERROR;
+        pmd ? ptEntries->pmd = pmd : ptEntries->pmd = PADDR_ERROR;
+        pte ? ptEntries->pte = pte : ptEntries->pte = PADDR_ERROR;
+    }
 
     return physaddr;
 }
 
 
 quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
-        bool enableExceptions)
+        bool enableExceptions, struct pageTableEntries *ptEntries)
 {
     quint64 physAddr = (_specs.arch & MemSpecs::ar_i386) ?
-            virtualToPhysical32(vaddr, pageSize, enableExceptions) :
-            virtualToPhysical64(vaddr, pageSize, enableExceptions);
+            virtualToPhysical32(vaddr, pageSize, enableExceptions, ptEntries) :
+            virtualToPhysical64(vaddr, pageSize, enableExceptions, ptEntries);
 
     if (_physMemSize > 0 && physAddr >= (quint64)_physMemSize)
         virtualMemoryOtherError(
@@ -738,7 +756,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
 
 
 quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
-        bool enableExceptions)
+        bool enableExceptions, struct pageTableEntries *ptEntries)
 {
 
 	if (_userland){
@@ -772,7 +790,7 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
 
         // First 896MB of phys. memory are mapped between PAGE_OFFSET and
         // high_memory (the latter requires initialization)
-        if (!_specs.initialized || vaddr < _specs.highMemory) {
+        if ((!_specs.initialized || vaddr < _specs.highMemory) && !ptEntries) {
             physaddr = ((vaddr) - _specs.pageOffset);
             *pageSize = -1;
         }
@@ -783,7 +801,7 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
             if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
 #endif
                 // No hit, so use the address lookup function
-                physaddr = pageLookup32(vaddr, pageSize, enableExceptions);
+                physaddr = pageLookup32(vaddr, pageSize, enableExceptions, ptEntries);
         }
     }
     else {
@@ -801,7 +819,7 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
 
 
 quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
-        bool enableExceptions)
+        bool enableExceptions, struct pageTableEntries *ptEntries)
 {
     quint64 physaddr = 0;
 
@@ -813,7 +831,7 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
 
     if (_userland) {
     	//std::cout << "reading userland mem pgd:" << std::hex << _userPGD << std::endl;
-    	return pageLookup64(vaddr, pageSize, enableExceptions);
+        return pageLookup64(vaddr, pageSize, enableExceptions, ptEntries);
     }
 
     /*
@@ -843,7 +861,7 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
         // All phys. memory (up to 64TB) is linearly mapped here:
         // PAGE_OFFSET       - high_memory (requires initialization)
         // (ffff880000000000 - (ffff8800 00000000 + phys.mem.size))
-        else if (!_specs.initialized || vaddr < _specs.highMemory) {
+        else if ((!_specs.initialized || vaddr < _specs.highMemory) && !ptEntries) {
             physaddr = ((vaddr) - _specs.pageOffset);
             *pageSize = -1;
         }
@@ -858,7 +876,7 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
             if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
 #endif
                 // No hit, so use one of the address lookup functions
-                physaddr = pageLookup64(vaddr, pageSize, enableExceptions);
+                physaddr = pageLookup64(vaddr, pageSize, enableExceptions, ptEntries);
         }
         /*else {
             virtualMemoryOtherError(
@@ -899,3 +917,107 @@ void VirtualMemory::flushTlb()
 }
 #endif
 
+quint64 VirtualMemory::updateFlags(quint64 currentFlags, quint64 entry)
+{
+    quint64 result = currentFlags;
+
+    // Present
+    // 0 = Not Present, 1 = Present
+    if (!(entry & Present))
+        result &= ~((quint64)Present);
+
+    // Read/Write
+    // 0 = Read Only, 1 = Read & Write
+    if (!(entry & ReadWrite))
+        result &= ~((quint64)ReadWrite);
+
+    // Supervisor/User
+    // 0 = Supervisor, 1 = User
+    if (entry & Supervisor)
+        result |= Supervisor;
+
+    // NX
+    // 0 = Executable, 1 = Non-Executable
+    if (entry & NX)
+        result |= NX;
+
+    return result;
+}
+
+quint64 VirtualMemory::getFlags(quint64 vaddr) {
+    struct pageTableEntries ptEntries;
+    int data;
+    quint64 flags = 0;
+
+    virtualToPhysical(vaddr, &data, true, &ptEntries);
+
+    if (_specs.arch & MemSpecs::ar_i386) {
+        // PAE or 32-bit paging
+
+        if (_specs.arch & MemSpecs::ar_pae_enabled) {
+            // PAE
+
+            // Use PDPTES Present flags as base
+            flags |= (ptEntries.pgd & Present);
+
+            // PDPTEs do not specify R/W, U/S, or NX!
+            // Thus we take them from the PDE
+            flags |= (ptEntries.pmd & (ReadWrite | Supervisor | NX));
+
+            // Update remaining flags = Present Flag
+            flags &= ptEntries.pmd;
+
+            // Update the flags with the PTE if any
+            if (ptEntries.pte != PADDR_ERROR) {
+                flags = updateFlags(flags, ptEntries.pte);
+            }
+        }
+        else {
+            // 32-bit paging
+            // Use PGD flags as base
+            flags |= ptEntries.pgd;
+
+            // Update the flags with the PTE if any
+            if (ptEntries.pte != PADDR_ERROR) {
+                flags = updateFlags(flags, ptEntries.pte);
+            }
+        }
+    }
+    else {
+        // IA-32e paging
+
+        // PML4e as starting point
+        flags |= ptEntries.pgd;
+
+        // Update
+        flags = updateFlags(flags, ptEntries.pud);
+        flags = updateFlags(flags, ptEntries.pmd);
+
+        // Update the flags with the PTE if any
+        if (ptEntries.pte != PADDR_ERROR) {
+            flags = updateFlags(flags, ptEntries.pte);
+        }
+
+    }
+
+    return flags;
+}
+
+bool VirtualMemory::isExecutable(quint64 vaddr)
+{
+    quint64 flags = 0;
+
+    try {
+        flags = getFlags(vaddr);
+    }
+    catch (VirtualMemoryException &e) {
+        return false;
+    }
+
+    // We only check for NX at this point, but we probably should also
+    // verify that the memory area is not writeable
+    if (flags & NX)
+        return false;
+
+    return true;
+}
