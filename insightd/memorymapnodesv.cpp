@@ -173,7 +173,10 @@ void MemoryMapNodeSV::updateProbabilitySV(MemoryMapNodeSV *initiator)
         childrenProb = 1.0;
 
     // The more we encounter the node the more likely it is
-    encounterProb = 1.5 * _encountered;
+    if(_encountered > 1)
+        encounterProb = 1.5 * (_encountered - 1);
+    else
+        encounterProb = 1.0;
 
     // New probability
     prob = _initialProb * parentProb * childrenProb * encounterProb;

@@ -34,7 +34,7 @@ public:
      * @return calculated probability
      */
     virtual float calculateNodeProbability(const Instance *inst,
-                                           float parentProbability = 0) const;
+                                           float parentProbability = 1.0) const;
 
 protected:
     virtual void run();

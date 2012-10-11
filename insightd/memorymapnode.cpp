@@ -23,7 +23,7 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
         if (_address >= (1ULL << 32))
             genericError(QString("Address 0x%1 exceeds 32 bit address space")
                     .arg(_address, 0, 16));
-    updateProbability();
+//    updateProbability();
 }
 
 
@@ -37,7 +37,7 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
             genericError(QString("Address 0x%1 exceeds 32 bit address space")
                     .arg(_address, 0, 16));
 
-    updateProbability(&inst);
+//    updateProbability(&inst);
 }
 
 
