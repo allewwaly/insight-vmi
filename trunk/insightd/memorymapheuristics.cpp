@@ -10,6 +10,10 @@
 #define IS_ERR(x) (((x) > (MINUS_ONE_32 - MAX_ERRNO) && (x) <= MINUS_ONE_32) ||       \
                           (x) > (MINUS_ONE_64 - MAX_ERRNO))
 
+// Poison values for list_heads from the kernel
+#define LIST_POISON1 0x00100100
+#define LIST_POISON2 0x00200200
+
 MemoryMapHeuristics::MemoryMapHeuristics()
 {
 }
@@ -17,13 +21,15 @@ MemoryMapHeuristics::MemoryMapHeuristics()
 bool MemoryMapHeuristics::defaultValue(quint64 value)
 {
     // Is the given value a default value?
-    if(value == 0 || MINUS_ONE(value) || IS_ERR(value))
+    if(value == 0 || MINUS_ONE(value) || IS_ERR(value) ||
+            value == LIST_POISON1 || value == LIST_POISON2)
         return true;
 
     return false;
 }
 
-bool MemoryMapHeuristics::validAddress(quint64 address, VirtualMemory *vmem)
+bool MemoryMapHeuristics::validAddress(quint64 address, VirtualMemory *vmem,
+                                       bool defaultValid)
 {
     // Make sure the address is within the virtual address space
     if (vmem && (vmem->memSpecs().arch & MemSpecs::ar_i386) &&
@@ -38,7 +44,7 @@ bool MemoryMapHeuristics::validAddress(quint64 address, VirtualMemory *vmem)
 
     // Is the adress 0 or -1?
     if(defaultValue(address))
-        return false;
+        return defaultValid;
 
     // Try to resolve it
     if (vmem && address > vmem->memSpecs().pageOffset &&
@@ -48,7 +54,7 @@ bool MemoryMapHeuristics::validAddress(quint64 address, VirtualMemory *vmem)
     return true;
 }
 
-bool MemoryMapHeuristics::validPointer(const Instance *p)
+bool MemoryMapHeuristics::validPointer(const Instance *p, bool defaultValid)
 {
     // Is this even a pointer
     if (!p || p->isNull() || !(p->type()) || !(p->type()->type() & rtPointer))
@@ -58,16 +64,16 @@ bool MemoryMapHeuristics::validPointer(const Instance *p)
     quint64 targetAdr = (quint64)p->toPointer();
 
     // Is the address valid?
-    return validAddress(targetAdr, p->vmem());
+    return validAddress(targetAdr, p->vmem(), defaultValid);
 }
 
-bool MemoryMapHeuristics::validFunctionPointer(const Instance *p)
+bool MemoryMapHeuristics::validFunctionPointer(const Instance *p, bool defaultValid)
 {
     if (!p || !(p->type()) || !(p->type()->type() & rtFuncPointer))
         return false;
 
     // Is the address the pointer points to valid?
-    if(!validAddress(p->address(), p->vmem()))
+    if(!validAddress(p->address(), p->vmem(), defaultValid))
         return false;
 
     // Is the address the pointer points to executable?
@@ -79,9 +85,9 @@ bool MemoryMapHeuristics::userLandPointer(const Instance *p)
     return (p->address() < p->vmem()->memSpecs().pageOffset);
 }
 
-bool MemoryMapHeuristics::validUserLandPointer(const Instance *p)
+bool MemoryMapHeuristics::validUserLandPointer(const Instance *p, bool defaultValid)
 {
-    return (validPointer(p) && userLandPointer(p));
+    return (validPointer(p, defaultValid) && userLandPointer(p));
 }
 
 bool MemoryMapHeuristics::isListHead(const Instance *i)
@@ -171,7 +177,7 @@ bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct, const 
     return true;
 }
 
-bool MemoryMapHeuristics::validListHead(const Instance *i)
+bool MemoryMapHeuristics::validListHead(const Instance *i, bool defaultValid)
 {
     // Is this even a list_head?
     if(!i || i->isNull() || (!isListHead(i) && !isHListHead(i)))
@@ -193,10 +199,10 @@ bool MemoryMapHeuristics::validListHead(const Instance *i)
                                                        next.type()->size());
 
     // Check for possible default values.
-    // We allow that a pointer can be 0, -1, or next == prev since this
-    // are actually valid values.
-    if(defaultValue(nextAdr) || nextAdr == prevAdr)
-        return true;
+    // We allow that a pointer can be 0, -1, next == prev, or
+    // LIST_POISON1/LIST_POISON2 since this are actually valid values.
+    if(defaultValue(nextAdr) || defaultValue(prevAdr) || nextAdr == prevAdr)
+        return defaultValid;
 
     // Can we obtain the address that the next pointer points to
     if(!i->vmem()->safeSeek(nextAdr))
@@ -216,7 +222,7 @@ bool MemoryMapHeuristics::validListHead(const Instance *i)
 bool MemoryMapHeuristics::validCandidateBasedOnListHead(const Instance *listHead, const Instance *cand)
 {
     // Did we receive a valid list_head?
-    if(!validListHead(listHead))
+    if(!validListHead(listHead, false))
         return false;
 
     // Get the instance of the 'next' member within the list_head
@@ -263,7 +269,7 @@ bool MemoryMapHeuristics::validInstance(const Instance *i)
     if(i->isNull() || !i->isValid())
         return false;
 
-    if(!validAddress(i->address(), i->vmem()))
+    if(!validAddress(i->address(), i->vmem(), false))
         return false;
 
     /// todo: We could also test the heuristics at this point

@@ -283,7 +283,7 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
 
     // Is this is an invalid list head or if we already processed this
     // member return
-    if (!MemoryMapHeuristics::validListHead(listHead) ||
+    if (!MemoryMapHeuristics::validListHead(listHead, false) ||
             node->memberProcessed(listHead->address(), firstListMember->address()))
         return;
 
@@ -377,14 +377,15 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
 
 void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
 {
-    if (!MemoryMapHeuristics::validListHead(inst))
+    // Ignore lists with default values
+    if (!MemoryMapHeuristics::validListHead(inst, false))
         return;
 
     // Get the next and prev pointer.
     Instance next = inst->member(0, 0, -1, true);
 
     // Is the next pointer valid e.g. not Null
-    if (!MemoryMapHeuristics::validPointer(&next))
+    if (!MemoryMapHeuristics::validPointer(&next, false))
         return;
 
     // For Lists we can also verify the prev pointer in contrast
@@ -393,7 +394,7 @@ void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
         Instance prev = inst->member(1, 0, -1, true);
 
         // Filter invalid or default pointers (next == prev)
-        if (!MemoryMapHeuristics::validPointer(&prev) ||
+        if (!MemoryMapHeuristics::validPointer(&prev, false) ||
                 next.toPointer() == prev.toPointer())
             return;
     }
@@ -455,9 +456,11 @@ void MemoryMapBuilderSV::processCandidates(Instance *inst, const ReferencingType
 
 void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst)
 {
+    // Filter pointers that have default values, since we do not need to
+    // process them further
     if (inst && inst->type() && inst->type()->type() & rtPointer &&
             !(inst->type()->type() & rtFuncPointer) &&
-            MemoryMapHeuristics::validPointer(inst) &&
+            MemoryMapHeuristics::validPointer(inst, false) &&
             !MemoryMapHeuristics::userLandPointer(inst) &&
             // Filter self pointers
             inst->address() != (quint64)inst->toPointer() &&
@@ -505,7 +508,8 @@ void MemoryMapBuilderSV::processArray(MemoryMapNodeSV *node, Instance *inst)
             {
                 Instance e = inst->arrayElem(i);
 
-                if (MemoryMapHeuristics::validAddress(e.address(), e.vmem()))
+                // We do not need to process nodes with default values
+                if (MemoryMapHeuristics::validAddress(e.address(), e.vmem(), false))
                     processNode(node, &e, a);
 
                    // _map->addChildIfNotExistend(e, node, _index, node->address() + (i * e.size()));
@@ -833,16 +837,19 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) 
         if (instRefType && instRefType->type() & rtFuncPointer) {
             Instance funcPointer = inst->dereference(BaseType::trLexicalAndPointers);
 
-            if (!MemoryMapHeuristics::validFunctionPointer(&funcPointer) &&
-                     !MemoryMapHeuristics::defaultValue((quint64)inst->toPointer()))
+            // Verify. Default values are fine.
+            // Notice that the first line is necessary since NULL pointers cannot be
+            // dereferenced
+            if ((quint64)inst->toPointer() != 0 &&
+                    !MemoryMapHeuristics::validFunctionPointer(&funcPointer))
                 // Invalid function pointer that has no default value
                 return (p * (1 - degInvalidPointer));
 
             return p;
         }
         else {
-            if (!MemoryMapHeuristics::validFunctionPointer(inst) &&
-                    !MemoryMapHeuristics::defaultValue((quint64)inst->toPointer()))
+            // Verify. Default values are fine.
+            if (!MemoryMapHeuristics::validFunctionPointer(inst))
                 // Invalid function pointer that has no default value
                 return (p * (1 - degInvalidPointer));
 
@@ -851,8 +858,8 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) 
     }
     // Pointer ?
     else if (instType && instType->type() & rtPointer) {
-        if (!MemoryMapHeuristics::validPointer(inst) &&
-                !MemoryMapHeuristics::defaultValue((quint64)inst->toPointer()))
+        // Verify. Default values are fine.
+        if (!MemoryMapHeuristics::validPointer(inst))
             // Invalid pointer that has no default value
             return (p * (1 - degInvalidPointer));
 
@@ -887,6 +894,7 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) 
             // List Heads
             if (MemoryMapHeuristics::isListHead(&mi))
             {
+                // Valid list_head? (Allow default values)
                 if (!MemoryMapHeuristics::validListHead(&mi))
                     p *= (1 - degInvalidListHead);
             }
