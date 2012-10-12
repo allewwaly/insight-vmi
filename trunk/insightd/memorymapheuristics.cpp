@@ -1,28 +1,24 @@
 #include "memorymapheuristics.h"
 
-#define MINUS_ONE_32 0xffffffff
+#define MINUS_ONE_32 ((quint32)-1)
 #define MINUS_ONE_64 -1ULL
 
-#define MINUS_ONE(x) (((x) == MINUS_ONE_32 || (x) == MINUS_ONE_64) ? true : false)
+#define MINUS_ONE(x) ((x) == MINUS_ONE_32 || (x) == MINUS_ONE_64)
 
 // Same as in the kernel
-#define MAX_ERRNO 4095
-#define IS_ERR(x) (((x) > (MINUS_ONE_32 - MAX_ERRNO) && (x) <= MINUS_ONE_32) ||       \
-                          (x) > (MINUS_ONE_64 - MAX_ERRNO))
+#define IS_ERR(x, errno) (((x) > (MINUS_ONE_32 - (errno)) && (x) <= MINUS_ONE_32) || \
+                           (x) > (MINUS_ONE_64 - (errno)))
 
-// Poison values for list_heads from the kernel
-#define LIST_POISON1 0x00100100
-#define LIST_POISON2 0x00200200
 
 MemoryMapHeuristics::MemoryMapHeuristics()
 {
 }
 
-bool MemoryMapHeuristics::defaultValue(quint64 value)
+bool MemoryMapHeuristics::defaultValue(quint64 value, const MemSpecs& specs)
 {
     // Is the given value a default value?
-    if(value == 0 || MINUS_ONE(value) || IS_ERR(value) ||
-            value == LIST_POISON1 || value == LIST_POISON2)
+    if (value == 0 || MINUS_ONE(value) || IS_ERR(value, specs.maxErrNo) ||
+            value == specs.listPoison1 || value == specs.listPoison2)
         return true;
 
     return false;
@@ -31,6 +27,7 @@ bool MemoryMapHeuristics::defaultValue(quint64 value)
 bool MemoryMapHeuristics::validAddress(quint64 address, VirtualMemory *vmem,
                                        bool defaultValid)
 {
+    assert(vmem != 0);
     // Make sure the address is within the virtual address space
     if (vmem && (vmem->memSpecs().arch & MemSpecs::ar_i386) &&
         address > VADDR_SPACE_X86)
@@ -43,7 +40,7 @@ bool MemoryMapHeuristics::validAddress(quint64 address, VirtualMemory *vmem,
     }
 
     // Is the adress 0 or -1?
-    if(defaultValue(address))
+    if(defaultValue(address, vmem->memSpecs()))
         return defaultValid;
 
     // Try to resolve it
@@ -201,7 +198,8 @@ bool MemoryMapHeuristics::validListHead(const Instance *i, bool defaultValid)
     // Check for possible default values.
     // We allow that a pointer can be 0, -1, next == prev, or
     // LIST_POISON1/LIST_POISON2 since this are actually valid values.
-    if(defaultValue(nextAdr) || defaultValue(prevAdr) || nextAdr == prevAdr)
+    if (defaultValue(nextAdr, i->vmem()->memSpecs()) ||
+        defaultValue(prevAdr, i->vmem()->memSpecs()) || nextAdr == prevAdr)
         return defaultValid;
 
     // Can we obtain the address that the next pointer points to
@@ -230,8 +228,8 @@ bool MemoryMapHeuristics::validCandidateBasedOnListHead(const Instance *listHead
 
     // If this list head points to itself, or is 0/-1 we do not need
     // to consider it anymore.
-    if(memberNext == listHead->member(0, 0, -1, true).address() ||
-            defaultValue(memberNext))
+    if (memberNext == listHead->member(0, 0, -1, true).address() ||
+            defaultValue(memberNext, listHead->vmem()->memSpecs()))
         return false;
 
     // Get the offset of the list_head struct within the candidate type

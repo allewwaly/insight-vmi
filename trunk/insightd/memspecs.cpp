@@ -7,6 +7,14 @@
 
 #include "memspecs.h"
 
+// Taken from <linux/include/linux/err.h>
+#define MAX_ERRNO 4095
+
+// Taken from <linux/include/linux/poison.h>
+#define LIST_POISON1 0x00100100
+#define LIST_POISON2 0x00200200
+
+
 KernelMemSpecList MemSpecs::supportedMemSpecs()
 {
     KernelMemSpecList list;
@@ -89,6 +97,25 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
             "%16llx",
             "defined(VMEMMAP_START) && defined(VMEMMAP_END)"));
 
+    // Poison and error values
+    // See <linux/include/linux/poison.h>
+    list.append(KernelMemSpec(
+            "LIST_POISON1",
+            "LIST_POISON1",
+            "unsigned long long",
+            "%16llx"));
+    list.append(KernelMemSpec(
+            "LIST_POISON2",
+            "LIST_POISON2",
+            "unsigned long long",
+            "%16llx"));
+    // See <linux/include/linux/err.h>
+    list.append(KernelMemSpec(
+            "MAX_ERRNO",
+            "MAX_ERRNO",
+            "int",
+            "%d"));
+
     // Linux kernel version information
     // See <init/version.c>
     list.append(KernelMemSpec(
@@ -113,6 +140,31 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
             "%s"));
 
     return list;
+}
+
+
+MemSpecs::MemSpecs() :
+    pageOffset(0),
+    vmallocStart(0),
+    vmallocEnd(0),
+    vmallocOffset(0),
+    vmemmapStart(0),
+    vmemmapEnd(0),
+    modulesVaddr(0),
+    modulesEnd(0),
+    startKernelMap(0),
+    initLevel4Pgt(0),
+    swapperPgDir(0),
+    highMemory(0),
+    vmallocEarlyreserve(0),
+    listPoison1(LIST_POISON1),
+    listPoison2(LIST_POISON2),
+    maxErrNo(MAX_ERRNO),
+    sizeofLong(sizeof(long)),
+    sizeofPointer(sizeof(void*)),
+    arch(ar_undefined),
+    initialized(false)
+{
 }
 
 
@@ -150,6 +202,12 @@ bool MemSpecs::setFromKeyValue(const QString& key, const QString& value)
         else
             ok = false;
     }
+    else if (key == "LIST_POISON1")
+        listPoison1 = value.toULong(&ok, 16);
+    else if (key == "LIST_POISON2")
+        listPoison2 = value.toULong(&ok, 16);
+    else if (key == "MAX_ERRNO")
+        maxErrNo = value.toInt();
     else if (key == "UTS_SYSNAME")
         version.sysname = value;
     else if (key == "UTS_RELEASE")
@@ -202,6 +260,9 @@ QString MemSpecs::toString() const
         ret += QString("%1 = 0x%2\n").arg("high_memory", key_w).arg(highMemory, val_w, 16, QChar('0'));
     if (vmallocEarlyreserve > 0)
         ret += QString("%1 = 0x%2\n").arg("vmalloc_earlyreserve", key_w).arg(vmallocEarlyreserve, val_w, 16, QChar('0'));
+    ret += QString("%1 = 0x%2\n").arg("LIST_POISON1", key_w).arg(listPoison1, val_w, 16, QChar('0'));
+    ret += QString("%1 = 0x%2\n").arg("LIST_POISON2", key_w).arg(listPoison2, val_w, 16, QChar('0'));
+    ret += QString("%1 = %2\n").arg("MAX_ERRNO", key_w).arg(maxErrNo);
     if (!version.sysname.isEmpty())
         ret += QString("%1 = %2\n").arg("UTS_SYSNAME", key_w).arg(version.sysname);
     if (!version.release.isEmpty())
@@ -243,6 +304,12 @@ KernelSymbolStream& operator>>(KernelSymbolStream& in, MemSpecs& specs)
            >> specs.version.version
            >> specs.version.machine;
     }
+    // Poison information was added in v18
+    if (in.kSymVersion() >= kSym::VERSION_18) {
+        in >> specs.listPoison1
+           >> specs.listPoison2
+           >> specs.maxErrNo;
+    }
 
     return in;
 }
@@ -274,6 +341,13 @@ KernelSymbolStream& operator<<(KernelSymbolStream& out, const MemSpecs& specs)
             << specs.version.release
             << specs.version.version
             << specs.version.machine;
+    }
+
+    // Poison information was added in v18
+    if (out.kSymVersion() >= kSym::VERSION_18) {
+        out << specs.listPoison1
+            << specs.listPoison2
+            << specs.maxErrNo;
     }
 
     return out;
