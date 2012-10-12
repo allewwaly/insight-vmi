@@ -167,7 +167,7 @@ public:
      * @param the value to check
      * @return \c true if the value seems to be a default value, \c false otherwise
      */
-    static bool defaultValue(quint64 value);
+    static bool defaultValue(quint64 value, const MemSpecs &specs);
 };
 
 #endif // MEMORYMAPHEURISTICS_H

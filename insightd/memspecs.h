@@ -114,25 +114,7 @@ struct MemSpecs
     };
 
     /// Constructor
-    MemSpecs() :
-        pageOffset(0),
-        vmallocStart(0),
-        vmallocEnd(0),
-        vmallocOffset(0),
-        vmemmapStart(0),
-        vmemmapEnd(0),
-        modulesVaddr(0),
-        modulesEnd(0),
-        startKernelMap(0),
-        initLevel4Pgt(0),
-        swapperPgDir(0),
-        highMemory(0),
-        vmallocEarlyreserve(0),
-        sizeofLong(sizeof(long)),
-        sizeofPointer(sizeof(void*)),
-        arch(ar_undefined),
-        initialized(false)
-    {}
+    MemSpecs();
 
     /**
      * Sets any of the local member variables by parsing a key-value pair.
@@ -183,6 +165,9 @@ struct MemSpecs
     quint64 swapperPgDir;
     quint64 highMemory;          ///< This is set at runtime by MemoryDump::init()
     quint64 vmallocEarlyreserve; ///< This is set at runtime by MemoryDump::init()
+    quint64 listPoison1;
+    quint64 listPoison2;
+    qint32 maxErrNo;
     qint32 sizeofLong;
     qint32 sizeofPointer;
     qint32 arch;                 ///< An Architecture value
