@@ -1,7 +1,7 @@
 #include "memorymapheuristics.h"
 
 #define MINUS_ONE_32 0xffffffff
-#define MINUS_ONE_64 0xffffffffffffffff
+#define MINUS_ONE_64 -1ULL
 
 #define MINUS_ONE(x) (((x) == MINUS_ONE_32 || (x) == MINUS_ONE_64) ? true : false)
 
