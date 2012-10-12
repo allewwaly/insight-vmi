@@ -356,14 +356,14 @@ void MemSpecParser::parseSystemMap(MemSpecs* specs)
 
     while (!lvl4_ok && !sysMap.atEnd() && sysMap.readLine(buf, bufsize) > 0) {
         QString line(buf);
-        if (line.contains("init_level4_pgt") && re.exactMatch(line))
+        if (line.contains(str::initLvl4Pgt) && re.exactMatch(line))
             // Update the given MemSpecs object with the parsed key-value pair
             specs->initLevel4Pgt = re.cap(1).toULong(&lvl4_ok, 16);
-        else if (line.contains("swapper_pg_dir") && re.exactMatch(line))
+        else if (line.contains(str::swapperPgDir) && re.exactMatch(line))
             // Update the given MemSpecs object with the parsed key-value pair
             specs->swapperPgDir = re.cap(1).toULong(&swp_ok, 16);
         // TODO This is overwritten in MemoryDump::init() anyway, why check here?
-        else if (line.contains("vmalloc_earlyreserve") && re.exactMatch(line))
+        else if (line.contains(str::vmallocEarlyres) && re.exactMatch(line))
             _vmallocEarlyreserve = re.cap(1).toULong(&ok, 16);
     }
 
