@@ -211,7 +211,7 @@ bool VarListFilter::match(const Variable *var) const
         _varName.compare(var->name(), Qt::CaseInsensitive) != 0)
         return false;
     else if (filterActive(foVarNameWildcard) &&
-             !_varRegEx.exactMatch(var->name()) < 0)
+             !_varRegEx.exactMatch(var->name()))
         return false;
     else if (filterActive(foVarNameRegEx) &&
              _varRegEx.indexIn(var->name()) < 0)
