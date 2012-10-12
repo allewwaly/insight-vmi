@@ -230,6 +230,24 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 //                     .arg(v->name())
 //                     .arg(v->id(), 0, 16)
 //                     .arg(v->altRefTypeCount()));
+
+        // Filter variables that are NULL
+        try {
+            if ((_vmem->memSpecs().arch & MemSpecs::ar_i386)) {
+                if (v->value<quint32>(_vmem) == 0)
+                    continue;
+            }
+            else {
+                if (v->value<quint64>(_vmem) == 0)
+                    continue;
+            }
+        }
+        catch(VirtualMemoryException &e) {
+            // Variable cannot be dereferenced thus continue
+            continue;
+        }
+
+        // Process Variable
         try {
             // Is this a per_cpu variable
             if (v->name().startsWith("per_cpu__")) {
