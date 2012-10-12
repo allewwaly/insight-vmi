@@ -200,39 +200,31 @@ bool MemSpecs::setFromKeyValue(const QString& key, const QString& value)
     bool ok = true;
 
     if (key == str::startKernelMap)
-        startKernelMap = value.toULong(&ok, 16);
+        startKernelMap = value.toULongLong(&ok, 16);
     else if (key == str::pageOffset)
-        pageOffset = value.toULong(&ok, 16);
+        pageOffset = value.toULongLong(&ok, 16);
     else if (key == str::vmallocStart)
-        vmallocStart = value.toULong(&ok, 16);
+        vmallocStart = value.toULongLong(&ok, 16);
     else if (key == str::vmallocEnd)
-        vmallocEnd = value.toULong(&ok, 16);
+        vmallocEnd = value.toULongLong(&ok, 16);
     else if (key == str::vmallocOffset)
-        vmallocOffset = value.toULong(&ok, 16);
+        vmallocOffset = value.toULongLong(&ok, 16);
     else if (key == str::modulesVaddr)
-        modulesVaddr = value.toULong(&ok, 16);
+        modulesVaddr = value.toULongLong(&ok, 16);
     else if (key == str::modulesEnd)
-        modulesEnd = value.toULong(&ok, 16);
+        modulesEnd = value.toULongLong(&ok, 16);
     else if (key == str::vmemmapStart)
-        vmemmapStart = value.toULong(&ok, 16);
+        vmemmapStart = value.toULongLong(&ok, 16);
     else if (key == str::vmemmapEnd)
-        vmemmapEnd = value.toULong(&ok, 16);
+        vmemmapEnd = value.toULongLong(&ok, 16);
     else if (key == str::sizeofLong)
         sizeofLong = value.toInt(&ok);
     else if (key == str::sizeofPointer)
         sizeofPointer = value.toInt(&ok);
-    else if (key == "ARCHITECTURE") {
-        if (value == "i386")
-            arch |= ar_i386;
-        else if (value == "x86_64")
-            arch |= ar_x86_64;
-        else
-            ok = false;
-    }
     else if (key == str::listPoison1)
-        listPoison1 = value.toULong(&ok, 16);
+        listPoison1 = value.toULongLong(&ok, 16);
     else if (key == str::listPoison2)
-        listPoison2 = value.toULong(&ok, 16);
+        listPoison2 = value.toULongLong(&ok, 16);
     else if (key == str::maxErrNo)
         maxErrNo = value.toInt();
     else if (key == str::utsSysname)
