@@ -1033,6 +1033,9 @@ int Shell::cmdListTypes(QStringList args, int typeFilter)
     }
     catch (ListFilterException& e) {
         errMsg(e.message, true);
+        _out << "Try \"list "
+             << (typeFilter == rtFunction ? "functions" :  "types")
+             << " help\" for more information." << endl;
     }
     return ecCaughtException;
 }
@@ -1398,6 +1401,7 @@ int Shell::cmdListVars(QStringList args)
     }
     catch (ListFilterException& e) {
         errMsg(e.message, true);
+        _out << "Try \"list variables help\" for more information." << endl;
     }
 
     return ecCaughtException;
