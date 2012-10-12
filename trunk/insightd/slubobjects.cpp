@@ -53,17 +53,20 @@ SlubObjects::ObjectValidity SlubObjects::objectValid(const Instance *inst) const
     SlubObject obj(objectAt(inst->address()));
     // Did we find an object at that address?
     if (obj.isNull) {
+        bool isSlubType = false;
+        // Is this type acutally organized in slabs?
+        for (int i = 0; !isSlubType && i < _caches.size(); ++i)
+            if (_caches[i].baseType &&
+                _caches[i].baseType->hash() == inst->type()->hash())
+                isSlubType = true;
+        if (!isSlubType)
+            return ovNoSlabType;
         // Do we find a global variable of that type?
         VariableList vars = _factory->varsUsingId(inst->type()->id());
         for (int i = 0; i < vars.size(); ++i)
             if (vars[i]->offset() == inst->address())
                 return ovValid;
-        // Is this type acutally organized in slabs?
-        for (int i = 0; i < _caches.size(); ++i)
-            if (_caches[i].baseType &&
-                _caches[i].baseType->hash() == inst->type()->hash())
-                return ovNotFound;
-        return ovNoSlabType;
+        return ovNotFound;
     }
     // If we don't know the slab object's type, we assume it's valid
     else if (!obj.baseType)
