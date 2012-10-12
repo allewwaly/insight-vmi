@@ -43,25 +43,24 @@ public:
 
     /**
      * Checks if the given is address is valid based on heuristics.
-     * \note that this function checks if the address if 4 Byte aligned. This
-     * is not the case for all pointers, but should be true for all pointers that
-     * point to the first element. For instance, a char * should be 4 byte aligned
-     * if it points to the first character in a string, but it may not be 4 byte aligned
-     * if it points to the n-th character in a string.
      * @param address the address to verify
      * @param vmem a pointer to the VirtualMemory that the address is part of
+     * @param defaultValid specifies whether default values such as 0 or -1 should
+     * be considered as valid values or as invalid values while verifying the given
+     * \a address. By default all default values are considered to be valid.
      * @return true if the address seems to be valid, false otherwise
      */
-    static bool validAddress(quint64 address, VirtualMemory *vmem);
+    static bool validAddress(quint64 address, VirtualMemory *vmem, bool defaultValid = true);
 
     /**
      * Checks if the given pointer points to a valid address.
-     * \note that this function does not consider 0, -1 as valid values for a
-     * pointer and will return false if a pointer is 0 or -1.
      * @param p the pointer instance to verify
+     * @param defaultValid specifies whether default values such as 0 or -1 should
+     * be considered as valid values or as invalid values while verifying the given
+     * instance \a i. By default all default values are considered to be valid.
      * @return true if the pointer is valid, false otherwise
      */
-    static bool validPointer(const Instance *p);
+    static bool validPointer(const Instance *p, bool defaultValid = true);
 
     /**
      * Checks if the given pointer is a valid function pointer.
@@ -70,7 +69,7 @@ public:
      * @param p the pointer instance to verify
      * @return true if the pointer is valid, false otherwise
      */
-    static bool validFunctionPointer(const Instance *p);
+    static bool validFunctionPointer(const Instance *p, bool defaultValid = true);
 
     /**
      * Checks if the diven pointer is a userland pointer.
@@ -82,31 +81,41 @@ public:
     /**
      * Checks if the given pointer is a valid userland pointer.
      * @param p the pointer instance to verify
+     * @param defaultValid specifies whether default values such as 0 or -1 should
+     * be considered as valid values or as invalid values while verifying the given
+     * instance \a i. By default all default values are considered to be valid.
      * @return true if the pointer is a valid userland pointer, false otherwise
      */
-    static bool validUserLandPointer(const Instance *p);
+    static bool validUserLandPointer(const Instance *p, bool defaultValid = true);
 
     /**
      * Checks if the given instance is a valid 'struct list_head'.
-     * \note that this functions verifies if the list_head itself is valid.
-     * This means that the next pointer of a list_head could be 0 or -1 and would
-     * be considered to be valid, since this are actucally valid values for a
-     * list_head. The caller has to check for these values before dereferencing a
-     * list_head that is valid according to this function.
+     * \note that the result of this function depends on the fact if default
+     * values are considered to be valid or invalid (\a defaultValid). For instance,
+     * the next pointer of a list_head could be 0, -1 or POISONED
+     * (0x00100100 or 0x00200200, see /include/linux/poison.h for details). Altough,
+     * the next pointer cannot be dereferenced in this case, it is a valid value for the
+     * next pointer and the list_head would therefore be considered to be valid as well.
+     * In other cases, however, one may want to check if the list_head is valid in the sense
+     * that it can be dereferenced. In this case default values should be considered as invalid.
      * @param i the list_head instance to verify
+     * @param defaultValid specifies whether default values such as 0 or -1 should
+     * be considered as valid values or as invalid values while verifying the given
+     * instance \a i. By default all default values are considered to be valid.
      * @return true of the instance is a valid list_head false otherwise.
      */
-    static bool validListHead(const Instance *i);
+    static bool validListHead(const Instance *i, bool defaultValid = true);
 
     /**
      * Check if the given candidate is a valid candidate for the given list head.
-     * \note that this check is based on heuristics and may therefore return
-     * incorrect results.
+     * \note that this check does not consider default values such as 0 or -1 to be
+     * valid. Thus if the next pointer of the given list_head \a listHead has a
+     * default value, this function will return \c false.
      * @param listHead a pointer to the list head instance whose next pointer has
      * multiple possible candidates
      * @param cand a pointer to the candidate that should be check for compatability
      * to the given list head
-     * @return true if the candidate is compatbible false otherwise
+     * @return \c true if the candidate is compatbible \c false otherwise
      */
     static bool validCandidateBasedOnListHead(const Instance *listHead, const Instance *cand);
 
@@ -127,6 +136,9 @@ public:
 
     /**
      * Checks if the given instance is valid.
+     * \note that default addresses such as 0 or -1 are not considered as valid. Thus
+     * if the given instance \a i has a default value as its address this function will
+     * return \c false
      * @param i the instance to verify
      * @return \c true if the instance \a is considered to be valid, \c false otherwise
      */
