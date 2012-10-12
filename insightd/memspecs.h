@@ -15,6 +15,15 @@
 #define VADDR_SPACE_X86    0xFFFFFFFFUL
 #define VADDR_SPACE_X86_64 0xFFFFFFFFFFFFFFFFULL
 
+namespace str
+{
+extern const char* initLvl4Pgt;
+extern const char* swapperPgDir;
+extern const char* highMemory;
+extern const char* vmallocEarlyres;
+}
+
+
 /**
  * This struct holds the definition of how a memory specification can be
  * extracted from a kernel source tree. It is used in conjunction with the
