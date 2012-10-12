@@ -838,9 +838,9 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) 
             Instance funcPointer = inst->dereference(BaseType::trLexicalAndPointers);
 
             // Verify. Default values are fine.
-            // Notice that the first line is necessary since NULL pointers cannot be
-            // dereferenced
-            if ((quint64)inst->toPointer() != 0 &&
+            // Notice that the first line is necessary since we may not be able to
+            // dereference the pointer
+            if (!MemoryMapHeuristics::defaultValue((quint64)inst->toPointer()) &&
                     !MemoryMapHeuristics::validFunctionPointer(&funcPointer))
                 // Invalid function pointer that has no default value
                 return (p * (1 - degInvalidPointer));
