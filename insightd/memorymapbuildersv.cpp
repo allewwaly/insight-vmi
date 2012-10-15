@@ -552,6 +552,132 @@ void MemoryMapBuilderSV::processUnion(MemoryMapNodeSV */*node*/, Instance */*ins
     // Ignore Unions for now.
 }
 
+void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *inst)
+{
+    MemoryMapNodeSV *nextNode = NULL;
+
+    if (!inst || inst->isNull() || !inst->isValid())
+        return;
+
+    // Add current node
+    if (!existsNode(inst))
+        nextNode = dynamic_cast<MemoryMapNodeSV *>(_map->
+                   addChildIfNotExistend((*inst), node, _index, inst->address()));
+
+    if (!nextNode) {
+        debugerr("Could cast Node to MemoryMapNodeSV!");
+        return;
+    }
+
+    // Get the height of the node
+    Instance height = inst->findMember("height", BaseType::trLexical);
+
+    if (height.isNull() || !height.isValid()) {
+        debugerr("Radix Tree Node has no member height!");
+        return;
+    }
+
+    quint32 heightInt = height.toInt32();
+
+    // Get the slots
+    Instance radixSlots = inst->findMember("slots", BaseType::trLexical, true);
+
+    if (radixSlots.isNull() || !radixSlots.isValid()) {
+        debugerr("Radix Tree Node has no member slots!");
+    }
+
+    // Iterate over the array and add all nodes
+    const Array* a = dynamic_cast<const Array*>(radixSlots.type());
+    quint64 curAddress = 0;
+    Instance curInst = Instance(inst->address(), inst->type(), "",
+                                inst->parentNameComponents(), inst->vmem());
+
+    if (a && a->length() > 0)
+    {
+        // Add all elements to the stack that haven't been visited
+        for (int i = 0; i < a->length(); ++i)
+        {
+            try
+            {
+                if(inst->vmem()->memSpecs().arch & MemSpecs::ar_i386)
+                    curAddress = radixSlots.arrayElem(i).toUInt32();
+                else
+                    curAddress = radixSlots.arrayElem(i).toUInt64();
+
+                // Filter invalid pointer
+                if (!MemoryMapHeuristics::validAddress(curAddress, inst->vmem(), false))
+                    continue;
+
+                // Set data
+                curInst.setName(QString("%1.slots[%2]").arg(inst->name()).arg(i));
+                curInst.setAddress(curAddress);
+
+                if (heightInt > 1)
+                    processRadixTreeNode(nextNode, &curInst);
+                else if (heightInt == 1)
+                     unknownPointer.insert(inst->address() +
+                                          (i * curInst.sizeofPointer()), curAddress);
+
+            }
+            catch (GenericException& e)
+            {
+                // Do nothing
+            }
+        }
+    }
+}
+
+void MemoryMapBuilderSV::processRadixTree(MemoryMapNodeSV *node, Instance *inst)
+{
+    if (!inst || inst->isNull() || !inst->isValid())
+        return;
+
+    if (!MemoryMapHeuristics::isRadixTreeRoot(inst))
+        return;
+
+    // Get the rnode
+    Instance rnode = inst->findMember("rnode", BaseType::trLexicalAndPointers);
+
+    // Verify if the instance is valid or if it is still a pointer.
+    // in the latter case the pointer could not be dereferenced thus we ignore this
+    // instance.
+    if (!MemoryMapHeuristics::validInstance(&rnode) || rnode.type()->type() & rtPointer)
+        return;
+
+    // Fix the pointer if necessary
+    if (rnode.address() & 1ULL) {
+        rnode.setAddress(rnode.address() & ~1ULL);
+    }
+    else
+    {
+        // This is a pointer to an arbitrary struct.
+        // Do we have already know that object?
+        MemMapSet nodes = _map->vmemMap().objectsAt(rnode.address());
+
+        if (nodes.size() == 1) {
+            // Yep. Increase the nodes probability.
+            MemoryMapNodeSV *node = dynamic_cast<MemoryMapNodeSV *>(*nodes.begin());
+
+            if(node)
+                node->encountered();
+        }
+        else if (nodes.size() > 1) {
+            // More than one node.
+            // Ignore this one for now.
+        }
+        else
+        {
+            // Add it to the list of unknown pointer
+            unknownPointer.insert(inst->address(), rnode.address());
+        }
+
+        return;
+    }
+
+    // Handle the node
+    processRadixTreeNode(node, &rnode);
+}
+
 void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
                                      const ReferencingType *ref)
 {
@@ -593,6 +719,8 @@ void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
         else if(MemoryMapHeuristics::isHListNode(inst))
             // Ignore hlist_nodes for now
             return;
+        else if (MemoryMapHeuristics::isRadixTreeRoot(inst))
+            processRadixTree(node, inst);
         else if(inst->type()->type() & rtStruct)
             processStruct(node, inst);
         else if(inst->type()->type() & rtUnion)

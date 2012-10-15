@@ -217,6 +217,17 @@ bool MemoryMapHeuristics::validListHead(const Instance *i, bool defaultValid)
     return true;
 }
 
+bool MemoryMapHeuristics::isRadixTreeRoot(const Instance *i)
+{
+    if(!i)
+        return false;
+
+    if(i->typeName().compare("struct radix_tree_root") == 0)
+        return true;
+
+    return false;
+}
+
 bool MemoryMapHeuristics::validCandidateBasedOnListHead(const Instance *listHead, const Instance *cand)
 {
     // Did we receive a valid list_head?

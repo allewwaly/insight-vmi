@@ -61,7 +61,7 @@ struct PhysMemMapProperties: public MemMapProperties
 };
 
 
-typedef MemoryRangeTree<const MemoryMapNode*, PtrAccessor<MemoryMapNode>, MemMapProperties> MemoryMapRangeTree;
+typedef MemoryRangeTree<MemoryMapNode*, PtrAccessor<MemoryMapNode>, MemMapProperties> MemoryMapRangeTree;
 typedef MemoryMapRangeTree::ItemSet MemMapSet;
 
 typedef MemoryRangeTree<PhysMemoryMapNode, RefAccessor<PhysMemoryMapNode>, PhysMemMapProperties> PhysMemoryMapRangeTree;

@@ -80,11 +80,15 @@ private:
     void processArray(MemoryMapNodeSV *node, Instance *inst);
     void processStruct(MemoryMapNodeSV *node, Instance *inst);
     void processUnion(MemoryMapNodeSV *node, Instance *inst);
+    void processRadixTreeNode(MemoryMapNodeSV *node, Instance *inst);
+    void processRadixTree(MemoryMapNodeSV *node, Instance *inst);
     void processNode(MemoryMapNodeSV *node, Instance *inst = NULL,
                      const ReferencingType *ref = NULL);
 
     static QMutex builderMutex;
     static bool statisticsShown;
+
+    QMap<quint64, quint64> unknownPointer;
 };
 
 #endif /* MEMORYMAPBUILDERSV_H_ */
