@@ -121,3 +121,39 @@ struct prio_tree_node {
 }}}
 
 In the above example, `struct prio_tree_node` implicitely includes `struct raw_prio_tree_node`, but not as a field directly, but only implicitely through by starting with the same three members as the other type.
+
+= Pointer derference based on flag (radix tree) =
+
+http://lxr.linux.no/#linux+v2.6.32.58/lib/radix-tree.c#L102
+
+Based on the last bit of the pointer that points to the next node in a radix tree, the pointer may either be directly dereferenceable or not.
+
+{{{
+static void *radix_tree_lookup_element(struct radix_tree_root *root,
+                               unsigned long index, int is_slot)
+{
+        unsigned int height, shift;
+        struct radix_tree_node *node, **slot;
+
+        node = rcu_dereference(root->rnode);
+        if (node == NULL)
+                return NULL;
+
+        if (!radix_tree_is_indirect_ptr(node)) {
+               if (index > 0)
+                        return NULL;
+               return is_slot ? (void *)&root->rnode : node;
+        }
+       node = radix_tree_indirect_to_ptr(node);
+ 
+       ...
+}}}
+
+In case the last bit is set, the pointer must be dereferenced using the following method:
+
+{{{
+static inline void *radix_tree_indirect_to_ptr(void *ptr)
+{
+       return (void *)((unsigned long)ptr & ~RADIX_TREE_INDIRECT_PTR);
+}
+}}}
