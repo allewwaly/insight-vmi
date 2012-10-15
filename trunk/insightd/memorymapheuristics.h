@@ -42,6 +42,13 @@ public:
     static bool isHListNode(const Instance *i);
 
     /**
+     * Checks if this instance is of type 'struct radix_tree_root'.
+     * @return \c true if this object is of type 'struct radix_tree_root', \c false
+     * otherwise
+     */
+    static bool isRadixTreeRoot(const Instance *i);
+
+    /**
      * Checks if the given is address is valid based on heuristics.
      * @param address the address to verify
      * @param vmem a pointer to the VirtualMemory that the address is part of
