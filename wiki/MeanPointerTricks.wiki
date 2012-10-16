@@ -158,19 +158,86 @@ static inline void *radix_tree_indirect_to_ptr(void *ptr)
 }
 }}}
 
-= Per-CPU variable in struct fields =
+= Percpu Variables =
+http://lxr.linux.no/#linux+v2.6.32.58/include/linux/percpu.h#L191
 
-http://lxr.linux.no/#linux+v2.6.32.58/fs/namespace.c#L154
-
-Field `struct vfsmount.mnt_writers` is initialized as per-CPU variable at runtime but not declared as such:
+Percpu variables are pointers that are not valid by themselves. Instead the pointer value that a percpu variable contains must be added to the the correct offset for the cpu that tries to access this variable. This offset is stored in the global array "__per_cpu_offset". This gets especially nasty if a variable within a struct is not defined as a percpu variable, but is initialized as one as in the case of vfsmount.mnt_writers:
 
 {{{
-Found type with name vfsmount:
-  ID:             0x14da5
-  Name:           struct vfsmount
-  Type:           Struct
-  Size:           124
-  Members:        23
-    ...                                                                                            
-    0x78  mnt_writers:     0x13146    int *
+struct vfsmount {
+        struct list_head mnt_hash;
+        struct vfsmount *mnt_parent;    /* fs we are mounted on */
+        struct dentry *mnt_mountpoint;  /* dentry of mountpoint */
+        struct dentry *mnt_root;        /* root of the mounted tree */
+        struct super_block *mnt_sb;     /* pointer to superblock */
+        struct list_head mnt_mounts;    /* list of children, anchored here */
+        struct list_head mnt_child;     /* and going through their mnt_child */
+        int mnt_flags;
+        /* 4 bytes hole on 64bits arches */
+        const char *mnt_devname;        /* Name of device e.g. /dev/dsk/hda1 */
+        struct list_head mnt_list;
+        struct list_head mnt_expire;    /* link in fs-specific expiry list */
+        struct list_head mnt_share;     /* circular list of shared mounts */
+        struct list_head mnt_slave_list;/* list of slave mounts */
+        struct list_head mnt_slave;     /* slave list entry */
+        struct vfsmount *mnt_master;    /* slave is on master->mnt_slave_list */
+        struct mnt_namespace *mnt_ns;   /* containing namespace */
+        int mnt_id;                     /* mount identifier */
+        int mnt_group_id;               /* peer group identifier */
+        /*
+         * We put mnt_count & mnt_expiry_mark at the end of struct vfsmount
+         * to let these frequently modified fields in a separate cache line
+         * (so that reads of mnt_flags wont ping-pong on SMP machines)
+         */
+        atomic_t mnt_count;
+        int mnt_expiry_mark;            /* true if marked for expiry */
+        int mnt_pinned;
+        int mnt_ghosts;
+#ifdef CONFIG_SMP
+        int *mnt_writers;
+#else
+        int mnt_writers;
+#endif
+};
+}}}
+
+mnt_writers is defined as *int. But it is in fact a percpu variable:
+
+http://lxr.linux.no/#linux+v2.6.32.58/fs/namespace.c#L128
+
+{{{
+struct vfsmount *alloc_vfsmnt(const char *name)
+{
+        struct vfsmount *mnt = kmem_cache_zalloc(mnt_cache, GFP_KERNEL);
+        if (mnt) {
+                int err;
+
+                err = mnt_alloc_id(mnt);
+                if (err)
+                        goto out_free_cache;
+
+                if (name) {
+                        mnt->mnt_devname = kstrdup(name, GFP_KERNEL);
+                        if (!mnt->mnt_devname)
+                                goto out_free_id;
+                }
+
+                atomic_set(&mnt->mnt_count, 1);
+                INIT_LIST_HEAD(&mnt->mnt_hash);
+                INIT_LIST_HEAD(&mnt->mnt_child);
+                INIT_LIST_HEAD(&mnt->mnt_mounts);
+                INIT_LIST_HEAD(&mnt->mnt_list);
+                INIT_LIST_HEAD(&mnt->mnt_expire);
+                INIT_LIST_HEAD(&mnt->mnt_share);
+                INIT_LIST_HEAD(&mnt->mnt_slave_list);
+                INIT_LIST_HEAD(&mnt->mnt_slave);
+#ifdef CONFIG_SMP
+                mnt->mnt_writers = alloc_percpu(int);
+                if (!mnt->mnt_writers)
+                       goto out_free_devname;
+#else
+                mnt->mnt_writers = 0;
+#endif
+        }
+...
 }}}
