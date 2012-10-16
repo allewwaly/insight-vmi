@@ -201,7 +201,7 @@ struct vfsmount {
 };
 }}}
 
-mnt_writers is defined as *int. But it is in fact a percpu variable:
+mnt_writers is defined as {{{*int}}}. But it is in fact a percpu variable:
 
 http://lxr.linux.no/#linux+v2.6.32.58/fs/namespace.c#L128
 
