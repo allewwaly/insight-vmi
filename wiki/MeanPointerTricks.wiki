@@ -161,7 +161,7 @@ static inline void *radix_tree_indirect_to_ptr(void *ptr)
 = Percpu Variables =
 http://lxr.linux.no/#linux+v2.6.32.58/include/linux/percpu.h#L191
 
-Percpu variables are pointers that are not valid by themselves. Instead the pointer value that a percpu variable contains must be added to the the correct offset for the cpu that tries to access this variable. This offset is stored in the global array "__per_cpu_offset". This gets especially nasty if a variable within a struct is not defined as a percpu variable, but is initialized as one as in the case of vfsmount.mnt_writers:
+Percpu variables are pointers that are not valid by themselves. Instead the pointer value that a percpu variable contains must be added to the the correct offset for the cpu that tries to access this variable. This offset is stored in the global array {{{__per_cpu_offset}}}. This gets especially nasty if a variable within a struct is not defined as a percpu variable, but is initialized as one as in the case of vfsmount.mnt_writers:
 
 {{{
 struct vfsmount {
