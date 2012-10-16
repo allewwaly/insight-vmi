@@ -228,6 +228,17 @@ bool MemoryMapHeuristics::isRadixTreeRoot(const Instance *i)
     return false;
 }
 
+bool MemoryMapHeuristics::isIdr(const Instance *i)
+{
+    if(!i)
+        return false;
+
+    if(i->typeName().compare("struct idr") == 0)
+        return true;
+
+    return false;
+}
+
 bool MemoryMapHeuristics::validCandidateBasedOnListHead(const Instance *listHead, const Instance *cand)
 {
     // Did we receive a valid list_head?

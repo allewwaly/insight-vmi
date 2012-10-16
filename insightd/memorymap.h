@@ -323,14 +323,16 @@ private:
 	 * @param inst the instance to create a new node from
 	 * @param parent the parent node of the new node to be created
      * @param addrInParent the address of the member within the parent
+     * @param addToQueue should the new node be added to the queue
      * @param hasCandidates specifies if the node has candidates that will be
      * added next
      * @return \c A pointer to the new node if the node could be added, \c NULL
      * if that instance is in conflict to already existing nodes and a pointer to
      * the existing node, if it already existed in the virtual memory mapping
 	 */
-    MemoryMapNode * addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,
-            int threadIndex, quint64 addrInParent, bool hasCandidates = false);
+    MemoryMapNode * addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,  
+                                          int threadIndex, quint64 addrInParent,
+                                          bool addToQueue = true, bool hasCandidates = false);
 
     /**
      * Check if at least one builder is still runnning.

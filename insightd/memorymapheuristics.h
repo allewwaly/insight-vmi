@@ -49,6 +49,15 @@ public:
     static bool isRadixTreeRoot(const Instance *i);
 
     /**
+     * Checks if this instance is of type 'struct idr'.
+     * \note struct idrs belong to a "small id to pointer translation service" that
+     * is similar to radix_trees. For more information see include/linux/lxr.h
+     * @return \c true if this object is of type 'struct idr', \c false
+     * otherwise
+     */
+    static bool isIdr(const Instance *i);
+
+    /**
      * Checks if the given is address is valid based on heuristics.
      * @param address the address to verify
      * @param vmem a pointer to the VirtualMemory that the address is part of
