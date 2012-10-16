@@ -139,6 +139,9 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     totalTimer.start();
     qint64 prev_queue_size = 0;
 
+    // Variable that temporarily stores the value of each insight variable
+    quint64 var_value = 0;
+
     // Get all the data that we need to handle per_cpu variables.
     quint32 nr_cpus = 1;
 
@@ -234,14 +237,16 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 //                     .arg(v->id(), 0, 16)
 //                     .arg(v->altRefTypeCount()));
 
-        // Filter variables that are NULL
+        // Filter variables that are NULL or cannot be dereferenced
         try {
             if ((_vmem->memSpecs().arch & MemSpecs::ar_i386)) {
-                if (v->value<quint32>(_vmem) == 0)
+                if ((var_value = v->value<quint32>(_vmem)) == 0 ||
+                        !_vmem->safeSeek(var_value))
                     continue;
             }
             else {
-                if (v->value<quint64>(_vmem) == 0)
+                if ((var_value = v->value<quint64>(_vmem)) == 0 ||
+                        !_vmem->safeSeek(var_value))
                     continue;
             }
         }
