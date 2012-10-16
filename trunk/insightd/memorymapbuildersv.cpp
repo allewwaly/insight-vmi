@@ -552,6 +552,100 @@ void MemoryMapBuilderSV::processUnion(MemoryMapNodeSV */*node*/, Instance */*ins
     // Ignore Unions for now.
 }
 
+void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance *inst, quint32 layers)
+{
+    if (!inst || inst->isNull() || !inst->isValid())
+        return;
+
+    // Add current node
+    MemoryMapNodeSV *nextNode = NULL;
+
+    if (!existsNode(inst))
+        nextNode = dynamic_cast<MemoryMapNodeSV *>(_map->
+                   addChildIfNotExistend((*inst), node, _index, inst->address(), false));
+
+    if (!nextNode) {
+        debugerr("Could cast node to MemoryMapNodeSV!");
+        return;
+    }
+
+    // Get the pointer array
+    Instance ary = inst->findMember("ary", BaseType::trLexical, true);
+
+    if (ary.isNull() || !ary.isValid()) {
+        debugerr("Idr Layer has no member ary!");
+    }
+
+    // Iterate over the array and add all nodes
+    const Array* a = dynamic_cast<const Array*>(ary.type());
+    int derefCnt = 0;
+
+    if (a && a->length() > 0)
+    {
+        // Add all elements to the stack that haven't been visited
+        for (int i = 0; i < a->length(); ++i)
+        {
+            try
+            {
+                derefCnt = 0;
+                Instance e = ary.arrayElem(i).dereference(BaseType::trLexicalAndPointers,
+                                                          -1, &derefCnt);
+
+                // Filter invalid pointer
+                if (!derefCnt || !MemoryMapHeuristics::validInstance(&e))
+                    continue;
+
+                if (layers > 1)
+                    processIdrLayer(nextNode, &e, (--layers));
+                else
+                    unknownPointer.insert(inst->address() +
+                                          (i * e.sizeofPointer()), e.address());
+
+            }
+            catch (GenericException& e)
+            {
+                // Do nothing
+            }
+        }
+    }
+}
+
+void MemoryMapBuilderSV::processIdr(MemoryMapNodeSV *node, Instance *inst)
+{
+    if (!inst || inst->isNull() || !inst->isValid())
+        return;
+
+    if (!MemoryMapHeuristics::isIdr(inst))
+        return;
+
+    // Get the top layer
+    Instance top = inst->findMember("top", BaseType::trLexicalAndPointers);
+
+    // Verify if the instance is valid or if it is still a pointer.
+    // in the latter case the pointer could not be dereferenced thus we ignore this
+    // instance.
+    if (!MemoryMapHeuristics::validInstance(&top) || top.type()->type() & rtPointer)
+        return;
+
+    // Get the number of layers
+    Instance layers = inst->findMember("layers", BaseType::trLexical);
+
+    // Handle the node
+    processIdrLayer(node, &top, layers.toUInt32());
+
+    // Get the free layer
+    Instance free = inst->findMember("id_free", BaseType::trLexical);
+
+    // Verify if the instance is valid or if it is still a pointer.
+    // in the latter case the pointer could not be dereferenced thus we ignore this
+    // instance.
+    if (!MemoryMapHeuristics::validInstance(&free) || free.type()->type() & rtPointer)
+        return;
+
+    // No special handling of the free pointer required just process it as usually
+    processNode(node, &free);
+}
+
 void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *inst)
 {
     MemoryMapNodeSV *nextNode = NULL;
@@ -562,7 +656,7 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *i
     // Add current node
     if (!existsNode(inst))
         nextNode = dynamic_cast<MemoryMapNodeSV *>(_map->
-                   addChildIfNotExistend((*inst), node, _index, inst->address()));
+                   addChildIfNotExistend((*inst), node, _index, inst->address(), false));
 
     if (!nextNode) {
         debugerr("Could cast Node to MemoryMapNodeSV!");
@@ -615,7 +709,7 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *i
                 if (heightInt > 1)
                     processRadixTreeNode(nextNode, &curInst);
                 else if (heightInt == 1)
-                     unknownPointer.insert(inst->address() +
+                    unknownPointer.insert(inst->address() +
                                           (i * curInst.sizeofPointer()), curAddress);
 
             }
@@ -712,6 +806,7 @@ void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
     // Is this a struct or union?
     else if (inst->memberCount() > 0)
     {
+        // Sepcial cases
         // Is this a (h)list_head?
         if(MemoryMapHeuristics::isListHead(inst) ||
                 MemoryMapHeuristics::isHListHead(inst))
@@ -721,6 +816,9 @@ void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
             return;
         else if (MemoryMapHeuristics::isRadixTreeRoot(inst))
             processRadixTree(node, inst);
+        else if(MemoryMapHeuristics::isIdr(inst))
+            processIdr(node, inst);
+        // Struct or Union
         else if(inst->type()->type() & rtStruct)
             processStruct(node, inst);
         else if(inst->type()->type() & rtUnion)

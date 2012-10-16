@@ -221,6 +221,9 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 //         if (v->name() != "init_task")
 //            continue;
 
+//       if (v->name() != "init_ipc_ns")
+//            continue;
+
         // For now ignore all symbols that have been defined in modules
         if (v->symbolSource() == ssModule)
             continue;
@@ -878,7 +881,7 @@ bool MemoryMap::objectIsSane(const Instance& inst,
 
 MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
         MemoryMapNode* parent, int threadIndex, quint64 addrInParent,
-        bool hasCandidates)
+        bool addToQueue, bool hasCandidates)
 {
     MemoryMapNode *child = existsNode(inst);
     // Return child if it already exists in virtual memory.
@@ -965,9 +968,11 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
             _shared->vmemWritingLock.unlock();
 
             // Insert the new node into the queue
-            _shared->queueLock.lock();
-            _shared->queue.insert(child->probability(), child);
-            _shared->queueLock.unlock();
+            if(addToQueue) {
+                _shared->queueLock.lock();
+                _shared->queue.insert(child->probability(), child);
+                _shared->queueLock.unlock();
+            }
 
 //            // Sanity check
 //            if ((parent->type()->dereferencedType(BaseType::trLexical) & StructOrUnion) &&

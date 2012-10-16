@@ -82,6 +82,8 @@ private:
     void processUnion(MemoryMapNodeSV *node, Instance *inst);
     void processRadixTreeNode(MemoryMapNodeSV *node, Instance *inst);
     void processRadixTree(MemoryMapNodeSV *node, Instance *inst);
+    void processIdr(MemoryMapNodeSV *node, Instance *inst);
+    void processIdrLayer(MemoryMapNodeSV *node, Instance *inst, quint32 layers);
     void processNode(MemoryMapNodeSV *node, Instance *inst = NULL,
                      const ReferencingType *ref = NULL);
 
