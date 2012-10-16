@@ -64,17 +64,48 @@ bool MemoryMapHeuristics::validPointer(const Instance *p, bool defaultValid)
     return validAddress(targetAdr, p->vmem(), defaultValid);
 }
 
-bool MemoryMapHeuristics::validFunctionPointer(const Instance *p, bool defaultValid)
+bool MemoryMapHeuristics::isFunctionPointer(const Instance *p)
 {
-    if (!p || !(p->type()) || !(p->type()->type() & rtFuncPointer))
+    if (!p || !(p->type()))
         return false;
 
+    // Find the BaseType of the type that is referenced this instance if any
+    // This is necessary to identify function pointers which may be labled as
+    // pointers to a function pointer
+    const BaseType* instRefType = (p->type()->type() & rtPointer) ?
+                                   p->type()->dereferencedBaseType(BaseType::trLexicalAndPointers) :
+                                   0;
+
+    if (!(p->type()->type() & rtFuncPointer) &&
+            (!instRefType || !(instRefType->type() & rtFuncPointer)))
+        return false;
+
+    return true;
+}
+
+bool MemoryMapHeuristics::validFunctionPointer(const Instance *p, bool defaultValid)
+{
+    if (!p || !(p->type()))
+        return false;
+
+    if (!isFunctionPointer(p))
+        return false;
+
+    // Get the function pointer
+    Instance functionPointer = (p->type()->type() & rtFuncPointer) ?
+                               (*p) :
+                               p->dereference(BaseType::trLexicalAndPointers);
+
+    // Does the pointer have an default value
+    if (MemoryMapHeuristics::defaultValue((quint64)p->toPointer(), p->vmem()->memSpecs()))
+        return defaultValid;
+
     // Is the address the pointer points to valid?
-    if(!validAddress(p->address(), p->vmem(), defaultValid))
+    if (!validAddress(functionPointer.address(), p->vmem(), false))
         return false;
 
     // Is the address the pointer points to executable?
-    return p->vmem()->isExecutable(p->address());
+    return p->vmem()->isExecutable(functionPointer.address());
 }
 
 bool MemoryMapHeuristics::userLandPointer(const Instance *p)

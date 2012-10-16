@@ -459,7 +459,7 @@ void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst)
     // Filter pointers that have default values, since we do not need to
     // process them further
     if (inst && inst->type() && inst->type()->type() & rtPointer &&
-            !(inst->type()->type() & rtFuncPointer) &&
+            !MemoryMapHeuristics::isFunctionPointer(inst) &&
             MemoryMapHeuristics::validPointer(inst, false) &&
             !MemoryMapHeuristics::userLandPointer(inst) &&
             // Filter self pointers
@@ -639,7 +639,7 @@ void MemoryMapBuilderSV::processIdr(MemoryMapNodeSV *node, Instance *inst)
     // Verify if the instance is valid or if it is still a pointer.
     // in the latter case the pointer could not be dereferenced thus we ignore this
     // instance.
-    if (!MemoryMapHeuristics::validInstance(&free) || free.type()->type() & rtPointer)
+    if (!MemoryMapHeuristics::validInstance(&free) || !(free.type()->type() & rtPointer))
         return;
 
     // No special handling of the free pointer required just process it as usually
@@ -1048,40 +1048,13 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) 
     const BaseType* instType = inst->type() ?
             inst->type()->dereferencedBaseType(BaseType::trLexical) : 0;
 
-    // Find the BaseType of the type that is referenced this instance if any
-    // This is necessary to identify function pointers which may be labled as
-    // pointers to a function pointer
-    const BaseType* instRefType = inst->type() ?
-            inst->type()->dereferencedBaseType(BaseType::trLexicalAndPointers) : 0;
-
     // Function Pointer ?
-    if ((instType && instType->type() & rtFuncPointer) ||
-            (instRefType && instRefType->type() & rtFuncPointer)) {
-        // Since the function pointer that we are considering may be instRefType
-        // the current instance could actually be of type pointer. Thus get the
-        // correct instance before we run the checks.
-        if (instRefType && instRefType->type() & rtFuncPointer) {
-            Instance funcPointer = inst->dereference(BaseType::trLexicalAndPointers);
+    if (MemoryMapHeuristics::isFunctionPointer(inst)) {
+        if (!MemoryMapHeuristics::validFunctionPointer(inst))
+            // Invalid function pointer that has no default value
+            return (p * (1 - degInvalidPointer));
 
-            // Verify. Default values are fine.
-            // Notice that the first line is necessary since we may not be able to
-            // dereference the pointer
-            if (!MemoryMapHeuristics::defaultValue((quint64)inst->toPointer(),
-                                                   _map->_vmem->memSpecs()) &&
-                    !MemoryMapHeuristics::validFunctionPointer(&funcPointer))
-                // Invalid function pointer that has no default value
-                return (p * (1 - degInvalidPointer));
-
-            return p;
-        }
-        else {
-            // Verify. Default values are fine.
-            if (!MemoryMapHeuristics::validFunctionPointer(inst))
-                // Invalid function pointer that has no default value
-                return (p * (1 - degInvalidPointer));
-
-            return p;
-        }
+        return p;
     }
     // Pointer ?
     else if (instType && instType->type() & rtPointer) {

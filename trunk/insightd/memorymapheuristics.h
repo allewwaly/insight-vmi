@@ -79,6 +79,16 @@ public:
     static bool validPointer(const Instance *p, bool defaultValid = true);
 
     /**
+     * Checks if the given pointer is a function pointer.
+     * @param p the pointer instance to verify
+     * @param defaultValid specifies whether default values such as 0 or -1 should
+     * be considered as valid values or as invalid values while verifying the given
+     * \a address. By default all default values are considered to be valid.
+     * @return true if the pointer is valid, false otherwise
+     */
+    static bool isFunctionPointer(const Instance *p);
+
+    /**
      * Checks if the given pointer is a valid function pointer.
      * \note that this function does not consider 0, -1 as valid values for a
      * pointer and will return false if a pointer is 0 or -1.
