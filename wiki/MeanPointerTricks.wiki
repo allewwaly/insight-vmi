@@ -157,3 +157,20 @@ static inline void *radix_tree_indirect_to_ptr(void *ptr)
        return (void *)((unsigned long)ptr & ~RADIX_TREE_INDIRECT_PTR);
 }
 }}}
+
+= Per-CPU variable in struct fields =
+
+http://lxr.linux.no/#linux+v2.6.32.58/fs/namespace.c#L154
+
+Field `struct vfsmount.mnt_writers` is initialized as per-CPU variable at runtime but not declared as such:
+
+{{{
+Found type with name vfsmount:
+  ID:             0x14da5
+  Name:           struct vfsmount
+  Type:           Struct
+  Size:           124
+  Members:        23
+    ...                                                                                            
+    0x78  mnt_writers:     0x13146    int *
+}}}
