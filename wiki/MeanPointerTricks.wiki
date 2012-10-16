@@ -244,3 +244,4 @@ struct vfsmount *alloc_vfsmnt(const char *name)
 
 More examples:
  * hd_struct.dkstats: http://lxr.linux.no/#linux+v2.6.32.58/include/linux/genhd.h#L252
+ * percpu_counter.counters: http://lxr.linux.no/#linux+v2.6.32.58/lib/percpu_counter.c#L29
