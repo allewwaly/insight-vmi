@@ -166,6 +166,8 @@ void BaseType::readFrom(KernelSymbolStream &in)
 
 void BaseType::writeTo(KernelSymbolStream &out) const
 {
+    // We do NOT support writing of old formats
+    assert(out.kSymVersion() == kSym::VERSION_MAX);
     // Write inherited values
     Symbol::writeTo(out);
     SourceRef::writeTo(out);

@@ -35,6 +35,11 @@ public:
     virtual ~VirtualMemoryException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "VirtualMemoryException";
+    }
 };
 
 #endif /* VIRTUALMEMORYEXCEPTION_H_ */

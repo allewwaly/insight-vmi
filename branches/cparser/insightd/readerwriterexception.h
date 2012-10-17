@@ -35,6 +35,11 @@ public:
     virtual ~ReaderWriterException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "ReaderWriterException";
+    }
 };
 
 #endif /* READERWRITEREXCEPTION_H_ */

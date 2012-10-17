@@ -8,6 +8,7 @@
 #include "structured.h"
 #include "pointer.h"
 #include <debug.h>
+#include "shell.h"
 
 
 Structured::Structured(SymFactory* factory)
@@ -51,11 +52,51 @@ uint Structured::hash(bool* isValid) const
             rot = (rot + 3) % 32;
             _hash ^= rotl32(qHash(member->name()), rot);
             rot = (rot + 3) % 32;
+            _hash ^= rotl32((qint32)member->bitSize(), rot);
+            rot = (rot + 3) % 32;
+            _hash ^= rotl32((qint32)member->bitOffset(), rot);
+            rot = (rot + 3) % 32;
         }
     }
     if (isValid)
         *isValid = _hashValid;
     return _hash;
+}
+
+
+uint Structured::hashMembers(quint32 memberIndex, quint32 nrMembers, bool *isValid) const
+{
+    // Check error cases
+    if ( (uint)this->members().size() <= memberIndex ||
+         (uint)this->members().size() < (memberIndex + nrMembers) )
+    {
+        if (isValid)
+            (*isValid) = false;
+        return 0;
+    }
+
+    uint hash = 0;
+    bool valid = true;
+    // To place the member hashes at different bit positions
+    uint rot = 0;
+
+    for (int i = memberIndex; i < (memberIndex + nrMembers) && valid; ++i)
+    {
+        const StructuredMember* member = _members[i];
+        hash ^= rotl32(member->refType()->hash(&valid), rot);
+        rot = (rot + 3) % 32;
+        hash ^= rotl32(qHash(member->name()), rot);
+        rot = (rot + 3) % 32;
+        hash ^= rotl32((qint32)member->bitSize(), rot);
+        rot = (rot + 3) % 32;
+        hash ^= rotl32((qint32)member->bitOffset(), rot);
+        rot = (rot + 3) % 32;
+    }
+
+    if (isValid)
+        (*isValid) = valid;
+
+    return hash;
 }
 
 
@@ -124,6 +165,24 @@ const StructuredMember* Structured::findMember(const QString& memberName,
 }
 
 
+const StructuredMember *Structured::memberAtOffset(size_t offset, bool exactMatch) const
+{
+    int i;
+
+    for (i = 0; i < _members.size() && _members[i]->offset() <= offset; ++i)
+        // Ignore members that have a size of 0
+        if (_members[i]->offset() == offset && _members[i]->refType()->size() > 0)
+            return _members[i];
+
+    if(exactMatch)
+        return 0;
+    else if(i == 0)
+        return _members[i];
+    else
+        return _members[i - 1];
+}
+
+
 void Structured::readFrom(KernelSymbolStream& in)
 {
     BaseType::readFrom(in);
@@ -168,13 +227,16 @@ void Structured::writeTo(KernelSymbolStream& out) const
 }
 
 
-QString Structured::toString(QIODevice* mem, size_t offset) const
+QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
 {
 //    static RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
 
-    QString s;
+    QString s, name;
     int index_len = 0, offset_len = 1, name_len = 1, type_len = 1;
     quint32 i = _size;
+    bool invalidAdr = false;
+    QString errMsg;
+    QString valueStr;
 
     while ( (i >>= 4) )
         offset_len++;
@@ -183,10 +245,18 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
         index_len++;
 
     for (int i = 0; i < _members.size(); ++i) {
-        if (name_len < _members[i]->name().length())
-            name_len = _members[i]->name().length();
-        if (_members[i]->refType() && type_len < _members[i]->refType()->prettyName().length())
-            type_len = _members[i]->refType()->prettyName().length();
+        const StructuredMember* m = _members[i];
+        int len = m->name().length();
+        // Is it a bit-field with a bit size and offset?
+        if (m->bitSize() >= 0) {
+            len += 2;
+            if (m->bitSize() >= 10)
+                len++;
+        }
+        if (name_len < len)
+            name_len = len;
+        if (m->refType() && type_len < m->refType()->prettyName().length())
+            type_len = m->refType()->prettyName().length();
     }
 
     // Output all members
@@ -211,46 +281,102 @@ QString Structured::toString(QIODevice* mem, size_t offset) const
                 while ( addr && !(t->type() & StructOrUnion) ) {
                     const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
                     if (rbt->type() & rtPointer) {
-                        addr = (quint64) rbt->toPointer(mem, addr);
-                        wasPointer = true;
+                        try {
+                            addr = (quint64) rbt->toPointer(mem, addr);
+                            wasPointer = true;
+                            invalidAdr = false;
+                        }
+                        catch (VirtualMemoryException &e) {
+                            addr = offset + m->offset();
+                            invalidAdr = true;
+                            errMsg = e.message;
+                        }
                     }
                     t = rbt->refType();
                 }
 
-                QString addrStr;
                 if (!wasPointer)
-                    addrStr = "...";
+                    valueStr = "...";
                 else if (addr) {
-                    addrStr = QString("... @ 0x%1").arg(addr, 0, 16);
-                    if (addr == offset)
-                        addrStr += " (self)";
-                }
-                else
-                    addrStr = "NULL";
+                    valueStr = QString("0x%1").arg(addr,
+                                                   factory()->memSpecs().sizeofPointer << 1,
+                                                   16,
+                                                   QChar('0'));
+                    if (col)
+                        valueStr = col->color(ctAddress) + valueStr + col->color(ctReset);
 
-                s += QString("%0.  0x%1  %2 : %3 = %4")
-                        .arg(i, index_len)
-                        .arg(m->offset(), offset_len, 16, QChar('0'))
-                        .arg(m->name(), -name_len)
-                        .arg(m->refType()->prettyName(), -type_len)
-						.arg(addrStr);
+                    if (invalidAdr)
+                        valueStr += QString(" (%1)").arg(errMsg);
+                    else {
+                        valueStr.prepend("... @ ");
+                        if (addr == offset)
+                            valueStr += " (self)";
+                    }
+                }
+                else {
+                    valueStr = "NULL";
+                    if (col)
+                        valueStr = col->color(ctAddress) + valueStr + col->color(ctReset);
+                }
+            }
+            else if (m->bitSize() >= 0) {
+                const IntegerBitField* ibf =
+                        dynamic_cast<const IntegerBitField*>(
+                            m->refTypeDeep(BaseType::trLexical));
+                assert(ibf != 0);
+                valueStr = QString::number(ibf->toIntBitField(mem, offset + m->offset(), m));
+                if (col)
+                    valueStr = col->color(ctNumber) + valueStr + col->color(ctReset);
             }
             else {
-                s += QString("%0.  0x%1  %2 : %3 = %4")
-                        .arg(i, index_len)
-                        .arg(m->offset(), offset_len, 16, QChar('0'))
-                        .arg(m->name(), -name_len)
-                        .arg(m->refType()->prettyName(), -type_len)
-                        .arg(m->refType()->toString(mem, offset + m->offset()));
+                valueStr = m->refType()->toString(mem, offset + m->offset(), col);
             }
         }
         else {
-            s += QString("%0.  0x%1  %2 : %3 = (unresolved type 0x%3)")
-                    .arg(i, index_len)
-                    .arg(m->offset(), offset_len, 16, QChar('0'))
-                    .arg(m->name(), -name_len)
-                    .arg(m->refType()->prettyName(), -type_len)
-                    .arg((uint)m->refTypeId(), 0, 16);
+            valueStr = QString("(unresolved type 0x%1)")
+                            .arg((uint)m->refTypeId(), 0, 16);
+        }
+
+        // Write member name as "name[:<bitOffset]" with colors
+        int curNameLen = m->name().size();
+        name = col ? QString("%1%2%3")
+                     .arg(col->color(ctMember))
+                     .arg(m->name())
+                     .arg(col->color(ctReset))
+                   : m->name();
+        if (m->bitSize() >= 0) {
+            QString bitSize = QString::number(m->bitSize());
+            name += QString(":%1%2%3")
+                    .arg(col ? col->color(ctOffset) : "")
+                    .arg(bitSize)
+                    .arg(col ? col->color(ctReset) : "");
+            curNameLen += 1 + bitSize.size();
+        }
+        // Pad string to the column width
+        if (name_len > curNameLen)
+            name += QString(name_len - curNameLen, QChar(' '));
+
+        s += QString("%0%1. 0x%2  %3 : %4 = %5")
+                .arg(col ? col->color(ctReset) : "")
+                .arg(i, index_len)
+                .arg(m->offset(), offset_len, 16, QChar('0'))
+                .arg(name)
+                .arg(col ? col->prettyNameInColor(m->refType(), type_len)
+                         : m->refType()->prettyName(),
+                     -type_len)
+                .arg(valueStr);
+
+        if (m->altRefTypeCount() > 0) {
+            for (int j = 0; j < m->altRefTypeCount(); ++j) {
+                const BaseType* t = m->altRefBaseType(j);
+                s += QString("\n\t<%1>%2 0x%3 %4 : %5")
+                        .arg(j+1)
+                        .arg(col ? col->color(ctTypeId) : "")
+                        .arg((uint)t->id(), -8, 16)
+                        .arg(col ? col->prettyNameInColor(t, t->prettyName().length())
+                                 : t->prettyName())
+                        .arg(m->altRefType(j).expr()->toString(true));
+            }
         }
     }
 

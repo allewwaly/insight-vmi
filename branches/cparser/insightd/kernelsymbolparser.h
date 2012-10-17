@@ -11,9 +11,12 @@
 #include "typeinfo.h"
 #include "longoperation.h"
 #include <QStack>
+#include <QDir>
+#include <QMutex>
+#include <QStringList>
+#include <QThread>
 
 // forward declarations
-class QIODevice;
 class SymFactory;
 
 /**
@@ -22,13 +25,63 @@ class SymFactory;
  */
 class KernelSymbolParser: public LongOperation
 {
+    /**
+     * Helper class to support multi-threaded parsing.
+     */
+    class WorkerThread: public QThread
+    {
+    public:
+        WorkerThread(KernelSymbolParser* parser);
+        virtual ~WorkerThread();
+
+        /**
+         * Stop execution of this thread.
+         */
+        void stop() { _stopExecution = true; }
+
+        /**
+         * Starts the parsing of the debugging symbols from device \a from. This
+         * function is intended for testing purpose only.
+         */
+        void parse(QIODevice* from);
+
+    protected:
+        void run();
+
+    private:
+        void parseFile(const QString& fileName);
+        void finishLastSymbol();
+        void parseParam(const ParamSymbolType param, QString value);
+
+        KernelSymbolParser* _parser;
+        bool _stopExecution;
+        quint64 _line;
+        qint64 _bytesRead;
+        QStack<TypeInfo*> _infos;
+        TypeInfo* _info;
+        TypeInfo* _parentInfo;
+        HdrSymbolType _hdrSym;
+        int _curSrcID;
+        qint32 _nextId;
+        int _curFileIndex;
+    };
+
+    friend class WorkerThread;
+
 public:
     /**
      * Constructor
-     * @param from source to read the debugging symbols from
      * @param factory the SymFactory to use for symbol creation
+     * @param srcPath path to the kernel's source tree
      */
-    KernelSymbolParser(QIODevice* from, SymFactory* factory);
+    KernelSymbolParser(SymFactory* factory);
+
+    /**
+     * Constructor
+     * @param factory the SymFactory to use for symbol creation
+     * @param srcPath path to the kernel's source tree
+     */
+    KernelSymbolParser(const QString& srcPath, SymFactory* factory);
 
     /**
      * Destructor
@@ -36,15 +89,15 @@ public:
     virtual ~KernelSymbolParser();
 
     /**
-     * Starts the parsing process
-     * @exception ParserException unrecoverable parsing error
+     * Starts the parsing of the debugging symbols
      */
     void parse();
 
     /**
-     * @return the last processed line number of the debugging symbols
+     * Starts the parsing of the debugging symbols from device \a from. This
+     * function is intended for testing purpose only.
      */
-    quint64 line() const;
+    void parse(QIODevice *from);
 
 protected:
     /**
@@ -53,19 +106,21 @@ protected:
     virtual void operationProgress();
 
 private:
-    void finishLastSymbol();
-    void parseParam(const ParamSymbolType param, QString value);
-    QIODevice* _from;
+    void cleanUpThreads();
+
+    QString _srcPath;
     SymFactory* _factory;
-    quint64 _line;
-    qint64 _bytesRead;
-    QStack<TypeInfo*> _infos;
-    TypeInfo* _info;
-    TypeInfo* _parentInfo;
-    HdrSymbolType _hdrSym;
-    bool _isRelevant;
-    int _curSrcID;
-    qint32 _nextId;
+    QDir _srcDir;
+    QString _currentFile;
+    QStringList _fileNames;
+    int _filesIndex;
+    qint64 _binBytesRead;
+    qint64 _binBytesTotal;
+    QList<WorkerThread*> _threads;
+    QMutex _filesMutex;
+    QMutex _progressMutex;
+    QMutex _factoryMutex;
+    int _durationLastFileFinished;
 };
 
 #endif /* KERNELSYMBOLPARSER_H_ */

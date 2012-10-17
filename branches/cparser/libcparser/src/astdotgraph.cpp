@@ -9,8 +9,8 @@
 #include <abstractsyntaxtree.h>
 #include <astsymbol.h>
 #include <asttypeevaluator.h>
+#include <typeevaluatorexception.h>
 
-#include <QTextDocument>
 #include <QTextStream>
 #include <QFile>
 #include <QDateTime>
@@ -49,9 +49,14 @@ ASTDotGraph::~ASTDotGraph()
 }
 
 
-inline QString ASTDotGraph::dotEscape(const QString& s) const
+inline QString ASTDotGraph::dotEscape(QString s) const
 {
-    return Qt::escape(s).replace('[', "&#91;").replace(']', "&#93;");
+    return s.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+            .replace('[', "&#91;")
+            .replace(']', "&#93;");
 }
 
 
@@ -167,7 +172,7 @@ void ASTDotGraph::printDotGraphConnection(pANTLR3_COMMON_TOKEN src,
 {
     QString srcId = getTokenId(src);
     QString destId = getNodeId(an->node);
-    QString label = QString("(%1)").arg(an->addedInRound);
+    QString label = QString("(r.%1)").arg(an->addedInRound);
 
 
     QString s;
@@ -176,11 +181,13 @@ void ASTDotGraph::printDotGraphConnection(pANTLR3_COMMON_TOKEN src,
             s.fill(QChar('&'), -an->transformations.derefCount());
         else
             s.fill(QChar('*'), an->transformations.derefCount());
-        s = dotEscape(s);
+        s = dotEscape(s) + " ";
     }
-    if (!an->transformations.isEmpty()) {
-        s += "<BR/>" + an->transformations.toString();
-    }
+    s +=  ": ";
+    if (!an->transformations.isEmpty())
+        s += dotEscape(an->transformations.toString(antlrTokenToStr(src)));
+    else
+        s += antlrTokenToStr(src);
 
     if (!s.isEmpty())
         label += QString(" <FONT " FONT_DEF_STR ">%1</FONT>").arg(s);
@@ -364,6 +371,10 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
         printDotGraphTokenList(node->u.declarator_suffix.identifier_list, ",", nodeId);
         break;
     case nt_designated_initializer:
+        if (node->u.designated_initializer.identifier) {
+            printDotGraphString(".", nodeId);
+            printDotGraphToken(node->u.designated_initializer.identifier, nodeId, TOK_POSTFIX_EX);
+        }
         break;
     case nt_direct_abstract_declarator:
         break;
@@ -505,19 +516,22 @@ void ASTDotGraph::beforeChildren(const ASTNode* node, int flags)
     case nt_primary_expression:
         if (node->u.primary_expression.expression)
             printDotGraphString("(", nodeId);
-        if (node->u.primary_expression.hasDot)
-            printDotGraphString(".", nodeId);
         printDotGraphToken(node->u.primary_expression.identifier, nodeId, TOK_PRIM_EX_IDENTIFIER);
         if (_eval && node->u.primary_expression.identifier) {
-            const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);
-            if (sym && !sym->assignedAstNodes().isEmpty()) {
-                for (AssignedNodeSet::const_iterator it =
-                        sym->assignedAstNodes().begin(),
-                     e = sym->assignedAstNodes().end(); it != e; ++it)
-                {
-                    printDotGraphConnection(
-                                node->u.primary_expression.identifier, &(*it));
+            try {
+                const ASTSymbol* sym = _eval->findSymbolOfPrimaryExpression(node);
+                if (sym && !sym->assignedAstNodes().isEmpty()) {
+                    for (AssignedNodeSet::const_iterator it =
+                         sym->assignedAstNodes().begin(),
+                         e = sym->assignedAstNodes().end(); it != e; ++it)
+                    {
+                        printDotGraphConnection(
+                                    node->u.primary_expression.identifier, &(*it));
+                    }
                 }
+            }
+            catch (TypeEvaluatorException&) {
+                // ignore
             }
         }
 

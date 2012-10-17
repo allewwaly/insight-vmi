@@ -41,14 +41,14 @@ apt-get -y source linux-image-$VER &&
 cd linux-*${MINOR_VER}* &&
 test -r Makefile.orig || mv -v Makefile Makefile.orig &&
 sed \
-        -e 's@^\(CFLAGS_KERNEL\s*=\)@\1 -g @' \
-        -e 's@^\(AFLAGS_KERNEL\s*=\)@\1 -gdwarf-2 @' \
+	-e 's@^\(CFLAGS_\(KERNEL\|MODULE\)\s*=\)@\1 -g @' \
+	-e 's@^\(AFLAGS_\(KERNEL\|MODULE\)\s*=\)@\1 -gdwarf-2 @' \
         Makefile.orig > Makefile
 
 
 # Use gcc_pp, if available
 EXEC_DIR="$PWD"
-for GCC_PP in "$EXEC_DIR/gcc_pp" "$(dirname $0)/gcc_pp" "$(which gcc_pp)"; do
+for GCC_PP in "$EXEC_DIR/gcc_pp" "$(dirname $0)/gcc_pp" "$(which gcc_pp)" /usr/share/insight/tools/gcc_pp; do
 	if [ -x "$GCC_PP" ]; then
 		sed -i "s@^\(CC\\s*=\).*gcc\\s*\$@\1 $GCC_PP@" Makefile
 		echo "Using $GCC_PP as compiler"
@@ -60,10 +60,21 @@ if ! [ -x "$GCC_PP" ]; then
         echo "WARNING: gcc_pp script not found." >&2
 fi
 
+# Apply all patches found in base directory
+for f in ../*.diff ../*.patch; do
+	if [ -r "$f" ]; then
+		echo "Applying patch: $f"
+		patch -Np0 -i $f || exit 1
+	fi
+done
 
 # Run parallel jobs when compiling the source
 if [ -z "$CONCURRENCY_LEVEL" ]; then
        	export CONCURRENCY_LEVEL=$(( `grep  -c '^processor' /proc/cpuinfo` + 1))
+	# Don't set anything for uni-processor systems
+	if [ "$CONCURRENCY_LEVEL" = 2 ]; then
+		unset CONCURRENCY_LEVEL
+	fi
 fi
 
 # Compile source and create package
@@ -73,7 +84,6 @@ make-kpkg --us --uc $ROOTCMD --append-to-version $APPEND_VER --initrd kernel_ima
 if [ -x "$GCC_PP" ]; then
 	GCC_ORIG=$(grep '^CC' Makefile.orig | sed "s@^CC\\s*=\(.*\)\$@\1@")
 	sed -i "s@^\(CC\\s*=\).*\$@\1 $GCC_ORIG@" Makefile
-	break
 fi
 
 if [ -r vmlinux ]; then
@@ -86,8 +96,8 @@ if [ -r vmlinux ]; then
 #	fi
 	#bzip2 -9 vmlinux -c > ../vmlinux-${VER}${APPEND}.bz2 &&
 	#cp -v vmlinux ../vmlinux-${VER}${APPEND} &&
-	echo -e "\nGenerating object dump for vmlinux-${VER}${APPEND}..." &&
-	objdump -W vmlinux 2>/dev/null | bzip2 -z -c --best > ../objdump-${VER}${APPEND}.bz2 &&
+#	echo -e "\nGenerating object dump for vmlinux-${VER}${APPEND}..." &&
+#	objdump -W vmlinux 2>/dev/null | bzip2 -z -c --best > ../objdump-${VER}${APPEND}.bz2 &&
 	echo "Done." || echo "Error generating objdump."
 fi
 

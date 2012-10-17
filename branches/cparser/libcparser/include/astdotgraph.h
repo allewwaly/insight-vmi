@@ -31,7 +31,7 @@ protected:
     virtual void afterChildren(const ASTNode *node, int flags);
 
 private:
-    QString dotEscape(const QString& s) const;
+    QString dotEscape(QString s) const;
     QString getNodeId(const ASTNode* node) const;
     QString getTokenId(pANTLR3_COMMON_TOKEN token) const;
     void printDotGraphNodeLabel(const ASTNode* node);

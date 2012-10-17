@@ -89,14 +89,18 @@ static const int FunctionTypes =
     rtFuncPointer |
     rtFunction;
 
-/// These types need further resolution
-static const int ReferencingTypes =
+/// These types are descendants of the RefBaseType class
+static const int RefBaseTypes =
     FunctionTypes |
     rtPointer     |
     rtArray       |
     rtConst       |
     rtVolatile    |
-    rtTypedef     |
+    rtTypedef;
+
+/// These types need further resolution
+static const int ReferencingTypes =
+    RefBaseTypes  |
     rtStruct      |
     rtUnion;
 

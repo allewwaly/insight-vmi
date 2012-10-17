@@ -8,15 +8,28 @@
 #ifndef KERNELSYMBOLCONSTS_H_
 #define KERNELSYMBOLCONSTS_H_
 
+  /*
+   * If another Version is added, adapt new Version in:
+   *  * referencetype
+   *  * structuredmember
+   *  * memspecs
+   */
+
 namespace kSym {
     enum Versions {
         VERSION_MIN = 11,
-        VERSION_11 = 11,
-        VERSION_12 = 12,
-        VERSION_MAX = 12
+        VERSION_11  = 11,
+        VERSION_12  = 12,
+        VERSION_13  = 13,
+        VERSION_14  = 14,
+        VERSION_15  = 15,
+        VERSION_16  = 16,
+        VERSION_17  = 17,
+        VERSION_18  = 18,
+        VERSION_MAX = 18
     };
     static const qint32 fileMagic = 0x4B53594D; // "KSYM"
-    static const qint16 fileVersion = VERSION_12;
+    static const qint16 fileVersion = VERSION_MAX;
 //    static const qint16 flagCompressed = 1;
 }
 

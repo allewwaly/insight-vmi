@@ -4,4 +4,5 @@ HEADERS = priorityqueuetester.h ../../priorityqueue.h
 SOURCES = priorityqueuetester.cpp
 QT += core \
     testlib
-CONFIG += qtestlib
+QT -= webkit
+CONFIG += qtestlib debug_and_release

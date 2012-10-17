@@ -13,11 +13,17 @@
 #include <QFile>
 #include <QProcess>
 #include <QRegExp>
+#include <QDateTime>
 #include <debug.h>
 
 #define MEMSPEC_C_BODY "%MEMSPEC_BODY%"
 const char* memspec_c_file = "memspec.c";
 const char* memspec_c_src =
+    "#include <linux/compile.h>\n"
+    "#include <linux/uts.h>\n"
+    "#include <linux/utsname.h>\n"
+    "#include <linux/utsrelease.h>\n"
+    "#include <linux/version.h>\n"
     "#include <linux/kernel.h>\n"
     "#include <linux/module.h>\n"
     "#include <linux/mm.h>\n"
@@ -46,7 +52,6 @@ const char* memspec_c_src =
     "  unsigned long high_memory = 0;\n"
 	"  unsigned long vmalloc_earlyreserve = 0;\n"
     "\n"
-    "  mt_initmem();\n"
     MEMSPEC_C_BODY       // this placeholder gets replaced later on
     "  mt_printmem();\n"
     "  return 0;\n"
@@ -63,17 +68,16 @@ const char* memprint_h_src =
     "#define MEMPRINT_H 1\n"
     "\n"
     "enum Defines {\n"
-    MEMPRINT_H_ENUM
+    MEMPRINT_H_ENUM    // this placeholder gets replaced later on
     "};\n"
     "\n"
     "struct MemVars {\n"
     "    int defines;\n"
-    MEMPRINT_H_STRUCT
+    MEMPRINT_H_STRUCT  // this placeholder gets replaced later on
     "};\n"
     "\n"
     "extern struct MemVars " MEMPRINT_STRUCT_NAME ";\n"
     "\n"
-    "void mt_initmem(void);\n"
     "void mt_printmem(void);\n"
     "\n"
     "#endif\n"
@@ -85,18 +89,12 @@ const char* memprint_c_file = "memprint.c";
 const char* memprint_c_src =
     "#include \"memprint.h\"\n"
     "#include <stdio.h>\n"
-    "#include <string.h>\n"
     "\n"
-    "struct MemVars " MEMPRINT_STRUCT_NAME ";\n"
-    "\n"
-    "void mt_initmem(void)\n"
-    "{\n"
-    "    memset(&" MEMPRINT_STRUCT_NAME ", 0, sizeof(struct MemVars));\n"
-    "}\n"
+    "struct MemVars " MEMPRINT_STRUCT_NAME " = {0};\n"
     "\n"
     "void mt_printmem(void)\n"
     "{\n"
-    MEMPRINT_C_BODY
+    MEMPRINT_C_BODY  // this placeholder gets replaced later on
     "}\n"
     "\n"
     ;
@@ -204,19 +202,24 @@ void MemSpecParser::writeSrcFile(const QString& fileName, const QString& src)
 
 void MemSpecParser::setupBuildDir()
 {
-    char buf[] = "/tmp/insight.XXXXXX";
-    if (!mkdtemp(buf)) {
-        int e = errno;
-        memSpecParserError(QString("Error creating temporary directory: %1").arg(strerror(e)));
-    }
-    _buildDir = QString(buf);
+    QDir tmp = QDir::temp();
+    QString tmpDir;
+    uint ctr = QDateTime::currentDateTime().toTime_t();
+    do {
+        tmpDir = QString("insight.%1").arg(ctr++, 0, 16);
+    } while (tmp.exists(tmpDir));
+
+    if (!tmp.mkdir(tmpDir))
+        memSpecParserError(QString("Error creating temporary directory: %1").arg(tmpDir));
+    _buildDir = tmp.absoluteFilePath(tmpDir);
 
     // Prepare the source files
     QString ms_body, pm_enum, pm_struct, pm_body;
     int shmt = 0;
     KernelMemSpecList list = MemSpecs::supportedMemSpecs();
     for (int i = 0; i < list.size(); ++i) {
-        pm_struct += QString("  unsigned long long %1;\n")
+        pm_struct += QString("  %1 %2;\n")
+                    .arg(list[i].valueType.toLower())
                     .arg(list[i].keyFmt.toLower());
 
         if (list[i].macroCond.isEmpty()) {
@@ -276,7 +279,7 @@ void MemSpecParser::buildHelperProg(const MemSpecs& specs)
     QStringList cmdlines;
     QString arch = (specs.arch & MemSpecs::ar_x86_64) ? "x86_64" : "i386";
 
-    cmdlines += QString("make KDIR=%1 ARCH=%2")
+    cmdlines += QString("make KDIR=%1 ARCH=%2 V=1")
             .arg(QDir::current().absoluteFilePath(_kernelSrcDir))
             .arg(arch);
     cmdlines += QString("make memspec");
@@ -292,12 +295,14 @@ void MemSpecParser::buildHelperProg(const MemSpecs& specs)
         proc.waitForFinished(-1);
 
         if (proc.exitCode() != 0) {
-            _errorOutput = proc.readAllStandardError();
-            memSpecParserError(
-                    QString("Command failed with exit code %3: %1 %2")
-                        .arg(cmd)
-                        .arg(args.join(" "))
-                        .arg(proc.exitCode()));
+            _errorOutput = proc.readAllStandardOutput();
+            _errorOutput += proc.readAllStandardError();
+            memSpecParserError2(
+                        QString("Command failed with exit code %3: %1 %2")
+                            .arg(cmd)
+                            .arg(args.join(" "))
+                            .arg(proc.exitCode()),
+                        _errorOutput);
         }
 
         proc.close();
@@ -316,12 +321,13 @@ void MemSpecParser::parseHelperProg(MemSpecs* specs)
     proc.start(cmd);
     proc.waitForFinished(-1);
 
-    if (proc.exitCode() != 0) {
+    if (proc.exitStatus() || proc.exitCode() != 0) {
         _errorOutput = proc.readAllStandardError();
         memSpecParserError(
-                QString("Command failed with exit code %2: %1")
+                QString("Command failed with exit code %2 and exit status \"%3\": %1")
                     .arg(cmd)
-                    .arg(proc.exitCode()));
+                    .arg(proc.exitCode())
+                    .arg((proc.exitStatus()) ? "crashed" : "normal"));
     }
 
     const int bufsize = 1024;
@@ -331,7 +337,7 @@ void MemSpecParser::parseHelperProg(MemSpecs* specs)
     while (!proc.atEnd() && proc.readLine(buf, bufsize) > 0) {
         if (re.exactMatch(buf))
             // Update the given MemSpecs object with the parsed key-value pair
-            specs->setFromKeyValue(re.cap(1), re.cap(2));
+            specs->setFromKeyValue(re.cap(1), re.cap(2).trimmed());
     }
 }
 
@@ -350,14 +356,14 @@ void MemSpecParser::parseSystemMap(MemSpecs* specs)
 
     while (!lvl4_ok && !sysMap.atEnd() && sysMap.readLine(buf, bufsize) > 0) {
         QString line(buf);
-        if (line.contains("init_level4_pgt") && re.exactMatch(line))
+        if (line.contains(str::initLvl4Pgt) && re.exactMatch(line))
             // Update the given MemSpecs object with the parsed key-value pair
             specs->initLevel4Pgt = re.cap(1).toULong(&lvl4_ok, 16);
-        else if (line.contains("swapper_pg_dir") && re.exactMatch(line))
+        else if (line.contains(str::swapperPgDir) && re.exactMatch(line))
             // Update the given MemSpecs object with the parsed key-value pair
             specs->swapperPgDir = re.cap(1).toULong(&swp_ok, 16);
         // TODO This is overwritten in MemoryDump::init() anyway, why check here?
-        else if (line.contains("vmalloc_earlyreserve") && re.exactMatch(line))
+        else if (line.contains(str::vmallocEarlyres) && re.exactMatch(line))
             _vmallocEarlyreserve = re.cap(1).toULong(&ok, 16);
     }
 

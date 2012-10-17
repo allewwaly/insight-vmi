@@ -46,7 +46,9 @@ protected:
 
     void readVersion11(KernelSymbolStream& in);
     void readVersion12(KernelSymbolStream& in);
+
 private:
+
     /// Encodes the reading phases of the reading process
     enum Phases {
         phCompileUnits,

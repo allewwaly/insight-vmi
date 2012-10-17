@@ -23,7 +23,8 @@
 
 //------------------------------------------------------------------------------
 
-KernelSymbolReader::KernelSymbolReader(QIODevice* from, SymFactory* factory, MemSpecs* specs)
+KernelSymbolReader::KernelSymbolReader(QIODevice* from, SymFactory* factory,
+                                       MemSpecs* specs)
     : _from(from), _factory(factory), _specs(specs), _phase(phFinished)
 {
 }
@@ -50,29 +51,42 @@ void KernelSymbolReader::read()
         readerWriterError(QString("The given file magic number 0x%1 is invalid.")
                                   .arg(magic, 0, 16));
     if (qt_stream_version > in.version()) {
-        std::cerr << "WARNING: This file was created with a newer version of "
+        shell->err()
+            << shell->color(ctWarningLight) << "WARNING:"
+            << shell->color(ctWarning)
+            << " This file was created with a newer version of "
             << "the Qt libraries, your system is running version " << qVersion()
-            << ". We will continue, but the result is undefined!" << std::endl;
+            << ". We will continue, but the result is undefined!"
+            << shell->color(ctReset) << endl;
     }
+
+    // Warn for deprecated symbol versions
+    if (version < kSym::VERSION_MAX) {
+        shell->err()
+            << shell->color(ctWarningLight) << "WARNING:"
+            << shell->color(ctWarning)
+            << " The kernel symbols were parsed with an older version of "
+            << ProjectInfo::projectName << ". You may want to consider "
+               "re-creating the symbols to benefit from all features."
+            << shell->color(ctReset) << endl;
+    }
+
     // Try to apply the version in any case
     in.setVersion(qt_stream_version);
 
     // Set kernel symbol version
     in.setKSymVersion(version);
-    debugmsg(QString("Symbol version: %1").arg(version));
+//    debugmsg(QString("Symbol version: %1").arg(version));
     // Call the appropirate reader function
-    switch (version) {
-    case kSym::VERSION_11:
-        readVersion11(in);
-        break;
-    case kSym::VERSION_12:
-        readVersion12(in);
-        break;
-    default:
-        readerWriterError(QString("Don't know how to read symbol file verison "
-                                  "%1 (our max. version is %2).")
-                                  .arg(version)
-                                  .arg(kSym::VERSION_MAX));
+    if (version == kSym::VERSION_11){
+      readVersion11(in);
+    } else if (version >= kSym::VERSION_12 && version <= kSym::VERSION_MAX){
+      readVersion12(in);
+    } else {
+      readerWriterError(QString("Don't know how to read symbol file verison "
+            "%1 (our max. version is %2).")
+          .arg(version)
+          .arg(kSym::VERSION_MAX));
     }
 }
 
@@ -206,7 +220,7 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
     catch (...) {
         // Exceptional cleanup
         operationStopped();
-        shell->out() << endl;
+        shellOut(QString(), true);
         throw; // Re-throw exception
     }
 
@@ -214,11 +228,12 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
 
     // Regular cleanup
     operationStopped();
-    shell->out() << "\rReading symbols finished";
+
+    QString s("\rReading symbols finished");
     if (!_from->isSequential())
-        shell->out() << " ("
-        << _from->pos() << " bytes read)";
-    shell->out() << "." << endl;
+        s += QString(" (%1 bytes read)").arg(_from->pos());
+    s += ".";
+    shellOut(s, true);
 }
 
 
@@ -437,11 +452,18 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
             v->readAltRefTypesFrom(in, _factory);
             checkOperationProgress();
         }
+
+        // Since version 17: Read file names containing the orig. symbols
+        if (in.kSymVersion() >= kSym::VERSION_17) {
+            QStringList fileNames;
+            in >> fileNames;
+            _factory->setOrigSymFiles(fileNames);
+        }
     }
     catch (...) {
         // Exceptional cleanup
         operationStopped();
-        shell->out() << endl;
+        shellOut(QString(), true);
         throw; // Re-throw exception
     }
 
@@ -449,11 +471,12 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
 
     // Regular cleanup
     operationStopped();
-    shell->out() << "\rReading symbols finished";
+
+    QString s("\rReading symbols finished");
     if (!_from->isSequential())
-        shell->out() << " ("
-        << _from->pos() << " bytes read)";
-    shell->out() << "." << endl;
+        s += QString(" (%1 read)").arg(bytesToString(_from->pos()));
+    s += ".";
+    shellOut(s, true);
 }
 
 
@@ -471,11 +494,13 @@ void KernelSymbolReader::operationProgress()
     default:                 what = "variables"; break;
     }
 
-    shell->out() << "\rReading " << what;
+    what = "\rReading " + what;
 
     qint64 size = _from->size();
     qint64 pos = _from->pos();
     if (!_from->isSequential() && size > 0)
-        shell->out() << " (" << (int) ((pos / (float) size) * 100) << "%)";
-    shell->out() << ", " << elapsedTime() << " elapsed" << flush;
+        what += QString(" (%1%)").arg((int)((pos / (float) size) * 100));
+    what += QString(", %1 elapsed").arg(elapsedTime());
+
+    shellOut(what, false);
 }

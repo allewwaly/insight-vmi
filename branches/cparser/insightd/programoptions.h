@@ -23,14 +23,17 @@ enum Action {
 enum Options {
 	opNone            = 0,
 	opDaemonize       = (1 << 0),
-	opForeground      = (1 << 1)
+	opForeground      = (1 << 1),
+	opColorLightBg    = (1 << 2),
+	opColorDarkBg     = (1 << 3)
 };
 
 /// The expected next token when parsing the command line arguments
 enum NextToken {
     ntOption,
     ntInFileName,
-    ntMemFileName
+    ntMemFileName,
+    ntColorMode
 };
 
 /// Represents one command line option
@@ -119,6 +122,12 @@ public:
      * line
      */
     int activeOptions() const;
+
+    /**
+     * Sets the active options
+     * @param options
+     */
+    void setActiveOptions(int options);
 
 private:
     QString _inFileName;

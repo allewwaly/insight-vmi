@@ -13,6 +13,8 @@
 #include "typeinfo.h"
 #include "instance_def.h"
 
+class ColorPalette;
+
 /**
   Basic exception class for all type-related exceptions
  */
@@ -34,6 +36,11 @@ public:
     virtual ~BaseTypeException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "BaseTypeException";
+    }
 };
 
 /**
@@ -49,6 +56,11 @@ public:
 
     virtual ~MemAccessException() throw()
     {
+    }
+
+    virtual const char* className() const
+    {
+        return "MemAccessException";
     }
 };
 
@@ -70,7 +82,10 @@ public:
         trLexicalAndPointers = trLexical|rtPointer, ///< resolve as for trLexical plus rtPointer
         trPointersAndArrays = rtPointer|rtArray,    ///< resolve rtPointer and rtArray
         trLexicalPointersArrays = trLexicalAndPointers|rtArray, ///< resolve as for trLexicalAndPointers plus rtArray
-        trAny = 0xFFFFFFFF                          ///< resolve all types
+        trAnyNonNull   = trLexicalPointersArrays,   ///< resolve all types, but no null pointers
+        trAnyButTypedef = rtPointer|rtArray|rtConst|rtVolatile|rtFunction, ///< resolve all referencing types except rtTypedef
+        trNullPointers = 0x80000000,                ///< resolve rtPointer even with null address
+        trAny          = trNullPointers|trAnyNonNull ///< resolve all types, incl. null pointers
     };
 
     /**
@@ -189,10 +204,10 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset) const = 0;
+    virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const = 0;
 
     /**
-     * Explicit representation of a value is the given type.
+     * Explicit representation of a value as the given type.
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
@@ -203,7 +218,7 @@ public:
     }
 
     /**
-     * Explicit representation of a value is the given type.
+     * Explicit representation of a value as the given type.
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
@@ -214,7 +229,7 @@ public:
     }
 
     /**
-     * Explicit representation of a value is the given type.
+     * Explicit representation of a value as the given type.
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
@@ -226,7 +241,7 @@ public:
 
 
     /**
-     * Explicit representation of a value is the given type.
+     * Explicit representation of a value as the given type.
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
@@ -237,7 +252,7 @@ public:
     }
 
     /**
-     * Explicit representation of a value is the given type.
+     * Explicit representation of a value as the given type.
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
@@ -248,7 +263,7 @@ public:
     }
 
     /**
-     * Explicit representation of a value is the given type.
+     * Explicit representation of a value as the given type.
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
@@ -259,7 +274,7 @@ public:
     }
 
     /**
-     * Explicit representation of a value is the given type.
+     * Explicit representation of a value as the given type.
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
@@ -270,7 +285,7 @@ public:
     }
 
     /**
-     * Explicit representation of a value is the given type.
+     * Explicit representation of a value as the given type.
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
@@ -281,7 +296,7 @@ public:
     }
 
     /**
-     * Explicit representation of a value is the given type.
+     * Explicit representation of a value as the given type.
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
@@ -292,7 +307,7 @@ public:
     }
 
     /**
-     * Explicit representation of a value is the given type.
+     * Explicit representation of a value as the given type.
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type
@@ -303,7 +318,7 @@ public:
     }
 
     /**
-     * Explicit representation of a value is the given type.
+     * Explicit representation of a value as the given type.
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return the value at @a offset as the desired type

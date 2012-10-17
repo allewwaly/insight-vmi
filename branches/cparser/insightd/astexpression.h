@@ -62,6 +62,7 @@ class ASTExpression
 public:
     ASTExpression() : _alternative(0) {}
 
+    virtual ~ASTExpression(){};
     virtual ExpressionType type() const = 0;
     virtual int resultType() const = 0;
     virtual ExpressionResult result(const Instance* inst = 0) const = 0;

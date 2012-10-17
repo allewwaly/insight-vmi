@@ -41,6 +41,7 @@ private:
     int _indent;
     int _lineIndent;
     const ASTNode *_currNode;
+    const ASTNode *_rootNode;
     bool _prefixLineNo;
 };
 

@@ -15,6 +15,7 @@
 #include <QMultiHash>
 #include <QStack>
 #include <QStringList>
+#include <genericexception.h>
 
 
 template <class Stack>
@@ -30,22 +31,24 @@ public:
 
 class ASTType
 {
+    enum Flags {
+        flPtrSkipped   = (1 << 0),
+        flIsFunc       = (1 << 1),
+        flAmpSkipped   = (1 << 2)
+    };
+
 public:
     ASTType()
-        : _type(rtUndefined), _next(0), _node(0), _pointerSkipped(false),
-          _arraySize(-1) {}
+        : _type(rtUndefined), _next(0), _node(0), _flags(0), _arraySize(-1) {}
     ASTType(RealType type, ASTType* next = 0)
-        : _type(type), _next(next), _node(0), _pointerSkipped(false),
-          _arraySize(-1) {}
+        : _type(type), _next(next), _node(0), _flags(0), _arraySize(-1) {}
     ASTType(RealType type, const QString& identifier)
     	: _type(type), _next(0), _identifier(identifier), _node(0),
-          _pointerSkipped(false), _arraySize(-1) {}
+          _flags(0), _arraySize(-1) {}
     ASTType(RealType type, const ASTNode* node)
-        : _type(type), _next(0), _node(node), _pointerSkipped(false),
-          _arraySize(-1) {}
+        : _type(type), _next(0), _node(node), _flags(0), _arraySize(-1) {}
     ASTType(RealType type, const ASTNode* node, int arraySize)
-        : _type(type), _next(0), _node(node), _pointerSkipped(false),
-          _arraySize(arraySize) {}
+        : _type(type), _next(0), _node(node), _flags(0), _arraySize(arraySize) {}
 
     inline bool isNull() const { return _type == 0; }
     inline RealType type() const { return _type; }
@@ -56,8 +59,18 @@ public:
     inline void setIdentifier(const QString& id) { _identifier = id; }
     inline const ASTNode* node() const { return _node; }
     inline void setNode(const ASTNode* node) { _node = node; }
-    inline bool pointerSkipped() const { return _pointerSkipped; }
-    inline void setPointerSkipped(bool value) { _pointerSkipped = value; }
+    inline bool pointerSkipped() const { return _flags & flPtrSkipped; }
+    inline void setPointerSkipped(bool value) {
+        _flags = value ? (_flags | flPtrSkipped) : (_flags & ~flPtrSkipped);
+    }
+    inline bool ampersandSkipped() const { return _flags & flAmpSkipped; }
+    inline void setAmpersandSkipped(bool value) {
+        _flags = value ? (_flags | flAmpSkipped) : (_flags & ~flAmpSkipped);
+    }
+    inline bool isFunction() const { return _flags & flIsFunc; }
+    inline void setIsFunction(bool value) {
+        _flags = value ? (_flags | flIsFunc) : (_flags & ~flIsFunc);
+    }
     inline bool isPointer() const {
         return (_type&(rtFuncPointer|rtPointer|rtArray)) || (_next && _next->isPointer());
     }
@@ -72,7 +85,7 @@ private:
     ASTType* _next;
     QString _identifier;
     const ASTNode* _node;
-    bool _pointerSkipped;
+    quint8 _flags;
     int _arraySize;
 };
 
@@ -192,13 +205,20 @@ struct TypeEvalDetails
 class ASTTypeEvaluator: public ASTWalker
 {
 public:
-    ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong);
+    /**
+     * Constructor
+     * @param ast the AbstractSyntaxTree to work on
+     * @param sizeofLong the size of a <tt>long int</tt> type, in bytes
+     * @param sizeofPointer the size of a pointer type, in bytes
+     */
+    ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong, int sizeofPointer);
     virtual ~ASTTypeEvaluator();
 
     bool evaluateTypes();
     ASTType* typeofNode(const ASTNode* node);
     ASTType* typeofSymbol(const ASTSymbol* sym);
     int sizeofLong() const;
+    int sizeofPointer() const;
 
     const ASTSymbol *findSymbolOfDirectDeclarator(const ASTNode *node,
                                                   bool enableExcpetions = true);
@@ -208,19 +228,24 @@ public:
     RealType realTypeOfConstFloat(const ASTNode* node, double* value = 0) const;
     RealType realTypeOfConstInt(const ASTNode* node, quint64* value = 0) const;
     virtual int evaluateIntExpression(const ASTNode* node, bool* ok = 0);
+    virtual void evaluateMagicNumbers(const ASTNode *node);
 
     /**
      * @return a string with details about the given type change.
      */
     QString typeChangeInfo(const TypeEvalDetails &ed,
-                           const QString &expr = QString());
+                           const QString &expr = QString()) const;
+
+    void reportErr(const GenericException& e,  const ASTNode* node,
+                   const TypeEvalDetails* ed) const;
 
 protected:
     enum EvalPhase {
-        epFindSymbols = (1 << 0),
-        epPointsTo    = (1 << 1),
-        epPointsToRev = (1 << 2),
-        epUsedAs      = (1 << 3)
+        epFindSymbols  = (1 << 0),
+        epPointsTo     = (1 << 1),
+        epPointsToRev  = (1 << 2),
+        epUsedAs       = (1 << 3),
+        epMagicNumbers = (1 << 4)
     };
 
     enum EvalResult {
@@ -245,6 +270,7 @@ protected:
     void appendTransformations(const ASTNode *node,
                                SymbolTransformations *transformations) const;
     void collectSymbols(const ASTNode *node);
+    bool canHoldPointerValue(RealType type) const;
     void evaluateIdentifierPointsTo(const ASTNode *node);
     int evaluateIdentifierPointsToRek(PointsToEvalState *es);
     void evaluateIdentifierPointsToRev(const ASTNode *node);
@@ -281,10 +307,10 @@ private:
                            ASTType* next = 0);
     ASTType* copyDeepAppend(const ASTType* src, ASTType* next);
     ASTType* copyDeep(const ASTType* src);
-    RealType evaluateBuiltinType(const pASTTokenList list) const;
+    RealType evaluateBuiltinType(const pASTTokenList list, QString *pTokens) const;
     ASTType* typeofTypeId(const ASTNode* node);
-    inline RealType realTypeOfLong() const;
-    inline RealType realTypeOfULong() const;
+    RealType realTypeOfLong() const;
+    RealType realTypeOfULong() const;
     RealType resolveBaseType(const ASTType* type) const;
     int sizeofType(RealType type) const;
     inline bool typeIsLargerThen(RealType typeA, RealType typeB) const;
@@ -300,7 +326,7 @@ private:
     ASTType* typeofSymbolDeclaration(const ASTSymbol* sym);
     ASTType* typeofSymbolFunctionDef(const ASTSymbol* sym);
     ASTType* typeofSymbolFunctionParam(const ASTSymbol* sym);
-    ASTType* typeofDesignatedInitializer(const ASTNode* node);
+    ASTType* typeofDesignatedInitializerList(const ASTNodeList *list);
     ASTType* typeofInitializer(const ASTNode* node);
     ASTType* typeofStructDeclarator(const ASTNode* node);
     ASTType* typeofStructOrUnionSpecifier(const ASTNode* node);
@@ -336,6 +362,7 @@ private:
     ASTNodeTransSymHash _symbolsBelowNode;
     ASTNodeSymHash _symbolOfNode;
     int _sizeofLong;
+    int _sizeofPointer;
     EvalPhase _phase;
     int _pointsToRound;
     int _assignments;
@@ -348,6 +375,11 @@ private:
 inline int ASTTypeEvaluator::sizeofLong() const
 {
     return _sizeofLong;
+}
+
+inline int ASTTypeEvaluator::sizeofPointer() const
+{
+    return _sizeofPointer;
 }
 
 inline RealType ASTTypeEvaluator::realTypeOfLong() const

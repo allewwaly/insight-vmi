@@ -819,7 +819,8 @@ antlr3ListNew	(ANTLR3_UINT32 sizeHint)
 
     if	(list->table == (pANTLR3_HASH_TABLE)ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM))
     {
-	return	(pANTLR3_LIST)ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM);
+    ANTLR3_FREE(list);
+    return	(pANTLR3_LIST)ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM);
     }
 
     /* Allocation was good, install interface
@@ -921,6 +922,7 @@ antlr3StackNew	(ANTLR3_UINT32 sizeHint)
 
     if	(stack->vector == (pANTLR3_VECTOR)ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM))
     {
+    ANTLR3_FREE(stack);
 	return	(pANTLR3_STACK)ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM);
     }
 
@@ -1848,6 +1850,7 @@ intTrieAdd	(pANTLR3_INT_TRIE trie, ANTLR3_UINT64 key, ANTLR3_UINT32 type, ANTLR3
     {
 	/* Out of memory, all we can do is return the fact that the insert failed.
 	 */
+	ANTLR3_FREE(nextNode);
 	return	ANTLR3_FALSE;
     }
 

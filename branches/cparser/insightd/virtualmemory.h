@@ -8,13 +8,39 @@
 #ifndef VIRTUALMEMORY_H_
 #define VIRTUALMEMORY_H_
 
-#include <QIODevice>
+// Enabling the TLB is actually slower than without due to the used QCache
+//#define ENABLE_TLB 1
+#undef ENABLE_TLB
+
+#ifdef ENABLE_TLB
 #include <QCache>
+#endif
+
+#include <QIODevice>
 #include <QMutex>
-#include "genericexception.h"
+#include <genericexception.h>
 #include "memspecs.h"
 
-static const quint64 PADDR_ERROR = 0xFFFFFFFFFFFFFFFFUL;
+/**
+ * Error code returned by VirtualMemory::virtualToPhysical() in case address
+ * translation failes and exceptions are disabled.
+ */
+static const quint64 PADDR_ERROR = 0xFFFFFFFFFFFFFFFFULL;
+
+// Used to initialize MemSpecs::highMemory in case no "high_memory" instance
+// exists in 64-bit mode
+static const quint64 HIGH_MEMORY_FAILSAFE_X86_64 = 0xffffc7ffffffffffULL;
+
+/**
+ * Struct to store the page table entries in case they are requested.
+ * Entries that are invalid should be set to PADDR_ERROR.
+ */
+struct pageTableEntries {
+    quint64 pgd;
+    quint64 pud;
+    quint64 pmd;
+    quint64 pte;
+};
 
 /**
  * This class provides read access to a virtual address space and performs
@@ -23,6 +49,13 @@ static const quint64 PADDR_ERROR = 0xFFFFFFFFFFFFFFFFUL;
 class VirtualMemory: public QIODevice
 {
 public:
+    enum PageTableFlags {
+        Present = 0x1,              ///< If set the page is present
+        ReadWrite = 0x2,            ///< 0 = Read only, 1 = Read & Write
+        Supervisor = 0x4,           ///< 0 = Supervisor, 1 = User
+        NX = 0x8000000000000000     ///< 0 = Execute, 1 = Non-Executable
+    };
+
     VirtualMemory(const MemSpecs& specs, QIODevice* physMem, int memDumpIndex);
     virtual ~VirtualMemory();
 
@@ -72,7 +105,7 @@ public:
      */
     const QIODevice* physMem() const;
 
-    /**
+    /**struct page_table_entries *ptEntries
      * @return the device containing the physical memory
      */
     QIODevice* physMem();
@@ -105,12 +138,15 @@ public:
      * if address translation fails, including detailed information about the
      * error, if \c false then a return value of PADDR_ERROR indicates an error
      * in the address translation
+     * @param ptEntries if specified the page table entries that are obtained
+     * during address resolution will be written to the structure.
+     * Invalid/Unresolved entries will be set to PADDR_ERROR
      * @return physical address in case of success, PADDR_ERROR in case of
      * address resolution failure
      * \exception VirtualMemoryException
      */
     quint64 virtualToPhysical(quint64 vaddr, int* pageSize,
-            bool enableExceptions = true);
+            bool enableExceptions = true, struct pageTableEntries *ptEntries = 0);
 
     quint64 virtualToPhysicalUserLand(quint64 vaddr, int* pageSize, quint64 pgd,
                 bool enableExceptions = true);
@@ -132,17 +168,38 @@ public:
      */
     bool setThreadSafety(bool safe);
 
+#ifdef ENABLE_TLB
     /**
      * Removes all cache entries from the TLB.
      */
     void flushTlb();
+#endif
 
+    /**
+     * Checks if the given address lies within an executable page. The check is
+     * based on the flage of the page table entries that reference the given
+     * address.
+     * \note in case of a \sa VirtualMemoryExecption e.g. the address is not mapped
+     * this function will return \c false.
+     * @param vaddr the virtual address which should be checked for executability
+     * @return \c true if the address is marked as executable, \c false otherwise
+     */
+    bool isExecutable(quint64 vaddr);
+
+    /**
+     * Obtain the page flags for the given virtual address.
+     * @param vaddr the virtual address to get the page flags for
+     * @return the consolidated page flags of the page table entries that map
+     * the given virtual address
+     */
+    quint64 getFlags(quint64 vaddr);
 protected:
     // Pure virtual functions of QIODevice
     virtual qint64 readData (char* data, qint64 maxSize);
     virtual qint64 writeData (const char* data, qint64 maxSize);
 
 private:
+#ifdef ENABLE_TLB
     /**
      * Looks up a virtual address in the translation look-aside buffer (TLB)
      * and returns the physical address. This is independent of the architecture
@@ -152,6 +209,7 @@ private:
      * @return physical address, if TLB hit, \c 0 otherwise.
      */
     quint64 tlbLookup(quint64 vaddr, int* pageSize);
+#endif
 
     /**
      * Looks up a virtual address in the x86_64 page table and returns the
@@ -162,11 +220,14 @@ private:
      * if address translation fails, including detailed information about the
      * error, if \c false then a return value of PADDR_ERROR indicates an error
      * in the address translation
+     * @param ptEntries if the given pointer is not NULL the page table entries
+     * that are obtained during the address resolution will be written to this
+     * struct. Invalid/Unresolved entries will be set to PADDR_ERROR
      * @return physical address in case of success, PADDR_ERROR in case of
      * address resolution failure
      */
     quint64 pageLookup64(quint64 vaddr, int* pageSize,
-            bool enableExceptions);
+            bool enableExceptions, struct pageTableEntries *ptEntries);
 
     /**
      * Looks up a virtual address in the i386 page table and returns the
@@ -177,11 +238,14 @@ private:
      * if address translation fails, including detailed information about the
      * error, if \c false then a return value of PADDR_ERROR indicates an error
      * in the address translation
+     * @param ptEntries if the given pointer is not NULL the page table entries
+     * that are obtained during the address resolution will be written to this
+     * struct. Invalid/Unresolved entries will be set to PADDR_ERROR
      * @return physical address in case of success, PADDR_ERROR in case of
      * address resolution failure
      */
     quint64 pageLookup32(quint64 vaddr, int* pageSize,
-            bool enableExceptions);
+            bool enableExceptions, struct pageTableEntries *ptEntries);
 
     /**
      * i386 specific translation
@@ -191,11 +255,14 @@ private:
      * if address translation fails, including detailed information about the
      * error, if \c false then a return value of PADDR_ERROR indicates an error
      * in the address translation
+     * @param ptEntries if the given pointer is not NULL the page table entries
+     * that are obtained during the address resolution will be written to this
+     * struct. Invalid/Unresolved entries will be set to PADDR_ERROR
      * @return physical address in case of success, PADDR_ERROR in case of
      * address resolution failure
      */
     quint64 virtualToPhysical32(quint64 vaddr, int* pageSize,
-            bool enableExceptions);
+            bool enableExceptions, struct pageTableEntries *ptEntries);
 
     /**
      * x86_64 specific translation
@@ -205,11 +272,14 @@ private:
      * if address translation fails, including detailed information about the
      * error, if \c false then a return value of PADDR_ERROR indicates an error
      * in the address translation
+     * @param ptEntries if the given pointer is not NULL the page table entries
+     * that are obtained during the address resolution will be written to this
+     * struct. Invalid/Unresolved entries will be set to PADDR_ERROR
      * @return physical address in case of success, PADDR_ERROR in case of
      * address resolution failure
      */
     quint64 virtualToPhysical64(quint64 vaddr, int* pageSize,
-            bool enableExceptions);
+            bool enableExceptions, struct pageTableEntries *ptEntries);
 
     /**
      * Reads a value of type \a T from memory and returns it.
@@ -226,6 +296,7 @@ private:
     inline T extractFromPhysMem(quint64 physaddr, bool enableExceptions,
             bool* ok);
 
+#ifdef ENABLE_TLB
     struct TLBEntry {
         TLBEntry(quint64 addr = 0, int size = 0)
             : addr(addr), size(size) {}
@@ -234,6 +305,18 @@ private:
     };
 
     QCache<quint64, TLBEntry> _tlb;
+    QMutex _tlbMutex;
+#endif
+
+    /**
+     * Update the given flags using the given page table entry.
+     * \note that this function currently only updates the following flags:
+     * P, R/W, S/U, NX
+     * @param currentFlags the currently valid flags
+     * @param entry the page table entry that is used to update the flags
+     * @return the flags that are valid after consideration of the given entry
+     */
+    quint64 updateFlags(quint64 currentFlags, quint64 entry);
 
     QIODevice* _physMem;
     qint64 _physMemSize;
@@ -243,7 +326,6 @@ private:
     quint64 _pos;
     int _memDumpIndex;
     bool _threadSafe;
-    QMutex _tlbMutex;
     QMutex _physMemMutex;
 
     bool _userland; // <! switch to change change from kernelspace reading to userland reading.

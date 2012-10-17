@@ -9,15 +9,15 @@ if(ARGV.length > 1){
 	var arg5 = params["r9"] //hex string
 	var userPGD = params["cr3"] // hex string
 	
-	if(typeof(arg0) == "undefined") print("rdi undefined")
-	if(typeof(arg1) == "undefined") print("r2i undefined")
-	if(typeof(arg2) == "undefined") print("rdx undefined")
-	if(typeof(arg3) == "undefined") print("r10 undefined")
-	if(typeof(arg4) == "undefined") print("r8 undefined")
-	if(typeof(arg5) == "undefined") print("r9 undefined")
-	if(typeof(userPGD) == "undefined") print("cr3 undefined")
+    if(typeof(arg0) == "undefined") println("rdi undefined")
+    if(typeof(arg1) == "undefined") println("r2i undefined")
+    if(typeof(arg2) == "undefined") println("rdx undefined")
+    if(typeof(arg3) == "undefined") println("r10 undefined")
+    if(typeof(arg4) == "undefined") println("r8 undefined")
+    if(typeof(arg5) == "undefined") println("r9 undefined")
+    if(typeof(userPGD) == "undefined") println("cr3 undefined")
 }else{
-	print("no parameters specified")
+    println("no parameters specified")
 }
 
 
@@ -72,7 +72,7 @@ function main(){
 	
 	current = getCurrentTask(GS_BASE_2632x64);
 	
-	print(SysCalls[sys_call_nr]["sys_name"]+": "+SysCalls[sys_call_nr]["signature"]);
+    println(SysCalls[sys_call_nr]["sys_name"]+": "+SysCalls[sys_call_nr]["signature"]);
 	
 	var line = "";
 	
@@ -91,7 +91,7 @@ function main(){
 			var value = eval("arg"+i)
 			line += "arg"+i+": 0x"+value+"\n";
 		}
-		print(line)
+        println(line)
 	}
 	
 	var i;
@@ -154,27 +154,27 @@ function main(){
 					line += " -> ";
 					
 					var files_struct = current.files;
-					//print(current)
+                    //println(current)
 					
 					try{
 						//TODO InSight bug, must change type here
 						files_struct.ChangeType("files_struct");
-						//print(files_struct + " \n@ " + files_struct.Address());
-						//print(files_struct.TypeName()) // struct files_struct
+                        //println(files_struct + " \n@ " + files_struct.Address());
+                        //println(files_struct.TypeName()) // struct files_struct
 					
 						var fdtable = files_struct.fdt;
 						//file = fdtable.fd[fd]
 						var file = fdtable.fd;
 						
 						
-						//print(fdtable.Address())
-						//print("fdtable:"+fdtable)
+                        //println(fdtable.Address())
+                        //println("fdtable:"+fdtable)
 						fdtable.ChangeType("uint64_t");
-						//print(fdtable.Address())
+                        //println(fdtable.Address())
 						fdtable.AddToAddress(8);
-						//print("file ptr for given fd at: " + fdtable.Address().toString());
+                        //println("file ptr for given fd at: " + fdtable.Address().toString());
 						
-						//print("1##########################################################################################################################################")
+                        //println("1##########################################################################################################################################")
 						
 						var file_ptr = fdtable;
 						//file_ptr.ChangeType("uint64_t");
@@ -182,10 +182,10 @@ function main(){
 						file_ptr.AddToAddress(fd*POINTER_SIZE);
 						
 						file_ptr = __uintToHex(file_ptr);
-						//print("file for given fd at "+file_ptr);
+                        //println("file for given fd at "+file_ptr);
 						
 						file.SetAddress(file_ptr);
-						//print("2##########################################################################################################################################")
+                        //println("2##########################################################################################################################################")
 						
 						//howto deetermine wether it is a socket:
 						// static struct socket *sock_from_file(struct file *file, int *err)
@@ -207,11 +207,11 @@ function main(){
 							socket.SetAddress(__uintToHex(private_data));
 							
 							socket.ChangeType("socket");
-							//print(socket.Address())
+                            //println(socket.Address())
 							if(socket.Size() == 0){
 								line += "type "+socket.TypeName()+" currently unknown to InSight; "
 							}
-							//print(socket.Address());
+                            //println(socket.Address());
 							
 							socket.AddToAddress(4);
 							line += "type: " + __getSocketParams("type", socket.toUInt16());
@@ -222,28 +222,28 @@ function main(){
 							//
 							//var sock = new Instance(EMPTY_INSTANCE);
 							//var addr = __uintToHex(socket);
-							//print(addr);
+                            //println(addr);
 							//sock.SetAddress(addr);
 							//sock.ChangeType("sock");
-							//print(sock)
+                            //println(sock)
 							
 						}else{
 						
 							// -- end socket
 
 						
-							//print(fdtable.fd.Address());
-							//print(file.Address());
-							//print(file)
+                            //println(fdtable.fd.Address());
+                            //println(file.Address());
+                            //println(file)
 					
 							//TODO InSight bug
 							//without ChangeType (type is already file" an error occurs
 							//file.ChangeType("file");
 							var dentry = file.f_path.dentry;
-							//print(dentry.toString());
+                            //println(dentry.toString());
 							if(dentry.toString() != "NULL"){
-								//print(file.f_path.Address())
-								//print(file.f_path);
+                                //println(file.f_path.Address())
+                                //println(file.f_path);
 						
 								var tmp = dentry.d_iname
 								tmp.ChangeType("char");
@@ -358,14 +358,14 @@ function main(){
 				
 			}
 		}
-		print(line)
+        println(line)
 	
 	}
 	if(want_mmap_mappings){
 		line = "Memory mapping before syscall:\n";
 		var mmap = getMemoryMap(current)
 		line += mmap;
-		print(line)
+        println(line)
 	}
 	
 }
@@ -373,6 +373,6 @@ function main(){
 try{
 	main()
 }catch(e){
-	print("Exception in main():")
-	print(e)
+    println("Exception in main():")
+    println(e)
 }

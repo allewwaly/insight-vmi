@@ -6,6 +6,7 @@
  */
 
 #include "instance.h"
+#include "variable.h"
 #include "instancedata.h"
 #include "structured.h"
 #include "refbasetype.h"
@@ -38,7 +39,9 @@ Instance::Instance(size_t address, const BaseType* type, VirtualMemory* vmem,
     _d.type = type;
     _d.vmem = vmem;
     _d.isValid = type != 0;
-    _d.isNull = !_d.address || !_d.isValid;
+    if (_d.vmem && (_d.vmem->memSpecs().arch & MemSpecs::ar_i386))
+        _d.address &= 0xFFFFFFFFUL;
+    _d.isNull = !_d.address;
 }
 
 
@@ -52,7 +55,9 @@ Instance::Instance(size_t address, const BaseType* type, const QString& name,
     _d.parentNames = parentNames;
     _d.vmem = vmem;
     _d.isValid = type != 0;
-    _d.isNull = !_d.address || !_d.isValid;
+    if (_d.vmem && (_d.vmem->memSpecs().arch & MemSpecs::ar_i386))
+        _d.address &= 0xFFFFFFFFUL;
+    _d.isNull = !_d.address;
 }
 
 
@@ -367,20 +372,46 @@ void Instance::differencesRek(const Instance& other,
 
 Instance Instance::arrayElem(int index) const
 {
-    if (!_d.type || !(_d.type->type() & (rtPointer|rtArray)))
+    if (!_d.type || index < 0)
         return Instance();
 
-    const Pointer* p = dynamic_cast<const Pointer*>(_d.type);
-    if (!p->refType())
+    const Pointer* p = (_d.type->type() & (rtPointer|rtArray)) ?
+                dynamic_cast<const Pointer*>(_d.type) : 0;
+
+    if (p && !p->refType())
         return Instance();
 
-    return Instance(
-                _d.address + (index * p->refType()->size()),
-                p->refType(),
-                _d.name + '[' + QString::number(index) + ']',
-                _d.parentNames,
-                _d.vmem,
-                -1);
+    Instance ret;
+
+    // A pointer we have to dereference first
+    if (_d.type->type() == rtPointer) {
+        int deref;
+        // Dereference exactely once
+        ret = dereference(BaseType::trLexicalAndPointers, 1, &deref);
+        if (deref != 1)
+            return Instance();
+    }
+    else {
+        ret = *this;
+        // For arrays, the resulting type is the referencing type
+        if (_d.type->type() == rtArray)
+            ret._d.type = p->refType();
+    }
+
+    // Update address and name
+    ret._d.address += index * (p ? p->refType()->size() : ret.size());
+    ret._d.name += '[' + QString::number(index) + ']';
+
+    return ret;
+}
+
+
+int Instance::arrayLength() const
+{
+    if (!_d.type || _d.type->type() != rtArray)
+        return -1;
+
+    return dynamic_cast<const Array*>(_d.type)->length();
 }
 
 
@@ -392,10 +423,20 @@ Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCoun
     if (isNull())
         return *this;
 
-    if (_d.type && (_d.type->type() & resolveTypes))
-        return _d.type->toInstance(_d.address, _d.vmem, _d.name,
-                _d.parentNames, resolveTypes, maxPtrDeref, derefCount);
-
+    if (_d.type && (_d.type->type() & resolveTypes)) {
+        int dcnt = 0;
+        Instance ret = _d.type->toInstance(_d.address, _d.vmem, _d.name,
+                                           _d.parentNames, resolveTypes,
+                                           maxPtrDeref, &dcnt);
+        // If only lexical types were dereferenced, preserve the bit-field location
+        if (dcnt == 0) {
+            ret.setBitSize(_d.bitSize);
+            ret.setBitOffset(_d.bitOffset);
+        }
+        else if (derefCount)
+            *derefCount = dcnt;
+        return ret;
+    }
     return *this;
 }
 
@@ -442,6 +483,23 @@ Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
 }
 
 
+Instance Instance::memberByOffset(size_t off, bool exactMatch) const
+{
+    // Is this an struct?
+    const Structured* s = dynamic_cast<const Structured*>(_d.type);
+
+    if (!s)
+        return Instance();
+
+    const StructuredMember *sm = s->memberAtOffset(off, exactMatch);
+
+    if (!sm)
+        return Instance();
+
+    return sm->toInstance(this->address(), this->vmem(), this);
+}
+
+
 const BaseType* Instance::memberType(int index, int resolveTypes,
 									 bool declaredType) const
 {
@@ -465,7 +523,7 @@ quint64 Instance::memberAddress(int index, bool declaredType) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && index >= 0 && index < s->members().size()) {
-		const StructuredMember* m = s->members().at(index);
+        const StructuredMember* m = s->members().at(index);
 		if (declaredType || m->altRefTypeCount() != 1)
 			return _d.address + m->offset();
 		else {
@@ -630,7 +688,7 @@ Instance Instance::memberCandidate(const StructuredMember* m,
 	// Otherwise use the alternative type
 	const ReferencingType::AltRefType& alt = m->altRefType(cndtIndex);
 	return alt.toInstance(_d.vmem, this, _d.type ? _d.type->factory() : 0,
-						  m->name(), _d.parentNames);
+						  m->name(), fullNameComponents());
 }
 
 
@@ -683,7 +741,7 @@ ExpressionResult Instance::toExpressionResult() const
 		return ExpressionResult(ert, esDouble, t->toDouble(_d.vmem, _d.address));
 	case rtFuncPointer:
 	case rtPointer:
-		return pointerSize() == 4 ?
+		return sizeofPointer() == 4 ?
 					ExpressionResult(ert, esUInt32,
 									 (quint64)t->toUInt32(_d.vmem, _d.address)) :
 					ExpressionResult(ert, esUInt64,
@@ -692,3 +750,435 @@ ExpressionResult Instance::toExpressionResult() const
 		return ExpressionResult(erUndefined);
 	}
 }
+
+
+bool Instance::compareInstance(const Instance& inst, 
+    bool &embedded, bool &overlap, bool &thisParent) const
+{
+  bool isSane = false;
+      
+  // Are the two instances the same
+  bool ok1 = false, ok2 = false;
+  if (this->address() == inst.address() &&
+      this->type() && inst.type() &&
+      this->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
+      ok1 && ok2)
+  {
+    //debugmsg("Object already found");
+    isSane = true;
+    embedded = overlap = thisParent = false;
+  }
+  // If inst begins before instA or inst is bigger than instA
+  // call this function with the instances exchanged
+  else if (this->address() > inst.address() || 
+           ( this->address() == inst.address() &&
+             this->endAddress() < inst.endAddress() ))
+  {
+    thisParent = !thisParent;
+    isSane = inst.compareInstance(*this,
+                    embedded, overlap, thisParent);
+  }
+  // If the start address is not the same and inst ends after instA
+  // both instances overlap
+  else if (this->address() != inst.address() &&
+      this->endAddress() < inst.endAddress())
+  {
+    // Possible overlap
+    // Check for kmem_cache because of "wrong" size (true size in kmem_size, see slub.c)
+    quint32 kmem_size = this->type()->factory()->findVarByName("kmem_size")->toInstance(_d.vmem, BaseType::trLexical).toUInt32(); 
+    if( // instA is kmem_cache and is placed before otherNode
+        ( (this->address() - inst.address() > kmem_size) &&
+          this->typeName().compare("kmem_cache") &&
+          ! this->memberByOffset(0x54).toString().startsWith("kmalloc-") ) 
+      ){
+      isSane = true;
+      overlap = embedded = thisParent = false;
+    }else{
+      // debugmsg("Objects overlap");
+      overlap = true;
+      isSane = embedded = thisParent = false;
+    }
+  }
+  // Here inst is embedded inside of instA
+  else
+  {
+    embedded = true;
+    thisParent = true;
+    overlap = false;
+
+    // check if instA is an Array or Pointer
+    if( this->type()->type() & rtArray ||
+        this->type()->type() & rtPointer )
+    {
+        isSane = this->compareInstanceType(inst); 
+    }
+    else if ( ( this->address() == inst.address() &&
+                this->size() == inst.size() ) && 
+              ( inst.type()->type() & rtArray ||
+                inst.type()->type() & rtPointer ) )
+    {
+        thisParent = ! thisParent;
+        isSane = inst.compareInstanceType(*this); 
+    }
+    // Handle UnionTypes
+    else if (this->type()->type() & rtUnion || 
+             inst.type()->type() & rtUnion)
+    {
+      isSane = this->compareUnionInstances(inst, thisParent);
+      embedded = isSane;
+    }
+    else
+    {
+      Instance member = (this->type()->type() & BaseType::trLexical) ?
+            this->dereference(BaseType::trLexical) : inst;
+      Instance searchMember;
+      while(!member.isNull() && member.size() > inst.size())
+      {
+        searchMember = member.memberByOffset(inst.address() - member.address());
+        if(!searchMember.isNull()) member = searchMember;
+        else
+        {
+          int i = 1;
+          for(; member.memberAddress(i) < inst.address() && i < member.memberCount(); i++);
+          member = member.member(i-1);
+        }
+        
+        member = (member.type() && member.type()->type() & BaseType::trLexical) ?
+            member.dereference(BaseType::trLexical) : member;
+      }
+      if(!member.isNull())
+      {
+        isSane = member.compareInstanceType(inst);
+      }
+      if(!isSane && 
+         (this->address() == inst.address() &&
+          this->size() == inst.size()))
+      {
+        member = inst.memberByOffset(0);
+        if(!member.isNull())
+          thisParent = ! thisParent;
+          isSane = member.compareInstanceType(*this);
+      }
+      
+      if(!isSane)
+      {
+        //Type mismatch
+        //debugmsg("Conflict found:\n" << 
+        //    "\tInstance: " << this->fullName() << 
+        //    "\tType: " << std::hex << this->type()->id() << 
+        //    "\tAddress: " << std::hex << this->address() << 
+        //    "\tEndAddress: " << std::hex << this->endAddress() << 
+        //    "\tSize: " << std::dec << this->size() << "\n" <<
+        //    "\tInstance: " << inst.fullName() << 
+        //    "\tType: " << std::hex << inst.type()->id() << 
+        //    "\tAddress: " << std::hex << inst.address() << 
+        //    "\tEndAddress: " << std::hex << inst.endAddress() << 
+        //    "\tSize: " << std::dec << inst.size() <<
+        //    "\tOffset: " << std::hex << (inst.address() - this->address()));
+      }
+    }
+  }
+  return isSane;
+}
+
+
+bool Instance::compareUnionInstances(const Instance& inst, bool &thisParent) const
+{
+  bool isSane = false;
+  
+  if (inst.type()->type() & rtUnion)
+  {
+    thisParent = !thisParent;
+    for (int i = 0 ; i < inst.memberCount() ; i++ )
+    {
+      if (inst.member(i).type()->id() == this->type()->id())
+      {
+        thisParent = ! thisParent;
+        isSane = true;
+      }
+    }
+  }
+
+  if (this->type()->type() & rtUnion)
+  {
+    for (int i = 0 ; i < this->memberCount() ; i++ )
+    {
+      if (this->member(i).type()->id() == inst.type()->id())
+      {
+        isSane = true;
+      }
+    }
+  }
+
+  return isSane;
+}
+
+
+bool Instance::compareInstanceType(const Instance& inst) const
+{
+  // Dereference type
+  const RefBaseType* refType = dynamic_cast<const RefBaseType*>(this->type());
+
+  // Check for plausible offset and same type
+  if(this->type() && inst.type() && 
+     this->type()->hash() == inst.type()->hash())
+  {
+    return true;
+  }
+
+  if ( ( inst.address() - this->address() ) % inst.size() == 0 ){
+    while ( refType && refType->refType() ) {
+      // Try to dereference the found type until it is compatible with the given instance
+      if (inst.type()->id() == refType->refType()->id() || 
+          inst.type()->hash() == refType->refType()->hash())
+      {
+        return true;
+      }
+      // TODO Workarround! Otherwise SEGFAULT when dereferencing long unsigned int
+      if (refType->refType()->type() & RefBaseTypes )
+        refType = dynamic_cast<const RefBaseType*>(refType->refType());
+      else
+      {
+        break;
+      }
+    };
+  }
+
+  return false;
+}
+
+
+bool Instance::isValidConcerningMagicNumbers(bool * constants) const
+{
+    if(constants) *constants = false;
+    //Check if type is structured
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
+        return true;
+
+    bool isValid = true;
+    try {
+
+        MemberList members = dynamic_cast<const Structured*>(_d.type)->members();
+
+        MemberList::iterator memberIterator;
+        for (memberIterator = members.begin(); 
+                memberIterator != members.end(); ++memberIterator)
+        {
+            QString debugString;
+
+            Instance memberInstance = 
+                (*memberIterator)->toInstance(_d.address, _d.vmem, this);
+            bool memberValid = false;
+            if((*memberIterator)->hasConstantIntValue())
+            {
+                if(memberInstance.name() == "refcount"){
+                    memberValid = true;
+                    continue;
+                }
+                if(constants) *constants = true;
+                qint64 constInt = 0;
+                constInt = memberInstance.toString().toLong();
+                const BaseType* bt;
+                if (memberInstance.bitSize() >= 0 &&
+                        (bt = memberInstance.type()->dereferencedBaseType(BaseType::trLexical)) &&
+                        (bt->type() & IntegerTypes))
+                {
+                    const IntegerBitField* ibf = dynamic_cast<const IntegerBitField*>(bt);
+                    constInt = ibf->toIntBitField(memberInstance._d.vmem, memberInstance._d.address, memberInstance._d.bitSize, memberInstance._d.bitOffset);
+                }
+                else{
+                    switch (memberInstance.type()->type()) {
+                        case rtBool8:
+                        case rtInt8:
+                        case rtUInt8:
+                            constInt = memberInstance.toUInt8();
+                            break;
+
+                        case rtBool16:
+                        case rtInt16:
+                        case rtUInt16:
+                            constInt = memberInstance.toUInt16();
+                            break;
+
+                        case rtBool32:
+                        case rtInt32:
+                        case rtUInt32:
+                            constInt = memberInstance.toUInt32();
+                            break;
+
+                        case rtBool64:
+                        case rtInt64:
+                        case rtUInt64:
+                            constInt = memberInstance.toUInt64();
+                            break;
+
+                        case rtEnum:
+                            switch (memberInstance.size()) {
+                                case 8: 
+                                    constInt = memberInstance.toUInt64();
+                                    break;
+                                case 4: 
+                                    constInt = memberInstance.toUInt32();
+                                    break;
+                                case 2: 
+                                    constInt = memberInstance.toUInt16();
+                                    break;
+                                default: 
+                                    constInt = memberInstance.toUInt8();
+                                    break;
+                            }
+
+                        default:
+                            break;
+                    }
+                }
+                debugString.append(QString("%1 -> %2 : %3 (%4)\n%5\n")
+                        .arg(this->fullName())
+                        .arg(memberInstance.name())
+                        .arg(constInt)
+                        .arg(memberInstance.typeName())
+                        .arg(memberInstance.fullName())
+                        );
+                if (constInt == 0 || 
+                        ((*memberIterator)->constantIntValue().size() == 1 &&
+                        (*memberIterator)->constantIntValue().first() == 0))
+                {
+                    memberValid = true;
+                    continue;
+                }
+                debugString.append(QString("Number of candidates: %1\n").
+                        arg((*memberIterator)->constantIntValue().size()));
+                QList<qint64> constantList = (*memberIterator)->constantIntValue();
+                QList<qint64>::iterator constant;
+                for (constant = constantList.begin();
+                        constant != constantList.end();
+                        ++constant)
+                {
+                    if(constInt == (*constant)) memberValid = true;
+                    debugString.append(QString("Possible Value: %1\n").arg(*constant));
+                }
+            }
+            //        else if ((*memberIterator)->hasConstantStringValue())
+            //        {
+            //            if(constants) *constants = true;
+            //            debugString.append(QString("Found String: \"%1\"\n").arg(memberInstance.toString()));
+            //            QList<QString> constantList = (*memberIterator)->constantStringValue();
+            //            QList<QString>::iterator constant;
+            //            for (constant = constantList.begin();
+            //                    constant != constantList.end();
+            //                    ++constant)
+            //            {
+            //                if(memberInstance.toString() == (*constant)) memberValid = true;
+            //                debugString.append(QString("Possible Value: %1\n").arg(*constant));
+            //            }
+            //            //TODO StringConstants do not seem to be a good indicator.
+            //            //Maybe enough if we see any string
+            //        }
+            else if ((*memberIterator)->hasStringValue())
+            {
+                if(constants) *constants = true;
+                //TODO check if type is String (Contains only ASCII Characters)
+                //Do not use toString Method, as is gives non-ascii charackers as dot.
+                if(memberInstance._d.isNull){
+                    //There should be a string (at least a pointer to an address that contains 0x0)
+                    memberValid = false;
+                }
+                else {
+                    const int len = 255;
+                    // Setup a buffer, at most 'len' bytes long
+                    // Read the data such that the result is always null-terminated
+                    char buf[len + 1];
+                    memset(buf, 0, len + 1);
+                    // We expect exceptions here
+                    try {
+                        qint64 ret;
+                        qint64 address;
+                        
+                        //Get correct address of string
+                        if (memberInstance._d.type->type() == rtArray){
+                            address = memberInstance._d.address;
+                        }else if(memberInstance._d.type->type() == rtPointer){
+                            // We have to consider the size of the pointer
+                            if (memberInstance._d.type->size() == 4) {
+                                address = memberInstance.toUInt32();
+                            }
+                            else if (memberInstance._d.type->size() == 8) {
+                                address = memberInstance.toUInt64();
+                            }
+                            else {
+                                throw BaseTypeException(
+                                        "Illegal conversion of a non-pointer type to a pointer",
+                                        __FILE__,
+                                        __LINE__);
+                            }
+                        }else if (memberInstance._d.type->type() == rtStruct){
+                        }
+
+                        //TODO This must not be threaded
+                        if (!memberInstance._d.vmem->seek(address) ||
+                            (ret = memberInstance._d.vmem->read(buf, len)) != len ) {
+                            memberValid = false;
+                        }
+                        else {
+                        // Limit to ASCII characters
+                            for (int i = 0; i < len; i++) {
+                                if (buf[i] == 0){
+                                    memberValid = true;
+                                    break;
+                                }
+                                else if ( (buf[i] & 0x80) || !(buf[i] & 0x60) || i == len ){ // buf[i] >= 128 || buf[i] < 32 || last character not 0
+                                    memberValid = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    catch (VirtualMemoryException& e) {
+                        memberValid = false;
+                    }
+                    catch (MemAccessException& e) {
+                        memberValid = false;
+                    }
+
+                    //debugString.append(QString("Found String: \"%1\"\n").arg(buf));
+                }
+            }else 
+                memberValid = true;
+            if (!memberValid)
+            {
+                isValid = false;
+                //debugmsg(debugString);
+            }
+        }
+    }
+    catch(VirtualMemoryException& ge) {
+        return false;
+    }
+    return isValid;
+}
+
+
+QString Instance::toString(const ColorPalette* col) const
+{
+    static const QString nullStr("NULL");
+    if (_d.isNull)
+        return nullStr;
+
+    const BaseType* bt;
+    if (_d.bitSize >= 0 &&
+        (bt = _d.type->dereferencedBaseType(BaseType::trLexical)) &&
+        (bt->type() & IntegerTypes))
+    {
+        const IntegerBitField* ibf = dynamic_cast<const IntegerBitField*>(bt);
+        quint64 val = ibf->toIntBitField(_d.vmem, _d.address, _d.bitSize, _d.bitOffset);
+        QString s = QString::number(val);
+        if (col)
+            return col->color(ctNumber) + s + col->color(ctReset);
+        else
+            return s;
+    }
+
+    return _d.type->toString(_d.vmem, _d.address, col);
+}
+
+

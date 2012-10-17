@@ -7,8 +7,10 @@
 
 #include "shell.h"
 #include <stdlib.h>
+#ifdef CONFIG_READLINE
 #include <readline/readline.h>
 #include <readline/history.h>
+#endif
 #include <insight/constdefs.h>
 #include <insight/insight.h>
 #include <insight/insightexception.h>
@@ -21,7 +23,8 @@ Shell* shell = 0;
 
 
 Shell::Shell(bool interactive, QObject* parent)
-    : QThread(parent), _interactive(interactive), _insight(0), _lastStatus(0)
+    : QThread(parent), _interactive(interactive), _insight(0), _finished(false),
+      _lastStatus(0)
 {
     // Open the console devices
     _stdin.open(stdin, QIODevice::ReadOnly);
@@ -75,6 +78,7 @@ QString Shell::readLine(const QString& prompt)
     QString ret;
     QString p = prompt.isEmpty() ? QString(">>> ") : prompt;
 
+#ifdef CONFIG_READLINE
     // Read input from stdin
     char* line = readline(p.toLocal8Bit().constData());
 
@@ -90,8 +94,14 @@ QString Shell::readLine(const QString& prompt)
 
     ret = QString::fromLocal8Bit(line, strlen(line)).trimmed();
     free(line);
+#else
+    // Print prompt in interactive mode
+    if (_interactive)
+        _out << p << flush;
+    ret = _stdin.readLine().trimmed();
+#endif
 
-    return ret;
+    return ret.trimmed();
 }
 
 
@@ -113,6 +123,7 @@ bool Shell::questionYesNo(const QString& question)
 
 void Shell::loadHistory()
 {
+#ifdef CONFIG_READLINE
     // Load the readline history
     QString histFile = QDir::home().absoluteFilePath(mt_history_file);
     if (QFile::exists(histFile)) {
@@ -121,11 +132,13 @@ void Shell::loadHistory()
             debugerr("Error #" << ret << " occured when trying to read the "
                     "history data from \"" << histFile << "\"");
     }
+#endif
 }
 
 
 void Shell::saveHistory()
 {
+#ifdef CONFIG_READLINE
     // Only save history for interactive sessions
     if (!_interactive)
     	return;
@@ -149,15 +162,19 @@ void Shell::saveHistory()
 			debugerr("Error #" << ret << " occured when trying to save the "
 					"history data to \"" << histFile << "\"");
     }
+#endif
 }
 
 
 void Shell::shellLoop()
 {
 	_interactive = true;
+
+#ifdef CONFIG_READLINE
     // Enable readline history
     using_history();
     loadHistory();
+#endif
 
 	_out << "Type \"exit\" to leave this shell." << endl << endl;
 	_finished = false;
@@ -176,7 +193,7 @@ void Shell::shellLoop()
 					break;
 				_lastStatus = _insight->eval(line);
 			}
-		    catch (InsightException e) {
+			catch (InsightException& e) {
 		        _err << "Caught exception at " << e.file << ":" << e.line << ":"
 		        	<< endl
 		            << e.message << endl;
@@ -185,7 +202,9 @@ void Shell::shellLoop()
 		}
 	}
 
-	saveHistory();
+#ifdef CONFIG_READLINE
+    saveHistory();
+#endif
 }
 
 
@@ -357,7 +376,7 @@ void Shell::run()
         } // end of switch()
 
     }
-    catch (InsightException e) {
+    catch (InsightException& e) {
         _err << "Caught exception at " << e.file << ":" << e.line << ":" << endl
             << e.message << endl;
         _lastStatus = 6;

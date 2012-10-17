@@ -10,6 +10,7 @@
 
 #include <QPair>
 #include <QList>
+#include <QLinkedList>
 #include <QHash>
 #include <QMultiHash>
 #include <exception>
@@ -60,6 +61,11 @@ public:
     virtual ~FactoryException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "FactoryException";
+    }
 };
 
 
@@ -71,6 +77,9 @@ typedef QList<BaseType*> BaseTypeList;
 
 /// List of Variable elements
 typedef QList<Variable*> VariableList;
+
+/// Linked list of Variable elements
+typedef QLinkedList<Variable*> VariableLList;
 
 /// List of Structured elements
 typedef QList<Structured*> StructuredList;
@@ -132,10 +141,31 @@ struct FoundBaseTypes
     const ASTType* astTypeNonPtr;
 };
 
-//typedef QList<FoundBaseType> FoundBaseTypes;
 
 typedef QPair<qint32, const Enum*> IntEnumPair;
 typedef QHash<QString, IntEnumPair> EnumStringHash;
+
+typedef QHash<int, int> IdIdMapping;
+
+/**
+ * This struct holds the original-to-local ID mappings for one particular symbol
+ * file, referenced by IdRevMapBucket::fileIndex.
+ */
+struct IdRevMapBucket
+{
+    /// Constructor
+    IdRevMapBucket() : fileIndex(-1) {}
+
+    /// Deletes all local data and resets to default values.
+    void clear() { fileIndex = -1; map.clear(); }
+
+    int fileIndex;    ///< index of file where this symbol was read from
+    IdIdMapping map;  ///< maps original to local IDs for this file
+};
+
+/// Maps original to internal symbol IDs
+typedef QVector<IdRevMapBucket> IdRevMapping;
+
 
 #define SYMFACTORY_DEFINED 1
 
@@ -193,6 +223,22 @@ public:
 	BaseType* findBaseTypeByName(const QString& name) const;
 
     /**
+     * Searches for types based on wildcards or regular expressions
+     * @param pattern the pattern to match the types' name against
+     * @param syntax the pattern syntax that was used
+     * @param sensitivity case sensitivity for name match
+     * @return a list of types matching \a pattern
+     *
+     * \warning This function uses regular expressions which are costly to
+     * evaluate. If you are searching one particular type, use the regular
+     * findBaseTypeByName() method instead.
+     */
+    BaseTypeList findBaseTypesByName(
+            const QString& pattern,
+            QRegExp::PatternSyntax syntax = QRegExp::WildcardUnix,
+            Qt::CaseSensitivity sensitivity = Qt::CaseSensitive) const;
+
+    /**
      * Retrieves a variable by its name.
      * @param name the name of the variable to retrieve
      * @return the requested variable, if found, \c null otherwise
@@ -213,6 +259,21 @@ public:
 	 * @return \c true if valid, \c false otherwise
 	 */
 	bool static isSymbolValid(const TypeInfo& info);
+
+	/**
+	 * Maps the original IDs in \a info to internal ones and replaces their
+	 * occurences in \a info
+	 * @param info
+	 */
+	void mapToInternalIds(TypeInfo& info);
+
+	/**
+	 * Deletes all original-to-local ID mappings parsed from the given file.
+	 * Call this function after all symbols have been parsed for a particular
+	 * file to reduce memory consumption.
+	 * @param fileIndex index of the symbol file to clear the mappings
+	 */
+	void clearIdRevMap(int fileIndex);
 
 	/**
 	 * Creates a new symbol based on the information provided in \a info and
@@ -260,14 +321,6 @@ public:
 	{
 		return _types;
 	}
-
-    /**
-     * @return the list of all artificial types created by this factory
-     */
-    inline const BaseTypeList& artificialTypes() const
-    {
-        return _artificialTypes;
-    }
 
 	/**
 	 * @return the hash of all types by their ID
@@ -376,10 +429,13 @@ public:
 
     QList<BaseType*> typesUsingId(int id) const;
 
+    QList<Variable*> varsUsingId(int id) const;
+
     void typeAlternateUsage(const TypeEvalDetails *ed, ASTTypeEvaluator* eval);
 
     FoundBaseTypes findBaseTypesForAstType(const ASTType* astType,
-                                            ASTTypeEvaluator *eval);
+                                            ASTTypeEvaluator *eval,
+                                           bool includeCustomTypes = false);
 
 	/**
 	 * Creates a new ASTExpression object of the given type \a type. This object
@@ -400,6 +456,63 @@ public:
 	 */
 	quint32 changeClock() const;
 
+	/**
+	 * Returns the list of executable files the debugging symbols were
+	 * originally parsed from. The index into these files corresponds the
+	 * index used by _origSymFiles.
+	 *\sa origSymKernelFileIndex()
+	 */
+	const QStringList& origSymFiles() const;
+
+	/**
+	 * Returns the index of file "vmlinux" within origSymFiles().
+	 *\sa origSymFiles()
+	 */
+	int origSymKernelFileIndex() const;
+
+	/**
+	 * Sets the list of files the debugging symbols were parsed from.
+	 * @param list relative file names
+	 */
+	void setOrigSymFiles(const QStringList& list);
+
+    /**
+     * Retrieves or generates a unique, internal type ID (> 0) for usage in
+     * multi-dimensional arrays.
+     * @param origId the original ID assigned to the Array type
+     * @param origFileIndex the index of the file this the array was found in
+     * @param localId the local ID assigned to the Array type
+     * @param boundsIndex the dimonsion index
+     * @return a unique ID > 0, computed with: localId + boundsIndex
+     * \sa getInternalTypeId()
+     */
+    int mapToInternalArrayId(int origId, int origFileIndex,
+                             int localId, int boundsIndex);
+
+    /**
+     * Retrieves the internal type ID (> 0) for the given combination of
+     * \a origSymId and \a fileIndex. If that mapping does not yet exist, a new
+     * unique ID is generated for it.
+     * @param fileIndex the index of the file the symbol was found in
+     * @param origSymId the original symbol ID of that symbol
+     * @return a unique ID > 0
+     * \sa mapToOriginalId(), mapToInternalArrayId()
+     */
+    int mapToInternalId(int fileIndex, int origSymId);
+
+    /**
+     * Scans all external variable declarations in _externalVars for variables
+     * for which we have found a declaration. Those variables are removed then.
+     * If \æ insertRemaining is set to \c true, then all remaining variables
+     * will be inserted into the \vars list and the _externalVars list is
+     * cleared afterwards.
+     * @param insertRemaining inserts the remaining variables that have not yet
+     * been found into the _vars list
+     */
+    void scanExternalVars(bool insertRemaining);
+
+	QMultiHash<int, int> seenMagicNumbers;
+
 protected:
 	void typeAlternateUsageStructMember(const TypeEvalDetails *ed,
 										const BaseType *targetBaseType,
@@ -414,6 +527,8 @@ protected:
 							   const BaseType *targetBaseType,
 							   ASTTypeEvaluator *eval);
 
+	void mergeAlternativeTypes(const Structured* src, Structured* dst);
+	void mergeAlternativeTypes(const ReferencingType *src, ReferencingType *dst);
 
 	/**
 	 * Creates or retrieves a BaseType based on the information provided in
@@ -602,6 +717,14 @@ private:
      */
     bool resolveReferences(Structured* s);
 
+    /**
+     * Checks if the (externally declared) variable \a v is already contained
+     * in the list of variables.
+     * @param v variable to check
+     * @return \c true if found, \c false otherwise
+     */
+    bool varDeclAvailable(Variable* v) const;
+
     void insertUsedBy(ReferencingType* ref);
     void insertUsedBy(RefBaseType* rbt);
     void insertUsedBy(Variable* var);
@@ -626,7 +749,12 @@ private:
 
     BaseTypeList typedefsOfType(BaseType* type);
 
-    int getUniqueTypeId();
+    /**
+     * Generates a unique, artificial type ID (< 0) and returns it.
+     * @return a unique ID < 0
+     * \sa getInternalTypeId()
+     */
+    int getArtificialTypeId();
 
     /**
      * Goes to the list of zero-sized structs/unions and tries to find the
@@ -641,14 +769,7 @@ private:
      * @param oldType the BaseType to be replaced
      * @param newType the BaseType to replace \a oldType
      */
-    void replaceType(BaseType* oldType, BaseType* newType);
-
-    /**
-     * Inserts all external variable declarations into the factory's symbols
-     * for which we do not have a declaration. Afterwards all remaining
-     * external variables are deleted and the _externalVars list is cleared.
-     */
-    void insertNewExternalVars();
+    void replaceType(const BaseType *oldType, BaseType* newType);
 
     /**
      * Tries to find a type equal to \a t based on its hash and the comparison
@@ -662,12 +783,11 @@ private:
 
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
-	VariableList _externalVars;       ///< Holds all external Variable declarations
+	VariableLList _externalVars;      ///< Holds all external Variable declarations
 	VariableStringHash _varsByName;   ///< Holds all Variable objects, indexed by name
 	VariableIntHash _varsById;	      ///< Holds all Variable objects, indexed by ID
 	EnumStringHash _enumsByName;         ///< Holds all enumerator values, indexed by name
 	BaseTypeList _types;              ///< Holds all BaseType objects which were parsed or read from symbol files
-	BaseTypeList _artificialTypes;    ///< Holds all BaseType objects which were created artificially
 	BaseTypeStringHash _typesByName;  ///< Holds all BaseType objects, indexed by name
 	BaseTypeIntHash _typesById;       ///< Holds all BaseType objects, indexed by ID
 	IntIntMultiHash _equivalentTypes; ///< Holds all type IDs of equivalent types
@@ -681,14 +801,18 @@ private:
 	FuncParamMultiHash _usedByFuncParams;///< Holds all FuncParam objects that hold a reference to another type
 	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
 	ASTExpressionList _expressions;
+	IdRevMapping _idRevMapping;       ///< Maps original to internal IDs
+	QStringList _origSymFiles;        ///< List of executable files the symbols were obtained from
+	int _origSymKernelFileIndex;      ///< Index of the kernel file within _origSymFiles
 
 	int _typeFoundByHash;
 	int _uniqeTypesChanged;
 	int _totalTypesChanged;
 	int _typesCopied;
 	int _varTypeChanges;
-	int _conflictingTypeChanges;
+	int _ambiguesAltTypes;
 	int _artificialTypeId;
+	int _internalTypeId;
 	quint32 _changeClock;
 	quint32 _maxTypeSize;
 	QMutex _typeAltUsageMutex;
@@ -722,6 +846,18 @@ inline Variable* SymFactory::findVarByName(const QString & name) const
 inline quint32 SymFactory::changeClock() const
 {
 	return _changeClock;
+}
+
+
+inline const QStringList &SymFactory::origSymFiles() const
+{
+	return _origSymFiles;
+}
+
+
+inline int SymFactory::origSymKernelFileIndex() const
+{
+	return _origSymKernelFileIndex;
 }
 
 #endif /* SYMFACTORY_H_ */

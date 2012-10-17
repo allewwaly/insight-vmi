@@ -18,8 +18,11 @@
 #include <QSemaphore>
 #include <QTime>
 #include <QMutex>
+#include <QSize>
 #include "kernelsymbols.h"
 #include "memorydump.h"
+#include "colorpalette.h"
+#include "listfilter.h"
 
 // Forward declaration
 class QProcess;
@@ -97,6 +100,11 @@ public:
      * @return the \c stderr stream of the shell
      */
     QTextStream& err();
+
+
+    void errMsg(const QString& s, bool newline = true);
+
+    void errMsg(const char* s, bool newline = true);
 
     /**
      * @return the KernelSymbol object of this Shell object
@@ -183,6 +191,43 @@ public:
      */
     int unloadMemDump(const QString& indexOrFileName, QString* unloadedFile = 0);
 
+    /**
+     * Returns the size of the ANSI terminal in character rows and columns
+     * @return terminal size
+     */
+    QSize termSize() const;
+
+    /**
+     * Returns the ANSI color code to produce the color for type \a ct.
+     * @param ct the desired color type
+     * @return color code to produce that color in an ANSI terminal
+     */
+    const char* color(ColorType ct) const;
+
+    /**
+     * Formats the pretty name of a type including ANSI color codes to produce
+     * some syntax highlighting.
+     * @param t the type to pretty-print
+     * @param minLen the desired minimum length of the output string (excluding
+     *  color codes); the string will be padded with spaces to match \a minLen
+     * @param maxLen the desired maximum length of the output string (excluding
+     *  color codes); the string will be shortend with "..." to be at most
+     *  \a maxLen characters long.
+     * @return the pretty name of type \a t, including ANSI color codes, padded
+     *  or shortend to the given \a minLen and \a maxLen.
+     */
+    QString prettyNameInColor(const BaseType* t, int minLen = 0,
+                              int maxLen = 0) const;
+
+    QString prettyNameInColor(const QString& name, ColorType nameType,
+                              const BaseType* t, int minLen = 0,
+                              int maxLen = 0) const;
+
+    /**
+     * Saves the command line history to the history file.
+     */
+    void saveShellHistory();
+
 protected:
     /**
      * Starts the interactive shell and does not return until the user invokes
@@ -240,11 +285,15 @@ private:
     int _lastStatus;
     QMutex _engineLock;
     ScriptEngine* _engine;
+    ColorPalette _color;
 
     void printTimeStamp(const QTime& time);
+    int memberNameLenth(const Structured* s, int indent) const;
+    void printStructMembers(const Structured* s, int indent, int id_width = -1,
+                            int offset_width = -1, int name_width = -1,
+                            bool printAlt = true, size_t offset = 0);
     void prepare();
     void prepareReadline();
-    void saveShellHistory();
     void cleanupPipedProcs();
     QStringList splitIntoPipes(QString command) const;
     QStringList splitIntoWords(QString command) const;
@@ -252,14 +301,19 @@ private:
     int evalLine();
     void hline(int width = 60);
     int parseMemDumpIndex(QStringList &args, int skip = 0, bool quiet = false);
-    //---------------------------------
-    int cmdDiffVectors(QStringList args);
+    int printVarList(const VarListFilter& filter);
+    int printTypeList(const TypeListFilter& filter);
+    int printFilterHelp(const QHash<QString, QString> help);
+//---------------------------------
+//    int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
     int cmdHelp(QStringList args);
+    int cmdColor(QStringList args);
     int cmdList(QStringList args);
     int cmdListSources(QStringList args);
-    int cmdListTypes(QStringList args);
+    int cmdListTypes(QStringList args, int typeFilter = -1);
     int cmdListVars(QStringList args);
+    int cmdListVarsUsing(QStringList args);
     int cmdListTypesUsing(QStringList args);
     int cmdListTypesById(QStringList args);
     int cmdListTypesByName(QStringList args);
@@ -270,25 +324,34 @@ private:
     int cmdMemorySpecs(QStringList args);
     int cmdMemoryQuery(QStringList args);
     int cmdMemoryDump(QStringList args);
+#ifdef CONFIG_MEMORY_MAP
     int cmdMemoryRevmap(QStringList args);
     int cmdMemoryRevmapBuild(int index, QStringList args);
     int cmdMemoryRevmapVisualize(int index, QString type = "v");
+    int cmdMemoryRevmapDump(int index, QStringList args);
+    int cmdMemoryRevmapDumpInit(int index, QStringList args);
     int cmdMemoryDiff(QStringList args);
     int cmdMemoryDiffBuild(int index1, int index2);
     int cmdMemoryDiffVisualize(int index);
+#endif
     int cmdScript(QStringList args);
     int cmdShow(QStringList args);
-    int cmdShowBaseType(const BaseType* t);
+    int cmdShowBaseType(const BaseType* t, const QString& name = QString(),
+                        ColorType nameType = ctReset);
     int cmdShowVariable(const Variable* v);
     int cmdStats(QStringList args);
     int cmdStatsPostponed(QStringList args);
     int cmdStatsTypes(QStringList args);
     int cmdStatsTypesByHash(QStringList args);
     int cmdSymbols(QStringList args);
+#ifdef DEBUG_MERGE_TYPES_AFTER_PARSING
+    int cmdSymbolsPostProcess(QStringList args);
+#endif
     int cmdSymbolsSource(QStringList args);
     int cmdSymbolsParse(QStringList args);
     int cmdSymbolsLoad(QStringList args);
     int cmdSymbolsStore(QStringList args);
+    int cmdSysInfo(QStringList args);
     int cmdBinary(QStringList args);
     int cmdBinaryMemDumpList(QStringList args);
 //    int cmdBinaryInstance(QStringList args);

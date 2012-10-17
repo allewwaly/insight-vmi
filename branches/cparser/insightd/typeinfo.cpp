@@ -10,7 +10,8 @@
 #include "funcparam.h"
 #include <QtAlgorithms>
 
-TypeInfo::TypeInfo()
+TypeInfo::TypeInfo(int threadIndex)
+	: _fileIndex(threadIndex)
 {
 	clear();
 }
@@ -21,10 +22,11 @@ void TypeInfo::clear()
 	_isRelevant = false;
 	_enc = eUndef;
 	_name.clear();
-	_id = _refTypeId = 0;
+	_id = _origId = _refTypeId = 0;
 	_byteSize = 0;
 	_bitSize = _bitOffset = -1;
 	_location = 0;
+	_hasLocation = false;
 	_dataMemberLoc = -1;
 	_upperBounds.clear();
 	_external = 0;
@@ -48,6 +50,18 @@ void TypeInfo::deleteParams()
 	for (int i = 0; i < _params.size(); ++i)
 		delete _params[i];
 	_params.clear();
+}
+
+
+int TypeInfo::fileIndex() const
+{
+	return _fileIndex;
+}
+
+
+void TypeInfo::setFileIndex(int index)
+{
+	_fileIndex = index;
 }
 
 
@@ -122,6 +136,18 @@ void TypeInfo::setId(int id)
 }
 
 
+int TypeInfo::origId() const
+{
+    return _origId;
+}
+
+
+void TypeInfo::setOrigId(int id)
+{
+    this->_origId = id;
+}
+
+
 int TypeInfo::refTypeId() const
 {
     return _refTypeId;
@@ -170,15 +196,22 @@ void TypeInfo::setBitOffset(int bitOffset)
 }
 
 
-size_t TypeInfo::location() const
+quint64 TypeInfo::location() const
 {
     return _location;
 }
 
 
-void TypeInfo::setLocation(size_t location)
+void TypeInfo::setLocation(quint64 location)
 {
     this->_location = location;
+    this->_hasLocation = true;
+}
+
+
+bool TypeInfo::hasLocation() const
+{
+    return _hasLocation;
 }
 
 
@@ -278,25 +311,25 @@ void TypeInfo::setInlined(bool value)
 }
 
 
-size_t TypeInfo::pcLow() const
+quint64 TypeInfo::pcLow() const
 {
 	return _pcLow;
 }
 
 
-void TypeInfo::setPcLow(size_t pc)
+void TypeInfo::setPcLow(quint64 pc)
 {
 	_pcLow = pc;
 }
 
 
-size_t TypeInfo::pcHigh() const
+quint64 TypeInfo::pcHigh() const
 {
 	return _pcHigh;
 }
 
 
-void TypeInfo::setPcHigh(size_t pc)
+void TypeInfo::setPcHigh(quint64 pc)
 {
 	_pcHigh = pc;
 }
@@ -350,7 +383,7 @@ const ParamList& TypeInfo::params() const
 }
 
 
-QString TypeInfo::dump() const
+QString TypeInfo::dump(const QStringList& symFiles) const
 {
 	static HdrSymMap hdrMap = getHdrSymMap();
 	QString symType;
@@ -370,6 +403,7 @@ QString TypeInfo::dump() const
 
 	QString ret;
 	if (_id != 0) 		        ret += QString("  id:            0x%1\n").arg(_id, 0, 16);
+	if (_origId != 0) 		    ret += QString("  origId:        0x%1\n").arg(_origId, 0, 16);
 	if (_symType >= 0)          ret += QString("  symType:       %1 (%2)\n").arg(_symType).arg(symType);
 	if (!_name.isEmpty())       ret += QString("  name:          %1\n").arg(_name);
 	if (_byteSize > 0)          ret += QString("  byteSize:      %1\n").arg(_byteSize);
@@ -385,8 +419,10 @@ QString TypeInfo::dump() const
 	if (_pcLow)                 ret += QString("  pcLow:         %1\n").arg(_pcLow);
 	if (_pcHigh)                ret += QString("  pcHigh:        %1\n").arg(_pcHigh);
 	if (!_srcDir.isEmpty())     ret += QString("  srcDir:        %1\n").arg(_srcDir);
-	if (_srcFileId != 0)        ret += QString("  srcFile:       %1\n").arg(_srcFileId);
+	if (_srcFileId != 0)        ret += QString("  srcFile:       0x%1\n").arg(_srcFileId, 0, 16);
 	if (_srcLine >= 0)          ret += QString("  srcLine:       %1\n").arg(_srcLine);
+	if (_fileIndex >= 0 && _fileIndex < symFiles.size())
+		ret +=                         QString("  symFile:       %1\n").arg(symFiles[_fileIndex]);
 	if (_sibling >= 0)          ret += QString("  sibling:       %1\n").arg(_sibling);
 	if (!_enumValues.isEmpty()) {
 	  ret +=                           QString("  enumValues:    ");

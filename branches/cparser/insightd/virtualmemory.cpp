@@ -40,22 +40,22 @@
 
 // See <linux/include/asm-x86/page_32.h>
 #define __PHYSICAL_MASK_SHIFT_X86     32
-#define __PHYSICAL_MASK_X86           ((1UL << __PHYSICAL_MASK_SHIFT_X86) - 1)
+#define __PHYSICAL_MASK_X86           ((1ULL << __PHYSICAL_MASK_SHIFT_X86) - 1)
 #define __PHYSICAL_MASK_SHIFT_X86_PAE 44
-#define __PHYSICAL_MASK_X86_PAE       ((1UL << __PHYSICAL_MASK_SHIFT_X86_PAE) - 1)
+#define __PHYSICAL_MASK_X86_PAE       ((1ULL << __PHYSICAL_MASK_SHIFT_X86_PAE) - 1)
 
 #define __VIRTUAL_MASK_SHIFT_X86    32
-#define __VIRTUAL_MASK_X86         ((1UL << __VIRTUAL_MASK_SHIFT_X86) - 1)
+#define __VIRTUAL_MASK_X86         ((1ULL << __VIRTUAL_MASK_SHIFT_X86) - 1)
 
 // See <linux/include/asm-x86/page_64.h>
 #define __PHYSICAL_MASK_SHIFT_X86_64  40
-#define __PHYSICAL_MASK_X86_64        ((1UL << __PHYSICAL_MASK_SHIFT_X86_64) - 1)
+#define __PHYSICAL_MASK_X86_64        ((1ULL << __PHYSICAL_MASK_SHIFT_X86_64) - 1)
 //#define __VIRTUAL_MASK_SHIFT_X86_64   48
-//#define __VIRTUAL_MASK_X86_64         ((1UL << __VIRTUAL_MASK_SHIFT_X86_64) - 1)
+//#define __VIRTUAL_MASK_X86_64         ((1ULL << __VIRTUAL_MASK_SHIFT_X86_64) - 1)
 
 // See <linux/include/asm-x86/page.h>
 #define PAGE_SHIFT             12
-#define KPAGE_SIZE              (1UL << PAGE_SHIFT)
+#define KPAGE_SIZE              (1ULL << PAGE_SHIFT)
 
 #define PHYSICAL_PAGE_MASK_X86       (~(KPAGE_SIZE-1) & (__PHYSICAL_MASK_X86 << PAGE_SHIFT))
 #define PHYSICAL_PAGE_MASK_X86_PAE   (~(KPAGE_SIZE-1) & (__PHYSICAL_MASK_X86_PAE << PAGE_SHIFT))
@@ -95,12 +95,15 @@
 #define pmd_index_x86_64(address)  (((address) >> PMD_SHIFT_X86_64) & (PTRS_PER_PMD_X86_64 - 1))
 #define pte_index_x86_64(address)  (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE_X86_64 - 1))
 
+// End of user space in x86_64
+#define VIRTUAL_USERSPACE_END_X86_64    0x00007fffffffffffULL
+
 #define virtualMemoryPageError(vaddr, level, throwExceptions) \
     do { \
         if (throwExceptions) \
             virtualMemoryError(\
                 QString("Error reading from virtual address 0x%1: page not present in %2") \
-                    .arg(vaddr, _specs.sizeofUnsignedLong << 1, 16, QChar('0')) \
+                    .arg(vaddr, _specs.sizeofPointer << 1, 16, QChar('0')) \
                     .arg(level)); \
         else \
             return PADDR_ERROR; \
@@ -118,12 +121,16 @@
 
 VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
                              int memDumpIndex)
-    : _tlb(50000), _physMem(physMem), _physMemSize(-1), _specs(specs), _pos(-1),
+    :
+#ifdef ENABLE_TLB
+      _tlb(50000),
+#endif
+      _physMem(physMem), _physMemSize(-1), _specs(specs), _pos(-1),
       _memDumpIndex(memDumpIndex), _threadSafe(false),
       _userland(false), _userPGD(0), _userlandMutex(QMutex::Recursive)
 {
     // Make sure the architecture is set
-    if ( !_specs.arch & (MemSpecs::ar_i386|MemSpecs::ar_x86_64) )
+    if ( !(_specs.arch & (MemSpecs::ar_i386|MemSpecs::ar_x86_64)) )
         virtualMemoryError("No architecture set in memory specifications");
 
     if (_physMem)
@@ -191,12 +198,12 @@ bool VirtualMemory::seek(qint64 pos)
 	//prevent any seek while we might be in userLand mode
 	QMutexLocker locker(&_userlandMutex);
 
-	if(!_userland){
+//	if(!_userland){
 		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
-	}else{
+//	}else{
 		//std::cout << "mySeek virtualToPhysicalUserLand pgd: "<<std::hex<<_userPGD<<std::endl;
-		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
-	}
+//		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
+//	}
 
 	locker.unlock();
 
@@ -250,7 +257,7 @@ bool VirtualMemory::safeSeek(qint64 pos)
 
         return seekOk;
     }
-    catch (VirtualMemoryException) {
+    catch (VirtualMemoryException&) {
         return false;
     }
 }
@@ -308,7 +315,7 @@ qint64 VirtualMemory::readData(char* data, qint64 maxSize)
             virtualMemoryError(QString("Cannot seek to address 0x%1 "
                     "(translated from virtual address 0x%2")
                     .arg(physAddr, 8, 16, QChar('0'))
-                    .arg(_pos, _specs.sizeofUnsignedLong, 16, QChar('0')));
+                    .arg(_pos, (_specs.sizeofPointer << 1), 16, QChar('0')));
         }
         // A page size of -1 means the address belongs to linear space
         if (pageSize < 0) {
@@ -316,7 +323,7 @@ qint64 VirtualMemory::readData(char* data, qint64 maxSize)
         }
         else {
             // Only read to the end of the page
-            qint64 pageOffset = _pos & (pageSize - 1UL);
+            qint64 pageOffset = _pos & (pageSize - 1ULL);
             qint64 remPageSize = pageSize - pageOffset;
             ret = _physMem->read(data, maxSize > remPageSize ? remPageSize : maxSize);
         }
@@ -354,11 +361,13 @@ void VirtualMemory::setPhysMem(QIODevice* physMem)
 
     if (doLock) _physMemMutex.lock();
 
+#ifdef ENABLE_TLB
     if (_physMem != physMem) {
         if (doLock) _tlbMutex.lock();
         _tlb.clear();
         if (doLock) _tlbMutex.unlock();
     }
+#endif
     _physMem = physMem;
     _physMemSize = _physMem ? _physMem->size() : -1;
 
@@ -403,6 +412,7 @@ T VirtualMemory::extractFromPhysMem(quint64 physaddr, bool enableExceptions,
 }
 
 
+#ifdef ENABLE_TLB
 inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 {
 //    // Disable TLB for now
@@ -418,7 +428,7 @@ inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
     if ( (tlbEntry = _tlb[vaddr & PAGEMASK]) ) {
         // Return page size and address
         *pageSize = tlbEntry->size;
-        quint64 mask = tlbEntry->size - 1UL;
+        quint64 mask = tlbEntry->size - 1ULL;
         result = tlbEntry->addr | (vaddr & mask);
     }
 
@@ -426,18 +436,21 @@ inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 
     return result;
 }
+#endif
 
 
 quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
-        bool enableExceptions)
+        bool enableExceptions, struct pageTableEntries *ptEntries)
 {
+#ifdef ENABLE_TLB
     bool doLock = _threadSafe;
+#endif
     quint64 pgd_addr;  // page global directory address
-    quint64 pgd;
+    quint64 pgd = 0;
     quint64 pmd_paddr; // page middle directory address (only for PAE)
-    quint64 pmd;
+    quint64 pmd = 0;
     quint64 pte_paddr; // page table address
-    quint64 pte;
+    quint64 pte = 0;
     quint64 physaddr = 0;
     bool ok;
 
@@ -555,12 +568,24 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
         }
     }
 
+#ifdef ENABLE_TLB
     // Create TLB entry. Always use small page size (4k) as key into cache.
     if (doLock) _tlbMutex.lock();
     _tlb.insert(
             vaddr & PAGEMASK,
             new TLBEntry(physaddr & ~((*pageSize) - 1), *pageSize));
     if (doLock) _tlbMutex.unlock();
+#endif
+
+    // Return the page table entries if requested.
+    if (ptEntries) {
+        // Unused Entries will be set to PADDR_ERROR
+        pgd ? ptEntries->pgd = pgd : ptEntries->pgd = PADDR_ERROR;
+        pmd ? ptEntries->pmd = pmd : ptEntries->pmd = PADDR_ERROR;
+        pte ? ptEntries->pte = pte : ptEntries->pte = PADDR_ERROR;
+
+        ptEntries->pud = PADDR_ERROR;
+    }
 
     return physaddr;
 }
@@ -568,17 +593,19 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
 
 
 quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
-        bool enableExceptions)
+        bool enableExceptions, struct pageTableEntries *ptEntries)
 {
+#ifdef ENABLE_TLB
     bool doLock = _threadSafe;
+#endif
     quint64 pgd_addr;  // page global directory address
-    quint64 pgd;
+    quint64 pgd = 0;
     quint64 pud_paddr; // page upper directory address
-    quint64 pud;
+    quint64 pud = 0;
     quint64 pmd_paddr; // page middle directory address
-    quint64 pmd;
+    quint64 pmd = 0;
     quint64 pte_paddr; // page table address
-    quint64 pte;
+    quint64 pte = 0;
     quint64 physaddr = 0;
     bool ok;
 
@@ -589,7 +616,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 
     // First translate the virtual address of the base page directory to a
     // physical address
-    if(!_userland){
+    if (!_userland) {
 		if (_specs.initLevel4Pgt >= _specs.startKernelMap) {
 			pgd_addr = ((_specs.initLevel4Pgt)
 					- (quint64) _specs.startKernelMap);
@@ -600,7 +627,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 		else {
 			pgd_addr = _specs.initLevel4Pgt;
 		}
-    }else{
+	} else {
     	if (vaddr >= _specs.pageOffset) {
     		virtualMemoryOtherError("vaddr >= PAGE_OFFSET, not a user-land address\n",
     		                enableExceptions);
@@ -683,6 +710,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 
 
 
+#ifdef ENABLE_TLB
     if(!_userland){
     	// Create TLB entry. Always use small page size (4k) as key into cache.
     	if (doLock) _tlbMutex.lock();
@@ -694,18 +722,27 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
     // never create a TLB entry outside kernelspace as InSight will never now about a contextswitch
     // if we connect it to a real machine
     // performance improvement: save last known _userPGD and flushTLB() on an new value
+#endif
 
+    // Return the page table entries if requested.
+    if (ptEntries) {
+        // Unused Entries will be set to PADDR_ERROR
+        pgd ? ptEntries->pgd = pgd : ptEntries->pgd = PADDR_ERROR;
+        pud ? ptEntries->pud = pud : ptEntries->pud = PADDR_ERROR;
+        pmd ? ptEntries->pmd = pmd : ptEntries->pmd = PADDR_ERROR;
+        pte ? ptEntries->pte = pte : ptEntries->pte = PADDR_ERROR;
+    }
 
     return physaddr;
 }
 
 
 quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
-        bool enableExceptions)
+        bool enableExceptions, struct pageTableEntries *ptEntries)
 {
     quint64 physAddr = (_specs.arch & MemSpecs::ar_i386) ?
-            virtualToPhysical32(vaddr, pageSize, enableExceptions) :
-            virtualToPhysical64(vaddr, pageSize, enableExceptions);
+            virtualToPhysical32(vaddr, pageSize, enableExceptions, ptEntries) :
+            virtualToPhysical64(vaddr, pageSize, enableExceptions, ptEntries);
 
     if (_physMemSize > 0 && physAddr >= (quint64)_physMemSize)
         virtualMemoryOtherError(
@@ -719,7 +756,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
 
 
 quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
-        bool enableExceptions)
+        bool enableExceptions, struct pageTableEntries *ptEntries)
 {
 
 	if (_userland){
@@ -729,7 +766,7 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
 	}
 
 	// Make sure the address is within a valid range
-    if ((_specs.arch & MemSpecs::ar_i386) && (vaddr >= (1UL << 32)))
+	if ((_specs.arch & MemSpecs::ar_i386) && (vaddr >= (1ULL << 32)))
         virtualMemoryOtherError(
                 QString("Virtual address 0x%1 exceeds 32 bit address space")
                         .arg(vaddr, 0, 16),
@@ -739,39 +776,41 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
     // If we can do the job with a simple linear translation subtract the
     // adequate constant from the virtual address
 
+#ifdef DEBUG
     // We don't expect to use _specs.vmemmapStart here, should be null!
     assert(_specs.vmemmapStart == 0 && _specs.vmemmapEnd == 0);
     // If _specs.modulesVaddr is set, it should equal _specs.vmallocStart
     if (_specs.modulesVaddr)
         assert(_specs.modulesVaddr == _specs.vmallocStart &&
                _specs.modulesEnd == _specs.vmallocEnd);
+#endif
 
-    // During initialization, the VMALLOC_START might be incorrect (i.e., less
-    // than PAGE_OFFSET). This is reflected in the _specs.initialized variable.
-    // In that case we always assume linear translation.
-    if (!(_specs.initialized) )//&&
-//         ((vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) /*||
-//          (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
-//          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd)*/)) )
-    {
-        if (vaddr >= _specs.pageOffset) {
+    // Is this a kernel space address?
+    if (vaddr >= _specs.pageOffset) {
+
+        // First 896MB of phys. memory are mapped between PAGE_OFFSET and
+        // high_memory (the latter requires initialization)
+        if ((!_specs.initialized || vaddr < _specs.highMemory) && !ptEntries) {
             physaddr = ((vaddr) - _specs.pageOffset);
+            *pageSize = -1;
         }
-        else {
-            virtualMemoryOtherError(
-                            QString("Error reading from virtual address 0x%1: "
-                                    "address below linear offsets, seems to be "
-                                    "user-land memory")
-                                .arg(vaddr, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')),
-                            enableExceptions);
+        // Dynamic memory mapping
+        else  {
+#ifdef ENABLE_TLB
+            // Check the TLB first.
+            if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
+#endif
+                // No hit, so use the address lookup function
+                physaddr = pageLookup32(vaddr, pageSize, enableExceptions, ptEntries);
         }
-        *pageSize = -1;
     }
     else {
-        // Check the TLB first.
-        if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
-            // No hit, so use the address lookup function
-            physaddr = pageLookup32(vaddr, pageSize, enableExceptions);
+        virtualMemoryOtherError(
+                    QString("Error reading from virtual address 0x%1: "
+                            "address below linear offsets, seems to be "
+                            "user-land memory")
+                    .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
+                    enableExceptions);
     }
 
     return physaddr;
@@ -780,65 +819,94 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
 
 
 quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
-        bool enableExceptions)
+        bool enableExceptions, struct pageTableEntries *ptEntries)
 {
     quint64 physaddr = 0;
 
-    if(!_specs.initialized){
-    	virtualMemoryOtherError(
-			QString("_specs not initialized"),
-			enableExceptions);
+    if (_userland && !_specs.initialized) {
+        virtualMemoryOtherError(
+            QString("_specs not initialized"),
+            enableExceptions);
     }
 
-    if(_userland){
+    if (_userland) {
     	//std::cout << "reading userland mem pgd:" << std::hex << _userPGD << std::endl;
-    	return pageLookup64(vaddr, pageSize, enableExceptions);
-    }else{
-    	//std::cout << "reading kernel mem" << std::endl;
+        return pageLookup64(vaddr, pageSize, enableExceptions, ptEntries);
     }
 
-    // If we can do the job with a simple linear translation subtract the
-    // adequate constant from the virtual address
-    if(!(_specs.initialized &&
-         ((vaddr >= _specs.realVmallocStart() && vaddr <= _specs.vmallocEnd) ||
-          (vaddr >= _specs.vmemmapStart && vaddr <= _specs.vmemmapEnd) ||
-          (vaddr >= _specs.modulesVaddr && vaddr <= _specs.modulesEnd))) )
-    {
-        if (vaddr >= _specs.startKernelMap) {
+    /*
+     * Address space x86_64 <Documentation/x86/x86_64/mm.txt>
+     * 00000000 00000000 - 00007fff ffffffff (=47 bits) user space, different per mm
+     * hole caused by [48:63] sign extension
+     * ffff8000 00000000 - ffff80ff ffffffff (=40 bits) guard hole
+     * ffff8800 00000000 - ffffc7ff ffffffff (=64 TB)   direct mapping of all phys. memory
+     * ffffc800 00000000 - ffffc8ff ffffffff (=40 bits) hole
+     * ffffc900 00000000 - ffffe8ff ffffffff (=45 bits) vmalloc/ioremap space
+     * ffffe900 00000000 - ffffe9ff ffffffff (=40 bits) hole
+     * ffffea00 00000000 - ffffeaff ffffffff (=40 bits) virtual memory map (1TB)
+     * ... unused hole ...
+     * ffffffff 80000000 - ffffffff a0000000 (=512 MB)  kernel text mapping, from phys 0
+     * ffffffff a0000000 - ffffffff ff000000 (=1536 MB) module mapping space
+     */
+
+    // Is address in kernel space?
+    if (vaddr >= _specs.pageOffset) {
+        // First 512MB of phys. memory are linearly mapped here:
+        // __START_KERNEL_map - MODULES_VADDR
+        // (ffffffff80000000 - ffffffffa0000000)
+        if (vaddr >= _specs.startKernelMap && vaddr < _specs.modulesVaddr) {
             physaddr = ((vaddr) - _specs.startKernelMap);
+            *pageSize = -1;
         }
-        else if (vaddr >= _specs.pageOffset) {
+        // All phys. memory (up to 64TB) is linearly mapped here:
+        // PAGE_OFFSET       - high_memory (requires initialization)
+        // (ffff880000000000 - (ffff8800 00000000 + phys.mem.size))
+        else if ((!_specs.initialized || vaddr < _specs.highMemory) && !ptEntries) {
             physaddr = ((vaddr) - _specs.pageOffset);
+            *pageSize = -1;
         }
-        else {
-            // Is the 64 bit address in canonical form?
-            quint64 high_bits = vaddr >> 47;
-            if (high_bits != 0 && high_bits != 0x1FFFFUL)
-                virtualMemoryOtherError(
-                                QString("Virtual address 0x%1 is not in canonical form")
-                                    .arg(vaddr, _specs.sizeofUnsignedLong, 16, QChar('0')),
-                                enableExceptions);
-
+        // Is address whithin any known dynamically mapped region?
+        // Note: We COULD disable this check here and a use the page table.
+        else /*if ((vaddr >= _specs.realVmallocStart() && vaddr < _specs.vmallocEnd) ||
+                 (vaddr >= _specs.vmemmapStart && vaddr < _specs.vmemmapEnd) ||
+                 (vaddr >= _specs.modulesVaddr && vaddr < _specs.modulesEnd))*/
+        {
+#ifdef ENABLE_TLB
+            // Check the TLB first.
+            if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
+#endif
+                // No hit, so use one of the address lookup functions
+                physaddr = pageLookup64(vaddr, pageSize, enableExceptions, ptEntries);
+        }
+        /*else {
             virtualMemoryOtherError(
-                            QString("Error reading from virtual address 0x%1: "
-                                    "address below linear offsets, seems to be "
-                                    "user-land memory")
-                                .arg(vaddr, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')),
-                            enableExceptions);
-        }
-        *pageSize = -1;
+                        QString("Virtual address 0x%1 not in any known address range")
+                        .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
+                        enableExceptions);
+
+        }*/
     }
+    // Is address in user space?
+    else if (vaddr <= VIRTUAL_USERSPACE_END_X86_64) {
+        virtualMemoryOtherError(
+                    QString("Virtual address 0x%1 points to user space")
+                        .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
+                            enableExceptions);
+    }
+    // Addresses must be in canonical form, bit 47 of address must be
+    // extended to bits 48:63, i.e., bist 47:63 must all be either 0 or 1.
     else {
-        // Check the TLB first.
-        if ( !(physaddr = tlbLookup(vaddr, pageSize)) )
-            // No hit, so use one of the address lookup functions
-            physaddr = pageLookup64(vaddr, pageSize, enableExceptions);
+        virtualMemoryOtherError(
+                        QString("Virtual address 0x%1 is not in canonical form")
+                            .arg(vaddr, (_specs.sizeofPointer << 1), 16, QChar('0')),
+                                enableExceptions);
     }
 
     return physaddr;
 }
 
 
+#ifdef ENABLE_TLB
 void VirtualMemory::flushTlb()
 {
     bool doLock = _threadSafe;
@@ -847,4 +915,109 @@ void VirtualMemory::flushTlb()
     _tlb.clear();
     if (doLock) _tlbMutex.unlock();
 }
+#endif
 
+quint64 VirtualMemory::updateFlags(quint64 currentFlags, quint64 entry)
+{
+    quint64 result = currentFlags;
+
+    // Present
+    // 0 = Not Present, 1 = Present
+    if (!(entry & Present))
+        result &= ~((quint64)Present);
+
+    // Read/Write
+    // 0 = Read Only, 1 = Read & Write
+    if (!(entry & ReadWrite))
+        result &= ~((quint64)ReadWrite);
+
+    // Supervisor/User
+    // 0 = Supervisor, 1 = User
+    if (entry & Supervisor)
+        result |= Supervisor;
+
+    // NX
+    // 0 = Executable, 1 = Non-Executable
+    if (entry & NX)
+        result |= NX;
+
+    return result;
+}
+
+quint64 VirtualMemory::getFlags(quint64 vaddr) {
+    struct pageTableEntries ptEntries;
+    int data;
+    quint64 flags = 0;
+
+    virtualToPhysical(vaddr, &data, true, &ptEntries);
+
+    if (_specs.arch & MemSpecs::ar_i386) {
+        // PAE or 32-bit paging
+
+        if (_specs.arch & MemSpecs::ar_pae_enabled) {
+            // PAE
+
+            // Use PDPTES Present flags as base
+            flags |= (ptEntries.pgd & Present);
+
+            // PDPTEs do not specify R/W, U/S, or NX!
+            // Thus we take them from the PDE
+            flags |= (ptEntries.pmd & (ReadWrite | Supervisor | NX));
+
+            // Update remaining flags = Present Flag
+            flags &= ptEntries.pmd;
+
+            // Update the flags with the PTE if any
+            if (ptEntries.pte != PADDR_ERROR) {
+                flags = updateFlags(flags, ptEntries.pte);
+            }
+        }
+        else {
+            // 32-bit paging
+            // Use PGD flags as base
+            flags |= ptEntries.pgd;
+
+            // Update the flags with the PTE if any
+            if (ptEntries.pte != PADDR_ERROR) {
+                flags = updateFlags(flags, ptEntries.pte);
+            }
+        }
+    }
+    else {
+        // IA-32e paging
+
+        // PML4e as starting point
+        flags |= ptEntries.pgd;
+
+        // Update
+        flags = updateFlags(flags, ptEntries.pud);
+        flags = updateFlags(flags, ptEntries.pmd);
+
+        // Update the flags with the PTE if any
+        if (ptEntries.pte != PADDR_ERROR) {
+            flags = updateFlags(flags, ptEntries.pte);
+        }
+
+    }
+
+    return flags;
+}
+
+bool VirtualMemory::isExecutable(quint64 vaddr)
+{
+    quint64 flags = 0;
+
+    try {
+        flags = getFlags(vaddr);
+    }
+    catch (VirtualMemoryException &e) {
+        return false;
+    }
+
+    // We only check for NX at this point, but we probably should also
+    // verify that the memory area is not writeable
+    if (flags & NX)
+        return false;
+
+    return true;
+}

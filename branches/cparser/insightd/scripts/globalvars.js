@@ -20,7 +20,7 @@ while (maxId > 0) {
 
 // Iterate over all variable IDs
 for (var i = 0; i < varIds.length; ++i) {
-//	print(i + ": 0x" + varIds[i].toString(16));
+//	println(i + ": 0x" + varIds[i].toString(16));
 	// Create an instance of each variable
 	var inst = new Instance(varIds[i]);
 	// Collect some information about it
@@ -43,7 +43,7 @@ for (var i = 0; i < varIds.length; ++i) {
 	}
 			
 	// Output the information
-	print(ralign("0x" + inst.Id().toString(16), size_id) + " " + 
+    println(ralign("0x" + inst.Id().toString(16), size_id) + " " +
 		  lalign(name + ": " + typeName,
 				 size_name + size_typeName + 2) + 
 //		  " " + 
@@ -53,13 +53,13 @@ for (var i = 0; i < varIds.length; ++i) {
 		  lalign(val, size_val));
 
 //    try {
-//		print(inst.toString());
+//		println(inst.toString());
 //    }
 //    catch (err) {
-//    	print(err);
+//    	println(err);
 //    }
 			
 }
 
-print("Total number of global variables: " + varIds.length)
+println("Total number of global variables: " + varIds.length)
 

@@ -11,6 +11,7 @@
 #include <bitop.h>
 #include "basetype.h"
 #include <debug.h>
+#include "colorpalette.h"
 
 /**
  * Generic template class for all numeric types
@@ -83,11 +84,25 @@ protected:
 };
 
 
+class IntegerBitField
+{
+public:
+    quint64 toIntBitField(QIODevice* mem, size_t offset,
+                          const Instance* inst) const;
+
+    quint64 toIntBitField(QIODevice* mem, size_t offset,
+                          const StructuredMember* m) const;
+
+    virtual quint64 toIntBitField(QIODevice* mem, size_t offset,
+                                  qint8 bitSize, qint8 bitOffset) const = 0;
+};
+
+
 /**
  * Generic template class for all integer types
  */
 template<class T, const RealType realType>
-class IntegerBaseType: public NumericBaseType<T, realType>
+class IntegerBaseType: public NumericBaseType<T, realType>, public IntegerBitField
 {
 public:
     /**
@@ -95,7 +110,7 @@ public:
      * @param factory the factory that created this symbol
      */
     IntegerBaseType(SymFactory* factory)
-        : NumericBaseType<T, realType>(factory), _bitSize(-1), _bitOffset(-1)
+        : NumericBaseType<T, realType>(factory)
     {
     }
 
@@ -105,9 +120,7 @@ public:
      * @param info the type information to construct this type from
      */
     IntegerBaseType(SymFactory* factory, const TypeInfo& info)
-        : NumericBaseType<T, realType>(factory, info),
-          _bitSize(info.bitSize()),
-          _bitOffset(info.bitOffset())
+        : NumericBaseType<T, realType>(factory, info)
     {
     }
 
@@ -116,74 +129,14 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset) const
+    virtual QString toString(QIODevice* mem, size_t offset,
+                             const ColorPalette* col = 0) const
     {
         T n = BaseType::value<T>(mem, offset);
-        // Take bit size and bit offset into account
-        if (_bitSize > 0 && _bitOffset >= 0) {
-            // Construct the bit mask
-            T mask = 0;
-            for (int i = 0; i < _bitSize; i++)
-                mask = (mask << 1) | 1;
-            // Extract the bits
-            n = (n >> _bitOffset) & mask;
-        }
-        return QString::number(n);
-    }
-
-    /**
-     * Create a hash of that type based on BaseType::hash(), bitSize() and
-     * bitOffset().
-     * @param isValid indicates if the hash is valid, for example, if all
-     * referencing types could be resolved
-     * @return a hash value of this type
-     */
-    virtual uint hash(bool* isValid = 0) const
-    {
-        if (!NumericBaseType<T, realType>::_hashValid) {
-            BaseType::_hash =
-                    NumericBaseType<T, realType>::hash(0) ^
-                    _bitSize ^
-                    rotl32(_bitOffset, 16);
-            BaseType::_hashValid = true;
-        }
-        if (isValid)
-            *isValid = BaseType::_hashValid;
-        return BaseType::_hash;
-    }
-
-    /**
-     * @return the bit size of this bit-split integer declaration
-     */
-    inline int bitSize() const
-    {
-        return _bitSize;
-    }
-
-    /**
-     * Sets the bit size of this bit-split integer declaration
-     * @param size new bit size of bit-split integer declaration
-     */
-    inline void setBitSize(int size)
-    {
-        _bitSize = size;
-    }
-
-    /**
-     * @return the bit offset of this bit-split integer declaration
-     */
-    inline int bitOffset() const
-    {
-        return _bitOffset;
-    }
-
-    /**
-     * Sets the bit offset of this bit-split integer declaration
-     * @param offset new bit offset of bit-split integer declaration
-     */
-    inline void setBitOffset(int offset)
-    {
-        _bitOffset = offset;
+        QString s = QString::number(n);
+        if (col)
+            s = col->color(ctNumber) + s + col->color(ctReset);
+        return s;
     }
 
     /**
@@ -193,24 +146,36 @@ public:
      */
     virtual void readFrom(KernelSymbolStream& in)
     {
-        BaseType::readFrom(in);
-        in >> _bitSize >> _bitOffset;
+        NumericBaseType<T, realType>::readFrom(in);
+        // Read obsolete values from older versions
+        if (in.kSymVersion() <= kSym::VERSION_15) {
+            qint32 i;
+            in >> i >> i;
+        }
     }
 
-    /**
-     * Writes a serialized version of this object to \a out
-     * \sa readFrom()
-     * @param out the data stream to write the data to, must be ready to write
-     */
-    virtual void writeTo(KernelSymbolStream& out) const
+    virtual quint64 toIntBitField(QIODevice* mem, size_t offset,
+                                  qint8 bitSize, qint8 bitOffset) const
     {
-        BaseType::writeTo(out);
-        out << _bitSize << _bitOffset;
-    }
+        // This won't work on big-endian architectures
+#if defined(Q_BYTE_ORDER) && Q_BYTE_ORDER != Q_LITTLE_ENDIAN
+#   error "This code only works for little endian architectures"
+#endif
 
-protected:
-    int _bitSize;
-    int _bitOffset;
+        T n = BaseType::value<T>(mem, offset);
+        if (bitSize > 0) {
+            // The offset is specified from the most significant bit of the
+            // integer that embeds the bit field. For little-endian systems
+            // such as x86, the offset specifies the bits on the right we need
+            // to discard.
+            // See http://dwarfstd.org/doc/Dwarf3.pdf, p. 75
+            n >>= (sizeof(T) << 3) - bitOffset - bitSize;
+            n &= ~(-1LL << bitSize);
+        }
+        else if (bitSize == 0)
+            return 0;
+        return n;
+    }
 };
 
 
@@ -246,9 +211,13 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset) const
+    virtual QString toString(QIODevice* mem, size_t offset,
+                             const ColorPalette* col = 0) const
     {
-        return QString::number(BaseType::value<T>(mem, offset));
+        QString s = QString::number(BaseType::value<T>(mem, offset));
+        if (col)
+            s = col->color(ctNumber) + s + col->color(ctReset);
+        return s;
     }
 };
 

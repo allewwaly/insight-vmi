@@ -1,0 +1,82 @@
+#!/bin/bash
+
+if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+	cat <<EOF
+This script mounts a raw QEMU disk image on a given mount point.
+Usage: $0 <disk-image> <mount-dir>
+EOF
+	exit 0
+fi
+
+DIR=$(dirname $0)
+IMG="$1"
+MNT="$2"
+
+# Check the parameters
+if ! [ -f "$IMG" ]; then
+	echo "File not found: $IMG" >&2
+	exit 1
+elif ! [ -d "$DIR" ]; then
+	echo "Mount point does not exist: $DIR" >&2
+	exit 2
+fi
+
+# If we have qemu-img available, check the image format
+if [ -x "$(which qemu-img)" ]; then
+	FMT=$(qemu-img info "$IMG" | awk '{ if (/^file format/) {print $3} }')
+	if [ "$FMT" != "raw" ]; then
+		echo -e "Mounting an image directly only works for disk images in raw format, but the given image has a $FMT format. You may try to convert it using the following command:\nqemu-img convert -O raw \"$IMG\" \"$IMG.raw\"" >&2
+		exit 3
+	fi
+fi
+
+# How do we become root?
+if [ $(id -u) == 0 ]; then
+        SUDO=""
+else
+        echo "You might be prompted for your sudo password."
+        SUDO="sudo"
+fi
+
+
+# Is loop device already set up?
+if $SUDO losetup -a | grep -q $IMG; then
+	DEV=$($SUDO losetup -a | grep $IMG | awk -F ':' '{print $1}' | tail -n 1)
+else
+	DEV=$($SUDO losetup --find)
+
+	if ! [ -b "$DEV" ]; then
+		echo -e "No loop device find. Try loading the \"loop\" module:\nmodprobe loop" >&2
+		exit 3
+	fi
+
+	# Find the offset of the first Linux parition
+	OFFSET=$(fdisk -l "$IMG" | sed 's@\*@@' | awk '{ if (!s && /Linux$/) {s=$2} } END { print s; }')
+	if [ -z "$OFFSET" ]; then
+		echo "Could not find offset of first Linux parition in given image." >&2
+		exit 4;
+	fi
+
+	if ! $SUDO losetup -o $(($OFFSET * 512)) $DEV "$IMG"; then
+		ret=$?
+		echo -e "Error invoking the following command:\nlosetup -o $(($OFFSET * 512)) $DEV \"$IMG\"" >&2
+		exit $ret
+	fi
+fi
+
+# Ist das Loop-Device schon gemountet?
+if ! mount | grep -q $DEV; then
+	if ! $SUDO mount -o ro $DEV "$MNT"; then
+		ret=$?
+		echo -e "Error invoking the following command:\n mount $DEV \"$MNT\"" >&2
+		exit $ret
+	else
+		echo "Image sucessfully mounted:"
+	fi
+else
+	echo "Image already mounted:"
+fi
+
+mount | grep $DEV
+
+

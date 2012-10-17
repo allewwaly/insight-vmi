@@ -17,6 +17,7 @@
 #include "varsetter.h"
 #include "memorymapbuilder.h"
 #include <debug.h>
+#include <expressionevalexception.h>
 
 
 // static variable
@@ -34,20 +35,31 @@ const QString& MemoryMap::insertName(const QString& name)
 
 //------------------------------------------------------------------------------
 
-
+#if MEMORY_MAP_VERIFICATION == 1
+MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
+    : _threads(0), _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
+      _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
+      _isBuilding(false), _shared(new BuilderSharedState(factory, vmem)),
+      _verifier(this, "/home/vogls/doc/projects/insight/slub/objects-20121009-181800.log")
+{
+    clear();
+}
+#else
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
       _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
-      _isBuilding(false), _shared(new BuilderSharedState)
+      _isBuilding(false), _shared(new BuilderSharedState(factory, vmem))
 {
 	clear();
 }
-
+#endif
 
 MemoryMap::~MemoryMap()
 {
     clear();
     delete _shared;
+    if (_threads)
+        delete _threads;
 }
 
 
@@ -72,12 +84,12 @@ void MemoryMap::clearRevmap()
     _vmemAddresses.clear();
 
 #ifdef DEBUG
-    degPerGenerationCnt = 0;
-    degForUnalignedAddrCnt = 0;
-    degForUserlandAddrCnt = 0;
-    degForInvalidAddrCnt = 0;
-    degForNonAlignedChildAddrCnt = 0;
-    degForInvalidChildAddrCnt = 0;
+    _shared->degPerGenerationCnt = 0;
+    _shared->degForUnalignedAddrCnt = 0;
+    _shared->degForUserlandAddrCnt = 0;
+    _shared->degForInvalidAddrCnt = 0;
+    _shared->degForNonAlignedChildAddrCnt = 0;
+    _shared->degForInvalidChildAddrCnt = 0;
 #endif
 }
 
@@ -93,11 +105,23 @@ bool MemoryMap::fitsInVmem(quint64 addr, quint64 size) const
     if (_vmem->memSpecs().arch == MemSpecs::ar_x86_64)
         return addr + size > addr;
     else
-        return addr + size <= (1UL << 32);
+        return addr + size <= (1ULL << 32);
 }
 
 
-void MemoryMap::build(float minProbability)
+bool MemoryMap::builderRunning() const
+{
+    for (int i = 0; i < _shared->threadCount; ++i) {
+        if (_threads && _threads[i]->isRunning())
+            return true;
+    }
+
+    return false;
+}
+
+
+void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
+                      const QString& slubObjFile)
 {
     // Set _isBuilding to true now and to false later
     VarSetter<bool> building(&_isBuilding, true, false);
@@ -107,58 +131,200 @@ void MemoryMap::build(float minProbability)
     _shared->reset();
     _shared->minProbability = minProbability;
 
+    if(type == btSibi)
+        _verifier.resetWatchNodes();
+
     QTime timer, totalTimer;
     timer.start();
     totalTimer.start();
     qint64 prev_queue_size = 0;
 
+    // Variable that temporarily stores the value of each insight variable
+    quint64 var_value = 0;
+
+    // Get all the data that we need to handle per_cpu variables.
+    quint32 nr_cpus = 1;
+
+    if (!_factory || !_vmem) {
+        debugerr("Factory or VirtualMemory is NULL! Aborting!");
+        return;
+    }
+
+    // Get the number of cpus from the dump if possible
+    Variable *nr_cpu_tmp = _factory->findVarByName("nr_cpu_ids");
+    if (nr_cpu_tmp != 0)
+                nr_cpus = nr_cpu_tmp->value<quint32>(_vmem);
+
+    // Get the per_cpu offsets
+    quint64 *per_cpu_offset = (quint64 *)malloc(sizeof(quint64) * nr_cpus);
+
+    if (!per_cpu_offset) {
+        debugerr("Could not reserve memory for the per_cpu_offset array!");
+        return;
+    }
+
+    // Get the variable
+    nr_cpu_tmp = _factory->findVarByName("__per_cpu_offset");
+    Instance per_cpu_offset_inst = nr_cpu_tmp ?
+                                   nr_cpu_tmp->toInstance(_vmem, BaseType::trLexical) :
+                                   Instance();
+    // Fill the array
+    for (quint32 i = 0; i < nr_cpus; ++i) {
+        if (!per_cpu_offset_inst.isNull()) {
+            per_cpu_offset[i] = (_vmem->memSpecs().arch & MemSpecs::ar_i386) ?
+                                 per_cpu_offset_inst.toUInt32() :
+                                 per_cpu_offset_inst.toUInt64();
+
+            // Update address
+            (_vmem->memSpecs().arch & MemSpecs::ar_i386) ?
+             per_cpu_offset_inst.addToAddress(4) :
+             per_cpu_offset_inst.addToAddress(8);
+        }
+        else
+            per_cpu_offset[i] = -1ULL;
+    }
+
     // NON-PARALLEL PART OF BUILDING PROCESS
 
+    // Read slubs object file, if given
+    if (!slubObjFile.isEmpty()) {
+        _shared->slubs.parsePreproc(slubObjFile);
+
+    }
+
     // How many threads to create?
-    _shared->threadCount =
-            qMin(qMax(QThread::idealThreadCount(), 1), MAX_BUILDER_THREADS);
-//    _shared->threadCount = 1;
+//    _shared->threadCount =
+//            qMin(qMax(QThread::idealThreadCount(), 1), MAX_BUILDER_THREADS);
+    _shared->threadCount = 1;
 
 //    debugmsg("Building reverse map with " << _shared->threadCount << " threads.");
+
+    // Create the builder threads
+    _threads = new MemoryMapBuilder*[_shared->threadCount];
+    for (int i = 0; i < _shared->threadCount; ++i) {
+        switch (type) {
+        case btSibi:
+            _threads[i] = new MemoryMapBuilderSV(this, i);
+            break;
+        case btChrschn:
+            _threads[i] = new MemoryMapBuilderCS(this, i);
+            break;
+        }
+    }
+
+    // Enable thread safety for VirtualMemory object
+    bool wasThreadSafe = _vmem->setThreadSafety(_shared->threadCount > 1);
 
     // Go through the global vars and add their instances to the queue
     for (VariableList::const_iterator it = _factory->vars().constBegin();
             it != _factory->vars().constEnd(); ++it)
     {
-        /// @todo consider alternative types for variables
-//        const Variable* v = *it;
+        const Variable* v = *it;
+        // For testing now only start with this one variable
+//         if (v->name() != "init_task")
+//            continue;
+
+//       if (v->name() != "init_ipc_ns")
+//            continue;
+
+        // For now ignore all symbols that have been defined in modules
+        if (v->symbolSource() == ssModule)
+            continue;
+
 //        if (v->hasAltRefTypes())
 //            debugmsg(QString("Variable \"%1\" (0x%2) has %3 candidate types.")
 //                     .arg(v->name())
 //                     .arg(v->id(), 0, 16)
 //                     .arg(v->altRefTypeCount()));
+
+        // Filter variables that are NULL or cannot be dereferenced
         try {
-            Instance inst = (*it)->toInstance(_vmem, BaseType::trLexical);
-            if (!inst.isNull() && fitsInVmem(inst.address(), inst.size())) {
-                MemoryMapNode* node = new MemoryMapNode(this, inst);
-                _roots.append(node);
-                _vmemMap.insert(node);
-                _vmemAddresses.insert(node->address());
-                _shared->queue.insert(node->probability(), node);
+            if ((_vmem->memSpecs().arch & MemSpecs::ar_i386)) {
+                if ((var_value = v->value<quint32>(_vmem)) == 0 ||
+                        !_vmem->safeSeek(var_value))
+                    continue;
+            }
+            else {
+                if ((var_value = v->value<quint64>(_vmem)) == 0 ||
+                        !_vmem->safeSeek(var_value))
+                    continue;
             }
         }
+        catch(VirtualMemoryException &e) {
+            // Variable cannot be dereferenced thus continue
+            continue;
+        }
+
+        // Process Variable
+        try {
+            // Is this a per_cpu variable
+            if (v->name().startsWith("per_cpu__")) {
+                // Dereference the variable for each cpu
+                for (quint32 i = 0; i < nr_cpus; i++) {
+                    Instance inst = (v->altRefTypeCount() == 1) ?
+                                v->altRefTypeInstance(_vmem, 0) :
+                                v->toInstance(_vmem, BaseType::trLexical);
+
+                    // Add offset
+                    if (!inst.isNull() && per_cpu_offset[i] != -1ULL) {
+                        inst.addToAddress(per_cpu_offset[i]);
+                    }
+
+                    if (!inst.isNull() && fitsInVmem(inst.address(), inst.size())) {
+                        MemoryMapNode* node = 0;
+                        switch(type) {
+                        case btChrschn:
+                            node = new MemoryMapNode(this, inst);
+                            break;
+                        case btSibi:
+                            node = new MemoryMapNodeSV(this, inst, 0, 0, false);
+                            break;
+                        }
+
+                        _roots.append(node);
+                        _vmemMap.insert(node);
+                        _vmemAddresses.insert(node->address());
+                        _shared->queue.insert(node->probability(), node);
+                    }
+                }
+            }
+            else {
+                // Use a variable's alternative type if it has exactly one
+                Instance inst = (v->altRefTypeCount() == 1) ?
+                            v->altRefTypeInstance(_vmem, 0) :
+                            v->toInstance(_vmem, BaseType::trLexical);
+
+                if (!inst.isNull() && fitsInVmem(inst.address(), inst.size())) {
+                    MemoryMapNode* node = 0;
+                    switch(type) {
+                    case btChrschn:
+                        node = new MemoryMapNode(this, inst);
+                        break;
+                    case btSibi:
+                        node = new MemoryMapNodeSV(this, inst, 0, 0, false);
+                        break;
+                    }
+
+                    _roots.append(node);
+                    _vmemMap.insert(node);
+                    _vmemAddresses.insert(node->address());
+                    _shared->queue.insert(node->probability(), node);
+                }
+            }
+        }
+        catch (ExpressionEvalException& e) {
+            // Do nothing
+        }
         catch (GenericException& e) {
-            debugerr("Caught exception for variable " << (*it)->name()
-                    << " at " << e.file << ":" << e.line << ":" << e.message);
+            debugerr("Caught exception for variable " << v->name()
+                    << " at " << e.file << ":" << e.line << ": " << e.message);
         }
     }
 
     // PARALLEL PART OF BUILDING PROCESS
 
-    // Enable thread safety for VirtualMemory object
-    bool wasThreadSafe = _vmem->setThreadSafety(_shared->threadCount > 1);
-
-    // Create the builder threads
-    MemoryMapBuilder* threads[_shared->threadCount];
-    for (int i = 0; i < _shared->threadCount; ++i) {
-        threads[i] = new MemoryMapBuilder(this, i);
-        threads[i]->start();
-    }
+    for (int i = 0; i < _shared->threadCount; ++i)
+        _threads[i]->start();
 
     bool firstLoop = true;
 
@@ -166,7 +332,8 @@ void MemoryMap::build(float minProbability)
     while (!shell->interrupted() &&
            !_shared->queue.isEmpty() &&
            (!_shared->lastNode ||
-            _shared->lastNode->probability() >= _shared->minProbability) )
+            _shared->lastNode->probability() >= _shared->minProbability) &&
+           builderRunning())
     {
 
         if (firstLoop || timer.elapsed() > 1000) {
@@ -186,14 +353,16 @@ void MemoryMap::build(float minProbability)
 //                    << ", pmemMap = " << _pmemMap.size()
 //                    << ", queue = " << queue_size << " " << indicator
 //                    << ", probability = " << (node ? node->probability() : 1.0));
-
             shell->out()
                     << "\rProcessed " << _shared->processed << " instances"
                     << ", vmemAddr = " << _vmemAddresses.size()
-                    << ", vmemMap = " << _vmemMap.objectCount()
-                    << ", pmemMap = " << _pmemMap.size()
+                    << ", objects = " << _vmemMap.size()
+                    << ", vmemMap nodes = " << _vmemMap.nodeCount()
+                    << ", pmemMap nodes = " << _pmemMap.nodeCount()
                     << ", queue = " << queue_size << " " << indicator
                     << ", probability = " << (node ? node->probability() : 1.0)
+                    << ", max_prob " << _shared->queue.largest()->probability()
+                    << ", min_prob " << _shared->queue.smallest()->probability()
                     << endl;
             prev_queue_size = queue_size;
         }
@@ -214,16 +383,24 @@ void MemoryMap::build(float minProbability)
 
     // Interrupt all threads, doesn't harm if they are not running anymore
     for (int i = 0; i < _shared->threadCount; ++i)
-        threads[i]->interrupt();
+        _threads[i]->interrupt();
     // Now wait for all threads and free them again
-    for (int i = 0; i < _shared->threadCount; ++i) {
-        if (threads[i]->isRunning())
-            threads[i]->wait();
-        delete threads[i];
+    // Threads need calculateNodeProbability of thread[0] so delete that at last
+    for (int i = _shared->threadCount - 1; i >= 0; i--) {
+        if (_threads[i]->isRunning())
+        {
+            _threads[i]->wait();
+        }
+        delete _threads[i];
     }
+    delete _threads;
+    _threads = 0;
 
     // Restore previous value
     _vmem->setThreadSafety(wasThreadSafe);
+
+    // Delete per_cpu_offsets
+    delete per_cpu_offset;
 
 //#define SHOW_STATISTICS 1
 
@@ -438,6 +615,159 @@ void MemoryMap::build(float minProbability)
 #endif
 
 #endif // SHOW_STATISTICS
+    debugmsg("Processed " << std::dec << _shared->processed << " instances");
+}
+
+
+bool MemoryMap::dump(const QString &fileName) const
+{
+    QFile fout(fileName);
+
+    if (!fout.open(QFile::WriteOnly|QFile::Truncate))
+        return false;
+
+    QTextStream out(&fout);
+
+    QTime time;
+    time.start();
+
+    int count = 0, totalCount = 0;
+    for (IntNodeHash::const_iterator it = _typeInstances.begin(),
+         e = _typeInstances.end(); it != e; ++it)
+    {   
+        ++totalCount;
+        const MemoryMapNode* node = *it;
+        // Are there overlapping objects?
+        MemoryMapRangeTree::ItemSet items = _vmemMap.objectsInRange(
+                    node->address(), node->endAddress());
+        assert(items.isEmpty() == false);
+        // In case we find more than one node, we have to choose the one with
+        // the highest probability
+        if (items.size() > 1) {
+            debugmsg(QString("%1 overlapping objects @ 0x%2 - 0x%3 (%4 bytes), node 0x%5")
+                     .arg(items.size())
+                     .arg(node->address(), 0, 16)
+                     .arg(node->endAddress(), 0, 16)
+                     .arg(node->type()->size())
+                     .arg((quint64)node, 0, 16));
+//            int cnt = 0;
+            const MemoryMapNode* maxProbNode = node;
+            for (MemoryMapRangeTree::ItemSet::const_iterator iit = items.begin();
+                 iit != items.end(); ++iit)
+            {
+                const MemoryMapNode* n = *iit;
+                if (n->probability() > maxProbNode->probability())
+                    maxProbNode = n;
+//                debugmsg(QString("    %0. 0x%1 - 0x%2, 0x%3 %4 (%5 bytes): %6")
+//                         .arg(++cnt)
+//                         .arg(n->address(), 0, 16)
+//                         .arg(n->endAddress(), 0, 16)
+//                         .arg((uint)n->type()->id(), 0, 16)
+//                         .arg(n->type()->prettyName())
+//                         .arg(n->type()->size())
+//                         .arg(n->fullName()));
+            }
+            // If current node does not have highest prob, we skip it
+            if (maxProbNode != node)
+                continue;
+        }
+
+        // Dump the node
+        out << left << qSetFieldWidth(0) << "0x" << hex << qSetFieldWidth(16) << node->address()
+            << qSetFieldWidth(0) << " "
+            << right << dec << qSetFieldWidth(6) << node->type()->size()
+            << qSetFieldWidth(0) << " "
+            << left << qSetFieldWidth(6) << QString::number(node->probability(), 'f', 4)
+            << qSetFieldWidth(0) << " 0x" << hex << qSetFieldWidth(8) << (uint) node->type()->id()
+            << qSetFieldWidth(0)
+            << " \"" << node->type()->prettyName() << "\""
+            << endl;
+
+        ++count;
+
+        if (time.elapsed() >= 1000) {
+            time.restart();
+            debugmsg("Wrote " << count << " of " << _vmemMap.size() << " nodes");
+        }
+    }
+
+    fout.close();
+
+    debugmsg("Wrote " << count << " of " << _vmemMap.size()
+             << " nodes to file \"" << fileName << "\", totalCount = "
+             << totalCount);
+
+    return true;
+}
+
+void MemoryMap::dumpInitHelper(QTextStream &out, MemoryMapNode *node, quint32 curLvl, const quint32 level) const
+{
+    MemoryMapNode *tmp = node;
+    MemoryMapNodeSV *tmp_sv = 0;
+    quint32 tmpLvl = curLvl;
+
+    for(int i = 0; i < node->children().size(); ++i) {
+        tmp = node->children().at(i);
+        tmp_sv = dynamic_cast<MemoryMapNodeSV*>(tmp);
+
+
+        out << left;
+
+        for(tmpLvl = curLvl; tmpLvl > 0; --tmpLvl) {
+            out << "\t";
+        }
+
+        out << " |-" << qSetFieldWidth(0) << "0x" << hex << qSetFieldWidth(16) << tmp->address()
+            << qSetFieldWidth(0) << " "
+            << left << qSetFieldWidth(6) << QString::number(tmp->probability(), 'f', 4)
+            << qSetFieldWidth(0)
+            << " \"" << tmp->fullName() << "\""
+            << qSetFieldWidth(0)
+            << " (" << tmp->type()->prettyName() << ")";
+
+        if (tmp_sv && tmp_sv->hasCandidates() && !tmp_sv->candidatesComplete()) {
+            out << qSetFieldWidth(0)
+                << " [!]";
+        }
+
+        out << endl;
+
+
+        if(tmp->children().size() > 0 && curLvl < level)
+            dumpInitHelper(out, tmp, curLvl + 1, level);
+
+    }
+}
+
+bool MemoryMap::dumpInit(const QString &fileName, const quint32 level) const
+{
+    MemoryMapNode *init_task = _roots.at(0);
+
+    if(!init_task)
+        return false;
+
+    QFile fout(fileName);
+
+    if (!fout.open(QFile::WriteOnly|QFile::Truncate))
+        return false;
+
+    QTextStream out(&fout);
+
+
+    out << left << qSetFieldWidth(0) << "0x" << hex << qSetFieldWidth(16) << init_task->address()
+        << qSetFieldWidth(0) << " "
+        << left << qSetFieldWidth(6) << QString::number(init_task->probability(), 'f', 4)
+        << qSetFieldWidth(0)
+        << " \"" << init_task->fullName() << "\""
+        << qSetFieldWidth(0)
+        << " (" << init_task->type()->prettyName() << ")"
+        << endl;
+
+    dumpInitHelper(out, init_task, 0, level);
+
+    fout.close();
+
+    return true;
 }
 
 
@@ -454,11 +784,18 @@ bool MemoryMap::addressIsWellFormed(quint64 address) const
         	return false;
     }
 
-//    // Throw out user-land addresses
-//    if (address < _vmem->memSpecs().pageOffset)
-//        return false;
+   // Throw out user-land addresses
+   if (address < _vmem->memSpecs().pageOffset)
+       return false;
 
-    return address > 0;
+   // Check for invalid addresses
+   if(address == 0 ||
+      address == 0xffffffffULL ||
+        address == 0xffffffffffffffffULL ||
+        (address & 0x3) != 0)
+       return false;
+
+    return true;
 }
 
 
@@ -469,64 +806,92 @@ bool MemoryMap::addressIsWellFormed(const Instance& inst) const
 }
 
 
+MemoryMapNode* MemoryMap::existsNode(const Instance& inst)
+{
+  // Increase the reading counter
+  _shared->vmemReadingLock.lock();
+  _shared->vmemReading++;
+  _shared->vmemReadingLock.unlock();
+
+  MemMapSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
+
+  for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
+      const MemoryMapNode* otherNode = *it;
+      // Is the the same object already contained?
+      bool ok1 = false, ok2 = false;
+      if (otherNode && otherNode->address() == inst.address() &&
+         otherNode->type() && inst.type() &&
+          otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
+          ok1 && ok2)
+        {
+          // Decrease the reading counter again
+          _shared->vmemReadingLock.lock();
+          _shared->vmemReading--;
+          _shared->vmemReadingLock.unlock();
+          // Wake up any sleeping thread
+          _shared->vmemReadingDone.wakeAll();
+          
+          return const_cast<MemoryMapNode*>(otherNode);
+        }
+  }
+
+  // Decrease the reading counter again
+  _shared->vmemReadingLock.lock();
+  _shared->vmemReading--;
+  _shared->vmemReadingLock.unlock();
+  // Wake up any sleeping thread
+  _shared->vmemReadingDone.wakeAll();
+
+  return NULL;
+}
+
+
 bool MemoryMap::objectIsSane(const Instance& inst,
         const MemoryMapNode* parent)
 {
     // We consider a difference in probability of 10% or more to be significant
-    static const float prob_significance_delta = 0.1;
+    //    static const float prob_significance_delta = 0.1;
 
     // Don't add null pointers
-    if (inst.isNull())
+    if (inst.isNull() || !parent)
         return false;
 
     if (_vmemMap.isEmpty())
         return true;
 
-    // Increase the reading counter
-    _shared->vmemReadingLock.lock();
-    _shared->vmemReading++;
-    _shared->vmemReadingLock.unlock();
+    //do not analyze trFuncPointers
+    //TODO how to cope with trFuncPointer types?
+    if(inst.type()->type() & rtFuncPointer)
+        return false;
+   
+    //do not analyze instances with no size
+    //TODO how to cope with those? eg: struct lock_class_key
+    if(!inst.size())
+        return false;
+
+    if(!inst.isValidConcerningMagicNumbers())
+        return false;
 
     bool isSane = true;
 
+#if MEMORY_MAP_PROCESS_NODES_WITH_ALT == 0
     // Check if the list contains an object within the same memory region with a
     // significantly higher probability
-    MemMapSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
+    isSane = ! existsNode(inst);
 
-    for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
-        const MemoryMapNode* otherNode = *it;
-
-        // Is the the same object already contained?
-        bool ok1 = false, ok2 = false;
-        if (otherNode->address() == inst.address() &&
-                otherNode->type() && inst.type() &&
-                otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
-                ok1 && ok2)
-            isSane = false;
-        // Is this an overlapping object with a significantly higher
-        // probability?
-        else {
-            float instProb =
-                    calculateNodeProbability(&inst, parent->probability());
-            if (instProb + prob_significance_delta <= otherNode->probability())
-                isSane = false;
-        }
-    }
-
-    // Decrease the reading counter again
-    _shared->vmemReadingLock.lock();
-    _shared->vmemReading--;
-    _shared->vmemReadingLock.unlock();
-    // Wake up any sleeping thread
-    _shared->vmemReadingDone.wakeAll();
-
+#endif
     return isSane;
 }
 
 
-bool MemoryMap::addChildIfNotExistend(const Instance& inst,
-        MemoryMapNode* parent, int threadIndex)
+MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
+        MemoryMapNode* parent, int threadIndex, quint64 addrInParent,
+        bool addToQueue, bool hasCandidates)
 {
+    MemoryMapNode *child = existsNode(inst);
+    // Return child if it already exists in virtual memory.
+    if(child) return child;
+
     static const int interestingTypes =
             BaseType::trLexical |
             rtArray |
@@ -539,12 +904,11 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
     const Instance i = (inst.type()->type() & BaseType::trLexical) ?
             inst.dereference(BaseType::trLexical) : inst;
 
-    bool result = false;
-
     if (!i.isNull() && i.type() && (i.type()->type() & interestingTypes))
     {
         // Is any other thread currently searching for the same address?
         _shared->currAddressesLock.lock();
+        _shared->currAddresses[threadIndex] = 0;
         int idx = 0;
         while (idx < _shared->threadCount) {
             if (_shared->currAddresses[idx] == i.address()) {
@@ -560,15 +924,34 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
             else
                 ++idx;
         }
+
         // No conflicts anymore, so we lock our current address
         _shared->currAddresses[threadIndex] = i.address();
-        _shared->perThreadLock[threadIndex].lock();
+        QMutexLocker threadLock(&_shared->perThreadLock[threadIndex]);
 
         _shared->currAddressesLock.unlock();
 
+        // Check if object conflicts previously given objects
         if (objectIsSane(i, parent)) {
+
             _shared->mapNodeLock.lock();
-            MemoryMapNode* child = parent->addChild(i);
+            try {
+                MemoryMapNodeSV* parent_sv = dynamic_cast<MemoryMapNodeSV*>(parent);
+                if (parent_sv)
+                    child = parent_sv->addChild(i, addrInParent, hasCandidates);
+                else
+                    child = parent->addChild(i);
+            }
+            catch(GenericException& ge) {
+                // The address of the instance is invalid
+
+                // Release locks and return
+                _shared->currAddresses[threadIndex] = 0;
+                _shared->mapNodeLock.unlock();
+
+                return child;
+            }
+
             _shared->mapNodeLock.unlock();
 
             // Acquire the writing lock
@@ -576,6 +959,7 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
 
             // Wait until there is no more reader and we hold the read lock
             _shared->vmemReadingLock.lock();
+
             while (_shared->vmemReading > 0) {
                 _shared->vmemReadingDone.wait(&_shared->vmemReadingLock);
                 // Keep the reading lock until we have finished writing
@@ -589,136 +973,26 @@ bool MemoryMap::addChildIfNotExistend(const Instance& inst,
             _shared->vmemWritingLock.unlock();
 
             // Insert the new node into the queue
-            _shared->queueLock.lock();
-            _shared->queue.insert(child->probability(), child);
-            _shared->queueLock.unlock();
+            if(addToQueue) {
+                _shared->queueLock.lock();
+                _shared->queue.insert(child->probability(), child);
+                _shared->queueLock.unlock();
+            }
 
-            result = true;
+//            // Sanity check
+//            if ((parent->type()->dereferencedType(BaseType::trLexical) & StructOrUnion) &&
+//                child->type()->dereferencedType(BaseType::trLexical) & StructOrUnion)
+//                debugerr("This should not happen! " << child->fullName());
         }
 
         // Done, release our current address (no need to hold currAddressesLock)
         _shared->currAddresses[threadIndex] = 0;
-        _shared->perThreadLock[threadIndex].unlock();
 //        // Wake up a waiting thread (if it exists)
 //        _shared->threadDone[threadIndex].wakeOne();
 
     }
 
-    return result;
-}
-
-
-float MemoryMap::calculateNodeProbability(const Instance* inst,
-        float parentProbability) const
-{
-    // Degradation of 1% per parent-child relation.
-    // Starting from 1.0, this means that the 69th generation will have a
-    // probability < 0.5, the 230th generation will be < 0.1.
-    const float degPerGeneration = 0.99;
-
-    // Degradation of 20% for address of this node not being aligned at 4 byte
-    // boundary
-    const float degForUnalignedAddr = 0.8;
-
-    // Degradation of 5% for address begin in userland
-    const float degForUserlandAddr = 0.95;
-
-    // Degradation of 90% for an invalid address of this node
-    const float degForInvalidAddr = 0.1;
-
-    // Max. degradation of 30% for non-aligned pointer childen the type of this
-    // node has
-    const float degForNonAlignedChildAddr = 0.7;
-
-    // Max. degradation of 50% for invalid pointer childen the type of this node
-    // has
-    const float degForInvalidChildAddr = 0.5;
-
-    float prob = parentProbability < 0 ?
-                 1.0 :
-                 parentProbability * degPerGeneration;
-
-    if (parentProbability >= 0)
-        degPerGenerationCnt++;
-
-    // Check userland address
-    if (inst->address() < _vmem->memSpecs().pageOffset) {
-        prob *= degForUserlandAddr;
-        degForUserlandAddrCnt++;
-    }
-    // Check validity
-    if (! _vmem->safeSeek((qint64) inst->address()) ) {
-        prob *= degForInvalidAddr;
-        degForInvalidAddrCnt++;
-    }
-    // Check alignment
-    else if (inst->address() & 0x3UL) {
-        prob *= degForUnalignedAddr;
-        degForUnalignedAddrCnt++;
-    }
-
-    // Find the BaseType of this instance, dereference any lexical type(s)
-    const BaseType* instType = inst->type() ?
-            inst->type()->dereferencedBaseType(BaseType::trLexical) : 0;
-
-    // If this a union or struct, we have to consider the pointer members
-    if ( instType &&
-         (instType->type() & StructOrUnion) )
-    {
-        const Structured* structured =
-                dynamic_cast<const Structured*>(instType);
-        quint32 nonAlignedChildAddrCnt = 0, invalidChildAddrCnt = 0;
-        // Check address of all descendant pointers
-        for (MemberList::const_iterator it = structured->members().begin(),
-             e = structured->members().end(); it != e; ++it)
-        {
-            const StructuredMember* m = *it;
-            const BaseType* m_type = m->refTypeDeep(BaseType::trLexical);
-
-            if (m_type && (m_type->type() & rtPointer)) {
-                try {
-                    quint64 m_addr = inst->address() + m->offset();
-                    // Try a safeSeek first to avoid costly throws of exceptions
-                    if (_vmem->safeSeek(m_addr)) {
-                        m_addr = (quint64)m_type->toPointer(_vmem, m_addr);
-                        // Check validity
-                        if (! _vmem->safeSeek((qint64) m_addr) ) {
-                            invalidChildAddrCnt++;
-                        }
-                        // Check alignment
-                        else if (m_addr & 0x3UL) {
-                            nonAlignedChildAddrCnt++;
-                        }
-                    }
-                    else {
-                        // Address was invalid
-                        invalidChildAddrCnt++;
-                    }
-                }
-                catch (MemAccessException&) {
-                    // Address was invalid
-                    invalidChildAddrCnt++;
-                }
-                catch (VirtualMemoryException&) {
-                    // Address was invalid
-                    invalidChildAddrCnt++;
-                }
-            }
-        }
-
-        // Penalize probabilities, weighted by total no. of children
-        if (nonAlignedChildAddrCnt) {
-            float invPart = nonAlignedChildAddrCnt / (float) structured->members().size();
-            prob *= invPart * degForNonAlignedChildAddr + (1.0 - invPart);
-            degForNonAlignedChildAddrCnt++;
-        }
-        if (invalidChildAddrCnt) {
-            float invPart = invalidChildAddrCnt / (float) structured->members().size();
-            prob *= invPart * degForInvalidChildAddr + (1.0 - invPart);
-            degForInvalidChildAddrCnt++;
-        }
-    }
-    return prob;
+    return child;
 }
 
 
@@ -781,9 +1055,7 @@ void MemoryMap::diffWith(MemoryMap* other)
                 if (equal) {
                     // Add difference to tree
                     if (!wasEqual)
-                        _pmemDiff.insert(Difference(startAddr, length),
-                                         startAddr,
-                                         startAddr + length - 1);
+                        _pmemDiff.insert(Difference(startAddr, length));
                 }
                 // Memory differs
                 else {
@@ -812,9 +1084,7 @@ void MemoryMap::diffWith(MemoryMap* other)
 
     // Add last difference, if any
     if (!wasEqual)
-        _pmemDiff.insert(Difference(startAddr, length),
-                         startAddr,
-                         startAddr + length - 1);
+        _pmemDiff.insert(Difference(startAddr, length));
 
     shell->out() << "\rComparing memory dumps finished." << endl;
 

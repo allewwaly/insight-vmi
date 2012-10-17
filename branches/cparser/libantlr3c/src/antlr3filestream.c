@@ -99,6 +99,7 @@ antlr3readAscii(pANTLR3_INPUT_STREAM    input, pANTLR3_UINT8 fileName)
 
     if	(input->data == NULL)
     {
+    ANTLR3_FREE(input);
 	return	(ANTLR3_UINT64)ANTLR3_ERR_NOMEM;
     }
     

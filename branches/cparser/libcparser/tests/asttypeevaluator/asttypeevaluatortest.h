@@ -11,6 +11,7 @@
 #include <C.h>
 #include <QObject>
 #include <QByteArray>
+#include <QTextStream>
 
 class AbstractSyntaxTree;
 class ASTBuilder;
@@ -125,6 +126,8 @@ private:
 	ASTBuilder* _builder;
 	ASTTypeEvaluatorTester* _tester;
 	QByteArray _ascii;
+	QString _err_str;
+	QTextStream _err;
 };
 
 #endif /* ASTTYPEEVALUATORTEST_H_ */

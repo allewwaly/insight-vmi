@@ -10,7 +10,13 @@
 
 #include <genericexception.h>
 
-#define parserError(x) do { throw ParserException((x), __FILE__, __LINE__); } while (0)
+#define parserError(x) do { \
+    throw ParserException(QString("At %1:%2:\n%3") \
+                            .arg(_parser->_fileNames[_curFileIndex]) \
+                            .arg(_line)\
+                            .arg(x), \
+                        __FILE__, __LINE__); \
+    } while (0)
 
 /**
  * Exception class for parser-related errors
@@ -33,6 +39,11 @@ public:
 
     virtual ~ParserException() throw()
     {
+    }
+
+    virtual const char* className() const
+    {
+        return "ParserException";
     }
 };
 

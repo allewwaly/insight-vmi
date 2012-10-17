@@ -38,7 +38,7 @@ QString VolatileType::prettyName() const
 }
 
 
-//QString VolatileType::toString(QIODevice* mem, size_t offset) const
+//QString VolatileType::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
 //{
 //	assert(_refType != 0);
 //	return _refType->toString(offset);

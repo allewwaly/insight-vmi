@@ -200,8 +200,7 @@ void KernelSymbolWriter::write()
 
         // Write list of missing types by ID
         const int ids_to_write =
-                _factory->typesById().size() - _factory->types().size() -
-                _factory->artificialTypes().size();
+                _factory->typesById().size() - _factory->types().size();
         out << (qint32)ids_to_write;
 #ifdef WRITE_ASCII_FILE
         dout << endl << "# Further type relations" << endl
@@ -329,6 +328,10 @@ void KernelSymbolWriter::write()
 #endif
             checkOperationProgress();
         }
+
+        // Since version 17: Write file names containing the orig. symbols
+        if (out.kSymVersion() >= kSym::VERSION_17)
+            out <<_factory->origSymFiles();
     }
     catch (...) {
         // Exceptional cleanup
@@ -338,22 +341,21 @@ void KernelSymbolWriter::write()
     }
 
     operationStopped();
-    shell->out() << "\rWriting symbols finished";
+
+    QString s("\rReading symbols finished");
     if (!_to->isSequential())
-        shell->out() << " ("
-        << _to->pos() << " bytes written)";
-    shell->out() << "." << endl;
+        s += QString(" (%1 read)").arg(bytesToString(_to->pos()));
+    s += ".";
+    shellOut(s, true);
 }
 
 
 // Show some progress information
 void KernelSymbolWriter::operationProgress()
 {
-    shell->out() << "\rWriting symbols";
-
-    qint64 pos = _to->pos();
-    if (!_to->isSequential() && pos > 0)
-        shell->out()
-            << " (" << pos << " bytes)";
-    shell->out() << ", " << elapsedTime() << " elapsed" << flush;
+    QString s("\rWriting symbols");
+    if (!_to->isSequential())
+        s += QString(" (%1 written)").arg(bytesToString(_to->pos()));
+    s += ", " + elapsedTime() + " elapsed";
+    shellOut(s, false);
 }

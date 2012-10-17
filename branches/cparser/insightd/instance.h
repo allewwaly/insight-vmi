@@ -11,6 +11,7 @@
 #include "instancedata.h"
 #include "basetype.h"
 #include "virtualmemory.h"
+#include "virtualmemoryexception.h"
 #include "instance_def.h"
 
 inline int Instance::id() const
@@ -40,14 +41,42 @@ inline quint64 Instance::endAddress() const
 inline void Instance::setAddress(quint64 addr)
 {
     _d.address = addr;
-    _d.isNull = !_d.address || !_d.isValid;
+    if (_d.vmem && (_d.vmem->memSpecs().arch & MemSpecs::ar_i386))
+        _d.address &= 0xFFFFFFFFUL;
+    _d.isNull = !_d.address;
 }
 
 
 inline void Instance::addToAddress(quint64 offset)
 {
     _d.address += offset;
-    _d.isNull = !_d.address || !_d.isValid;
+    if (_d.vmem && (_d.vmem->memSpecs().arch & MemSpecs::ar_i386))
+        _d.address &= 0xFFFFFFFFUL;
+    _d.isNull = !_d.address;
+}
+
+
+inline int Instance::bitSize() const
+{
+    return _d.bitSize;
+}
+
+
+inline void Instance::setBitSize(qint8 size)
+{
+    _d.bitSize = size;
+}
+
+
+inline int Instance::bitOffset() const
+{
+    return _d.bitOffset;
+}
+
+
+inline void Instance::setBitOffset(qint8 offset)
+{
+    _d.bitOffset = offset;
 }
 
 
@@ -81,6 +110,12 @@ inline QString Instance::typeName() const
 }
 
 
+inline uint Instance::typeHash() const
+{
+    return _d.type ? _d.type->hash() : 0;
+}
+
+
 inline quint32 Instance::size() const
 {
     return _d.type ? _d.type->size() : 0;
@@ -105,15 +140,15 @@ inline bool Instance::isAccessible() const
 }
 
 
-inline QString Instance::toString() const
+inline int Instance::sizeofPointer() const
 {
-    return _d.isNull ? QString("NULL") : _d.type->toString(_d.vmem, _d.address);
+    return _d.vmem ? _d.vmem->memSpecs().sizeofPointer : sizeof(void*);
 }
 
 
-inline int Instance::pointerSize() const
+inline int Instance::sizeofLong() const
 {
-    return _d.vmem ? _d.vmem->memSpecs().sizeofUnsignedLong : 8;
+    return _d.vmem ? _d.vmem->memSpecs().sizeofLong : sizeof(long);
 }
 
 
@@ -165,6 +200,26 @@ inline quint64 Instance::toUInt64() const
 }
 
 
+inline qint64 Instance::toLong() const
+{
+    if (_d.isNull)
+        return 0;
+    return sizeofLong() == 4 ?
+                (qint64) _d.type->toInt32(_d.vmem, _d.address) :
+                (qint64) _d.type->toInt64(_d.vmem, _d.address);
+}
+
+
+inline quint64 Instance::toULong() const
+{
+    if (_d.isNull)
+        return 0;
+    return sizeofLong() == 4 ?
+                (qint64) _d.type->toUInt32(_d.vmem, _d.address) :
+                (qint64) _d.type->toUInt64(_d.vmem, _d.address);
+}
+
+
 inline float Instance::toFloat() const
 {
     return _d.isNull ? 0 : _d.type->toFloat(_d.vmem, _d.address);
@@ -188,24 +243,31 @@ inline QString Instance::derefUserLand(const QString &pgd) const
 	//TODO
 	//diekmann
 	QString ret;
-    if(_d.isNull){
+	if (_d.isNull) {
     	ret = "NULL";
-    }else{
+    }
+    else {
     	bool ok;
 
     	qint64 pgd_d = pgd.toULongLong(&ok, 16);
-    	if(!ok) throw GenericException("(PDG invalid)");
+        if (!ok)
+            virtualMemoryError("(PDG invalid)");
 
     	_d.vmem->setUserLand(pgd_d);
-    	try{
+        try {
     		ret = _d.type->toString(_d.vmem, _d.address);
-    	}catch(...){
+        } catch(...) {
         	_d.vmem->setKernelSpace();
     		throw;
     	}
     	_d.vmem->setKernelSpace();
     }
     return ret;
+}
+
+inline VirtualMemory* Instance::vmem() const
+{
+    return _d.vmem;
 }
 
 

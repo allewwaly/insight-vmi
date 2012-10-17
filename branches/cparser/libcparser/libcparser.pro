@@ -1,13 +1,15 @@
+# Global configuration file
+include(../config.pri)
+
 TEMPLATE = lib
 TARGET = cparser
 VERSION = 1.0.0
 CONFIG += debug_and_release \
     staticlib \
-    create_prl
-QMAKE_CFLAGS_DEBUG += -w
-QMAKE_CFLAGS_RELEASE += -O3 -w
-QMAKE_CXXFLAGS_RELEASE += -O3
+    create_prl \
+    warn_off
 QT += core
+QT -= gui webkit
 HEADERS += include/ast_interface.h \
     include/astscopemanager.h \
     include/genericexception.h \
@@ -25,6 +27,7 @@ HEADERS += include/ast_interface.h \
     antlr_generated/CLexer.h \
     antlr_generated/CParser.h \
     include/astsourceprinter.h \
+    include/expressionevalexception.h \
     include/bitop.h
 SOURCES += src/astscopemanager.cpp \
     src/astsymbol.cpp \
@@ -40,10 +43,10 @@ SOURCES += src/astscopemanager.cpp \
     antlr_generated/CLexer.c \
     antlr_generated/CParser.c \
     src/astsourceprinter.cpp
-LIBS += -L../libantlr3c \
-    -lantlr3c \
-    -L../libdebug \
-    -ldebug
+LIBS += -L../libantlr3c$$BUILD_DIR \
+    -l$$ANTLR_LIB \
+    -L../libdebug$$BUILD_DIR \
+    -l$$DEBUG_LIB
 INCLUDEPATH += ./antlr_generated \
     ./src \
     ./include \

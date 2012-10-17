@@ -321,7 +321,7 @@ bool MemoryMapWidget::event(QEvent *event)
             {
                 addrEnd = totalAddrSpaceEnd();
             }
-            int width = _map && _map->addrSpaceEnd() >= (1UL << 32) ? 16 : 8;
+            int width = _map && _map->addrSpaceEnd() >= (1ULL << 32) ? 16 : 8;
 
             QTextDocument doc;
             QTextCursor cur(&doc);
@@ -357,9 +357,9 @@ bool MemoryMapWidget::event(QEvent *event)
 
 
             QString elem;
-            ConstNodeList nodes = _map ?
+            NodeList nodes = _map ?
                     _map->objectsInRange(addrStart, addrEnd).toList()
-                    : ConstNodeList();
+                    : NodeList();
             qSort(nodes.begin(), nodes.end(), NodeProbabilityGreaterThan);
 
             if (!nodes.isEmpty()) {
@@ -378,7 +378,7 @@ bool MemoryMapWidget::event(QEvent *event)
                 cur.insertBlock(defBlkFmt, defCharFmt);
 
                 int rowCnt = 0;
-                for (ConstNodeList::iterator it = nodes.begin();
+                for (NodeList::iterator it = nodes.begin();
                         it != nodes.end() && rowCnt < rows;
                         ++it, ++rowCnt)
                 {
