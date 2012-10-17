@@ -477,7 +477,7 @@ TEST_FUNCTION(structInitializers)
     CHANGE_LAST("struct module foo = { .list = { h, m } };",
         "m", "Pointer->Struct(module)", "", "Pointer->Struct(list_head)");
     CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo = { .func = m };",
-        "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+        "m", "Pointer->Struct(module)", "", "Pointer->FuncPointer->Int32");
     NO_CHANGE2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo = { .func = ifunc };");
 }
 
@@ -527,17 +527,17 @@ TEST_FUNCTION(designatedInitializers)
     NO_CHANGE2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0] = { [0] = { .func = ifunc } } };");
 
     CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[] = { [0].func = m };",
-        "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+        "m", "Pointer->Struct(module)", "", "Pointer->FuncPointer->Int32");
     CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[] = { [0] = { .func = m } };",
-                 "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+                 "m", "Pointer->Struct(module)", "", "Pointer->FuncPointer->Int32");
     CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0][0].func = m };",
-                 "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+                 "m", "Pointer->Struct(module)", "", "Pointer->FuncPointer->Int32");
     CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0] = { [0].func = m } };",
-                 "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+                 "m", "Pointer->Struct(module)", "", "Pointer->FuncPointer->Int32");
     CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0][0] = { .func = m } };",
-                 "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+                 "m", "Pointer->Struct(module)", "", "Pointer->FuncPointer->Int32");
     CHANGE_LAST2("struct bar { void* p; int (*func)(); };\nint ifunc() { return 0; }", "struct bar foo[][] = { [0] = { [0] = { .func = m } } };",
-                 "m", "Pointer->Struct(module)", "", "FuncPointer->Int32");
+                 "m", "Pointer->Struct(module)", "", "Pointer->FuncPointer->Int32");
 
     NO_CHANGE2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { 0, {m, m} };");
     NO_CHANGE2("struct bar { void* p; struct module* mod[2]; };", "struct bar foo = { .p = 0 };");
@@ -625,19 +625,19 @@ TEST_FUNCTION(functionDefsDecls)
     TEST_DATA_COLUMNS;
     // Function definitions
     CHANGE_LAST2("int foo() { return 0; }", "void* p = foo;",
-        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int* foo() { return 0; }", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int** foo() { return 0; }", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 
     // Function declarations
     CHANGE_LAST2("int foo();", "void* p = foo;",
-        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int* foo();", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int** foo();", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 }
 
 
@@ -646,23 +646,23 @@ TEST_FUNCTION(functionPointers)
     TEST_DATA_COLUMNS;
     // Function pointers
     CHANGE_LAST2("int   (  foo)();", "void* p = foo;",
-        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int*  (  foo)();", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int** (  foo)();", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int   (* foo)();", "void* p = foo;",
-        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int*  (* foo)();", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int** (* foo)();", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int   (**foo)();", "void* p = foo;",
-        "foo", "FuncPointer->FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int*  (**foo)();", "void* p = foo;",
-        "foo", "FuncPointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("int** (**foo)();", "void* p = foo;",
-        "foo", "FuncPointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 }
 
 
@@ -671,23 +671,23 @@ TEST_FUNCTION(functionPointerTypedefs)
     TEST_DATA_COLUMNS;
     // Function pointer typedefs
     CHANGE_LAST2("typedef int   (  foodef)(); foodef foo;", "void* p = foo;",
-        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int*  (  foodef)(); foodef foo;", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int** (  foodef)(); foodef foo;", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int   (* foodef)(); foodef foo;", "void* p = foo;",
-        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int*  (* foodef)(); foodef foo;", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int** (* foodef)(); foodef foo;", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int   (**foodef)(); foodef foo;", "void* p = foo;",
-        "foo", "FuncPointer->FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int*  (**foodef)(); foodef foo;", "void* p = foo;",
-        "foo", "FuncPointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int** (**foodef)(); foodef foo;", "void* p = foo;",
-        "foo", "FuncPointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 }
 
 
@@ -696,23 +696,23 @@ TEST_FUNCTION(functionPointerParams)
     TEST_DATA_COLUMNS;
     // Function pointer parameters
     CHANGE_LAST2("void func(int   (  foo)()) { void* p = foo; }", "",
-        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("void func(int*  (  foo)()) { void* p = foo; }", "",
-        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("void func(int** (  foo)()) { void* p = foo; }", "",
-        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("void func(int   (* foo)()) { void* p = foo; }", "",
-        "foo", "FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("void func(int*  (* foo)()) { void* p = foo; }", "",
-        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("void func(int** (* foo)()) { void* p = foo; }", "",
-        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("void func(int   (**foo)()) { void* p = foo; }", "",
-        "foo", "FuncPointer->FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("void func(int*  (**foo)()) { void* p = foo; }", "",
-        "foo", "FuncPointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("void func(int** (**foo)()) { void* p = foo; }", "",
-        "foo", "FuncPointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 }
 
 
@@ -732,12 +732,12 @@ TEST_FUNCTION(functionPointerInvocations)
         "foo", "Pointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int** (* foo)();", "void* p = foo();",
         "foo", "Pointer->Pointer->Int32", "()", "Pointer->Void");
-    CHANGE_LAST2("int   (**foo)();", "void* p = foo();",
-        "foo", "FuncPointer->Int32", "()", "Pointer->Void");
+    CHANGE_LAST2("int   (**foo)();", "void* p = (*foo)();",
+        "foo", "Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int*  (**foo)();", "void* p = foo();",
-        "foo", "FuncPointer->Pointer->Int32", "()", "Pointer->Void");
+        "foo", "Pointer->Int32", "()", "Pointer->Void");
     CHANGE_LAST2("int** (**foo)();", "void* p = foo();",
-        "foo", "FuncPointer->Pointer->Pointer->Int32", "()", "Pointer->Void");
+        "foo", "Pointer->Pointer->Int32", "()", "Pointer->Void");
 
      // Indirect function invocation through pointer
     CHANGE_LAST2("int* foo();", "typeof( foo) f; void* p = f();",
@@ -754,6 +754,10 @@ TEST_FUNCTION(functionPointerInvocations)
                 "Expected a function pointer type here instead of \"Pointer->FuncPointer->Int32\" at :25:17");
     EXCEPTIONAL("int* foo() { return 0; }", "typeof(& &foo) bf; void* p = f();",
                 "Expected a function pointer type here instead of \"Pointer->FuncPointer->Int32\" at :25:17");
+    EXCEPTIONAL("int* foo();", "typeof(foo) **f; void* p = f();",
+                "Expected a function pointer type here instead of \"Pointer->FuncPointer->Int32\" at :25:17");
+    EXCEPTIONAL("int* foo() { return 0; }", "typeof(foo)** bf; void* p = f();",
+                "Expected a function pointer type here instead of \"Pointer->FuncPointer->Int32\" at :25:17");
 }
 
 
@@ -762,42 +766,42 @@ TEST_FUNCTION(funcPtrTypdefPtrs)
     TEST_DATA_COLUMNS;
     // Pointers of function pointer typedefs
     CHANGE_LAST2("typedef int   (  foodef)(); foodef *foo;", "void* p = foo;",
-        "foo", "FuncPointer->Int32", "", "Pointer->Void");
-    CHANGE_LAST2("typedef int*  (  foodef)(); foodef *foo;", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Int32", "", "Pointer->Void");
-    CHANGE_LAST2("typedef int** (  foodef)(); foodef *foo;", "void* p = foo;",
-        "foo", "FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
-    CHANGE_LAST2("typedef int   (* foodef)(); foodef *foo;", "void* p = foo;",
         "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
-    CHANGE_LAST2("typedef int*  (* foodef)(); foodef *foo;", "void* p = foo;",
+    CHANGE_LAST2("typedef int*  (  foodef)(); foodef *foo;", "void* p = foo;",
         "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
-    CHANGE_LAST2("typedef int** (* foodef)(); foodef *foo;", "void* p = foo;",
+    CHANGE_LAST2("typedef int** (  foodef)(); foodef *foo;", "void* p = foo;",
         "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int   (* foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (* foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (* foodef)(); foodef *foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int   (**foodef)(); foodef *foo;", "void* p = foo;",
-        "foo", "Pointer->FuncPointer->FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int*  (**foodef)(); foodef *foo;", "void* p = foo;",
-        "foo", "Pointer->FuncPointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int** (**foodef)(); foodef *foo;", "void* p = foo;",
-        "foo", "Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 
     CHANGE_LAST2("typedef int   (  foodef)(); foodef **foo;", "void* p = foo;",
-        "foo", "Pointer->FuncPointer->Int32", "", "Pointer->Void");
-    CHANGE_LAST2("typedef int*  (  foodef)(); foodef **foo;", "void* p = foo;",
-        "foo", "Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
-    CHANGE_LAST2("typedef int** (  foodef)(); foodef **foo;", "void* p = foo;",
-        "foo", "Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
-    CHANGE_LAST2("typedef int   (* foodef)(); foodef **foo;", "void* p = foo;",
         "foo", "Pointer->Pointer->FuncPointer->Int32", "", "Pointer->Void");
-    CHANGE_LAST2("typedef int*  (* foodef)(); foodef **foo;", "void* p = foo;",
+    CHANGE_LAST2("typedef int*  (  foodef)(); foodef **foo;", "void* p = foo;",
         "foo", "Pointer->Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
-    CHANGE_LAST2("typedef int** (* foodef)(); foodef **foo;", "void* p = foo;",
+    CHANGE_LAST2("typedef int** (  foodef)(); foodef **foo;", "void* p = foo;",
         "foo", "Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int   (* foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->Pointer->FuncPointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int*  (* foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+    CHANGE_LAST2("typedef int** (* foodef)(); foodef **foo;", "void* p = foo;",
+        "foo", "Pointer->Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int   (**foodef)(); foodef **foo;", "void* p = foo;",
-        "foo", "Pointer->Pointer->FuncPointer->FuncPointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->Pointer->Pointer->FuncPointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int*  (**foodef)(); foodef **foo;", "void* p = foo;",
-        "foo", "Pointer->Pointer->FuncPointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->Pointer->Pointer->FuncPointer->Pointer->Int32", "", "Pointer->Void");
     CHANGE_LAST2("typedef int** (**foodef)(); foodef **foo;", "void* p = foo;",
-        "foo", "Pointer->Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
+        "foo", "Pointer->Pointer->Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32", "", "Pointer->Void");
 }
 
 
@@ -814,17 +818,17 @@ TEST_FUNCTION(funcPtrTypdefPtrInvocations)
 
     // Illegal invocation of pointers of function pointer typedefs
     EXCEPTIONAL("typedef int   (* foodef)(); foodef *foo;", "void* p = foo();",
-        "Expected a function pointer type here instead of \"Pointer->FuncPointer->Int32\" at :25:17");
+        "Expected a function pointer type here instead of \"Pointer->Pointer->FuncPointer->Int32\" at :25:17");
     EXCEPTIONAL("typedef int*  (* foodef)(); foodef *foo;", "void* p = foo();",
-        "Expected a function pointer type here instead of \"Pointer->FuncPointer->Pointer->Int32\" at :25:17");
+        "Expected a function pointer type here instead of \"Pointer->Pointer->FuncPointer->Pointer->Int32\" at :25:17");
     EXCEPTIONAL("typedef int** (* foodef)(); foodef *foo;", "void* p = foo();",
-        "Expected a function pointer type here instead of \"Pointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17");
+        "Expected a function pointer type here instead of \"Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17");
     EXCEPTIONAL("typedef int   (**foodef)(); foodef *foo;", "void* p = foo();",
-        "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Int32\" at :25:17");
+        "Expected a function pointer type here instead of \"Pointer->Pointer->Pointer->FuncPointer->Int32\" at :25:17");
     EXCEPTIONAL("typedef int*  (**foodef)(); foodef *foo;", "void* p = foo();",
-        "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Pointer->Int32\" at :25:17");
+        "Expected a function pointer type here instead of \"Pointer->Pointer->Pointer->FuncPointer->Pointer->Int32\" at :25:17");
     EXCEPTIONAL("typedef int** (**foodef)(); foodef *foo;", "void* p = foo();",
-        "Expected a function pointer type here instead of \"Pointer->FuncPointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17");
+        "Expected a function pointer type here instead of \"Pointer->Pointer->Pointer->FuncPointer->Pointer->Pointer->Int32\" at :25:17");
 }
 
 
