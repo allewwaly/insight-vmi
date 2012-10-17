@@ -21,6 +21,10 @@
 #include <bitop.h>
 #include <QProcess>
 
+#define DEBUG_POINTS_TO 1
+//#define DEBUG_NODE_EVAL 1
+#define DEBUG_USED_AS 1
+
 #define checkNodeType(node, expected_type) \
     if ((node)->type != (expected_type)) { \
             typeEvaluatorError( \
@@ -263,15 +267,11 @@ int ASTTypeEvaluator::sizeofType(RealType type) const
     case rtTypedef:
     	return 0;
     case rtFuncPointer:
-        return sizeofPointer();
     case rtFunction:
-        return 0;
     case rtVoid:
-    	return 0;
+        return 1;
     case rtVaList:
     	return -1;
-//    case rtFuncCall:
-//    	return 0;
     };
 
     return -1;
@@ -290,18 +290,18 @@ ASTType* ASTTypeEvaluator::typeofNode(const ASTNode *node)
         return 0;
 
 #   ifdef DEBUG_NODE_EVAL
-    QString indent = QString("%1").arg("", _nodeStack.count() << 1);
-    debugmsg(indent << "+++ Evaluating node " << ast_node_type_to_str(node)
-            << " (" << QString::number((quint64)node, 16) << ")"
-            << " at " << node->start->line << ":"
+    QString indent = QString("%1").arg("", _typeNodeStack.count() << 1);
+    debugmsg(indent << "+++ Evaluating node \"" << ast_node_type_to_str(node)
+//            << " (" << QString::number((quint64)node, 16) << ")"
+            << "\" at " << node->start->line << ":"
             << node->start->charPosition);
 #   endif
 
     if (hasValidType(node)) {
 #       ifdef DEBUG_NODE_EVAL
-        debugmsg(indent << "+++ Node " << ast_node_type_to_str(node)
-                << " (" << QString::number((quint64)node, 16) << ")"
-                << " at " << node->start->line << ":"
+        debugmsg(indent << "+++ Node \"" << ast_node_type_to_str(node)
+//                << " (" << QString::number((quint64)node, 16) << ")"
+                << "\" at " << node->start->line << ":"
                 << node->start->charPosition
                 << " has type " << _types[node]->toString());
 #       endif
@@ -665,9 +665,9 @@ ASTType* ASTTypeEvaluator::typeofNode(const ASTNode *node)
     }
 
 #   ifdef DEBUG_NODE_EVAL
-    debugmsg(indent << "+++ Node " << ast_node_type_to_str(node)
-            << " (" << QString::number((quint64)node, 16) << ")"
-            << " at " << node->start->line << ":"
+    debugmsg(indent << "+++ Node \"" << ast_node_type_to_str(node)
+//            << " (" << QString::number((quint64)node, 16) << ")"
+            << "\" at " << node->start->line << ":"
             << node->start->charPosition
             << " has type " << _types[node]->toString());
 #   endif
@@ -884,7 +884,10 @@ const ASTSymbol* ASTTypeEvaluator::embeddingFuncSymbol(const ASTNode *node)
     const ASTNode* dd = node
             ->u.function_definition.declarator
             ->u.declarator.direct_declarator;
-    QString name = antlrTokenToStr(dd->u.direct_declarator.identifier);
+    while (dd && !dd->u.direct_declarator.identifier)
+        dd = dd->u.direct_declarator.declarator->u.declarator.direct_declarator;
+    QString name = dd ? antlrTokenToStr(dd->u.direct_declarator.identifier)
+                      : QString();
 
     const ASTSymbol* sym = node->scope->find(name, ASTScope::ssSymbols);
     assert(sym && sym->type() == stFunctionDef);
@@ -1067,7 +1070,7 @@ ASTType* ASTTypeEvaluator::typeofParameterDeclaration(const ASTNode *node)
     	 list = list->next)
     {
         const ASTNode* d_ad = list->item;
-    	ret = preprendPointersArrays(d_ad, ret);
+        ret = processDeclPointerSuffix(d_ad, ret);
     }
 
     return ret;
@@ -1081,7 +1084,7 @@ ASTType* ASTTypeEvaluator::typeofSymbolDeclaration(const ASTSymbol* sym)
     checkNodeType(sym->astNode(), nt_declaration);
 
     ASTType* ret = typeofNode(sym->astNode()->u.declaration.declaration_specifier);
-    ret = preprendPointersArraysOfIdentifier(sym->name(), sym->astNode(), ret);
+    ret = processDeclPointerSuffixOfId(sym->name(), sym->astNode(), ret);
 
     return ret;
 }
@@ -1112,7 +1115,7 @@ ASTType* ASTTypeEvaluator::typeofSymbolFunctionParam(const ASTSymbol* sym)
          list;
          list = list->next)
     {
-        ret = preprendPointersArrays(list->item, ret);
+        ret = processDeclPointerSuffix(list->item, ret);
     }
 
     return ret;
@@ -1146,7 +1149,7 @@ ASTType* ASTTypeEvaluator::typeofStructDeclarator(const ASTNode *node)
 
     const ASTNode* sd = node->parent;
 
-    _types[node] = preprendPointersArrays(
+    _types[node] = processDeclPointerSuffix(
     		node->u.struct_declarator.declarator, typeofNode(sd));
 
     return _types[node];
@@ -1260,7 +1263,7 @@ ASTType* ASTTypeEvaluator::typeofTypeName(const ASTNode *node)
     	return typeofNode(node);
 
     ASTType* ret = typeofSpecifierQualifierList(node->u.type_name.specifier_qualifier_list);
-    ret = preprendPointersArrays(node->u.type_name.abstract_declarator, ret);
+    ret = processDeclPointerSuffix(node->u.type_name.abstract_declarator, ret);
 
     return _types[node] = ret;
 }
@@ -1288,43 +1291,43 @@ ASTType* ASTTypeEvaluator::typeofUnaryExpressionOp(const ASTNode *node)
     else if (op == "*") {
     	ASTType* ret = typeofNode(node->u.unary_expression.cast_expression);
     	// Is top type a pointer type?
-    	if (!ret || !(ret->type() & (rtPointer|rtArray|rtFuncPointer)))
+        if (!ret || !(ret->type() & (rtPointer|rtArray)))
             typeEvaluatorError(
                     QString("We expected a pointer or array here at %1:%2")
                             .arg(_ast->fileName())
                             .arg(node->start->line));
-    	// If this expression dereferences  a function pointer, don't remove
-    	// the first rtFuncPointer type, because this is done by the
-    	// postfix_expression_parens node later on as part of the invocation
-    	if (ret->type() == rtFuncPointer &&
-			(node->parent->parent->type != nt_unary_expression_op ||
-			 "*" != antlrTokenToStr(
-					 node->parent->parent->u.unary_expression.unary_operator)))
-    	{
-    	    bool hasParens = false;
-    	    // Find enclosing postfix_expression node
-            const ASTNode* postEx = node->parent;
-    	    while (postEx && postEx->type != nt_postfix_expression)
-    	        postEx = postEx->parent;
+//    	// If this expression dereferences  a function pointer, don't remove
+//    	// the first rtFuncPointer type, because this is done by the
+//    	// postfix_expression_parens node later on as part of the invocation
+//    	if (ret->type() == rtFuncPointer &&
+//			(node->parent->parent->type != nt_unary_expression_op ||
+//			 "*" != antlrTokenToStr(
+//					 node->parent->parent->u.unary_expression.unary_operator)))
+//    	{
+//    	    bool hasParens = false;
+//    	    // Find enclosing postfix_expression node
+//            const ASTNode* postEx = node->parent;
+//    	    while (postEx && postEx->type != nt_postfix_expression)
+//    	        postEx = postEx->parent;
 
-    	    if (postEx) {
-                // Check if we really have a postfix_expression_parens node
-                for (const ASTNodeList* list = !postEx ? 0 :
-                        postEx->u.postfix_expression.postfix_expression_suffix_list;
-                    list;
-                    list = list->next)
-                {
-                    if (list->item->type == nt_postfix_expression_parens) {
-                        hasParens = true;
-                        break;
-                    }
-                }
-    	    }
-    	    // Remove top-most FuncPointer type if and only if enclosing
-    	    // postfix_expression has no postfix_expression_parens suffix
-			_types[node] = hasParens ? ret : ret->next();
-    	}
-    	else
+//    	    if (postEx) {
+//                // Check if we really have a postfix_expression_parens node
+//                for (const ASTNodeList* list = !postEx ? 0 :
+//                        postEx->u.postfix_expression.postfix_expression_suffix_list;
+//                    list;
+//                    list = list->next)
+//                {
+//                    if (list->item->type == nt_postfix_expression_parens) {
+//                        hasParens = true;
+//                        break;
+//                    }
+//                }
+//    	    }
+//    	    // Remove top-most FuncPointer type if and only if enclosing
+//    	    // postfix_expression has no postfix_expression_parens suffix
+//			_types[node] = hasParens ? ret : ret->next();
+//    	}
+//    	else
     		_types[node] = ret->next();
     }
     // Pointer obtaining
@@ -1332,9 +1335,9 @@ ASTType* ASTTypeEvaluator::typeofUnaryExpressionOp(const ASTNode *node)
     	ASTType* ret = typeofNode(node->u.unary_expression.cast_expression);
         // Obtaining address of a function does not result in another pointer
         // level
-        if (ret && ret->isFunction() && !ret->ampersandSkipped())
-            ret->setAmpersandSkipped(true);
-        else
+//        if (ret && ret->isFunction() && !ret->ampersandSkipped())
+//            ret->setAmpersandSkipped(true);
+//        else
             ret = createASTType(rtPointer, node, ret);
         _types[node] = ret;
     }
@@ -1482,19 +1485,19 @@ ASTType* ASTTypeEvaluator::typeofSymbol(const ASTSymbol* sym)
     case stVariableDef:
     case stStructOrUnionDecl:
     case stStructOrUnionDef:
-        return typeofNode(sym->astNode());
+//        return typeofNode(sym->astNode());
 
     case stStructMember:
-        return typeofNode(sym->astNode());
+//        return typeofNode(sym->astNode());
 
     case stFunctionDecl:
-        return typeofNode(sym->astNode());
+//        return typeofNode(sym->astNode());
 
     case stFunctionDef:
-        return typeofNode(sym->astNode());
+//        return typeofNode(sym->astNode());
 
     case stFunctionParam:
-        return typeofNode(sym->astNode());
+//        return typeofNode(sym->astNode());
 
     case stEnumDecl:
     case stEnumDef:
@@ -1764,8 +1767,9 @@ ASTType* ASTTypeEvaluator::typeofDirectDeclarator(const ASTNode *node)
     switch (declarator->parent->type) {
     case nt_direct_declarator:
         // Must be a function pointer like "void (*foo)()"
-    	assert(declarator->parent->parent->type == nt_declarator ||
-    			declarator->parent->parent->type == nt_abstract_declarator);
+        type = typeofNode(declarator->parent);
+/*    	assert(declarator->parent->parent->type == nt_declarator ||
+            declarator->parent->parent->type == nt_abstract_declarator);
 
     	// Start with the declared basic type
     	if (declarator->parent->parent->parent->parent->type == nt_declaration)
@@ -1774,6 +1778,8 @@ ASTType* ASTTypeEvaluator::typeofDirectDeclarator(const ASTNode *node)
     		type = typeofNode(declarator->parent->parent->parent->u.parameter_declaration.declaration_specifier);
     	else if (declarator->parent->parent->parent->parent->type == nt_struct_declaration)
     		type = typeofSpecifierQualifierList(declarator->parent->parent->parent->parent->u.struct_declaration.specifier_qualifier_list);
+        else if (declarator->parent->parent->parent->type == nt_function_definition)
+            type = typeofNode(declarator->parent->parent->parent->u.function_definition.declaration_specifier);
     	else
     		typeEvaluatorError(
     				QString("Unexpected parent chain for node %1,\n"
@@ -1793,6 +1799,7 @@ ASTType* ASTTypeEvaluator::typeofDirectDeclarator(const ASTNode *node)
 
         // Prepend any pointer of the basic type
         type = preprendPointersArrays(declarator->parent->parent, type);
+*/
         break;
 
     case nt_function_definition:
@@ -1804,14 +1811,14 @@ ASTType* ASTTypeEvaluator::typeofDirectDeclarator(const ASTNode *node)
     	break;
 
     case nt_init_declarator:
-        // If this is a top-level direct_declarator of a function definition,
-        // use the type of the inner direct_declarator as the type
-        if (node->u.direct_declarator.declarator) {
-            type = typeofNode(node->u.direct_declarator.declarator);
-            doPrepend = false;
-        }
-        // Otherwise evaluate the type as usual
-        else
+//        // If this is a top-level direct_declarator of a function definition,
+//        // use the type of the inner direct_declarator as the type
+//        if (node->u.direct_declarator.declarator) {
+//            type = typeofNode(node->u.direct_declarator.declarator);
+//            doPrepend = false;
+//        }
+//        // Otherwise evaluate the type as usual
+//        else
             type = typeofNode(declarator->parent->parent->u.declaration.declaration_specifier);
     	break;
 
@@ -1836,7 +1843,7 @@ ASTType* ASTTypeEvaluator::typeofDirectDeclarator(const ASTNode *node)
     }
 
     if (doPrepend)
-    	type = preprendPointersArrays(declarator, type);
+        type = processDeclPointerSuffix(declarator, type);
 
 //    QStringList sl;
 //    debugmsg(QString("Type of symbol \"%1\" in scope 0x%2 is %3 at %4:%5")
@@ -1958,7 +1965,7 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(const ASTNode *node)
 
         case nt_postfix_expression_brackets:
             // Array operator, i.e., dereferencing
-            if (!type || !(type->type() & (rtFuncPointer|rtPointer|rtArray)))
+            if (!type || !(type->type() & (rtPointer|rtArray)))
                 typeEvaluatorError(
                         QString("Expected a pointer or array here at %1:%2")
                                 .arg(_ast->fileName())
@@ -2119,15 +2126,34 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(const ASTNode *node)
         }
 
         case nt_postfix_expression_parens: {
+            // FIXME: Dirty hack: If the primary expression has no symbol,
+            // e.g. as in "(*p) = 42", don't even try to check the symbol's type
+            const ASTSymbol* sym =
+                    pe->u.postfix_expression.primary_expression
+                      ->u.primary_expression.identifier
+                    ? findSymbolOfPrimaryExpression(
+                          pe->u.postfix_expression.primary_expression)
+                    : 0;
+            // For non-function types, we excpect to see a pointer first
+            if (!sym || !(sym->type() & (stFunctionDecl|stFunctionDef))) {
+                if (!type || !(type->type() & (rtPointer)))
+                    typeEvaluatorError(
+                            QString("Expected a Pointer->FuncPointer type here instead of \"%1\" at %2:%3:%4")
+                                    .arg(type ? type->toString() : QString())
+                                    .arg(_ast->fileName())
+                                    .arg(pes->start->line)
+                                    .arg(pes->start->charPosition));
+                type = type->next();
+            }
             // Function operator, i.e., function call
             if (!type || !(type->type() & (rtFuncPointer)))
                 typeEvaluatorError(
-                        QString("Expected a function pointer type here instead of \"%1\" at %2:%3:%4")
+                        QString("Expected a FuncPointer type here instead of \"%1\" at %2:%3:%4")
                                 .arg(type ? type->toString() : QString())
                                 .arg(_ast->fileName())
                                 .arg(pes->start->line)
                                 .arg(pes->start->charPosition));
-            // Remove top function pointer type
+            // Remove function pointer type, result is function's return type
             type = type->next();
             break;
         }
@@ -2288,7 +2314,7 @@ const ASTNode *ASTTypeEvaluator::findIdentifierInIDL(const QString& identifier,
 }
 
 
-ASTType* ASTTypeEvaluator::preprendPointersArraysOfIdentifier(
+ASTType* ASTTypeEvaluator::processDeclPointerSuffixOfId(
         const QString& identifier, const ASTNode *declaration, ASTType* type)
 {
     if (!declaration)
@@ -2301,7 +2327,7 @@ ASTType* ASTTypeEvaluator::preprendPointersArraysOfIdentifier(
     		declaration->u.declaration.init_declarator_list);
 
     if (ddec)
-        type = preprendPointersArrays(ddec->parent, type);
+        type = processDeclPointerSuffix(ddec->parent, type);
     else
         typeEvaluatorError(
                 QString("Did not find identifier \"%1\" in "
@@ -2314,7 +2340,7 @@ ASTType* ASTTypeEvaluator::preprendPointersArraysOfIdentifier(
 }
 
 
-ASTType* ASTTypeEvaluator::preprendPointersArrays(const ASTNode *d_ad, ASTType* type)
+ASTType* ASTTypeEvaluator::processDeclPointerSuffix(const ASTNode *d_ad, ASTType* type)
 {
     if (!d_ad)
         return type;
@@ -2325,95 +2351,82 @@ ASTType* ASTTypeEvaluator::preprendPointersArrays(const ASTNode *d_ad, ASTType* 
                 .arg(_ast->fileName())
                 .arg(d_ad->start->line));
 
-    type = preprendPointers(d_ad, type);
+    type = processDeclPointer(d_ad, type);
 
     if (d_ad->type == nt_declarator) {
         if (d_ad->u.declarator.direct_declarator)
-            type = preprendArrays(d_ad->u.declarator.direct_declarator, type);
+            type = processDeclSuffix(d_ad->u.declarator.direct_declarator, type);
     }
     else /*if (d_ad->type == nt_abstract_declarator)*/ {
         if (d_ad->u.abstract_declarator.direct_abstract_declarator)
-            type = preprendArrays(d_ad->u.abstract_declarator.direct_abstract_declarator, type);
+            type = processDeclSuffix(d_ad->u.abstract_declarator.direct_abstract_declarator, type);
     }
 
     return type;
 }
 
 
-ASTType* ASTTypeEvaluator::preprendPointers(const ASTNode *d_ad, ASTType* type)
+ASTType* ASTTypeEvaluator::processDeclPointer(const ASTNode *d_ad, ASTType* type)
 {
     if (!d_ad)
         return type;
-    if (d_ad->type != nt_declarator && d_ad->type != nt_abstract_declarator)
-        typeEvaluatorError(
-            QString("Unexpected node type \"%1\" at %3:%4")
-                .arg(ast_node_type_to_str(d_ad))
-                .arg(_ast->fileName())
-                .arg(d_ad->start->line));
 
     // Distinguish between declarator and abstract_declarator
     const ASTNode* ptr = 0;
     if (d_ad->type == nt_declarator)
         ptr = d_ad->u.declarator.pointer;
-    else /*if (d_ad->type == nt_abstract_declarator)*/
+    else if (d_ad->type == nt_abstract_declarator)
         ptr = d_ad->u.abstract_declarator.pointer;
+    else
+        typeEvaluatorError(
+            QString("Unexpected node type \"%1\" at %3:%4:%5")
+                .arg(ast_node_type_to_str(d_ad))
+                .arg(_ast->fileName())
+                .arg(d_ad->start->line)
+                .arg(d_ad->start->charPosition));
 
     // Distinguish between function pointer and regular pointer: The declarator
     // of a function pointer is always child of a direct_declarator node.
-    RealType ptrType = rtPointer;
-    bool skipFirst = false;
-    if (d_ad->parent->type == nt_direct_declarator ||
-		d_ad->parent->type == nt_direct_abstract_declarator)
-    {
-    	ptrType = rtFuncPointer;
-    	// If there is at least one declarator_suffix_parens in the suffix list,
-    	// then we need to skip the first pointer, because it is added when we
-    	// encounter the declarator_suffix_parens anyways
-        const ASTNodeList* list = d_ad->parent->type == nt_direct_declarator ?
-    	        d_ad->parent->u.direct_declarator.declarator_suffix_list :
-    	        d_ad->parent->u.direct_abstract_declarator.abstract_declarator_suffix_list;
-    	for (; list; list = list->next) {
-            const ASTNode* ds_ads = list->item;
-    	    if (ds_ads->type == nt_abstract_declarator_suffix_parens ||
-                ds_ads->type == nt_declarator_suffix_parens)
-    	    {
-    	        skipFirst = true;
-    	        break;
-    	    }
-    	}
-    }
-    // If the type is FuncPointer and there was no pointer to be skipped at its
-    // definition (e.g., as in "typedef void (foo)()"), than we have yet to skip
-    // the first pointer
-    else if (type && type->type() == rtFuncPointer && !type->pointerSkipped())
-    {
-        skipFirst = true;
-    }
+//    RealType ptrType = rtPointer;
+//    bool skipFirst = false;
+//    if (d_ad->parent->type == nt_direct_declarator ||
+//		d_ad->parent->type == nt_direct_abstract_declarator)
+//    {
+//    	// If there is at least one declarator_suffix_parens in the suffix list,
+//    	// then we need to skip the first pointer, because it is added when we
+//    	// encounter the declarator_suffix_parens anyways
+//        const ASTNodeList* list = d_ad->parent->type == nt_direct_declarator ?
+//    	        d_ad->parent->u.direct_declarator.declarator_suffix_list :
+//    	        d_ad->parent->u.direct_abstract_declarator.abstract_declarator_suffix_list;
+//    	for (; list; list = list->next) {
+//            const ASTNode* ds_ads = list->item;
+//    	    if (ds_ads->type == nt_abstract_declarator_suffix_parens ||
+//                ds_ads->type == nt_declarator_suffix_parens)
+//    	    {
+//    	        skipFirst = true;
+//    	        break;
+//    	    }
+//    	}
+//    }
+
+//    debugmsg(QString("Processing \"%1\" at %3:%4:%5, type is %2")
+//        .arg(ast_node_type_to_str(d_ad))
+//        .arg(type ? type->toString() : QString("null"))
+//        .arg(_ast->fileName())
+//        .arg(d_ad->start->line)
+//        .arg(d_ad->start->charPosition));
+
 
     // Add one pointer type node for every asterisk in the declaration
     while (ptr) {
-    	// For function pointers, the first asterisk is ignored, because GCC
-    	// treats "void (foo)()" and "void (*foo)()" equally.
-    	if (skipFirst) {
-    		skipFirst = false;
-            // We must not change the original type information, so copy it
-            // before any modification
-            type = copyDeep(type);
-            type->setPointerSkipped(true);
-    	}
-    	else {
-    		type = createASTType(ptrType, ptr, type);
-    		if (ptrType == rtFuncPointer)
-    		    type->setPointerSkipped(true);
-    	}
-
+        type = createASTType(rtPointer, ptr, type);
         ptr = ptr->u.pointer.pointer;
     }
     return type;
 }
 
 
-ASTType* ASTTypeEvaluator::preprendArrays(const ASTNode *dd_dad, ASTType* type)
+ASTType* ASTTypeEvaluator::processDeclSuffix(const ASTNode *dd_dad, ASTType* type)
 {
     if (!dd_dad)
         return type;
@@ -2428,7 +2441,7 @@ ASTType* ASTTypeEvaluator::preprendArrays(const ASTNode *dd_dad, ASTType* type)
     const ASTNodeList* list = 0;
     bool isFuncPtr = false;
     if (dd_dad->type == nt_direct_abstract_declarator) {
-    	type = preprendPointersArrays(
+        type = processDeclPointerSuffix(
     			dd_dad->u.direct_abstract_declarator.abstract_declarator,
     			type);
         list = dd_dad->u.direct_abstract_declarator.abstract_declarator_suffix_list;
@@ -2459,7 +2472,7 @@ ASTType* ASTTypeEvaluator::preprendArrays(const ASTNode *dd_dad, ASTType* type)
             if (ok)
                 type->setArraySize(size);
         }
-        // Parens lead to a function pointer type
+        // Parens lead to a function type
         else if (ds_ads->type == nt_declarator_suffix_parens ||
                 ds_ads->type == nt_abstract_declarator_suffix_parens)
         {
@@ -2474,6 +2487,11 @@ ASTType* ASTTypeEvaluator::preprendArrays(const ASTNode *dd_dad, ASTType* type)
                         .arg(ds_ads->start->line));
         list = list->next;
     }
+
+    // We may have nested function pointer declarations
+//    if (dd_dad->u.direct_declarator.declarator)
+//        type = processDeclPointerSuffix(dd_dad->u.direct_declarator.declarator, type);
+
     return type;
 }
 
@@ -2837,6 +2855,60 @@ void ASTTypeEvaluator::evaluateIdentifierPointsTo(const ASTNode *node)
     evaluateIdentifierPointsToRek(&es);
 }
 
+template<class State>
+bool ASTTypeEvaluator::shouldFollowLinks(State* ps,
+                       const SymbolTransformations &localTrans,
+                       SymbolTransformations& combTrans,
+                       SymbolTransformations& localMissingTrans)
+{
+    bool followLinks = false;
+
+    // If last link involved transformations, they must be a prefix
+    // of the local transformations.
+    if (ps->lastLinkTrans.isPrefixOf(localTrans)) {
+        combTrans = combineTansformations(
+                    ps->transformations, localTrans,
+                    ps->lastLinkTrans);
+        followLinks = true;
+    }
+    // Only exception: local transformations are are prefix of the last
+    // link's transformations and we follow a function pointer to its
+    // later invokation.
+//    else if (localTrans.isPrefixOf(es->lastLinkTrans)) {
+//        localMissingTrans = combineTansformations(
+//                    es->transformations, es->lastLinkTrans,
+//                    localTrans);
+//        // Is the first missing transformation a function call?
+//        if (!localMissingTrans.isEmpty() &&
+//            localMissingTrans.first().type == ttFuncCall)
+//        {
+//            combinedTrans = es->transformations;
+//            combinedTrans.append(localTrans);
+//            followLinks = true;
+//        }
+//    }
+    else if (!ps->lastLinkTrans.isEmpty() &&
+             ps->lastLinkTrans.first().type == ttFuncCall)
+    {
+        // Merge all missing transformations to localMissingTrans
+        for (int i = 0; i < ps->lastLinkTrans.size(); ++i) {
+            if (i >= localTrans.size() ||
+                ps->lastLinkTrans[i] != localTrans[i])
+                localMissingTrans.append(ps->lastLinkTrans[i]);
+        }
+        // Is the first missing transformation a function call?
+        if (!localMissingTrans.isEmpty() &&
+            localMissingTrans.first().type == ttFuncCall)
+        {
+            combTrans = ps->transformations;
+            combTrans.append(localTrans);
+            followLinks = true;
+        }
+    }
+
+    return followLinks;
+}
+
 
 int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
 {
@@ -2896,18 +2968,83 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
         // Was this node assigned to other variables?
         it = _assignedNodesRev.find(es->root);
         if (it != e) {
+//            // Create list of transformations
+//            SymbolTransformations tmpTrans(es->lastLinkTrans);
+//            for (int i = 0;
+//                 i < es->lastLinkTrans.size() && i < localTrans.size() &&
+//                 localTrans[i] == es->lastLinkTrans[i];
+//                 ++i)
+//            {
+//                tmpTrans.pop_front();
+//            }
+
+            SymbolTransformations combinedTrans(this), localMissingTrans(this);
+            bool followLinks = shouldFollowLinks(es, localTrans, combinedTrans,
+                                                 localMissingTrans);
+
+/*
             // If last link involved transformations, they must be a prefix
-            // of the local transformations
+            // of the local transformations.
             if (es->lastLinkTrans.isPrefixOf(localTrans)) {
+                combinedTrans = combineTansformations(
+                            es->transformations, localTrans,
+                            es->lastLinkTrans);
+                followLinks = true;
+            }
+            // Only exception: local transformations are are prefix of the last
+            // link's transformations and we follow a function pointer to its
+            // later invokation.
+//            else if (localTrans.isPrefixOf(es->lastLinkTrans)) {
+//                localMissingTrans = combineTansformations(
+//                            es->transformations, es->lastLinkTrans,
+//                            localTrans);
+//                // Is the first missing transformation a function call?
+//                if (!localMissingTrans.isEmpty() &&
+//                    localMissingTrans.first().type == ttFuncCall)
+//                {
+//                    combinedTrans = es->transformations;
+//                    combinedTrans.append(localTrans);
+//                    followLinks = true;
+//                }
+//            }
+            else if (!es->lastLinkTrans.isEmpty() &&
+                     es->lastLinkTrans.first().type == ttFuncCall)
+            {
+                // Merge all missing transformations to localMissingTrans
+                for (int i = 0; i < es->lastLinkTrans.size(); ++i) {
+                    if (i >= localTrans.size() ||
+                        es->lastLinkTrans[i] != localTrans[i])
+                        localMissingTrans.append(es->lastLinkTrans[i]);
+                }
+                // Is the first missing transformation a function call?
+                if (!localMissingTrans.isEmpty() &&
+                    localMissingTrans.first().type == ttFuncCall)
+                {
+                    combinedTrans = es->transformations;
+                    combinedTrans.append(localTrans);
+                    followLinks = true;
+                }
+            }
+*/
+
+#ifdef DEBUG_POINTS_TO
+            if (!followLinks) {
+                debugmsg(QString("Skipping all links from %1 %2:%3 because %4 "
+                                 "is no prefix of %5 nor vice versa w/ missing ttFuncCall")
+                         .arg(ast_node_type_to_str(es->root))
+                         .arg(es->root->start->line)
+                         .arg(es->root->start->charPosition)
+                         .arg(es->lastLinkTrans.toString(es->sym->name()))
+                         .arg(localTrans.toString(es->sym->name())));
+            }
+#endif
+
+            if (followLinks) {
 #ifdef DEBUG_POINTS_TO
                 int cnt = 0, total = _assignedNodesRev.count(es->root), w = 0;
                 for (int i = total; i > 0; i /= 10)
                     ++w;
 #endif
-
-                SymbolTransformations combinedTrans = combineTansformations(
-                            es->transformations, localTrans,
-                            es->lastLinkTrans);
 
                 TransformedSymbol curSym, ts;
 
@@ -2948,7 +3085,10 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                     rek_es = *es;
                     rek_es.followedSymStack.push(ts);
                     rek_es.root = it->node;
-                    rek_es.lastLinkTrans = it->transformations;
+                    // All missing transformations still must be found after
+                    // following the next link
+                    rek_es.lastLinkTrans = localMissingTrans;
+                    rek_es.lastLinkTrans.append(it->transformations);
                     rek_es.transformations = combinedTrans;
                     rek_es.interLinks.insert(es->root,  rek_es.root);
 #ifdef DEBUG_POINTS_TO
@@ -2965,17 +3105,6 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                         _pointsToDeadEnds.insert(symHash, linkTargetHash);
                 }
             }
-#ifdef DEBUG_POINTS_TO
-            else {
-                debugmsg(QString("Skipping all links from %1 %2:%3 because %4 "
-                                 "is no prefix of %5")
-                         .arg(ast_node_type_to_str(es->root))
-                         .arg(es->root->start->line)
-                         .arg(es->root->start->charPosition)
-                         .arg(es->lastLinkTrans.toString(es->sym->name()))
-                         .arg(localTrans.toString(es->sym->name())));
-            }
-#endif
         }
 
         // Find out the situation in which the identifier is used
@@ -3031,9 +3160,16 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 if (es->interLinks.contains(assigned))
                     return assignments;
 
+                // If Right-hand side is a function, GCC automatically takes
+                // its address, so pretend we saw an address operator
+                ASTType* type = typeofNode(assigned);
+                if (type->type() == rtFuncPointer) {
+                    type = createASTType(rtPointer, assigned, type);
+//                    localTrans.append(ttAddress, assigned);
+                }
+
                 // Ignore right-hand side expressions that cannot hold a pointer
                 // value
-                const ASTType* type = typeofNode(assigned);
                 if ((type->type() & NumericTypes) &&
                     !canHoldPointerValue(type->type()))
                     return assignments;
@@ -3135,6 +3271,13 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 if (!es->interLinks.isEmpty())
                     return assignments;
 
+                // If Right-hand side is a function, GCC automatically takes
+                // its address, so pretend we saw an address operator
+//                const ASTType* type = typeofNode(assigned);
+//                if (type->type() == rtFuncPointer) {
+//                    localTrans.append(ttAddress, assigned);
+//                }
+
                 // Combine global with local transformations. Acutally no need
                 // to trim the transformations because es->lastLinkTrans is
                 // guaranteed to be empty.
@@ -3180,6 +3323,13 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
         case nt_jump_statement_return: {
             // An identifier underneath a return should be the initializer
             assert((assigned = es->root->u.jump_statement.initializer) != 0);
+
+            // If Right-hand side is a function, GCC automatically takes
+            // its address, so pretend we saw an address operator
+//            ASTType* type = typeofNode(assigned);
+//            if (type->type() == rtFuncPointer) {
+//                localTrans.append(ttAddress, assigned);
+//            }
 
             // Check last link's transformations are a prefix of the local ones
             if (!es->lastLinkTrans.isPrefixOf(localTrans)) {
@@ -3362,43 +3512,67 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
             if (!interLinkTypeMatches(ed, localTrans))
                 return erInvalidTransition;
 
-            SymbolTransformations combTrans = combineTansformations(
-                        ed->transformations, localTrans,
-                        ed->lastLinkTrans);
+            SymbolTransformations combTrans(this), localMissingTrans(this);
+            bool followLinks = false;
+
             if (// Limit recursion level
                 (ed->interLinks.size() < 4) &&
-                // If last link involved transformations, they must be a prefix
-                // of the local transformations
-                ed->lastLinkTrans.isPrefixOf(localTrans) &&
                 // Do not recurse for plain local variables without context
-                // (i.e., postfix expression suffixes)
+                // (i.e., w/o postfix expression suffixes)
                 (ed->sym->isGlobal() || combTrans.memberCount() > 0))
             {
-
-                for (; it != e && it.key() == ed->rootNode; ++it) {
-                    // Skip all inter-links that lead back to the source node
-                    if (it->node == ed->srcNode)
-                        continue;
-                    // Skip all targets that are target of this symbol anyway
-                    if (ed->sym->assignedAstNodes().contains(it.value()))
-                        continue;
-
-                    rek_ed = *ed;
-                    rek_ed.rootNode = it->node;
-                    rek_ed.lastLinkTrans = it->transformations;
-                    rek_ed.lastLinkSrcType = typeofNode(ed->rootNode);
-                    rek_ed.lastLinkDestType = typeofNode(
-                                it->transformations.isEmpty() ?
-                                    it->node :
-                                    it->transformations.last().node);
-                    rek_ed.transformations = combTrans;
-                    rek_ed.interLinks.insert(ed->rootNode, rek_ed.rootNode);
-                    evaluateIdentifierUsedAsRek(&rek_ed);
+                followLinks = shouldFollowLinks(ed, localTrans, combTrans,
+                                                localMissingTrans);
+/*
+                // If last link involved transformations, they must be a prefix
+                // of the local transformations.
+                if (ed->lastLinkTrans.isPrefixOf(localTrans)) {
+                    combTrans = combineTansformations(
+                                ed->transformations, localTrans,
+                                ed->lastLinkTrans);
+                    followLinks = true;
                 }
+                else if (!ed->lastLinkTrans.isEmpty() &&
+                         ed->lastLinkTrans.first().type == ttFuncCall)
+                {
+                    // Merge all missing transformations to localMissingTrans
+                    for (int i = 0; i < ed->lastLinkTrans.size(); ++i) {
+                        if (i >= localTrans.size() ||
+                            ed->lastLinkTrans[i] != localTrans[i])
+                            localMissingTrans.append(ed->lastLinkTrans[i]);
+                    }
+                    // Is the first missing transformation a function call?
+                    if (!localMissingTrans.isEmpty() &&
+                        localMissingTrans.first().type == ttFuncCall)
+                    {
+                        combTrans = ed->transformations;
+                        combTrans.append(localTrans);
+                        followLinks = true;
+                    }
+                }
+
+//                // Only exception: local transformations are are prefix of the last
+//                // link's transformations and we follow a function pointer to its
+//                // later invokation.
+//                else if (localTrans.isPrefixOf(ed->lastLinkTrans)) {
+//                    localMissingTrans = combineTansformations(
+//                                ed->transformations, ed->lastLinkTrans,
+//                                localTrans);
+//                    // Is the first missing transformation a function call?
+//                    if (!localMissingTrans.isEmpty() &&
+//                        localMissingTrans.first().type == ttFuncCall)
+//                    {
+//                        combTrans = ed->transformations;
+//                        combTrans.append(localTrans);
+//                        followLinks = true;
+//                    }
+//                }
+*/
             }
+
 #ifdef DEBUG_USED_AS
             // It's not the same pointer of the deref counters don't not match!
-            else {
+            if (!followLinks) {
                 QString reason("of unknown reason");
                 if (ed->interLinks.size() >= 4)
                     reason = QString("recursion level limit (%1) was reached ")
@@ -3419,6 +3593,46 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
                          .arg(reason));
             }
 #endif
+
+            if (followLinks) {
+
+//            SymbolTransformations combTrans = combineTansformations(
+//                        ed->transformations, localTrans,
+//                        ed->lastLinkTrans);
+//            if (// Limit recursion level
+//                (ed->interLinks.size() < 4) &&
+//                // If last link involved transformations, they must be a prefix
+//                // of the local transformations
+//                ed->lastLinkTrans.isPrefixOf(localTrans) &&
+//                // Do not recurse for plain local variables without context
+//                // (i.e., postfix expression suffixes)
+//                (ed->sym->isGlobal() || combTrans.memberCount() > 0))
+//            {
+
+                for (; it != e && it.key() == ed->rootNode; ++it) {
+                    // Skip all inter-links that lead back to the source node
+                    if (it->node == ed->srcNode)
+                        continue;
+                    // Skip all targets that are target of this symbol anyway
+                    if (ed->sym->assignedAstNodes().contains(it.value()))
+                        continue;
+
+                    rek_ed = *ed;
+                    rek_ed.rootNode = it->node;
+//                    rek_ed.lastLinkTrans = localMissingTrans;
+//                    rek_ed.lastLinkTrans.append(it->transformations);
+                    rek_ed.lastLinkTrans = it->transformations;
+                    rek_ed.lastLinkTrans.append(localMissingTrans);
+                    rek_ed.lastLinkSrcType = typeofNode(ed->rootNode);
+                    rek_ed.lastLinkDestType = typeofNode(
+                                it->transformations.isEmpty() ?
+                                    it->node :
+                                    it->transformations.last().node);
+                    rek_ed.transformations = combTrans;
+                    rek_ed.interLinks.insert(ed->rootNode, rek_ed.rootNode);
+                    evaluateIdentifierUsedAsRek(&rek_ed);
+                }
+            }
         }
 
         // Find out the situation in which the identifier is used
@@ -3426,9 +3640,9 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
         case nt_additive_expression:
             // Ignore numeric types in arithmetic expressions
             if (ed->rootNode->u.binary_expression.right &&  !ed->castExNode) {
-                SymbolTransformations combTrans = combineTansformations(
-                            ed->transformations, localTrans,
-                            ed->lastLinkTrans);
+//                SymbolTransformations combTrans = combineTansformations(
+//                            ed->transformations, localTrans,
+//                            ed->lastLinkTrans);
                 const ASTNode* n = localTrans.isEmpty() ?
                             ed->primExNode->parent : localTrans.last().node;
                 if (typeofNode(n)->type() & NumericTypes)
@@ -3644,6 +3858,15 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
     if (!ed->rootNode)
         return erNoAssignmentUse;
 
+    // If Right-hand side is a function, GCC automatically takes
+    // its address, so pretend we saw an address operator
+    ASTType* rType = typeofNode(rNode);
+    if (rType->type() == rtFuncPointer) {
+        rType = createASTType(rtPointer, rNode, rType);
+        localTrans.append(ttAddress, rNode);
+    }
+
+
     // Check if local transformations are a prefix of last
     // link's transformations
     if (!ed->lastLinkTrans.isPrefixOf(localTrans)) {
@@ -3694,7 +3917,7 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
     if (lType->equalTo(typeofNode(n)))
         return erTypesAreEqual;
 
-    ASTType* rType = typeofNode(rNode);
+//    ASTType* rType = typeofNode(rNode);
     // Skip if resulting type of one side does not fit to the other side. We
     // allow pointer-to-integer casts, though.
     if (lType->isPointer() &&
@@ -4045,7 +4268,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
         case ttDereference:
         case ttArray:
             // Array operator, i.e., dereferencing
-            if (!ed->ctxType || !(ed->ctxType->type() & (rtFuncPointer|rtPointer|rtArray)))
+            if (!ed->ctxType || !(ed->ctxType->type() & (rtPointer|rtArray)))
                 typeEvaluatorError2(*ed,
                         QString("Expected a pointer or array type here instead "
                                 "of \"%1\" at %2:%3:%4")
@@ -4058,8 +4281,20 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
             break;
 
         case ttFuncCall:
+            // For non-function types, we excpect to see a pointer first
+            if (!(ed->sym->type() & (stFunctionDecl|stFunctionDef))) {
+                if (!ed->ctxType || !(ed->ctxType->type() & (rtPointer)))
+                    typeEvaluatorError(
+                                QString("Expected a Pointer->FuncPointer type here instead "
+                                        "of \"%1\" at %2:%3:%4")
+                                        .arg(ed->ctxType ? ed->ctxType->toString() : QString())
+                                        .arg(_ast->fileName())
+                                        .arg(ed->ctxNode->start->line)
+                                        .arg(ed->ctxNode->start->charPosition));
+                ed->ctxType = ed->ctxType->next();
+            }
             // Function operator, i.e., function call
-            if (!ed->ctxType || !(ed->ctxType->type() & (rtFuncPointer)))
+            if (!ed->ctxType || !(ed->ctxType->type() & (rtFuncPointer|rtFunction)))
                 typeEvaluatorError2(*ed,
                         QString("Expected a function pointer type here instead "
                                 "of \"%1\" at %2:%3:%4")
@@ -4143,9 +4378,6 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
     // Push current root on the recursion tracking stack, gets auto-popped later
     StackAutoPopper<ASTNodeStack> autoPopper(&ed->evalNodeStack, ed->rootNode);
 
-    // Evaluate if type changes in this expression
-    ret = evaluateTypeFlow(ed);
-
 #ifdef DEBUG_USED_AS
     QString s;
     for (ASTNodeNodeHash::const_iterator it = ed->interLinks.begin();
@@ -4171,6 +4403,9 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateIdentifierUsedAsRek(
              .arg(ed->interLinks.size())
              .arg(s));
 #endif
+
+    // Evaluate if type changes in this expression
+    ret = evaluateTypeFlow(ed);
 
     if (ret == erTypesAreDifferent) {
 

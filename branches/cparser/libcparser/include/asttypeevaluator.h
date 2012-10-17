@@ -59,10 +59,10 @@ public:
     inline void setIdentifier(const QString& id) { _identifier = id; }
     inline const ASTNode* node() const { return _node; }
     inline void setNode(const ASTNode* node) { _node = node; }
-    inline bool pointerSkipped() const { return _flags & flPtrSkipped; }
-    inline void setPointerSkipped(bool value) {
-        _flags = value ? (_flags | flPtrSkipped) : (_flags & ~flPtrSkipped);
-    }
+//    inline bool pointerSkipped() const { return _flags & flPtrSkipped; }
+//    inline void setPointerSkipped(bool value) {
+//        _flags = value ? (_flags | flPtrSkipped) : (_flags & ~flPtrSkipped);
+//    }
     inline bool ampersandSkipped() const { return _flags & flAmpSkipped; }
     inline void setAmpersandSkipped(bool value) {
         _flags = value ? (_flags | flAmpSkipped) : (_flags & ~flAmpSkipped);
@@ -271,6 +271,10 @@ protected:
                                SymbolTransformations *transformations) const;
     void collectSymbols(const ASTNode *node);
     bool canHoldPointerValue(RealType type) const;
+    template<class State>
+    bool shouldFollowLinks(State* ps, const SymbolTransformations& localTrans,
+                           SymbolTransformations& combTrans,
+                           SymbolTransformations& localMissingTrans);
     void evaluateIdentifierPointsTo(const ASTNode *node);
     int evaluateIdentifierPointsToRek(PointsToEvalState *es);
     void evaluateIdentifierPointsToRev(const ASTNode *node);
@@ -348,10 +352,10 @@ private:
     ASTType* embeddingFuncReturnType(const ASTNode* node);
     const ASTSymbol* embeddingFuncSymbol(const ASTNode *node);
     ASTType* expectedTypeAtInitializerPosition(const ASTNode* node);
-    ASTType* preprendPointers(const ASTNode* d_ad, ASTType* type);
-    ASTType* preprendArrays(const ASTNode* dd_dad, ASTType* type);
-    ASTType* preprendPointersArrays(const ASTNode* d_ad, ASTType* type);
-    ASTType* preprendPointersArraysOfIdentifier(const QString& identifier,
+    ASTType* processDeclPointer(const ASTNode* d_ad, ASTType* type);
+    ASTType* processDeclSuffix(const ASTNode* dd_dad, ASTType* type);
+    ASTType* processDeclPointerSuffix(const ASTNode* d_ad, ASTType* type);
+    ASTType* processDeclPointerSuffixOfId(const QString& identifier,
             const ASTNode* declaration, ASTType* type);
     const ASTNode* findIdentifierInIDL(const QString& identifier,
             const ASTNodeList* initDeclaratorList);

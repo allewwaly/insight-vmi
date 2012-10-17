@@ -847,7 +847,7 @@ function_declarator returns [pASTNode node]
                 $init_declarator::isFuncTypedef = ANTLR3_TRUE;
             }
         }        
-      de=declarator // The first star is optional for GCC  
+      de=declarator
         { 
             $node = $de.node;
             $node->u.declarator.isFuncDeclarator = ANTLR3_TRUE; 
