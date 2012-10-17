@@ -430,7 +430,7 @@ QString ASTWalker::antlrTokenToStr(const pANTLR3_COMMON_TOKEN tok) const
         return _ast->antlrTokenToStr(tok);
     // Otherwise use the non-caching version
     else
-        return antlrStringToStr(tok->getText(tok));
+        return tok ? antlrStringToStr(tok->getText(tok)) : QString();
 }
 
 
@@ -441,7 +441,7 @@ QString ASTWalker::antlrStringToStr(const pANTLR3_STRING s) const
         return _ast->antlrStringToStr(s);
     // Otherwise use the non-caching version
     else
-        return QString::fromAscii((const char*)s->chars, s->len);
+        return s ? QString::fromAscii((const char*)s->chars, s->len) : QString();
 }
 
 
