@@ -10,9 +10,19 @@
 
 #include <QDataStream>
 #include <debug.h>
+#include "kernelsymbolstream.h"
 
 #define VADDR_SPACE_X86    0xFFFFFFFFUL
 #define VADDR_SPACE_X86_64 0xFFFFFFFFFFFFFFFFULL
+
+namespace str
+{
+extern const char* initLvl4Pgt;
+extern const char* swapperPgDir;
+extern const char* highMemory;
+extern const char* vmallocEarlyres;
+}
+
 
 /**
  * This struct holds the definition of how a memory specification can be
@@ -53,9 +63,11 @@ struct KernelMemSpec
     KernelMemSpec() {}
 
     /// Constructor
-    KernelMemSpec(QString keyFmt, QString valueFmt, QString outputFmt, QString macroCond = QString()) :
+    KernelMemSpec(QString keyFmt, QString valueFmt, QString valueType,
+                  QString outputFmt, QString macroCond = QString()) :
         keyFmt(keyFmt),
         valueFmt(valueFmt),
+        valueType(valueType),
         outputFmt(outputFmt),
         macroCond(macroCond)
     {}
@@ -65,6 +77,9 @@ struct KernelMemSpec
 
     /// A valid expression in C syntax to calcluate the value of a key-value pair.
     QString valueFmt;
+
+    /// The dat atype of the value, e.g., <tt>long long</tt> or <tt>char*</tt>
+    QString valueType;
 
     /// The output format in which the value should be printed (printf syntax).
     QString outputFmt;
@@ -93,25 +108,22 @@ struct MemSpecs
         ar_i386_pae     = ar_i386 & ar_pae_enabled ///< architecture is i386 with PAE enabled
     };
 
+    /**
+     * Linux kernel version information, see Linux type "struct new_utsname"
+     * in <include/linux/utsname.h>
+     */
+    struct Version
+    {
+        QString sysname;
+        QString release;
+        QString version;
+        QString machine;
+        bool equals(const Version& other) const;
+        QString toString() const;
+    };
+
     /// Constructor
-    MemSpecs() :
-        pageOffset(0),
-        vmallocStart(0),
-        vmallocEnd(0),
-        vmallocOffset(0),
-        vmemmapStart(0),
-        vmemmapEnd(0),
-        modulesVaddr(0),
-        modulesEnd(0),
-        startKernelMap(0),
-        initLevel4Pgt(0),
-        swapperPgDir(0),
-        highMemory(0),
-        vmallocEarlyreserve(0),
-        sizeofUnsignedLong(sizeof(unsigned long)),
-        arch(ar_undefined),
-        initialized(false)
-    {}
+    MemSpecs();
 
     /**
      * Sets any of the local member variables by parsing a key-value pair.
@@ -162,8 +174,13 @@ struct MemSpecs
     quint64 swapperPgDir;
     quint64 highMemory;          ///< This is set at runtime by MemoryDump::init()
     quint64 vmallocEarlyreserve; ///< This is set at runtime by MemoryDump::init()
-    qint32 sizeofUnsignedLong;
+    quint64 listPoison1;
+    quint64 listPoison2;
+    qint32 maxErrNo;
+    qint32 sizeofLong;
+    qint32 sizeofPointer;
     qint32 arch;                 ///< An Architecture value
+    struct Version version;      ///< Linux kernel version information
     bool initialized;            ///< \c true after MemoryDump::init() is complete, \c false otherwise
 };
 
@@ -191,7 +208,7 @@ inline quint64 MemSpecs::realVmallocStart() const
 * @param specs object to store the serialized data to
 * @return the data stream \a in
 */
-QDataStream& operator>>(QDataStream& in, MemSpecs& specs);
+KernelSymbolStream& operator>>(KernelSymbolStream& in, MemSpecs& specs);
 
 
 /**
@@ -200,7 +217,7 @@ QDataStream& operator>>(QDataStream& in, MemSpecs& specs);
 * @param specs object to serialize
 * @return the data stream \a out
 */
-QDataStream& operator<<(QDataStream& out, const MemSpecs& specs);
+KernelSymbolStream& operator<<(KernelSymbolStream& out, const MemSpecs& specs);
 
 
 #endif /* MEMSPECS_H_ */

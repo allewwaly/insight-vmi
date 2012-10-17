@@ -26,6 +26,7 @@
 #include "memspecparser.h"
 #include "shell.h"
 #include <debug.h>
+#include <bugreport.h>
 
 
 //------------------------------------------------------------------------------
@@ -40,13 +41,12 @@ KernelSymbols::~KernelSymbols()
 }
 
 
-void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
-        const QString systemMap)
+void KernelSymbols::parseSymbols(const QString& kernelSrc)
 {
-	if (!from)
-		parserError("Received a null device to read the data from");
-
 	_factory.clear();
+
+	QString systemMap(kernelSrc + (kernelSrc.endsWith('/') ?
+									   "System.map" : "/System.map"));
 
     QTime timer;
     timer.start();
@@ -69,34 +69,22 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
             time = QString("%1 min ").arg(m) + time;
 
 	    shell->out()
-            << "\rSuccessfully parsed the memory specifications in " << time << endl;
-
-//        // Ask the user if he wants to keep the build directory
-//	    debugmsg("Ask user to keep the build directory");
-//        QString reply;
-//        do {
-//            QString prompt = QString("Keep build directory \"%1\"? [Y/n] ").arg(specParser.buildDir());
-//            reply = shell->readLine(prompt).toLower();
-//            if (reply.isEmpty())
-//                reply = "y";
-//        } while (reply != "y" && reply != "n");
-//        specParser.setAutoRemoveBuildDir(reply == "n");
+			<< "\rSuccessfully parsed the memory specifications in " << time
+			<< "." << endl;
 	}
-    catch (GenericException& e) {
-        shell->err()
-            << endl
-            << "Caught exception at " << e.file << ":" << e.line << endl
-            << "Message: " << e.message << endl;
-
-        // Was the error caused during the memspec build process?
-        if (!specParser.errorOutput().isEmpty()) {
+	catch (MemSpecParserException& e) {
+		// Was the error caused during the memspec build process?
+        if (!specParser.errorOutput().isEmpty() && shell->interactive()) {
             // Output the error messages
-            shell->err() << endl << specParser.errorOutput() << endl;
+            shell->err() << endl << "Caught a " << e.className() << " at "
+                         << e.file << ":" << e.line << ": " << e.message
+                         << endl;
 
             // Ask the user if he wants to keep the build directory
             QString reply;
             do {
-                QString prompt = QString("Keep build directory \"%1\"? [Y/n] ").arg(specParser.buildDir());
+                QString prompt = QString("Keep build directory \"%1\"? [Y/n] ")
+                                    .arg(specParser.buildDir());
                 reply = shell->readLine(prompt).toLower();
                 if (reply.isEmpty())
                     reply = "y";
@@ -106,81 +94,10 @@ void KernelSymbols::parseSymbols(QIODevice* from, const QString& kernelSrc,
         throw;
     }
 
-    KernelSymbolParser symParser(from, &_factory);
+    KernelSymbolParser symParser(kernelSrc, &_factory);
 
-    try {
-	    // Parse the debugging symbols
-		symParser.parse();
-	    _factory.symbolsFinished(SymFactory::rtParsing);
-
-        // Print out some timing statistics
-        int duration = timer.elapsed();
-        int s = (duration / 1000) % 60;
-        int m = duration / (60*1000);
-        QString time = QString("%1 sec").arg(s);
-        if (m > 0)
-            time = QString("%1 min ").arg(m) + time;
-
-		shell->out() << "Parsing finish in " << time;
-        if (duration > 0)
-            shell->out() << " (" << (int)((symParser.line() / (float)duration * 1000)) << " lines per second)";
-        shell->out() << "." << endl;
-	}
-    catch (GenericException& e) {
-        shell->err()
-            << endl
-            << "Caught exception at " << e.file << ":" << e.line
-            << " at input line " << symParser.line() << " of the debug symbols" << endl
-            << "Message: " << e.message << endl;
-		throw;
-	}
-}
-
-
-void KernelSymbols::parseSymbols(const QString& objdump,
-        const QString& kernelSrc, const QString systemMap)
-{
-	QFile file(objdump);
-	if (!file.open(QIODevice::ReadOnly))
-	    genericError(QString("Error opening file %1 for reading").arg(objdump));
-
-	parseSymbols(&file, kernelSrc, systemMap);
-
-	file.close();
-}
-
-
-void KernelSymbols::parseSymbols(const QString& kernelSrc)
-{
-	QString kernel = kernelSrc + (kernelSrc.endsWith('/') ? "vmlinux" : "/vmlinux");
-	QString sysmap = kernelSrc + (kernelSrc.endsWith('/') ? "System.map" : "/System.map");
-
-	QProcess proc;
-	proc.setReadChannel(QProcess::StandardOutput);
-
-	QString cmd = "objdump";
-	QStringList args;
-	args << "-W" << kernel;
-
-	// Start objdump process
-	proc.start(cmd, args, QIODevice::ReadOnly);
-	if (proc.waitForStarted(-1))
-		// Parse its output
-		parseSymbols(&proc, kernelSrc, sysmap);
-	else {
-		genericError(
-				QString("Could not execute \"%1\". Make sure the "
-					"%1 utility is installed and can be found through "
-				    "the PATH variable.").arg(cmd));
-	}
-	// Did the process exit normally?
-	if (proc.exitCode()) {
-		genericError(
-				QString("Error encountered executing \"%1 %2\":\n%3")
-					.arg(cmd)
-					.arg(args.join(" "))
-					.arg(QString::fromLocal8Bit(proc.readAllStandardError())));
-	}
+	// Parse the debugging symbols
+	symParser.parse();
 }
 
 
@@ -190,6 +107,7 @@ void KernelSymbols::loadSymbols(QIODevice* from)
         genericError("Received a null device to read the data from");
 
     _factory.clear();
+    _memSpecs = MemSpecs();
 
     KernelSymbolReader reader(from, &_factory, &_memSpecs);
     try {
@@ -217,7 +135,8 @@ void KernelSymbols::loadSymbols(QIODevice* from)
     }
     catch (GenericException& e) {
         shell->err()
-            << "Caught exception at " << e.file << ":" << e.line << endl
+            << "Caught a " << e.className() << " at " << e.file << ":"
+            << endl
             << "Message: " << e.message << endl;
         throw;
     }
@@ -267,7 +186,8 @@ void KernelSymbols::saveSymbols(QIODevice* to)
     }
     catch (GenericException& e) {
         shell->err()
-            << "Caught exception at " << e.file << ":" << e.line << endl
+            << "Caught a " << e.className() << " at " << e.file << ":" << e.line
+            << endl
             << "Message: " << e.message << endl;
         throw;
     }

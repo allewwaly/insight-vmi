@@ -5,16 +5,19 @@
  *      Author: chrschn
  */
 
+#include <QRegExp>
+#include <QTime>
+#include <QProcess>
+#include <QCoreApplication>
+#include <QDirIterator>
+
 #include "kernelsymbolparser.h"
 #include "symfactory.h"
 #include "parserexception.h"
 #include "shell.h"
 #include "funcparam.h"
-#include <QRegExp>
-#include <QTime>
-#include <QProcess>
-#include <QCoreApplication>
-
+#include "bugreport.h"
+#include <debug.h>
 
 #define parseInt(i, s, pb) \
     do { \
@@ -98,37 +101,79 @@ namespace str {
 
 //------------------------------------------------------------------------------
 
-KernelSymbolParser::KernelSymbolParser(QIODevice* from, SymFactory* factory)
-    : _from(from),
-      _factory(factory),
+KernelSymbolParser::WorkerThread::WorkerThread(
+        KernelSymbolParser* parser)
+    : _parser(parser),
+      _stopExecution(false),
       _line(0),
       _bytesRead(0),
       _info(0),
-      _parentInfo(0)
+      _parentInfo(0),
+      _hdrSym(hsUnknownSymbol),
+      _curSrcID(-1),
+      _nextId(-1),
+      _curFileIndex(-1)
 {
-    _infos.push(new TypeInfo);
+    _infos.push(new TypeInfo(_curFileIndex));
 }
 
 
-KernelSymbolParser::~KernelSymbolParser()
+KernelSymbolParser::WorkerThread::~WorkerThread()
 {
     for (int i = 0; i < _infos.size(); ++i)
         delete _infos[i];
 }
 
 
-quint64 KernelSymbolParser::line() const
+void KernelSymbolParser::WorkerThread::run()
 {
-    return _line;
+    QString currentFile;
+    QMutexLocker filesLock(&_parser->_filesMutex);
+    QMutexLocker facLock(&_parser->_factoryMutex);
+    facLock.unlock();
+    _stopExecution = false;
+
+    while (!_stopExecution && !shell->interrupted() &&
+           _parser->_filesIndex < _parser->_fileNames.size())
+    {
+        _curFileIndex = _parser->_filesIndex++;
+        currentFile = _parser->_fileNames[_curFileIndex];
+
+        _parser->_currentFile = currentFile;
+
+        if (_parser->_filesIndex <= 1)
+            _parser->operationProgress();
+        else
+            _parser->checkOperationProgress();
+        filesLock.unlock();
+
+        _infos.top()->setFileIndex(_curFileIndex);
+        parseFile(_parser->_srcDir.absoluteFilePath(currentFile));
+
+        filesLock.relock();
+        _parser->_binBytesRead += QFileInfo(_parser->_srcDir, currentFile).size();
+        _parser->_durationLastFileFinished = _parser->_duration;
+        filesLock.unlock();
+
+        facLock.relock();
+        // Remove externally declared variables, for which we have full
+        // declarations
+        _parser->_factory->scanExternalVars(false);
+        // Delete the reverse mappings for the finished file
+        _parser->_factory->clearIdRevMap(_curFileIndex);
+        facLock.unlock();
+
+        filesLock.relock();
+    }
 }
 
 
-void KernelSymbolParser::finishLastSymbol()
+void KernelSymbolParser::WorkerThread::finishLastSymbol()
 {
     // Do we need to open a new scope?
     if (_info->sibling() > 0 && _info->sibling() > _nextId) {
         _parentInfo = _info;
-        _info = new TypeInfo();
+        _info = new TypeInfo(_curFileIndex);
         _infos.push(_info);
     }
     else {
@@ -138,6 +183,8 @@ void KernelSymbolParser::finishLastSymbol()
             if (_info->symType() && _info->isRelevant()) {
                 if (_info->symType() & SubHdrTypes) {
                     assert(_parentInfo != 0);
+                    // Make this function thread-safe
+                    QMutexLocker lock(&_parser->_factoryMutex);
                     switch (_info->symType()) {
                     case hsSubrangeType:
                         // We ignore subInfo.type() for now...
@@ -147,10 +194,14 @@ void KernelSymbolParser::finishLastSymbol()
                         _parentInfo->addEnumValue(_info->name(), _info->constValue().toInt());
                         break;
                     case hsMember:
-                        _parentInfo->members().append(new StructuredMember(_factory, *_info));
+                        _parser->_factory->mapToInternalIds(*_info);
+                        _parentInfo->members().append(
+                                    new StructuredMember(_parser->_factory, *_info));
                         break;
                     case hsFormalParameter:
-                        _parentInfo->params().append(new FuncParam(_factory, *_info));
+                        _parser->_factory->mapToInternalIds(*_info);
+                        _parentInfo->params().append(
+                                    new FuncParam(_parser->_factory, *_info));
                         break;
                     default:
                         parserError(QString("Unhandled sub-type: %1").arg(_info->symType()));
@@ -163,14 +214,16 @@ void KernelSymbolParser::finishLastSymbol()
                 }
                 // Non-external variables without a location belong to inline assembler
                 // statements which we can ignore
-                else if (_info->symType() != hsVariable ||
-                         _info->location() > 0 || _info->external())
+                else if (_info->symType() != hsVariable || _info->hasLocation())
                 {
                     // Do not pass the type name of constant or volatile types to the
                     // factory
                     if (_info->symType() & (hsConstType|hsVolatileType))
                         _info->setName(QString());
-                    _factory->addSymbol(*_info);
+                    // Make this function thread-safe
+                    QMutexLocker lock(&_parser->_factoryMutex);
+                    _parser->_factory->mapToInternalIds(*_info);
+                    _parser->_factory->addSymbol(*_info);
                 }
             }
 
@@ -189,7 +242,8 @@ void KernelSymbolParser::finishLastSymbol()
 }
 
 
-void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
+void KernelSymbolParser::WorkerThread::parseParam(const ParamSymbolType param,
+                                                  QString value)
 {
     bool ok;
     qint32 i;
@@ -282,7 +336,6 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
         // If the regex did not match, it must be a local variable
         else if (_hdrSym == hsVariable) {
             _info->clear();
-            _isRelevant = false;
         }
         // Ignore location for parameters
         else if (_hdrSym == hsFormalParameter) {
@@ -302,6 +355,7 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
     case psInline: {
         if (!rxBound.exactMatch(value))
             parserError(QString(str::regexErrorMsg).arg(rxBound.pattern()).arg(value));
+
         parseInt(i, rxBound.cap(1), &ok);
         _info->setInlined(i != 0);
         break;
@@ -331,8 +385,15 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
         // This can be decimal or integer encoded
         else if (!rxBound.exactMatch(value))
             parserError(QString(str::regexErrorMsg).arg(rxBound.pattern()).arg(value));
-        parseInt(i, rxBound.cap(1), &ok);
-        _info->addUpperBound(i);
+        if (rxBound.cap(1).startsWith("0x")) {
+            QString s = rxBound.cap(1);
+            parseULongLong16(ul, s.right(s.size() - 2), &ok);
+            i = (ul > 0x7FFFFFFFUL) ? -1 : ul;
+        }
+        else
+            parseInt(i, rxBound.cap(1), &ok);
+        if (i > 0)
+            _info->addUpperBound(i);
         break;
     }
     case psExternal: {
@@ -356,7 +417,43 @@ void KernelSymbolParser::parseParam(const ParamSymbolType param, QString value)
 }
 
 
-void KernelSymbolParser::parse()
+void KernelSymbolParser::WorkerThread::parseFile(const QString& fileName)
+{
+	// Create the objdump process
+	QProcess proc;
+	proc.setReadChannel(QProcess::StandardOutput);
+
+	static const QString cmd("objdump");
+	QStringList args;
+	args << "-W" << fileName;
+
+	// Start objdump process
+	proc.start(cmd, args, QIODevice::ReadOnly);
+	if (!proc.waitForStarted(-1)) {
+		genericError(
+				QString("Could not execute \"%1\". Make sure the "
+					"%1 utility is installed and can be found through "
+					"the PATH variable.").arg(cmd));
+	}
+
+    // Did the process start normally?
+    if ( proc.state() == QProcess::NotRunning &&
+         ((proc.exitStatus() != QProcess::NormalExit) || proc.exitCode()) )
+    {
+        genericError(
+                QString("Error encountered executing \"%1 %2\":\n%3")
+                    .arg(cmd)
+                    .arg(args.join(" "))
+                    .arg(QString::fromLocal8Bit(proc.readAllStandardError())));
+    }
+
+    parse(&proc);
+    // Avoid warnings "Destroyed while process is still running."
+    proc.waitForFinished();
+}
+
+
+void KernelSymbolParser::WorkerThread::parse(QIODevice* from)
 {
     const int bufSize = 4096;
     char buf[bufSize];
@@ -367,36 +464,38 @@ void KernelSymbolParser::parse()
     static const HdrSymMap hdrMap = getHdrSymMap();
     static const ParamSymMap paramMap = getParamSymMap();
 
-	// Try to cast a reference to a QProcess object
-	QProcess* objdumpProc = dynamic_cast<QProcess*>(_from);
+	// Create the objdump process
+	QProcess* proc = dynamic_cast<QProcess*>(from);
 
     QString line;
     ParamSymbolType paramSym;
     qint32 i;
     _nextId = 0;
+    _line = 0;
     bool ok;
     _curSrcID = -1;
     while (_infos.size() > 1)
-        delete _infos.top();
+        delete _infos.pop();
     _info = _infos.top();
     _info->clear();
+    _parentInfo = 0;
 
     _hdrSym = hsUnknownSymbol;
 
-    operationStarted();
-
     try {
+
         while ( !shell->interrupted() &&
-                ( !_from->atEnd() ||
-        	      (objdumpProc && objdumpProc->state() != QProcess::NotRunning) ) )
+                ( !from->atEnd() ||
+                  (proc && proc->state() != QProcess::NotRunning) ) )
         {
         	// Make sure one line is available for sequential devices
-        	if (_from->isSequential() && !_from->canReadLine()) {
+            if (from->isSequential() && !from->canReadLine()) {
+                yieldCurrentThread();
         		QCoreApplication::processEvents();
         		continue;
         	}
 
-            int len = _from->readLine(buf, bufSize);
+            int len = from->readLine(buf, bufSize);
             if (len == 0)
             	continue;
             if (len < 0)
@@ -409,89 +508,284 @@ void KernelSymbolParser::parse()
             if (len < 30 || line.isEmpty() || (line[0] != '<' && (line[0] != 'D' && line[1] != 'W')))
                 continue;
 
-            // First see if a new header starts
-            if (rxHdr.exactMatch(line)) {
+            try {
+                // First see if a new header starts
+                if (rxHdr.exactMatch(line)) {
 
-                // If the symbol does not exist in the hash, it will return 0, which
-                // corresponds to hsUnknownSymbol.
-                _hdrSym = hdrMap.value(rxHdr.cap(2));
-                if (_hdrSym == hsUnknownSymbol)
-                    parserError(QString("Unknown debug symbol type encountered: %1").arg(rxHdr.cap(2)));
-                parseInt16(_nextId, rxHdr.cap(1), &ok);
+                    // If the symbol does not exist in the hash, it will return 0, which
+                    // corresponds to hsUnknownSymbol.
+                    _hdrSym = hdrMap.value(rxHdr.cap(2));
+                    if (_hdrSym == hsUnknownSymbol)
+                        parserError(QString("Unknown debug symbol type "
+                                            "encountered: %1").arg(rxHdr.cap(2)));
+                    parseInt16(_nextId, rxHdr.cap(1), &ok);
 
-                // Finish the last symbol before we continue parsing
-                finishLastSymbol();
+                    // Finish the last symbol before we continue parsing
+                    try {
+                        finishLastSymbol();
+                    }
+                    catch (...) {
+                        // Don't process this symbol again
+                        _info->setIsRelevant(false);
+                        throw;
+                    }
 
-                switch(_parentInfo ? _parentInfo->symType() : hsUnknownSymbol) {
-                // For functions parse parameters but ignore local variables
-                case hsSubprogram:
-                    _info->setIsRelevant(_hdrSym & ~hsVariable &
-                                         (RelevantHdr|hsFormalParameter));
-                    break;
-                    // For inlined functions ignore parameters and local variables
-                case hsInlinedSubroutine:
-                    _info->setIsRelevant(_hdrSym & ~hsVariable & RelevantHdr);
-                    break;
-                    // For functions pointers parse the parameters
-                case hsSubroutineType:
-                    _info->setIsRelevant(_hdrSym &
-                                         (RelevantHdr|hsFormalParameter));
-                    break;
-                    // Default parsing
-                default:
-                    _info->setIsRelevant(_hdrSym & RelevantHdr);
-                    break;
+                    switch(_parentInfo ? _parentInfo->symType() : hsUnknownSymbol) {
+                    // For functions parse parameters but ignore local variables
+                    case hsSubprogram:
+                        _info->setIsRelevant(_hdrSym & ~hsVariable &
+                                             (RelevantHdr|hsFormalParameter));
+                        break;
+                        // For inlined functions ignore parameters and local variables
+                    case hsInlinedSubroutine:
+                        _info->setIsRelevant(_hdrSym & ~hsVariable & RelevantHdr);
+                        break;
+                        // For functions pointers parse the parameters
+                    case hsSubroutineType:
+                        _info->setIsRelevant(_hdrSym &
+                                             (RelevantHdr|hsFormalParameter));
+                        break;
+                        // Default parsing
+                    default:
+                        _info->setIsRelevant(_hdrSym & RelevantHdr);
+                        break;
+                    }
+
+                    // Are we interested in this symbol?
+                    if (_info->isRelevant()) {
+                        _info->setSymType(_hdrSym);
+                        parseInt16(i, rxHdr.cap(1), &ok);
+                        _info->setId(i);
+                        _info->setOrigId(i);
+                        // If this is a compile unit, save its ID locally
+                        if (_hdrSym == hsCompileUnit)
+                            _curSrcID = _info->id();
+                    }
                 }
+                // Next see if this matches a parameter
+                else if (_info->isRelevant() && rxParam.exactMatch(line)) {
+                    paramSym = paramMap.value(rxParam.cap(1));
 
-                // Are we interested in this symbol?
-                if (_info->isRelevant()) {
-                    _info->setSymType(_hdrSym);
-                    parseInt16(i, rxHdr.cap(1), &ok);
-                    _info->setId(i);
-                    // If this is a compile unit, save its ID locally
-                    if (_hdrSym == hsCompileUnit)
-                        _curSrcID = _info->id();
+                    // Are we interested in this parameter?
+                    if (paramSym & RelevantParam)
+                        parseParam(paramSym, rxParam.cap(2));
                 }
             }
-            // Next see if this matches a parameter
-            else if (_info->isRelevant() && rxParam.exactMatch(line)) {
-                paramSym = paramMap.value(rxParam.cap(1));
-
-                // Are we interested in this parameter?
-                if (paramSym & RelevantParam)
-                    parseParam(paramSym, rxParam.cap(2));
+            catch (GenericException& e) {
+                QString msg = QString("%0: %1\n\n").arg(e.className()).arg(e.message);
+                BugReport::reportErr(msg, e.file, e.line);
             }
-            checkOperationProgress();
+        }
+
+        // Finish the last symbol, if required
+        if (_info->isRelevant())
+            finishLastSymbol();
+    }
+    catch (GenericException& e) {
+        QString msg = QString("%0: %1\n\n").arg(e.className()).arg(e.message);
+        BugReport::reportErr(msg, e.file, e.line);
+    }
+}
+
+
+/******************************************************************************/
+
+KernelSymbolParser::KernelSymbolParser(SymFactory *factory)
+    : _factory(factory), _filesIndex(0), _durationLastFileFinished(0)
+{
+}
+
+
+KernelSymbolParser::KernelSymbolParser(const QString& srcPath,
+                                       SymFactory* factory)
+    : _srcPath(srcPath), _factory(factory), _srcDir(srcPath), _filesIndex(0),
+      _durationLastFileFinished(0)
+{
+}
+
+
+KernelSymbolParser::~KernelSymbolParser()
+{
+    cleanUpThreads();
+}
+
+
+void KernelSymbolParser::parse(QIODevice *from)
+{
+    WorkerThread worker(this);
+    worker.parse(from);
+}
+
+
+void KernelSymbolParser::parse()
+{
+    // Make sure the source directoy exists
+    if (!_srcDir.exists()) {
+        shell->err() << "Source directory \"" << _srcDir.absolutePath()
+                     << "\" does not exist."
+                     << endl;
+        return;
+    }
+
+    // Test if we can execute "objdump"
+    QProcess testproc;
+    testproc.start("objdump", QIODevice::ReadOnly);
+
+    if (!testproc.waitForFinished() ||
+        testproc.error() != QProcess::UnknownError)
+    {
+        shell->err() << "Could not execute \"objdump\". Make sure the "
+                        "objdump utility is installed and can be found through "
+                        "the PATH variable."
+                     << endl;
+        return;
+    }
+
+    // Init bug report
+    if (BugReport::log())
+        BugReport::log()->newFile("insightd");
+    else
+        BugReport::setLog(new BugReport("insightd"));
+
+    cleanUpThreads();
+
+    operationStarted();
+    _durationLastFileFinished = _duration;
+
+    shellOut("Collecting list of files to process: ", false);
+
+//#define DEBUG_SYM_PARSING 1
+
+    // Collect files to process along with their size
+    _filesIndex = 0;
+    _fileNames.clear();
+#if defined(DEBUG_SYM_PARSING)
+    _binBytesTotal = 0;
+#else
+    _fileNames.append(_srcDir.relativeFilePath("vmlinux"));
+    _binBytesTotal = QFileInfo(_srcDir, "vmlinux").size();
+#endif
+    _binBytesRead = 0;
+
+    QDirIterator dit(_srcPath, QDir::Files|QDir::NoSymLinks|QDir::NoDotAndDotDot,
+                     QDirIterator::Subdirectories);
+
+    while (!shell->interrupted() && dit.hasNext()) {
+        dit.next();
+        // Find all modules outside the lib/modules/ directory
+        if (dit.fileInfo().suffix() == "ko" &&
+    #if defined(DEBUG_SYM_PARSING)
+            (dit.fileInfo().baseName() == "mbp_nvidia_bl" ||
+             dit.fileInfo().baseName() == "ibmaem") &&
+    #endif
+            !dit.fileInfo().filePath().contains("/lib/modules/"))
+        {
+            _fileNames.append(
+                        _srcDir.relativeFilePath(
+                            dit.fileInfo().absoluteFilePath()));
+            _binBytesTotal += dit.fileInfo().size();
+
+#if defined(DEBUG_SYM_PARSING)
+//            if (_fileNames.size() >= 4)
+//                break;
+#endif
         }
     }
-    catch (...) {
-        // Exceptional cleanup
-        operationStopped();
-        shell->out() << endl;
-        throw; // Re-throw exception
+
+    _factory->setOrigSymFiles(_fileNames);
+
+    shellOut(QString("%1 files found.").arg(_fileNames.size()), true);
+
+    // Create worker threads, limited to single-threading for debugging
+#if defined(DEBUG_SYM_PARSING)
+    const int THREAD_COUNT = 1;
+#else
+    const int THREAD_COUNT = QThread::idealThreadCount();
+#endif
+
+    for (int i = 0; i < THREAD_COUNT; ++i)
+    {
+        WorkerThread* thread = new WorkerThread(this);
+        _threads.append(thread);
+        thread->start();
     }
 
-    // Finish the last symbol, if required
-    if (_isRelevant)
-        finishLastSymbol();
+    // Show progress while parsing is not finished
+    for (int i = 0; i < THREAD_COUNT; ++i)
+        while (!_threads[i]->wait(250))
+            checkOperationProgress();
+
+    cleanUpThreads();
 
     operationStopped();
+    QString s = QString("\rParsed debugging symbols in %1 of %2 files "
+                        "(%3 MB) in %4.")
+            .arg(_filesIndex)
+            .arg(_fileNames.size())
+            .arg(_binBytesRead >> 20)
+            .arg(elapsedTimeVerbose());
+    shellOut(s, true);
 
-    shell->out()
-        << "\rParsing " << _line << " lines ("
-        << _bytesRead << " bytes) finished." << endl;
+
+    shellOut("Post-processing symbols... ", false);
+    _factory->symbolsFinished(SymFactory::rtParsing);
+    shellOut("done.", true);
+
+    // In case there were errors, show the user some information
+    if (BugReport::log()) {
+        if (BugReport::log()->entries()) {
+            BugReport::log()->close();
+            shell->out() << endl
+                         << BugReport::log()->bugSubmissionHint(
+                                BugReport::log()->entries());
+        }
+        delete BugReport::log();
+        BugReport::setLog(0);
+    }
 }
 
 
 // Show some progress information
 void KernelSymbolParser::operationProgress()
 {
-    shell->out() << "\rParsing line " << _line;
+    QMutexLocker lock(&_progressMutex);
+    float percent = _binBytesRead /
+            (float) (_binBytesTotal > 0 ? _binBytesTotal : 1);
+    int remaining = -1;
+    if (percent > 0) {
+        remaining = _durationLastFileFinished / percent * (1.0 - percent);
+        remaining = (remaining - (_duration - _durationLastFileFinished)) / 1000;
+    }
 
-    qint64 size = _from->size();
-    if (!_from->isSequential() && size > 0)
-        shell->out()
-            << " (" << (int) ((_bytesRead / (float) size) * 100) << "%)";
+    QString remStr = remaining > 0 ?
+                QString("%1:%2").arg(remaining / 60).arg(remaining % 60, 2, 10, QChar('0')) :
+                QString("??");
 
-    shell->out() << ", " << elapsedTime() << " elapsed" << flush;
+    QString fileName = _currentFile;
+    QString s = QString("\rParsing file %1/%2 (%3%), %4 elapsed, %5 remaining%7: %6")
+            .arg(_filesIndex)
+            .arg(_fileNames.size())
+            .arg((int)(percent * 100))
+            .arg(elapsedTime())
+            .arg(remStr)
+            .arg(fileName);
+    // Show no. of errors
+    if (BugReport::log() && BugReport::log()->entries())
+        s = s.arg(QString(", %1 errors so far").arg(BugReport::log()->entries()));
+    else
+        s = s.arg(QString());
+
+    shellOut(s, false);
+}
+
+
+void KernelSymbolParser::cleanUpThreads()
+{
+    for (int i = 0; i < _threads.size(); ++i)
+        _threads[i]->stop();
+    for (int i = 0; i < _threads.size(); ++i) {
+        _threads[i]->wait();
+        _threads[i]->deleteLater();
+    }
+    _threads.clear();
 }

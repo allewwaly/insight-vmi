@@ -13,12 +13,16 @@
 #include "virtualmemory.h"
 #include "instance.h"
 #include "basetype.h"
+#include "memorymapbuilder.h"
 
 // forward declarations
 class QFile;
 class QIODevice;
 class SymFactory;
+
+#ifdef CONFIG_MEMORY_MAP
 class MemoryMap;
+#endif
 
 /**
  * Exception class for queries
@@ -66,6 +70,11 @@ public:
 
     virtual ~QueryException() throw()
     {
+    }
+
+    virtual const char* className() const
+    {
+        return "QueryException";
     }
 };
 
@@ -120,7 +129,7 @@ public:
      * @exception QueryException the queried symbol does not exist or cannot
      * be read
      */
-    QString query(const int queryId) const;
+    QString query(const int queryId, const ColorPalette &col) const;
 
     /**
      * Retrieves a string representation a symbol specified in dotted notation,
@@ -133,7 +142,7 @@ public:
      * @exception QueryException the queried symbol does not exist or cannot
      * be read
      */
-    QString query(const QString& queryString) const;
+    QString query(const QString& queryString, const ColorPalette &col) const;
 
     /**
      * Retrieves an Instance object for the variable with ID \a queryId.
@@ -200,7 +209,7 @@ public:
      * @return a string representation of the memory region at \a address as
      * type \a type
      */
-    QString dump(const QString& type, quint64 address) const;
+    QString dump(const QString& type, quint64 address, const ColorPalette &col) const;
 
     /**
      * @return the memory specification this MemDump object uses
@@ -217,6 +226,7 @@ public:
      */
     int index() const;
 
+#ifdef CONFIG_MEMORY_MAP
     /**
      * @return the memory map of this dump
      */
@@ -232,13 +242,15 @@ public:
      * @param minProbability stop building when the node's probability drops
      *  below this threshold
      */
-    void setupRevMap(float minProbability = 0.0);
+    void setupRevMap(MemoryMapBuilderType type, float minProbability = 0.0,
+                     const QString& slubObjFile = QString());
 
     /**
      * Calculates the differences with MemoryDump \a other.
      * @param other
      */
     void setupDiff(MemoryDump* other);
+#endif
 
 private:
     void init();
@@ -246,10 +258,12 @@ private:
     MemSpecs _specs;
     QFile* _file;
     QString _fileName;
-    VirtualMemory* _vmem;
     const SymFactory* _factory;
-    int _index;
+    VirtualMemory* _vmem;
+#ifdef CONFIG_MEMORY_MAP
     MemoryMap* _map;
+#endif
+    int _index;
 };
 
 /// An array of MemoryDump files
@@ -276,6 +290,8 @@ inline int MemoryDump::index() const
 }
 
 
+#ifdef CONFIG_MEMORY_MAP
+
 inline const MemoryMap* MemoryDump::map() const
 {
     return _map;
@@ -287,6 +303,7 @@ inline MemoryMap* MemoryDump::map()
     return _map;
 }
 
+#endif
 
 inline VirtualMemory* MemoryDump::vmem()
 {

@@ -23,8 +23,19 @@ class VirtualMemory;
  * This class provides access to the kernel symbols from within the QtScript
  * environment.
  *
- * \note All methods of this class implemented as Qt slots are available within
- * the scripting environment using the global \c Symbols object.
+ * All methods of this class implemented as Qt slots are available within
+ * the scripting environment using the global \c Symbols object, for example:
+ *
+ * \code
+ * var ids = Symbols.typeIds();
+ * // Create an instance for every type
+ * for (var i in ids) {
+ *     var instance = Symbols.getType(ids[i]);
+ *     // Print unique types (not very efficient, though)
+ *     if (instance.TypeId() == ids[i])
+ *         print(instance.TypeName());
+ * }
+ * \endcode
  */
 class KernelSymbolsClass: public QObject, public QScriptable
 {

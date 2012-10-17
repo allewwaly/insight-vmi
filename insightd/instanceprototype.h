@@ -183,6 +183,37 @@ public slots:
     void AddToAddress(int offset);
 
     /**
+     * Treats this Instance as an array and returns a new instance
+     * at index \a index. The behavior depends on the Type():
+     *
+     *  * For pointers of type <tt>T*</tt>, the pointer is dereferenced and
+     *    \a index * <tt>sizeof(T)</tt> is added to the resulting address. The
+     *    resulting type is <tt>T</tt>. If the pointer cannot be dereferenced,
+     *    either because it is of type <tt>void*</tt> or the address is not
+     *    accessible, an empty Instance is returned.
+     *  * For arrays of type <tt>T[]</tt>, \a index * <tt>sizeof(T)</tt> is
+     *    added to the current address. The resulting type is <tt>T</tt>.
+     *  * For any other type <tt>T</tt>, only \a index * <tt>sizeof(T)</tt> is
+     *    added to the current address. The type <tt>T</tt> remains unchanged.
+     *
+     * \warning For Array types, the ArrayLength() parameter is never checked
+     * against \a index!
+     *
+     * @param index array index to access
+     * @return a new Instance as described above
+     *\sa ArrayLength()
+     */
+    Instance ArrayElem(int index) const;
+
+    /**
+     * If this Instance represents an Array with a defined length, this length
+     * os returned by this function, otherwise the return value is -1.
+     * @return array length field as described above
+     * \sa ArrayElem()
+     */
+    int ArrayLength() const;
+
+    /**
      * @return the ID of this instance, if it was directly instantiated from a
      * global variable, -1 otherwise
      */
@@ -245,7 +276,7 @@ public slots:
      * @param declaredTypes selects if candidate types or declared types should
      * be used, where applicable
      * @return a list of instances of all members
-     * \sa MemberNames(), FindMember()
+     * \sa MemberNames(), Member()
      */
     InstanceList Members(bool declaredTypes = false) const;
 
@@ -298,6 +329,8 @@ public slots:
      * @return the name of this instance's type
      */
     QString TypeName() const;
+
+    uint TypeHash() const;
 
     /**
      * Returns the value of \c sizeof(type) for this instance's type.
@@ -455,7 +488,14 @@ public slots:
      * This method always returns 4 on 32-bit kernels and 8 on 64-bit kernels.
      * @return the size of pointers for this architecture, in bytes
      */
-    int PointerSize() const;
+    int SizeofPointer() const;
+
+    /**
+     * This method returns the storage size of type <tt>long int</tt> on the
+     * guest architecture.
+     * @return the size of <tt>long int</tt>, in bytes
+     */
+    int SizeofLong() const;
 
     /**
      * Compares this Instance with \a other on a value basis. Two instances
@@ -625,6 +665,7 @@ public slots:
      * than 10, the value is treated as an unsigned integer.
      * @param base numeric base to convert this string to
      * @return the value of this type as a qint64, converted to a string
+     * \sa toUInt64()
      */
     QString toInt64(int base = 10) const;
 
@@ -635,6 +676,7 @@ public slots:
      * than 10, the value is treated as an unsigned integer.
      * @param base numeric base to convert this string to
      * @return the value of this type as a quint64, converted to a string
+     * \sa toUInt64Low(), toUInt64High()
      */
     QString toUInt64(int base = 10) const;
 
@@ -642,6 +684,7 @@ public slots:
      * Explicit representation of this instance as quint64, returning only the
      * 32 most significant bits.
      * @return the 32 most significant bits of this type as a quint64
+     * \sa toUInt64Low()
      */
     quint32 toUInt64High() const;
 
@@ -649,8 +692,45 @@ public slots:
      * Explicit representation of this instance as quint64, returning only the
      * 32 least significant bits.
      * @return the 32 least significant bits of this type as a quint64
+     * \sa toUInt64High()
      */
     quint32 toUInt64Low() const;
+
+    /**
+     * Explicit representation of this instance as \c long value.  As JavaScript
+     * does not support native 64-bit integers, the value is always returned as
+     * a string, even for platforms having a 32-bit \c long type.
+     * The base is 10 by default and must be between 2 and 36. For bases other
+     * than 10, the value is treated as an unsigned integer.
+     * @param base numeric base to convert this string to
+     * @return the value of this type as a qint64, converted to a string
+     * \sa toULong(), SizeofLong()
+     */
+    QString toLong(int base = 10) const;
+
+    /**
+     * Explicit representation of this instance as <tt>unsigned long</tt> value.
+     * Since JavaScript does not support native 64-bit integers, the value is
+     * always returned as a string, even for platforms having a 32-bit \c long
+     * type.
+     * The base is 10 by default and must be between 2 and 36. For bases other
+     * than 10, the value is treated as an unsigned integer.
+     * @param base numeric base to convert this string to
+     * @return the value of this type as a qint64, converted to a string
+     * \sa toLong(), SizeofLong()
+     */
+    QString toULong(int base = 10) const;
+
+    /**
+     * Explicit representation of this instance as pointer. As JavaScript does
+     * not support native 64-bit integers, the value is always returned as a
+     * string, even for 32-bit systems.
+     * The base is 16 by default and must be between 2 and 36.
+     * @param base numeric base to convert this string to
+     * @return the value of this type as a pointer, converted to a string
+     * \sa SizeofPointer()
+     */
+    QString toPointer(int base = 16) const;
 
     /**
      * Explicit representation of this instance as float.
@@ -671,7 +751,7 @@ public slots:
 
     /**
      * Returns a toString() representation of this instance using the page
-     * global directory (i. e., page table) specified as \a pgd for
+     * global directory (that is, page table) specified as \a pgd for
      * virtual-to-physical address translation. This allows to read an instance
      * that is located in user-land address space.
      *

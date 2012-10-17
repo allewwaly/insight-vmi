@@ -43,7 +43,7 @@ public:
 //     * @param offset the offset at which to read the value from memory
 //     * @return a string representation of this type
 //     */
-//    virtual QString toString(QIODevice* mem, size_t offset) const;
+//    virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const;
 };
 
 

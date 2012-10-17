@@ -37,7 +37,6 @@ protected:
      */
     virtual void operationProgress() = 0;
 
-protected:
     /**
      * Call this function at the start of the long operation.
      */
@@ -66,6 +65,34 @@ protected:
      */
     QString elapsedTime() const;
 
+    /**
+     * @return QString representing the elapsed time in the format "<m> min and
+     * <s> sec"
+     */
+    QString elapsedTimeVerbose() const;
+
+    /**
+     * Outputs string \a s to the shell, overwriting the complete last line
+     * that was output without line break.
+     * @param s the string to print
+     * @param newline set to \c true to insert a newline after \a s, \c set to
+     * \c false otherwise
+     */
+    void shellOut(const QString &s, bool newline);
+
+    /**
+     * Outputs string \a s to the shell's error stream.
+     * @param s the string to print
+     */
+    void shellErr(const QString &s);
+
+    /**
+     * Convertes an amount of bytes to a String such as "4 kB", "12 MB" etc.
+     * @param byteSize size in bytes
+     * @return formated string
+     */
+    static QString bytesToString(qint64 byteSize);
+
     QTime _elapsedTime; ///< use _elapsedTime.elapsed() to get the elapsed
                         ///< time since operationStarted() was called
     int _duration;      ///< holds the elapsed time after operationStopped()
@@ -74,6 +101,7 @@ protected:
 
 private:
     QTime _timer;        ///< used internally to trigger progress events
+    int _lastLen;        ///< length of last output line before linebreak
 };
 
 #endif /* LONGOPERATION_H_ */

@@ -313,7 +313,7 @@ QString SymbolTransformations::antlrTokenToStr(
 
 
 ASTSymbol::ASTSymbol()
-	: _type(stNull), _astNode(0)
+    : _type(stNull), _astNode(0), _ast(0)
 {
 }
 

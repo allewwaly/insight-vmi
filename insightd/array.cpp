@@ -6,8 +6,10 @@
  */
 
 #include "array.h"
+#include "funcpointer.h"
 #include "virtualmemoryexception.h"
 #include <debug.h>
+#include "colorpalette.h"
 
 Array::Array(SymFactory* factory)
     : Pointer(factory), _length(-1)
@@ -23,10 +25,14 @@ Array::Array(SymFactory *factory, const TypeInfo &info, int boundsIndex)
         // Create a new ID greater than the original one, depending on the
         // boundsIndex. For the first dimension (boundsIndex == 0), the
         // resulting ID must equal info.id()!
-        setId(info.id() +  boundsIndex);
+        setId(factory->mapToInternalArrayId(info.origId(), info.fileIndex(),
+                                            info.id(), boundsIndex));
         // Only the last dimension of an array refers to info.refTypeId()
         if (boundsIndex + 1 < info.upperBounds().size())
-            setRefTypeId(id() + 1);
+            setRefTypeId(factory->mapToInternalArrayId(info.origId(),
+                                                       info.fileIndex(),
+                                                       info.id(),
+                                                       boundsIndex + 1));
     }
 }
 
@@ -58,14 +64,18 @@ QString Array::prettyName() const
 {
     QString len = (_length >= 0) ? QString::number(_length) : QString();
     const BaseType* t = refType();
-    if (t)
+    const FuncPointer *fp = dynamic_cast<const FuncPointer*>(
+                refTypeDeep(trAnyButTypedef));
+    if (fp)
+        return fp->prettyName(QString(), this);
+    else if (t)
         return QString("%1[%2]").arg(t->prettyName()).arg(len);
     else
         return QString("[%1]").arg(len);
 }
 
 
-QString Array::toString(QIODevice* mem, size_t offset) const
+QString Array::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
 {
     QString result;
 
@@ -76,15 +86,19 @@ QString Array::toString(QIODevice* mem, size_t offset) const
     if (t && t->type() == rtInt8) {
         QString s = readString(mem, offset, _length > 0 ? _length : 256, &result);
 
-        if (result.isEmpty())
-            return QString("\"%1\"").arg(s);
+        if (result.isEmpty()) {
+            s = QString("\"%1\"").arg(s);
+            if (col)
+                s = col->color(ctString) + s + col->color(ctReset);
+            return s;
+        }
     }
     else {
         if (_length >= 0) {
             // Output all array members
             QString s = "(";
             for (int i = 0; i < _length; i++) {
-                s += t->toString(mem, offset + i * t->size());
+                s += t->toString(mem, offset + i * t->size(), col);
                 if (i+1 < _length)
                     s += ", ";
             }

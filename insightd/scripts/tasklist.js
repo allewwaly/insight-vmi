@@ -19,7 +19,7 @@ function printHdr()
 		lalign("COMMAND", cmd_size) +
 		lalign("ADDRESS", addr_size);
 
-	print(hdr);
+    println(hdr);
 }
 
 function printList(p)
@@ -29,7 +29,20 @@ function printList(p)
 	}
 	
 	var it = p;
+
+	// Find the candidate index for tasks.next that is compatible to a
+	// task_struct instance
+	var cndIdx = -1;
+	var cnt = p.tasks.MemberCandidatesCount("next");
+	for (var i = 0; i < cnt && cndIdx < 0; ++i) {
+		if (p.tasks.MemberCandidateCompatible("next", i)) {
+			cndIdx = i;
+		}
+	}
+//	println("Using candidate", cndIdx, "for \"tasks.next\"");
 	
+	printHdr();
+
 	do {
 		var uid, gid;
 
@@ -51,13 +64,20 @@ function printList(p)
 			lalign(it.comm.toString(), cmd_size) +
 			lalign("0x" + it.Address(), addr_size);
 
-		print(line);
+        println(line);
 		
-		it = it.tasks.next;
+		// Explicitely use the candidate index, if we have to
+		if (cndIdx < 0)
+			it = it.tasks.next;
+		else
+			it = it.tasks.MemberCandidate("next", cndIdx);
+
 	} while (it.pid.toUInt32() != 0);
 }
 
 var init = new Instance("init_task");
 
-printHdr();
+if (init.tasks.MemberCandidatesCount("next") < 1)
+	throw new Error("\"" + init.Name() + "\" does not have any candidate types for member \"tasks.next\"");
+
 printList(init);

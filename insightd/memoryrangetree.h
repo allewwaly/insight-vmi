@@ -10,13 +10,12 @@
 
 #include <QSet>
 
-//#define ENABLE_DOT_CODE 1
+#define ENABLE_DOT_CODE 1
 
 #ifdef ENABLE_DOT_CODE
 #include <QTextStream>
 #include <QDateTime>
 #include <QFile>
-#include "shell.h"
 #endif
 
 #ifndef QT_NO_STL
@@ -26,18 +25,58 @@
 
 #include <debug.h>
 
+/**
+ * Generic accessor template class for pointers of objects stored in a
+ * MemoryRangeTree.
+ */
+template<class value_type>
+class PtrAccessor
+{
+public:
+    static inline quint64 address(const value_type* item)
+    {
+        return item->address();
+    }
+
+    static inline quint64 endAddress(const value_type* item)
+    {
+        return item->endAddress();
+    }
+};
+
+/**
+ * Generic accessor template class for references to objects stored in a
+ * MemoryRangeTree.
+ */
+template<class value_type>
+class RefAccessor
+{
+public:
+    static inline quint64 address(const value_type& item)
+    {
+        return item.address();
+    }
+
+    static inline quint64 endAddress(const value_type& item)
+    {
+        return item.endAddress();
+    }
+};
+
+
 // Forward declarations
-template<class T, class P> class MemoryRangeTree;
+template<class value_type, class value_accessor, class property_type>
+class MemoryRangeTree;
 
 
 /**
  * A node in a MemoryRangeTree.
  */
-template<class T, class P>
+template<class value_type, class value_accessor, class property_type>
 struct MemoryRangeTreeNode
 {
-    typedef MemoryRangeTree<T, P> Tree;
-    typedef P Properties;
+    typedef MemoryRangeTree<value_type, value_accessor, property_type> Tree;
+    typedef property_type Properties;
     typedef typename Tree::ItemSet ItemSet;
 
     /**
@@ -71,18 +110,15 @@ struct MemoryRangeTreeNode
      * \a mmAddrStart to \a mmAddrEnd. This function may call split() internally
      * to split up this node.
      * @param item item to insert
-     * @param mmAddrStart start address of mapping
-     * @param mmAddrEnd end address of mapping
      */
-    void insert(T item, quint64 mmAddrStart, quint64 mmAddrEnd);
+    void insert(value_type item);
 
     /**
      * Splits this node into two children and moves all MemoryMapNode's in
      * nodes to one or both of them
-     * @param mmAddrStart start address of mapping
-     * @param mmAddrEnd end address of mapping
      */
-    void split(quint64 mmAddrStart, quint64 mmAddrEnd);
+    void split();
+
 
     /**
      * @return the end address of the left child
@@ -124,20 +160,18 @@ struct MemoryRangeTreeNode
  * start address, which allows fast queries of MemoryMapNode's and their
  * properties within a memory range.
  */
-template<class T, class P>
+template<class value_type, class value_accessor, class property_type>
 class MemoryRangeTree
 {
-    friend struct MemoryRangeTreeNode<T, P>;
+    friend struct MemoryRangeTreeNode<value_type, value_accessor, property_type>;
 
 public:
-    typedef P Properties;
-    typedef T Item;
+    typedef property_type Properties;
+    typedef value_type Item;
 
-    typedef MemoryRangeTreeNode<T, P> Node;
-//    // definitions to make the iterator's code compatible with this class
-//    typedef const MemoryMapNode* T;
+    typedef MemoryRangeTreeNode<value_type, value_accessor, property_type> Node;
     /// This type is returned by certain functions of this class
-    typedef QSet<T> ItemSet;
+    typedef QSet<value_type> ItemSet;
 
     // Forward declaration
     class const_iterator;
@@ -150,9 +184,8 @@ public:
     public:
         typedef std::bidirectional_iterator_tag  iterator_category;
         typedef qptrdiff difference_type;
-        typedef T value_type;
-        typedef T *pointer;
-        typedef T &reference;
+        typedef value_type *pointer;
+        typedef value_type &reference;
         Node *i;
         typename ItemSet::iterator it;
         inline iterator() : i(0) {}
@@ -160,8 +193,8 @@ public:
         inline iterator(Node *n, typename ItemSet::iterator it) : i(n), it(it) {}
         inline iterator(const iterator &o) : i(o.i), it(o.it) {}
         inline iterator &operator=(const iterator &o) { i = o.i; it = o.it; return *this; }
-        inline const T &operator*() const { return it.operator*(); }
-        inline const T *operator->() const { return it.operator->(); }
+        inline const value_type &operator*() const { return it.operator*(); }
+        inline const value_type *operator->() const { return it.operator->(); }
         inline bool operator==(const iterator &o) const { return i == o.i && it == o.it; }
         inline bool operator!=(const iterator &o) const { return i != o.i || it != o.it; }
         inline bool operator==(const const_iterator &o) const { return i == o.i && it == o.it; }
@@ -204,9 +237,8 @@ public:
     public:
         typedef std::bidirectional_iterator_tag  iterator_category;
         typedef qptrdiff difference_type;
-        typedef T value_type;
-        typedef const T *pointer;
-        typedef const T &reference;
+        typedef const value_type *pointer;
+        typedef const value_type &reference;
         Node *i;
         typename ItemSet::const_iterator it;
         inline const_iterator() : i(0) {}
@@ -215,8 +247,8 @@ public:
         inline const_iterator(const const_iterator &o) : i(o.i), it(o.it) {}
         inline const_iterator(iterator ci) : i(ci.i), it(ci.it) {}
         inline const_iterator &operator=(const const_iterator &o) { i = o.i; it = o.it; return *this; }
-        inline const T &operator*() const { return it.operator*(); }
-        inline const T *operator->() const { return it.operator->(); }
+        inline const value_type &operator*() const { return it.operator*(); }
+        inline const value_type *operator->() const { return it.operator->(); }
         inline bool operator==(const const_iterator &o) const { return i == o.i && it == o.it; }
         inline bool operator!=(const const_iterator &o) const { return i != o.i || it != o.it; }
         inline const_iterator &operator++() { if (++it == i->items.end()) goNext(false); return *this; }
@@ -279,14 +311,14 @@ public:
     /**
      * @return the number of MemoryRangeTreeNode objects within the tree
      */
-    inline int size() const { return _size; }
+    inline int nodeCount() const { return _nodeCount; }
 
     /**
      * @return the number of unique MemoryMapNode objects stored in the leaves
      * of the tree
      */
-    inline int objectCount() const
-    { return _objectCount; }
+    inline int size() const
+    { return _size; }
 
     /**
      * Deletes all data and resets the tree.
@@ -298,16 +330,7 @@ public:
      * range into the tree.
      * @param item the object to insert
      */
-    void insert(T item);
-
-    /**
-     * Inserts the given MemoryMapNode object within the range \a mmAddrStart to
-     * \a mmAddrEnd into the tree.
-     * @param item the object to insert
-     * @param mmAddrStart start address of mapping
-     * @param mmAddrEnd end address of mapping
-     */
-    void insert(T item, quint64 mmAddrStart, quint64 mmAddrEnd);
+    void insert(value_type item);
 
     /**
      * Finds all objects at a given memory address.
@@ -367,14 +390,14 @@ public:
     inline quint64 addrSpaceEnd() const { return _addrSpaceEnd; }
 
 private:
-    void normalizeInterval(quint64 &addrStart, quint64 &addrEnd) const;
+    void sanitizeInterval(quint64 &addrStart, quint64 &addrEnd) const;
 
     Node* _root;                  ///< Root node
     Node* _first;                 ///< First leaf
     Node* _last;                  ///< Last leaf
-    int _size;                    ///< No. of MemoryRangeTreeNode's
+    int _nodeCount;               ///< No. of MemoryRangeTreeNode's
     quint64 _addrSpaceEnd;        ///< Address of the last byte of address space
-    quint64 _objectCount;
+    quint64 _size;                ///< No. of items stored in this tree
     static ItemSet _emptyNodeSet;
     static Properties _emptyProperties;
 };
@@ -382,28 +405,28 @@ private:
 
 //------------------------------------------------------------------------------
 
-template<class T, class P>
-MemoryRangeTreeNode<T, P>::MemoryRangeTreeNode(Tree* tree,
+template<class value_type, class value_accessor, class property_type>
+MemoryRangeTreeNode<value_type, value_accessor, property_type>::MemoryRangeTreeNode(Tree* tree,
         quint64 addrStart, quint64 addrEnd, MemoryRangeTreeNode* parent)
     : tree(tree), parent(parent), lChild(0), rChild(0), next(0), prev(0),
       addrStart(addrStart), addrEnd(addrEnd)
 {
-    ++tree->_size;
+    ++tree->_nodeCount;
 #ifdef ENABLE_DOT_CODE
     id = nodeId++;
 #endif
 }
 
 
-template<class T, class P>
-MemoryRangeTreeNode<T, P>::~MemoryRangeTreeNode()
+template<class value_type, class value_accessor, class property_type>
+MemoryRangeTreeNode<value_type, value_accessor, property_type>::~MemoryRangeTreeNode()
 {
-    --tree->_size;
+    --tree->_nodeCount;
 }
 
 
-template<class T, class P>
-void MemoryRangeTreeNode<T, P>::deleteChildren()
+template<class value_type, class value_accessor, class property_type>
+void MemoryRangeTreeNode<value_type, value_accessor, property_type>::deleteChildren()
 {
     if (lChild) {
         lChild->deleteChildren();
@@ -418,31 +441,33 @@ void MemoryRangeTreeNode<T, P>::deleteChildren()
 }
 
 
-template<class T, class P>
-void MemoryRangeTreeNode<T, P>::insert(T item,
-        quint64 mmAddrStart, quint64 mmAddrEnd)
+template<class value_type, class value_accessor, class property_type>
+void MemoryRangeTreeNode<value_type, value_accessor, property_type>::insert(
+        value_type item /*,
+        quint64 mmAddrStart, quint64 mmAddrEnd*/)
 {
     properties.update(item);
 
     if (isLeaf()) {
-        if (item)
-            items.insert(item);
+        items.insert(item);
         // If the MemoryMapNode doesn't stretch over this node's entire
         // region, then split split up this MemoryRangeTreeNode
-        if (mmAddrStart > addrStart || mmAddrEnd < addrEnd)
-            split(mmAddrStart, mmAddrEnd);
+        if (value_accessor::address(item) > addrStart ||
+            value_accessor::endAddress(item) < addrEnd)
+            split();
     }
     else {
-        if (mmAddrStart <= lChild->addrEnd)
-            lChild->insert(item, mmAddrStart, mmAddrEnd);
-        if (mmAddrEnd >= rChild->addrStart)
-            rChild->insert(item, mmAddrStart, mmAddrEnd);
+        if (value_accessor::address(item) <= lChild->addrEnd)
+            lChild->insert(item);
+        if (value_accessor::endAddress(item) >= rChild->addrStart)
+            rChild->insert(item);
     }
 }
 
 
-template<class T, class P>
-inline void MemoryRangeTreeNode<T, P>::split(quint64 mmAddrStart, quint64 mmAddrEnd)
+template<class value_type, class value_accessor, class property_type>
+inline void MemoryRangeTreeNode<value_type, value_accessor, property_type>::split()
+//        quint64 mmAddrStart, quint64 mmAddrEnd)
 {
     assert(lChild == 0 && rChild == 0);
     assert(addrEnd > addrStart);
@@ -476,11 +501,10 @@ inline void MemoryRangeTreeNode<T, P>::split(quint64 mmAddrStart, quint64 mmAddr
     for (typename ItemSet::iterator it = items.begin(); it != items.end();
             ++it)
     {
-        T item = *it;
-        if (mmAddrStart <= lAddrEnd)
-            lChild->insert(item, mmAddrStart, mmAddrEnd);
-        if (mmAddrEnd >= rAddrStart)
-            rChild->insert(item, mmAddrStart, mmAddrEnd);
+        if (value_accessor::address(*it) <= lAddrEnd)
+            lChild->insert(*it);
+        if (value_accessor::endAddress(*it) >= rAddrStart)
+            rChild->insert(*it);
     }
 
     items.clear();
@@ -488,11 +512,11 @@ inline void MemoryRangeTreeNode<T, P>::split(quint64 mmAddrStart, quint64 mmAddr
 
 
 #ifdef ENABLE_DOT_CODE
-template<class T, class P>
-void MemoryRangeTreeNode<T, P>::outputDotCode(quint64 addrRangeStart,
-        quint64 addrRangeEnd, QTextStream& out) const
+template<class value_type, class value_accessor, class property_type>
+void MemoryRangeTreeNode<value_type, value_accessor, property_type>::outputDotCode(
+        quint64 addrRangeStart, quint64 addrRangeEnd, QTextStream& out) const
 {
-    int width = tree->addrSpaceEnd() > (1UL << 32) ? 16 : 8;
+    int width = tree->addrSpaceEnd() > (1ULL << 32) ? 16 : 8;
 
     // Node's own label
     out << QString("\tnode%1 [label=\"0x%2\\n0x%3\\nObjCnt: %4\"];")
@@ -507,7 +531,7 @@ void MemoryRangeTreeNode<T, P>::outputDotCode(quint64 addrRangeStart,
         // Move all items to one or both of the children
         for (typename ItemSet::const_iterator it = items.begin(); it != items.end(); ++it)
         {
-            T item = *it;
+            value_type item = *it;
             if (!s.isEmpty())
                 s += "\\n";
             s += QString("%1: 0x%2 - 0x%3 (%4 byte)")
@@ -581,37 +605,37 @@ void MemoryRangeTreeNode<T, P>::outputDotCode(quint64 addrRangeStart,
 }
 
 // Instance of static variable
-template<class T, class P>
-int MemoryRangeTreeNode<T, P>::nodeId = 0;
+template<class value_type, class value_accessor, class property_type>
+int MemoryRangeTreeNode<value_type, value_accessor, property_type>::nodeId = 0;
 #endif
 
 //------------------------------------------------------------------------------
 
 // Instances of static variables
-template<class T, class P>
-typename MemoryRangeTree<T, P>::ItemSet MemoryRangeTree<T, P>::_emptyNodeSet;
+template<class value_type, class value_accessor, class property_type>
+typename MemoryRangeTree<value_type, value_accessor, property_type>::ItemSet MemoryRangeTree<value_type, value_accessor, property_type>::_emptyNodeSet;
 
-template<class T, class P>
-typename MemoryRangeTree<T, P>::Properties  MemoryRangeTree<T, P>::_emptyProperties;
+template<class value_type, class value_accessor, class property_type>
+typename MemoryRangeTree<value_type, value_accessor, property_type>::Properties  MemoryRangeTree<value_type, value_accessor, property_type>::_emptyProperties;
 
 
-template<class T, class P>
-MemoryRangeTree<T, P>::MemoryRangeTree(quint64 addrSpaceEnd)
-    : _root(0), _first(0), _last(0), _size(0), _addrSpaceEnd(addrSpaceEnd),
-      _objectCount(0)
+template<class value_type, class value_accessor, class property_type>
+MemoryRangeTree<value_type, value_accessor, property_type>::MemoryRangeTree(quint64 addrSpaceEnd)
+    : _root(0), _first(0), _last(0), _nodeCount(0), _addrSpaceEnd(addrSpaceEnd),
+      _size(0)
 {
 }
 
 
-template<class T, class P>
-MemoryRangeTree<T, P>::~MemoryRangeTree()
+template<class value_type, class value_accessor, class property_type>
+MemoryRangeTree<value_type, value_accessor, property_type>::~MemoryRangeTree()
 {
     clear();
 }
 
 
-template<class T, class P>
-void MemoryRangeTree<T, P>::clear()
+template<class value_type, class value_accessor, class property_type>
+void MemoryRangeTree<value_type, value_accessor, property_type>::clear()
 {
     if (!_root)
         return;
@@ -620,8 +644,8 @@ void MemoryRangeTree<T, P>::clear()
     delete _root;
 
     _root = _first = _last = 0;
+    _nodeCount = 0;
     _size = 0;
-    _objectCount = 0;
 
 #ifdef ENABLE_DOT_CODE
     Node::nodeId = 0;
@@ -629,50 +653,39 @@ void MemoryRangeTree<T, P>::clear()
 }
 
 
-template<class T, class P>
-void MemoryRangeTree<T, P>::insert(T item)
-{
-    insert(item, item->address(), item->endAddress());
-}
-
-
-template<class T, class P>
-void MemoryRangeTree<T, P>::insert(T item, quint64 mmAddrStart,
-        quint64 mmAddrEnd)
+template<class value_type, class value_accessor, class property_type>
+void MemoryRangeTree<value_type, value_accessor, property_type>::insert(value_type item)
 {
     // Insert the first node
     if (!_root)
         _root = _first = _last =
                 new Node(this, 0, _addrSpaceEnd);
-    _root->insert(item, mmAddrStart, mmAddrEnd);
-    ++_objectCount;
+    _root->insert(item);
+    ++_size;
 }
 
+
+
 #ifdef ENABLE_DOT_CODE
-template<class T, class P>
-void MemoryRangeTree<T, P>::outputDotFile(const QString& filename) const
+template<class value_type, class value_accessor, class property_type>
+void MemoryRangeTree<value_type, value_accessor, property_type>::outputDotFile(const QString& filename) const
 {
     outputSubtreeDotFile(0, _addrSpaceEnd, filename);
 }
 
 
-template<class T, class P>
-void MemoryRangeTree<T, P>::outputSubtreeDotFile(quint64 addrStart, quint64 addrEnd,
+template<class value_type, class value_accessor, class property_type>
+void MemoryRangeTree<value_type, value_accessor, property_type>::outputSubtreeDotFile(quint64 addrStart, quint64 addrEnd,
         const QString& filename) const
 {
-    normalizeInterval(addrStart, addrEnd);
+    sanitizeInterval(addrStart, addrEnd);
 
     QFile outFile;
     QTextStream out;
 
-    // Write to the console, if no file name given
-    if (filename.isEmpty())
-        out.setDevice(shell->out().device());
-    else {
-        outFile.setFileName(filename);
-        assert(outFile.open(QIODevice::WriteOnly));
-        out.setDevice(&outFile);
-    }
+    outFile.setFileName(filename);
+    assert(outFile.open(QIODevice::WriteOnly));
+    out.setDevice(&outFile);
 
     // Write header, data and footer
     out << "/* Generated " << QDateTime::currentDateTime().toString() << " */"
@@ -685,9 +698,24 @@ void MemoryRangeTree<T, P>::outputSubtreeDotFile(quint64 addrStart, quint64 addr
 }
 #endif
 
-template<class T, class P>
-const typename MemoryRangeTree<T, P>::ItemSet&
-MemoryRangeTree<T, P>::objectsAt(quint64 address) const
+
+template<class value_type, class value_accessor, class property_type>
+void MemoryRangeTree<value_type, value_accessor, property_type>::sanitizeInterval(quint64 &addrStart, quint64 &addrEnd) const
+{
+    if (addrEnd > _addrSpaceEnd)
+        addrEnd = _addrSpaceEnd;
+    // Make sure the interval is valid, swap the addresses, if necessary
+    if (addrStart > addrEnd) {
+        quint64 tmp = addrStart;
+        addrStart = addrEnd;
+        addrEnd = tmp;
+    }
+}
+
+
+template<class value_type, class value_accessor, class property_type>
+const typename MemoryRangeTree<value_type, value_accessor, property_type>::ItemSet&
+MemoryRangeTree<value_type, value_accessor, property_type>::objectsAt(quint64 address) const
 {
     // Make sure the tree isn't empty and the address is in range
     if (!_root || address > _addrSpaceEnd)
@@ -705,25 +733,11 @@ MemoryRangeTree<T, P>::objectsAt(quint64 address) const
 }
 
 
-template<class T, class P>
-void MemoryRangeTree<T, P>::normalizeInterval(quint64 &addrStart, quint64 &addrEnd) const
+template<class value_type, class value_accessor, class property_type>
+typename MemoryRangeTree<value_type, value_accessor, property_type>::ItemSet
+MemoryRangeTree<value_type, value_accessor, property_type>::objectsInRange(quint64 addrStart, quint64 addrEnd) const
 {
-    if (addrEnd > _addrSpaceEnd)
-        addrEnd = _addrSpaceEnd;
-    // Make sure the interval is valid, swap the addresses, if necessary
-    if (addrStart > addrEnd) {
-        quint64 tmp = addrStart;
-        addrStart = addrEnd;
-        addrEnd = tmp;
-    }
-}
-
-
-template<class T, class P>
-typename MemoryRangeTree<T, P>::ItemSet
-MemoryRangeTree<T, P>::objectsInRange(quint64 addrStart, quint64 addrEnd) const
-{
-    normalizeInterval(addrStart, addrEnd);
+    sanitizeInterval(addrStart, addrEnd);
     // Make sure the tree isn't empty and the address is in range
     if (!_root || addrStart > _addrSpaceEnd)
         return _emptyNodeSet;
@@ -738,19 +752,22 @@ MemoryRangeTree<T, P>::objectsInRange(quint64 addrStart, quint64 addrEnd) const
     }
 
     // Unite all mappings that are in the requested range
-    ItemSet result;
-    do {
-        result.unite(n->items);
-        n = n->next;
-    } while (n && addrEnd >= n->addrStart);
+    ItemSet result(n->items);
+    typename ItemSet::const_iterator it, e;
+    n = n->next;
+    while (n && addrEnd >= n->addrStart) {
+        for (it = n->items.constBegin(), e = n->items.constEnd(); it != e; ++it)
+            result.insert(*it);
 
+        n = n->next;
+    }
     return result;
 }
 
 
-template<class T, class P>
-const typename MemoryRangeTree<T, P>::Properties&
-MemoryRangeTree<T, P>::propertiesAt(quint64 address) const
+template<class value_type, class value_accessor, class property_type>
+const typename MemoryRangeTree<value_type, value_accessor, property_type>::Properties&
+MemoryRangeTree<value_type, value_accessor, property_type>::propertiesAt(quint64 address) const
 {
     // Make sure the tree isn't empty and the address is in range
     if (!_root || address > _addrSpaceEnd)
@@ -768,12 +785,12 @@ MemoryRangeTree<T, P>::propertiesAt(quint64 address) const
 }
 
 
-template<class T, class P>
-typename MemoryRangeTree<T, P>::Properties
-MemoryRangeTree<T, P>::propertiesOfRange(quint64 addrStart,
+template<class value_type, class value_accessor, class property_type>
+typename MemoryRangeTree<value_type, value_accessor, property_type>::Properties
+MemoryRangeTree<value_type, value_accessor, property_type>::propertiesOfRange(quint64 addrStart,
         quint64 addrEnd) const
 {
-    normalizeInterval(addrStart, addrEnd);
+    sanitizeInterval(addrStart, addrEnd);
    // Make sure the tree isn't empty and the address is in range
     if (!_root || addrStart > _addrSpaceEnd)
         return _emptyProperties;

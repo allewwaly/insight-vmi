@@ -8,6 +8,7 @@
 #include <bitop.h>
 #include "enum.h"
 #include <debug.h>
+#include "colorpalette.h"
 
 Enum::Enum(SymFactory* factory)
     : BaseType(factory)
@@ -51,11 +52,19 @@ uint Enum::hash(bool* isValid) const
 }
 
 
-QString Enum::toString(QIODevice* mem, size_t offset) const
+QString Enum::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
 {
 	qint32 key = value<qint32>(mem, offset);
-	if (_enumValues.contains(key))
-		return QString("%1 (%2)").arg(_enumValues.value(key)).arg(key);
+	if (_enumValues.contains(key)) {
+		if (col)
+			return QString("%1%2%3 (%1%4%3)")
+					.arg(col->color(ctType))
+					.arg(_enumValues.value(key))
+					.arg(col->color(ctReset))
+					.arg(key);
+		else
+			return QString("%1 (%2)").arg(_enumValues.value(key)).arg(key);
+	}
 	else
 		return QString("(Out of enum range: %1)").arg(key);
 }

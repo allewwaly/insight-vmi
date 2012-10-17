@@ -93,16 +93,23 @@ public:
     /**
      * This gives a pretty name of this function pointer with the given name
      * as variable or typedef of name \a name.
+     * @param name symbol name to use in the declaration
      * @return the pretty name of this function pointer, e.g., "int (*name)()"
      */
-    QString prettyName(const QString& name) const;
+    QString prettyName(QString name, const RefBaseType *from) const;
+
+    /**
+     * Returns a pretty-printed list of the function's parameters.
+     * @return formated parameters
+     */
+    QString prettyParams() const;
 
     /**
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset) const;
+    virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const;
 
     /**
      * Reads a serialized version of this object from \a in.
@@ -119,6 +126,7 @@ public:
     virtual void writeTo(KernelSymbolStream& out) const;
 
 protected:
+
     ParamList _params;  ///< Holds all parameters
 };
 

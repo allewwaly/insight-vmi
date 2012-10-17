@@ -18,6 +18,7 @@ class BaseType;
 class VirtualMemory;
 class Instance;
 class StructuredMember;
+class ColorPalette;
 
 /// A list of Instance objects
 typedef QList<Instance> InstanceList;
@@ -92,6 +93,28 @@ public:
     quint64 endAddress() const;
 
     /**
+     * @return the bit size of this bit-field integer declaration
+     */
+    int bitSize() const;
+
+    /**
+     * Sets the bit size of this bit-field integer declaration.
+     * @param size new bit size of bit-field integer declaration
+     */
+    void setBitSize(qint8 size);
+
+    /**
+     * @return the bit offset of this bit-field integer declaration
+     */
+    int bitOffset() const;
+
+    /**
+     * Sets the bit offset of this bit-field integer declaration.
+     * @param offset new bit offset of bit-field integer declaration
+     */
+    void setBitOffset(qint8 offset);
+
+    /**
      * This gives the (short) name of this Instance, i. e., its name its
      * parent's struct. For example, if you have accessed this Instance via
      * \c init_task.children.next, this will return \c next.
@@ -146,9 +169,9 @@ public:
     const QStringList& memberNames() const;
 
     /**
-     * Gives access to all members if this instance. If a member has exactly
+     * Gives access to all members of this instance. If a member has exactly
      * one candidate type, this type will be used instead of the originally
-     * declared type of the mamber. To have the declared types instead, set
+     * declared type of the member. To have the declared types instead, set
      * \a declaredTypes to \c true.
      * @param declaredTypes selects if candidate types or declared types should
      * be used, where applicable
@@ -174,6 +197,8 @@ public:
      */
     QString typeName() const;
 
+    uint typeHash() const;
+
     /**
      * Convenience function to access type()->size()
      * @return the size of this instance's type
@@ -181,7 +206,7 @@ public:
     quint32 size() const;
 
     /**
-     * Checks if this is a valid instance and its address is not null.
+     * Checks if this instance has a non-null address.
      * @return \c true if this object is null, \c false otherwise
      * \sa isValid()
      */
@@ -246,22 +271,35 @@ public:
     QStringList differences(const Instance& other, bool recursive) const;
 
     /**
-     * Treats this Instance as an array instance and returns a new instance
-     * of the same type at the memory position as this instance plus \a index
-     * times the size of the array's value type. If this is not a Pointer or an
-     * Array instance, then an invalid Instance is returned
+     * Treats this Instance as an array and returns a new instance
+     * at index \a index. The behavior depends on the type():
      *
-     * \warning The length() parameter of the underlying Array type is neither
-     * checked against \a index nor modified. Be careful to only use the
-     * length() parameter of the original instance (with array index 0), not on
-     * any Instance object returned by this function.
+     *  * For pointers of type <tt>T*</tt>, the pointer is dereferenced and
+     *    \a index * <tt>sizeof(T)</tt> is added to the resulting address. The
+     *    resulting type is <tt>T</tt>. If the pointer cannot be dereferenced,
+     *    either because it is of type <tt>void*</tt> or the address is not
+     *    accessible, an empty Instance is returned.
+     *  * For arrays of type <tt>T[]</tt>, \a index * <tt>sizeof(T)</tt> is
+     *    added to the current address. The resulting type is <tt>T</tt>.
+     *  * For any other type <tt>T</tt>, only \a index * <tt>sizeof(T)</tt> is
+     *    added to the current address. The type <tt>T</tt> remains unchanged.
+     *
+     * \warning For Array types, the length() parameter is never checked against
+     * \a index!
      *
      * @param index array index to access
-     * @return a Instance at memory position size() + \a index *
-     * type()->refType()->size(), if this is a Pointer or an Array instance,
-     * otherwise an empty Instance object
+     * @return a new Instance as described above
+     * \sa arrayLength()
      */
     Instance arrayElem(int index) const;
+
+    /**
+     * If this Instance represents an Array with a defined length, this length
+     * os returned by this function, otherwise the return value is -1.
+     * @return array length field as described above
+     * \sa arrayElem()
+     */
+    int arrayLength() const;
 
     /**
      * Dereferences this instance as far as possible.
@@ -306,6 +344,24 @@ public:
      */
     Instance member(int index, int resolveTypes = 0,
                     int maxPtrDeref = -1, bool declaredType = false) const;
+
+    /**
+     * Obtain the member of this instance that has the given offset provided that
+     * this instance is a structure. If \a exactMatch is true the function will only
+     * return a member if it can find a member within the struct that has the exact
+     * offset \a offset. In case exactMatch is false, the function will return the
+     * member that ecompasses the given offset \a offset.
+     *
+     * \note Make sure to check Instance::isNull() on the returned object to
+     * see if it is valid or not.
+     *
+     * @param off The offset of the member that we are looking for
+     * @param exactMatch should the function only return a member if it has the exact
+     * offset \a offset.
+     * @return Instance object of the member at offset off or a null Instance
+     * \sa BaseType::TypeResolution
+     */
+     Instance memberByOffset(size_t off, bool exactMatch = true) const;
 
     /**
      * Gives access to the BaseType's of a member, if this is a struct or union.
@@ -520,6 +576,24 @@ public:
     quint64 toUInt64() const;
 
     /**
+     * Explicit representation of this instance as <tt>long int</tt>. The value
+     * will be read with the storage size of the guest system (32 or 64 bit),
+     * but will be returned as 64 bit integer.
+     * @return the value of this type as a <tt>long int</tt>
+     * \sa sizeofLong()
+     */
+    qint64 toLong() const;
+
+    /**
+     * Explicit representation of this instance as <tt>unsigned long int</tt>.
+     * The value will be read with the storage size of the guest system (32 or
+     * 64 bit), but will be returned as 64 bit integer.
+     * @return the value of this type as a <tt>unsigned long int</tt>
+     * \sa sizeofLong()
+     */
+    quint64 toULong() const;
+
+    /**
      * Explicit representation of this instance as float.
      * @return the value of this type as a float
      */
@@ -535,8 +609,10 @@ public:
      * Explicit representation of this instance as a pointer.
      * @return the value of this type as a variant
      * @warning This function should only be called for a pointer type!
-     * @warning The pointer has the bit size of the host system! Use
-     * pointerSize() to retrieve the pointer size of the guest system.
+     * @warning The pointer will be read with the size of the guest, but the
+     * return value has the pointer size of the host system! So a 32-bit guest
+     * reading a pointer from a 64-bit host will lose information! Use
+     * sizeofPointer() to retrieve the pointer size of the guest system.
      */
     void* toPointer() const;
 
@@ -565,7 +641,7 @@ public:
     /**
      * @return a string representation of this instance
      */
-    QString toString() const;
+    QString toString(const ColorPalette *col = 0) const;
 
     /**
      * Returns a toString() representation of this instance using the page
@@ -581,9 +657,62 @@ public:
     QString derefUserLand(const QString &pgd) const;
 
     /**
-     * @return the size of a pointer for this instance in bytes
+     * @return the storage size of a pointer for the guest platform,
+     * given in byte
+     * \sa toPointer()
      */
-    int pointerSize() const;
+    int sizeofPointer() const;
+
+    /**
+     * @return the storage size of a <tt>long int</tt> for the guest platform,
+     * given in byte
+     * \sa toLong(), toULong()
+     */
+    int sizeofLong() const;
+
+    /**
+      * Get the VirtualMemory object that is used by this instance
+      */
+    VirtualMemory* vmem() const;
+    
+    /**
+     * Function to compare two Instances.
+     * @param inst instance to compare to
+     * @param embedded \c true if one instance is embedded inside the other
+     * @param overlap \c true if instances overlap (not embedded)
+     * @param thisParent \c true if \a this instance contains \a inst
+     *                  (\c false if \a inst contains \a this instance)
+     * @return \c true if instances do not conflict with each other
+     */
+    bool compareInstance(const Instance& inst,
+        bool &embedded, bool &overlap, bool &thisParent) const;
+  
+    /**
+     * Function to compare two Instances, where one is a rtUnion.
+     * Used in compareInstances
+     * @param inst instance to compare to 
+     * @param thisParent \c true if \a this instance contains \a inst
+     *                  (\c false if \a inst contains \a this instance)
+     * @return \c true if instances do not conflict with each other
+     */
+    bool compareUnionInstances(const Instance& inst, bool &thisParent) const;
+
+    /**
+     * Function to compare two Instances Types.
+     * Used in compareInstance.
+     * @param inst instance to compare to
+     * @return \c true if instances types do not conflict with each other
+     */
+    bool compareInstanceType(const Instance& inst) const ;
+    
+    /**
+     * Function to check consistency by considering const / enum members.
+     * This function is only useful for structured types.
+     * Used in compareInstance.
+     * @return \c true if instance is considered as consistent. Also
+     *         \c true if instance is not a structured type.
+     */
+    bool isValidConcerningMagicNumbers(bool *constants = 0) const ;
 
 private:
     typedef QSet<quint64> VisitedSet;

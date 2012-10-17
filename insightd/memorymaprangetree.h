@@ -9,8 +9,8 @@
 #define MEMORYMAPRANGETREE_H_
 
 // Forward declarations
-class MemoryMapNode;
-template<class T, class P> class MemoryRangeTree;
+template<class value_type, class value_accessor, class property_type>
+class MemoryRangeTree;
 
 #include "memorymapnode.h"
 #include "memoryrangetree.h"
@@ -55,8 +55,16 @@ struct MemMapProperties
     MemMapProperties& unite(const MemMapProperties& other);
 };
 
+struct PhysMemMapProperties: public MemMapProperties
+{
+    void update(const PhysMemoryMapNode& mmnode);
+};
 
-typedef MemoryRangeTree<const MemoryMapNode*, MemMapProperties> MemoryMapRangeTree;
+
+typedef MemoryRangeTree<MemoryMapNode*, PtrAccessor<MemoryMapNode>, MemMapProperties> MemoryMapRangeTree;
 typedef MemoryMapRangeTree::ItemSet MemMapSet;
+
+typedef MemoryRangeTree<PhysMemoryMapNode, RefAccessor<PhysMemoryMapNode>, PhysMemMapProperties> PhysMemoryMapRangeTree;
+typedef PhysMemoryMapRangeTree::ItemSet PhysMemMapSet;
 
 #endif /* MEMORYMAPRANGETREE_H_ */

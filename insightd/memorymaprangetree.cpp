@@ -40,3 +40,9 @@ MemMapProperties& MemMapProperties::unite(const MemMapProperties& other)
     baseTypes |= other.baseTypes;
     return *this;
 }
+
+
+void PhysMemMapProperties::update(const PhysMemoryMapNode &mmnode)
+{
+    MemMapProperties::update(mmnode.memoryMapNode());
+}

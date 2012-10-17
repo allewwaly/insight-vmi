@@ -200,8 +200,10 @@ public:
 
 	/**
 	 * Constructor
+	 * @param fileIndex index of the symbol file where this information was
+	 * collected from
 	 */
-	TypeInfo();
+	TypeInfo(int fileIndex);
 
 	/**
 	 * Resets all data to their default (empty) values
@@ -209,6 +211,9 @@ public:
 	void clear();
 
 	void deleteParams();
+
+	int fileIndex() const;
+	void setFileIndex(int index);
 
 	bool isRelevant() const;
 	void setIsRelevant(bool value);
@@ -228,6 +233,9 @@ public:
     int id() const;
     void setId(int id);
 
+    int origId() const;
+    void setOrigId(int id);
+
     int refTypeId() const;
     void setRefTypeId(int refTypeID);
 
@@ -240,8 +248,10 @@ public:
     int bitOffset() const;
     void setBitOffset(int bitOffset);
 
-    size_t location() const;
-    void setLocation(size_t location);
+    quint64 location() const;
+    void setLocation(quint64 location);
+
+    bool hasLocation() const;
 
     qint32 dataMemberLocation() const;
     void setDataMemberLocation(qint32 location);
@@ -266,11 +276,11 @@ public:
     bool inlined() const;
     void setInlined(bool value);
 
-    size_t pcLow() const;
-    void setPcLow(size_t pc);
+    quint64 pcLow() const;
+    void setPcLow(quint64 pc);
 
-    size_t pcHigh() const;
-    void setPcHigh(size_t pc);
+    quint64 pcHigh() const;
+    void setPcHigh(quint64 pc);
 
     QVariant constValue() const;
     void setConstValue(QVariant value);
@@ -284,27 +294,30 @@ public:
     ParamList& params();
     const ParamList& params() const;
 
-    QString dump() const;
+    QString dump(const QStringList &symFiles) const;
 
 private:
+	int _fileIndex;          ///< index of the object dump containing the info
 	bool _isRelevant;
 	QString _name;           ///< holds the name of this symbol
 	QString _srcDir;         ///< holds the directory of the compile unit
 	int _srcFileId;          ///< holds the ID of the source file
 	int _srcLine;            ///< holds the line number within the source file
 	int _id;                 ///< holds the ID of this symbol
+	int _origId;             ///< holds the original ID of this symbol
 	int _refTypeId;          ///< holds the ID of the referenced symbol
 	quint32 _byteSize;       ///< holds the size in byte of this symbol
 	int _bitSize;            ///< holds the number of bits for a bit-split struct
 	int _bitOffset;          ///< holds the bit offset for a bit-split struct
-	size_t _location;        ///< holds the absolute offset offset of this symbol
+	quint64 _location;       ///< holds the absolute offset offset of this symbol
+	bool _hasLocation;   ///< is set to true when a location was set
 	int _external;			 ///< holds whether this is an external symbol
 	qint32 _dataMemberLoc;   ///< holds the offset relative offset of this symbol
 	IntVec _upperBounds;     ///< holds the upper bounds for an integer type symbol
 	qint32 _sibling;         ///< holds the sibling for a subprogram type symbol
 	bool _inlined;           ///< was the function inlined?
-	size_t _pcLow;           ///< low program counter of a function
-	size_t _pcHigh;          ///< high program counter of a function
+	quint64 _pcLow;          ///< low program counter of a function
+	quint64 _pcHigh;         ///< high program counter of a function
 	QVariant _constValue;    ///< holds the value of an enumerator symbol
 	EnumHash _enumValues; ///< holds the enumeration values, if this symbol is an enumeration
 	HdrSymbolType _symType;  ///< holds the type of this symbol

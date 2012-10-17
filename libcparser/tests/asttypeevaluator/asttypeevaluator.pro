@@ -1,8 +1,12 @@
+# Global configuration file
+include(../../../config.pri)
+
 TEMPLATE = app
 TARGET = asttypeevaluator
 QT += core \
     testlib
-CONFIG += qtestlib debug
+QT -= gui webkit
+CONFIG += qtestlib debug_and_release
 HEADERS += asttypeevaluatortest.h
 SOURCES += asttypeevaluatortest.cpp
 INCLUDEPATH += ../../src \
@@ -10,6 +14,7 @@ INCLUDEPATH += ../../src \
 	../../../libdebug/include \
 	../../antlr_generated \
 	../../../libantlr3c/include 
-LIBS += -L ../.. -lcparser \
-	-L../../../libdebug -ldebug \
-	-L../../../libantlr3c -lantlr3c
+
+LIBS += -L../..$$BUILD_DIR -l$$CPARSER_LIB \
+        -L../../../libdebug$$BUILD_DIR -l$$DEBUG_LIB \
+        -L../../../libantlr3c$$BUILD_DIR -l$$ANTLR_LIB

@@ -84,7 +84,7 @@
 
  */ 
 
-#include <QApplication>
+#include <QCoreApplication>
 #include <QDir>
 #include <QDateTime>
 #include <sys/types.h>
@@ -93,6 +93,15 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+
+// Print backtrace
+// Test this function under windows
+#ifndef _WIN32
+#include <execinfo.h>
+#include <ucontext.h>
+#include <cxxabi.h>
+#endif /* _WIN32 */
+
 #include <stdlib.h>
 #include <insight/constdefs.h>
 
@@ -101,8 +110,10 @@
 #include "shell.h"
 #include "genericexception.h"
 #include "programoptions.h"
-#include "memorymapwindow.h"
 
+#ifdef CONFIG_MEMORY_MAP
+#include "memorymapwindow.h"
+#endif
 
 /**
  * Log a message to stderr, prepended with the current date and time.
@@ -115,45 +126,101 @@ void log_message(const QString& msg)
         << " " << msg << std::endl;
 }
 
+// Daemon mode only supported on Unix systems
+#ifndef _WIN32
 
 /**
  * Signal handler for the Linux signals sent to daemon process, for more
  * signals, refer to
  * http://www.comptechdoc.org/os/linux/programming/linux_pgsignals.html
  */
-void signal_handler(int sig)
+void signal_handler(int sig_num, siginfo_t * info, void * ucontext)
 {
-	switch (sig) {
+    switch (sig_num) {
 
-	case SIGHUP:
-		break;
+        case SIGHUP:
+            break;
 
-	// Terminal interrupt
-    case SIGINT:
-        // Try to terminate a script
-        if (shell) {
-            if (shell->interactive()) {
-                shell->interrupt();
+            // Terminal interrupt
+        case SIGINT:
+            // Try to terminate a script
+            if (shell) {
+                if (shell->interactive()) {
+                    shell->interrupt();
+                }
+                else {
+                    shell->shutdown();
+                    shell->wait();
+                }
             }
-            else {
+            break;
+
+            // Terminal quit
+        case SIGQUIT:
+            // Termination
+        case SIGTERM:
+            if (shell) {
                 shell->shutdown();
                 shell->wait();
             }
-        }
-        break;
+            else
+                exit(0);
+            break;
+        case SIGABRT:
+        case SIGSEGV:
+            void * array[100];
+            void * caller_address;
+            char ** messages;
+            int size, i;
+            struct ucontext * uc;
 
-    // Terminal quit
-    case SIGQUIT:
-    // Termination
-    case SIGTERM:
-	    if (shell) {
-	        shell->shutdown();
-	        shell->wait();
-	    }
-	    else
-	        exit(0);
-		break;
-	}
+            uc = (struct ucontext *) ucontext;
+
+            /* Get the address at the time the signal was raised from the EIP (x86) */
+#if __WORDSIZE == 64
+            caller_address = (void *) uc->uc_mcontext.gregs[REG_RIP];
+#else /* __WORDSIZE == 32 */
+            caller_address = (void *) uc->uc_mcontext.gregs[REG_EIP];
+#endif /* __WORDSIZE == 32 */
+
+            fprintf(stderr, "signal %d (%s), address is %p from %p\n", sig_num,
+                    strsignal(sig_num), info->si_addr, (void *) caller_address);
+
+            size = backtrace(array, 50);
+            messages = backtrace_symbols(array, size);
+
+            /* skip first stack frame (points here) */
+            for (i = 2; i < size && messages != NULL; ++i) {
+                std::string trace(messages[i]);
+                // attempt to demangle
+                {
+                    std::string::size_type begin, end;
+
+                    // find the beginning and the end of the useful part of the trace
+                    begin = trace.find_first_of('(') + 1;
+                    end = trace.find_last_of('+');
+
+                    // if they were found, we'll go ahead and demangle
+                    if (begin != std::string::npos && end != std::string::npos) {
+                        std::string functionName = trace.substr(begin, end - begin);
+
+                        int demangleStatus;
+                        char* demangledName;
+                        if ((demangledName = abi::__cxa_demangle(
+                                        functionName.c_str(), 0, 0, &demangleStatus))
+                                && demangleStatus == 0) {
+                            trace.replace(begin, end - begin, demangledName); // the demangled name is now in our trace string
+                        }
+                        free(demangledName);
+                    }
+                }
+                fprintf(stderr, "[bt]: (%d) %s\n", i - 1, trace.c_str());
+            }
+
+            free(messages);
+            exit(1);
+            break;
+    }
 }
 
 
@@ -163,14 +230,25 @@ void signal_handler(int sig)
 void init_signals()
 {
     // Register signal handler for interesting signals
+
+    struct sigaction signal_action;
+
+    /* Set up the structure to specify the new action. */
+    signal_action.sa_sigaction = signal_handler;
+    sigemptyset(&signal_action.sa_mask);
+    signal_action.sa_flags = SA_RESTART | SA_SIGINFO;
+
+    sigaction(SIGHUP, &signal_action, NULL); // catch hangup signal
+    sigaction(SIGTERM, &signal_action, NULL); // catch terminal interrupt
+    sigaction(SIGINT, &signal_action, NULL); // catch terminal interrupt
+    sigaction(SIGQUIT, &signal_action, NULL); // catch terminal quit
+    sigaction(SIGABRT, &signal_action, NULL); // catch calls to abort() eg. uncaught exceptions
+    sigaction(SIGSEGV, &signal_action, NULL); // catch segfaults
+
 //    signal(SIGCHLD, SIG_IGN);       // ignore child
 //    signal(SIGTSTP, SIG_IGN);       // ignore tty signals
 //    signal(SIGTTOU, SIG_IGN);       // ignore writes from background child processes
 //    signal(SIGTTIN, SIG_IGN);       // ignore reads from background child processes
-    signal(SIGHUP, signal_handler);   // catch hangup signal
-    signal(SIGTERM, signal_handler);  // catch kill signal
-    signal(SIGINT, signal_handler);   // catch terminal interrupt
-    signal(SIGQUIT, signal_handler);  // catch terminal quit
 }
 
 
@@ -273,6 +351,8 @@ void init_daemon()
     }
 }
 
+#endif /* _WIN32 */
+
 
 /**
  * Entry point function that sets up the environment, parses the command line
@@ -280,7 +360,9 @@ void init_daemon()
  */
 int main(int argc, char* argv[])
 {
+#ifdef CONFIG_MEMORY_MAP
 	memMapWindow = 0;
+#endif
 	shell = 0;
 
 	// Parse the command line options
@@ -291,15 +373,22 @@ int main(int argc, char* argv[])
     bool daemonize = (programOptions.activeOptions() & opDaemonize);
 
 	try {
-	    init_signals();
+#ifndef _WIN32
+        init_signals();
+#endif
 
 		if (daemonize) {
+#ifdef _WIN32
+            log_message("Daemon mode not supported for Windows.");
+#else
 			init_daemon();
 		    // Start a new logging session
 			log_message(QString("InSight started with PID %1.").arg(getpid()));
+#endif
 		}
 
 		// Delay creation of QApplication until AFTER possible fork()!
+#ifdef CONFIG_WITH_X_SUPPORT
 		QApplication app(argc, argv);
 
 		if (!daemonize) {
@@ -307,7 +396,9 @@ int main(int argc, char* argv[])
 			memMapWindow->resize(800, 600);
 			memMapWindow->setAttribute(Qt::WA_QuitOnClose, false);
 		}
-
+#else
+		QCoreApplication app(argc, argv);
+#endif
 	    shell = new Shell(daemonize);
         KernelSymbols& sym = shell->symbols();
 
@@ -336,8 +427,9 @@ int main(int argc, char* argv[])
 		if (shell->interactive())
 		    shell->out() << "Done, exiting." << endl;
 	}
-	catch (GenericException e) {
-	    QString msg = QString("Caught exception at %1:%2\nMessage: %3")
+	catch (GenericException& e) {
+		QString msg = QString("Caught a %0 at %1:%2\nMessage: %3")
+				.arg(e.className())
 	            .arg(e.file)
 	            .arg(e.line)
 	            .arg(e.message);
@@ -355,8 +447,10 @@ int main(int argc, char* argv[])
 		delete shell;
 	}
 
+#ifdef CONFIG_MEMORY_MAP
 //	if (memMapWindow)
 //	    delete memMapWindow;
+#endif
 
     return ret;
 }

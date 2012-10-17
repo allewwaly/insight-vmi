@@ -48,6 +48,11 @@ public:
     virtual ~TypeEvaluatorException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "TypeEvaluatorException";
+    }
 };
 
 #endif /* TYPEEVALUATOREXCEPTION_H_ */

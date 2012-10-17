@@ -47,11 +47,11 @@ uint RefBaseType::hash(bool* isValid) const
 }
 
 
-QString RefBaseType::toString(QIODevice* mem, size_t offset) const
+QString RefBaseType::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
 {
     const BaseType* t = refType();
     assert(t != 0);
-    return t->toString(mem, offset);
+    return t->toString(mem, offset, col);
 }
 
 

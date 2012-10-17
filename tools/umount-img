@@ -1,0 +1,53 @@
+#!/bin/bash
+
+if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+	echo "Usage: $0 <disk-image>"
+	echo "       $0 <mount-dir>"
+	exit 0
+fi
+
+# How do we become root?
+if [ $(id -u) == 0 ]; then
+        SUDO=""
+else
+#        echo "You might be prompted for your sudo password."
+        SUDO="sudo"
+fi
+
+# Did the user specify an image or the mount directory?
+if [ -f "$1" ]; then
+	IMG="$1"
+	# Image given, find the loop device
+	if $SUDO losetup -a | grep -q $IMG; then
+		DEV=$($SUDO losetup -a | grep "$IMG" | awk -F ':' '{print $1}' | tail -n 1)
+	else
+		echo "Image \"$IMG\" does not seem to be set up as a loop device." >&2
+		exit 1
+	fi
+	# Find the mount point
+	if mount | grep -q $DEV; then
+		MNT=$(mount | grep $DEV | awk '{print $3}')
+	else
+		MNT=""
+	fi
+elif [ -d "$1" ]; then
+	MNT="$1"
+	# Mount point given, found the loop device
+	if mount | grep -q "$MNT"; then
+                DEV=$(mount | grep "$MNT" | awk '{print $1}')
+        else    
+                echo "Nothing is mounted on \"$MNT\"."
+		exit 0
+        fi
+else
+	echo "Given parameter is neither a disk image nor a mount point." >&2
+	exit 2
+fi
+
+# Umount loop device
+if [ -n "$MNT" ]; then
+	$SUDO umount "$MNT" || exit $?
+fi
+
+# Delete loop device
+$SUDO losetup -d $DEV

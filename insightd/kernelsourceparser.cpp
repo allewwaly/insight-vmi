@@ -15,9 +15,13 @@
 #include <astsourceprinter.h>
 #include <cassert>
 #include <debug.h>
+#include <bugreport.h>
 #include "shell.h"
 #include "compileunit.h"
 #include "filenotfoundexception.h"
+#include "expressionevalexception.h"
+
+#include <QDirIterator>
 
 
 #define sourceParserError(x) do { throw SourceParserException((x), __FILE__, __LINE__); } while (0)
@@ -43,6 +47,11 @@ public:
     virtual ~SourceParserException() throw()
     {
     }
+
+    virtual const char* className() const
+    {
+        return "SourceParserException";
+    }
 };
 
 
@@ -50,7 +59,7 @@ public:
 KernelSourceParser::KernelSourceParser(SymFactory* factory,
         const QString& srcPath)
     : _factory(factory), _srcPath(srcPath), _srcDir(srcPath), _filesIndex(0),
-      _lastFileNameLen(0)
+      _bytesRead(0), _bytesTotal(0), _durationLastFileFinished(0)
 {
     assert(_factory);
 }
@@ -65,20 +74,32 @@ KernelSourceParser::~KernelSourceParser()
 void KernelSourceParser::operationProgress()
 {
     QMutexLocker lock(&_progressMutex);
-    int percent = (_filesIndex / (float) _factory->sources().size()) * 100;
+    float percent = _bytesRead / (float) (_bytesTotal > 0 ? _bytesTotal : 1);
+    int remaining = -1;
+    // Avoid too noisy timer updates
+    if (percent > 0) {
+        remaining = _durationLastFileFinished / percent * (1.0 - percent);
+        remaining = (remaining - (_duration - _durationLastFileFinished)) / 1000;
+    }
+    QString remStr = remaining > 0 ?
+                QString("%1:%2").arg(remaining / 60).arg(remaining % 60, 2, 10, QChar('0')) :
+                QString("??");
+
     QString fileName = _currentFile;
-//    shell->out() << "Parsing file " << _filesDone << "/"
-//            <<  _factory->sources().size()
-//            << " (" << percent  << "%)"
-//            << ", " << elapsedTime() << " elapsed: "
-//            << qPrintable(_currentFile)
-//            << endl;
-    shell->out() << "\rParsing file " << _filesIndex << "/"
-            <<  _factory->sources().size() << " (" << percent  << "%)"
-            << ", " << elapsedTime() << " elapsed: "
-            << qSetFieldWidth(_lastFileNameLen) << qPrintable(fileName)
-            << qSetFieldWidth(0) << flush;
-    _lastFileNameLen = fileName.length();
+    QString s = QString("\rParsing file %1/%2 (%3%), %4 elapsed, %5 remaining%7: %6")
+            .arg(_filesIndex)
+            .arg(_fileNames.size())
+            .arg((int)(percent * 100))
+            .arg(elapsedTime())
+            .arg(remStr)
+            .arg(fileName);
+    // Show no. of errors
+    if (BugReport::log() && BugReport::log()->entries())
+        s = s.arg(QString(", %1 errors so far").arg(BugReport::log()->entries()));
+    else
+        s = s.arg(QString());
+
+    shellOut(s, false);
 }
 
 
@@ -104,19 +125,34 @@ void KernelSourceParser::parse()
         return;
     }
 
-    _filesIndex = _lastFileNameLen = 0;
+    if (BugReport::log())
+        BugReport::log()->newFile("insightd");
+    else
+        BugReport::setLog(new BugReport("insightd"));
+
     cleanUpThreads();
+    _factory->seenMagicNumbers.clear();
 
     operationStarted();
+    _durationLastFileFinished = _duration;
 
     // Collect files to process
     _fileNames.clear();
-    CompileUnitIntHash::const_iterator it = _factory->sources().begin();
+    _bytesTotal = _bytesRead = 0;
+    QString fileName;
+    CompileUnitIntHash::const_iterator it = _factory->sources().begin();    
     while (it != _factory->sources().end() && !shell->interrupted()) {
         const CompileUnit* unit = it.value();
         // Skip assembly files
-        if (!unit->name().endsWith(".S"))
-            _fileNames.append(unit->name() + ".i");
+        if (!unit->name().endsWith(".S")) {
+            fileName = unit->name() + ".i";
+            if (_srcDir.exists(fileName)) {
+                _fileNames.append(fileName);
+                _bytesTotal += QFileInfo(_srcDir, fileName).size();
+            }
+            else
+                shellErr(QString("File not found: %1").arg(fileName));
+        }
         ++it;
     }
     
@@ -146,14 +182,77 @@ void KernelSourceParser::parse()
 
     operationStopped();
 
-    shell->out() << qSetFieldWidth(_lastFileNameLen)
-                 << QString("\rParsed %1/%2 files in %3")
-                        .arg(_filesIndex)
-                        .arg(_fileNames.size())
-                        .arg(elapsedTime())
-                 << qSetFieldWidth(0) << endl;
+    QString s = QString("\rParsed %1/%2 files in %3.")
+            .arg(_filesIndex)
+            .arg(_fileNames.size())
+            .arg(elapsedTimeVerbose());
+    shellOut(s, true);
 
     _factory->sourceParcingFinished();
+
+    qint32 counter = 0;
+    for (QMultiHash<int, int>::iterator i = _factory->seenMagicNumbers.begin();
+            i != _factory->seenMagicNumbers.end(); ++i)
+    {
+        const BaseType* bt = _factory->findBaseTypeById(i.key());
+        if (!bt) {
+            debugerr(QString("It seems type 0x%1 does not exist (anymore)")
+                       .arg((uint)i.key(), 0, 16));
+            continue;
+        }
+        // Just to be save...
+        assert(bt->type() & StructOrUnion);
+        const Structured* str = dynamic_cast<const Structured*>(bt);
+        assert(i.value() >= 0 && i.value() < str->members().size());
+        const StructuredMember* m = str->members().at(i.value());
+
+        if (m->hasConstantIntValue())
+        {
+            counter++;
+            s.clear();
+            QList<qint64> constInt = m->constantIntValue();
+            for (int j = 0; j < constInt.size(); ++j) {
+                if (j > 0)
+                    s += ", ";
+                s += QString::number(constInt[j]);
+            }
+            debugmsg(QString("Found Constant: %0 %1.%2 = {%3}")
+                     .arg(m->refType() ? m->refType()->prettyName() : QString("(unknown)"))
+                     .arg(m->belongsTo()->name())
+                     .arg(m->name())
+                     .arg(s));
+        }
+        else if (m->hasConstantStringValue())
+        {
+            counter++;
+            s.clear();
+            QList<QString> constString = (m->constantStringValue());
+            for (int j = 0; j < constString.size(); ++j) {
+                if (j > 0)
+                    s += ", ";
+                s += constString[j];
+            }
+
+            debugmsg(QString("Found Constant: %0 %1.%2 = {%3}")
+                     .arg(m->refType() ? m->refType()->prettyName() : QString("(unknown)"))
+                     .arg(m->belongsTo()->name())
+                     .arg(m->name())
+                     .arg(s));
+        }
+    }
+    debugmsg(QString("Found %1 constants").arg(counter));
+
+
+    // In case there were errors, show the user some information
+    if (BugReport::log()) {
+        if (BugReport::log()->entries()) {
+            BugReport::log()->close();
+            shell->out() << endl
+                         << BugReport::log()->bugSubmissionHint(BugReport::log()->entries());
+        }
+        delete BugReport::log();
+        BugReport::setLog(0);
+    }
 }
 
 
@@ -167,10 +266,6 @@ void KernelSourceParser::WorkerThread::run()
            _parser->_filesIndex < _parser->_fileNames.size())
     {
         currentFile = _parser->_fileNames[_parser->_filesIndex++];
-
-//        if (_parser->_filesIndex < 116)
-//            continue;
-
         _parser->_currentFile = currentFile;
 
         if (_parser->_filesIndex <= 1)
@@ -179,26 +274,11 @@ void KernelSourceParser::WorkerThread::run()
             _parser->checkOperationProgress();
         lock.unlock();
 
-        try {
-            parseFile(currentFile);
-        }
-        catch (FileNotFoundException& e) {
-            shell->out() << "\r" << flush;
-            shell->err() << "WARNING: " << e.message << endl << flush;
-        }
-//        catch (TypeEvaluatorException& e) {
-//            shell->out() << "\r" << flush;
-//            shell->err() << "WARNING: At " << e.file << ":" << e.line
-//                         << ": " << e.message << endl << flush;
-//        }
-        catch (GenericException& e) {
-            shell->out() << endl;
-            shell->err() << e.file << ":" << e.line
-                         << " WARNING: " << e.message << endl << flush;
-            throw e;
-        }
+        parseFile(currentFile);
 
         lock.relock();
+        _parser->_bytesRead += QFileInfo(_parser->_srcDir, currentFile).size();
+        _parser->_durationLastFileFinished = _parser->_duration;
     }
 }
 
@@ -207,43 +287,51 @@ void KernelSourceParser::WorkerThread::parseFile(const QString &fileName)
 {
     QString file = _parser->_srcDir.absoluteFilePath(fileName);
 
-    if (!_parser->_srcDir.exists(fileName))
-        fileNotFoundError(QString("File not found: %1").arg(file));
+    if (!_parser->_srcDir.exists(fileName)) {
+        _parser->shellErr(QString("File not found: %1").arg(file));
+        return;
+    }
 
     AbstractSyntaxTree ast;
     ASTBuilder builder(&ast);
-
-    // Parse the file
-    if (!_stopExecution && builder.buildFrom(file) != 0)
-        sourceParserError(QString("Error parsing file %1").arg(file));
-
-    // Evaluate types
     KernelSourceTypeEvaluator eval(&ast, _parser->_factory);
+
     try {
+        // Parse the file
+        if (!_stopExecution && builder.buildFrom(file) > 0) {
+            BugReport::reportErr(QString("Could not recover after %1 errors "
+                                         "while parsing file:\n%2")
+                                 .arg(ast.errorCount())
+                                 .arg(file));
+            return;
+        }
+
+        // Evaluate types
         if (!_stopExecution && !eval.evaluateTypes()) {
             // Only throw exception if evaluation was not interrupted
             if (!_stopExecution && !eval.walkingStopped())
-                sourceParserError(QString("Error evaluating types in %1").arg(file));
+                BugReport::reportErr(QString("Error evaluating types in %1")
+                                     .arg(file));
         }
     }
     catch (TypeEvaluatorException& e) {
         // Print the source of the embedding external declaration
         const ASTNode* n = e.ed.srcNode;
-        while (n && n->parent) // && n->type != nt_external_declaration)
+        while (n && n->parent && n->type != nt_function_definition)
             n = n->parent;
-
-        ASTSourcePrinter printer(&ast);
-
-        shell->out() << "\r" << flush;
-        shell->err()
-                << "********************************************" << endl
-                << "WARNING: " << e.message << endl
-                << "------------------[Source]------------------" << endl
-                << printer.toString(n, true)
-                << "------------------[/Source]-----------------" << endl
-                << "Details (may be incomplete):" << endl
-                << eval.typeChangeInfo(e.ed) << endl << flush;
-        throw;
+        eval.reportErr(e, n, &e.ed);
+    }
+    catch (ExpressionEvalException& e) {
+        // Make sure we at least have the full postfix expression
+        const ASTNode* n = e.node;
+        for (int i = 0;
+             i < 3 && n && n->parent && n->type != nt_function_definition;
+             ++i)
+            n = n->parent;
+        eval.reportErr(e, n, 0);
+    }
+    catch (GenericException& e) {
+        eval.reportErr(e, 0, 0);
     }
 }
 

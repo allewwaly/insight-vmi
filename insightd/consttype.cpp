@@ -37,7 +37,7 @@ QString ConstType::prettyName() const
 }
 
 
-//QString ConstType::toString(QIODevice* mem, size_t offset) const
+//QString ConstType::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
 //{
 //	assert(_refType != 0);
 //	return _refType->toString(offset);

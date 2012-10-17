@@ -1,27 +1,13 @@
 
-//Prints a string with a given width left-aligned
-function lalign(s, len)
-{
-	while (len > 0 && s.length < len)
-		s += " ";
-	return s;
-}
-
-//Prints a string with a given width right-aligned
-function ralign(s, len)
-{
-	while (len > 0 && s.length < len)
-		s = " " + s;
-	return s;
-}
+include("lib_string.js");
 
 function doCompare(inst1, inst2)
 {
     if (inst1.Equals(inst2))
-        print("Equal:     [" + inst1.MemDumpIndex() + "] " + inst1.FullName() +
+        println("Equal:     [" + inst1.MemDumpIndex() + "] " + inst1.FullName() +
               ", [" + inst2.MemDumpIndex() + "] " + inst2.FullName());
     else
-        print("Different: [" + inst1.MemDumpIndex() + "] " + inst1.FullName() +
+        println("Different: [" + inst1.MemDumpIndex() + "] " + inst1.FullName() +
               ", [" + inst2.MemDumpIndex() + "] " + inst2.FullName());
 }
 
@@ -30,7 +16,7 @@ function showDifferences(inst1, inst2, recursive)
 {
 	var diff = inst1.Differences(inst2, recursive);
 //    for (i in diff)
-//        print("diff[" + i + "] = \"" + diff[i] + "\"");
+//        println("diff[" + i + "] = \"" + diff[i] + "\"");
 
 	var size_name = 0, size_val = 0;
 	for (i in diff) {
@@ -46,12 +32,12 @@ function showDifferences(inst1, inst2, recursive)
 	}
 	
 	
-    print("Differences for [" + inst1.MemDumpIndex() + "] " + inst1.FullName() +
+    println("Differences for [" + inst1.MemDumpIndex() + "] " + inst1.FullName() +
             ", [" + inst2.MemDumpIndex() + "] " + inst2.FullName() + ":");
     if (diff.length <= 0)
-    	print("  (instances are equal)");
+        println("  (instances are equal)");
     else if (diff[0].length == 0)
-    	print("  (instances are uncomparable)");
+        println("  (instances are uncomparable)");
     else {
     	for (i in diff) {
     		var n = diff[i];
@@ -61,22 +47,22 @@ function showDifferences(inst1, inst2, recursive)
     		var val2 = inst2[n].IsNumber() ? 
     				ralign(inst2[n].toString(), size_val) :
     				lalign(inst2[n].toString(), size_val);
-	        print("  " + lalign(n + ": ", size_name + 2) + val1 + ", " + val2);
+            println("  " + lalign(n + ": ", size_name + 2) + val1 + ", " + val2);
     	}
     }
 }
 
 
-var dumps = getMemDumps();
+var dumps = Memory.list();
 
 if (dumps.length < 2) {
-	print("We need at least two loaded memory dumps for this script.");
+    println("We need at least two loaded memory dumps for this script.");
 }
 else {
-	print("Comparing some instances between the following memory dumps:");
-	print("[0] " + dumps[0]);
-	print("[1] " + dumps[1]);
-    print();
+    println("Comparing some instances between the following memory dumps:");
+    println("[0] " + dumps[0]);
+    println("[1] " + dumps[1]);
+    println();
 	
     var inst1 = new Instance("init_task", 0);
     var inst2 = new Instance("init_task", 1);
@@ -95,33 +81,33 @@ else {
     doCompare(inst1.comm, inst1.tasks.next.comm);
     doCompare(inst1.comm, inst2.pid);
     
-    print();
+    println();
 
-    print("Detailed comparison of two struct instances:");
-    print();
+    println("Detailed comparison of two struct instances:");
+    println();
     showDifferences(inst1, inst1, false);
-    print();
+    println();
     showDifferences(inst1, inst2, false);
-    print();
+    println();
     showDifferences(inst1, inst1.tasks.next, false);
 
-    print();
+    println();
     
-    print("Recursive comparison of two struct instances:");
-    print();
+    println("Recursive comparison of two struct instances:");
+    println();
     showDifferences(inst1.user, inst2.user, true);
-    print();
+    println();
     showDifferences(inst1, inst2.user, true);
-    print();
+    println();
     showDifferences(new Instance("init_mm", 0), new Instance("init_mm", 1), true);
-    print();
+    println();
     try {
 	    showDifferences(inst1, inst2, true);
     }
     catch(err) {
-    	print(err);
+        println(err);
     }
-    print();
+    println();
 }
 
 

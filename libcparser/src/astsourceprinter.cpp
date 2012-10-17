@@ -8,7 +8,6 @@
 #include <astsourceprinter.h>
 #include <abstractsyntaxtree.h>
 #include <astsymbol.h>
-#include <QTextDocument>
 #include <QTextStream>
 #include <QFile>
 #include <QDateTime>
@@ -16,7 +15,8 @@
 
 
 ASTSourcePrinter::ASTSourcePrinter(AbstractSyntaxTree* ast)
-    : ASTWalker(ast), _indent(0), _lineIndent(0), _currNode(0)
+    : ASTWalker(ast), _indent(0), _lineIndent(0), _currNode(0), _rootNode(0),
+      _prefixLineNo(false)
 {
 }
 
@@ -197,7 +197,10 @@ void ASTSourcePrinter::beforeChildren(const ASTNode *node, int flags)
         _line += tokenListToString(node->u.declarator_suffix.identifier_list, ",");
         break;
     case nt_designated_initializer:
-        _line += "[";
+        if (node->u.designated_initializer.identifier)
+            _line += "." + antlrTokenToStr(node->u.designated_initializer.identifier);
+        else
+            _line += "[";
         break;
     case nt_direct_declarator:
         _line += tokenToString(node->u.direct_declarator.identifier);
@@ -291,8 +294,6 @@ void ASTSourcePrinter::beforeChildren(const ASTNode *node, int flags)
     case nt_primary_expression:
         if (node->u.primary_expression.expression)
             _line += "(";
-        if (node->u.primary_expression.hasDot)
-            _line += ".";
         if (node->u.primary_expression.identifier)
             _line += tokenToString(node->u.primary_expression.identifier);
         break;
@@ -350,6 +351,9 @@ void ASTSourcePrinter::beforeChildren(const ASTNode *node, int flags)
 
 void ASTSourcePrinter::beforeChild(const ASTNode *node, const ASTNode *childNode)
 {
+    if (_rootNode && _rootNode->parent == node)
+        return;
+
     switch (node->type) {
     case nt_abstract_declarator:
         if (childNode->type == nt_direct_abstract_declarator &&
@@ -598,7 +602,11 @@ void ASTSourcePrinter::afterChild(const ASTNode *node, const ASTNode *childNode)
                 _line += " ... ";
             else  {
                 _line += ":";
-                newlineIncIndent();
+                if (node->u.labeled_statement.statement &&
+                    node->u.labeled_statement.statement->type == nt_labeled_statement_case)
+                    newlineIndent();
+                else
+                    newlineIncIndent();
             }
         }
         break;
@@ -700,7 +708,8 @@ void ASTSourcePrinter::afterChildren(const ASTNode *node, int flags)
         _line += ")";
         break;
     case nt_designated_initializer:
-        _line += "]";
+        if (!node->u.designated_initializer.identifier)
+            _line += "]";
         break;
     case nt_expression_statement:
         _line += ";";
@@ -716,7 +725,11 @@ void ASTSourcePrinter::afterChildren(const ASTNode *node, int flags)
         break;
     case nt_labeled_statement_case:
     case nt_labeled_statement_default:
-        newlineDecIndent();
+        if (node->u.labeled_statement.statement &&
+            node->u.labeled_statement.statement->type == nt_labeled_statement_case)
+            newlineIndent();
+        else
+            newlineDecIndent();
         break;
     case nt_parameter_type_list:
         if (node->u.parameter_type_list.openArgs)
@@ -756,7 +769,7 @@ QString ASTSourcePrinter::toString(bool lineNo)
     _line.clear();
     _out.clear();
     _lineIndent = _indent = 0;
-    _currNode = _ast && _ast->rootNodes() ? _ast->rootNodes()->item : 0;
+    _rootNode = _currNode = _ast && _ast->rootNodes() ? _ast->rootNodes()->item : 0;
     _prefixLineNo = lineNo;
 
     if (_ast) {
@@ -774,7 +787,7 @@ QString ASTSourcePrinter::toString(const ASTNode* node, bool lineNo)
     _line.clear();
     _out.clear();
     _lineIndent = _indent = 0;
-    _currNode = node;
+    _rootNode = _currNode = node;
     _prefixLineNo = lineNo;
 
     if (_currNode) {

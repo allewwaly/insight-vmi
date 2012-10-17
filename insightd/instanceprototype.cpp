@@ -13,7 +13,7 @@
 
 Q_DECLARE_METATYPE(Instance*)
 
-#define INT32MASK 0xFFFFFFFFUL
+#define INT32MASK 0xFFFFFFFFULL
 
 InstancePrototype::InstancePrototype(QObject *parent)
     : QObject(parent)
@@ -44,7 +44,7 @@ QString InstancePrototype::Address() const
 {
 	Instance* inst;
     return ((inst = thisInstance())) ?
-            QString("%1").arg(inst->address(), inst->pointerSize() << 1, 16, QChar('0')) :
+            QString("%1").arg(inst->address(), inst->sizeofPointer() << 1, 16, QChar('0')) :
             QString("0");
 }
 
@@ -101,6 +101,20 @@ void InstancePrototype::AddToAddress(int offset)
     Instance* inst = thisInstance();
     if (inst)
         inst->addToAddress(offset);
+}
+
+
+Instance InstancePrototype::ArrayElem(int index) const
+{
+    Instance* inst = thisInstance();
+    return inst ? inst->arrayElem(index) : Instance();
+}
+
+
+int InstancePrototype::ArrayLength() const
+{
+    Instance* inst = thisInstance();
+    return inst ? inst->arrayLength() : -1;
 }
 
 
@@ -230,14 +244,21 @@ int InstancePrototype::TypeId() const
 QString InstancePrototype::TypeName() const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->typeName() : QString();
+	return ((inst = thisInstance())) ? inst->typeName() : QString();
+}
+
+
+uint InstancePrototype::TypeHash() const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ? inst->typeHash() : 0;
 }
 
 
 QString InstancePrototype::Type() const
 {
     Instance* inst;
-    return ( ((inst = thisInstance())) && inst->type() ) ?
+    return ((inst = thisInstance())) && inst->type() ?
             realTypeToStr(inst->type()->type()) : QString("unknown");
 }
 
@@ -313,16 +334,28 @@ int InstancePrototype::MemberCandidatesCount(int index) const
 Instance InstancePrototype::MemberCandidate(int mbrIndex, int cndtIndex) const
 {
 	Instance* inst;
-	return ((inst = thisInstance())) ?
-				inst->memberCandidate(mbrIndex, cndtIndex) : Instance();
+	try {
+		return ((inst = thisInstance())) ?
+					inst->memberCandidate(mbrIndex, cndtIndex) : Instance();
+	}
+	catch (GenericException& e) {
+		injectScriptError(e);
+	}
+	return Instance();
 }
 
 
 Instance InstancePrototype::MemberCandidate(const QString &name, int cndtIndex) const
 {
 	Instance* inst;
-	return ((inst = thisInstance())) ?
-				inst->memberCandidate(name, cndtIndex) : Instance();
+	try {
+		return ((inst = thisInstance())) ?
+					inst->memberCandidate(name, cndtIndex) : Instance();
+	}
+	catch (GenericException& e) {
+		injectScriptError(e);
+	}
+	return Instance();
 }
 
 
@@ -361,10 +394,17 @@ QString InstancePrototype::MemberAddress(const QString &name,
 }
 
 
-int InstancePrototype::PointerSize() const
+int InstancePrototype::SizeofPointer() const
 {
     Instance* inst;
-    return ((inst = thisInstance())) ? inst->pointerSize() : 8;
+    return ((inst = thisInstance())) ? inst->sizeofPointer() : 8;
+}
+
+
+int InstancePrototype::SizeofLong() const
+{
+    Instance* inst;
+    return ((inst = thisInstance())) ? inst->sizeofLong() : 8;
 }
 
 
@@ -376,8 +416,8 @@ void InstancePrototype::ChangeType(const QString& typeName)
     const BaseType* t = shell->symbols().factory().findBaseTypeByName(typeName);
     if (t)
         inst->setType(t);
-    else if (context())
-        context()->throwError(QString("Type not found: \"%1\"").arg(typeName));
+    else
+        injectScriptError(QString("Type not found: \"%1\"").arg(typeName));
 }
 
 
@@ -389,8 +429,8 @@ void InstancePrototype::ChangeType(int typeId)
     const BaseType* t = shell->symbols().factory().findBaseTypeById(typeId);
     if (t)
         inst->setType(t);
-    else if (context())
-        context()->throwError(QString("Type ID not found: 0x%1").arg(typeId, 0, 16));
+    else
+        injectScriptError(QString("Type ID not found: 0x%1").arg(typeId, 0, 16));
 }
 
 
@@ -526,6 +566,34 @@ quint32 InstancePrototype::toUInt64Low() const
 }
 
 
+QString InstancePrototype::toLong(int base) const
+{
+    try {
+        Instance* inst;
+        return ((inst = thisInstance())) ?
+                QString::number(inst->toLong(), base) : QString("0");
+    }
+    catch (GenericException& e) {
+        injectScriptError(e);
+    }
+    return "0";
+}
+
+
+QString InstancePrototype::toULong(int base) const
+{
+    try {
+        Instance* inst;
+        return ((inst = thisInstance())) ?
+                QString::number(inst->toULong(), base) : QString("0");
+    }
+    catch (GenericException& e) {
+        injectScriptError(e);
+    }
+    return "0";
+}
+
+
 float InstancePrototype::toFloat() const
 {
     try {
@@ -571,6 +639,21 @@ QString InstancePrototype::toString() const
 }
 
 
+QString InstancePrototype::toPointer(int base) const
+{
+    try {
+        Instance* inst;
+        return ((inst = thisInstance())) ?
+                    QString::number((quint64)inst->toPointer(), base) :
+                    QString("0");
+    }
+    catch (GenericException& e) {
+        injectScriptError(e);
+    }
+    return "0";
+}
+
+
 Instance* InstancePrototype::thisInstance() const
 {
 	Instance* inst = qscriptvalue_cast<Instance*>(thisObject().data());
@@ -589,14 +672,15 @@ Instance* InstancePrototype::thisInstance() const
 
 void InstancePrototype::injectScriptError(const GenericException& e) const
 {
+    QString msg = QString("%1: %2")
+                        .arg(e.className())
+                        .arg(e.message);
     if (context())
-        context()->throwError(
-                QString("%1:%2: %3")
-                    .arg(e.file)
-                    .arg(e.line)
-                    .arg(e.message));
-    else
+        context()->throwError(msg);
+    else {
+        debugerr(msg);
         throw e;
+    }
 }
 
 
@@ -604,8 +688,10 @@ void InstancePrototype::injectScriptError(const QString& msg) const
 {
     if (context())
         context()->throwError(msg);
-    else
+    else {
+        debugerr(msg);
         genericError(msg);
+    }
 }
 
 

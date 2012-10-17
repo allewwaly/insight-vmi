@@ -49,6 +49,7 @@ public:
 	~ASTScope();
 
 	inline ASTSymbolHash& symbols() { return _symbols; }
+	inline const ASTSymbolHash& symbols() const { return _symbols; }
 	inline ASTSymbolHash& compoundTypes() { return _compoundTypes; }
 	inline ASTSymbolHash& typedefs() { return _typedefs; }
 	inline struct ASTNode* astNode() const { return _astNode; }
@@ -82,6 +83,8 @@ public:
 	void addSymbol(const QString& name, ASTSymbolType type, struct ASTNode* node,
 			ASTScope* scope);
 	inline ASTScope* currentScope() const { return _currentScope; }
+	inline ASTScopeList scopes() { return _scopes; }
+	inline const ASTScopeList scopes() const { return _scopes; }
 };
 
 #endif /* ASTSCOPEMANAGER_H_ */

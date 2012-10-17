@@ -1,28 +1,54 @@
-# Set PREFIX, if not set
-isEmpty(PREFIX):PREFIX = /usr/local
+TEMPLATE = app
+
+# Global configuration file
+include(../config.pri)
 
 # Path for target
 target.path += $$PREFIX/bin
 
 # Extra target for scripts
+scripts.path += $$PREFIX/share/insight/examples
 scripts.files = scripts/*.js
-scripts.path += $$PREFIX/share/insight
+
+# Extra target for tools
+tools.path += $$PREFIX/share/insight/tools
+tools.files = ../tools/gcc_pp \
+	../tools/make-debug-kpkg \
+	../tools/mount-img \
+	../tools/umount-img
 
 # What to install
-INSTALLS += target scripts
+INSTALLS += target scripts tools
+
+CONFIG += console \
+    debug_and_release
+
+QT += script \
+    network
+QT -= webkit
+
+# Required libraries for building
+LIBS += \
+    -L../libdebug$$BUILD_DIR \
+    -l$$DEBUG_LIB \
+    -L../libinsight$$BUILD_DIR \
+    -l$$INSIGHT_LIB \
+    -L../libcparser$$BUILD_DIR \
+    -l$$CPARSER_LIB \
+    -L../libantlr3c$$BUILD_DIR \
+    -l$$ANTLR_LIB
+
+# Inter-project include paths
+INCLUDEPATH += ../libinsight/include \
+    ../libdebug/include \
+    ../libantlr3c/include \
+    ../libcparser/include
 
 SOURCES += kernelsourcetypeevaluator.cpp \
     kernelsourceparser.cpp \
     memorydumpsclass.cpp \
     scriptengine.cpp \
     kernelsymbolsclass.cpp \
-    memorydifftree.cpp \
-    memorymaprangetree.cpp \
-    memorymapbuilder.cpp \
-    memorymapwindow.cpp \
-    memorymapwidget.cpp \
-    memorymapnode.cpp \
-    memorymap.cpp \
     instancedata.cpp \
     instance.cpp \
     instanceprototype.cpp \
@@ -64,23 +90,24 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     astexpressionevaluator.cpp \
     astexpression.cpp \
     expressionresult.cpp \
-    kernelsymbolstream.cpp
+    kernelsymbolstream.cpp \
+    colorpalette.cpp \
+    slubobjects.cpp \
+    memorymapbuildersv.cpp \
+    memorymapbuildercs.cpp \
+    memorymapverifier.cpp \
+    memorymapnodesv.cpp \
+    memorymapheuristics.cpp \
+    listfilter.cpp
+
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
     memorydumpsclass.h \
     scriptengine.h \
     kernelsymbolsclass.h \
-    memorydifftree.h \
-    memorymaprangetree.h \
-    memoryrangetree.h \
     instance_def.h \
-    memorymapbuilder.h \
     priorityqueue.h \
-    memorymapwindow.h \
-    memorymapwidget.h \
     varsetter.h \
-    memorymapnode.h \
-    memorymap.h \
     instancedata.h \
     instance.h \
     instanceprototype.h \
@@ -125,32 +152,56 @@ HEADERS += kernelsourcetypeevaluator.h \
     function.h \
     astexpressionevaluator.h \
     astexpression.h \
-    expressionevalexception.h \
     expressionresult.h \
-    kernelsymbolstream.h
-CONFIG += console \
-    debug_and_release
-QMAKE_CFLAGS_RELEASE += -O3
-QMAKE_CXXFLAGS_RELEASE += -O3
-QT += script \
-    network \
-    gui
-LIBS += -lreadline \
-    -L../libdebug \
-    -ldebug \
-    -L../libinsight \
-    -linsight \
-    -L../libantlr3c \
-    -lantlr3c \
-    -L../libcparser \
-    -lcparser
-INCLUDEPATH += ../libinsight/include \
-    ../libdebug/include \
-    ../libantlr3c/include \
-    ../libcparser/include
-FORMS = memorymapwindow.ui
+    kernelsymbolstream.h \
+    colorpalette.h \
+    slubobjects.h \
+    memorymapbuildersv.h \
+    memorymapbuildercs.h \
+    memorymapverifier.h \
+    memorymapnodesv.h \
+    memorymapheuristics.h \
+    listfilter.h
 
+# Things to do when the memory map builder and widget is to be built. Enabling
+# this feature requires InSight to run on an X server.
+CONFIG(memory_map) {
+    unix:warning(Enabled compilation of the memory_map features. The resulting binary will must be run on an X windows system!)
 
+    DEFINES += CONFIG_MEMORY_MAP
 
+    FORMS += memorymapwindow.ui
 
+    SOURCES += memorydifftree.cpp \
+        memorymaprangetree.cpp \
+        memorymapbuilder.cpp \
+        memorymapwindow.cpp \
+        memorymapwidget.cpp \
+        memorymapnode.cpp \
+        memorymap.cpp
 
+    HEADERS += memorydifftree.h \
+        memorymaprangetree.h \
+        memoryrangetree.h \
+        memorymapbuilder.h \
+        memorymapwindow.h \
+        memorymapwidget.h \
+        memorymapnode.h \
+        memorymap.h
+}
+CONFIG(WITH_X_SUPPORT){
+    unix:warning(Enabled X support. Needed for example for some memory_map features.)
+    
+    DEFINES += CONFIG_WITH_X
+    QT += gui
+}
+
+#!CONFIG(WITH_X_SUPPORT) {
+#    QT -= gui
+#}
+
+# Enable or disable libreadline support
+CONFIG(with_readline) {
+    DEFINES += CONFIG_READLINE
+    LIBS += -lreadline
+}

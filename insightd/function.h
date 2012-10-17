@@ -41,7 +41,7 @@ public:
 	/**
 	 * @return the low program counter
 	 */
-	inline size_t pcLow() const
+	inline quint64 pcLow() const
 	{
 		return _pcLow;
 	}
@@ -49,7 +49,7 @@ public:
 	/**
 	 * @return the high program counter
 	 */
-	inline size_t pcHigh() const
+	inline quint64 pcHigh() const
 	{
 		return _pcHigh;
 	}
@@ -74,7 +74,7 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset) const;
+    virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const;
 
     /**
      * Reads a serialized version of this object from \a in.
@@ -92,8 +92,8 @@ public:
 
 private:
     bool _inlined;  ///< Is this an inlined function?
-    size_t _pcLow;  ///< Low program counter
-    size_t _pcHigh; ///< High program counter
+    quint64 _pcLow;  ///< Low program counter
+    quint64 _pcHigh; ///< High program counter
 };
 
 #endif // FUNCTION_H

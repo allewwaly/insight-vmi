@@ -48,6 +48,28 @@ public:
     void setOffset(size_t offset);
 
     /**
+     * @return the bit size of this bit-field integer declaration
+     */
+    int bitSize() const;
+
+    /**
+     * Sets the bit size of this bit-field integer declaration.
+     * @param size new bit size of bit-field integer declaration
+     */
+    void setBitSize(qint8 size);
+
+    /**
+     * @return the bit offset of this bit-field integer declaration
+     */
+    int bitOffset() const;
+
+    /**
+     * Sets the bit offset of this bit-field integer declaration.
+     * @param offset new bit offset of bit-field integer declaration
+     */
+    void setBitOffset(qint8 offset);
+
+    /**
      * This gives a pretty name of that type which may involve referencing
      * types.
      * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
@@ -89,6 +111,52 @@ public:
                         int resolveTypes = BaseType::trLexical,
                         int maxPtrDeref = -1) const;
 
+    /*
+      * Function to save result of magic number investigation.
+      * @returns true if object has already been seen
+      */
+    bool evaluateMagicNumberFoundNotConstant();
+    
+    /*
+      * Function to save result of magic number investigation.
+      * Should be called if constant integer type is found.
+      * @returns true if object has already been seen
+      */
+    bool evaluateMagicNumberFoundInt(qint64 constant);
+    
+    /*
+      * Function to save result of magic number investigation.
+      * Should be called if constant string is found.
+      * @returns true if object has already been seen
+      */
+    bool evaluateMagicNumberFoundString(const QString& constant);
+
+    inline bool hasNotConstValue() const
+    {
+        return (_seenInEvaluateMagicNumber) ? !(_hasConstIntValue || _hasConstStringValue) : false;
+    }
+    
+    inline bool hasConstantIntValue() const
+    {
+        return _hasConstIntValue;
+    }
+    inline bool hasConstantStringValue() const
+    {
+        return _hasConstStringValue;
+    }
+    inline bool hasStringValue() const
+    {
+        return _hasStringValue;
+    }
+    inline  const QList<qint64>& constantIntValue() const
+    {
+        return _constIntValue;
+    }
+    inline const QList<QString>& constantStringValue() const
+    {
+        return _constStringValue;
+    }
+
 protected:
     /**
      * Access function to the factory this symbol belongs to.
@@ -103,6 +171,15 @@ protected:
 private:
 	size_t _offset;          ///< the member's offset within the struct;
 	Structured* _belongsTo;  ///< Struct or Union this member belongs to
+    
+    bool _seenInEvaluateMagicNumber;
+    QList<qint64> _constIntValue;
+    QList<QString> _constStringValue;
+    bool _hasConstIntValue;
+    bool _hasConstStringValue;
+    bool _hasStringValue;
+    qint8 _bitSize;
+    qint8 _bitOffset;
 };
 
 
@@ -115,6 +192,48 @@ inline const SymFactory* StructuredMember::fac() const
 inline SymFactory* StructuredMember::fac()
 {
     return _factory;
+}
+
+
+inline size_t StructuredMember::offset() const
+{
+    return _offset;
+}
+
+
+inline void StructuredMember::setOffset(size_t offset)
+{
+    _offset = offset;
+}
+
+
+inline Structured* StructuredMember::belongsTo() const
+{
+    return _belongsTo;
+}
+
+
+inline int StructuredMember::bitSize() const
+{
+    return _bitSize;
+}
+
+
+inline void StructuredMember::setBitSize(qint8 size)
+{
+    _bitSize = size;
+}
+
+
+inline int StructuredMember::bitOffset() const
+{
+    return _bitOffset;
+}
+
+
+inline void StructuredMember::setBitOffset(qint8 offset)
+{
+    _bitOffset = offset;
 }
 
 

@@ -72,9 +72,31 @@
 #include    <sys/stat.h>
 #include    <stdarg.h>
 
-#define	ANTLR3_API  __declspec(dllexport)
+
+/*
+#ifndef __GNUC__
+# define ANTLR3_API __declspec(dllimport)
+#else
+# define ANTLR3_API __attribute__((dllimport)) extern
+#endif
+*/
+
+/* chrschn: No need for dllimport, we link this lib statically */
+#define ANTLR3_API extern
+
 #define	ANTLR3_CDECL __cdecl
 #define ANTLR3_FASTCALL __fastcall
+
+#if 1
+/* chrschn: ANTLR expects these types to be defined for Windows, however they
+   are not for the MinGW compiler and includes. If we at some point we receive
+   a "type redefined" error here, we need to find a properly #defined condition.
+ */
+typedef signed char INT8;         /* 8 bit signed */
+typedef unsigned char UINT8;      /* 8 bit unsigned */
+typedef short INT16;              /* 16 bit signed */
+typedef unsigned short UINT16;    /* 16 bit unsigned */
+#endif
 
 typedef	INT32	ANTLR3_CHAR,	*pANTLR3_CHAR;
 typedef	UINT32	ANTLR3_UCHAR,	*pANTLR3_UCHAR;
@@ -121,7 +143,9 @@ typedef	struct stat ANTLR3_FSTAT_STRUCT;
 
 /* Don't complain about "deprecated" functions such as strdup
  */
+#ifndef __GNUC__
 #pragma warning( disable : 4996 )
+#endif
 
 #else
 

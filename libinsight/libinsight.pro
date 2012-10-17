@@ -1,3 +1,6 @@
+# Global configuration file
+include(../config.pri)
+
 TEMPLATE = lib
 TARGET = insight
 
@@ -19,7 +22,7 @@ QMAKE_CFLAGS_RELEASE += -O3
 QMAKE_CXXFLAGS_RELEASE += -O3
 QT += core \
     network
-QT -= gui
+QT -= gui webkit
 HEADERS += eventloopthread.h \
     include/insight/devicemuxer.h \
     include/insight/insight.h \

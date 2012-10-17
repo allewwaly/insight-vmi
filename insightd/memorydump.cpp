@@ -12,8 +12,11 @@
 #include <QRegExp>
 #include "symfactory.h"
 #include "variable.h"
-#include "memorymap.h"
+#include "shell.h"
 
+#ifdef CONFIG_MEMORY_MAP
+#include "memorymap.h"
+#endif
 
 #define queryError(msg) do { throw QueryException((msg), __FILE__, __LINE__); } while (0)
 #define queryError2(msg, err) do { \
@@ -28,10 +31,12 @@ MemoryDump::MemoryDump(const MemSpecs& specs, QIODevice* mem,
                        SymFactory* factory, int index)
     : _specs(specs),
       _file(0),
-      _vmem(new VirtualMemory(_specs, mem, index)),
       _factory(factory),
-      _index(index),
-      _map(new MemoryMap(_factory, _vmem))
+      _vmem(new VirtualMemory(specs, mem, index)),
+#ifdef CONFIG_MEMORY_MAP
+      _map(new MemoryMap(_factory, _vmem)),
+#endif
+      _index(index)
 {
     init();
 }
@@ -41,10 +46,12 @@ MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
         const SymFactory* factory, int index)
     : _specs(specs),
       _file(new QFile(fileName)),
-      _vmem(new VirtualMemory(_specs, _file, index)),
       _factory(factory),
-      _index(index),
-      _map(new MemoryMap(_factory, _vmem))
+      _vmem(new VirtualMemory(_specs, _file, index)),
+#ifdef CONFIG_MEMORY_MAP
+      _map(new MemoryMap(_factory, _vmem)),
+#endif
+      _index(index)
 {
     _fileName = fileName;
     // Check existence
@@ -59,18 +66,34 @@ MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
 
 MemoryDump::~MemoryDump()
 {
+#ifdef CONFIG_MEMORY_MAP
+    if (_map)
+        delete _map;
+#endif
     if (_vmem)
         delete _vmem;
     // Delete the file object if we created one
     if (_file)
         delete _file;
-    if (_map)
-        delete _map;
+}
+
+
+QString trimQuotes(const QString& s)
+{
+    if (s.startsWith(QChar('"')) && s.endsWith(QChar('"')))
+        return s.mid(1, s.size() - 2);
+    return s;
 }
 
 
 void MemoryDump::init()
 {
+#define memDumpInitError(e) \
+    genericError("Failed to initialize this MemoryDump instance with " \
+                 "required run-time values from the dump. Error was: " + \
+                 e.message)
+
+
     // Open virtual memory for reading
     if (!_vmem->open(QIODevice::ReadOnly))
         throw IOException(
@@ -78,20 +101,31 @@ void MemoryDump::init()
                 __FILE__,
                 __LINE__);
 
-    // In i386 mode, the virtual address translation depends on the runtime
+    // The virtual address translation depends on the runtime
     // value of "high_memory". We need to query its value and add it to
     // _specs.vmallocStart before we can translate paged addresses.
-    if (_specs.arch & MemSpecs::ar_i386) {
-        // This symbol must exist
-        try {
-            Instance highMem = queryInstance("high_memory");
-            _specs.highMemory = highMem.toUInt32();
+    try {
+        Instance highMem = queryInstance("high_memory");
+        _specs.highMemory = (_specs.sizeofPointer == 4) ?
+                    (quint64)highMem.toUInt32() : highMem.toUInt64();
+    }
+    catch (QueryException& e) {
+        if (!_factory->findVarByName("high_memory")) {
+            // This is a failure for 32-bit systems
+            if (_specs.arch & MemSpecs::ar_i386)
+                memDumpInitError(e);
+            // Resort to the failsafe value for 64-bit systems
+            else {
+                debugmsg("Variable \"high_memory\" not found, resorting to "
+                         "failsafe default value");
+                _specs.highMemory = HIGH_MEMORY_FAILSAFE_X86_64;
+            }
         }
-        catch (QueryException& e) {
-            genericError("Failed to initialize this MemoryDump instance with "
-                    "required run-time values from the dump. Error was: " + e.message);
-        }
+        else
+            memDumpInitError(e);
+    }
 
+    if (_specs.arch & MemSpecs::ar_i386) {
         // This symbol only exists depending on the kernel version
         QString ve_name("vmalloc_earlyreserve");
         if (_factory->findVarByName(ve_name)) {
@@ -106,6 +140,51 @@ void MemoryDump::init()
         }
         else
             _specs.vmallocEarlyreserve = 0;
+    }
+
+    // Compare the Linux kernel version to the parsed symbols
+    QString uts_ns_name("init_uts_ns");
+    if (!_specs.version.release.isEmpty() &&
+        _factory->findVarByName(uts_ns_name))
+    {
+        try {
+            struct MemSpecs::Version ver;
+            Instance uts_ns = queryInstance(uts_ns_name);
+            uts_ns = getNextInstance("name", uts_ns);
+            // Read in all version information
+            if (!_specs.version.machine.isEmpty())
+                ver.machine = trimQuotes(
+                            uts_ns.findMember("machine",
+                                              BaseType::trLexical).toString());
+            if (!_specs.version.release.isEmpty())
+                ver.release = trimQuotes(
+                            uts_ns.findMember("release",
+                                              BaseType::trLexical).toString());
+            if (!_specs.version.sysname.isEmpty())
+                ver.sysname = trimQuotes(
+                            uts_ns.findMember("sysname",
+                                              BaseType::trLexical).toString());
+            if (!_specs.version.version.isEmpty())
+                ver.version = trimQuotes(
+                            uts_ns.findMember("version",
+                                              BaseType::trLexical).toString());
+
+            if (!_specs.version.equals(ver)) {
+                shell->err()
+                        << shell->color(ctWarningLight) << "WARNING:"
+                        << shell->color(ctWarning) << " The memory in "
+                        << shell->color(ctWarningLight) << _fileName
+                        << shell->color(ctWarning) << " belongs to a different "
+                           "kernel version than the loaded symbols!" << endl
+                        << "  Kernel symbols: " << _specs.version.toString() << endl
+                        << "  Memory file:    " << ver.toString()
+                        << shell->color(ctReset) << endl;
+            }
+        }
+        catch (QueryException& e) {
+            genericError("Failed to retrieve kernel version information of "
+                         "this memory dump. Error was: " + e.message);
+        }
     }
 
     // Initialization done
@@ -167,8 +246,8 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 {
 	Instance result;
 	QString typeString, symbol, offsetString, candidate, arrayIndexString;
-	size_t address;
 	bool okay;
+    quint32 compatibleCnt = 0;
 
 	// A component should have the form (symbol(-offset)?)?symbol(<candidate>)?([index])?
 #define SYMBOL "[A-Za-z0-9_]+"
@@ -229,13 +308,13 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 			// alternative type
 			if (candidateIndex < 0 && v->altRefTypeCount() == 1)
 				result = v->altRefTypeInstance(_vmem, 0);
-			else
+            else
 				result = v->toInstance(_vmem, BaseType::trLexical);
 		}
 	}
 	else {
 		// We have a instance therefore we resolve the member
-		if (!instance.type()->type() & StructOrUnion)
+		if (!(instance.type()->type() & StructOrUnion))
             queryError(QString("Member \"%1\" is not a struct or union")
                         .arg(instance.fullName()));
 
@@ -260,10 +339,25 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
             if (candidateIndex < 0 &&
                 instance.memberCandidatesCount(symbol) == 1)
                 result = instance.memberCandidate(symbol, 0);
-            else
-                result = instance.findMember(symbol,
+            else {
+                // If there is only one compatible candidate return that one.
+                for(int i = 0; i < instance.memberCandidatesCount(symbol); i++) {
+                    if(instance.memberCandidateCompatible(instance.indexOfMember(symbol), i)) {
+                        compatibleCnt++;
+
+                        if(compatibleCnt == 1)
+                            result = instance.memberCandidate(symbol, i);
+                        else
+                            break;
+                    }
+
+                }
+
+                if (compatibleCnt != 1)
+                    result = instance.findMember(symbol,
                                              BaseType::trLexical,
                                              true);
+            }
         }
 
         if (!result.isValid()) {
@@ -320,6 +414,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		}
 
 		// Get address
+		size_t address;
 		if (result.type()->type() & (rtPointer))
 			address = (size_t)result.toPointer() - offset;
 		else
@@ -363,7 +458,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 		
 	}
 	// Try to dereference this instance as deep as possible
-	return result.dereference(BaseType::trAny);
+	return result.dereference(BaseType::trAnyNonNull);
 }
 
 Instance MemoryDump::queryInstance(const QString& queryString) const
@@ -379,7 +474,7 @@ Instance MemoryDump::queryInstance(const QString& queryString) const
 		result = getNextInstance(components.first(), result);
 		components.pop_front();
 	}
-	
+
 	return result;
 }
 
@@ -398,22 +493,33 @@ Instance MemoryDump::queryInstance(const int queryId) const
 }
 
 
-QString MemoryDump::query(const int queryId) const
+QString MemoryDump::query(const int queryId, const ColorPalette& col) const
 {
     QString ret;
 
     Instance instance = queryInstance(queryId);
 
-    QString s = QString("0x%1: ").arg(queryId, 0, 16);
+    QString s = QString("%1%2%3%4: ")
+            .arg(col.color(ctTypeId))
+            .arg("0x")
+            .arg(queryId, 0, 16)
+            .arg(col.color(ctReset));
     if (instance.isValid()) {
-        s += QString("%1 (ID 0x%2)")
-                .arg(instance.typeName()).arg((uint)instance.type()->id(), 0, 16);
-        ret = instance.toString();
+        s += QString("%1%2%3 (ID%4 0x%5%6)")
+                .arg(col.color(ctType))
+                .arg(instance.typeName())
+                .arg(col.color(ctReset))
+                .arg(col.color(ctTypeId))
+                .arg((uint)instance.type()->id(), 0, 16)
+                .arg(col.color(ctReset));
+        ret = instance.toString(&col);
     }
     else
         s += "(unresolved type)";
-    s += QString(" @ 0x%1\n")
-            .arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'));
+    s += QString(" @%1 0x%2%3\n")
+            .arg(col.color(ctAddress))
+            .arg(instance.address(), _specs.sizeofPointer << 1, 16, QChar('0'))
+            .arg(col.color(ctReset));
 
     ret = s + ret;
 
@@ -421,7 +527,8 @@ QString MemoryDump::query(const int queryId) const
 }
 
 
-QString MemoryDump::query(const QString& queryString) const
+QString MemoryDump::query(const QString& queryString,
+                          const ColorPalette& col) const
 {
     QString ret;
 
@@ -437,45 +544,76 @@ QString MemoryDump::query(const QString& queryString) const
     else {
         Instance instance = queryInstance(queryString);
 
-        QString s = QString("%1: ").arg(queryString);
+        QString s = QString("%1%2%3: ")
+                .arg(col.color(ctBold))
+                .arg(queryString)
+                .arg(col.color(ctReset));
         if (instance.isValid()) {
-            s += QString("%1 (ID 0x%2)")
+            // Can we access the instance's memory? If not, an exception is
+            // thrown.
+            _vmem->seek(instance.address());
+
+            s += QString("%1%2%3 (ID%4 0x%5%6)")
+                    .arg(col.color(ctType))
                     .arg(instance.typeName())
-                    .arg((uint)instance.type()->id(), 0, 16);
-            ret = instance.toString();
+                    .arg(col.color(ctReset))
+                    .arg(col.color(ctTypeId))
+                    .arg((uint)instance.type()->id(), 0, 16)
+                    .arg(col.color(ctReset));
+            ret = instance.toString(&col);
         }
         else
             s += "(unresolved type)";
-        s += QString(" @ 0x%1\n").arg(instance.address(), _specs.sizeofUnsignedLong << 1, 16, QChar('0'));
 
-        ret = s + ret;
+        s += QString(" @%1 0x%2%3")
+                .arg(col.color(ctAddress))
+                .arg(instance.address(), _specs.sizeofPointer << 1, 16, QChar('0'))
+                .arg(col.color(ctReset));
+
+        if (instance.bitSize() >= 0) {
+            s += QString("[%1%3%2:%1%4%2]")
+                    .arg(col.color(ctOffset))
+                    .arg(col.color(ctReset))
+                    .arg((instance.size() << 3) - instance.bitOffset() - 1)
+                    .arg((instance.size() << 3) - instance.bitOffset() -
+                         instance.bitSize());
+
+        }
+
+        ret = s + "\n" + ret;
     }
+
 
     return ret;
 }
 
 
-QString MemoryDump::dump(const QString& type, quint64 address) const
+QString MemoryDump::dump(const QString& type, quint64 address,
+                         const ColorPalette& col) const
 {
     if (!_vmem->seek(address))
-        queryError(QString("Cannot seek address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
+        queryError(QString("Cannot seek address 0x%1")
+                   .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
 
     if (type == "char") {
         char c;
         if (_vmem->read(&c, sizeof(char)) != sizeof(char))
-            queryError(QString("Cannot read memory from address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
+            queryError(QString("Cannot read memory from address 0x%1")
+                       .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
         return QString("%1 (0x%2)").arg(c).arg(c, (sizeof(c) << 1), 16, QChar('0'));
     }
     if (type == "int") {
         qint32 i;
         if (_vmem->read((char*)&i, sizeof(qint32)) != sizeof(qint32))
-            queryError(QString("Cannot read memory from address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
+            queryError(QString("Cannot read memory from address 0x%1")
+                       .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
         return QString("%1 (0x%2)").arg(i).arg((quint32)i, (sizeof(i) << 1), 16, QChar('0'));
     }
     if (type == "long") {
         qint64 l;
         if (_vmem->read((char*)&l, sizeof(qint64)) != sizeof(qint64))
-            queryError(QString("Cannot read memory from address 0x%1").arg(address, (_specs.sizeofUnsignedLong << 1), 16, QChar('0')));
+            queryError(QString("Cannot read memory from address 0x%1")
+                       .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
         return QString("%1 (0x%2)").arg(l).arg((quint64)l, (sizeof(l) << 1), 16, QChar('0'));
     }
 
@@ -492,10 +630,16 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 			components.pop_front();
 		}
 			
-		return QString("%1 (ID 0x%2) @ %3\n")
-					.arg(result.typeName())
-					.arg((uint)result.type()->id(), 0, 16)
-					.arg(result.address(), 0, 16) + result.toString();
+		return QString("%1%2%3 (ID%4 0x%5%6) @%7 0x%8%9\n")
+				.arg(col.color(ctType))
+				.arg(result.typeName())
+				.arg(col.color(ctReset))
+				.arg(col.color(ctTypeId))
+				.arg((uint)result.type()->id(), 0, 16)
+				.arg(col.color(ctReset))
+				.arg(col.color(ctAddress))
+				.arg(result.address(), 0, 16)
+				.arg(col.color(ctReset)) + result.toString(&col);
 	}
 
     queryError3("Unknown type: " + type,
@@ -505,9 +649,12 @@ QString MemoryDump::dump(const QString& type, quint64 address) const
 }
 
 
-void MemoryDump::setupRevMap(float minProbability)
+#ifdef CONFIG_MEMORY_MAP
+
+void MemoryDump::setupRevMap(MemoryMapBuilderType type, float minProbability,
+                             const QString& slubObjFile)
 {
-    _map->build(minProbability);
+    _map->build(type, minProbability, slubObjFile);
 }
 
 
@@ -516,4 +663,4 @@ void MemoryDump::setupDiff(MemoryDump* other)
     _map->diffWith(other->map());
 }
 
-
+#endif

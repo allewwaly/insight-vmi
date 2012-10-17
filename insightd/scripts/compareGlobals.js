@@ -24,7 +24,7 @@ function myCompare(inst1, inst2)
     	}
     	else
     	{
-        	print("Different: [" + inst1.MemDumpIndex() + "] " + inst1.FullName() +
+            println("Different: [" + inst1.MemDumpIndex() + "] " + inst1.FullName() +
               		", [" + inst2.MemDumpIndex() + "] " + inst2.FullName());
 	}
 } 

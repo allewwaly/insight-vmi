@@ -16,13 +16,41 @@ typedef QStack<pASTNode> ASTNodeQStack;
 
 class AbstractSyntaxTree;
 
+/**
+ * This class builds an abstract syntax tree.
+ */
 class ASTBuilder
 {
 public:
+    /**
+     * Constructor
+     * @param ast the AST this builder should work on
+     */
     ASTBuilder(AbstractSyntaxTree* ast);
+
+    /**
+     * Destructor
+     */
     virtual ~ASTBuilder();
 
+    /**
+     * Builds the AST from the contents of file \a fileName.
+     * @param fileName the file to parse
+     * @return In case of an unrecoverable error, the total number of errors
+     * that occured before parsing was given up is returned. In case of one or
+     * more recoverable errors, -1 is returned, otherwise the return value is 0.
+     * \sa errorCount()
+     */
     int buildFrom(const QString& fileName);
+
+    /**
+     * Builds the AST from the contents of \a asciiText
+     * @param asciiText the text to parse
+     * @return In case of an unrecoverable error, the total number of errors
+     * that occured before parsing was given up is returned. In case of one or
+     * more recoverable errors, -1 is returned, otherwise the return value is 0.
+     * \sa errorCount()
+     */
     int buildFrom(const QByteArray& asciiText);
 
     bool isTypeName(pANTLR3_STRING name) const;
@@ -50,6 +78,12 @@ public:
     pASTNodeList newASTNodeList(pASTNode item, pASTNodeList tail);
     pASTTokenList newASTTokenList(pANTLR3_COMMON_TOKEN item,
             pASTTokenList tail);
+
+    /**
+     * @return the AST that this builder works on
+     */
+    inline AbstractSyntaxTree* ast() { return _ast; }
+
 private:
     QStack<pASTNode> _parentStack;
     AbstractSyntaxTree* _ast;

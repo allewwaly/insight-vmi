@@ -16,36 +16,36 @@ function printCurrentTask(gs_base)
 	current_task = getCurrentTask(gs_base)
 	
 	try{
-		print("UID   = " + current_task.cred.uid.toString());
+        println("UID   = " + current_task.cred.uid.toString());
 	}catch(e){
-		print("UID   = unknown");
+        println("UID   = unknown");
 	}
 	try{
-		print("EUID  = " + current_task.cred.euid.toString());
+        println("EUID  = " + current_task.cred.euid.toString());
 	}catch(e){
-		print("EUID  = unknown");
+        println("EUID  = unknown");
 	}
-	print("PID   = " + current_task.pid.toString());
+    println("PID   = " + current_task.pid.toString());
 	try{
-		print("GID   = " + current_task.cred.gid.toString());
+        println("GID   = " + current_task.cred.gid.toString());
 	}catch(e){
-		print("GID   = unknown");
+        println("GID   = unknown");
 	}
 	try{
-		print("EGID  = " + current_task.cred.egid.toString());
+        println("EGID  = " + current_task.cred.egid.toString());
 	}catch(e){
-		print("EGID  = unknown");
+        println("EGID  = unknown");
 	}
-	print("STATE = " + current_task.state.toString());
-	print("CMD   = "+current_task.comm.toString());
-	print("ADDR  = 0x" + current_task.Address());
+    println("STATE = " + current_task.state.toString());
+    println("CMD   = "+current_task.comm.toString());
+    println("ADDR  = 0x" + current_task.Address());
 }
 
 try{
 	printCurrentTask(GS_BASE_2632x64); // %gs register hardcoded as string!
 }catch(e){
-	print("Exception in printCurrentTask")
-	print(e)
+    println("Exception in printCurrentTask")
+    println(e)
 	// pipe exceptions to caller, as there shouldn't be any
 	throw(e)
 }

@@ -59,8 +59,8 @@ antlr3LexerNew(ANTLR3_UINT32 sizeHint)
 
     if	(lexer->rec == (pANTLR3_BASE_RECOGNIZER) ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM))
     {
-	lexer->free(lexer);
-	return	(pANTLR3_LEXER) ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM);
+    ANTLR3_FREE(lexer);
+    return	(pANTLR3_LEXER) ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM);
     }
     lexer->rec->super  =  lexer;
 
@@ -75,7 +75,7 @@ antlr3LexerNew(ANTLR3_UINT32 sizeHint)
     if	(lexer->tokSource == (pANTLR3_TOKEN_SOURCE) ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM)) 
     {
 	lexer->rec->free(lexer->rec);
-	lexer->free(lexer);
+	ANTLR3_FREE(lexer);
 
 	return	(pANTLR3_LEXER) ANTLR3_FUNC_PTR(ANTLR3_ERR_NOMEM);
     }

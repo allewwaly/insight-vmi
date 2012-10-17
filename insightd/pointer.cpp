@@ -6,9 +6,11 @@
  */
 
 #include "pointer.h"
+#include "funcpointer.h"
 #include <string.h>
 #include "virtualmemoryexception.h"
 #include <debug.h>
+#include "shell.h"
 
 Pointer::Pointer(SymFactory* factory)
 	: RefBaseType(factory)
@@ -38,7 +40,11 @@ RealType Pointer::type() const
 QString Pointer::prettyName() const
 {
     const BaseType* t = refType();
-    if (t)
+    const FuncPointer *fp = dynamic_cast<const FuncPointer*>(
+                refTypeDeep(trAnyButTypedef));
+    if (fp)
+        return fp->prettyName(QString(), this);
+    else if (t)
         return t->prettyName() + " *";
     else if (_refTypeId == 0)
         return "void *";
@@ -47,12 +53,18 @@ QString Pointer::prettyName() const
 }
 
 
-QString Pointer::toString(QIODevice* mem, size_t offset) const
+QString Pointer::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
 {
     quint64 p = (quint64) toPointer(mem, offset);
 
-    if (!p)
-        return "NULL";
+    if (!p) {
+        if (col)
+            return QString("%1NULL%2")
+                    .arg(col->color(ctAddress))
+                    .arg(col->color(ctReset));
+        else
+            return "NULL";
+    }
 
     QString errMsg;
 
@@ -70,13 +82,20 @@ QString Pointer::toString(QIODevice* mem, size_t offset) const
           refRefType->type() == rtInt8)))
     {
         QString s = readString(mem, p, 255, &errMsg);
-        if (errMsg.isEmpty())
-            return QString("\"%1\"").arg(s);
+        if (errMsg.isEmpty()) {
+            s = QString("\"%1\"").arg(s);
+            if (col)
+                s = col->color(ctString) + s + col->color(ctReset);
+            return s;
+        }
     }
 
     QString ret = (_size == 4) ?
             QString("0x%1").arg((quint32)p, (_size << 1), 16, QChar('0')) :
             QString("0x%1").arg(p, (_size << 1), 16, QChar('0'));
+
+    if (col)
+        ret = col->color(ctAddress) + ret + col->color(ctReset);
 
     if (!errMsg.isEmpty())
         ret += QString(" (%1)").arg(errMsg);
@@ -118,10 +137,12 @@ QString Pointer::readString(QIODevice* mem, size_t offset, const int len, QStrin
         return QString(buf);
     }
     catch (VirtualMemoryException& e) {
-        *errMsg = e.message;
+        if(errMsg)
+            *errMsg = e.message;
     }
     catch (MemAccessException& e) {
-        *errMsg = e.message;
+        if(errMsg)
+            *errMsg = e.message;
     }
 
     return QString();
