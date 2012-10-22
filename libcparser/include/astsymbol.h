@@ -39,7 +39,8 @@ enum SymbolTransformationType
     ttArray       = (1 << 1), ///< array access of a pointer/array type
     ttFuncCall    = (1 << 2), ///< function invocation
     ttDereference = (1 << 3), ///< pointer dereference, either through "*" or "->"
-    ttAddress     = (1 << 4)  ///< address operator, i.e. "&"
+    ttAddress     = (1 << 4), ///< address operator, i.e. "&"
+    ttFuncReturn  = (1 << 5)  ///< return value of a function
 };
 
 /**
