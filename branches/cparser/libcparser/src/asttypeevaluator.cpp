@@ -2566,6 +2566,8 @@ void ASTTypeEvaluator::appendTransformations(
 
         if (op == "&" || op == "&&") {
             transformations->append(ttAddress, node);
+            // FIXME this is wrong! C does not allow & & ! "&&" is a separate
+            // token with distinct semantics.
             if (op == "&&")
                 transformations->append(ttAddress, node);
         }
@@ -2888,7 +2890,7 @@ bool ASTTypeEvaluator::shouldFollowLinks(State* ps,
 //        }
 //    }
     else if (!ps->lastLinkTrans.isEmpty() &&
-             ps->lastLinkTrans.first().type == ttFuncCall)
+             ps->lastLinkTrans.first().type == ttFuncReturn)
     {
         // Merge all missing transformations to localMissingTrans
         for (int i = 0; i < ps->lastLinkTrans.size(); ++i) {
@@ -2896,9 +2898,9 @@ bool ASTTypeEvaluator::shouldFollowLinks(State* ps,
                 ps->lastLinkTrans[i] != localTrans[i])
                 localMissingTrans.append(ps->lastLinkTrans[i]);
         }
-        // Is the first missing transformation a function call?
+        // Is the first missing transformation a function return?
         if (!localMissingTrans.isEmpty() &&
-            localMissingTrans.first().type == ttFuncCall)
+            localMissingTrans.first().type == ttFuncReturn)
         {
             combTrans = ps->transformations;
             combTrans.append(localTrans);
@@ -2963,6 +2965,15 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
              .arg(es->interLinks.count(), 2)
              .arg(debugPrefix));
 #endif
+
+    // In case the last transformation was a function return, pretend we saw
+    // it locally
+    if (!es->lastLinkTrans.isEmpty() &&
+        es->lastLinkTrans.last().type == ttFuncReturn)
+    {
+        localTrans.append(es->lastLinkTrans.last());
+        es->lastLinkTrans.pop_back();
+    }
 
     while (es->root) {
         // Was this node assigned to other variables?
@@ -3087,8 +3098,9 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                     rek_es.root = it->node;
                     // All missing transformations still must be found after
                     // following the next link
-                    rek_es.lastLinkTrans = localMissingTrans;
-                    rek_es.lastLinkTrans.append(it->transformations);
+                    rek_es.lastLinkTrans = it->transformations;
+//                    rek_es.lastLinkTrans = localMissingTrans;
+//                    rek_es.lastLinkTrans.append(it->transformations);
                     rek_es.transformations = combinedTrans;
                     rek_es.interLinks.insert(es->root,  rek_es.root);
 #ifdef DEBUG_POINTS_TO
@@ -3173,7 +3185,6 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 if ((type->type() & NumericTypes) &&
                     !canHoldPointerValue(type->type()))
                     return assignments;
-
 
                 // If the dereference level of the lvalue is smaller or
                 // equal to the last link's dereference level, we shouldn't
@@ -3356,9 +3367,9 @@ int ASTTypeEvaluator::evaluateIdentifierPointsToRek(PointsToEvalState *es)
                 return assignments;
 
             // Treat any return statement as an assignment to the function
-            // definition symbol with a function call transformations
+            // definition symbol with a function return transformations
             SymbolTransformations trans(this);
-            trans.append(ttFuncCall, es->root);
+            trans.append(ttFuncReturn, es->root);
             if (es->root->scope->varAssignment(
                     funcSym->name(), assigned, trans, _pointsToRound))
             {
@@ -3498,6 +3509,15 @@ ASTTypeEvaluator::EvalResult ASTTypeEvaluator::evaluateTypeFlow(
     TypeEvalDetails rek_ed(this);
     SymbolTransformations localTrans(this);
     QString op;
+
+    // In case the last transformation was a function return, pretend we saw
+    // it locally
+    if (!ed->lastLinkTrans.isEmpty() &&
+        ed->lastLinkTrans.last().type == ttFuncReturn)
+    {
+        localTrans.append(ed->lastLinkTrans.last());
+        ed->lastLinkTrans.pop_back();
+    }
 
     // Is this somewhere in the right-hand of an assignment expression or
     // of an init declarator?
@@ -4246,6 +4266,16 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
 
             case ttNull:
                 break;
+
+            case ttFuncReturn:
+                typeEvaluatorError2(*ed,
+                        QString("Unexpected ttFuncReturn transformation for "
+                                "of \"%1\" at %2:%3:%4")
+                                .arg(ed->ctxType ? ed->ctxType->toString() : QString())
+                                .arg(_ast->fileName())
+                                .arg(ed->ctxNode->start->line)
+                                .arg(ed->ctxNode->start->charPosition));
+                break;
             }
         }
         else {
@@ -4312,6 +4342,7 @@ void ASTTypeEvaluator::evaluateTypeContext(TypeEvalDetails* ed)
 
         case ttMember:
         case ttNull:
+        case ttFuncReturn:
             // ignored
             break;
         }

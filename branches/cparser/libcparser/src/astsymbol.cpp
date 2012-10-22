@@ -23,6 +23,7 @@ const char* SymbolTransformation::typeToString(SymbolTransformationType type)
 	case ttFuncCall:    return "FuncCall";
 	case ttDereference: return "Dereference";
 	case ttAddress:     return "Address";
+	case ttFuncReturn:  return "FuncReturn";
 	}
 	return "(unknown)";
 }
@@ -70,6 +71,12 @@ void SymbolTransformations::append(const SymbolTransformation &st)
         if ((st.type == ttDereference && last().type == ttAddress) ||
             (st.type == ttAddress && last().type == ttDereference))
         {
+            // Both operations cancel each other out
+            pop_back();
+            return;
+        }
+        // Merge function call and return
+        else if (last().type == ttFuncReturn && st.type == ttFuncCall) {
             // Both operations cancel each other out
             pop_back();
             return;
@@ -246,6 +253,10 @@ QString SymbolTransformations::toString(const QString &symbol) const
 
         case ttFuncCall:
             s += "()";
+            break;
+
+        case ttFuncReturn:
+            s = QString("(return %1)").arg(s);
             break;
 
         case ttArray:
