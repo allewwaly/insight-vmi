@@ -1,0 +1,46 @@
+<typeknowledge>
+    <ruleincludes>
+        <ruleinclude>/path/to/rules</ruleinclude>
+        <ruleinclude>/path/to/more/rules</ruleinclude>
+    </ruleincludes>
+
+    <scriptincludes>
+        <scriptinclude>/path/to/scripts</scriptinclude>
+        <scriptinclude>/path/to/more/scripts</scriptinclude>
+    </scriptincludes>
+
+    <include>foobar.xml</include>
+
+    <rules architecture="x86" os="linux" minversion="2.6.12" maxversion="2.6.38">
+        <rule>
+            <description>This is awesome</description>
+            <filter>
+                <datatype>struct</datatype>
+                <typename>foo</typename>
+                <fields>
+                    <field />
+                    <field match="regex">i|p</field>
+                </fields>
+            </filter>
+            <action src="inline">
+// var inst = instance to check
+// var name = name of struct
+// var member = name of member
+include("check-foobar.js");
+if (1 &amp;&amp; 2) return true;
+checkFooBar(inst);
+            </action>
+        </rule>
+
+        <rule>
+            <filter>
+                <datatype>struct</datatype>
+                <variablename match="wildcard">__percpu__*</variablename>
+                <fields>
+                    <field>bar</field>
+                </fields>
+            </filter>
+            <action src="file" file="foobar.js">checkFoobar</action>
+        </rule>
+    </rules>
+</typeknowledge>

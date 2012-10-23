@@ -3,9 +3,14 @@
 #include "basetype.h"
 #include "variable.h"
 
-#define listFilterError(x) do { \
-        throw ListFilterException((x), __FILE__, __LINE__); \
-    } while (0)
+namespace str
+{
+const char* datatype     = "datatype";
+const char* type_name    = "typename";
+const char* variablename = "variablename";
+const char* filename     = "filename";
+const char* size         = "size";
+}
 
 
 #define parseInt(i, s, ok) \
@@ -15,7 +20,7 @@
         else \
             i = s.toInt(ok); \
         if (!(*ok)) \
-            listFilterError(QString("Illegal integer number: %1").arg(s)); \
+            filterError(QString("Illegal integer number: %1").arg(s)); \
     } while (0)
 
 #define parseUInt(i, s, ok) \
@@ -25,7 +30,7 @@
         else \
             i = s.toUInt(ok); \
         if (!(*ok)) \
-            listFilterError(QString("Illegal integer number: %1").arg(s)); \
+            filterError(QString("Illegal integer number: %1").arg(s)); \
     } while (0)
 
 
@@ -47,11 +52,11 @@ TypeListFilter::NameSyntax TypeListFilter::parseNamePattern(
             rx.setCaseSensitivity(rxRE.cap(3).isEmpty() ? Qt::CaseSensitive
                                                         : Qt::CaseInsensitive);
             if (!rx.isValid())
-                listFilterError(QString("Invalid regular expression '%1': %2")
+                filterError(QString("Invalid regular expression '%1': %2")
                                 .arg(pattern).arg(rx.errorString()));
         }
         else
-            listFilterError(QString("Invalid regular expression '%1'")
+            filterError(QString("Invalid regular expression '%1'")
                             .arg(pattern));
         return nsRegExp;
     }
@@ -61,7 +66,7 @@ TypeListFilter::NameSyntax TypeListFilter::parseNamePattern(
         rx.setPattern(pattern);
         rx.setCaseSensitivity(Qt::CaseInsensitive);
         if (!rx.isValid())
-            listFilterError(QString("Invalid wildcard expression '%1': %2")
+            filterError(QString("Invalid wildcard expression '%1': %2")
                             .arg(pattern).arg(rx.errorString()));
         return nsWildcard;
     }
@@ -80,16 +85,18 @@ void TypeListFilter::setTypeName(const QString &name)
     }
 }
 
+static QHash<QString, QString> typeFilters;
 
-QHash<QString, QString> TypeListFilter::filterHelp()
+const QHash<QString, QString> &TypeListFilter::supportedFilters()
 {
-    QHash<QString, QString> ret;
-    ret["name"] = "Match type name, either by a literal match, by a "
-                  "wildcard expression *glob*, or by a regular expression "
-                  "/re/.";
-    ret["type"] = "Match actual type, e.g. \"FuncPointer\" or \"UInt*\".";
-    ret["size"] = "Match type size.";
-    return ret;
+    if (typeFilters.isEmpty()) {
+        typeFilters[str::type_name] = "Match type name, either by a literal match, by a "
+                "wildcard expression *glob*, or by a regular expression "
+                "/re/.";
+        typeFilters[str::datatype] = "Match actual type, e.g. \"FuncPointer\" or \"UInt*\".";
+        typeFilters[str::size] = "Match type size.";
+    }
+    return typeFilters;
 }
 
 
@@ -148,14 +155,14 @@ void TypeListFilter::parseOptions(const QStringList &list)
         // No value found yet, the next parameter must be the value
         if (!valueFound) {
             if (++i >= list.size())
-                listFilterError(QString("Missing argument for filter '%1'").arg(key));
+                filterError(QString("Missing argument for filter '%1'").arg(key));
             value = list[i];
         }
 
         // Pass the option to the virtual handler
         key = key.toLower();
         if (key.isEmpty() || !parseOption(key, value))
-            listFilterError(QString("Invalid filter: '%1'").arg(key));
+            filterError(QString("Invalid filter: '%1'").arg(key));
 
         ++i;
     }
@@ -167,13 +174,13 @@ bool TypeListFilter::parseOption(const QString &key, const QString &value)
     quint32 u;
     bool ok;
 
-    if (QString("name").startsWith(key))
+    if (QString(str::type_name).startsWith(key))
         setTypeName(value);
-    else if (QString("size").startsWith(key)) {
+    else if (QString(str::size).startsWith(key)) {
         parseUInt(u, value, &ok);
         setSize(u);
     }
-    else if (QString("type").startsWith(key)) {
+    else if (QString(str::datatype).startsWith(key)) {
         int realType = 0;
         QString s, rt;
         QRegExp rx;
@@ -244,27 +251,29 @@ void VarListFilter::setVarName(const QString &name)
     }
 }
 
+static QHash<QString, QString> varFilters;
 
-QHash<QString, QString> VarListFilter::filterHelp()
+const QHash<QString, QString> &VarListFilter::supportedFilters()
 {
-    QHash<QString, QString> ret = TypeListFilter::filterHelp();
-    ret["typename"] = ret["name"];
-    ret["name"] = "Match variable name, either by a literal match, by a "
-                  "wildcard expression *glob*, or by a regular expression "
-                  "/re/.";
-    ret["file"] = "Match symbol file the variable belongs to, e.g. \"vmlinux\""
-                  " or \"snd.ko\".";
-    return ret;
+    if (varFilters.isEmpty()) {
+        varFilters = TypeListFilter::supportedFilters();
+        varFilters[str::variablename] = "Match variable name, either by a "
+                "literal match, by a wildcard expression *glob*, or by a "
+                "regular expression /re/.";
+        varFilters["filename"] = "Match symbol file the variable belongs to, "
+                "e.g. \"vmlinux\" or \"snd.ko\".";
+    }
+    return varFilters;
 }
 
 
 bool VarListFilter::parseOption(const QString &key, const QString &value)
 {
-    if (QString("name").startsWith(key))
+    if (QString(str::variablename).startsWith(key))
         setVarName(value);
-    else if (QString("typename").startsWith(key) && key.size() > 4)
+    else if (QString(str::type_name).startsWith(key) && key.size() > 4)
         setTypeName(value);
-    else if (QString("file").startsWith(key)) {
+    else if (QString(str::filename).startsWith(key)) {
         QString s = value.toLower();
         if (s != "vmlinux") {
             // Make sure kernel modules end with ".ko"

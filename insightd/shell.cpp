@@ -1020,7 +1020,7 @@ int Shell::cmdListSources(QStringList /*args*/)
 int Shell::cmdListTypes(QStringList args, int typeFilter)
 {
     if (!args.isEmpty() && args.first() == "help")
-        return printFilterHelp(TypeListFilter::filterHelp());
+        return printFilterHelp(TypeListFilter::supportedFilters());
 
     TypeListFilter filter;
     try {
@@ -1031,7 +1031,7 @@ int Shell::cmdListTypes(QStringList args, int typeFilter)
             filter.setRealType(typeFilter);
         return printTypeList(filter);
     }
-    catch (ListFilterException& e) {
+    catch (FilterException& e) {
         errMsg(e.message, true);
         _out << "Try \"list "
              << (typeFilter == rtFunction ? "functions" :  "types")
@@ -1391,7 +1391,7 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
 int Shell::cmdListVars(QStringList args)
 {
     if (!args.isEmpty() && args.first() == "help")
-        return printFilterHelp(VarListFilter::filterHelp());
+        return printFilterHelp(VarListFilter::supportedFilters());
 
     // Parse the filters
     VarListFilter filter(_sym.factory().origSymFiles());
@@ -1399,7 +1399,7 @@ int Shell::cmdListVars(QStringList args)
         filter.parseOptions(args);
         return printVarList(filter);
     }
-    catch (ListFilterException& e) {
+    catch (FilterException& e) {
         errMsg(e.message, true);
         _out << "Try \"list variables help\" for more information." << endl;
     }
