@@ -1,0 +1,89 @@
+Source: insight
+Section: unknown
+Priority: extra
+Maintainer: Christian Schneider <chrschn@sec.in.tum.de>
+Build-Depends: debhelper (>= 7.0.50~), libreadline6-dev, libqt4-dev, qt4-dev-tools
+Standards-Version: 3.8.4
+Homepage: https://code.google.com/p/insight-vmi/
+
+Package: insight
+Architecture: i386 amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, libreadline6, libqt4-network, insight-daemon
+Recommends: insight-scripts
+Description: Front-end to interact with the InSight daemon
+ InSight is a tool for bridging the semantic gap in the field of virtual machine
+ introspection (VMI) and digital forensics. It operates either on memory dump
+ files or in conjunction with any hypervisor that provides read access to the
+ physical memory of a guest VM. InSight is written in C++ based on the Qt
+ libraries and features interactive analysis of kernel objects as well as a
+ JavaScript engine for automation of repeating inspection tasks.
+ .
+ This package contains the front-end part of InSight.
+
+Package: insight-daemon
+Architecture: i386 amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, libreadline6, libqt4-script, libqt4-network, libinsight
+Recommends: insight-scripts
+Description: InSight daemon for memory analysis and forensic applications
+ InSight is a tool for bridging the semantic gap in the field of virtual machine
+ introspection (VMI) and digital forensics. It operates either on memory dump
+ files or in conjunction with any hypervisor that provides read access to the
+ physical memory of a guest VM. InSight is written in C++ based on the Qt
+ libraries and features interactive analysis of kernel objects as well as a
+ JavaScript engine for automation of repeating inspection tasks. 
+ .
+ This package contains the InSight daemon which can handle memory analysis
+ requests from the command line or from the InSight front-end.
+
+Package: insight-scripts
+Architecture: i386 amd64
+Depends: ${misc:Depends}
+Description: Sample JavaScript files for memory analysis with InSight
+ InSight is a tool for bridging the semantic gap in the field of virtual machine
+ introspection (VMI) and digital forensics. It operates either on memory dump
+ files or in conjunction with any hypervisor that provides read access to the
+ physical memory of a guest VM. InSight is written in C++ based on the Qt
+ libraries and features interactive analysis of kernel objects as well as a
+ JavaScript engine for automation of repeating inspection tasks. 
+ .
+ This package contains sample JavaScript files for various analysis tasks.
+
+Package: libinsight
+Architecture: i386 amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, libqt4-network
+Description: Shared functionality for InSight daemon and front-end
+ InSight is a tool for bridging the semantic gap in the field of virtual machine
+ introspection (VMI) and digital forensics. It operates either on memory dump
+ files or in conjunction with any hypervisor that provides read access to the
+ physical memory of a guest VM. InSight is written in C++ based on the Qt
+ libraries and features interactive analysis of kernel objects as well as a
+ JavaScript engine for automation of repeating inspection tasks. 
+ .
+ This packages contains the library with functions shared among the daemon and
+ the front-end.
+
+Package: libinsight-dev
+Architecture: i386 amd64
+Depends: ${misc:Depends}, libinsight, libqt4-dev
+Recommends: insight-daemon, qt4-dev-tools
+Description: Developer package for InSight
+ InSight is a tool for bridging the semantic gap in the field of virtual machine
+ introspection (VMI) and digital forensics. It operates either on memory dump
+ files or in conjunction with any hypervisor that provides read access to the
+ physical memory of a guest VM. InSight is written in C++ based on the Qt
+ libraries and features interactive analysis of kernel objects as well as a
+ JavaScript engine for automation of repeating inspection tasks. 
+ .
+ This package contains the development files.
+
+Package: insight-doc
+Architecture: all
+Description: A semantic bridge for virtual machine introspection and forensic applications
+ InSight is a tool for bridging the semantic gap in the field of virtual machine
+ introspection (VMI) and digital forensics. It operates either on memory dump
+ files or in conjunction with any hypervisor that provides read access to the
+ physical memory of a guest VM. InSight is written in C++ based on the Qt
+ libraries and features interactive analysis of kernel objects as well as a
+ JavaScript engine for automation of repeating inspection tasks.
+ .
+ This package contains the documentation.
