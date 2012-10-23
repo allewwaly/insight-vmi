@@ -5,39 +5,10 @@
 #include <QStringList>
 #include <QRegExp>
 #include <QHash>
-#include <genericexception.h>
+#include "filterexception.h"
 
 class BaseType;
 class Variable;
-
-/**
- * Exception class for list filter related errors
- * \sa TypeListFilter
- */
-class ListFilterException: public GenericException
-{
-public:
-    /**
-      Constructor
-      @param msg error message
-      @param file file name in which message was originally thrown
-      @param line line number at which message was originally thrown
-      @note Try to use @c __FILE__ for @a file and @c __LINE__ for @a line.
-     */
-    ListFilterException(QString msg = QString(), const char* file = 0, int line = -1)
-        : GenericException(msg, file, line)
-    {
-    }
-
-    virtual ~ListFilterException() throw()
-    {
-    }
-
-    virtual const char* className() const
-    {
-        return "ListFilterException";
-    }
-};
 
 /// Filter options for variables and types
 enum FilterOptions {
@@ -77,7 +48,7 @@ public:
     inline int filters() const { return _filters; }
     inline bool filterActive(int options) const { return _filters & options; }
 
-    static QHash<QString, QString> filterHelp();
+    static const QHash<QString, QString>& supportedFilters();
 
 protected:
     enum NameSyntax { nsLiteral, nsWildcard, nsRegExp };
@@ -123,7 +94,7 @@ public:
     inline int symFileIndex() const { return _symFileIndex; }
     inline void setSymFileIndex(int i) { _symFileIndex = i; _filters |= foVarSymFileIndex; }
 
-    static QHash<QString, QString> filterHelp();
+    static const QHash<QString, QString>& supportedFilters();
 
 protected:
     virtual bool parseOption(const QString& key, const QString& value);
