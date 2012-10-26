@@ -55,10 +55,10 @@ void OsFilter::parseOption(const QString &key, const QString &val)
 {
     QString k = key.toLower(), v = val.trimmed().toLower();
 
-    if (key == str::architecture) {
+    if (k == str::architecture) {
         _architectures = arIgnore;
         // Process comma-separated list
-        QStringList list = val.split(QChar(','), QString::SkipEmptyParts);
+        QStringList list = v.split(QChar(','), QString::SkipEmptyParts);
         for (int i = 0; i < list.size(); ++i) {
             QString a = list[i].trimmed();
             if (a == str::arX86)
@@ -71,10 +71,10 @@ void OsFilter::parseOption(const QString &key, const QString &val)
                 filterError(QString("Unknown architecture: %1").arg(a));
         }
     }
-    else if (key == str::os) {
+    else if (k == str::os) {
         _osTypes = arIgnore;
         // Process comma-separated list
-        QStringList list = val.split(QChar(','), QString::SkipEmptyParts);
+        QStringList list = v.split(QChar(','), QString::SkipEmptyParts);
         for (int i = 0; i < list.size(); ++i) {
             QString os = list[i].trimmed();
             if (os == str::osLinux)
@@ -85,11 +85,11 @@ void OsFilter::parseOption(const QString &key, const QString &val)
                 filterError(QString("Unknown operating system: %1").arg(os));
         }
     }
-    else if (key == str::minver) {
-        _minVer = val.split(QRegExp("[-,.]"));
+    else if (k == str::minver) {
+        _minVer = v.split(QRegExp("[-,.]"));
     }
-    else if (key == str::maxver) {
-        _maxVer = val.split(QRegExp("[-,.]"));
+    else if (k == str::maxver) {
+        _maxVer = v.split(QRegExp("[-,.]"));
     }
     else
         filterError(QString("Unknown property: %1").arg(key));
@@ -115,7 +115,7 @@ bool OsFilter::match(const OsFilter &other) const
 
     // Compare max. version if set on both sides
     if (!_maxVer.isEmpty() && !other._maxVer.isEmpty() &&
-        versionCmp(_maxVer, other._maxVer) > 0)
+        versionCmp(_maxVer, other._maxVer) < 0)
         return false;
 
     return true;
@@ -135,11 +135,15 @@ int OsFilter::versionCmp(const QStringList &a, const QStringList &b)
                 return -1;
             else if (ia > ib)
                 return 1;
+            else if (i+1 == a.size() && a.size() == b.size())
+                return 0;
         }
-        // Do a string comparison
-        ia = QString::compare(a[i], b[i], Qt::CaseSensitive);
-        if (ia)
-            return ia;
+        else {
+            // Do a string comparison
+            ia = QString::compare(a[i], b[i], Qt::CaseSensitive);
+            if (ia)
+                return ia;
+        }
     }
 
     // Still no decision, so the more longer list is larger
