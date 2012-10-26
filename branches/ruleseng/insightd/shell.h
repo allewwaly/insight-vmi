@@ -87,7 +87,7 @@ public:
     /**
      * Destructor
      */
-    ~Shell();
+    virtual ~Shell();
 
     /**
      * Use this stream to write information on the console.

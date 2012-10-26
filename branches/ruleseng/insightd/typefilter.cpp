@@ -34,56 +34,96 @@ const char* size         = "size";
     } while (0)
 
 
-TypeFilter::NameSyntax TypeFilter::parseNamePattern(
+TypeFilter::PatternSyntax TypeFilter::parseNamePattern(
         const QString& pattern, QString& name, QRegExp& rx) const
 {
-    name = pattern;
+    name = pattern.trimmed();
 
     // Do we have a literal match?
     QRegExp rxPlain("[a-zA-Z0-9_]*");
-    if (rxPlain.exactMatch(pattern))
-        return nsLiteral;
+    if (rxPlain.exactMatch(name))
+        return psLiteral;
     // Do we have a valid regular expression?
     else if (name.startsWith(QChar('/')) || name.startsWith(QChar('!'))) {
         QRegExp rxRE("([/!])([^/!]*)\\1(i)?");
-        if (rxRE.exactMatch(pattern)) {
-            rx.setPatternSyntax(QRegExp::RegExp);
-            rx.setPattern(rxRE.cap(2));
-            rx.setCaseSensitivity(rxRE.cap(3).isEmpty() ? Qt::CaseSensitive
-                                                        : Qt::CaseInsensitive);
-            if (!rx.isValid())
-                filterError(QString("Invalid regular expression '%1': %2")
-                                .arg(pattern).arg(rx.errorString()));
+        if (rxRE.exactMatch(name)) {
+            setNamePattern(rxRE.cap(2), name, rx, psRegExp);
+            // the "i" suffix makes the RegEx case-insensitive
+            if (!rxRE.cap(3).isEmpty())
+                rx.setCaseSensitivity(Qt::CaseInsensitive);
         }
         else
             filterError(QString("Invalid regular expression '%1'")
-                            .arg(pattern));
-        return nsRegExp;
+                            .arg(name));
+        return psRegExp;
     }
     // Assume wildcard expression
     else {
-        rx.setPatternSyntax(QRegExp::WildcardUnix);
-        rx.setPattern(pattern);
-        rx.setCaseSensitivity(Qt::CaseInsensitive);
-        if (!rx.isValid())
-            filterError(QString("Invalid wildcard expression '%1': %2")
-                            .arg(pattern).arg(rx.errorString()));
-        return nsWildcard;
+        setNamePattern(name, name, rx, psWildcard);
+        return psWildcard;
     }
 }
 
 
-void TypeFilter::setTypeName(const QString &name)
+TypeFilter::PatternSyntax TypeFilter::setNamePattern(
+        const QString &pattern, QString &name, QRegExp &rx,
+        PatternSyntax syntax) const
+{
+    if (syntax == psAuto)
+        syntax = parseNamePattern(pattern, name, rx);
+    else {
+        name = pattern.trimmed();
+
+        switch (syntax) {
+        case psRegExp:
+            rx.setPatternSyntax(QRegExp::RegExp);
+            rx.setCaseSensitivity(Qt::CaseSensitive);
+            rx.setPattern(name);
+            if (!rx.isValid())
+                filterError(QString("Invalid regular expression '%1': %2")
+                                .arg(name).arg(rx.errorString()));
+            break;
+        case psWildcard:
+            rx.setPatternSyntax(QRegExp::WildcardUnix);
+            rx.setCaseSensitivity(Qt::CaseInsensitive);
+            rx.setPattern(name);
+            if (!rx.isValid())
+                filterError(QString("Invalid wildcard expression '%1': %2")
+                                .arg(name).arg(rx.errorString()));
+            break;
+        default:
+            break;
+        }
+    }
+
+    return syntax;
+}
+
+
+void TypeFilter::setTypeName(const QString &name, PatternSyntax syntax)
 {
     _filters &= ~(foTypeName|foTypeNameRegEx|foTypeNameWildcard);
-    NameSyntax syntax = parseNamePattern(name, _typeName, _typeRegEx);
+    syntax = setNamePattern(name, _typeName, _typeRegEx, syntax);
 
     switch (syntax) {
-    case nsLiteral:  _filters |= foTypeName; break;
-    case nsRegExp:   _filters |= foTypeNameRegEx; break;
-    case nsWildcard: _filters |= foTypeNameWildcard; break;
+    case psAuto: break;
+    case psLiteral:  _filters |= foTypeName; break;
+    case psRegExp:   _filters |= foTypeNameRegEx; break;
+    case psWildcard: _filters |= foTypeNameWildcard; break;
     }
 }
+
+
+TypeFilter::PatternSyntax TypeFilter::typeNameSyntax() const
+{
+    if (filterActive(foTypeNameRegEx))
+        return psRegExp;
+    else if (filterActive(foTypeNameWildcard))
+        return psWildcard;
+    else
+        return psLiteral;
+}
+
 
 static QHash<QString, QString> typeFilters;
 
@@ -188,14 +228,14 @@ bool TypeFilter::parseOption(const QString &key, const QString &value)
         QStringList l = value.split(QChar(','), QString::SkipEmptyParts);
         for (int i = 0; i < l.size(); ++i) {
             // Treat each as a name pattern (always case-insensitive)
-            NameSyntax syntax = parseNamePattern(l[i], s, rx);
+            PatternSyntax syntax = parseNamePattern(l[i], s, rx);
             rx.setCaseSensitivity(Qt::CaseInsensitive);
 
             // Match pattern against all RealTypes
             for (int j = 1; j <= rtVaList; j <<= 1) {
                 rt = realTypeToStr((RealType)j);
-                if ( (syntax == nsLiteral && rt.compare(s, Qt::CaseInsensitive) == 0) ||
-                     (syntax != nsLiteral && rx.exactMatch(rt)) )
+                if ( (syntax == psLiteral && rt.compare(s, Qt::CaseInsensitive) == 0) ||
+                     (syntax != psLiteral && rx.indexIn(rt) != -1) )
                     realType |= j;
             }
         }
@@ -239,17 +279,30 @@ void VariableFilter::clear()
 }
 
 
-void VariableFilter::setVarName(const QString &name)
+void VariableFilter::setVarName(const QString &name, PatternSyntax syntax)
 {
     _filters &= ~(foVarName|foVarNameRegEx|foVarNameWildcard);
-    NameSyntax syntax = parseNamePattern(name, _varName, _varRegEx);
+    syntax = parseNamePattern(name, _varName, _varRegEx);
 
     switch (syntax) {
-    case nsLiteral:  _filters |= foVarName; break;
-    case nsRegExp:   _filters |= foVarNameRegEx; break;
-    case nsWildcard: _filters |= foVarNameWildcard; break;
+    case psAuto: break;
+    case psLiteral:  _filters |= foVarName; break;
+    case psRegExp:   _filters |= foVarNameRegEx; break;
+    case psWildcard: _filters |= foVarNameWildcard; break;
     }
 }
+
+
+TypeFilter::PatternSyntax VariableFilter::varNameSyntax() const
+{
+    if (filterActive(foVarNameRegEx))
+        return psRegExp;
+    else if (filterActive(foVarNameWildcard))
+        return psWildcard;
+    else
+        return psLiteral;
+}
+
 
 static QHash<QString, QString> varFilters;
 
