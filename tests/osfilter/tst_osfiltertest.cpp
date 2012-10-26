@@ -8,7 +8,7 @@ class OsfilterTest : public QObject
     
 public:
     OsfilterTest();
-    
+
 private Q_SLOTS:
     void parseArchitectures();
     void setArchitectures();

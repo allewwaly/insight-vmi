@@ -1,5 +1,5 @@
 #include "typerule.h"
-#include "listfilter.h"
+#include "typefilter.h"
 
 
 TypeRule::TypeRule()

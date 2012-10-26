@@ -98,7 +98,7 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     memorymapverifier.cpp \
     memorymapnodesv.cpp \
     memorymapheuristics.cpp \
-    listfilter.cpp \
+    typefilter.cpp \
     typerule.cpp \
     osfilter.cpp
 
@@ -163,7 +163,7 @@ HEADERS += kernelsourcetypeevaluator.h \
     memorymapverifier.h \
     memorymapnodesv.h \
     memorymapheuristics.h \
-    listfilter.h \
+    typefilter.h \
     typerule.h \
     osfilter.h \
     filterexception.h
