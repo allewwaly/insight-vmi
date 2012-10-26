@@ -52,6 +52,60 @@ public:
     bool match(const OsFilter& other) const;
 
     /**
+     * Returns the operating system types to match.
+     * \sa setOsType(), OsType
+     */
+    inline int osTypes() const { return _osTypes; }
+
+    /**
+     * Sets the operating system types to match.
+     * @param types logically ORed OsType values
+     * \sa osTypes(), OsType
+     */
+    inline void setOsTypes(int types) { _osTypes = types; }
+
+    /**
+     * Returns the architectures to match.
+     * \sa setArchitectures(), Architecture
+     */
+    inline int architectures() const { return _architectures; }
+
+    /**
+     * Sets the architectures to match.
+     * @param arch logically ORed Architecture values
+     * \sa architectures(), Architecture
+     */
+    inline void setArchitectures(int arch) { _architectures = arch; }
+
+    /**
+     * Returns the minimum version to match.
+     * \sa setMinVersion(), maxVersion()
+     */
+    inline const QStringList& minVersion() const { return _minVer; }
+
+    /**
+     * Sets the minimum version to match. Each version part is given as a string
+     * in the list.
+     * @param ver version
+     * \sa minVersion(), maxVersion()
+     */
+    inline void setMinVersion(const QStringList ver) { _minVer = ver; }
+
+    /**
+     * Returns the maximum version to match.
+     * \sa setMaxVersion(), minVersion()
+     */
+    inline const QStringList& maxVersion() const { return _maxVer; }
+
+    /**
+     * Sets the maximum version to match. Each version part is given as a string
+     * in the list.
+     * @param ver version
+     * \sa maxVersion(), minVersion()
+     */
+    inline void setMaxVersion(const QStringList ver) { _maxVer = ver; }
+
+    /**
      * Returns an associative list of filter options this class supports. The
      * key is the expected filter name, the value a short description of its
      * usage.
