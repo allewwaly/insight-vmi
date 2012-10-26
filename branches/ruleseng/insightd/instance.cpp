@@ -1092,7 +1092,7 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
                     // We expect exceptions here
                     try {
                         qint64 ret;
-                        qint64 address;
+                        qint64 address = 0;
                         
                         //Get correct address of string
                         if (memberInstance._d.type->type() == rtArray){
