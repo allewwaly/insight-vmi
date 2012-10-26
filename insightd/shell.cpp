@@ -1025,7 +1025,7 @@ int Shell::cmdListTypes(QStringList args, int typeFilter)
     TypeFilter filter;
     try {
         filter.parseOptions(args);
-        if (filter.filterActive(foRealType))
+        if (filter.filterActive(TypeFilter::foRealType))
             filter.setRealType(filter.realType() & typeFilter);
         else
             filter.setRealType(typeFilter);
