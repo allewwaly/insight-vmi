@@ -26,10 +26,10 @@ enum FilterOptions {
 /**
  * This class manages the filter options for a BaseType object list.
  */
-class TypeListFilter
+class TypeFilter
 {
 public:
-    TypeListFilter() : _filters(0), _realType(0), _size(0) {}
+    TypeFilter() : _filters(0), _realType(0), _size(0) {}
 
     bool match(const BaseType* type) const;
 
@@ -78,10 +78,10 @@ private:
 /**
  * This class manages the filter options for a Variable object list.
  */
-class VarListFilter: public TypeListFilter
+class VariableFilter: public TypeFilter
 {
 public:
-    VarListFilter(const QStringList& symFiles = QStringList())
+    VariableFilter(const QStringList& symFiles = QStringList())
         : _symFileIndex(-2), _symFiles(symFiles) {}
 
     bool match(const Variable* var) const;

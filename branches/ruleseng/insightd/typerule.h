@@ -3,7 +3,7 @@
 
 #include <QString>
 
-class TypeListFilter;
+class TypeFilter;
 class OsFilter;
 
 /**
@@ -49,7 +49,7 @@ public:
     /**
      * Returns the type filter for this rule.
      */
-    const TypeListFilter* filter() const { return _filter; }
+    const TypeFilter* filter() const { return _filter; }
 
     /**
      * Returns the OS filter that this rule applies to.
@@ -112,7 +112,7 @@ public:
 
 private:
     QString _description;
-    TypeListFilter *_filter;
+    TypeFilter *_filter;
     const OsFilter *_osFilter;
     ActionType _actionType;
     QString _action;

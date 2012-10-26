@@ -1,4 +1,4 @@
-#include "listfilter.h"
+#include "typefilter.h"
 #include <realtypes.h>
 #include "basetype.h"
 #include "variable.h"
@@ -34,7 +34,7 @@ const char* size         = "size";
     } while (0)
 
 
-TypeListFilter::NameSyntax TypeListFilter::parseNamePattern(
+TypeFilter::NameSyntax TypeFilter::parseNamePattern(
         const QString& pattern, QString& name, QRegExp& rx) const
 {
     name = pattern;
@@ -73,7 +73,7 @@ TypeListFilter::NameSyntax TypeListFilter::parseNamePattern(
 }
 
 
-void TypeListFilter::setTypeName(const QString &name)
+void TypeFilter::setTypeName(const QString &name)
 {
     _filters &= ~(foTypeName|foTypeNameRegEx|foTypeNameWildcard);
     NameSyntax syntax = parseNamePattern(name, _typeName, _typeRegEx);
@@ -87,7 +87,7 @@ void TypeListFilter::setTypeName(const QString &name)
 
 static QHash<QString, QString> typeFilters;
 
-const QHash<QString, QString> &TypeListFilter::supportedFilters()
+const QHash<QString, QString> &TypeFilter::supportedFilters()
 {
     if (typeFilters.isEmpty()) {
         typeFilters[str::type_name] = "Match type name, either by a literal match, by a "
@@ -100,7 +100,7 @@ const QHash<QString, QString> &TypeListFilter::supportedFilters()
 }
 
 
-bool TypeListFilter::match(const BaseType *type) const
+bool TypeFilter::match(const BaseType *type) const
 {
     if (!type)
         return false;
@@ -123,7 +123,7 @@ bool TypeListFilter::match(const BaseType *type) const
 }
 
 
-void TypeListFilter::clear()
+void TypeFilter::clear()
 {
     _filters = 0;
     _typeName.clear();
@@ -132,7 +132,7 @@ void TypeListFilter::clear()
 }
 
 
-void TypeListFilter::parseOptions(const QStringList &list)
+void TypeFilter::parseOptions(const QStringList &list)
 {
     QString key, value;
     int i = 0, index;
@@ -169,7 +169,7 @@ void TypeListFilter::parseOptions(const QStringList &list)
 }
 
 
-bool TypeListFilter::parseOption(const QString &key, const QString &value)
+bool TypeFilter::parseOption(const QString &key, const QString &value)
 {
     quint32 u;
     bool ok;
@@ -209,7 +209,7 @@ bool TypeListFilter::parseOption(const QString &key, const QString &value)
 
 
 
-bool VarListFilter::match(const Variable *var) const
+bool VariableFilter::match(const Variable *var) const
 {
     if (!var)
         return false;
@@ -227,19 +227,19 @@ bool VarListFilter::match(const Variable *var) const
              var->origFileIndex() != _symFileIndex)
         return false;
 
-    return TypeListFilter::match(var->refType());
+    return TypeFilter::match(var->refType());
 }
 
 
-void VarListFilter::clear()
+void VariableFilter::clear()
 {
-    TypeListFilter::clear();
+    TypeFilter::clear();
     _varName.clear();
     _symFileIndex = -2;
 }
 
 
-void VarListFilter::setVarName(const QString &name)
+void VariableFilter::setVarName(const QString &name)
 {
     _filters &= ~(foVarName|foVarNameRegEx|foVarNameWildcard);
     NameSyntax syntax = parseNamePattern(name, _varName, _varRegEx);
@@ -253,10 +253,10 @@ void VarListFilter::setVarName(const QString &name)
 
 static QHash<QString, QString> varFilters;
 
-const QHash<QString, QString> &VarListFilter::supportedFilters()
+const QHash<QString, QString> &VariableFilter::supportedFilters()
 {
     if (varFilters.isEmpty()) {
-        varFilters = TypeListFilter::supportedFilters();
+        varFilters = TypeFilter::supportedFilters();
         varFilters[str::variablename] = "Match variable name, either by a "
                 "literal match, by a wildcard expression *glob*, or by a "
                 "regular expression /re/.";
@@ -267,7 +267,7 @@ const QHash<QString, QString> &VarListFilter::supportedFilters()
 }
 
 
-bool VarListFilter::parseOption(const QString &key, const QString &value)
+bool VariableFilter::parseOption(const QString &key, const QString &value)
 {
     if (QString(str::variablename).startsWith(key))
         setVarName(value);
@@ -293,7 +293,7 @@ bool VarListFilter::parseOption(const QString &key, const QString &value)
         }
     }
     else
-        return TypeListFilter::parseOption(key, value);
+        return TypeFilter::parseOption(key, value);
 
     return true;
 }

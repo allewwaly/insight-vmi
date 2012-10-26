@@ -768,7 +768,7 @@ int Shell::eval(QString command)
     		if (e.errorCode == QueryException::ecAmbiguousType) {
                 errMsg("Select a type by its ID from the following list:", true);
 
-                TypeListFilter filter;
+                TypeFilter filter;
                 filter.setTypeName(e.errorParam.toString());
 
     			QIODevice* outDev = _out.device();
@@ -1020,9 +1020,9 @@ int Shell::cmdListSources(QStringList /*args*/)
 int Shell::cmdListTypes(QStringList args, int typeFilter)
 {
     if (!args.isEmpty() && args.first() == "help")
-        return printFilterHelp(TypeListFilter::supportedFilters());
+        return printFilterHelp(TypeFilter::supportedFilters());
 
-    TypeListFilter filter;
+    TypeFilter filter;
     try {
         filter.parseOptions(args);
         if (filter.filterActive(foRealType))
@@ -1080,7 +1080,7 @@ int Shell::printFilterHelp(const QHash<QString, QString> help)
 }
 
 
-int Shell::printTypeList(const TypeListFilter& filter)
+int Shell::printTypeList(const TypeFilter& filter)
 {
     const BaseTypeList* types = &_sym.factory().types();
     CompileUnit* unit = 0;
@@ -1391,10 +1391,10 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
 int Shell::cmdListVars(QStringList args)
 {
     if (!args.isEmpty() && args.first() == "help")
-        return printFilterHelp(VarListFilter::supportedFilters());
+        return printFilterHelp(VariableFilter::supportedFilters());
 
     // Parse the filters
-    VarListFilter filter(_sym.factory().origSymFiles());
+    VariableFilter filter(_sym.factory().origSymFiles());
     try {
         filter.parseOptions(args);
         return printVarList(filter);
@@ -1408,7 +1408,7 @@ int Shell::cmdListVars(QStringList args)
 }
 
 
-int Shell::printVarList(const VarListFilter& filter)
+int Shell::printVarList(const VariableFilter& filter)
 {
     const VariableList& vars = _sym.factory().vars();
     CompileUnit* unit = 0;
@@ -2404,14 +2404,14 @@ int Shell::cmdShow(QStringList args)
                  << "\" is ambiguous:" << endl << endl;
 
     		if (!types.isEmpty()) {
-                TypeListFilter filter;
+                TypeFilter filter;
                 filter.setTypeName(s);
                 printTypeList(filter);
     			if (!vars.isEmpty())
     				_out << endl;
     		}
             if (vars.size() > 0) {
-                VarListFilter filter;
+                VariableFilter filter;
                 filter.setVarName(s);
                 printVarList(filter);
             }
