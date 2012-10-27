@@ -15,6 +15,7 @@ const char* filename     = "filename";
 const char* size         = "size";
 const char* field        = "field";
 const char* match        = "match";
+
 const char* regex        = "regex";
 const char* wildcard     = "wildcard";
 }
