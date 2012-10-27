@@ -15,163 +15,202 @@
 // gcc -g -o test test.c && objdump -W test | grep '^\s*<' | sed 's/^.*$/"\0\\n"/'
 const char* objdump =
         " <0><b>: Abbrev Number: 1 (DW_TAG_compile_unit)\n"
-        "    < c>   DW_AT_producer    : (indirect string, offset: 0x0): GNU C 4.5.2     \n"
+        "    <c>   DW_AT_producer    : (indirect string, offset: 0x0): GNU C 4.5.4      \n"
         "    <10>   DW_AT_language    : 1       (ANSI C)\n"
-        "    <11>   DW_AT_name        : (indirect string, offset: 0x28): test.c \n"
-        "    <15>   DW_AT_comp_dir    : (indirect string, offset: 0x4c): insight-vmi/insightd/tests/astexpressionevaluator     \n"
-        "    <19>   DW_AT_low_pc      : 0x4004b4        \n"
-        "    <21>   DW_AT_high_pc     : 0x4004e4        \n"
+        "    <11>   DW_AT_name        : (indirect string, offset: 0x2e): test.c \n"
+        "    <15>   DW_AT_comp_dir    : (indirect string, offset: 0x43): /home/chrschn/workspace/insight-vmi/tests/typefilter   \n"
+        "    <19>   DW_AT_low_pc      : 0x4004e4        \n"
+        "    <21>   DW_AT_high_pc     : 0x400514        \n"
         "    <29>   DW_AT_stmt_list   : 0x0     \n"
-        " <1><2d>: Abbrev Number: 2 (DW_TAG_base_type)\n"
-        "    <2e>   DW_AT_byte_size   : 8       \n"
-        "    <2f>   DW_AT_encoding    : 5       (signed)\n"
-        "    <30>   DW_AT_name        : (indirect string, offset: 0x2f): long int       \n"
-        " <1><34>: Abbrev Number: 2 (DW_TAG_base_type)\n"
-        "    <35>   DW_AT_byte_size   : 8       \n"
-        "    <36>   DW_AT_encoding    : 7       (unsigned)\n"
-        "    <37>   DW_AT_name        : (indirect string, offset: 0xc): long unsigned int       \n"
-        " <1><3b>: Abbrev Number: 3 (DW_TAG_base_type)\n"
-        "    <3c>   DW_AT_byte_size   : 4       \n"
-        "    <3d>   DW_AT_encoding    : 5       (signed)\n"
-        "    <3e>   DW_AT_name        : int     \n"
-        " <1><42>: Abbrev Number: 4 (DW_TAG_structure_type)\n"
-        "    <43>   DW_AT_name        : A       \n"
-        "    <45>   DW_AT_byte_size   : 24      \n"
+        " <1><2d>: Abbrev Number: 2 (DW_TAG_structure_type)\n"
+        "    <2e>   DW_AT_name        : A       \n"
+        "    <30>   DW_AT_byte_size   : 24      \n"
+        "    <31>   DW_AT_decl_file   : 1       \n"
+        "    <32>   DW_AT_decl_line   : 1       \n"
+        "    <33>   DW_AT_sibling     : <0x68>  \n"
+        " <2><37>: Abbrev Number: 3 (DW_TAG_member)\n"
+        "    <38>   DW_AT_name        : l       \n"
+        "    <3a>   DW_AT_decl_file   : 1       \n"
+        "    <3b>   DW_AT_decl_line   : 2       \n"
+        "    <3c>   DW_AT_type        : <0x68>  \n"
+        "    <40>   DW_AT_data_member_location: 2 byte block: 23 0      (DW_OP_plus_uconst: 0)\n"
+        " <2><43>: Abbrev Number: 3 (DW_TAG_member)\n"
+        "    <44>   DW_AT_name        : s       \n"
         "    <46>   DW_AT_decl_file   : 1       \n"
-        "    <47>   DW_AT_decl_line   : 4       \n"
-        "    <48>   DW_AT_sibling     : <0x7d>  \n"
-        " <2><4c>: Abbrev Number: 5 (DW_TAG_member)\n"
-        "    <4d>   DW_AT_name        : l       \n"
-        "    <4f>   DW_AT_decl_file   : 1       \n"
-        "    <50>   DW_AT_decl_line   : 5       \n"
-        "    <51>   DW_AT_type        : <0x2d>  \n"
-        "    <55>   DW_AT_data_member_location: 2 byte block: 23 0      (DW_OP_plus_uconst: 0)\n"
-        " <2><58>: Abbrev Number: 5 (DW_TAG_member)\n"
-        "    <59>   DW_AT_name        : s       \n"
-        "    <5b>   DW_AT_decl_file   : 1       \n"
-        "    <5c>   DW_AT_decl_line   : 6       \n"
-        "    <5d>   DW_AT_type        : <0x7d>  \n"
-        "    <61>   DW_AT_data_member_location: 2 byte block: 23 8      (DW_OP_plus_uconst: 8)\n"
-        " <2><64>: Abbrev Number: 5 (DW_TAG_member)\n"
-        "    <65>   DW_AT_name        : i       \n"
-        "    <67>   DW_AT_decl_file   : 1       \n"
-        "    <68>   DW_AT_decl_line   : 7       \n"
-        "    <69>   DW_AT_type        : <0x3b>  \n"
-        "    <6d>   DW_AT_data_member_location: 2 byte block: 23 c      (DW_OP_plus_uconst: 12)\n"
-        " <2><70>: Abbrev Number: 5 (DW_TAG_member)\n"
-        "    <71>   DW_AT_name        : c       \n"
-        "    <73>   DW_AT_decl_file   : 1       \n"
-        "    <74>   DW_AT_decl_line   : 8       \n"
-        "    <75>   DW_AT_type        : <0x84>  \n"
-        "    <79>   DW_AT_data_member_location: 2 byte block: 23 10     (DW_OP_plus_uconst: 16)\n"
-        " <1><7d>: Abbrev Number: 2 (DW_TAG_base_type)\n"
-        "    <7e>   DW_AT_byte_size   : 2       \n"
-        "    <7f>   DW_AT_encoding    : 5       (signed)\n"
-        "    <80>   DW_AT_name        : (indirect string, offset: 0x42): short int      \n"
-        " <1><84>: Abbrev Number: 2 (DW_TAG_base_type)\n"
-        "    <85>   DW_AT_byte_size   : 1       \n"
-        "    <86>   DW_AT_encoding    : 6       (signed char)\n"
-        "    <87>   DW_AT_name        : (indirect string, offset: 0x23): char   \n"
-        " <1><8b>: Abbrev Number: 4 (DW_TAG_structure_type)\n"
-        "    <8c>   DW_AT_name        : B       \n"
-        "    <8e>   DW_AT_byte_size   : 120     \n"
-        "    <8f>   DW_AT_decl_file   : 1       \n"
-        "    <90>   DW_AT_decl_line   : 11      \n"
-        "    <91>   DW_AT_sibling     : <0xc8>  \n"
-        " <2><95>: Abbrev Number: 5 (DW_TAG_member)\n"
-        "    <96>   DW_AT_name        : j       \n"
-        "    <98>   DW_AT_decl_file   : 1       \n"
-        "    <99>   DW_AT_decl_line   : 12      \n"
-        "    <9a>   DW_AT_type        : <0x3b>  \n"
-        "    <9e>   DW_AT_data_member_location: 2 byte block: 23 0      (DW_OP_plus_uconst: 0)\n"
-        " <2><a1>: Abbrev Number: 5 (DW_TAG_member)\n"
-        "    <a2>   DW_AT_name        : a       \n"
-        "    <a4>   DW_AT_decl_file   : 1       \n"
-        "    <a5>   DW_AT_decl_line   : 13      \n"
-        "    <a6>   DW_AT_type        : <0xc8>  \n"
-        "    <aa>   DW_AT_data_member_location: 2 byte block: 23 8      (DW_OP_plus_uconst: 8)\n"
-        " <2><ad>: Abbrev Number: 5 (DW_TAG_member)\n"
-        "    <ae>   DW_AT_name        : pa      \n"
-        "    <b1>   DW_AT_decl_file   : 1       \n"
-        "    <b2>   DW_AT_decl_line   : 14      \n"
-        "    <b3>   DW_AT_type        : <0xd8>  \n"
-        "    <b7>   DW_AT_data_member_location: 2 byte block: 23 68     (DW_OP_plus_uconst: 104)\n"
-        " <2><ba>: Abbrev Number: 5 (DW_TAG_member)\n"
-        "    <bb>   DW_AT_name        : pb      \n"
-        "    <be>   DW_AT_decl_file   : 1       \n"
-        "    <bf>   DW_AT_decl_line   : 15      \n"
-        "    <c0>   DW_AT_type        : <0xde>  \n"
-        "    <c4>   DW_AT_data_member_location: 2 byte block: 23 70     (DW_OP_plus_uconst: 112)\n"
-        " <1><c8>: Abbrev Number: 6 (DW_TAG_array_type)\n"
-        "    <c9>   DW_AT_type        : <0x42>  \n"
-        "    <cd>   DW_AT_sibling     : <0xd8>  \n"
-        " <2><d1>: Abbrev Number: 7 (DW_TAG_subrange_type)\n"
-        "    <d2>   DW_AT_type        : <0x34>  \n"
-        "    <d6>   DW_AT_upper_bound : 3       \n"
-        " <1><d8>: Abbrev Number: 8 (DW_TAG_pointer_type)\n"
-        "    <d9>   DW_AT_byte_size   : 8       \n"
-        "    <da>   DW_AT_type        : <0x42>  \n"
-        " <1><de>: Abbrev Number: 8 (DW_TAG_pointer_type)\n"
-        "    <df>   DW_AT_byte_size   : 8       \n"
-        "    <e0>   DW_AT_type        : <0x8b>  \n"
-        " <1><e4>: Abbrev Number: 9 (DW_TAG_subprogram)\n"
-        "    <e5>   DW_AT_external    : 1       \n"
-        "    <e6>   DW_AT_name        : (indirect string, offset: 0x1e): main   \n"
-        "    <ea>   DW_AT_decl_file   : 1       \n"
-        "    <eb>   DW_AT_decl_line   : 21      \n"
-        "    <ec>   DW_AT_prototyped  : 1       \n"
-        "    <ed>   DW_AT_type        : <0x3b>  \n"
-        "    <f1>   DW_AT_low_pc      : 0x4004b4        \n"
-        "    <f9>   DW_AT_high_pc     : 0x4004e4        \n"
-        "    <101>   DW_AT_frame_base  : 0x0    (location list)\n"
-        "    <105>   DW_AT_sibling     : <0x126>        \n"
-        " <2><109>: Abbrev Number: 10 (DW_TAG_formal_parameter)\n"
-        "    <10a>   DW_AT_name        : (indirect string, offset: 0x38): argc  \n"
-        "    <10e>   DW_AT_decl_file   : 1      \n"
-        "    <10f>   DW_AT_decl_line   : 21     \n"
-        "    <110>   DW_AT_type        : <0x3b> \n"
-        "    <114>   DW_AT_location    : 2 byte block: 91 6c    (DW_OP_fbreg: -20)\n"
-        " <2><117>: Abbrev Number: 10 (DW_TAG_formal_parameter)\n"
-        "    <118>   DW_AT_name        : (indirect string, offset: 0x3d): argv  \n"
-        "    <11c>   DW_AT_decl_file   : 1      \n"
-        "    <11d>   DW_AT_decl_line   : 21     \n"
-        "    <11e>   DW_AT_type        : <0x126>        \n"
-        "    <122>   DW_AT_location    : 2 byte block: 91 60    (DW_OP_fbreg: -32)\n"
-        " <1><126>: Abbrev Number: 8 (DW_TAG_pointer_type)\n"
-        "    <127>   DW_AT_byte_size   : 8      \n"
-        "    <128>   DW_AT_type        : <0x12c>        \n"
-        " <1><12c>: Abbrev Number: 8 (DW_TAG_pointer_type)\n"
-        "    <12d>   DW_AT_byte_size   : 8      \n"
-        "    <12e>   DW_AT_type        : <0x84> \n"
-        " <1><132>: Abbrev Number: 11 (DW_TAG_variable)\n"
-        "    <133>   DW_AT_name        : a      \n"
-        "    <135>   DW_AT_decl_file   : 1      \n"
-        "    <136>   DW_AT_decl_line   : 18     \n"
-        "    <137>   DW_AT_type        : <0x42> \n"
-        "    <13b>   DW_AT_external    : 1      \n"
-        "    <13c>   DW_AT_declaration : 1      \n"
-        " <1><13d>: Abbrev Number: 11 (DW_TAG_variable)\n"
-        "    <13e>   DW_AT_name        : b      \n"
-        "    <140>   DW_AT_decl_file   : 1      \n"
-        "    <141>   DW_AT_decl_line   : 19     \n"
-        "    <142>   DW_AT_type        : <0x8b> \n"
-        "    <146>   DW_AT_external    : 1      \n"
-        "    <147>   DW_AT_declaration : 1      \n"
-        " <1><148>: Abbrev Number: 12 (DW_TAG_variable)\n"
-        "    <149>   DW_AT_name        : a      \n"
-        "    <14b>   DW_AT_decl_file   : 1      \n"
-        "    <14c>   DW_AT_decl_line   : 18     \n"
-        "    <14d>   DW_AT_type        : <0x42> \n"
-        "    <151>   DW_AT_external    : 1      \n"
-        "    <152>   DW_AT_location    : 9 byte block: 3 40 10 60 0 0 0 0 0     (DW_OP_addr: 601040)\n"
-        " <1><15c>: Abbrev Number: 12 (DW_TAG_variable)\n"
-        "    <15d>   DW_AT_name        : b      \n"
-        "    <15f>   DW_AT_decl_file   : 1      \n"
-        "    <160>   DW_AT_decl_line   : 19     \n"
-        "    <161>   DW_AT_type        : <0x8b> \n"
-        "    <165>   DW_AT_external    : 1      \n"
-        "    <166>   DW_AT_location    : 9 byte block: 3 60 10 60 0 0 0 0 0     (DW_OP_addr: 601060)\n"
-        "\n";
+        "    <47>   DW_AT_decl_line   : 3       \n"
+        "    <48>   DW_AT_type        : <0x6f>  \n"
+        "    <4c>   DW_AT_data_member_location: 2 byte block: 23 8      (DW_OP_plus_uconst: 8)\n"
+        " <2><4f>: Abbrev Number: 3 (DW_TAG_member)\n"
+        "    <50>   DW_AT_name        : i       \n"
+        "    <52>   DW_AT_decl_file   : 1       \n"
+        "    <53>   DW_AT_decl_line   : 4       \n"
+        "    <54>   DW_AT_type        : <0x76>  \n"
+        "    <58>   DW_AT_data_member_location: 2 byte block: 23 c      (DW_OP_plus_uconst: 12)\n"
+        " <2><5b>: Abbrev Number: 3 (DW_TAG_member)\n"
+        "    <5c>   DW_AT_name        : c       \n"
+        "    <5e>   DW_AT_decl_file   : 1       \n"
+        "    <5f>   DW_AT_decl_line   : 5       \n"
+        "    <60>   DW_AT_type        : <0x7d>  \n"
+        "    <64>   DW_AT_data_member_location: 2 byte block: 23 10     (DW_OP_plus_uconst: 16)\n"
+        " <1><68>: Abbrev Number: 4 (DW_TAG_base_type)\n"
+        "    <69>   DW_AT_byte_size   : 8       \n"
+        "    <6a>   DW_AT_encoding    : 5       (signed)\n"
+        "    <6b>   DW_AT_name        : (indirect string, offset: 0x35): long int       \n"
+        " <1><6f>: Abbrev Number: 4 (DW_TAG_base_type)\n"
+        "    <70>   DW_AT_byte_size   : 2       \n"
+        "    <71>   DW_AT_encoding    : 5       (signed)\n"
+        "    <72>   DW_AT_name        : (indirect string, offset: 0x95): short int      \n"
+        " <1><76>: Abbrev Number: 5 (DW_TAG_base_type)\n"
+        "    <77>   DW_AT_byte_size   : 4       \n"
+        "    <78>   DW_AT_encoding    : 5       (signed)\n"
+        "    <79>   DW_AT_name        : int     \n"
+        " <1><7d>: Abbrev Number: 4 (DW_TAG_base_type)\n"
+        "    <7e>   DW_AT_byte_size   : 1       \n"
+        "    <7f>   DW_AT_encoding    : 6       (signed char)\n"
+        "    <80>   DW_AT_name        : (indirect string, offset: 0x29): char   \n"
+        " <1><84>: Abbrev Number: 6 (DW_TAG_union_type)\n"
+        "    <85>   DW_AT_byte_size   : 24      \n"
+        "    <86>   DW_AT_decl_file   : 1       \n"
+        "    <87>   DW_AT_decl_line   : 14      \n"
+        "    <88>   DW_AT_sibling     : <0xae>  \n"
+        " <2><8c>: Abbrev Number: 7 (DW_TAG_member)\n"
+        "    <8d>   DW_AT_name        : (indirect string, offset: 0x9f): nested_i       \n"
+        "    <91>   DW_AT_decl_file   : 1       \n"
+        "    <92>   DW_AT_decl_line   : 15      \n"
+        "    <93>   DW_AT_type        : <0x76>  \n"
+        " <2><97>: Abbrev Number: 7 (DW_TAG_member)\n"
+        "    <98>   DW_AT_name        : (indirect string, offset: 0x8c): nested_f       \n"
+        "    <9c>   DW_AT_decl_file   : 1       \n"
+        "    <9d>   DW_AT_decl_line   : 16      \n"
+        "    <9e>   DW_AT_type        : <0xae>  \n"
+        " <2><a2>: Abbrev Number: 7 (DW_TAG_member)\n"
+        "    <a3>   DW_AT_name        : (indirect string, offset: 0x78): nested_a       \n"
+        "    <a7>   DW_AT_decl_file   : 1       \n"
+        "    <a8>   DW_AT_decl_line   : 17      \n"
+        "    <a9>   DW_AT_type        : <0x2d>  \n"
+        " <1><ae>: Abbrev Number: 4 (DW_TAG_base_type)\n"
+        "    <af>   DW_AT_byte_size   : 4       \n"
+        "    <b0>   DW_AT_encoding    : 4       (float)\n"
+        "    <b1>   DW_AT_name        : (indirect string, offset: 0x86): float  \n"
+        " <1><b5>: Abbrev Number: 2 (DW_TAG_structure_type)\n"
+        "    <b6>   DW_AT_name        : B       \n"
+        "    <b8>   DW_AT_byte_size   : 168     \n"
+        "    <b9>   DW_AT_decl_file   : 1       \n"
+        "    <ba>   DW_AT_decl_line   : 8       \n"
+        "    <bb>   DW_AT_sibling     : <0x10b> \n"
+        " <2><bf>: Abbrev Number: 3 (DW_TAG_member)\n"
+        "    <c0>   DW_AT_name        : j       \n"
+        "    <c2>   DW_AT_decl_file   : 1       \n"
+        "    <c3>   DW_AT_decl_line   : 9       \n"
+        "    <c4>   DW_AT_type        : <0x76>  \n"
+        "    <c8>   DW_AT_data_member_location: 2 byte block: 23 0      (DW_OP_plus_uconst: 0)\n"
+        " <2><cb>: Abbrev Number: 3 (DW_TAG_member)\n"
+        "    <cc>   DW_AT_name        : a       \n"
+        "    <ce>   DW_AT_decl_file   : 1       \n"
+        "    <cf>   DW_AT_decl_line   : 10      \n"
+        "    <d0>   DW_AT_type        : <0x2d>  \n"
+        "    <d4>   DW_AT_data_member_location: 2 byte block: 23 8      (DW_OP_plus_uconst: 8)\n"
+        " <2><d7>: Abbrev Number: 8 (DW_TAG_member)\n"
+        "    <d8>   DW_AT_name        : (indirect string, offset: 0x1e): array  \n"
+        "    <dc>   DW_AT_decl_file   : 1       \n"
+        "    <dd>   DW_AT_decl_line   : 11      \n"
+        "    <de>   DW_AT_type        : <0x10b> \n"
+        "    <e2>   DW_AT_data_member_location: 2 byte block: 23 20     (DW_OP_plus_uconst: 32)\n"
+        " <2><e5>: Abbrev Number: 3 (DW_TAG_member)\n"
+        "    <e6>   DW_AT_name        : pa      \n"
+        "    <e9>   DW_AT_decl_file   : 1       \n"
+        "    <ea>   DW_AT_decl_line   : 12      \n"
+        "    <eb>   DW_AT_type        : <0x122> \n"
+        "    <ef>   DW_AT_data_member_location: 3 byte block: 23 80 1   (DW_OP_plus_uconst: 128)\n"
+        " <2><f3>: Abbrev Number: 3 (DW_TAG_member)\n"
+        "    <f4>   DW_AT_name        : pb      \n"
+        "    <f7>   DW_AT_decl_file   : 1       \n"
+        "    <f8>   DW_AT_decl_line   : 13      \n"
+        "    <f9>   DW_AT_type        : <0x128> \n"
+        "    <fd>   DW_AT_data_member_location: 3 byte block: 23 88 1   (DW_OP_plus_uconst: 136)\n"
+        " <2><101>: Abbrev Number: 9 (DW_TAG_member)\n"
+        "    <102>   DW_AT_type        : <0x84> \n"
+        "    <106>   DW_AT_data_member_location: 3 byte block: 23 90 1  (DW_OP_plus_uconst: 144)\n"
+        " <1><10b>: Abbrev Number: 10 (DW_TAG_array_type)\n"
+        "    <10c>   DW_AT_type        : <0x2d> \n"
+        "    <110>   DW_AT_sibling     : <0x11b>        \n"
+        " <2><114>: Abbrev Number: 11 (DW_TAG_subrange_type)\n"
+        "    <115>   DW_AT_type        : <0x11b>        \n"
+        "    <119>   DW_AT_upper_bound : 3      \n"
+        " <1><11b>: Abbrev Number: 4 (DW_TAG_base_type)\n"
+        "    <11c>   DW_AT_byte_size   : 8      \n"
+        "    <11d>   DW_AT_encoding    : 7      (unsigned)\n"
+        "    <11e>   DW_AT_name        : (indirect string, offset: 0xc): long unsigned int      \n"
+        " <1><122>: Abbrev Number: 12 (DW_TAG_pointer_type)\n"
+        "    <123>   DW_AT_byte_size   : 8      \n"
+        "    <124>   DW_AT_type        : <0x2d> \n"
+        " <1><128>: Abbrev Number: 12 (DW_TAG_pointer_type)\n"
+        "    <129>   DW_AT_byte_size   : 8      \n"
+        "    <12a>   DW_AT_type        : <0xb5> \n"
+        " <1><12e>: Abbrev Number: 13 (DW_TAG_subprogram)\n"
+        "    <12f>   DW_AT_external    : 1      \n"
+        "    <130>   DW_AT_name        : (indirect string, offset: 0x24): main  \n"
+        "    <134>   DW_AT_decl_file   : 1      \n"
+        "    <135>   DW_AT_decl_line   : 24     \n"
+        "    <136>   DW_AT_prototyped  : 1      \n"
+        "    <137>   DW_AT_type        : <0x76> \n"
+        "    <13b>   DW_AT_low_pc      : 0x4004e4       \n"
+        "    <143>   DW_AT_high_pc     : 0x400514       \n"
+        "    <14b>   DW_AT_frame_base  : 0x0    (location list)\n"
+        "    <14f>   DW_AT_sibling     : <0x170>        \n"
+        " <2><153>: Abbrev Number: 14 (DW_TAG_formal_parameter)\n"
+        "    <154>   DW_AT_name        : (indirect string, offset: 0x3e): argc  \n"
+        "    <158>   DW_AT_decl_file   : 1      \n"
+        "    <159>   DW_AT_decl_line   : 24     \n"
+        "    <15a>   DW_AT_type        : <0x76> \n"
+        "    <15e>   DW_AT_location    : 2 byte block: 91 6c    (DW_OP_fbreg: -20)\n"
+        " <2><161>: Abbrev Number: 14 (DW_TAG_formal_parameter)\n"
+        "    <162>   DW_AT_name        : (indirect string, offset: 0x81): argv  \n"
+        "    <166>   DW_AT_decl_file   : 1      \n"
+        "    <167>   DW_AT_decl_line   : 24     \n"
+        "    <168>   DW_AT_type        : <0x170>        \n"
+        "    <16c>   DW_AT_location    : 2 byte block: 91 60    (DW_OP_fbreg: -32)\n"
+        " <1><170>: Abbrev Number: 12 (DW_TAG_pointer_type)\n"
+        "    <171>   DW_AT_byte_size   : 8      \n"
+        "    <172>   DW_AT_type        : <0x176>        \n"
+        " <1><176>: Abbrev Number: 12 (DW_TAG_pointer_type)\n"
+        "    <177>   DW_AT_byte_size   : 8      \n"
+        "    <178>   DW_AT_type        : <0x7d> \n"
+        " <1><17c>: Abbrev Number: 15 (DW_TAG_variable)\n"
+        "    <17d>   DW_AT_name        : a      \n"
+        "    <17f>   DW_AT_decl_file   : 1      \n"
+        "    <180>   DW_AT_decl_line   : 21     \n"
+        "    <181>   DW_AT_type        : <0x2d> \n"
+        "    <185>   DW_AT_external    : 1      \n"
+        "    <186>   DW_AT_declaration : 1      \n"
+        " <1><187>: Abbrev Number: 15 (DW_TAG_variable)\n"
+        "    <188>   DW_AT_name        : b      \n"
+        "    <18a>   DW_AT_decl_file   : 1      \n"
+        "    <18b>   DW_AT_decl_line   : 22     \n"
+        "    <18c>   DW_AT_type        : <0xb5> \n"
+        "    <190>   DW_AT_external    : 1      \n"
+        "    <191>   DW_AT_declaration : 1      \n"
+        " <1><192>: Abbrev Number: 16 (DW_TAG_variable)\n"
+        "    <193>   DW_AT_name        : a      \n"
+        "    <195>   DW_AT_decl_file   : 1      \n"
+        "    <196>   DW_AT_decl_line   : 21     \n"
+        "    <197>   DW_AT_type        : <0x2d> \n"
+        "    <19b>   DW_AT_external    : 1      \n"
+        "    <19c>   DW_AT_location    : 9 byte block: 3 f0 10 60 0 0 0 0 0     (DW_OP_addr: 6010f0)\n"
+        " <1><1a6>: Abbrev Number: 16 (DW_TAG_variable)\n"
+        "    <1a7>   DW_AT_name        : b      \n"
+        "    <1a9>   DW_AT_decl_file   : 1      \n"
+        "    <1aa>   DW_AT_decl_line   : 22     \n"
+        "    <1ab>   DW_AT_type        : <0xb5> \n"
+        "    <1af>   DW_AT_external    : 1      \n"
+        "    <1b0>   DW_AT_location    : 9 byte block: 3 40 10 60 0 0 0 0 0     (DW_OP_addr: 601040)\n";
+
+#define VERIFY_F_VF(ta, tb, ti, va, vb) \
+    QVERIFY(f.match(type_a) == (ta)); \
+    QVERIFY(f.match(type_b) == (tb)); \
+    QVERIFY(f.match(type_int) == (ti)); \
+    QVERIFY(vf.match(var_a) == (va)); \
+    QVERIFY(vf.match(var_b) == (vb));
 
 
 class TypeFilterTest : public QObject
@@ -190,12 +229,14 @@ private Q_SLOTS:
     void parseVarName();
     void parseFileName();
     void parseSize();
+    void parseFields();
 
     void setDataType();
     void setTypeName();
     void setVarName();
     void setFileName();
     void setSize();
+    void setFields();
 
 private:
     SymFactory* _factory;
@@ -514,6 +555,169 @@ void TypeFilterTest::parseSize()
 }
 
 
+void TypeFilterTest::parseFields()
+{
+    TypeFilter f;
+    VariableFilter vf;
+
+#define TEST_PARSE_FIELD1(f1, kv, ta, tb, va, vb) \
+    f.clear(); \
+    vf.clear(); \
+    f.parseOption("field", f1, kv); \
+    vf.parseOption("field", f1, kv); \
+    QVERIFY(f.fields().size() == 1); \
+    QVERIFY(vf.fields().size() == 1); \
+    VERIFY_F_VF(ta, tb, false, va, vb)
+
+#define TEST_PARSE_FIELD2(f1, f2, kv, ta, tb, va, vb) \
+    f.clear(); \
+    vf.clear(); \
+    f.parseOption("field", f1, kv); \
+    vf.parseOption("field", f1, kv); \
+    f.parseOption("field", f2, kv); \
+    vf.parseOption("field", f2, kv); \
+    QVERIFY(f.fields().size() == 2); \
+    QVERIFY(vf.fields().size() == 2); \
+    VERIFY_F_VF(ta, tb, false, va, vb)
+
+#define TEST_PARSE_FIELD3(f1, f2, f3, kv, ta, tb, va, vb) \
+    f.clear(); \
+    vf.clear(); \
+    f.parseOption("field", f1, kv); \
+    vf.parseOption("field", f1, kv); \
+    f.parseOption("field", f2, kv); \
+    vf.parseOption("field", f2, kv); \
+    f.parseOption("field", f3, kv); \
+    vf.parseOption("field", f3, kv); \
+    QVERIFY(f.fields().size() == 3); \
+    QVERIFY(vf.fields().size() == 3); \
+    VERIFY_F_VF(ta, tb, false, va, vb)
+
+    // Match none
+    TEST_PARSE_FIELD1("not_existing", 0, false, false, false, false);
+    // struct A
+    TEST_PARSE_FIELD1("l", 0, true, false, true, false);
+    TEST_PARSE_FIELD1("s", 0, true, false, true, false);
+    TEST_PARSE_FIELD1("i", 0, true, false, true, false);
+    TEST_PARSE_FIELD1("c", 0, true, false, true, false);
+    // struct B
+    TEST_PARSE_FIELD1("j", 0, false, true, false, true);
+    TEST_PARSE_FIELD1("a", 0, false, true, false, true);
+    TEST_PARSE_FIELD1("pa", 0, false, true, false, true);
+    TEST_PARSE_FIELD1("array", 0, false, true, false, true);
+    TEST_PARSE_FIELD1("", 0, false, true, false, true);
+    TEST_PARSE_FIELD1("nested_i", 0, false, false, false, false);
+    // struct B nested
+    TEST_PARSE_FIELD2("a", "l", 0, false, true, false, true);
+    TEST_PARSE_FIELD2("a", "s", 0, false, true, false, true);
+    TEST_PARSE_FIELD2("a", "i", 0, false, true, false, true);
+    TEST_PARSE_FIELD2("a", "c", 0, false, true, false, true);
+    TEST_PARSE_FIELD2("a", "not_existing", 0, false, false, false, false);
+    TEST_PARSE_FIELD2("", "nested_i", 0, false, true, false, true);
+    TEST_PARSE_FIELD2("", "nested_f", 0, false, true, false, true);
+    TEST_PARSE_FIELD2("", "nested_a", 0, false, true, false, true);
+    // struct B 2x nested
+    TEST_PARSE_FIELD3("", "nested_a", "l", 0, false, true, false, true);
+    TEST_PARSE_FIELD3("", "nested_a", "s", 0, false, true, false, true);
+    TEST_PARSE_FIELD3("", "nested_a", "i", 0, false, true, false, true);
+    TEST_PARSE_FIELD3("", "nested_a", "c", 0, false, true, false, true);
+    TEST_PARSE_FIELD3("", "nested_a", "", 0, false, false, false, false);
+    TEST_PARSE_FIELD3("", "nested_a", "not_existing", 0, false, false, false, false);
+
+    // whitespace
+    TEST_PARSE_FIELD1("  a", 0, false, true, false, true);
+    TEST_PARSE_FIELD1("a  ", 0, false, true, false, true);
+    TEST_PARSE_FIELD1(" a ", 0, false, true, false, true);
+    // case-insensitive
+    TEST_PARSE_FIELD1("aRrAy", 0, false, true, false, true);
+    TEST_PARSE_FIELD1("ARRAY", 0, false, true, false, true);
+
+    KeyValStore kv;
+    kv["match"] = "wildcard";
+
+    // Match none
+    TEST_PARSE_FIELD1("not_existing", &kv, false, false, false, false);
+    // struct A
+    TEST_PARSE_FIELD1("*l", &kv, true, false, true, false);
+    TEST_PARSE_FIELD1("*s*", &kv, true, false, true, false);
+    TEST_PARSE_FIELD1("?", &kv, true, true, true, true);
+    TEST_PARSE_FIELD1("c", &kv, true, false, true, false);
+    TEST_PARSE_FIELD1("C", &kv, true, false, true, false);
+    // struct B
+    TEST_PARSE_FIELD1("p?", &kv, false, true, false, true);
+    TEST_PARSE_FIELD1("p*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD1("nested_*", &kv, false, false, false, false);
+    // struct B nested
+    TEST_PARSE_FIELD2("a", "?", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2("?", "?", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2("*", "*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2("?", "nested_*", &kv, false, false, false, false);
+    TEST_PARSE_FIELD2("*", "nested_*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2("*", "l", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2("", "nested_*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2("", "nested_?", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2("", "nested_f", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2("", "nested_x", &kv, false, false, false, false);
+    // struct B 2x nested
+    TEST_PARSE_FIELD3("*", "*", "*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("*", "*", "?", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("*", "*", "l", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", "*", "*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", "*", "?", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", "*", "l", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("foobar", "*", "*", &kv, false, false, false, false);
+    TEST_PARSE_FIELD3("foobar", "*", "?", &kv, false, false, false, false);
+    TEST_PARSE_FIELD3("foobar", "*", "l", &kv, false, false, false, false);
+    TEST_PARSE_FIELD3("", "nested_*", "s", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", "nested_?", "i", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", "nested_a", "c", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", "nested_a", "nested_*", &kv, false, false, false, false);
+    TEST_PARSE_FIELD3("", "nested_a", "not_existing", &kv, false, false, false, false);
+
+    kv["match"] = "regex";
+
+    // Match none
+    TEST_PARSE_FIELD1("not_existing", &kv, false, false, false, false);
+    // struct A
+    TEST_PARSE_FIELD1(".*l", &kv, true, false, true, false);
+    TEST_PARSE_FIELD1("^.*s.*$", &kv, true, false, true, false);
+    TEST_PARSE_FIELD1("l?", &kv, true, true, true, true);
+    TEST_PARSE_FIELD1("c", &kv, true, false, true, false);
+    TEST_PARSE_FIELD1("C", &kv, false, false, false, false);
+    // struct B
+    TEST_PARSE_FIELD1("p.", &kv, false, true, false, true);
+    TEST_PARSE_FIELD1("p.*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD1("nested_.", &kv, false, false, false, false);
+    // struct B nested
+    TEST_PARSE_FIELD2("a", ".", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2(".", ".", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2(".*", ".*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2(".", "nested_.*", &kv, false, false, false, false);
+    TEST_PARSE_FIELD2(".", "nested_.*", &kv, false, false, false, false);
+    TEST_PARSE_FIELD2(".*", "nested_.*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2(".", "l", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2(".*", "l", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2("", "nested_.*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2("", "nested_.", &kv, false, true, false, true);
+    TEST_PARSE_FIELD2("", "nested_f", &kv, false, true, false, true);
+    // struct B 2x nested
+    TEST_PARSE_FIELD3(".*", ".*", ".*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3(".*", ".*", ".", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3(".*", ".*", "l", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", ".*", ".*", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", ".*", ".", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", ".*", "l", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("foobar", ".*", ".*", &kv, false, false, false, false);
+    TEST_PARSE_FIELD3("foobar", ".*", ".", &kv, false, false, false, false);
+    TEST_PARSE_FIELD3("foobar", ".*", "l", &kv, false, false, false, false);
+    TEST_PARSE_FIELD3("", "nested_.*", "s", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", "nested_.", "i", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", "nested_a", "c", &kv, false, true, false, true);
+    TEST_PARSE_FIELD3("", "nested_a", "nested_.*", &kv, false, false, false, false);
+    TEST_PARSE_FIELD3("", "nested_a", "not_existing", &kv, false, false, false, false);
+}
+
+
 void TypeFilterTest::setDataType()
 {
     TypeFilter f;
@@ -524,11 +728,7 @@ void TypeFilterTest::setDataType()
     vf.setDataType(t); \
     QVERIFY(f.dataType() == (t)); \
     QVERIFY(vf.dataType() == (t)); \
-    QVERIFY(f.match(type_a) == (ta)); \
-    QVERIFY(f.match(type_b) == (tb)); \
-    QVERIFY(f.match(type_int) == (ti)); \
-    QVERIFY(vf.match(var_a) == (va)); \
-    QVERIFY(vf.match(var_b) == (vb));
+    VERIFY_F_VF(ta, tb, ti, va, vb)
 
     TEST_DATA_TYPE(rtStruct, true, true, false, true, true);
     TEST_DATA_TYPE(rtInt32, false, false, true, false, false);
@@ -551,41 +751,35 @@ void TypeFilterTest::setTypeName()
     QVERIFY(f.typeNameSyntax() == (s)); \
     QVERIFY(vf.typeName() == (n)); \
     QVERIFY(vf.typeNameSyntax() == (s)); \
-    QVERIFY(f.match(type_a) == (ta)); \
-    QVERIFY(f.match(type_b) == (tb)); \
-    QVERIFY(f.match(type_int) == (ti)); \
-    QVERIFY(vf.match(var_a) == (va)); \
-    QVERIFY(vf.match(var_b) == (vb));
+    VERIFY_F_VF(ta, tb, ti, va, vb)
 
+    TEST_TYPE_NAME("A", Filter::psLiteral, true, false, false, true, false);
+    TEST_TYPE_NAME("a", Filter::psLiteral, true, false, false, true, false);
+    TEST_TYPE_NAME("B", Filter::psLiteral, false, true, false, false, true);
+    TEST_TYPE_NAME("b", Filter::psLiteral, false, true, false, false, true);
+    TEST_TYPE_NAME("int", Filter::psLiteral, false, false, true, false, false);
+    TEST_TYPE_NAME("InT", Filter::psLiteral, false, false, true, false, false);
+    TEST_TYPE_NAME("z", Filter::psLiteral, false, false, false, false, false);
 
+    TEST_TYPE_NAME("A", Filter::psWildcard, true, false, false, true, false);
+    TEST_TYPE_NAME("A*", Filter::psWildcard, true, false, false, true, false);
+    TEST_TYPE_NAME("[a]", Filter::psWildcard, true, false, false, true, false);
+    TEST_TYPE_NAME("?", Filter::psWildcard, true, true, false, true, true);
+    TEST_TYPE_NAME("[a-z]", Filter::psWildcard, true, true, false, true, true);
+    TEST_TYPE_NAME("*b*", Filter::psWildcard, false, true, false, false, true);
+    TEST_TYPE_NAME("*in?", Filter::psWildcard, false, false, true, false, false);
+    TEST_TYPE_NAME("?nT*", Filter::psWildcard, false, false, true, false, false);
+    TEST_TYPE_NAME("*z*", Filter::psWildcard, false, false, false, false, false);
 
-    TEST_TYPE_NAME("A", TypeFilter::psLiteral, true, false, false, true, false);
-    TEST_TYPE_NAME("a", TypeFilter::psLiteral, true, false, false, true, false);
-    TEST_TYPE_NAME("B", TypeFilter::psLiteral, false, true, false, false, true);
-    TEST_TYPE_NAME("b", TypeFilter::psLiteral, false, true, false, false, true);
-    TEST_TYPE_NAME("int", TypeFilter::psLiteral, false, false, true, false, false);
-    TEST_TYPE_NAME("InT", TypeFilter::psLiteral, false, false, true, false, false);
-    TEST_TYPE_NAME("z", TypeFilter::psLiteral, false, false, false, false, false);
-
-    TEST_TYPE_NAME("A", TypeFilter::psWildcard, true, false, false, true, false);
-    TEST_TYPE_NAME("A*", TypeFilter::psWildcard, true, false, false, true, false);
-    TEST_TYPE_NAME("[a]", TypeFilter::psWildcard, true, false, false, true, false);
-    TEST_TYPE_NAME("?", TypeFilter::psWildcard, true, true, false, true, true);
-    TEST_TYPE_NAME("[a-z]", TypeFilter::psWildcard, true, true, false, true, true);
-    TEST_TYPE_NAME("*b*", TypeFilter::psWildcard, false, true, false, false, true);
-    TEST_TYPE_NAME("*in?", TypeFilter::psWildcard, false, false, true, false, false);
-    TEST_TYPE_NAME("?nT*", TypeFilter::psWildcard, false, false, true, false, false);
-    TEST_TYPE_NAME("*z*", TypeFilter::psWildcard, false, false, false, false, false);
-
-    TEST_TYPE_NAME("A", TypeFilter::psRegExp, true, false, false, true, false);
-    TEST_TYPE_NAME("a", TypeFilter::psRegExp, false, false, false, false, false);
-    TEST_TYPE_NAME("B", TypeFilter::psRegExp, false, true, false, false, true);
-    TEST_TYPE_NAME("b", TypeFilter::psRegExp, false, false, false, false, false);
-    TEST_TYPE_NAME("int", TypeFilter::psRegExp, false, false, true, false, false);
-    TEST_TYPE_NAME("InT", TypeFilter::psRegExp, false, false, false, false, false);
-    TEST_TYPE_NAME("[ABab]", TypeFilter::psRegExp, true, true, false, true, true);
-    TEST_TYPE_NAME("A|B", TypeFilter::psRegExp, true, true, false, true, true);
-    TEST_TYPE_NAME("[z].*", TypeFilter::psRegExp, false, false, false, false, false);
+    TEST_TYPE_NAME("A", Filter::psRegExp, true, false, false, true, false);
+    TEST_TYPE_NAME("a", Filter::psRegExp, false, false, false, false, false);
+    TEST_TYPE_NAME("B", Filter::psRegExp, false, true, false, false, true);
+    TEST_TYPE_NAME("b", Filter::psRegExp, false, false, false, false, false);
+    TEST_TYPE_NAME("int", Filter::psRegExp, false, false, true, false, false);
+    TEST_TYPE_NAME("InT", Filter::psRegExp, false, false, false, false, false);
+    TEST_TYPE_NAME("[ABab]", Filter::psRegExp, true, true, false, true, true);
+    TEST_TYPE_NAME("A|B", Filter::psRegExp, true, true, false, true, true);
+    TEST_TYPE_NAME("[z].*", Filter::psRegExp, false, false, false, false, false);
 }
 
 
@@ -600,28 +794,28 @@ void TypeFilterTest::setVarName()
     QCOMPARE(vf.match(var_a), (va)); \
     QCOMPARE(vf.match(var_b), (vb));
 
-    TEST_VAR_NAME("a", TypeFilter::psLiteral, true, false);
-    TEST_VAR_NAME("A", TypeFilter::psLiteral, true, false);
-    TEST_VAR_NAME("b", TypeFilter::psLiteral, false, true);
-    TEST_VAR_NAME("B", TypeFilter::psLiteral, false, true);
-    TEST_VAR_NAME("z", TypeFilter::psLiteral, false, false);
+    TEST_VAR_NAME("a", Filter::psLiteral, true, false);
+    TEST_VAR_NAME("A", Filter::psLiteral, true, false);
+    TEST_VAR_NAME("b", Filter::psLiteral, false, true);
+    TEST_VAR_NAME("B", Filter::psLiteral, false, true);
+    TEST_VAR_NAME("z", Filter::psLiteral, false, false);
 
-    TEST_VAR_NAME("a", TypeFilter::psWildcard, true, false);
-    TEST_VAR_NAME("*a*", TypeFilter::psWildcard, true, false);
-    TEST_VAR_NAME("*A*", TypeFilter::psWildcard, true, false);
-    TEST_VAR_NAME("*b*", TypeFilter::psWildcard, false, true);
-    TEST_VAR_NAME("*B*", TypeFilter::psWildcard, false, true);
-    TEST_VAR_NAME("?", TypeFilter::psWildcard, true, true);
-    TEST_VAR_NAME("z", TypeFilter::psWildcard, false, false);
+    TEST_VAR_NAME("a", Filter::psWildcard, true, false);
+    TEST_VAR_NAME("*a*", Filter::psWildcard, true, false);
+    TEST_VAR_NAME("*A*", Filter::psWildcard, true, false);
+    TEST_VAR_NAME("*b*", Filter::psWildcard, false, true);
+    TEST_VAR_NAME("*B*", Filter::psWildcard, false, true);
+    TEST_VAR_NAME("?", Filter::psWildcard, true, true);
+    TEST_VAR_NAME("z", Filter::psWildcard, false, false);
 
-    TEST_VAR_NAME("a+", TypeFilter::psRegExp, true, false);
-    TEST_VAR_NAME("A+", TypeFilter::psRegExp, false, false);
-    TEST_VAR_NAME("[b]", TypeFilter::psRegExp, false, true);
-    TEST_VAR_NAME("[B]", TypeFilter::psRegExp, false, false);
-    TEST_VAR_NAME("^(a|b)$", TypeFilter::psRegExp, true, true);
-    TEST_VAR_NAME("^[ab]$", TypeFilter::psRegExp, true, true);
-    TEST_VAR_NAME(".", TypeFilter::psRegExp, true, true);
-    TEST_VAR_NAME("z", TypeFilter::psRegExp, false, false);
+    TEST_VAR_NAME("a+", Filter::psRegExp, true, false);
+    TEST_VAR_NAME("A+", Filter::psRegExp, false, false);
+    TEST_VAR_NAME("[b]", Filter::psRegExp, false, true);
+    TEST_VAR_NAME("[B]", Filter::psRegExp, false, false);
+    TEST_VAR_NAME("^(a|b)$", Filter::psRegExp, true, true);
+    TEST_VAR_NAME("^[ab]$", Filter::psRegExp, true, true);
+    TEST_VAR_NAME(".", Filter::psRegExp, true, true);
+    TEST_VAR_NAME("z", Filter::psRegExp, false, false);
 }
 
 
@@ -646,17 +840,58 @@ void TypeFilterTest::setSize()
     vf.setSize(s); \
     QVERIFY(f.size() == (s)); \
     QVERIFY(vf.size() == (s)); \
-    QVERIFY(f.match(type_a) == (ta)); \
-    QVERIFY(f.match(type_b) == (tb)); \
-    QVERIFY(f.match(type_int) == (ti)); \
-    QVERIFY(vf.match(var_a) == (va)); \
-    QVERIFY(vf.match(var_b) == (vb));
+    VERIFY_F_VF(ta, tb, ti, va, vb)
 
     TEST_SIZE(type_a->size(), true, false, false, true, false);
     TEST_SIZE(type_b->size(), false, true, false, false, true);
     TEST_SIZE(type_int->size(), false, false, true, false, false);
     TEST_SIZE(type_a->size() + type_b->size() + type_int->size(),
               false, false, false, false, false);
+}
+
+void TypeFilterTest::setFields()
+{
+    TypeFilter f;
+    VariableFilter vf;
+    FieldFilterList fl;
+
+#define TEST_SET_FIELD1(f1, s1, ta, tb) \
+    f.clear(); \
+    vf.clear(); \
+    fl.clear(); \
+    fl.append(FieldFilter(f1, s1)); \
+    f.setFields(fl); \
+    vf.setFields(fl); \
+    QVERIFY(f.fields().size() == 1); \
+    QVERIFY(vf.fields().size() == 1); \
+    VERIFY_F_VF(ta, tb, false, ta, tb)
+
+#define TEST_SET_FIELD2(f1, s1, f2, s2, ta, tb) \
+    f.clear(); \
+    vf.clear(); \
+    fl.clear(); \
+    fl.append(FieldFilter(f1, s1)); \
+    fl.append(FieldFilter(f2, s2)); \
+    f.setFields(fl); \
+    vf.setFields(fl); \
+    QVERIFY(f.fields().size() == 2); \
+    QVERIFY(vf.fields().size() == 2); \
+    VERIFY_F_VF(ta, tb, false, ta, tb)
+
+    TEST_SET_FIELD1("l", Filter::psLiteral, true, false);
+    TEST_SET_FIELD1("a", Filter::psLiteral, false, true);
+    TEST_SET_FIELD1("", Filter::psLiteral, false, true);
+    TEST_SET_FIELD1(".", Filter::psRegExp, true, true);
+    TEST_SET_FIELD1("..", Filter::psRegExp, false, true);
+    TEST_SET_FIELD1("?", Filter::psWildcard, true, true);
+    TEST_SET_FIELD1("??", Filter::psWildcard, false, true);
+
+    TEST_SET_FIELD2("?", Filter::psWildcard, "l", Filter::psLiteral, false, true);
+    TEST_SET_FIELD2("??", Filter::psWildcard, "l", Filter::psLiteral, false, false);
+    TEST_SET_FIELD2("?", Filter::psWildcard, "x?i", Filter::psRegExp, false, true);
+    TEST_SET_FIELD2("??", Filter::psWildcard, "p?a", Filter::psRegExp, false, false);
+    TEST_SET_FIELD2("^a?$", Filter::psRegExp, "^.*i$", Filter::psRegExp, false, true);
+    TEST_SET_FIELD2("^$", Filter::psRegExp, "nested_*", Filter::psWildcard, false, true);
 }
 
 
