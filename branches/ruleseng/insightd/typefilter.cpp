@@ -2,6 +2,9 @@
 #include <realtypes.h>
 #include "basetype.h"
 #include "variable.h"
+#include "structured.h"
+#include "structuredmember.h"
+
 
 namespace str
 {
@@ -10,7 +13,13 @@ const char* type_name    = "typename";
 const char* variablename = "variablename";
 const char* filename     = "filename";
 const char* size         = "size";
+const char* field        = "field";
+const char* match        = "match";
+const char* regex        = "regex";
+const char* wildcard     = "wildcard";
 }
+
+using namespace Filter;
 
 
 #define parseInt(i, s, ok) \
@@ -34,8 +43,70 @@ const char* size         = "size";
     } while (0)
 
 
-TypeFilter::PatternSyntax TypeFilter::parseNamePattern(
-        const QString& pattern, QString& name, QRegExp& rx) const
+FieldFilter::FieldFilter(const QString& name, Filter::PatternSyntax syntax)
+    : _name(name), _regEx(0), _syntax(syntax)
+{
+    setName(name, syntax);
+}
+
+
+FieldFilter::FieldFilter(const FieldFilter& from)
+    : _name(from._name), _regEx(0), _syntax(from._syntax)
+{
+    if (from._regEx)
+        _regEx = new QRegExp(*from._regEx);
+}
+
+
+FieldFilter::~FieldFilter()
+{
+    if (_regEx)
+        delete _regEx;
+}
+
+
+bool FieldFilter::operator==(const FieldFilter &other) const
+{
+    if (_name != other._name || _syntax != other._syntax)
+        return false;
+    if (_regEx && other._regEx)
+        return _regEx->operator==(*other._regEx);
+    if ((_regEx && !other._regEx) || (!_regEx && other._regEx))
+        return false;
+    return true;
+}
+
+
+void FieldFilter::setName(const QString &name, PatternSyntax syntax)
+{
+    QRegExp rx;
+    _syntax = TypeFilter::setNamePattern(name, _name, rx, syntax);
+    if (_syntax != psLiteral) {
+        if (_regEx)
+            delete _regEx;
+        _regEx = new QRegExp(rx);
+    }
+}
+
+
+bool FieldFilter::match(const StructuredMember *member) const
+{
+    if (!member)
+        return false;
+
+    switch (_syntax) {
+    case psAuto:
+    case psLiteral:
+        return QString::compare(_name, member->name(), Qt::CaseInsensitive) == 0;
+    case psWildcard:
+    case psRegExp:
+        return _regEx->indexIn(member->name()) >= 0;
+    }
+}
+
+
+PatternSyntax TypeFilter::parseNamePattern(
+        const QString& pattern, QString& name, QRegExp& rx)
 {
     name = pattern.trimmed();
 
@@ -65,9 +136,9 @@ TypeFilter::PatternSyntax TypeFilter::parseNamePattern(
 }
 
 
-TypeFilter::PatternSyntax TypeFilter::setNamePattern(
+PatternSyntax TypeFilter::setNamePattern(
         const QString &pattern, QString &name, QRegExp &rx,
-        PatternSyntax syntax) const
+        PatternSyntax syntax)
 {
     if (syntax == psAuto)
         syntax = parseNamePattern(pattern, name, rx);
@@ -100,6 +171,27 @@ TypeFilter::PatternSyntax TypeFilter::setNamePattern(
 }
 
 
+PatternSyntax TypeFilter::givenSyntax(const KeyValStore *keyVal)
+{
+    static const QString match(str::match);
+
+    if (!keyVal)
+        return psAuto;
+
+    if (keyVal->contains(match)) {
+        QString val = keyVal->value(match).toLower();
+        if (val == str::regex)
+            return psRegExp;
+        else if (val == str::wildcard)
+            return psWildcard;
+        else
+            filterError(QString("Invalid value for attribute '%1': '%2'")
+                            .arg(match).arg(val));
+    }
+    return psLiteral;
+}
+
+
 void TypeFilter::setTypeName(const QString &name, PatternSyntax syntax)
 {
     _filters &= ~(foTypeName|foTypeNameRegEx|foTypeNameWildcard);
@@ -114,7 +206,7 @@ void TypeFilter::setTypeName(const QString &name, PatternSyntax syntax)
 }
 
 
-TypeFilter::PatternSyntax TypeFilter::typeNameSyntax() const
+PatternSyntax TypeFilter::typeNameSyntax() const
 {
     if (filterActive(foTypeNameRegEx))
         return psRegExp;
@@ -125,9 +217,21 @@ TypeFilter::PatternSyntax TypeFilter::typeNameSyntax() const
 }
 
 
+void TypeFilter::appendField(const FieldFilter &field)
+{
+    _fields.append(field);
+}
+
+
+void TypeFilter::appendField(const QString &name, PatternSyntax syntax)
+{
+    appendField(FieldFilter(name, syntax));
+}
+
+
 static QHash<QString, QString> typeFilters;
 
-const QHash<QString, QString> &TypeFilter::supportedFilters()
+const KeyValStore &TypeFilter::supportedFilters()
 {
     if (typeFilters.isEmpty()) {
         typeFilters[str::type_name] = "Match type name, either by a literal match, by a "
@@ -135,6 +239,7 @@ const QHash<QString, QString> &TypeFilter::supportedFilters()
                 "/re/.";
         typeFilters[str::datatype] = "Match actual type, e.g. \"FuncPointer\" or \"UInt*\".";
         typeFilters[str::size] = "Match type size.";
+        typeFilters[str::field] = "Match field name of a struct or union (specify multiple times to match nested structs' fields)";
     }
     return typeFilters;
 }
@@ -158,8 +263,35 @@ bool TypeFilter::match(const BaseType *type) const
     else if (filterActive(foTypeNameRegEx) &&
              _typeRegEx.indexIn(type->name()) < 0)
         return false;
+    else if (!_fields.isEmpty()) {
+        const BaseType* dt = type->dereferencedBaseType(BaseType::trLexical);
+        if (!(dt->type() & StructOrUnion))
+            return false;
+        if (!matchFieldsRek(dt, 0))
+            return false;
+    }
 
     return true;
+}
+
+
+bool TypeFilter::matchFieldsRek(const BaseType* type, int index) const
+{
+    if (index >= _fields.size())
+        return true;
+
+    const Structured* s = dynamic_cast<const Structured*>(type);
+    if (!s)
+        return false;
+
+    const FieldFilter& f = _fields[index];
+    for (int i = 0; i < s->members().size(); ++i) {
+        const StructuredMember* m = s->members().at(i);
+        if (f.match(m) &&
+            matchFieldsRek(m->refTypeDeep(BaseType::trLexical), index + 1))
+            return true;
+    }
+    return false;
 }
 
 
@@ -169,6 +301,7 @@ void TypeFilter::clear()
     _typeName.clear();
     _realType = 0;
     _size = 0;
+    _fields.clear();
 }
 
 
@@ -209,15 +342,17 @@ void TypeFilter::parseOptions(const QStringList &list)
 }
 
 
-bool TypeFilter::parseOption(const QString &key, const QString &value)
+bool TypeFilter::parseOption(const QString &key, const QString &value,
+                             const KeyValStore *keyVals)
 {
     quint32 u;
     bool ok;
+    QString v = value.trimmed();
 
     if (QString(str::type_name).startsWith(key))
-        setTypeName(value);
+        setTypeName(v, givenSyntax(keyVals));
     else if (QString(str::size).startsWith(key)) {
-        parseUInt(u, value, &ok);
+        parseUInt(u, v, &ok);
         setSize(u);
     }
     else if (QString(str::datatype).startsWith(key)) {
@@ -225,7 +360,7 @@ bool TypeFilter::parseOption(const QString &key, const QString &value)
         QString s, rt;
         QRegExp rx;
         // Allow comma sparated list of RealType names
-        QStringList l = value.split(QChar(','), QString::SkipEmptyParts);
+        QStringList l = v.split(QChar(','), QString::SkipEmptyParts);
         for (int i = 0; i < l.size(); ++i) {
             // Treat each as a name pattern (always case-insensitive)
             PatternSyntax syntax = parseNamePattern(l[i], s, rx);
@@ -240,6 +375,9 @@ bool TypeFilter::parseOption(const QString &key, const QString &value)
             }
         }
         setDataType(realType);
+    }
+    else if (QString(str::field).startsWith(key)) {
+        appendField(v, givenSyntax(keyVals));
     }
     else
         return false;
@@ -293,7 +431,7 @@ void VariableFilter::setVarName(const QString &name, PatternSyntax syntax)
 }
 
 
-TypeFilter::PatternSyntax VariableFilter::varNameSyntax() const
+PatternSyntax VariableFilter::varNameSyntax() const
 {
     if (filterActive(foVarNameRegEx))
         return psRegExp;
@@ -306,7 +444,7 @@ TypeFilter::PatternSyntax VariableFilter::varNameSyntax() const
 
 static QHash<QString, QString> varFilters;
 
-const QHash<QString, QString> &VariableFilter::supportedFilters()
+const KeyValStore &VariableFilter::supportedFilters()
 {
     if (varFilters.isEmpty()) {
         varFilters = TypeFilter::supportedFilters();
@@ -320,12 +458,11 @@ const QHash<QString, QString> &VariableFilter::supportedFilters()
 }
 
 
-bool VariableFilter::parseOption(const QString &key, const QString &value)
+bool VariableFilter::parseOption(const QString &key, const QString &value,
+                                 const KeyValStore* keyVals)
 {
     if (QString(str::variablename).startsWith(key))
-        setVarName(value);
-    else if (QString(str::type_name).startsWith(key) && key.size() > 4)
-        setTypeName(value);
+        setVarName(value, givenSyntax(keyVals));
     else if (QString(str::filename).startsWith(key)) {
         QString s = value.toLower();
         if (s != "vmlinux") {
@@ -346,7 +483,7 @@ bool VariableFilter::parseOption(const QString &key, const QString &value)
         }
     }
     else
-        return TypeFilter::parseOption(key, value);
+        return TypeFilter::parseOption(key, value, keyVals);
 
     return true;
 }
