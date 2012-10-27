@@ -12,6 +12,22 @@ class BaseType;
 class Variable;
 class StructuredMember;
 
+namespace str
+{
+extern const char* datatype;
+extern const char* type_name;
+extern const char* variablename;
+extern const char* filename;
+extern const char* size;
+extern const char* field;
+extern const char* match;
+
+extern const char* regex;
+extern const char* wildcard;
+}
+
+
+
 namespace Filter
 {
 /// Pattern syntax to use for matching a name

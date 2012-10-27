@@ -5,6 +5,14 @@
 #include <QStringList>
 #include <QHash>
 
+namespace str
+{
+extern const char* architecture;
+extern const char* os;
+extern const char* minver;
+extern const char* maxver;
+}
+
 /**
  * This class provides a filter for the type of operating system.
  */
