@@ -40,6 +40,7 @@
 #include "kernelsourceparser.h"
 #include "function.h"
 #include "memspecparser.h"
+#include "typefilter.h"
 
 #ifdef CONFIG_MEMORY_MAP
 #include "memorymap.h"
@@ -773,7 +774,7 @@ int Shell::eval(QString command)
 
     			QIODevice* outDev = _out.device();
     			_out.setDevice(_err.device());                
-                printTypeList(filter);
+                printTypeList(&filter);
     			_out.setDevice(outDev);
     		}
     	}
@@ -1029,7 +1030,7 @@ int Shell::cmdListTypes(QStringList args, int typeFilter)
             filter.setDataType(filter.dataType() & typeFilter);
         else
             filter.setDataType(typeFilter);
-        return printTypeList(filter);
+        return printTypeList(&filter);
     }
     catch (FilterException& e) {
         errMsg(e.message, true);
@@ -1080,7 +1081,7 @@ int Shell::printFilterHelp(const QHash<QString, QString> help)
 }
 
 
-int Shell::printTypeList(const TypeFilter& filter)
+int Shell::printTypeList(const TypeFilter *filter)
 {
     const BaseTypeList* types = &_sym.factory().types();
     CompileUnit* unit = 0;
@@ -1111,7 +1112,7 @@ int Shell::printTypeList(const TypeFilter& filter)
         BaseType* type = types->at(i);
 
         // Skip all types not matching the filter
-        if (filter.filters() && !filter.match(type))
+        if (filter && filter->filters() && !filter->match(type))
             continue;
 
         // Print header if not yet done
@@ -1174,7 +1175,7 @@ int Shell::printTypeList(const TypeFilter& filter)
 			_out << "Total types: " << color(ctBold) << dec << typeCount
 				 << color(ctReset) << endl;
 		}
-		else if (filter.filters())
+		else if (filter && filter->filters())
 			_out << "No types match the specified filters." << endl;
 	}
 
@@ -1397,7 +1398,7 @@ int Shell::cmdListVars(QStringList args)
     VariableFilter filter(_sym.factory().origSymFiles());
     try {
         filter.parseOptions(args);
-        return printVarList(filter);
+        return printVarList(&filter);
     }
     catch (FilterException& e) {
         errMsg(e.message, true);
@@ -1408,7 +1409,7 @@ int Shell::cmdListVars(QStringList args)
 }
 
 
-int Shell::printVarList(const VariableFilter& filter)
+int Shell::printVarList(const VariableFilter *filter)
 {
     const VariableList& vars = _sym.factory().vars();
     CompileUnit* unit = 0;
@@ -1441,7 +1442,7 @@ int Shell::printVarList(const VariableFilter& filter)
         Variable* var = vars[i];
 
         // Apply filter
-        if (filter.filters() && !filter.match(var))
+        if (filter && filter->filters() && !filter->match(var))
             continue;
 
         // Print header if not yet done
@@ -1528,7 +1529,7 @@ int Shell::printVarList(const VariableFilter& filter)
             _out << "Total variables: " << color(ctBold) << dec << varCount
                  << color(ctReset) << endl;
         }
-        else if (filter.filters())
+        else if (filter && filter->filters())
             _out << "No variable matches the specified filters." << endl;
     }
 
@@ -2406,14 +2407,14 @@ int Shell::cmdShow(QStringList args)
     		if (!types.isEmpty()) {
                 TypeFilter filter;
                 filter.setTypeName(s);
-                printTypeList(filter);
+                printTypeList(&filter);
     			if (!vars.isEmpty())
     				_out << endl;
     		}
             if (vars.size() > 0) {
                 VariableFilter filter;
                 filter.setVarName(s);
-                printVarList(filter);
+                printVarList(&filter);
             }
     		return 1;
     	}
