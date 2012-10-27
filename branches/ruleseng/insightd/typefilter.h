@@ -50,8 +50,8 @@ public:
     void setTypeName(const QString& name, PatternSyntax syntax = psAuto);
     PatternSyntax typeNameSyntax() const;
 
-    inline int realType() const { return _realType; }
-    inline void setRealType(int type) { _realType = type; _filters |= foRealType; }
+    inline int dataType() const { return _realType; }
+    inline void setDataType(int type) { _realType = type; _filters |= foRealType; }
 
     inline quint32 size() const { return _size; }
     inline void setSize(quint32 size) { _size = size; _filters |= foSize; }
