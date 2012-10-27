@@ -239,7 +239,7 @@ bool TypeFilter::parseOption(const QString &key, const QString &value)
                     realType |= j;
             }
         }
-        setRealType(realType);
+        setDataType(realType);
     }
     else
         return false;
@@ -282,7 +282,7 @@ void VariableFilter::clear()
 void VariableFilter::setVarName(const QString &name, PatternSyntax syntax)
 {
     _filters &= ~(foVarName|foVarNameRegEx|foVarNameWildcard);
-    syntax = parseNamePattern(name, _varName, _varRegEx);
+    syntax = setNamePattern(name, _varName, _varRegEx, syntax);
 
     switch (syntax) {
     case psAuto: break;
