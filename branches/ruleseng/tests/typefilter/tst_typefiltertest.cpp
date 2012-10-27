@@ -191,6 +191,12 @@ private Q_SLOTS:
     void parseFileName();
     void parseSize();
 
+    void setDataType();
+    void setTypeName();
+    void setVarName();
+    void setFileName();
+    void setSize();
+
 private:
     SymFactory* _factory;
     MemSpecs* _specs;
@@ -505,6 +511,152 @@ void TypeFilterTest::parseSize()
     QVERIFY(!f.match(type_int));
     QVERIFY(!vf.match(var_a));
     QVERIFY(!vf.match(var_b));
+}
+
+
+void TypeFilterTest::setDataType()
+{
+    TypeFilter f;
+    VariableFilter vf;
+
+#define TEST_DATA_TYPE(t, ta, tb, ti, va, vb) \
+    f.setDataType(t); \
+    vf.setDataType(t); \
+    QVERIFY(f.dataType() == (t)); \
+    QVERIFY(vf.dataType() == (t)); \
+    QVERIFY(f.match(type_a) == (ta)); \
+    QVERIFY(f.match(type_b) == (tb)); \
+    QVERIFY(f.match(type_int) == (ti)); \
+    QVERIFY(vf.match(var_a) == (va)); \
+    QVERIFY(vf.match(var_b) == (vb));
+
+    TEST_DATA_TYPE(rtStruct, true, true, false, true, true);
+    TEST_DATA_TYPE(rtInt32, false, false, true, false, false);
+    TEST_DATA_TYPE(rtStruct|rtInt32, true, true, true, true, true);
+    TEST_DATA_TYPE(rtUnion|rtTypedef, false, false, false, false, false);
+    TEST_DATA_TYPE(rtInt32|rtTypedef|rtUnion, false, false, true, false, false);
+    TEST_DATA_TYPE(rtStruct|rtPointer|rtInt8, true, true, false, true, true);
+}
+
+
+void TypeFilterTest::setTypeName()
+{
+    TypeFilter f;
+    VariableFilter vf;
+
+#define TEST_TYPE_NAME(n, s, ta, tb, ti, va, vb) \
+    f.setTypeName(n, s); \
+    vf.setTypeName(n, s); \
+    QVERIFY(f.typeName() == (n)); \
+    QVERIFY(f.typeNameSyntax() == (s)); \
+    QVERIFY(vf.typeName() == (n)); \
+    QVERIFY(vf.typeNameSyntax() == (s)); \
+    QVERIFY(f.match(type_a) == (ta)); \
+    QVERIFY(f.match(type_b) == (tb)); \
+    QVERIFY(f.match(type_int) == (ti)); \
+    QVERIFY(vf.match(var_a) == (va)); \
+    QVERIFY(vf.match(var_b) == (vb));
+
+
+
+    TEST_TYPE_NAME("A", TypeFilter::psLiteral, true, false, false, true, false);
+    TEST_TYPE_NAME("a", TypeFilter::psLiteral, true, false, false, true, false);
+    TEST_TYPE_NAME("B", TypeFilter::psLiteral, false, true, false, false, true);
+    TEST_TYPE_NAME("b", TypeFilter::psLiteral, false, true, false, false, true);
+    TEST_TYPE_NAME("int", TypeFilter::psLiteral, false, false, true, false, false);
+    TEST_TYPE_NAME("InT", TypeFilter::psLiteral, false, false, true, false, false);
+    TEST_TYPE_NAME("z", TypeFilter::psLiteral, false, false, false, false, false);
+
+    TEST_TYPE_NAME("A", TypeFilter::psWildcard, true, false, false, true, false);
+    TEST_TYPE_NAME("A*", TypeFilter::psWildcard, true, false, false, true, false);
+    TEST_TYPE_NAME("[a]", TypeFilter::psWildcard, true, false, false, true, false);
+    TEST_TYPE_NAME("?", TypeFilter::psWildcard, true, true, false, true, true);
+    TEST_TYPE_NAME("[a-z]", TypeFilter::psWildcard, true, true, false, true, true);
+    TEST_TYPE_NAME("*b*", TypeFilter::psWildcard, false, true, false, false, true);
+    TEST_TYPE_NAME("*in?", TypeFilter::psWildcard, false, false, true, false, false);
+    TEST_TYPE_NAME("?nT*", TypeFilter::psWildcard, false, false, true, false, false);
+    TEST_TYPE_NAME("*z*", TypeFilter::psWildcard, false, false, false, false, false);
+
+    TEST_TYPE_NAME("A", TypeFilter::psRegExp, true, false, false, true, false);
+    TEST_TYPE_NAME("a", TypeFilter::psRegExp, false, false, false, false, false);
+    TEST_TYPE_NAME("B", TypeFilter::psRegExp, false, true, false, false, true);
+    TEST_TYPE_NAME("b", TypeFilter::psRegExp, false, false, false, false, false);
+    TEST_TYPE_NAME("int", TypeFilter::psRegExp, false, false, true, false, false);
+    TEST_TYPE_NAME("InT", TypeFilter::psRegExp, false, false, false, false, false);
+    TEST_TYPE_NAME("[ABab]", TypeFilter::psRegExp, true, true, false, true, true);
+    TEST_TYPE_NAME("A|B", TypeFilter::psRegExp, true, true, false, true, true);
+    TEST_TYPE_NAME("[z].*", TypeFilter::psRegExp, false, false, false, false, false);
+}
+
+
+void TypeFilterTest::setVarName()
+{
+    VariableFilter vf;
+
+#define TEST_VAR_NAME(n, s, va, vb) \
+    vf.setVarName(n, s); \
+    QCOMPARE(vf.varName(), QString(n)); \
+    QCOMPARE((int)vf.varNameSyntax(), (int)(s)); \
+    QCOMPARE(vf.match(var_a), (va)); \
+    QCOMPARE(vf.match(var_b), (vb));
+
+    TEST_VAR_NAME("a", TypeFilter::psLiteral, true, false);
+    TEST_VAR_NAME("A", TypeFilter::psLiteral, true, false);
+    TEST_VAR_NAME("b", TypeFilter::psLiteral, false, true);
+    TEST_VAR_NAME("B", TypeFilter::psLiteral, false, true);
+    TEST_VAR_NAME("z", TypeFilter::psLiteral, false, false);
+
+    TEST_VAR_NAME("a", TypeFilter::psWildcard, true, false);
+    TEST_VAR_NAME("*a*", TypeFilter::psWildcard, true, false);
+    TEST_VAR_NAME("*A*", TypeFilter::psWildcard, true, false);
+    TEST_VAR_NAME("*b*", TypeFilter::psWildcard, false, true);
+    TEST_VAR_NAME("*B*", TypeFilter::psWildcard, false, true);
+    TEST_VAR_NAME("?", TypeFilter::psWildcard, true, true);
+    TEST_VAR_NAME("z", TypeFilter::psWildcard, false, false);
+
+    TEST_VAR_NAME("a+", TypeFilter::psRegExp, true, false);
+    TEST_VAR_NAME("A+", TypeFilter::psRegExp, false, false);
+    TEST_VAR_NAME("[b]", TypeFilter::psRegExp, false, true);
+    TEST_VAR_NAME("[B]", TypeFilter::psRegExp, false, false);
+    TEST_VAR_NAME("^(a|b)$", TypeFilter::psRegExp, true, true);
+    TEST_VAR_NAME("^[ab]$", TypeFilter::psRegExp, true, true);
+    TEST_VAR_NAME(".", TypeFilter::psRegExp, true, true);
+    TEST_VAR_NAME("z", TypeFilter::psRegExp, false, false);
+}
+
+
+void TypeFilterTest::setFileName()
+{
+    VariableFilter f;
+
+    // Cannot be tested, requires further changes in KernelSymbolParser
+    f.setSymFileIndex(3);
+    QVERIFY(!f.match(var_a));
+    QVERIFY(!f.match(var_b));
+}
+
+
+void TypeFilterTest::setSize()
+{
+    TypeFilter f;
+    VariableFilter vf;
+
+#define TEST_SIZE(s, ta, tb, ti, va, vb) \
+    f.setSize(s); \
+    vf.setSize(s); \
+    QVERIFY(f.size() == (s)); \
+    QVERIFY(vf.size() == (s)); \
+    QVERIFY(f.match(type_a) == (ta)); \
+    QVERIFY(f.match(type_b) == (tb)); \
+    QVERIFY(f.match(type_int) == (ti)); \
+    QVERIFY(vf.match(var_a) == (va)); \
+    QVERIFY(vf.match(var_b) == (vb));
+
+    TEST_SIZE(type_a->size(), true, false, false, true, false);
+    TEST_SIZE(type_b->size(), false, true, false, false, true);
+    TEST_SIZE(type_int->size(), false, false, true, false, false);
+    TEST_SIZE(type_a->size() + type_b->size() + type_int->size(),
+              false, false, false, false, false);
 }
 
 
