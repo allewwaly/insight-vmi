@@ -1,0 +1,30 @@
+<typeknowledge>
+
+    <ruleincludes>
+        <ruleinclude>/tmp</ruleinclude>
+    </ruleincludes>
+
+<!--    <include>test.xml</include>-->
+
+<!--
+    <scriptincludes>
+        <scriptinclude>/tmp</scriptinclude>
+    </scriptincludes>
+-->
+
+    <rules architecture="x86" os="linux">
+        <rule>
+            <name>Hello</name>
+            <filter>
+                <datatype>struct,union</datatype>
+                <typename>foo</typename>
+                <fields>
+                    <field>bar</field>
+                </fields>
+            </filter>
+            <action src="inline">
+                println("Hello, world");
+            </action>
+        </rule>
+    </rules>
+</typeknowledge>

@@ -27,11 +27,12 @@
 #include "shell.h"
 #include <debug.h>
 #include <bugreport.h>
+#include "typerulereader.h"
 
 
 //------------------------------------------------------------------------------
 KernelSymbols::KernelSymbols()
-    : _factory(_memSpecs)
+	: _factory(_memSpecs)
 {
 }
 
@@ -203,4 +204,18 @@ void KernelSymbols::saveSymbols(const QString& fileName)
     saveSymbols(&file);
 
     file.close();
+}
+
+
+void KernelSymbols::loadRules(const QString &fileName, bool forceRead)
+{
+    TypeRuleReader reader(&_ruleEngine, forceRead);
+    reader.readFrom(fileName);
+    _ruleEngine.checkRules(&_factory);
+}
+
+
+void KernelSymbols::flushRules()
+{
+    _ruleEngine.clear();
 }

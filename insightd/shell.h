@@ -19,6 +19,7 @@
 #include <QTime>
 #include <QMutex>
 #include <QSize>
+#include "keyvaluestore.h"
 #include "kernelsymbols.h"
 #include "memorydump.h"
 #include "colorpalette.h"
@@ -304,7 +305,7 @@ private:
     int parseMemDumpIndex(QStringList &args, int skip = 0, bool quiet = false);
     int printVarList(const VariableFilter* filter);
     int printTypeList(const TypeFilter* filter);
-    int printFilterHelp(const QHash<QString, QString> help);
+    int printFilterHelp(const KeyValueStore &help);
 //---------------------------------
 //    int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
@@ -335,6 +336,11 @@ private:
     int cmdMemoryDiffBuild(int index1, int index2);
     int cmdMemoryDiffVisualize(int index);
 #endif
+    int cmdRules(QStringList args);
+    int cmdRulesLoad(QStringList args);
+    int cmdRulesList(QStringList args);
+    int cmdRulesActive(QStringList args);
+    int cmdRulesFlush(QStringList args);
     int cmdScript(QStringList args);
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t, const QString& name = QString(),

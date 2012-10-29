@@ -2,33 +2,68 @@
 #define TYPERULEPARSER_H
 
 #include <QXmlDefaultHandler>
+#include <QStack>
+#include <QSet>
+#include "xmlschema.h"
+#include "keyvaluestore.h"
 
 class TypeRule;
-class TypeFilter;
+class InstanceFilter;
 class OsFilter;
+class TypeRuleReader;
 
+/**
+ * This class parses the type rules from an XML file.
+ */
 class TypeRuleParser : public QXmlDefaultHandler
 {
 public:
-    TypeRuleParser();
+    TypeRuleParser(TypeRuleReader *reader);
+    virtual ~TypeRuleParser();
+
     // Error handling
     virtual bool waring(const QXmlParseException& exception);
     virtual bool error(const QXmlParseException& exception);
     virtual bool fatalError(const QXmlParseException& exception);
-    QString errorString () const;
 
     // Data handling
+    bool startDocument();
+    bool endDocument();
     bool characters(const QString& ch);
     bool startElement(const QString& namespaceURI, const QString& localName,
                       const QString& qName, const QXmlAttributes& atts);
     bool endElement(const QString& namespaceURI, const QString& localName,
                     const QString& qName);
 
+    // Location reporting
+    void setDocumentLocator(QXmlLocator* locator);
+
+    static const XmlSchema &schema();
+
 private:
-    QString _currElem;
+    /// Binds an OS filter to its scope: the XML element it was specified for
+    struct OsFilterScope
+    {
+        OsFilterScope() {}
+        OsFilterScope(const QString& elem, const OsFilter* osf)
+            : elem(elem), osf(osf) {}
+        QString elem;
+        const OsFilter *osf;
+    };
+
+    typedef QStack<OsFilterScope> OsFilterStack;
+
+    void handleError(const QString &severity, const QXmlParseException& exception);
+
+    TypeRuleReader* _reader;
+    QStack<QString> _elems;
+    QStack< QSet<QString> > _children;
+    QStack<KeyValueStore> _attributes;
     TypeRule* _rule;
-    TypeFilter* _filter;
-    OsFilter* _osFilter;
+    InstanceFilter* _filter;
+    OsFilterStack _osfStack;
+    QString _cdata;
+    QXmlLocator* _locator;
 };
 
 #endif // TYPERULEPARSER_H
