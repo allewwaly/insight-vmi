@@ -544,10 +544,28 @@ void Shell::run()
     _lastStatus = 0;
     _finished = false;
 
+	// Perform any initial action that might be given
+	switch (programOptions.action()) {
+	case acNone:
+		break;
+	case acParseSymbols:
+		cmdSymbolsParse(QStringList(programOptions.inFileName()));
+		break;
+	case acLoadSymbols:
+		cmdSymbolsLoad(QStringList(programOptions.inFileName()));
+		break;
+	case acUsage:
+		ProgramOptions::cmdOptionsUsage();
+		_finished = true;
+	}
+
     // Handle the command line params
-    for (int i = 0; i < programOptions.memFileNames().size(); ++i) {
+    for (int i = 0; !_interrupted && i < programOptions.memFileNames().size(); ++i) {
         cmdMemoryLoad(QStringList(programOptions.memFileNames().at(i)));
     }
+
+    if (_interrupted)
+        _out << endl << "Operation interrupted by user." << endl;
 
     // Read input from shell or from socket?
     if (_listenOnSocket) {
@@ -585,10 +603,9 @@ bool Shell::shuttingDown() const
 
 void Shell::interrupt()
 {
-    if (executing()) {
-        _interrupted = true;
+    _interrupted = true;
+    if (executing())
         _engine->terminateScript();
-    }
 }
 
 
