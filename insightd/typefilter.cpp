@@ -95,14 +95,10 @@ bool FieldFilter::match(const StructuredMember *member) const
     if (!member)
         return false;
 
-    switch (_syntax) {
-    case psAuto:
-    case psLiteral:
-        return QString::compare(_name, member->name(), Qt::CaseInsensitive) == 0;
-    case psWildcard:
-    case psRegExp:
+    if (_syntax & (psWildcard|psRegExp))
         return _regEx->indexIn(member->name()) >= 0;
-    }
+    else
+        return QString::compare(_name, member->name(), Qt::CaseInsensitive) == 0;
 }
 
 
