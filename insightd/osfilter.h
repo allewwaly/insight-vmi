@@ -15,19 +15,20 @@ extern const char* maxver;
 }
 
 /**
- * This class provides a filter for the type of operating system.
+ * This class describes the family, architecture and version of an operating
+ * system.
  */
-class OsFilter
+class OsSpecs
 {
 public:
-    /// Specifies the type of operating system this filter applies to.
-    enum OsType {
-        osIgnore  = 0,          ///< OS type is ignored
-        osLinux   = (1 << 0),   ///< OS type is Linux
-        osWindows = (1 << 1)    ///< OS type is Windows
+    /// Specifies the operating system family
+    enum OsFamily {
+        ofIgnore  = 0,          ///< OS family is ignored
+        ofLinux   = (1 << 0),   ///< OS family is Linux
+        ofWindows = (1 << 1)    ///< OS family is Windows
     };
 
-    /// Specifies the hardware architecture this filter applies to.
+    /// Specifies the hardware architecture
     enum Architecture {
         arIgnore  = 0,         ///< architecture is ignored
         arX86     = (1 << 0),  ///< architecture is x86 (IA-32) without PAE
@@ -35,6 +36,81 @@ public:
         arAMD64   = (1 << 2)   ///< architecture is AMD64/Intel 64
     };
 
+    /**
+     * Constructor
+     */
+    OsSpecs() : _osFamily(ofIgnore), _architecture(arIgnore) {}
+
+    /**
+     * Resets all options to default values, i.e., "ignored".
+     */
+    void clear();
+
+    /**
+     * Returns the operating system families.
+     * \sa setOsFamily(), OsFamily
+     */
+    inline OsFamily osFamily() const { return _osFamily; }
+
+    /**
+     * Sets the operating system family.
+     * @param family OS family type
+     * \sa osFamily(), OsFamily
+     */
+    inline void setOsFamily(OsFamily family) { _osFamily = family; }
+
+    /**
+     * Returns the architecture of this operating system.
+     * \sa setArchitecture(), Architecture
+     */
+    inline Architecture architecture() const { return _architecture; }
+
+    /**
+     * Sets the architecture of this operating system.
+     * @param arch logically ORed Architecture values
+     * \sa architecture(), Architecture
+     */
+    inline void setArchitecture(Architecture arch) { _architecture = arch; }
+
+    /**
+     * Returns the version of this operating system.
+     * \sa setVersion()
+     */
+    inline const QStringList& version() const { return _version; }
+
+    /**
+     * Sets the version of this operating system.
+     * @param ver version
+     * \sa version(), parseVersion()
+     */
+    inline void setVersion(const QString& ver) { _version = parseVersion(ver); }
+
+    /**
+     * Sets the version of this operating system.
+     * @param ver version
+     * \sa version(), parseVersion()
+     */
+    inline void setVersion(const QStringList& ver) { _version = ver; }
+
+    /**
+     * Splits up a version string like "x.y-z" into its components x, y, z.
+     * @param version version string
+     * @return components of version string
+     */
+    static QStringList parseVersion(const QString& version);
+
+private:
+    OsFamily _osFamily;
+    Architecture _architecture;
+    QStringList _version;
+};
+
+/**
+ * This class provides a filter for the type of operating system.
+ */
+class OsFilter
+{
+public:
     /**
      * Constructor
      */
@@ -55,23 +131,23 @@ public:
 
     /**
      * Matches this filter against \a other.
-     * @param other filter to match against
+     * @param specs filter to match against
      * @return \c true if \a other is matched by this filter, \a false otherwise
      */
-    bool match(const OsFilter& other) const;
+    bool match(const OsSpecs& specs) const;
 
     /**
-     * Returns the operating system types to match.
-     * \sa setOsType(), OsType
+     * Returns the operating system families to match.
+     * \sa setOsFamilies(), OsType
      */
-    inline int osTypes() const { return _osTypes; }
+    inline int osFamilies() const { return _osFamilies; }
 
     /**
-     * Sets the operating system types to match.
-     * @param types logically ORed OsType values
-     * \sa osTypes(), OsType
+     * Sets the operating system families to match.
+     * @param families logically ORed OsSpecs::OsFamily's values
+     * \sa osFamilies(), OsSpecs::OsFamily
      */
-    inline void setOsTypes(int types) { _osTypes = types; }
+    inline void setOsFamilies(int families) { _osFamilies = families; }
 
     /**
      * Returns the architectures to match.
@@ -96,9 +172,9 @@ public:
      * Sets the minimum version to match. Each version part is given as a string
      * in the list.
      * @param ver version
-     * \sa minVersion(), maxVersion()
+     * \sa minVersion(), maxVersion(), OsSpecs::parseVersion()
      */
-    inline void setMinVersion(const QStringList ver) { _minVer = ver; }
+    inline void setMinVersion(const QStringList& ver) { _minVer = ver; }
 
     /**
      * Returns the maximum version to match.
@@ -110,9 +186,9 @@ public:
      * Sets the maximum version to match. Each version part is given as a string
      * in the list.
      * @param ver version
-     * \sa maxVersion(), minVersion()
+     * \sa maxVersion(), minVersion(), OsSpecs::parseVersion()
      */
-    inline void setMaxVersion(const QStringList ver) { _maxVer = ver; }
+    inline void setMaxVersion(const QStringList& ver) { _maxVer = ver; }
 
     /**
      * Returns a string representation of this filter.
@@ -149,7 +225,7 @@ public:
     static int compareVersions(const QStringList& a, const QStringList& b);
 
 private:
-    int _osTypes;
+    int _osFamilies;
     int _architectures;
     QStringList _minVer;
     QStringList _maxVer;

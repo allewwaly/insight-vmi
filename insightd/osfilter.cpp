@@ -17,6 +17,22 @@ const char* osLinux   = "linux";
 const char* osWindows = "windows";
 }
 
+
+void OsSpecs::clear()
+{
+    _architecture = arIgnore;
+    _osFamily = ofIgnore;
+    _version.clear();
+}
+
+
+QStringList OsSpecs::parseVersion(const QString &version)
+{
+    return version.split(QRegExp("[-,.]"));
+}
+
+
+
 static KeyValueStore filters;
 
 const KeyValueStore& OsFilter::supportedFilters()
@@ -38,15 +54,15 @@ const KeyValueStore& OsFilter::supportedFilters()
 
 
 OsFilter::OsFilter()
-    : _osTypes(osIgnore), _architectures(arIgnore)
+    : _osFamilies(OsSpecs::ofIgnore), _architectures(OsSpecs::arIgnore)
 {
 }
 
 
 void OsFilter::clear()
 {
-    _osTypes = osIgnore;
-    _architectures = arIgnore;
+    _osFamilies = OsSpecs::ofIgnore;
+    _architectures = OsSpecs::arIgnore;
     _minVer.clear();
     _maxVer.clear();
 }
@@ -57,66 +73,68 @@ void OsFilter::parseOption(const QString &key, const QString &val)
     QString k = key.toLower(), v = val.trimmed().toLower();
 
     if (k == str::architecture) {
-        _architectures = arIgnore;
+        _architectures = OsSpecs::arIgnore;
         // Process comma-separated list
         QStringList list = v.split(QChar(','), QString::SkipEmptyParts);
         for (int i = 0; i < list.size(); ++i) {
             QString a = list[i].trimmed();
             if (a == str::arX86)
-                _architectures |= arX86;
+                _architectures |= OsSpecs::arX86;
             else if (a == str::arX86PAE)
-                _architectures |= arX86PAE;
+                _architectures |= OsSpecs::arX86PAE;
             else if (a == str::arAMD64)
-                _architectures |= arAMD64;
+                _architectures |= OsSpecs::arAMD64;
             else
                 filterError(QString("Unknown architecture: %1").arg(a));
         }
     }
     else if (k == str::os) {
-        _osTypes = arIgnore;
+        _osFamilies = OsSpecs::arIgnore;
         // Process comma-separated list
         QStringList list = v.split(QChar(','), QString::SkipEmptyParts);
         for (int i = 0; i < list.size(); ++i) {
             QString os = list[i].trimmed();
             if (os == str::osLinux)
-                _osTypes |= osLinux;
+                _osFamilies |= OsSpecs::ofLinux;
             else if (os == str::osWindows)
-                _osTypes |= osWindows;
+                _osFamilies |= OsSpecs::ofWindows;
             else
                 filterError(QString("Unknown operating system: %1").arg(os));
         }
     }
     else if (k == str::minver) {
-        _minVer = v.split(QRegExp("[-,.]"));
+        _minVer = OsSpecs::parseVersion(v);
     }
     else if (k == str::maxver) {
-        _maxVer = v.split(QRegExp("[-,.]"));
+        _maxVer = OsSpecs::parseVersion(v);
     }
     else
         filterError(QString("Unknown property: %1").arg(key));
 }
 
 
-bool OsFilter::match(const OsFilter &other) const
+bool OsFilter::match(const OsSpecs &specs) const
 {
     // Compare architecture if set on both sides
-    if (_architectures != arIgnore && other._architectures != arIgnore &&
-        !(_architectures & other._architectures))
+    if (_architectures != OsSpecs::arIgnore &&
+        specs.architecture() != OsSpecs::arIgnore &&
+        !(_architectures & specs.architecture()))
         return false;
 
     // Compare OS type if set on both sides
-    if (_osTypes != osIgnore && other._osTypes != osIgnore &&
-        !(_osTypes & other._osTypes))
+    if (_osFamilies != OsSpecs::ofIgnore &&
+        specs.osFamily() != OsSpecs::ofIgnore &&
+        !(_osFamilies & specs.osFamily()))
         return false;
 
     // Compare min. version if set on both sides
-    if (!_minVer.isEmpty() && !other._minVer.isEmpty() &&
-        compareVersions(_minVer, other._minVer) > 0)
+    if (!_minVer.isEmpty() && !specs.version().isEmpty() &&
+        compareVersions(_minVer, specs.version()) > 0)
         return false;
 
     // Compare max. version if set on both sides
-    if (!_maxVer.isEmpty() && !other._maxVer.isEmpty() &&
-        compareVersions(_maxVer, other._maxVer) < 0)
+    if (!_maxVer.isEmpty() && !specs.version().isEmpty() &&
+        compareVersions(_maxVer, specs.version()) < 0)
         return false;
 
     return true;
@@ -135,14 +153,14 @@ QString OsFilter::toString() const
     } while (0)
 
     QString s;
-    if (_osTypes) {
+    if (_osFamilies) {
         s += "OS type: ";
         bool first = true;
-        if (_osTypes & osLinux) {
+        if (_osFamilies & OsSpecs::ofLinux) {
             commaIfNotFirst(s, first);
             s += str::osLinux;
         }
-        if (_osTypes & osLinux) {
+        if (_osFamilies & OsSpecs::ofLinux) {
             commaIfNotFirst(s, first);
             s += str::osWindows;
         }
@@ -153,15 +171,15 @@ QString OsFilter::toString() const
     if (_architectures) {
         s += "Architecture: ";
         bool first = true;
-        if (_architectures & arX86) {
+        if (_architectures & OsSpecs::arX86) {
             commaIfNotFirst(s, first);
             s += str::arX86;
         }
-        if (_architectures & arX86PAE) {
+        if (_architectures & OsSpecs::arX86PAE) {
             commaIfNotFirst(s, first);
             s += str::arX86PAE;
         }
-        if (_architectures & arAMD64) {
+        if (_architectures & OsSpecs::arAMD64) {
             commaIfNotFirst(s, first);
             s += str::arAMD64;
         }
@@ -179,7 +197,7 @@ QString OsFilter::toString() const
 
 bool OsFilter::operator ==(const OsFilter &osf) const
 {
-    return _osTypes == osf._osTypes &&
+    return _osFamilies == osf._osFamilies &&
             _architectures == osf._architectures &&
             _minVer == osf._minVer &&
             _maxVer == osf._maxVer;
@@ -224,10 +242,11 @@ uint qHash(const OsFilter& osf)
 {
     uint ret, rot = 7;
     ret = osf.architectures();
-    ret ^= rotl32(osf.osTypes(), rot);
+    ret ^= rotl32(osf.osFamilies(), rot);
     rot = (rot + 7) % 32;
     ret ^= rotl32(qHash(osf.minVersion().join(".")), rot);
     rot = (rot + 7) % 32;
     ret ^= rotl32(qHash(osf.maxVersion().join(".")), rot);
     return ret;
 }
+

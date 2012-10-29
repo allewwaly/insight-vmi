@@ -39,44 +39,44 @@ void OsfilterTest::parseArchitectures()
 {
     OsFilter filter;
 
-    QCOMPARE(filter.architectures(), (int)OsFilter::arIgnore);
+    QCOMPARE(filter.architectures(), (int)OsSpecs::arIgnore);
 
     // Single architecture
     filter.parseOption("architecture", "x86");
-    QCOMPARE(filter.architectures(), (int)OsFilter::arX86);
+    QCOMPARE(filter.architectures(), (int)OsSpecs::arX86);
     filter.clear();
 
     filter.parseOption("architecture", "x86_pae");
-    QCOMPARE(filter.architectures(), (int)OsFilter::arX86PAE);
+    QCOMPARE(filter.architectures(), (int)OsSpecs::arX86PAE);
     filter.clear();
 
     filter.parseOption("architecture", "AMD64");
-    QCOMPARE(filter.architectures(), (int)OsFilter::arAMD64);
+    QCOMPARE(filter.architectures(), (int)OsSpecs::arAMD64);
     filter.clear();
 
     filter.parseOption("aRcHiTeCtUrE", "aMd64"); // case insensitive?
-    QCOMPARE(filter.architectures(), (int)OsFilter::arAMD64);
+    QCOMPARE(filter.architectures(), (int)OsSpecs::arAMD64);
     filter.clear();
 
     filter.parseOption("architecture", "  amd64"); // white space?
-    QCOMPARE(filter.architectures(), (int)OsFilter::arAMD64);
+    QCOMPARE(filter.architectures(), (int)OsSpecs::arAMD64);
     filter.clear();
 
     filter.parseOption("architecture", "amd64  "); // white space?
-    QCOMPARE(filter.architectures(), (int)OsFilter::arAMD64);
+    QCOMPARE(filter.architectures(), (int)OsSpecs::arAMD64);
     filter.clear();
 
     filter.parseOption("architecture", "  amd64  "); // white space?
-    QCOMPARE(filter.architectures(), (int)OsFilter::arAMD64);
+    QCOMPARE(filter.architectures(), (int)OsSpecs::arAMD64);
     filter.clear();
 
     // combined architectures
     filter.parseOption("architecture", "x86,x86_pae");
-    QCOMPARE(filter.architectures(), (int)(OsFilter::arX86|OsFilter::arX86PAE));
+    QCOMPARE(filter.architectures(), (int)(OsSpecs::arX86|OsSpecs::arX86PAE));
 
     filter.parseOption("architecture", "x86,x86_pae,amd64");
     QCOMPARE(filter.architectures(),
-             (int)(OsFilter::arX86|OsFilter::arX86PAE|OsFilter::arAMD64));
+             (int)(OsSpecs::arX86|OsSpecs::arX86PAE|OsSpecs::arAMD64));
 }
 
 
@@ -85,21 +85,21 @@ void OsfilterTest::setArchitectures()
     OsFilter filter;
 
     // Single architecture
-    filter.setArchitectures(OsFilter::arX86);
-    QCOMPARE(filter.architectures(), (int)OsFilter::arX86);
+    filter.setArchitectures(OsSpecs::arX86);
+    QCOMPARE(filter.architectures(), (int)OsSpecs::arX86);
     filter.clear();
 
-    filter.setArchitectures(OsFilter::arX86PAE);
-    QCOMPARE(filter.architectures(), (int)OsFilter::arX86PAE);
+    filter.setArchitectures(OsSpecs::arX86PAE);
+    QCOMPARE(filter.architectures(), (int)OsSpecs::arX86PAE);
     filter.clear();
 
-    filter.setArchitectures(OsFilter::arAMD64);
-    QCOMPARE(filter.architectures(), (int)OsFilter::arAMD64);
+    filter.setArchitectures(OsSpecs::arAMD64);
+    QCOMPARE(filter.architectures(), (int)OsSpecs::arAMD64);
     filter.clear();
 
-    filter.setArchitectures(OsFilter::arAMD64|OsFilter::arX86PAE|OsFilter::arX86);
+    filter.setArchitectures(OsSpecs::arAMD64|OsSpecs::arX86PAE|OsSpecs::arX86);
     QCOMPARE(filter.architectures(),
-             (int)(OsFilter::arAMD64|OsFilter::arX86PAE|OsFilter::arX86));
+             (int)(OsSpecs::arAMD64|OsSpecs::arX86PAE|OsSpecs::arX86));
     filter.clear();
 }
 
@@ -108,44 +108,44 @@ void OsfilterTest::parseOsTypes()
 {
     OsFilter filter;
 
-    QCOMPARE(filter.osTypes(), (int)OsFilter::osIgnore);
+    QCOMPARE(filter.osFamilies(), (int)OsSpecs::ofIgnore);
 
     // single OS
     filter.parseOption("os", "linux");
-    QCOMPARE(filter.osTypes(), (int)OsFilter::osLinux);
+    QCOMPARE(filter.osFamilies(), (int)OsSpecs::ofLinux);
     filter.clear();
 
     filter.parseOption("os", "windows");
-    QCOMPARE(filter.osTypes(), (int)OsFilter::osWindows);
+    QCOMPARE(filter.osFamilies(), (int)OsSpecs::ofWindows);
     filter.clear();
 
     filter.parseOption("os", "WiNdOwS"); // case sensitive?
-    QCOMPARE(filter.osTypes(), (int)OsFilter::osWindows);
+    QCOMPARE(filter.osFamilies(), (int)OsSpecs::ofWindows);
     filter.clear();
 
     filter.parseOption("OS", "windows"); // case sensitive?
-    QCOMPARE(filter.osTypes(), (int)OsFilter::osWindows);
+    QCOMPARE(filter.osFamilies(), (int)OsSpecs::ofWindows);
     filter.clear();
 
     filter.parseOption("OS", "  windows"); // white space?
-    QCOMPARE(filter.osTypes(), (int)OsFilter::osWindows);
+    QCOMPARE(filter.osFamilies(), (int)OsSpecs::ofWindows);
     filter.clear();
 
     filter.parseOption("OS", "windows  "); // white space?
-    QCOMPARE(filter.osTypes(), (int)OsFilter::osWindows);
+    QCOMPARE(filter.osFamilies(), (int)OsSpecs::ofWindows);
     filter.clear();
 
     filter.parseOption("OS", " windows  "); // white space?
-    QCOMPARE(filter.osTypes(), (int)OsFilter::osWindows);
+    QCOMPARE(filter.osFamilies(), (int)OsSpecs::ofWindows);
     filter.clear();
 
     // combined OS types
     filter.parseOption("os", "linux,windows");
-    QCOMPARE(filter.osTypes(), (int)(OsFilter::osLinux|OsFilter::osWindows));
+    QCOMPARE(filter.osFamilies(), (int)(OsSpecs::ofLinux|OsSpecs::ofWindows));
     filter.clear();
 
     filter.parseOption("os", "windows,linux");
-    QCOMPARE(filter.osTypes(), (int)(OsFilter::osLinux|OsFilter::osWindows));
+    QCOMPARE(filter.osFamilies(), (int)(OsSpecs::ofLinux|OsSpecs::ofWindows));
     filter.clear();
 }
 
@@ -153,12 +153,12 @@ void OsfilterTest::parseOsTypes()
 void OsfilterTest::setOsTypes()
 {
     OsFilter filter;
-    filter.setOsTypes(OsFilter::osWindows);
-    QCOMPARE(filter.osTypes(), (int)OsFilter::osWindows);
+    filter.setOsFamilies(OsSpecs::ofWindows);
+    QCOMPARE(filter.osFamilies(), (int)OsSpecs::ofWindows);
     filter.clear();
 
-    filter.setOsTypes(OsFilter::osLinux);
-    QCOMPARE(filter.osTypes(), (int)OsFilter::osLinux);
+    filter.setOsFamilies(OsSpecs::ofLinux);
+    QCOMPARE(filter.osFamilies(), (int)OsSpecs::ofLinux);
     filter.clear();
 }
 
@@ -231,325 +231,254 @@ void OsfilterTest::setMaxVersion()
 
 void OsfilterTest::matchArchitecture()
 {
-    OsFilter f1, f2;
+    OsFilter f;
+    OsSpecs s;
 
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
+    QVERIFY(f.match(s));
 
     // Match architectures
-    f1.setArchitectures(OsFilter::arX86);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.setArchitectures(OsFilter::arX86);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.setArchitectures(OsSpecs::arX86);
+    QVERIFY(f.match(s));
+    s.setArchitecture(OsSpecs::arX86);
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.setArchitectures(OsFilter::arAMD64);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.setArchitectures(OsFilter::arAMD64);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.setArchitectures(OsSpecs::arAMD64);
+    QVERIFY(f.match(s));
+    s.setArchitecture(OsSpecs::arAMD64);
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.setArchitectures(OsFilter::arAMD64|OsFilter::arX86);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.setArchitectures(OsFilter::arAMD64);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.setArchitectures(OsSpecs::arAMD64|OsSpecs::arX86);
+    QVERIFY(f.match(s));
+    s.setArchitecture(OsSpecs::arAMD64);
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.setArchitectures(OsFilter::arX86);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.setArchitectures(OsFilter::arX86PAE);
-    QVERIFY(!f1.match(f2));
-    QVERIFY(!f2.match(f1));
-    f1.clear(); f2.clear();
+    f.setArchitectures(OsSpecs::arX86);
+    QVERIFY(f.match(s));
+    s.setArchitecture(OsSpecs::arX86PAE);
+    QVERIFY(!f.match(s));
+    f.clear(); s.clear();
 }
 
 
 void OsfilterTest::matchOsType()
 {
-    OsFilter f1, f2;
+    OsFilter f;
+    OsSpecs s;
 
     // Match OS type
-    f1.setOsTypes(OsFilter::osLinux);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.setOsTypes(OsFilter::osLinux);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.setOsFamilies(OsSpecs::ofLinux);
+    QVERIFY(f.match(s));
+    s.setOsFamily(OsSpecs::ofLinux);
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.setOsTypes(OsFilter::osWindows);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.setOsTypes(OsFilter::osWindows);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.setOsFamilies(OsSpecs::ofWindows);
+    QVERIFY(f.match(s));
+    s.setOsFamily(OsSpecs::ofWindows);
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.setOsTypes(OsFilter::osLinux|OsFilter::osWindows);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.setOsTypes(OsFilter::osLinux);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.setOsFamilies(OsSpecs::ofLinux|OsSpecs::ofWindows);
+    QVERIFY(f.match(s));
+    s.setOsFamily(OsSpecs::ofLinux);
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.setOsTypes(OsFilter::osLinux);
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.setOsTypes(OsFilter::osWindows);
-    QVERIFY(!f1.match(f2));
-    QVERIFY(!f2.match(f1));
-    f1.clear(); f2.clear();
+    f.setOsFamilies(OsSpecs::ofLinux);
+    QVERIFY(f.match(s));
+    s.setOsFamily(OsSpecs::ofWindows);
+    QVERIFY(!f.match(s));
+    f.clear(); s.clear();
 }
 
 
 void OsfilterTest::matchMinVersion()
 {
-    OsFilter f1, f2;
+    OsFilter f;
+    OsSpecs s;
 
-    f1.parseOption("minversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("minversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("minversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("minversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("minversion", "2.6.32");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("minversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.32");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("minversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("minversion", "2.7.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("minversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.7.31");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("minversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("minversion", "3.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("minversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("3.6.31");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("minversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("minversion", "2.6.31.1");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("minversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31.1");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("minversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("minversion", "2.6.31-a");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("minversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31-a");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("minversion", "2.6.31-a");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("minversion", "2.6.31-b");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("minversion", "2.6.31-a");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31-b");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("minversion", "2.6.31-1");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("minversion", "2.6.31-b");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("minversion", "2.6.31-1");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31-b");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("minversion", "02.06.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("minversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("minversion", "02.06.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("minversion", "02.06.031");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("minversion", "2.6.32");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("minversion", "02.06.031");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.32");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("minversion", "2.6.31-a");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("minversion", "2.6.31-b");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("minversion", "2.6.31-a");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31-b");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 }
 
 
 void OsfilterTest::matchMaxVersion()
 {
-    OsFilter f1, f2;
+    OsFilter f;
+    OsSpecs s;
 
-    f1.parseOption("maxversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("maxversion", "2.6.32");
-    QVERIFY(!f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("maxversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.32");
+    QVERIFY(!f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("maxversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("maxversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("maxversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("maxversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("maxversion", "2.7.31");
-    QVERIFY(!f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("maxversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.7.31");
+    QVERIFY(!f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("maxversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("maxversion", "3.6.31");
-    QVERIFY(!f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("maxversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("3.6.31");
+    QVERIFY(!f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("maxversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("maxversion", "2.6.31.1");
-    QVERIFY(!f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("maxversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31.1");
+    QVERIFY(!f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("maxversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("maxversion", "2.6.31-a");
-    QVERIFY(!f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("maxversion", "2.6.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31-a");
+    QVERIFY(!f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("maxversion", "2.6.31-a");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("maxversion", "2.6.31-b");
-    QVERIFY(!f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("maxversion", "2.6.31-a");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31-b");
+    QVERIFY(!f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("maxversion", "2.6.31-1");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("maxversion", "2.6.31-b");
-    QVERIFY(!f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("maxversion", "2.6.31-1");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31-b");
+    QVERIFY(!f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("maxversion", "02.06.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("maxversion", "2.6.31");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("maxversion", "02.06.31");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31");
+    QVERIFY(f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("maxversion", "02.06.031");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("maxversion", "2.6.32");
-    QVERIFY(!f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f1.clear(); f2.clear();
+    f.parseOption("maxversion", "02.06.031");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.32");
+    QVERIFY(!f.match(s));
+    f.clear(); s.clear();
 
-    f1.parseOption("maxversion", "2.6.31-a");
-    QVERIFY(f1.match(f2));
-    QVERIFY(f2.match(f1));
-    f2.parseOption("maxversion", "2.6.31-b");
-    QVERIFY(!f1.match(f2));
-    QVERIFY(f2.match(f1));
+    f.parseOption("maxversion", "2.6.31-a");
+    QVERIFY(f.match(s));
+    s.setVersion("2.6.31-b");
+    QVERIFY(!f.match(s));
 }
 
 
 void OsfilterTest::matchAll()
 {
-    OsFilter f1, f2;
+    OsFilter f;
+    OsSpecs s;
 
-    f1.setArchitectures(OsFilter::arX86|OsFilter::arX86PAE);
-    f1.setOsTypes(OsFilter::osLinux);
-    f1.parseOption("minversion", "2.6.30");
-    f1.parseOption("maxversion", "2.6.40");
+    f.setArchitectures(OsSpecs::arX86|OsSpecs::arX86PAE);
+    f.setOsFamilies(OsSpecs::ofLinux);
+    f.parseOption("minversion", "2.6.30");
+    f.parseOption("maxversion", "2.6.40");
 
-    f2.parseOption("minversion", "2.6.5");
-    f2.parseOption("maxversion", "2.6.5");
-    QVERIFY(!f1.match(f2));
-    QVERIFY(!f2.match(f1));
+    s.setVersion("2.6.5");
+    QVERIFY(!f.match(s));
 
-    f2.parseOption("minversion", "3.0");
-    f2.parseOption("maxversion", "3.0");
-    QVERIFY(!f1.match(f2));
-    QVERIFY(!f2.match(f1));
+    s.setVersion("3.0");
+    QVERIFY(!f.match(s));
 
-    f2.parseOption("minversion", "2.6.32");
-    f2.parseOption("maxversion", "2.6.32");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
+    s.setVersion("2.6.32");
+    QVERIFY(f.match(s));
 
-    f2.parseOption("minversion", "2.6.32.1");
-    f2.parseOption("maxversion", "2.6.32.1");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
+    s.setVersion("2.6.32.1");
+    QVERIFY(f.match(s));
 
-    f2.parseOption("minversion", "2.6.32.a");
-    f2.parseOption("maxversion", "2.6.32.a");
-    QVERIFY(f1.match(f2));
-    QVERIFY(!f2.match(f1));
+    s.setVersion("2.6.32.a");
+    QVERIFY(f.match(s));
 
-    f2.setArchitectures(OsFilter::arAMD64);
-    QVERIFY(!f1.match(f2));
-    QVERIFY(!f2.match(f1));
+    s.setArchitecture(OsSpecs::arAMD64);
+    QVERIFY(!f.match(s));
 
-    f2.setArchitectures(OsFilter::arX86);
-    QVERIFY(f1.match(f2));
-//    QVERIFY(f2.match(f1));
+    s.setArchitecture(OsSpecs::arX86);
+    QVERIFY(f.match(s));
 
-    f2.setArchitectures(OsFilter::arX86PAE);
-    QVERIFY(f1.match(f2));
-//    QVERIFY(f2.match(f1));
+    s.setArchitecture(OsSpecs::arX86PAE);
+    QVERIFY(f.match(s));
 
-    f2.setOsTypes(OsFilter::osWindows);
-    QVERIFY(!f1.match(f2));
-//    QVERIFY(!f2.match(f1));
+    s.setOsFamily(OsSpecs::ofWindows);
+    QVERIFY(!f.match(s));
 
-    f2.setOsTypes(OsFilter::osLinux);
-    QVERIFY(f1.match(f2));
-//    QVERIFY(f2.match(f1));
+    s.setOsFamily(OsSpecs::ofLinux);
+    QVERIFY(f.match(s));
 }
 
 
