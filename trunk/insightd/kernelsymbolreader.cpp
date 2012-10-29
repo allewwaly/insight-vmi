@@ -402,6 +402,7 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         }
 
         // Read list of types with alternative types
+        _phase = phCandidateTypes;
         RefBaseType* rbt;
         in >> size;
         for (qint32 i = 0; i < size; ++i) {
@@ -491,6 +492,7 @@ void KernelSymbolReader::operationProgress()
     case phReferencingTypes: what = "referencing types"; break;
     case phStructuredTypes:  what = "structured types"; break;
     case phTypeRelations:    what = "type aliases"; break;
+    case phCandidateTypes:   what = "candidate types"; break;
     default:                 what = "variables"; break;
     }
 

@@ -57,6 +57,7 @@ private:
         phStructuredTypes,
         phTypeRelations,
         phVariables,
+        phCandidateTypes,
         phFinished
     };
 
