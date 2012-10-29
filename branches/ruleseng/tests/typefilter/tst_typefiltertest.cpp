@@ -632,7 +632,7 @@ void TypeFilterTest::parseFields()
     TEST_PARSE_FIELD1("aRrAy", 0, false, true, false, true);
     TEST_PARSE_FIELD1("ARRAY", 0, false, true, false, true);
 
-    KeyValStore kv;
+    KeyValueStore kv;
     kv["match"] = "wildcard";
 
     // Match none

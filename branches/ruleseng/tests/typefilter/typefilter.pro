@@ -7,7 +7,7 @@
 # Global configuration file
 include(../../config.pri)
 
-QT       += core testlib script network
+QT       += core testlib script xml network
 
 QT       -= gui webkit
 
@@ -56,9 +56,9 @@ SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/instance.cpp \
     $$ROOT_DIR/insightd/instancedata.cpp \
     $$ROOT_DIR/insightd/instanceprototype.cpp \
-    $$ROOT_DIR/insightd/kernelsymbolparser.cpp \
     $$ROOT_DIR/insightd/kernelsourceparser.cpp \
     $$ROOT_DIR/insightd/kernelsourcetypeevaluator.cpp \
+    $$ROOT_DIR/insightd/kernelsymbolparser.cpp \
     $$ROOT_DIR/insightd/kernelsymbolreader.cpp \
     $$ROOT_DIR/insightd/kernelsymbolsclass.cpp \
     $$ROOT_DIR/insightd/kernelsymbols.cpp \
@@ -70,6 +70,7 @@ SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/memspecparser.cpp \
     $$ROOT_DIR/insightd/memspecs.cpp \
     $$ROOT_DIR/insightd/numeric.cpp \
+    $$ROOT_DIR/insightd/osfilter.cpp \
     $$ROOT_DIR/insightd/pointer.cpp \
     $$ROOT_DIR/insightd/programoptions.cpp \
     $$ROOT_DIR/insightd/refbasetype.cpp \
@@ -85,9 +86,14 @@ SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/typedef.cpp \
     $$ROOT_DIR/insightd/typefilter.cpp \
     $$ROOT_DIR/insightd/typeinfo.cpp \
+    $$ROOT_DIR/insightd/typerule.cpp \
+    $$ROOT_DIR/insightd/typeruleengine.cpp \
+    $$ROOT_DIR/insightd/typeruleparser.cpp \
+    $$ROOT_DIR/insightd/typerulereader.cpp \
     $$ROOT_DIR/insightd/variable.cpp \
     $$ROOT_DIR/insightd/virtualmemory.cpp \
     $$ROOT_DIR/insightd/volatiletype.cpp \
+    $$ROOT_DIR/insightd/xmlschema.cpp \
     $$ROOT_DIR/libcparser/src/genericexception.cpp
 
 HEADERS += $$ROOT_DIR/insightd/typefilter.h \
