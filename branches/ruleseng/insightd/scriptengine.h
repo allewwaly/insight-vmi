@@ -10,6 +10,7 @@
 
 #include <QScriptValue>
 #include <QTextStream>
+#include <QScriptSyntaxCheckResult>
 
 // Forward declaration
 class QScriptEngine;
@@ -29,6 +30,12 @@ class MemoryDumpsClass;
 class ScriptEngine
 {
 public:
+	enum FuncExistsResult {
+		feRuntimeError,
+		feDoesNotExist,
+		feExists
+	};
+
 	/**
 	 * Constructor
 	 */
@@ -81,6 +88,13 @@ public:
     int uncaughtExceptionLineNumber() const;
 
     /**
+     * Checks the syntax of a program.
+     * @param program the program code to check
+     * @return syntax check result
+     */
+    QScriptSyntaxCheckResult checkSyntax(const QString& program);
+
+    /**
      * Evaluates the script code \a program and returns the result of the
      * evaluation. The arguments \a args are passed as array \c ARGV to the
      * scripting environment. The first element of \a args is set as the file
@@ -88,21 +102,40 @@ public:
      * function backtraces.
      * @param program script code to be evaluated.
      * @param args a list of parameters that are passed to the script
-     * @param includePath when a relative file name is passed to the
-     * \c include() function within a script, the file will be found relative
-     * to this directory
+     * @param includePaths list of paths to look for script file includes
      * @return the result of the script evaluation
      */
-	QScriptValue evaluate(const QString& program, const QStringList& args,
-			const QString& includePath);
+    QScriptValue evaluate(const QString& program, const QStringList& args,
+            const QStringList &includePaths);
+
+    FuncExistsResult functionExists(const QString& function,
+                                    const QString& program,
+                                    const QStringList& args,
+                                    const QStringList& includePaths);
+
+    /**
+     * Returns \c true if the last evaluation resulted in an error, \c false
+     * otherwise. Check lastError() to get the last error message.
+     * @return last evaluation status
+     * \sa lastError(), hasUncaughtException()
+     */
+    inline bool lastEvaluationFailed() const { return _lastEvalFailed; }
+
+    /**
+     * Returns the last error of the most recent evaluation.
+     * \sa lastEvaluationFailed()
+     */
+    inline const QString& lastError() const { return _lastError; }
 
 private:
 	QScriptEngine* _engine;
 	InstanceClass* _instClass;
 	KernelSymbolsClass* _symClass;
 	MemoryDumpsClass* _memClass;
+	QString _lastError;
+	bool _lastEvalFailed;
 
-	void initScriptEngine();
+	void initScriptEngine(const QStringList &argv, const QStringList &includePaths);
 
     static QScriptValue scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng, void* arg);
     static QScriptValue scriptPrint(QScriptContext* ctx, QScriptEngine* eng);

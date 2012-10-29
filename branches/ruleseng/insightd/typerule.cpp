@@ -27,6 +27,36 @@ void TypeRule::setFilter(const InstanceFilter *filter)
 }
 
 
+bool TypeRule::match(const BaseType *type, const OsSpecs *specs) const
+{
+    if (_osFilter && !_osFilter->match(specs))
+        return false;
+    if (_filter && !_filter->matchType(type))
+        return false;
+    return true;
+}
+
+
+bool TypeRule::match(const Variable *var, const OsSpecs *specs) const
+{
+    if (_osFilter && !_osFilter->match(specs))
+        return false;
+    if (_filter && !_filter->matchVar(var))
+        return false;
+    return true;
+}
+
+
+bool TypeRule::match(const Instance *inst, const OsSpecs *specs) const
+{
+    if (_osFilter && !_osFilter->match(specs))
+        return false;
+    if (_filter && !_filter->matchInst(inst))
+        return false;
+    return true;
+}
+
+
 QString TypeRule::toString() const
 {
     QString s;

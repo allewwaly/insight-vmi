@@ -1,6 +1,7 @@
 #include "osfilter.h"
 #include "filterexception.h"
 #include <bitop.h>
+#include "memspecs.h"
 
 namespace str
 {
@@ -18,11 +19,39 @@ const char* osWindows = "windows";
 }
 
 
+OsSpecs::OsSpecs(const MemSpecs *mspecs)
+    : _osFamily(ofIgnore), _architecture(arIgnore)
+{
+    setFrom(mspecs);
+}
+
+
 void OsSpecs::clear()
 {
     _architecture = arIgnore;
     _osFamily = ofIgnore;
     _version.clear();
+}
+
+
+void OsSpecs::setFrom(const MemSpecs *mspecs)
+{
+    clear();
+    if (mspecs) {
+        // OS family
+        if (mspecs->version.sysname.toLower() == "linux")
+            setOsFamily(ofLinux);
+        // Version
+        if (!mspecs->version.release.isEmpty())
+            setVersion(mspecs->version.release);
+        // Architecture
+        switch (mspecs->arch) {
+        case MemSpecs::ar_i386:     setArchitecture(arX86);    break;
+        case MemSpecs::ar_i386_pae: setArchitecture(arX86PAE); break;
+        case MemSpecs::ar_x86_64:   setArchitecture(arAMD64);  break;
+        default: break;
+        }
+    }
 }
 
 
@@ -113,28 +142,32 @@ void OsFilter::parseOption(const QString &key, const QString &val)
 }
 
 
-bool OsFilter::match(const OsSpecs &specs) const
+bool OsFilter::match(const OsSpecs *specs) const
 {
+    // If nothing is specified, every specs match the filer
+    if (!specs)
+        return true;
+
     // Compare architecture if set on both sides
     if (_architectures != OsSpecs::arIgnore &&
-        specs.architecture() != OsSpecs::arIgnore &&
-        !(_architectures & specs.architecture()))
+        specs->architecture() != OsSpecs::arIgnore &&
+        !(_architectures & specs->architecture()))
         return false;
 
     // Compare OS type if set on both sides
     if (_osFamilies != OsSpecs::ofIgnore &&
-        specs.osFamily() != OsSpecs::ofIgnore &&
-        !(_osFamilies & specs.osFamily()))
+        specs->osFamily() != OsSpecs::ofIgnore &&
+        !(_osFamilies & specs->osFamily()))
         return false;
 
     // Compare min. version if set on both sides
-    if (!_minVer.isEmpty() && !specs.version().isEmpty() &&
-        compareVersions(_minVer, specs.version()) > 0)
+    if (!_minVer.isEmpty() && !specs->version().isEmpty() &&
+        compareVersions(_minVer, specs->version()) > 0)
         return false;
 
     // Compare max. version if set on both sides
-    if (!_maxVer.isEmpty() && !specs.version().isEmpty() &&
-        compareVersions(_maxVer, specs.version()) < 0)
+    if (!_maxVer.isEmpty() && !specs->version().isEmpty() &&
+        compareVersions(_maxVer, specs->version()) < 0)
         return false;
 
     return true;

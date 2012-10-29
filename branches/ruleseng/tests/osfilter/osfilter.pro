@@ -4,6 +4,9 @@
 #
 #-------------------------------------------------
 
+# Global configuration file
+include(../../config.pri)
+
 QT       += core testlib
 
 QT       -= gui
@@ -18,7 +21,11 @@ DEFINES += SRCDIR=\\\"$$PWD/\\\"
 ROOT_DIR = ../..
 
 INCLUDEPATH += $$ROOT_DIR/insightd \
+    $$ROOT_DIR/libdebug/include \
     $$ROOT_DIR/libcparser/include
+
+LIBS += -L$$ROOT_DIR/libdebug$$BUILD_DIR -l$$DEBUG_LIB
+
 SOURCES += tst_osfiltertest.cpp \
     $$ROOT_DIR/insightd/osfilter.cpp \
     $$ROOT_DIR/libcparser/src/genericexception.cpp

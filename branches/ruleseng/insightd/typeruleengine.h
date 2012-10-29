@@ -3,11 +3,13 @@
 
 #include <QStringList>
 #include <QHash>
+#include <QVector>
 
 class TypeRule;
 class TypeRuleReader;
 class SymFactory;
 class OsFilter;
+class OsSpecs;
 
 /// List of type rules
 typedef QList<TypeRule*> TypeRuleList;
@@ -20,7 +22,6 @@ typedef QHash<uint, const OsFilter*> OsFilterHash;
  */
 class TypeRuleEngine
 {
-//    friend class TypeRuleReader;
 public:
     /**
      * Constructor
@@ -70,20 +71,49 @@ public:
 
     /**
      * Checks all rules for correctness and sets the relevant rules active.
+     * @param factory symbol factory to use for checking the rules
+     * @param OS specification to match against the rules
      */
-    void checkRules(const SymFactory* factory);
+    void checkRules(const SymFactory* factory, const OsSpecs* specs);
 
+    /**
+     * Returns all rules that are stored in this engine.
+     * \sa activeRules()
+     */
     inline const TypeRuleList& rules() const { return _rules; }
+
+    /**
+     * Returns all rules that are stored in this engine. Call checkRules() to
+     * have all rules returned by rules() checked if they apply to the given
+     * symbols. All relevant rules are put into the active list.
+     * \sa rules(), checkRules(
+     */
     inline const TypeRuleList& activeRules() const { return _rules; }
+
+    /**
+     * Returns a list of all file names from which the rules were read.
+     * \sa ruleFile()
+     */
     inline const QStringList& ruleFiles() const { return _ruleFiles; }
 
+    /**
+     * Returns the file name in which \a rule was read from.
+     * @param rule the rule
+     * @return absolute file name of rules file
+     */
+    QString ruleFile(const TypeRule* rule) const;
+
 private:
+    void warnRule(const TypeRule *rule, const QString& msg) const;
+    QString shortFileName(const QString& fileName) const;
+
     const OsFilter* insertOsFilter(const OsFilter* osf);
 
     TypeRuleList _rules;
     TypeRuleList _activeRules;
     OsFilterHash _osFilters;
     QStringList _ruleFiles;
+    QVector<int> _hits;
 };
 
 #endif // TYPERULEENGINE_H

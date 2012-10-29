@@ -14,6 +14,8 @@ extern const char* minver;
 extern const char* maxver;
 }
 
+struct MemSpecs;
+
 /**
  * This class describes the family, architecture and version of an operating
  * system.
@@ -42,9 +44,22 @@ public:
     OsSpecs() : _osFamily(ofIgnore), _architecture(arIgnore) {}
 
     /**
+     * Constructor that initializes the OsSpecs object with values from
+     * \a mspecs.
+     * @param mspecs memory specifications to initialize from
+     */
+    OsSpecs(const MemSpecs* mspecs);
+
+    /**
      * Resets all options to default values, i.e., "ignored".
      */
     void clear();
+
+    /**
+     * Initializes the OsSpecs object with values from \a mspecs.
+     * @param mspecs memory specifications to initialize from
+     */
+    void setFrom(const MemSpecs* mspecs);
 
     /**
      * Returns the operating system families.
@@ -134,7 +149,14 @@ public:
      * @param specs filter to match against
      * @return \c true if \a other is matched by this filter, \a false otherwise
      */
-    bool match(const OsSpecs& specs) const;
+    inline bool match(const OsSpecs& specs) const { return match(&specs); }
+
+    /**
+     * Matches this filter against \a other.
+     * @param specs filter to match against
+     * @return \c true if \a other is matched by this filter, \a false otherwise
+     */
+    bool match(const OsSpecs* specs) const;
 
     /**
      * Returns the operating system families to match.

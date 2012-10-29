@@ -44,7 +44,7 @@
                     <field>bar</field>
                 </fields>
             </filter>
-            <action src="file" file="samplerule.js">checkWildcards</action>
+            <action src="file" file="samplerule.js">println</action>
         </rule>
     </rules>
 </typeknowledge>

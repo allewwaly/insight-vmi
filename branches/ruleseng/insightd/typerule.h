@@ -5,6 +5,10 @@
 
 class InstanceFilter;
 class OsFilter;
+class OsSpecs;
+class BaseType;
+class Variable;
+class Instance;
 
 /**
  * This class represents expert knowledge about the inspected system's type
@@ -168,6 +172,30 @@ public:
      * @param line line number
      */
     inline void setActionSrcLine(int line) { _actionSrcLine = line; }
+
+    /**
+     * Matches the given type and OS specifications against this rule.
+     * @param type type to match
+     * @param specs current OS specifications (ignored if \c null)
+     * @return \c true if \a type \specs match this rule, \c false otherwise
+     */
+    bool match(const BaseType* type, const OsSpecs* specs = 0) const;
+
+    /**
+     * Matches the given variable and OS specifications against this rule.
+     * @param var variable to match
+     * @param specs current OS specifications (ignored if \c null)
+     * @return \c true if \a var \specs match this rule, \c false otherwise
+     */
+    bool match(const Variable* var, const OsSpecs* specs = 0) const;
+
+    /**
+     * Matches the given instance and OS specifications against this rule.
+     * @param inst instance to match
+     * @param specs current OS specifications (ignored if \c null)
+     * @return \c true if \a inst \specs match this rule, \c false otherwise
+     */
+    bool match(const Instance* inst, const OsSpecs* specs = 0) const;
 
     /**
      * Returns a textual representation of this rule.
