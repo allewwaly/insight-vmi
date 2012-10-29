@@ -4,6 +4,7 @@
 #include "variable.h"
 #include "structured.h"
 #include "structuredmember.h"
+#include "instance_def.h"
 
 
 namespace str
@@ -286,7 +287,7 @@ const KeyValueStore &TypeFilter::supportedFilters()
 }
 
 
-bool TypeFilter::match(const BaseType *type) const
+bool TypeFilter::matchType(const BaseType *type) const
 {
     if (!type)
         return false;
@@ -427,26 +428,34 @@ bool TypeFilter::parseOption(const QString &key, const QString &value,
 }
 
 
+bool VariableFilter::matchVarName(const QString &name) const
+{
+    if (filterActive(ftVarName) &&
+        _varName.compare(name, Qt::CaseInsensitive) != 0)
+        return false;
+    else if (filterActive(ftVarNameWildcard) &&
+             !_varRegEx.exactMatch(name))
+        return false;
+    else if (filterActive(ftVarNameRegEx) &&
+             _varRegEx.indexIn(name) < 0)
+        return false;
 
-bool VariableFilter::match(const Variable *var) const
+    return true;
+}
+
+
+bool VariableFilter::matchVar(const Variable *var) const
 {
     if (!var)
         return false;
 
-    if (filterActive(ftVarName) &&
-        _varName.compare(var->name(), Qt::CaseInsensitive) != 0)
-        return false;
-    else if (filterActive(ftVarNameWildcard) &&
-             !_varRegEx.exactMatch(var->name()))
-        return false;
-    else if (filterActive(ftVarNameRegEx) &&
-             _varRegEx.indexIn(var->name()) < 0)
+    if (filterActive(ftVarNameAny) && !matchVarName(var->name()))
         return false;
     else if (filterActive(ftVarSymFileIndex) &&
              var->origFileIndex() != _symFileIndex)
         return false;
 
-    return TypeFilter::match(var->refType());
+    return TypeFilter::matchType(var->refType());
 }
 
 
@@ -540,4 +549,22 @@ bool VariableFilter::parseOption(const QString &key, const QString &value,
         return TypeFilter::parseOption(key, value, keyVals);
 
     return true;
+}
+
+
+bool InstanceFilter::matchInst(const Instance *inst) const
+{
+    if (!inst)
+        return false;
+
+    if (filterActive(ftVarNameAny) && !matchVarName(inst->name()))
+        return false;
+    else if (filterActive(ftVarSymFileIndex) && inst->id() > 0) {
+        const SymFactory* factory = inst->type() ? inst->type()->factory() : 0;
+        const Variable* v = factory->findVarById(inst->id());
+        if (v && v->origFileIndex() != symFileIndex())
+            return false;
+    }
+
+    return TypeFilter::matchType(inst->type());
 }

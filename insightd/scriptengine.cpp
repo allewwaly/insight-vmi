@@ -13,10 +13,17 @@
 #include "shell.h"
 #include "symfactory.h"
 #include "variable.h"
+#include <QDir>
+
+namespace str
+{
+const char* includePath = "INCLUDE_PATH";
+}
 
 
 ScriptEngine::ScriptEngine()
-	: _engine(0), _instClass(0), _symClass(0), _memClass(0)
+	: _engine(0), _instClass(0), _symClass(0), _memClass(0),
+	  _lastEvalFailed(false)
 {
 }
 
@@ -39,6 +46,8 @@ void ScriptEngine::reset()
 		delete _symClass;
 	if (_memClass)
 	    delete _memClass;
+	_lastError.clear();
+	_lastEvalFailed = false;
 }
 
 
@@ -76,7 +85,8 @@ int ScriptEngine::uncaughtExceptionLineNumber() const
 }
 
 
-void ScriptEngine::initScriptEngine()
+void ScriptEngine::initScriptEngine(const QStringList &args,
+                                    const QStringList &includePaths)
 {
     // Prepare the script engine
     reset();
@@ -121,23 +131,24 @@ void ScriptEngine::initScriptEngine()
                     QScriptEngine::QtOwnership,
                     QScriptEngine::ExcludeSuperClassContents),
             roFlags);
+
+    // Export parameters to the script
+    _engine->globalObject().setProperty("ARGV", _engine->toScriptValue(args),
+            QScriptValue::ReadOnly);
+
+    // Export SCRIPT_PATH to the script
+    _engine->globalObject().setProperty(str::includePath,
+            includePaths.join(":"),
+            QScriptValue::ReadOnly|
+            QScriptValue::Undeletable);
+
 }
 
 
 QScriptValue ScriptEngine::evaluate(const QString& program,
-		const QStringList& args, const QString &includePath)
+		const QStringList& args, const QStringList& includePaths)
 {
-	initScriptEngine();
-
-    // Export parameters to the script
-    _engine->globalObject().setProperty("ARGV", _engine->toScriptValue(args),
-    		QScriptValue::ReadOnly);
-
-    // Export SCRIPT_PATH to the script
-    _engine->globalObject().setProperty("SCRIPT_PATH",
-    		includePath,
-    		QScriptValue::ReadOnly|
-    		QScriptValue::Undeletable);
+	initScriptEngine(args, includePaths);
 
 	QScriptValue ret;
 
@@ -146,7 +157,43 @@ QScriptValue ScriptEngine::evaluate(const QString& program,
 	else
 		ret = _engine->evaluate(program, args.first());
 
+	// Save the last error message
+	if (_engine->hasUncaughtException())
+		_lastError = _engine->uncaughtException().toString();
+	else if (ret.isError())
+		_lastError = ret.toString();
+
 	return ret;
+}
+
+
+ScriptEngine::FuncExistsResult ScriptEngine::functionExists(
+		const QString& function, const QString& program,
+		const QStringList& args, const QStringList& includePaths)
+{
+	QScriptValue ret = evaluate(program, args, includePaths);
+
+	if (_engine->hasUncaughtException() || ret.isError())
+		return feRuntimeError;
+
+	ret = _engine->globalObject().property(function);
+	if (ret.isValid() && ret.isFunction())
+		return feExists;
+	else
+		return feDoesNotExist;
+}
+
+
+QScriptSyntaxCheckResult ScriptEngine::checkSyntax(
+		const QString &program)
+{
+	// Make sure the engine is usable
+	if (!_engine) {
+		QStringList empty;
+		initScriptEngine(empty, empty);
+	}
+
+	return _engine->checkSyntax(program);
 }
 
 
@@ -232,28 +279,42 @@ QScriptValue ScriptEngine::scriptPrintLn(QScriptContext* ctx, QScriptEngine* eng
 }
 
 
-/*
- * implements the 'include' function for QTScript
- *
- * Depends on SCRIPT_PATH being set in engine
- */
 QScriptValue ScriptEngine::scriptInclude(QScriptContext *context,
 		QScriptEngine *engine)
 {
-    QScriptValue callee = context->callee();
     QScriptValue ret;
     if (context->argumentCount() == 1) {
 
         QString fileName = context->argument(0).toString();
 
-        QString path = engine->globalObject().property("SCRIPT_PATH",
+        QString paths = engine->globalObject().property(str::includePath,
         		QScriptValue::ResolveLocal).toString();
+        QStringList pathList = paths.split(QChar(':'));
 
-		QFile file(path + "/" + fileName);
+		// Try all include paths in their order
+		QDir dir;
+		bool found = false;
+		for (int i = 0; i < pathList.size(); ++i) {
+			dir.setPath(pathList[i]);
+			if (dir.exists(fileName)) {
+				fileName = QDir::cleanPath(dir.absoluteFilePath(fileName));
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			context->throwError(
+					QString("Could not find included file \"%1\".")
+						.arg(fileName));
+			return false;
+		}
+
+		QFile file(fileName);
 		if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) ){
 			context->throwError(
-					QString("include(): could not open File %1")
-						.arg(file.fileName()));
+						QString("Error opening file \"%1\" for reading.")
+							.arg(fileName));
 			return false;
 		}
 		context->setActivationObject(
@@ -265,7 +326,7 @@ QScriptValue ScriptEngine::scriptInclude(QScriptContext *context,
     }
     else {
     	context->throwError(QString("include() expects exactly one argument"));
-    	return ret;
+        return false;
     }
     return ret;
 }

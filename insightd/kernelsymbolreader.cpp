@@ -236,6 +236,60 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
     shellOut(s, true);
 }
 
+/*
+bool checkAltRefType(const ReferencingType::AltRefType& at)
+{
+    ASTConstExpressionList list;
+    list += at.expr()->findExpressions(etInclusiveOr);
+    list += at.expr()->findExpressions(etExclusiveOr);
+    list += at.expr()->findExpressions(etAnd);
+    list += at.expr()->findExpressions(etShiftLeft);
+    list += at.expr()->findExpressions(etShiftRight);
+    list += at.expr()->findExpressions(etMultiplicativeMult);
+    list += at.expr()->findExpressions(etMultiplicativeDiv);
+    list += at.expr()->findExpressions(etMultiplicativeMod);
+    return !list.isEmpty();
+}
+
+
+void checkAltRefTypes(const RefBaseType* rt)
+{
+    for (int i = 0; i < rt->altRefTypeCount(); ++i) {
+        const ReferencingType::AltRefType& at = rt->altRefTypes().at(i);
+        if (checkAltRefType(at)) {
+            QString s("0x%1 %2, cdt %3:\n%4");
+            s = s.arg(rt->id(), 0, 16).arg(rt->prettyName()).arg(i+1).arg(at.expr()->toString());
+            debugmsg(s);
+        }
+    }
+}
+
+
+void checkAltRefTypes(const Variable* v)
+{
+    for (int i = 0; i < v->altRefTypeCount(); ++i) {
+        const ReferencingType::AltRefType& at = v->altRefTypes().at(i);
+        if (checkAltRefType(at)) {
+            QString s("0x%1 %2, cdt %3:\n%4");
+            s = s.arg(v->id(), 0, 16).arg(v->prettyName()).arg(i+1).arg(at.expr()->toString());
+            debugmsg(s);
+        }
+    }
+}
+
+
+void checkAltRefTypes(const StructuredMember* m)
+{
+    for (int i = 0; i < m->altRefTypeCount(); ++i) {
+        const ReferencingType::AltRefType& at = m->altRefTypes().at(i);
+        if (checkAltRefType(at)) {
+            QString s("0x%1 %2, cdt %3:\n%4");
+            s = s.arg(m->id(), 0, 16).arg(m->prettyName()).arg(i+1).arg(at.expr()->toString());
+            debugmsg(s);
+        }
+    }
+}
+*/
 
 void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
 {

@@ -28,6 +28,7 @@
 #include <debug.h>
 #include <bugreport.h>
 #include "typerulereader.h"
+#include "osfilter.h"
 
 
 //------------------------------------------------------------------------------
@@ -211,7 +212,8 @@ void KernelSymbols::loadRules(const QString &fileName, bool forceRead)
 {
     TypeRuleReader reader(&_ruleEngine, forceRead);
     reader.readFrom(fileName);
-    _ruleEngine.checkRules(&_factory);
+    OsSpecs specs(&_memSpecs);
+    _ruleEngine.checkRules(&_factory, &specs);
 }
 
 

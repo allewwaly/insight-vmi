@@ -206,11 +206,11 @@ const char* objdump =
         "    <1b0>   DW_AT_location    : 9 byte block: 3 40 10 60 0 0 0 0 0     (DW_OP_addr: 601040)\n";
 
 #define VERIFY_F_VF(ta, tb, ti, va, vb) \
-    QVERIFY(f.match(type_a) == (ta)); \
-    QVERIFY(f.match(type_b) == (tb)); \
-    QVERIFY(f.match(type_int) == (ti)); \
-    QVERIFY(vf.match(var_a) == (va)); \
-    QVERIFY(vf.match(var_b) == (vb));
+    QVERIFY(f.matchType(type_a) == (ta)); \
+    QVERIFY(f.matchType(type_b) == (tb)); \
+    QVERIFY(f.matchType(type_int) == (ti)); \
+    QVERIFY(vf.matchVar(var_a) == (va)); \
+    QVERIFY(vf.matchVar(var_b) == (vb));
 
 
 class TypeFilterTest : public QObject
@@ -294,71 +294,71 @@ void TypeFilterTest::parseDataType()
     TypeFilter f;
 
     f.parseOption("datatype", "struct");
-    QVERIFY(f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("datatype", "struct,union");
-    QVERIFY(f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("datatype", "*int*,struct,union");
-    QVERIFY(f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     f.parseOption("datatype", "str*");
-    QVERIFY(f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("datatype", "*int*");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     f.parseOption("datatype", "/int/");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     f.parseOption("datatype", "/U?[Ii]nt/");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     f.parseOption("datatype", "/Int|Struct/");
-    QVERIFY(f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     f.parseOption("datatype", "/int/i");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     // Whitespace
     f.parseOption("datatype", "  struct");
-    QVERIFY(f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("datatype", "struct  ");
-    QVERIFY(f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("datatype", "  struct  ");
-    QVERIFY(f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     // Case sensitivity
     f.parseOption("datatype", "StRuCt");
-    QVERIFY(f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 }
 
 
@@ -367,74 +367,74 @@ void TypeFilterTest::parseTypeName()
     TypeFilter f;
 
     f.parseOption("typename", "A");
-    QVERIFY(f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("typename", "a");
-    QVERIFY(f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("typename", "B");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("typename", "b");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("typename", "int");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     f.parseOption("typename", "  int");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     f.parseOption("typename", "int  ");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     f.parseOption("typename", "  int  ");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     f.parseOption("typename", "InT");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     f.parseOption("typename", "*a*");
-    QVERIFY(f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("typename", "*i*");
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(f.match(type_int));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 
     f.parseOption("typename", "/[AB]/");
-    QVERIFY(f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("typename", "/[Ab]/");
-    QVERIFY(f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 
     f.parseOption("typename", "/[Ab]/i");
-    QVERIFY(f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
 }
 
 
@@ -443,64 +443,64 @@ void TypeFilterTest::parseVarName()
     VariableFilter f;
 
     f.parseOption("variablename", "A");
-    QVERIFY(f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 
     f.parseOption("variablename", "a");
-    QVERIFY(f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 
     f.parseOption("variablename", "B");
-    QVERIFY(!f.match(var_a));
-    QVERIFY(f.match(var_b));
+    QVERIFY(!f.matchVar(var_a));
+    QVERIFY(f.matchVar(var_b));
 
     f.parseOption("variablename", "b");
-    QVERIFY(!f.match(var_a));
-    QVERIFY(f.match(var_b));
+    QVERIFY(!f.matchVar(var_a));
+    QVERIFY(f.matchVar(var_b));
 
     f.parseOption("variablename", "/A/");
-    QVERIFY(!f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(!f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 
     f.parseOption("variablename", "/A/i");
-    QVERIFY(f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 
     f.parseOption("variablename", "/a/");
-    QVERIFY(f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 
     f.parseOption("variablename", "/^a$/");
-    QVERIFY(f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 
     f.parseOption("variablename", "*A*");
-    QVERIFY(f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 
     f.parseOption("variablename", "*a*");
-    QVERIFY(f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 
     f.parseOption("variablename", "  A");
-    QVERIFY(f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 
     f.parseOption("variablename", "A  ");
-    QVERIFY(f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 
     f.parseOption("variablename", "  A  ");
-    QVERIFY(f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 
     f.parseOption("variablename", "/[ab]/");
-    QVERIFY(f.match(var_a));
-    QVERIFY(f.match(var_b));
+    QVERIFY(f.matchVar(var_a));
+    QVERIFY(f.matchVar(var_b));
 
     f.parseOption("variablename", "foo");
-    QVERIFY(!f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(!f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 }
 
 
@@ -510,8 +510,8 @@ void TypeFilterTest::parseFileName()
 
     // Cannot be tested, requires further changes in KernelSymbolParser
     f.parseOption("filename", "vmlinux");
-    QVERIFY(!f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(!f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 }
 
 
@@ -522,36 +522,36 @@ void TypeFilterTest::parseSize()
 
     f.parseOption("size", QString::number(type_a->size()));
     vf.parseOption("size", QString::number(f.size()));
-    QVERIFY(f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(!f.match(type_int));
-    QVERIFY(vf.match(var_a));
-    QVERIFY(!vf.match(var_b));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
+    QVERIFY(vf.matchVar(var_a));
+    QVERIFY(!vf.matchVar(var_b));
 
     f.parseOption("size", QString::number(type_b->size()));
     vf.parseOption("size", QString::number(f.size()));
-    QVERIFY(!f.match(type_a));
-    QVERIFY(f.match(type_b));
-    QVERIFY(!f.match(type_int));
-    QVERIFY(!vf.match(var_a));
-    QVERIFY(vf.match(var_b));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
+    QVERIFY(!vf.matchVar(var_a));
+    QVERIFY(vf.matchVar(var_b));
 
     f.parseOption("size", QString::number(type_int->size()));
     vf.parseOption("size", QString::number(f.size()));
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(f.match(type_int));
-    QVERIFY(!vf.match(var_a));
-    QVERIFY(!vf.match(var_b));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
+    QVERIFY(!vf.matchVar(var_a));
+    QVERIFY(!vf.matchVar(var_b));
 
     f.parseOption("size", QString::number(
                       type_int->size() + type_a->size() + type_b->size()));
     vf.parseOption("size", QString::number(f.size()));
-    QVERIFY(!f.match(type_a));
-    QVERIFY(!f.match(type_b));
-    QVERIFY(!f.match(type_int));
-    QVERIFY(!vf.match(var_a));
-    QVERIFY(!vf.match(var_b));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
+    QVERIFY(!vf.matchVar(var_a));
+    QVERIFY(!vf.matchVar(var_b));
 }
 
 
@@ -791,8 +791,8 @@ void TypeFilterTest::setVarName()
     vf.setVarName(n, s); \
     QCOMPARE(vf.varName(), QString(n)); \
     QCOMPARE((int)vf.varNameSyntax(), (int)(s)); \
-    QCOMPARE(vf.match(var_a), (va)); \
-    QCOMPARE(vf.match(var_b), (vb));
+    QCOMPARE(vf.matchVar(var_a), (va)); \
+    QCOMPARE(vf.matchVar(var_b), (vb));
 
     TEST_VAR_NAME("a", Filter::psLiteral, true, false);
     TEST_VAR_NAME("A", Filter::psLiteral, true, false);
@@ -825,8 +825,8 @@ void TypeFilterTest::setFileName()
 
     // Cannot be tested, requires further changes in KernelSymbolParser
     f.setSymFileIndex(3);
-    QVERIFY(!f.match(var_a));
-    QVERIFY(!f.match(var_b));
+    QVERIFY(!f.matchVar(var_a));
+    QVERIFY(!f.matchVar(var_b));
 }
 
 

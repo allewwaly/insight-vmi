@@ -205,8 +205,8 @@ Shell::Shell(bool listenOnSocket)
                  &Shell::cmdRules,
                  "Read and manage rule files",
                  "This command allows to manage type knowledge rules.\n"
-                 "  rules load [-f] <file>   Loades the from <file>, force\n"
-                 "                           re-read with -f\n"
+                 "  rules load [-f] <file>   Loades the from <file>, flushes all\n"
+                 "                           rules first with -f\n"
                  "  rules list               Lists all loaded rules\n"
                  "  rules active             Lists all rules that are currently\n"
                  "                           active\n"
@@ -1125,7 +1125,7 @@ int Shell::printTypeList(const TypeFilter *filter)
         BaseType* type = types->at(i);
 
         // Skip all types not matching the filter
-        if (filter && filter->filters() && !filter->match(type))
+        if (filter && filter->filters() && !filter->matchType(type))
             continue;
 
         // Print header if not yet done
@@ -1455,7 +1455,7 @@ int Shell::printVarList(const VariableFilter *filter)
         Variable* var = vars[i];
 
         // Apply filter
-        if (filter && filter->filters() && !filter->match(var))
+        if (filter && filter->filters() && !filter->matchVar(var))
             continue;
 
         // Print header if not yet done
@@ -2311,10 +2311,10 @@ int Shell::cmdRules(QStringList args)
 
 int Shell::cmdRulesLoad(QStringList args)
 {
-    bool force = false;
-    if (!args.isEmpty() && (args.first() == "-f" || args.first() == "--force"))
+    bool flush = false;
+    if (!args.isEmpty() && (args.first() == "-f" || args.first() == "--flush"))
     {
-        force = true;
+        flush = true;
         args.pop_front();
     }
 
@@ -2324,9 +2324,11 @@ int Shell::cmdRulesLoad(QStringList args)
     }
 
     try {
+        if (flush)
+            _sym.flushRules();
 
         int noBefore = _sym.ruleEngine().rules().size();
-        _sym.loadRules(args.first(), force);
+        _sym.loadRules(args.first());
         int noAfter = _sym.ruleEngine().rules().size();
 
         shell->out() << "Loaded " << (noAfter - noBefore) << " new rules, "
@@ -2397,7 +2399,7 @@ int Shell::cmdScript(QStringList args)
 
     QString fileName = args[0];
     QFile file(fileName);
-    QFileInfo includePathFileInfo(file);
+    QStringList includePaths(QDir::cleanPath(QFileInfo(file).absolutePath()));
 
     // Read script code from file or from args[1] if the file name is "eval"
     QString scriptCode;
@@ -2431,8 +2433,7 @@ int Shell::cmdScript(QStringList args)
 	QTime timer;
 	if (timing)
 		timer.start();
-	QScriptValue result = _engine->evaluate(scriptCode, args,
-											includePathFileInfo.absolutePath());
+	QScriptValue result = _engine->evaluate(scriptCode, args, includePaths);
 
 	if (_engine->hasUncaughtException()) {
 		_err << color(ctError) << "Exception occured on ";

@@ -11,6 +11,7 @@
 
 class BaseType;
 class Variable;
+class Instance;
 class StructuredMember;
 
 namespace str
@@ -139,14 +140,16 @@ public:
         ftTypeNameWildcard = (1 << 5),  ///< wildcard name match
         ftTypeNameRegEx    = (1 << 6),  ///< QRegExp type name match
         ftRealType         = (1 << 7),  ///< match RealType of type
-        ftSize             = (1 << 8)   ///< match type size
+        ftSize             = (1 << 8),   ///< match type size
+        ftTypeNameAny      = ftTypeName|ftTypeNameWildcard|ftTypeNameRegEx,  ///< any kind of type name matching
+        ftVarNameAny       = ftVarName|ftVarNameWildcard|ftVarNameRegEx  ///< any kind of variable name matching
     };
 
     TypeFilter() : _filters(0), _realType(0), _size(0) {}
 
     virtual void clear();
 
-    bool match(const BaseType* type) const;
+    bool matchType(const BaseType* type) const;
 
     void parseOptions(const QStringList& list);
     virtual bool parseOption(const QString& key, const QString& value,
@@ -230,21 +233,26 @@ public:
 
     virtual void clear();
 
-    bool match(const Variable* var) const;
+    bool matchVar(const Variable* var) const;
 
     virtual bool parseOption(const QString& key, const QString& value,
                              const KeyValueStore *keyVals = 0);
 
     inline const QString& varName() const { return _varName; }
-    void setVarName(const QString& name, Filter::PatternSyntax syntax = Filter::psAuto);
+    void setVarName(const QString& name,
+                    Filter::PatternSyntax syntax = Filter::psAuto);
     Filter::PatternSyntax varNameSyntax() const;
 
     inline int symFileIndex() const { return _symFileIndex; }
-    inline void setSymFileIndex(int i) { _symFileIndex = i; _filters |= ftVarSymFileIndex; }
+    inline void setSymFileIndex(int i)
+    { _symFileIndex = i; _filters |= ftVarSymFileIndex; }
 
     virtual QString toString() const;
 
     static const KeyValueStore& supportedFilters();
+
+protected:
+    bool matchVarName(const QString& name) const;
 
 private:
     QString _varName;
@@ -259,6 +267,8 @@ private:
  */
 class InstanceFilter: public VariableFilter
 {
+public:
+    bool matchInst(const Instance* inst) const;
 };
 
 
