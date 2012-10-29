@@ -511,6 +511,11 @@ public:
      */
     void scanExternalVars(bool insertRemaining);
 
+    /**
+     * Returns \c true if this factory holds some symbols, \c false otherwise.
+     */
+    inline bool symbolsAvailable() const { return !_types.isEmpty(); }
+
 	QMultiHash<int, int> seenMagicNumbers;
 
 protected:
