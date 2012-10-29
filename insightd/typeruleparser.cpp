@@ -159,7 +159,9 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
                                           "allowed for element \"%1\".")
                                   .arg(name));
 
-                osf = new OsFilter();
+                // Create new filter based on the stack top (if exists)
+                osf = _osfStack.isEmpty() ?
+                            new OsFilter() : new OsFilter(*_osfStack.top().osf);
                 _osfStack.push(OsFilterScope(name, osf));
             }
             osf->parseOption(attr, atts.value(i));
