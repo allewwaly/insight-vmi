@@ -62,7 +62,7 @@ class ASTExpression
 public:
     ASTExpression() : _alternative(0) {}
 
-    virtual ~ASTExpression(){};
+    virtual ~ASTExpression(){}
     virtual ExpressionType type() const = 0;
     virtual int resultType() const = 0;
     virtual ExpressionResult result(const Instance* inst = 0) const = 0;
@@ -74,20 +74,18 @@ public:
         return other && type() == other->type();
     }
 
-    inline virtual ASTExpressionList findExpressions(ExpressionType type)
+    inline ASTExpressionList findExpressions(ExpressionType type)
     {
         ASTExpressionList list;
-        if (type == this->type())
-            list.append(this);
+        this->findExpressions(type, &list);
         return list;
     }
 
-    inline virtual ASTConstExpressionList findExpressions(ExpressionType type)
+    inline ASTConstExpressionList findExpressions(ExpressionType type)
         const
     {
         ASTConstExpressionList list;
-        if (type == this->type())
-            list.append(this);
+        this->findExpressions(type, &list);
         return list;
     }
 
@@ -129,6 +127,22 @@ protected:
         if (_alternative)
             expr->_alternative = _alternative->clone(list);
         return expr;
+    }
+
+    inline virtual void findExpressions(ExpressionType type,
+                                        ASTExpressionList *list)
+    {
+        if (type == this->type())
+            list->append(this);
+    }
+
+    inline virtual void findExpressions(ExpressionType type,
+                                        ASTConstExpressionList *list) const
+    {
+        if (type == this->type())
+            list->append(this);
+        if (_alternative)
+            _alternative->findExpressions(type, list);
     }
 
     ASTExpression* _alternative;
@@ -479,32 +493,6 @@ public:
                 ((!_right && !b->_right) || _right->equals(b->_right));
     }
 
-    inline virtual ASTExpressionList findExpressions(ExpressionType type)
-    {
-        ASTExpressionList list;
-        if (type == this->type())
-            list.append(this);
-        if (_left)
-            list.append(_left->findExpressions(type));
-        if (_right)
-            list.append(_right->findExpressions(type));
-        return list;
-    }
-
-
-    inline virtual ASTConstExpressionList findExpressions(ExpressionType type)
-        const
-    {
-        ASTConstExpressionList list;
-        if (type == this->type())
-            list.append(this);
-        if (_left)
-            list.append(((const ASTExpression*)_left)->findExpressions(type));
-        if (_right)
-            list.append(((const ASTExpression*)_right)->findExpressions(type));
-        return list;
-    }
-
     static ExpressionResultSize binaryExprSize(const ExpressionResult& r1,
                                                const ExpressionResult& r2);
 
@@ -513,6 +501,27 @@ public:
 
 protected:
     QString operatorToString() const;
+
+    inline virtual void findExpressions(ExpressionType type,
+                                        ASTExpressionList* list)
+    {
+        ASTExpression::findExpressions(type, list);
+        if (_left)
+            list->append(_left->findExpressions(type));
+        if (_right)
+            list->append(_right->findExpressions(type));
+    }
+
+
+    inline virtual void findExpressions(ExpressionType type,
+                                        ASTConstExpressionList* list) const
+    {
+        ASTExpression::findExpressions(type, list);
+        if (_left)
+            list->append(((const ASTExpression*)_left)->findExpressions(type));
+        if (_right)
+            list->append(((const ASTExpression*)_right)->findExpressions(type));
+    }
 
     ExpressionType _type;
     ASTExpression* _left;
@@ -571,32 +580,27 @@ public:
         return u && ((!_child && !u->_child) || _child->equals(u->_child));
     }
 
-    inline virtual ASTExpressionList findExpressions(ExpressionType type)
-    {
-        ASTExpressionList list;
-        if (type == this->type())
-            list.append(this);
-        if (_child)
-            list.append(_child->findExpressions(type));
-        return list;
-    }
-
-    inline virtual ASTConstExpressionList findExpressions(ExpressionType type)
-        const
-    {
-        ASTConstExpressionList list;
-        if (type == this->type())
-            list.append(this);
-        if (_child)
-            list.append(((const ASTExpression*)_child)->findExpressions(type));
-        return list;
-    }
-
     virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
     virtual void writeTo(KernelSymbolStream &out) const;
 
 protected:
     QString operatorToString() const;
+
+    inline virtual void findExpressions(ExpressionType type,
+                                        ASTExpressionList* list)
+    {
+        ASTExpression::findExpressions(type, list);
+        if (_child)
+            list->append(_child->findExpressions(type));
+    }
+
+    inline virtual void findExpressions(ExpressionType type,
+                                        ASTConstExpressionList* list) const
+    {
+        ASTExpression::findExpressions(type, list);
+        if (_child)
+            list->append(((const ASTExpression*)_child)->findExpressions(type));
+    }
 
     ExpressionType _type;
     ASTExpression* _child;
