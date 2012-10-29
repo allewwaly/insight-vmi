@@ -1,5 +1,6 @@
 #include "osfilter.h"
 #include "filterexception.h"
+#include <bitop.h>
 
 namespace str
 {
@@ -16,9 +17,9 @@ const char* osLinux   = "linux";
 const char* osWindows = "windows";
 }
 
-static QHash<QString, QString> filters;
+static KeyValueStore filters;
 
-const QHash<QString, QString>& OsFilter::supportedFilters()
+const KeyValueStore& OsFilter::supportedFilters()
 {
     if (filters.isEmpty()) {
         filters[str::architecture] = "comma-separated list of hardware "
@@ -110,19 +111,82 @@ bool OsFilter::match(const OsFilter &other) const
 
     // Compare min. version if set on both sides
     if (!_minVer.isEmpty() && !other._minVer.isEmpty() &&
-        versionCmp(_minVer, other._minVer) > 0)
+        compareVersions(_minVer, other._minVer) > 0)
         return false;
 
     // Compare max. version if set on both sides
     if (!_maxVer.isEmpty() && !other._maxVer.isEmpty() &&
-        versionCmp(_maxVer, other._maxVer) < 0)
+        compareVersions(_maxVer, other._maxVer) < 0)
         return false;
 
     return true;
 }
 
 
-int OsFilter::versionCmp(const QStringList &a, const QStringList &b)
+QString OsFilter::toString() const
+{
+#define commaIfNotFirst(str, first) suffixIfNotFirst(str, first, ", ")
+#define suffixIfNotFirst(str, first, suffix) \
+    do { \
+        if (first) \
+            first = false; \
+        else \
+            str += (suffix); \
+    } while (0)
+
+    QString s;
+    if (_osTypes) {
+        s += "OS type: ";
+        bool first = true;
+        if (_osTypes & osLinux) {
+            commaIfNotFirst(s, first);
+            s += str::osLinux;
+        }
+        if (_osTypes & osLinux) {
+            commaIfNotFirst(s, first);
+            s += str::osWindows;
+        }
+        if (first)
+            s += "(none)";
+        s += "\n";
+    }
+    if (_architectures) {
+        s += "Architecture: ";
+        bool first = true;
+        if (_architectures & arX86) {
+            commaIfNotFirst(s, first);
+            s += str::arX86;
+        }
+        if (_architectures & arX86PAE) {
+            commaIfNotFirst(s, first);
+            s += str::arX86PAE;
+        }
+        if (_architectures & arAMD64) {
+            commaIfNotFirst(s, first);
+            s += str::arAMD64;
+        }
+        if (first)
+            s += "(none)";
+        s += "\n";
+    }
+    if (!_minVer.isEmpty())
+        s += "Min. version: " + _minVer.join(".") + "\n";
+    if (!_maxVer.isEmpty())
+        s += "Max. version: " + _maxVer.join(".") + "\n";
+    return s;
+}
+
+
+bool OsFilter::operator ==(const OsFilter &osf) const
+{
+    return _osTypes == osf._osTypes &&
+            _architectures == osf._architectures &&
+            _minVer == osf._minVer &&
+            _maxVer == osf._maxVer;
+}
+
+
+int OsFilter::compareVersions(const QStringList &a, const QStringList &b)
 {
     int ia, ib;
     bool a_ok, b_ok;
@@ -153,4 +217,17 @@ int OsFilter::versionCmp(const QStringList &a, const QStringList &b)
         return 1;
     else
         return 0;
+}
+
+
+uint qHash(const OsFilter& osf)
+{
+    uint ret, rot = 7;
+    ret = osf.architectures();
+    ret ^= rotl32(osf.osTypes(), rot);
+    rot = (rot + 7) % 32;
+    ret ^= rotl32(qHash(osf.minVersion().join(".")), rot);
+    rot = (rot + 7) % 32;
+    ret ^= rotl32(qHash(osf.maxVersion().join(".")), rot);
+    return ret;
 }

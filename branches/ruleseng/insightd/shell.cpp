@@ -41,6 +41,7 @@
 #include "function.h"
 #include "memspecparser.h"
 #include "typefilter.h"
+#include "typeruleexception.h"
 
 #ifdef CONFIG_MEMORY_MAP
 #include "memorymap.h"
@@ -198,6 +199,18 @@ Shell::Shell(bool listenOnSocket)
                 "                              dump <index2>"
 #endif
                 ));
+
+    _commands.insert("rules",
+             Command(
+                 &Shell::cmdRules,
+                 "Read and manage rule files",
+                 "This command allows to manage type knowledge rules.\n"
+                 "  rules load [-f] <file>   Loades the from <file>, force\n"
+                 "                           re-read with -f\n"
+                 "  rules list               Lists all loaded rules\n"
+                 "  rules active             Lists all rules that are currently\n"
+                 "                           active\n"
+                 "  rules flush              Removes all rules"));
 
     _commands.insert("script",
             Command(
@@ -1026,7 +1039,7 @@ int Shell::cmdListTypes(QStringList args, int typeFilter)
     TypeFilter filter;
     try {
         filter.parseOptions(args);
-        if (filter.filterActive(TypeFilter::foRealType))
+        if (filter.filterActive(TypeFilter::ftRealType))
             filter.setDataType(filter.dataType() & typeFilter);
         else
             filter.setDataType(typeFilter);
@@ -1042,7 +1055,7 @@ int Shell::cmdListTypes(QStringList args, int typeFilter)
 }
 
 
-int Shell::printFilterHelp(const QHash<QString, QString> help)
+int Shell::printFilterHelp(const KeyValueStore& help)
 {
     QStringList keys(help.uniqueKeys());
     keys.sort();
@@ -2250,8 +2263,8 @@ int Shell::cmdMemoryDiffVisualize(int index)
     if (!_memDumps[index]->map() || _memDumps[index]->map()->pmemDiff().isEmpty())
     {
         _err << "The memory dump has not yet been compared to another dump "
-                << index << ". Try \"help memory\" to learn how to compare them."
-                << endl;
+             << index << ". Try \"help memory\" to learn how to compare them."
+             << endl;
         return 1;
     }
 
@@ -2260,7 +2273,7 @@ int Shell::cmdMemoryDiffVisualize(int index)
     return 1;
 #endif
 
-   memMapWindow->mapWidget()->setDiff(&_memDumps[index]->map()->pmemDiff());
+    memMapWindow->mapWidget()->setDiff(&_memDumps[index]->map()->pmemDiff());
 
     if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
         debugerr("Error invoking show() on memMapWindow");
@@ -2268,8 +2281,106 @@ int Shell::cmdMemoryDiffVisualize(int index)
     return ecOk;
 }
 
-#endif
+#endif /* CONFIG_MEMORY_MAP */
 
+
+int Shell::cmdRules(QStringList args)
+{
+    if (args.size() < 1) {
+        cmdHelp(QStringList("rules"));
+        return ecInvalidArguments;
+    }
+
+    QString cmd = args.front().toLower();
+    args.pop_front();
+
+    if (cmd.size() >= 2 && QString("load").startsWith(cmd))
+        return cmdRulesLoad(args);
+    else if (cmd.size() >= 2 && QString("list").startsWith(cmd))
+        return cmdRulesList(args);
+    else if (QString("active").startsWith(cmd))
+        return cmdRulesActive(args);
+    else if (QString("flush").startsWith(cmd))
+        return cmdRulesFlush(args);
+    else
+        cmdHelp(QStringList("rules"));
+
+    return ecInvalidArguments;
+}
+
+
+int Shell::cmdRulesLoad(QStringList args)
+{
+    bool force = false;
+    if (!args.isEmpty() && (args.first() == "-f" || args.first() == "--force"))
+    {
+        force = true;
+        args.pop_front();
+    }
+
+    if (args.size() < 1) {
+        cmdHelp(QStringList("rules"));
+        return ecInvalidArguments;
+    }
+
+    try {
+
+        int noBefore = _sym.ruleEngine().rules().size();
+        _sym.loadRules(args.first(), force);
+        int noAfter = _sym.ruleEngine().rules().size();
+
+        shell->out() << "Loaded " << (noAfter - noBefore) << " new rules, "
+                     << "total no. of rules is " << noAfter << "."
+                     << endl;
+    }
+    catch (TypeRuleException& e) {
+        // Shorten the path as much as possible
+        QString file = QDir::current().relativeFilePath(e.xmlFile);
+        if (file.size() > e.xmlFile.size())
+            file = e.xmlFile;
+
+        shell->err() << "In file " << color(ctBold) << file << color(ctReset);
+        if (e.xmlLine > 0) {
+            shell->err() << " line "
+                         << color(ctBold) << e.xmlLine << color(ctReset);
+        }
+        if (e.xmlColumn > 0) {
+            shell->err() << " column "
+                         << color(ctBold) << e.xmlColumn << color(ctReset);
+        }
+        shell->err() << ":" << endl
+                     << color(ctErrorLight) << e.message << color(ctReset)
+                     << endl;
+        return ecCaughtException;
+    }
+
+    return ecOk;
+}
+
+
+int Shell::cmdRulesList(QStringList args)
+{
+    Q_UNUSED(args)
+    debugmsg("Not implemented.");
+    return ecOk;
+}
+
+
+int Shell::cmdRulesActive(QStringList args)
+{
+    Q_UNUSED(args)
+    debugmsg("Not implemented.");
+    return ecOk;
+}
+
+
+int Shell::cmdRulesFlush(QStringList args)
+{
+    Q_UNUSED(args)
+    _sym.flushRules();
+    shell->out() << "All rules have been deleted." << endl;
+    return ecOk;
+}
 
 int Shell::cmdScript(QStringList args)
 {

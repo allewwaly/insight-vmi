@@ -104,7 +104,8 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     osfilter.cpp \
     typeruleengine.cpp \
     typeruleparser.cpp \
-    typerulereader.cpp
+    typerulereader.cpp \
+    xmlschema.cpp
 
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
@@ -174,7 +175,9 @@ HEADERS += kernelsourcetypeevaluator.h \
     typeruleengine.h \
     typeruleparser.h \
     typerulereader.h \
-    typeruleexception.h
+    typeruleexception.h \
+    keyvaluestore.h \
+    xmlschema.h
 
 # Things to do when the memory map builder and widget is to be built. Enabling
 # this feature requires InSight to run on an X server.
@@ -218,3 +221,6 @@ CONFIG(with_readline) {
     DEFINES += CONFIG_READLINE
     LIBS += -lreadline
 }
+
+OTHER_FILES += \
+    scripts/samplerule.js

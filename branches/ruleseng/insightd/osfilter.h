@@ -4,6 +4,7 @@
 #include <QString>
 #include <QStringList>
 #include <QHash>
+#include "keyvaluestore.h"
 
 namespace str
 {
@@ -114,25 +115,51 @@ public:
     inline void setMaxVersion(const QStringList ver) { _maxVer = ver; }
 
     /**
+     * Returns a string representation of this filter.
+     */
+    QString toString() const;
+
+    /**
+     * Comparison operator
+     * @param osf object to compare to
+     * @return \c true if objects are equal, false otherwise
+     */
+    bool operator==(const OsFilter& osf) const;
+
+    /**
+     * Comparison operator
+     * @param osf object to compare to
+     * @return \c true if objects are not equal, false otherwise
+     */
+    inline bool operator!=(const OsFilter& osf) const { return !operator==(osf); }
+
+    /**
      * Returns an associative list of filter options this class supports. The
      * key is the expected filter name, the value a short description of its
      * usage.
      */
-    static const QHash<QString, QString>& supportedFilters();
+    static const KeyValueStore& supportedFilters();
 
-private:
     /**
      * Compares two lists containing version information.
      * @param a alpha-numeric version information
      * @param b alpha-numeric version information
      * @return -1, 0, or 1 if \a a is less than, equal to or greater than \a b
      */
-    static int versionCmp(const QStringList& a, const QStringList& b);
+    static int compareVersions(const QStringList& a, const QStringList& b);
 
+private:
     int _osTypes;
     int _architectures;
     QStringList _minVer;
     QStringList _maxVer;
 };
+
+/**
+ * Returns a hash value for an OsFilter object
+ * @param osf object to hash
+ * @return hash value
+ */
+uint qHash(const OsFilter& osf);
 
 #endif // OSFILTER_H

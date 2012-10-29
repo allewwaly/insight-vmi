@@ -1,18 +1,20 @@
-<typeknowledge>
+<typeknowledge os="linux">
+<!--
     <ruleincludes>
         <ruleinclude>/path/to/rules</ruleinclude>
         <ruleinclude>/path/to/more/rules</ruleinclude>
     </ruleincludes>
+-->
 
     <scriptincludes>
-        <scriptinclude>/path/to/scripts</scriptinclude>
-        <scriptinclude>/path/to/more/scripts</scriptinclude>
+        <scriptinclude>../scripts</scriptinclude>
     </scriptincludes>
 
-    <include>foobar.xml</include>
+    <include>morerules.xml</include>
 
-    <rules architecture="x86" os="linux" minversion="2.6.12" maxversion="2.6.38">
+    <rules>
         <rule>
+            <name>Simple</name>
             <description>This is awesome</description>
             <filter>
                 <datatype>struct</datatype>
@@ -23,24 +25,26 @@
                 </fields>
             </filter>
             <action src="inline">
-// var inst = instance to check
-// var name = name of struct
-// var member = name of member
-include("check-foobar.js");
-if (1 &amp;&amp; 2) return true;
-checkFooBar(inst);
+                // var inst = instance to check
+                // var name = name of struct
+                // var member = name of member
+                include("check-foobar.js");
+                if (1 &amp;&amp; 2) return true;
+                checkFooBar(inst);
             </action>
         </rule>
 
-        <rule>
+        <rule architecture="x86" os="linux" minversion="2.6.12" maxversion="2.6.38">
+            <name>Wildcards</name>
             <filter>
-                <datatype>struct</datatype>
+                <datatype>struct,union</datatype>
                 <variablename match="wildcard">__percpu__*</variablename>
+                <typename>bar</typename>
                 <fields>
                     <field>bar</field>
                 </fields>
             </filter>
-            <action src="file" file="foobar.js">checkFoobar</action>
+            <action src="file" file="samplerule.js">checkWildcards</action>
         </rule>
     </rules>
 </typeknowledge>

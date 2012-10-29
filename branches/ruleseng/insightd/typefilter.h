@@ -7,6 +7,7 @@
 #include <QRegExp>
 #include <QHash>
 #include "filterexception.h"
+#include "keyvaluestore.h"
 
 class BaseType;
 class Variable;
@@ -120,12 +121,9 @@ private:
 /// List of FieldFilter objects
 typedef QList<FieldFilter> FieldFilterList;
 
-/// Hash-based key-value store of strings
-typedef QHash<QString, QString> KeyValStore;
-
 
 /**
- * This class manages the filter options for a BaseType object list.
+ * This class allows to filter BaseType object.
  */
 class TypeFilter
 {
@@ -133,15 +131,15 @@ class TypeFilter
 public:
     /// Filter options for variables and types
     enum FilterOptions {
-        foVarName          = (1 << 0),  ///< literal name match
-        foVarNameWildcard  = (1 << 1),  ///< wildcard name match
-        foVarNameRegEx     = (1 << 2),  ///< regular expression name match
-        foVarSymFileIndex  = (1 << 3),  ///< match original symbol file index of variable
-        foTypeName         = (1 << 4),  ///< literal type name match
-        foTypeNameWildcard = (1 << 5),  ///< wildcard name match
-        foTypeNameRegEx    = (1 << 6),  ///< QRegExp type name match
-        foRealType         = (1 << 7),  ///< match RealType of type
-        foSize             = (1 << 8)   ///< match type size
+        ftVarName          = (1 << 0),  ///< literal name match
+        ftVarNameWildcard  = (1 << 1),  ///< wildcard name match
+        ftVarNameRegEx     = (1 << 2),  ///< regular expression name match
+        ftVarSymFileIndex  = (1 << 3),  ///< match original symbol file index of variable
+        ftTypeName         = (1 << 4),  ///< literal type name match
+        ftTypeNameWildcard = (1 << 5),  ///< wildcard name match
+        ftTypeNameRegEx    = (1 << 6),  ///< QRegExp type name match
+        ftRealType         = (1 << 7),  ///< match RealType of type
+        ftSize             = (1 << 8)   ///< match type size
     };
 
     TypeFilter() : _filters(0), _realType(0), _size(0) {}
@@ -152,7 +150,7 @@ public:
 
     void parseOptions(const QStringList& list);
     virtual bool parseOption(const QString& key, const QString& value,
-                             const KeyValStore* keyVals = 0);
+                             const KeyValueStore* keyVals = 0);
 
     inline const QString& typeName() const { return _typeName; }
     void setTypeName(const QString& name,
@@ -160,10 +158,10 @@ public:
     Filter::PatternSyntax typeNameSyntax() const;
 
     inline int dataType() const { return _realType; }
-    inline void setDataType(int type) { _realType = type; _filters |= foRealType; }
+    inline void setDataType(int type) { _realType = type; _filters |= ftRealType; }
 
     inline quint32 size() const { return _size; }
-    inline void setSize(quint32 size) { _size = size; _filters |= foSize; }
+    inline void setSize(quint32 size) { _size = size; _filters |= ftSize; }
 
     inline int filters() const { return _filters; }
     inline bool filterActive(int options) const { return _filters & options; }
@@ -175,7 +173,9 @@ public:
     inline void appendField(const QString& name,
                             Filter::PatternSyntax syntax = Filter::psAuto);
 
-    static const KeyValStore& supportedFilters();
+    virtual QString toString() const;
+
+    static const KeyValueStore& supportedFilters();
 
 protected:
     /**
@@ -204,7 +204,7 @@ protected:
                                                 QString& name, QRegExp& rx,
                                                 Filter::PatternSyntax syntax);
 
-    static Filter::PatternSyntax givenSyntax(const KeyValStore* keyVal);
+    static Filter::PatternSyntax givenSyntax(const KeyValueStore* keyVal);
 
     bool matchFieldsRek(const BaseType* type, int index) const;
 
@@ -220,7 +220,7 @@ private:
 
 
 /**
- * This class manages the filter options for a Variable object list.
+ * This class manages the filter options for a Variable object.
  */
 class VariableFilter: public TypeFilter
 {
@@ -233,17 +233,18 @@ public:
     bool match(const Variable* var) const;
 
     virtual bool parseOption(const QString& key, const QString& value,
-                             const KeyValStore *keyVals = 0);
+                             const KeyValueStore *keyVals = 0);
 
     inline const QString& varName() const { return _varName; }
     void setVarName(const QString& name, Filter::PatternSyntax syntax = Filter::psAuto);
     Filter::PatternSyntax varNameSyntax() const;
 
     inline int symFileIndex() const { return _symFileIndex; }
-    inline void setSymFileIndex(int i) { _symFileIndex = i; _filters |= foVarSymFileIndex; }
+    inline void setSymFileIndex(int i) { _symFileIndex = i; _filters |= ftVarSymFileIndex; }
 
-    static const KeyValStore& supportedFilters();
+    virtual QString toString() const;
 
+    static const KeyValueStore& supportedFilters();
 
 private:
     QString _varName;
@@ -251,5 +252,14 @@ private:
     int _symFileIndex;
     QStringList _symFiles;
 };
+
+
+/**
+ * This class allows to filter Instance objects.
+ */
+class InstanceFilter: public VariableFilter
+{
+};
+
 
 #endif // LISTFILTER_H

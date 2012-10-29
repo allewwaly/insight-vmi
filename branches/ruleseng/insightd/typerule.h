@@ -3,7 +3,7 @@
 
 #include <QString>
 
-class TypeFilter;
+class InstanceFilter;
 class OsFilter;
 
 /**
@@ -34,6 +34,17 @@ public:
     ~TypeRule();
 
     /**
+     * Returns the name of this rule.
+     */
+    inline const QString& name() const { return _name; }
+
+    /**
+     * Sets the name for this rule.
+     * @param name new name
+     */
+    inline void setName(const QString& name) { _name = name; }
+
+    /**
      * Returns the description of the rule.
      * \sa setDescription()
      */
@@ -49,20 +60,30 @@ public:
     /**
      * Returns the type filter for this rule.
      */
-    const TypeFilter* filter() const { return _filter; }
+    inline const InstanceFilter* filter() const { return _filter; }
+
+    /**
+     * Sets the type filter for this rule.
+     * \warning The TypeRule takes over the ownership for \a filter and deletes
+     * it if itself is deleted.
+     * @param filter type filter
+     */
+    void setFilter(const InstanceFilter* filter);
 
     /**
      * Returns the OS filter that this rule applies to.
      * \sa setOsFilter()
      */
-    const OsFilter* osFilter() const { return _osFilter; }
+    inline const OsFilter* osFilter() const { return _osFilter; }
 
     /**
      * Sets the OS filters.
+     * \warning The caller remains the owner of \a filter and is responsible to
+     * delete it!
      * @param filter OS filter applicable for this rule
      * \sa osFilter()
      */
-    void setOsFilter(const OsFilter* filter) { _osFilter = filter; }
+    inline void setOsFilter(const OsFilter* filter) { _osFilter = filter; }
 
     /**
      * Returns the action that is performed when this rule hits. This can either
@@ -70,7 +91,7 @@ public:
      * code that is evaluated, depending on the value of actionType().
      * \sa setAction(), actionType(), scriptFile()
      */
-    const QString& action() const { return _action; }
+    inline const QString& action() const { return _action; }
 
     /**
      * Sets the action to be performed when the rule hits. How this value is
@@ -78,21 +99,21 @@ public:
      * @param action new action
      * \sa action(), actionType(), scriptFile()
      */
-    void setAction(const QString& action) { _action = action; }
+    inline void setAction(const QString& action) { _action = action; }
 
     /**
      * Returns the specified type of action that is performed when the rule
      * hits.
      * \sa action(), scriptFile()
      */
-    ActionType actionType() const { return _actionType; }
+    inline ActionType actionType() const { return _actionType; }
 
     /**
      * Sets a new action type.
      * @param type type of action to be performed when this rule hits
      * \sa actionType(), action(), scriptFile()
      */
-    void setActionType(ActionType type) { _actionType = type; }
+    inline void setActionType(ActionType type) { _actionType = type; }
 
     /**
      * Returns the script file containing the function to be invoked if this
@@ -101,22 +122,70 @@ public:
      * @return script file name
      * \sa setScriptFile(), actionType(), action()
      */
-    const QString& scriptFile() const { return _scriptFile; }
+    inline const QString& scriptFile() const { return _scriptFile; }
 
     /**
      * Sets the script file name containing the action code.
      * @param file file name
      * \sa scriptFile(), actionType(), action()
      */
-    void setScriptFile(const QString& file) { _scriptFile = file; }
+    inline void setScriptFile(const QString& file) { _scriptFile = file; }
+
+    /**
+     * Returns the file index this rule was read from.
+     */
+    inline int srcFileIndex() const { return _srcFileIndex; }
+
+    /**
+     * Sets the file index this rule was read from.
+     * @param index file index
+     */
+    inline void setSrcFileIndex(int index) { _srcFileIndex = index; }
+
+    /**
+     * Returns the line no. of the element within the file this rule was read
+     * from.
+     * @return line number
+     */
+    inline int srcLine() const { return _srcLine; }
+
+    /**
+     * Sets the line no. of the element within the file this rule was read from.
+     * @param line line number
+     */
+    inline void setSrcLine(int line) { _srcLine = line; }
+
+    /**
+     * Returns the line number of the action element within the file this rule
+     * was read from.
+     * @return line number
+     */
+    inline int actionSrcLine() const { return _actionSrcLine; }
+
+    /**
+     * Sets the line number of the action element within the file this rule was
+     * read from.
+     * @param line line number
+     */
+    inline void setActionSrcLine(int line) { _actionSrcLine = line; }
+
+    /**
+     * Returns a textual representation of this rule.
+     * @return
+     */
+    QString toString() const;
 
 private:
+    QString _name;
     QString _description;
-    TypeFilter *_filter;
+    const InstanceFilter *_filter;
     const OsFilter *_osFilter;
     ActionType _actionType;
     QString _action;
     QString _scriptFile;
+    int _srcFileIndex;
+    int _srcLine;
+    int _actionSrcLine;
 };
 
 #endif // TYPERULE_H
