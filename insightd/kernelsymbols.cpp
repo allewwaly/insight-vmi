@@ -117,6 +117,13 @@ void KernelSymbols::loadSymbols(QIODevice* from)
         timer.start();
 
         reader.read();
+
+        // Revert everything if operation was interrupted
+        if (shell->interrupted()) {
+            _factory.clear();
+            return;
+        }
+
         _factory.symbolsFinished(SymFactory::rtLoading);
 
         // Print out some timing statistics
