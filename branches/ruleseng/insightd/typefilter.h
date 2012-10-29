@@ -33,10 +33,10 @@ namespace Filter
 {
 /// Pattern syntax to use for matching a name
 enum PatternSyntax {
-    psAuto,     ///< try to guess correct type
-    psLiteral,  ///< literal name match
-    psWildcard, ///< match with waldcard expression
-    psRegExp    ///< match with regular expression
+    psAuto     = 0,        ///< try to guess correct type
+    psLiteral  = (1 << 0), ///< literal name match
+    psWildcard = (1 << 1), ///< match with waldcard expression
+    psRegExp   = (1 << 2)  ///< match with regular expression
 };
 }
 
