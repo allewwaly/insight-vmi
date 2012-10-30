@@ -832,7 +832,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfBuiltinFuncOffsetOfSingle(
                                node);
             }
 
-            m = s->findMember(name);
+            m = s->member(name);
             if (!m) {
                 if (!exceptions)
                     return 0;

@@ -1082,8 +1082,8 @@ int Shell::printFilterHelp(const KeyValueStore& help)
         if (keys[i].size() > maxKeySize)
             maxKeySize = keys[i].size();
 
-    shell->out() << "Filters can be applied in the form \"key:value\". The "
-                    "following filter options are available:" << endl;
+    _out << "Filters can be applied in the form \"key:value\". The "
+            "following filter options are available:" << endl;
 
     QSize ts = termSize();
     for (int i = 0; i < keys.size(); ++i) {
@@ -1099,11 +1099,11 @@ int Shell::printFilterHelp(const KeyValueStore& help)
                 j += w;
             }
             else {
-                shell->out() << s << endl;
+                _out << s << endl;
                 s = QString(maxKeySize + 4, QChar(' '));
             }
         }
-        shell->out() << s << endl;
+        _out << s << endl;
         s.clear();
     }
 
@@ -2348,9 +2348,12 @@ int Shell::cmdRulesLoad(QStringList args)
         _sym.loadRules(args.first());
         int noAfter = _sym.ruleEngine().rules().size();
 
-        shell->out() << "Loaded " << (noAfter - noBefore) << " new rules, "
-                     << "total no. of rules is " << noAfter << "."
-                     << endl;
+        _out << "Loaded ";
+        if (noBefore)
+            _out << (noAfter - noBefore) << " new rules, a total of ";
+        _out << noAfter << " rules, "
+             << _sym.ruleEngine().activeRules().size()  << " are active."
+             << endl;
     }
     catch (TypeRuleException& e) {
         // Shorten the path as much as possible
@@ -2358,16 +2361,16 @@ int Shell::cmdRulesLoad(QStringList args)
         if (file.size() > e.xmlFile.size())
             file = e.xmlFile;
 
-        shell->err() << "In file " << color(ctBold) << file << color(ctReset);
+        _err << "In file " << color(ctBold) << file << color(ctReset);
         if (e.xmlLine > 0) {
-            shell->err() << " line "
+            _err << " line "
                          << color(ctBold) << e.xmlLine << color(ctReset);
         }
         if (e.xmlColumn > 0) {
-            shell->err() << " column "
+            _err << " column "
                          << color(ctBold) << e.xmlColumn << color(ctReset);
         }
-        shell->err() << ":" << endl
+        _err << ":" << endl
                      << color(ctErrorLight) << e.message << color(ctReset)
                      << endl;
         return ecCaughtException;
@@ -2397,7 +2400,7 @@ int Shell::cmdRulesFlush(QStringList args)
 {
     Q_UNUSED(args)
     _sym.flushRules();
-    shell->out() << "All rules have been deleted." << endl;
+    _out << "All rules have been deleted." << endl;
     return ecOk;
 }
 
@@ -2597,7 +2600,7 @@ int Shell::cmdShow(QStringList args)
 
                 if (! (s = dynamic_cast<const Structured*>(bt)) )
                     errorMsg = "Not a struct or a union: ";
-                else if ( (m = s->findMember(expr[i])) )
+                else if ( (m = s->member(expr[i])) )
                     bt = m->refType();
                 else {
                     if (expr[i].contains('<'))
@@ -3159,8 +3162,8 @@ int Shell::cmdSymbolsParse(QStringList args)
     if (BugReport::log()) {
         if (BugReport::log()->entries()) {
             BugReport::log()->close();
-            shell->out() << endl
-                         << BugReport::log()->bugSubmissionHint(BugReport::log()->entries());
+            _out << endl
+                 << BugReport::log()->bugSubmissionHint(BugReport::log()->entries());
         }
         delete BugReport::log();
         BugReport::setLog(0);
@@ -3222,7 +3225,7 @@ int Shell::cmdSymbolsStore(QStringList args)
 
 int Shell::cmdSysInfo(QStringList /*args*/)
 {
-    shell->out() << BugReport::systemInfo(false) << endl;
+    _out << BugReport::systemInfo(false) << endl;
 
     return ecOk;
 }
@@ -3502,7 +3505,7 @@ void Shell::printTimeStamp(const QTime& time)
 //    }
 
 //    Instance inst = _memDumps[index]->queryInstance(args[0]);
-//    // TODO implement me
+//    // TO DO implement me
 //}
 
 

@@ -6,6 +6,8 @@
 #include "symfactory.h"
 #include "shell.h"
 #include "scriptengine.h"
+#include "basetype.h"
+#include "variable.h"
 #include <debug.h>
 
 TypeRuleEngine::TypeRuleEngine()
@@ -85,13 +87,13 @@ bool TypeRuleEngine::fileAlreadyRead(const QString &fileName)
 
 void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
 {
-    _activeRules.clear();
     _hits.fill(0, _rules.size());
+    _activeRules.clear();
 
     if (!factory->symbolsAvailable())
         return;
 
-    ScriptEngine checkEng, evalEng;
+    ScriptEngine evalEng;
     QStringList includes, args;
 
     int i = -1;
@@ -108,16 +110,23 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
         }
 
         QString xmlFile(ruleFile(rule));
+        QScriptProgramPtr prog;
 
         // Check script syntax
         if (rule->actionType() == TypeRule::atInlineCode) {
-            QScriptSyntaxCheckResult result = checkEng.checkSyntax(rule->action());
+            QScriptSyntaxCheckResult result =
+                    QScriptEngine::checkSyntax(rule->action());
             if (result.state() != QScriptSyntaxCheckResult::Valid) {
                 typeRuleError2(xmlFile,
                                rule->actionSrcLine() + result.errorLineNumber() - 1,
                                result.errorColumnNumber(),
                                QString("Syntax error: %1")
                                     .arg(result.errorMessage()));
+            }
+            else {
+                prog = QScriptProgramPtr(
+                            new QScriptProgram(rule->action(), xmlFile,
+                                               rule->actionSrcLine() - 1));
             }
         }
         else if (rule->actionType() == TypeRule::atFunction) {
@@ -128,7 +137,7 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
                             .arg(rule->scriptFile()));
             QString code(scriptFile.readAll());
             // Basic syntax check
-            QScriptSyntaxCheckResult result = checkEng.checkSyntax(code);
+            QScriptSyntaxCheckResult result = QScriptEngine::checkSyntax(code);
             if (result.state() != QScriptSyntaxCheckResult::Valid) {
                 typeRuleError2(xmlFile,
                                rule->actionSrcLine(),
@@ -173,31 +182,44 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
                                        .arg(rule->action())
                                        .arg(shortFileName(rule->scriptFile())));
             }
+
+            // Append the function invocation
+            code += QString("\n%1();").arg(rule->action());
+            prog = QScriptProgramPtr(
+                        new QScriptProgram(code, rule->scriptFile()));
         }
         else {
             warnRule(rule, "is ignored because it does not specify an action.");
             continue;
         }
 
+        ActiveRule arule(i, rule, prog);
+
         // Should we check variables or types?
         int hits = 0;
         bool varRule = rule->filter()->filterActive(TypeFilter::ftVarNameAny);
-        if (varRule) {
-            foreach (const Variable* v, factory->vars()) {
-                if (rule->match(v))
-                    ++hits;
-            }
-        }
-        else {
+//        if (varRule) {
+//            foreach (const Variable* v, factory->vars()) {
+//                if (rule->match(v)) {
+//                    _rulesPerType.insertMulti(v->refType()->id(), arule);
+//                    ++hits;
+//                }
+//            }
+//        }
+//        else {
             foreach (const BaseType* bt, factory->types()) {
-                if (rule->match(bt))
+                if (rule->match(bt)) {
+                    _rulesPerType.insertMulti(bt->id(), arule);
                     ++hits;
+                }
             }
-        }
+//        }
 
         // Warn if a rule does not match
-        if (hits)
+        if (hits) {
             _hits[i] = hits;
+            _activeRules.append(arule);
+        }
         else
             warnRule(rule, QString("does not match any %1.")
                                 .arg(varRule ? "variable" : "type"));
@@ -212,6 +234,23 @@ QString TypeRuleEngine::ruleFile(const TypeRule *rule) const
         rule->srcFileIndex() < _ruleFiles.size())
         return _ruleFiles[rule->srcFileIndex()];
     return QString();
+}
+
+
+bool TypeRuleEngine::match(const Instance *inst) const
+{
+    if (!inst || !inst->type())
+        return false;
+
+    ActiveRuleHash::const_iterator it = _rulesPerType.find(inst->type()->id()),
+            e = _rulesPerType.end();
+
+    // Rules with variable names might not match inst->name(), so check again
+    while (it != e && it.key() == inst->type()->id())
+        if (it.value().rule->match(inst))
+            return true;
+
+    return false;
 }
 
 

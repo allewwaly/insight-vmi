@@ -35,6 +35,7 @@
 KernelSymbols::KernelSymbols()
 	: _factory(_memSpecs)
 {
+	Instance::setRuleEngine(&_ruleEngine);
 }
 
 
@@ -73,6 +74,9 @@ void KernelSymbols::parseSymbols(const QString& kernelSrc)
 	    shell->out()
 			<< "\rSuccessfully parsed the memory specifications in " << time
 			<< "." << endl;
+
+		// Check rules again
+		checkRules();
 	}
 	catch (MemSpecParserException& e) {
 		// Was the error caused during the memspec build process?
@@ -141,7 +145,10 @@ void KernelSymbols::loadSymbols(QIODevice* from)
         if (from->pos() > 0 && duration > 0)
             shell->out() << " (" << (int)((from->pos() / (float)duration * 1000)) << " byte/s)";
         shell->out() << "." << endl;
-    }
+
+		// Check rules again
+		checkRules();
+	}
     catch (GenericException& e) {
         shell->err()
             << "Caught a " << e.className() << " at " << e.file << ":"
@@ -219,12 +226,18 @@ void KernelSymbols::loadRules(const QString &fileName, bool forceRead)
 {
     TypeRuleReader reader(&_ruleEngine, forceRead);
     reader.readFrom(fileName);
-    OsSpecs specs(&_memSpecs);
-    _ruleEngine.checkRules(&_factory, &specs);
+    checkRules();
 }
 
 
 void KernelSymbols::flushRules()
 {
     _ruleEngine.clear();
+}
+
+
+void KernelSymbols::checkRules()
+{
+    OsSpecs specs(&_memSpecs);
+    _ruleEngine.checkRules(&_factory, &specs);
 }

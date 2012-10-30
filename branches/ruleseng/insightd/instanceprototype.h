@@ -350,7 +350,7 @@ public slots:
      * Calculates the offset of a member within a struct, if this is a struct
      * or union.
      * @param name the name of the member
-     * @return offset of member \a name within the struct, or 0 if no such
+     * @return offset of member \a name within the struct, or -1 if no such
      * member exists or if this instance is no struct or union
      */
     int MemberOffset(const QString& name) const;

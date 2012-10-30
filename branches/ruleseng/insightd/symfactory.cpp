@@ -1939,7 +1939,7 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                             // Now find the member of that struct by name
                             Structured* s = dynamic_cast<Structured*>(candidates[i]);
                             if (s && s->memberExists(id)) {
-                                baseTypes += s->findMember(id)->refType();
+                                baseTypes += s->member(id)->refType();
                                 // Exit the outer loop
                                 structSpecifier = 0;
                             }
@@ -1990,7 +1990,7 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                         // Now find the member of that struct by name
                         Structured* s = dynamic_cast<Structured*>(candidates[i]);
                         if (s && s->memberExists(name)) {
-                            baseTypes += s->findMember(name)->refType();
+                            baseTypes += s->member(name)->refType();
                             // Exit the outer loop
                             structSpecifier = 0;
                         }
@@ -2323,7 +2323,7 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                 arraysBetweenMembers = arraysCnt;
                 arraysCnt = 0;
 
-                if (!(member = s->findMember(trans[j].member))) {
+                if (!(member = s->member(trans[j].member))) {
                     error = true;
                     // Do not throw exception if we still have candidates left
                     if (!membersFound && i + 1 >= ctxBaseTypes.size())
@@ -2414,7 +2414,7 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                                          .arg(realTypeToStr(t->type()))
                                          .arg(t->prettyName()));
                         // Find the member within the copied type
-                        member = s->findMember(ed->transformations.lastMember());
+                        member = s->member(ed->transformations.lastMember());
                         assert(member != 0);
                         // Clear all alternative types for that member
                         member->altRefTypes().clear();
