@@ -19,10 +19,8 @@
 #include <QScriptEngine>
 #include <QSharedData>
 
-
-Q_DECLARE_METATYPE(Instance)
-
-static const QStringList _emtpyStringList;
+static const QStringList emtpyStringList;
+static const QString emtpyString;
 
 
 //-----------------------------------------------------------------------------
@@ -96,6 +94,14 @@ QStringList Instance::fullNameComponents() const
 }
 
 
+const QString &Instance::memberName(int index) const
+{
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
+        return emtpyString;
+    return dynamic_cast<const Structured*>(_d.type)->memberNames().at(index);
+}
+
+
 int Instance::memberCount() const
 {
     if (!_d.type || !(_d.type->type() & StructOrUnion))
@@ -107,8 +113,8 @@ int Instance::memberCount() const
 const QStringList& Instance::memberNames() const
 {
     if (!_d.type || !(_d.type->type() & StructOrUnion))
-        return _emtpyStringList;
-	return dynamic_cast<const Structured*>(_d.type)->memberNames();
+        return emtpyStringList;
+    return dynamic_cast<const Structured*>(_d.type)->memberNames();
 }
 
 
@@ -457,11 +463,13 @@ Instance Instance::member(const Structured* s, const ConstMemberList &members,
 		extraOffset += members[i]->offset();
 
 	const StructuredMember* m = members.last();
+	Instance** newInst = 0;
+	int match;
 
 	if (declaredType)
 		return m->toInstance(_d.address + extraOffset, _d.vmem, this,
 							 resolveTypes, maxPtrDeref);
-	else if (_ruleEngine && _ruleEngine->match(this)) {
+	else if (_ruleEngine && (match = _ruleEngine->match(this, members, newInst))) {
 		// TODO
 	}
 	else {

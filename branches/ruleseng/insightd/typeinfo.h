@@ -13,6 +13,7 @@
 #include <QVariant>
 #include <QVector>
 #include <sys/types.h>
+#include "memberlist.h"
 
 /// These enum values represent all possible debugging symbol
 enum HdrSymbolType {
@@ -180,11 +181,7 @@ static const quint32 RelevantParam =
 	psUpperBound;
 
 // forward declaration
-class StructuredMember;
 class FuncParam;
-
-/// A list of StructuredMember objects
-typedef QList<StructuredMember*> MemberList;
 
 /// A list of FuncParam objects
 typedef QList<FuncParam*> ParamList;

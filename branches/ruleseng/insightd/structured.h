@@ -13,9 +13,7 @@
 
 #include <QList>
 #include <QStringList>
-
-/// A list of StructuredMember objects
-typedef QList<const StructuredMember*> ConstMemberList;
+#include "memberlist.h"
 
 /**
  * Base class for a struct or union type

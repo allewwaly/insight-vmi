@@ -262,6 +262,16 @@ public slots:
     QString FullName() const;
 
     /**
+     * Returns the name of member no. \a index. Calling "inst.MemberName(i)" is
+     * much more efficient than calling "inst.Member(i).Name()", since it does
+     * not construct an intermediate Instance object.
+     * @param index index into the member list
+     * @return name of member \a index
+     * \sa MemberCount(), Members(), MemberNames()
+     */
+    QString MemberName(int index) const;
+
+    /**
      * Gives access to the names of all members if this instance.
      * @return a list of the names of all direct members of this instance
      * \sa Members(), MemberExists()

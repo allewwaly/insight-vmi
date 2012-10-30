@@ -7,7 +7,7 @@
 #include "instance_def.h"
 
 
-namespace str
+namespace xml
 {
 const char* datatype     = "datatype";
 const char* type_name    = "typename";
@@ -171,16 +171,16 @@ PatternSyntax TypeFilter::setNamePattern(
 
 PatternSyntax TypeFilter::givenSyntax(const KeyValueStore *keyVal)
 {
-    static const QString match(str::match);
+    static const QString match(xml::match);
 
     if (!keyVal)
         return psAuto;
 
     if (keyVal->contains(match)) {
         QString val = keyVal->value(match).toLower();
-        if (val == str::regex)
+        if (val == xml::regex)
             return psRegExp;
-        else if (val == str::wildcard)
+        else if (val == xml::wildcard)
             return psWildcard;
         else
             filterError(QString("Invalid value for attribute '%1': '%2'")
@@ -276,12 +276,12 @@ static KeyValueStore typeFilters;
 const KeyValueStore &TypeFilter::supportedFilters()
 {
     if (typeFilters.isEmpty()) {
-        typeFilters[str::type_name] = "Match type name, either by a literal match, by a "
+        typeFilters[xml::type_name] = "Match type name, either by a literal match, by a "
                 "wildcard expression *glob*, or by a regular expression "
                 "/re/.";
-        typeFilters[str::datatype] = "Match actual type, e.g. \"FuncPointer\" or \"UInt*\".";
-        typeFilters[str::size] = "Match type size.";
-        typeFilters[str::field] = "Match field name of a struct or union (specify multiple times to match nested structs' fields)";
+        typeFilters[xml::datatype] = "Match actual type, e.g. \"FuncPointer\" or \"UInt*\".";
+        typeFilters[xml::size] = "Match type size.";
+        typeFilters[xml::field] = "Match field name of a struct or union (specify multiple times to match nested structs' fields)";
     }
     return typeFilters;
 }
@@ -391,13 +391,13 @@ bool TypeFilter::parseOption(const QString &key, const QString &value,
     bool ok;
     QString v = value.trimmed();
 
-    if (QString(str::type_name).startsWith(key))
+    if (QString(xml::type_name).startsWith(key))
         setTypeName(v, givenSyntax(keyVals));
-    else if (QString(str::size).startsWith(key)) {
+    else if (QString(xml::size).startsWith(key)) {
         parseUInt(u, v, &ok);
         setSize(u);
     }
-    else if (QString(str::datatype).startsWith(key)) {
+    else if (QString(xml::datatype).startsWith(key)) {
         int realType = 0;
         QString s, rt;
         QRegExp rx;
@@ -418,7 +418,7 @@ bool TypeFilter::parseOption(const QString &key, const QString &value,
         }
         setDataType(realType);
     }
-    else if (QString(str::field).startsWith(key)) {
+    else if (QString(xml::field).startsWith(key)) {
         appendField(v, givenSyntax(keyVals));
     }
     else
@@ -511,7 +511,7 @@ const KeyValueStore &VariableFilter::supportedFilters()
 {
     if (varFilters.isEmpty()) {
         varFilters = TypeFilter::supportedFilters();
-        varFilters[str::variablename] = "Match variable name, either by a "
+        varFilters[xml::variablename] = "Match variable name, either by a "
                 "literal match, by a wildcard expression *glob*, or by a "
                 "regular expression /re/.";
         varFilters["filename"] = "Match symbol file the variable belongs to, "
@@ -524,9 +524,9 @@ const KeyValueStore &VariableFilter::supportedFilters()
 bool VariableFilter::parseOption(const QString &key, const QString &value,
                                  const KeyValueStore* keyVals)
 {
-    if (QString(str::variablename).startsWith(key))
+    if (QString(xml::variablename).startsWith(key))
         setVarName(value, givenSyntax(keyVals));
-    else if (QString(str::filename).startsWith(key)) {
+    else if (QString(xml::filename).startsWith(key)) {
         QString s = value.toLower();
         if (s != "vmlinux") {
             // Make sure kernel modules end with ".ko"

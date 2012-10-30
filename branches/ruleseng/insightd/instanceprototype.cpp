@@ -11,8 +11,6 @@
 #include "shell.h"
 #include <debug.h>
 
-Q_DECLARE_METATYPE(Instance*)
-
 #define INT32MASK 0xFFFFFFFFULL
 
 InstancePrototype::InstancePrototype(QObject *parent)
@@ -208,7 +206,14 @@ QString InstancePrototype::ParentName() const
 QString InstancePrototype::FullName() const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->fullName() : QString();
+	return ((inst = thisInstance())) ? inst->fullName() : QString();
+}
+
+
+QString InstancePrototype::MemberName(int index) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ? inst->memberName(index) : QString();
 }
 
 

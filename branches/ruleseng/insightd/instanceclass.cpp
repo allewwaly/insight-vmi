@@ -13,10 +13,12 @@
 #include "basetype.h"
 #include <debug.h>
 
-Q_DECLARE_METATYPE(Instance)
-Q_DECLARE_METATYPE(Instance*)
-Q_DECLARE_METATYPE(InstanceClass*)
-Q_DECLARE_METATYPE(InstanceList)
+namespace js
+{
+const char* getInstance = "getInstance";
+const char* instance    = "Instance";
+const char* length      = "length";
+}
 
 /**
  * This is an iterator for the properties of InstanceClass object.
@@ -173,13 +175,11 @@ QScriptValue InstanceClass::construct(QScriptContext* ctx, QScriptEngine* eng)
         return QScriptValue();
     // Provide a copy-constructor, if argument was given
     QScriptValue arg = ctx->argument(0);
-    if (arg.instanceOf(ctx->callee())) {
-        debugmsg("Called copy-constructor");
+    if (arg.instanceOf(ctx->callee()))
         return cls->newInstance(qscriptvalue_cast<Instance>(arg));
-    }
     // Otherwise execute the "getInstance" function as constructor
     // First, get the "getInstance" function object
-    QScriptValue getInstance = eng->globalObject().property("getInstance");
+    QScriptValue getInstance = eng->globalObject().property(js::getInstance);
     if (!getInstance.isFunction())
     	return QScriptValue();
     // Second, call the function
@@ -189,7 +189,7 @@ QScriptValue InstanceClass::construct(QScriptContext* ctx, QScriptEngine* eng)
 
 QScriptValue InstanceClass::instToScriptValue(QScriptEngine* eng, const Instance& inst)
 {
-    QScriptValue ctor = eng->globalObject().property("Instance");
+    QScriptValue ctor = eng->globalObject().property(js::instance);
     InstanceClass *cls = qscriptvalue_cast<InstanceClass*>(ctor.data());
     if (!cls)
         return eng->newVariant(qVariantFromValue(inst));
@@ -218,7 +218,7 @@ void InstanceClass::membersFromScriptValue(const QScriptValue& obj, InstanceList
     if (!obj.isArray())
         return;
 
-    QScriptValue lenVal = obj.property("length");
+    QScriptValue lenVal = obj.property(js::length);
     int len = lenVal.isNumber() ? lenVal.toNumber() : 0;
 
     for (int i = 0; i < len; ++i) {
@@ -244,7 +244,7 @@ void InstanceClass::stringListFromScriptValue(const QScriptValue& obj, QStringLi
     if (!obj.isArray())
         return;
 
-    QScriptValue lenVal = obj.property("length");
+    QScriptValue lenVal = obj.property(js::length);
     int len = lenVal.isNumber() ? lenVal.toNumber() : 0;
 
     for (int i = 0; i < len; ++i) {

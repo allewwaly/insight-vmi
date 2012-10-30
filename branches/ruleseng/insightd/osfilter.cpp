@@ -3,7 +3,7 @@
 #include <bitop.h>
 #include "memspecs.h"
 
-namespace str
+namespace xml
 {
 const char* architecture = "architecture";
 const char* os           = "os";
@@ -67,15 +67,15 @@ static KeyValueStore filters;
 const KeyValueStore& OsFilter::supportedFilters()
 {
     if (filters.isEmpty()) {
-        filters[str::architecture] = "comma-separated list of hardware "
+        filters[xml::architecture] = "comma-separated list of hardware "
                 "architectures:" +
-                QString(str::arX86) + ", " +
-                QString(str::arX86PAE) + ", " +
-                QString(str::arAMD64);
-        filters[str::os] = "comma-separated list of operating system types: " +
-                QString(str::osLinux) + ", " + QString(str::osWindows);
-        filters[str::minver] = "minimum operating system version";
-        filters[str::maxver] = "maximum operating system version";
+                QString(xml::arX86) + ", " +
+                QString(xml::arX86PAE) + ", " +
+                QString(xml::arAMD64);
+        filters[xml::os] = "comma-separated list of operating system types: " +
+                QString(xml::osLinux) + ", " + QString(xml::osWindows);
+        filters[xml::minver] = "minimum operating system version";
+        filters[xml::maxver] = "maximum operating system version";
     }
 
     return filters;
@@ -101,40 +101,40 @@ void OsFilter::parseOption(const QString &key, const QString &val)
 {
     QString k = key.toLower(), v = val.trimmed().toLower();
 
-    if (k == str::architecture) {
+    if (k == xml::architecture) {
         _architectures = OsSpecs::arIgnore;
         // Process comma-separated list
         QStringList list = v.split(QChar(','), QString::SkipEmptyParts);
         for (int i = 0; i < list.size(); ++i) {
             QString a = list[i].trimmed();
-            if (a == str::arX86)
+            if (a == xml::arX86)
                 _architectures |= OsSpecs::arX86;
-            else if (a == str::arX86PAE)
+            else if (a == xml::arX86PAE)
                 _architectures |= OsSpecs::arX86PAE;
-            else if (a == str::arAMD64)
+            else if (a == xml::arAMD64)
                 _architectures |= OsSpecs::arAMD64;
             else
                 filterError(QString("Unknown architecture: %1").arg(a));
         }
     }
-    else if (k == str::os) {
+    else if (k == xml::os) {
         _osFamilies = OsSpecs::arIgnore;
         // Process comma-separated list
         QStringList list = v.split(QChar(','), QString::SkipEmptyParts);
         for (int i = 0; i < list.size(); ++i) {
             QString os = list[i].trimmed();
-            if (os == str::osLinux)
+            if (os == xml::osLinux)
                 _osFamilies |= OsSpecs::ofLinux;
-            else if (os == str::osWindows)
+            else if (os == xml::osWindows)
                 _osFamilies |= OsSpecs::ofWindows;
             else
                 filterError(QString("Unknown operating system: %1").arg(os));
         }
     }
-    else if (k == str::minver) {
+    else if (k == xml::minver) {
         _minVer = OsSpecs::parseVersion(v);
     }
-    else if (k == str::maxver) {
+    else if (k == xml::maxver) {
         _maxVer = OsSpecs::parseVersion(v);
     }
     else
@@ -191,11 +191,11 @@ QString OsFilter::toString() const
         bool first = true;
         if (_osFamilies & OsSpecs::ofLinux) {
             commaIfNotFirst(s, first);
-            s += str::osLinux;
+            s += xml::osLinux;
         }
         if (_osFamilies & OsSpecs::ofLinux) {
             commaIfNotFirst(s, first);
-            s += str::osWindows;
+            s += xml::osWindows;
         }
         if (first)
             s += "(none)";
@@ -206,15 +206,15 @@ QString OsFilter::toString() const
         bool first = true;
         if (_architectures & OsSpecs::arX86) {
             commaIfNotFirst(s, first);
-            s += str::arX86;
+            s += xml::arX86;
         }
         if (_architectures & OsSpecs::arX86PAE) {
             commaIfNotFirst(s, first);
-            s += str::arX86PAE;
+            s += xml::arX86PAE;
         }
         if (_architectures & OsSpecs::arAMD64) {
             commaIfNotFirst(s, first);
-            s += str::arAMD64;
+            s += xml::arAMD64;
         }
         if (first)
             s += "(none)";

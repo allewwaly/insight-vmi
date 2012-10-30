@@ -14,7 +14,7 @@ class Variable;
 class Instance;
 class StructuredMember;
 
-namespace str
+namespace xml
 {
 extern const char* datatype;
 extern const char* type_name;

@@ -135,9 +135,12 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
             if (!scriptFile.open(QFile::ReadOnly))
                 ioError(QString("Error opening file \"%1\" for reading.")
                             .arg(rule->scriptFile()));
-            QString code(scriptFile.readAll());
+            prog = QScriptProgramPtr(
+                        new QScriptProgram(scriptFile.readAll(), rule->scriptFile()));
+
             // Basic syntax check
-            QScriptSyntaxCheckResult result = QScriptEngine::checkSyntax(code);
+            QScriptSyntaxCheckResult result =
+                    QScriptEngine::checkSyntax(prog->sourceCode());
             if (result.state() != QScriptSyntaxCheckResult::Valid) {
                 typeRuleError2(xmlFile,
                                rule->actionSrcLine(),
@@ -149,12 +152,8 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
                                        .arg(result.errorMessage()));
             }
             // Check if the function exists
-            args.clear();
-            args << rule->scriptFile();
-            includes.clear();
-            includes << QFileInfo(rule->scriptFile()).absoluteFilePath();
             ScriptEngine::FuncExistsResult ret =
-                    evalEng.functionExists(rule->action(), code, args, includes);
+                    evalEng.functionExists(rule->action(), *prog);
             if (ret == ScriptEngine::feRuntimeError) {
                 QString err;
                 if (evalEng.hasUncaughtException()) {
@@ -183,10 +182,6 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
                                        .arg(shortFileName(rule->scriptFile())));
             }
 
-            // Append the function invocation
-            code += QString("\n%1();").arg(rule->action());
-            prog = QScriptProgramPtr(
-                        new QScriptProgram(code, rule->scriptFile()));
         }
         else {
             warnRule(rule, "is ignored because it does not specify an action.");
@@ -237,20 +232,68 @@ QString TypeRuleEngine::ruleFile(const TypeRule *rule) const
 }
 
 
-bool TypeRuleEngine::match(const Instance *inst) const
+int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
+                          Instance** newInst) const
 {
     if (!inst || !inst->type())
-        return false;
+        return mrNoMatch;
 
     ActiveRuleHash::const_iterator it = _rulesPerType.find(inst->type()->id()),
             e = _rulesPerType.end();
 
-    // Rules with variable names might not match inst->name(), so check again
-    while (it != e && it.key() == inst->type()->id())
-        if (it.value().rule->match(inst))
-            return true;
+    int ret = mrNoMatch;
 
-    return false;
+    // Rules with variable names might need to match inst->name(), so check all.
+    // We can stop as soon as all possibly ORed values are included.
+    while (it != e && it.key() == inst->type()->id() && ret != mrMatchAndDefer)
+    {
+        const TypeRule* rule = it.value().rule;
+        if (rule->match(inst)) {
+            // Are all required fields accessed?
+            const InstanceFilter* filter = rule->filter();
+            if (filter) {
+                // Not all fields given ==> defer
+                if (filter->fields().size() > members.size())
+                    ret |= mrDefer;
+                // To many fields given ==> no match
+                else if (rule->filter()->fields().size() < members.size())
+                    continue;
+                // If all fields match ==> match
+                else {
+                    bool match = true;
+                    for (int i = 0; match && i< members.size(); ++i)
+                        if (!filter->fields().at(i).match(members[i]))
+                            match = false;
+                    // Only consider the first match
+                    if (match && !(ret & mrMatch)) {
+
+                        *newInst = new Instance();
+                        ret |= mrMatch;
+                    }
+                }
+            }
+            else if (members.isEmpty())
+                ret |= mrMatch;
+        }
+    }
+
+    return ret;
+}
+
+QScriptValue TypeRuleEngine::evaluateRule(const ActiveRule& arule,
+                                          const Instance *inst,
+                                          const ConstMemberList &members)
+{
+    // Prepare list of member indices
+    QVector<int> indexlist(members.size());
+    for (int i = 0; i < members.size(); ++i)
+        indexlist[i] = members[i]->index();
+
+    ScriptEngine eng;
+    QScriptValueList args;
+    args << eng.toScriptValue(inst) << eng.toScriptValue(indexlist);
+
+    return eng.evaluateFunction(arule.rule->action(), args, *arule.prog);
 }
 
 
