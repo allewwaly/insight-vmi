@@ -400,7 +400,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers_initializer(
     }
     
     if (!memberName.isEmpty()){
-        StructuredMember *member = (StructuredMember*) structured->findMember(memberName);
+        StructuredMember *member = (StructuredMember*) structured->member(memberName);
         if(member){
             if(member->hasNotConstValue() || 
                !(localNode->u.assignment_expression.initializer &&
@@ -570,7 +570,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
                                         if (baseType && baseType->type() & (rtStruct|rtUnion))
                                         {
                                             structured = dynamic_cast<const Structured*>(baseType);
-                                            member = (StructuredMember*) structured->findMember(memberName);
+                                            member = (StructuredMember*) structured->member(memberName);
                                             if (member){
                                                 if (member->refType()->type() == rtStruct || member->refType()->type() ==rtUnion)
                                                     structured = dynamic_cast<const Structured*>(member->refType());
@@ -578,7 +578,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
                                             }
                                         }
                                     } else {
-                                        member = (StructuredMember*) structured->findMember(memberName);
+                                        member = (StructuredMember*) structured->member(memberName);
                                         if (member){
                                             if (member->refType()->type() & (rtStruct | rtUnion))
                                                 structured = dynamic_cast<const Structured*>(member->refType());

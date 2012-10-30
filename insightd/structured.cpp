@@ -112,55 +112,88 @@ void Structured::addMember(StructuredMember* member)
 
 bool Structured::memberExists(const QString& memberName, bool recursive) const
 {
-	return findMember(memberName, recursive) != 0;
+	return member(memberName, recursive) != 0;
 }
 
 
 template<class T, class S>
-inline T* Structured::findMember(const QString& memberName, bool recursive) const
+inline QList<T*> Structured::memberChain(const QString& memberName,
+                                         bool skipLocal) const
 {
-    for (MemberList::const_iterator it = _members.begin();
-        it != _members.end(); ++it)
-    {
-        if ((*it)->name() == memberName)
-            return *it;
-    }
-
-    T* result = 0;
-
-    // If we didn't find the member yet, try all anonymous structs/unions
-    if (recursive) {
-        for (MemberList::const_iterator it = _members.begin();
-            !result && it != _members.end(); ++it)
-        {
-            T* m = *it;
-            // Look out for anonymous struct or union members
-            if (m->refType() && (m->refType()->type() & StructOrUnion) &&
-                m->name().isEmpty() && m->refType()->name().isEmpty())
-            {
-                S* s = dynamic_cast<S*>(m->refType());
-                assert(s != 0);
-                result = s->findMember<T, S>(memberName, recursive);
+    if (!skipLocal) {
+        foreach (T* m, _members) {
+            if (m->name() == memberName) {
+                QList<T*> list;
+                list += m;
+                return list;
             }
         }
     }
 
-    return result;
+    QList<T*> list;
 
+    // If we didn't find the member yet, try all anonymous structs/unions
+    foreach (T* m, _members) {
+        // Look out for anonymous struct or union members
+        if (m->refType() && (m->refType()->type() & StructOrUnion) &&
+            m->name().isEmpty() && m->refType()->name().isEmpty())
+        {
+            S* s = dynamic_cast<S*>(m->refType());
+            assert(s != 0);
+            list = s->memberChain<T, S>(memberName);
+            if (!list.isEmpty()) {
+                list.prepend(m);
+                return list;
+            }
+        }
+    }
+
+    return list;
 }
 
 
-StructuredMember* Structured::findMember(const QString& memberName,
+
+
+MemberList Structured::memberChain(const QString &memberName)
+{
+    return memberChain<StructuredMember, Structured>(memberName);
+}
+
+
+ConstMemberList Structured::memberChain(const QString &memberName) const
+{
+    return memberChain<const StructuredMember, const Structured>(memberName);
+}
+
+
+template<class T, class S>
+inline T* Structured::member(const QString& memberName, bool recursive) const
+{
+    foreach (T* m, _members)
+        if (m->name() == memberName)
+            return m;
+
+    if (recursive) {
+        QList<T*> list = memberChain<T, S>(memberName, true);
+        if (!list.isEmpty())
+            return list.last();
+    }
+
+    return 0;
+}
+
+
+StructuredMember* Structured::member(const QString& memberName,
                                          bool recursive)
 {
-    return findMember<StructuredMember, Structured>(memberName, recursive);
+    return member<StructuredMember, Structured>(memberName, recursive);
 }
 
 
-const StructuredMember* Structured::findMember(const QString& memberName,
-                                               bool recursive) const
+const StructuredMember* Structured::member(const QString& memberName,
+                                           bool recursive) const
 {
-    return findMember<const StructuredMember, const Structured>(
+    return member<const StructuredMember, const Structured>(
                 memberName, recursive);
 }
 
@@ -180,6 +213,28 @@ const StructuredMember *Structured::memberAtOffset(size_t offset, bool exactMatc
         return _members[i];
     else
         return _members[i - 1];
+}
+
+
+int Structured::memberOffset(const QString &member, bool recursive) const
+{
+    foreach (const StructuredMember* m, _members)
+        if (m->name() == member)
+            return m->offset();
+
+    if (recursive) {
+        ConstMemberList list(
+                    memberChain<const StructuredMember, const Structured>(
+                        member, true));
+        if (list.isEmpty())
+            return -1;
+        int offset = 0;
+        foreach (const StructuredMember* m, list)
+            offset += m->offset();
+        return offset;
+    }
+
+    return -1;
 }
 
 

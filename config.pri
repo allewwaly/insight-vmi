@@ -5,7 +5,7 @@ isEmpty(PREFIX) {
 }
 
 # Should the tests be built?
-CONFIG += tests
+#CONFIG += tests
 
 # Should the memory_map feature be built? Requires the X window system
 # for Unix. Disabled by default.

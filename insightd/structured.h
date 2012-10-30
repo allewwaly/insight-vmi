@@ -14,6 +14,9 @@
 #include <QList>
 #include <QStringList>
 
+/// A list of StructuredMember objects
+typedef QList<const StructuredMember*> ConstMemberList;
+
 /**
  * Base class for a struct or union type
  */
@@ -97,8 +100,7 @@ public:
 	 * @param recursive also search in nested, anonymous structs and unions
 	 * @return the member, if it exists, \c 0 otherwise
 	 */
-	StructuredMember* findMember(const QString& memberName,
-								 bool recursive = true);
+	StructuredMember* member(const QString& memberName, bool recursive = true);
 
     /**
      * Searches for a member with the name \a memberName (const version)
@@ -106,8 +108,24 @@ public:
      * @param recursive also search in nested, anonymous structs and unions
      * @return the member, if it exists, \c 0 otherwise
      */
-    const StructuredMember* findMember(const QString& memberName,
-                                       bool recursive = true) const;
+    const StructuredMember* member(const QString& memberName,
+                                   bool recursive = true) const;
+
+    /**
+     * Searches for a member with the name \a memberName in this structure or
+     * all nested anonymous structs or unions, if required.
+     * @param memberName name of the member to search
+     * @return list of members leading to \a memberName
+     */
+    MemberList memberChain(const QString& memberName);
+
+    /**
+     * Searches for a member with the name \a memberName in this structure or
+     * all nested anonymous structs or unions, if required.
+     * @param memberName name of the member to search
+     * @return list of members leading to \a memberName
+     */
+    ConstMemberList memberChain(const QString& memberName) const;
 
     /**
      * Obtain the member that has the given offset. If \a exactMatch is true
@@ -121,6 +139,15 @@ public:
      * @return the member at offset \a offset, if found, \c null otherwise
      */
      const StructuredMember* memberAtOffset(size_t offset, bool exactMatch) const;
+
+     /**
+      * Returns the offset of member \a member within this structure.
+      * @param member member name
+      * @param recursive also search in nested, anonymous structs and unions
+      * @return offset of member relative to base address of this structure, if
+      *   found, -1 otherwise
+      */
+     int memberOffset(const QString& member, bool recursive = true) const;
 
     /**
      * Reads a serialized version of this object from \a in.
@@ -148,13 +175,24 @@ protected:
 
 private:
     /**
-     * Searches for a member with the name \a memberName (const version)
+     * Searches for a member with the name \a memberName in this structure or
+     * all nested anonymous structs or unions, if requested.
      * @param memberName name of the member to search
      * @param recursive also search in nested, anonymous structs and unions
      * @return the member, if it exists, \c 0 otherwise
      */
     template<class T, class S>
-    T* findMember(const QString& memberName, bool recursive = true) const;
+    inline T* member(const QString& memberName, bool recursive) const;
+
+    /**
+     * Searches for a member with the name \a memberName in this structure or
+     * all nested anonymous structs or unions, if required.
+     * @param memberName name of the member to search
+     * @param skipLocal do not search (again) the member names of this structure
+     * @return list of members leading to \a memberName
+     */
+    template<class T, class S>
+    QList<T*> memberChain(const QString& memberName, bool skipLocal = false) const;
 };
 
 

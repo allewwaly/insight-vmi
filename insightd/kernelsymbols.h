@@ -115,7 +115,9 @@ public:
     bool symbolsAvailable() const;
 
 private:
-	MemSpecs _memSpecs;
+	void checkRules();
+
+    MemSpecs _memSpecs;
     SymFactory _factory;
     TypeRuleEngine _ruleEngine;
     QString _fileName;

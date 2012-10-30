@@ -280,7 +280,7 @@ bool InstancePrototype::MemberExists(const QString& name) const
 int InstancePrototype::MemberOffset(const QString& name) const
 {
 	Instance* inst;
-	return ((inst = thisInstance())) ? inst->memberOffset(name) : 0;
+	return ((inst = thisInstance())) ? inst->memberOffset(name) : -1;
 }
 
 
@@ -295,7 +295,7 @@ Instance InstancePrototype::Member(const QString& name, bool declaredType) const
 {
 	Instance* inst;
     return ((inst = thisInstance())) ?
-            inst->findMember(name, BaseType::trAny, declaredType) : Instance();
+            inst->member(name, BaseType::trAny, -1, declaredType) : Instance();
 }
 
 

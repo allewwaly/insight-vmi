@@ -4,15 +4,39 @@
 #include <QStringList>
 #include <QHash>
 #include <QVector>
+#include <QSharedPointer>
+#include <QScriptProgram>
 
 class TypeRule;
 class TypeRuleReader;
 class SymFactory;
 class OsFilter;
 class OsSpecs;
+class Instance;
+
+typedef QSharedPointer<const QScriptProgram> QScriptProgramPtr;
+
+/// Represents an active TypeRule
+struct ActiveRule
+{
+    ActiveRule() : index(-1), rule(0) {}
+    explicit ActiveRule(int index, const TypeRule* rule, const QScriptProgram* prog)
+        : index(index), rule(rule), prog(prog) {}
+    explicit ActiveRule(int index, const TypeRule* rule, const QScriptProgramPtr& prog)
+        : index(index), rule(rule), prog(prog) {}
+    int index;
+    const TypeRule* rule;
+    QScriptProgramPtr prog;
+};
 
 /// List of type rules
 typedef QList<TypeRule*> TypeRuleList;
+
+/// List of type rules
+typedef QList<ActiveRule> ActiveRuleList;
+
+/// List of type rules
+typedef QHash<int, ActiveRule> ActiveRuleHash;
 
 /// Hash of OsFilter objects
 typedef QHash<uint, const OsFilter*> OsFilterHash;
@@ -88,7 +112,7 @@ public:
      * symbols. All relevant rules are put into the active list.
      * \sa rules(), checkRules(
      */
-    inline const TypeRuleList& activeRules() const { return _rules; }
+    inline const ActiveRuleList& activeRules() const { return _activeRules; }
 
     /**
      * Returns a list of all file names from which the rules were read.
@@ -103,6 +127,8 @@ public:
      */
     QString ruleFile(const TypeRule* rule) const;
 
+    bool match(const Instance* inst) const;
+
 private:
     void warnRule(const TypeRule *rule, const QString& msg) const;
     QString shortFileName(const QString& fileName) const;
@@ -110,7 +136,8 @@ private:
     const OsFilter* insertOsFilter(const OsFilter* osf);
 
     TypeRuleList _rules;
-    TypeRuleList _activeRules;
+    ActiveRuleList _activeRules;
+    ActiveRuleHash _rulesPerType;
     OsFilterHash _osFilters;
     QStringList _ruleFiles;
     QVector<int> _hits;

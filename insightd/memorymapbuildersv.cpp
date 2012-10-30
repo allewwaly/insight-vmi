@@ -570,7 +570,7 @@ void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance *inst, 
     }
 
     // Get the pointer array
-    Instance ary = inst->findMember("ary", BaseType::trLexical, true);
+    Instance ary = inst->member("ary", BaseType::trLexical, 0, true);
 
     if (ary.isNull() || !ary.isValid()) {
         debugerr("Idr Layer has no member ary!");
@@ -619,7 +619,7 @@ void MemoryMapBuilderSV::processIdr(MemoryMapNodeSV *node, Instance *inst)
         return;
 
     // Get the top layer
-    Instance top = inst->findMember("top", BaseType::trLexicalAndPointers);
+    Instance top = inst->member("top", BaseType::trLexicalAndPointers);
 
     // Verify if the instance is valid or if it is still a pointer.
     // in the latter case the pointer could not be dereferenced thus we ignore this
@@ -628,13 +628,13 @@ void MemoryMapBuilderSV::processIdr(MemoryMapNodeSV *node, Instance *inst)
         return;
 
     // Get the number of layers
-    Instance layers = inst->findMember("layers", BaseType::trLexical);
+    Instance layers = inst->member("layers", BaseType::trLexical);
 
     // Handle the node
     processIdrLayer(node, &top, layers.toUInt32());
 
     // Get the free layer
-    Instance free = inst->findMember("id_free", BaseType::trLexical);
+    Instance free = inst->member("id_free", BaseType::trLexical);
 
     // Verify if the instance is valid or if it is still a pointer.
     // in the latter case the pointer could not be dereferenced thus we ignore this
@@ -664,7 +664,7 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *i
     }
 
     // Get the height of the node
-    Instance height = inst->findMember("height", BaseType::trLexical);
+    Instance height = inst->member("height", BaseType::trLexical);
 
     if (height.isNull() || !height.isValid()) {
         debugerr("Radix Tree Node has no member height!");
@@ -674,7 +674,7 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *i
     quint32 heightInt = height.toInt32();
 
     // Get the slots
-    Instance radixSlots = inst->findMember("slots", BaseType::trLexical, true);
+    Instance radixSlots = inst->member("slots", BaseType::trLexical, 0, true);
 
     if (radixSlots.isNull() || !radixSlots.isValid()) {
         debugerr("Radix Tree Node has no member slots!");
@@ -730,7 +730,7 @@ void MemoryMapBuilderSV::processRadixTree(MemoryMapNodeSV *node, Instance *inst)
         return;
 
     // Get the rnode
-    Instance rnode = inst->findMember("rnode", BaseType::trLexicalAndPointers);
+    Instance rnode = inst->member("rnode", BaseType::trLexicalAndPointers);
 
     // Verify if the instance is valid or if it is still a pointer.
     // in the latter case the pointer could not be dereferenced thus we ignore this

@@ -154,20 +154,20 @@ void MemoryDump::init()
             // Read in all version information
             if (!_specs.version.machine.isEmpty())
                 ver.machine = trimQuotes(
-                            uts_ns.findMember("machine",
-                                              BaseType::trLexical).toString());
+                            uts_ns.member("machine",
+                                          BaseType::trLexical).toString());
             if (!_specs.version.release.isEmpty())
                 ver.release = trimQuotes(
-                            uts_ns.findMember("release",
-                                              BaseType::trLexical).toString());
+                            uts_ns.member("release",
+                                          BaseType::trLexical).toString());
             if (!_specs.version.sysname.isEmpty())
                 ver.sysname = trimQuotes(
-                            uts_ns.findMember("sysname",
-                                              BaseType::trLexical).toString());
+                            uts_ns.member("sysname",
+                                          BaseType::trLexical).toString());
             if (!_specs.version.version.isEmpty())
                 ver.version = trimQuotes(
-                            uts_ns.findMember("version",
-                                              BaseType::trLexical).toString());
+                            uts_ns.member("version",
+                                          BaseType::trLexical).toString());
 
             if (!_specs.version.equals(ver)) {
                 shell->err()
@@ -354,9 +354,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
                 }
 
                 if (compatibleCnt != 1)
-                    result = instance.findMember(symbol,
-                                             BaseType::trLexical,
-                                             true);
+                    result = instance.member(symbol, BaseType::trLexical, 0, true);
             }
         }
 
@@ -407,7 +405,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 				}
 				else {
 					StructuredMember* structdMember =
-							structd->findMember(offsetString);
+							structd->member(offsetString);
 					offset = structdMember->offset();
 				}
 			}

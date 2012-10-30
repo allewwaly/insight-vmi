@@ -198,7 +198,7 @@ bool ASTVariableExpression::compatible(const Instance *inst) const
             const Structured* s = dynamic_cast<const Structured*>(bt);
             if (!s)
                 return false;
-            const StructuredMember* m = s->findMember(_transformations[i].member);
+            const StructuredMember* m = s->member(_transformations[i].member);
             if (!m)
                 return false;
             bt = m->refType();
@@ -271,7 +271,7 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
                                       "type")
                               .arg(prettyType)
                               .arg((uint)bt->id(), 0, 16));
-            const StructuredMember* m = s->findMember(_transformations[i].member);
+            const StructuredMember* m = s->member(_transformations[i].member);
             if (!m)
                 exprEvalError(QString("Type \"%1\" has no member \"%2\"")
                               .arg(prettyType)
@@ -313,8 +313,8 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
             break;
 
         case ttMember:
-            tmp = tmp.findMember(_transformations[j].member,
-                                 BaseType::trLexical, true);
+            tmp = tmp.member(_transformations[j].member,
+                             BaseType::trLexical, 0, true);
             prettyType += "." + _transformations[j].member;
             break;
 

@@ -10,30 +10,57 @@
         <scriptinclude>../scripts</scriptinclude>
     </scriptincludes>
 
-    <include>morerules.xml</include>
+<!--    <include>morerules.xml</include>-->
 
     <rules>
         <rule>
-            <name>Simple</name>
-            <description>This is awesome</description>
+            <name>modules</name>
+            <description>
+                Variable "modules" is head of "struct module" objects.
+            </description>
             <filter>
                 <datatype>struct</datatype>
-                <typename>foo</typename>
+                <typename>list_head</typename>
+                <variablename>modules</variablename>
                 <fields>
-                    <field />
-                    <field match="regex">i|p</field>
+                    <field match="wildcard">*</field>
                 </fields>
             </filter>
             <action src="inline">
                 // var inst = instance to check
-                // var name = name of struct
-                // var member = name of member
-                include("check-foobar.js");
-                if (1 &amp;&amp; 2) return true;
-                checkFooBar(inst);
+                // var fields = array of requested field(s)
+                inst = inst.Member(fields[0]);
+                inst.ChangeType("module");
+                inst.AddToAddress(inst.MemberOffset("list"));
+                return inst;
             </action>
         </rule>
 
+        <rule>
+            <name>module.list</name>
+            <description>
+                Field "list" in "struct module" points to further  module
+                objects.
+            </description>
+            <filter>
+                <datatype>struct</datatype>
+                <typename>module</typename>
+                <fields>
+                    <field>list</field>
+                    <field match="wildcard">*</field>
+                </fields>
+            </filter>
+            <action src="inline">
+                // var inst = instance to check
+                // var fields = array of requested field(s)
+                inst = inst.Member(fields[0]);
+                inst.ChangeType("module");
+                inst.AddToAddress(inst.MemberOffset("list"));
+                return inst;
+            </action>
+        </rule>
+
+<!--
         <rule architecture="x86" os="linux" minversion="2.6.12" maxversion="2.6.38">
             <name>Wildcards</name>
             <filter>
@@ -46,5 +73,6 @@
             </filter>
             <action src="file" file="samplerule.js">println</action>
         </rule>
+-->
     </rules>
 </typeknowledge>
