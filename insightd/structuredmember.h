@@ -37,6 +37,12 @@ public:
     StructuredMember(SymFactory* factory, const TypeInfo& info);
 
     /**
+     * Returns the index of this member into its structure's member list.
+     * @return index into member list
+     */
+    int index() const;
+
+    /**
      * @return the offset of this member within a struct or union
      */
     size_t offset() const;

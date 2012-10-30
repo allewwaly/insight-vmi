@@ -21,7 +21,7 @@
     } while (0)
 
 
-namespace str
+namespace xml
 {
 const char* typeknowledge = "typeknowledge";
 const char* ruleincludes = "ruleincludes";
@@ -210,14 +210,14 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
     }
 
     // <rule>
-    if (name == str::rule) {
+    if (name == xml::rule) {
         _rule = new TypeRule();
         _rule->setSrcLine(_locator ? _locator->lineNumber() : -1);
     }
     // <filter>
-    else if (name == str::filter)
+    else if (name == xml::filter)
         _filter = new InstanceFilter();
-    else if (name == str::action) {
+    else if (name == xml::action) {
         errorIfNull(_rule);
         _rule->setActionSrcLine(_locator ? _locator->lineNumber() : -1);
     }
@@ -237,9 +237,9 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
 
 TypeRule::ActionType strToActionType(const QString& action)
 {
-    if (action == str::file)
+    if (action == xml::file)
         return TypeRule::atFunction;
-    else if (action == str::inlineCode)
+    else if (action == xml::inlineCode)
         return TypeRule::atInlineCode;
     else
         return TypeRule::atNone;
@@ -256,13 +256,13 @@ bool TypeRuleParser::endElement(const QString &namespaceURI,
     QString name(localName.toLower());
 
     // <rule>
-    if (name == str::rule) {
+    if (name == xml::rule) {
         errorIfNull(_rule);
         // We require a filter and an action
-        if (!_children.top().contains(str::filter))
+        if (!_children.top().contains(xml::filter))
             typeRuleErrorLoc(QString("No filter specified for rule in line %1.")
                              .arg(_rule->srcLine()));
-        if (!_children.top().contains(str::action))
+        if (!_children.top().contains(xml::action))
             typeRuleErrorLoc(QString("No action specified for rule in line %1.")
                              .arg(_rule->srcLine()));
         // Pass the rule on to the reader
@@ -270,32 +270,32 @@ bool TypeRuleParser::endElement(const QString &namespaceURI,
         _rule = 0;
     }
     // <ruleinclude>
-    else if (name == str::ruleinclude)
+    else if (name == xml::ruleinclude)
         _reader->appendRulesInclude(_cdata.trimmed());
     // <scriptinclude>
-    else if (name == str::scriptinclude)
+    else if (name == xml::scriptinclude)
         _reader->appendScriptInclude(_cdata.trimmed());
     // <include>
-    else if (name == str::include) {
+    else if (name == xml::include) {
         bool ret = _reader->includeRulesFile(_cdata.trimmed());
         if (!ret)
             typeRuleErrorLoc(QString("Unable to resolve included file \"%1\".")
                      .arg(_cdata.trimmed()));
     }
     // <name>
-    if (name == str::name) {
+    if (name == xml::name) {
         errorIfNull(_rule);
         _rule->setName(_cdata.trimmed());
     }
     // <description>
-    if (name == str::description) {
+    if (name == xml::description) {
         errorIfNull(_rule);
         _rule->setDescription(_cdata.trimmed());
     }
     // <action>
-    else if (name == str::action) {
+    else if (name == xml::action) {
         errorIfNull(_rule);
-        QString src = _attributes.top().value(str::src);
+        QString src = _attributes.top().value(xml::src);
         TypeRule::ActionType type = strToActionType(src);
         _rule->setActionType(type);
         _rule->setAction(type == TypeRule::atInlineCode ? _cdata : _cdata.trimmed());
@@ -305,14 +305,14 @@ bool TypeRuleParser::endElement(const QString &namespaceURI,
             // No more action required
             break;
         case TypeRule::atFunction: {
-            if (!_attributes.top().contains(str::file))
+            if (!_attributes.top().contains(xml::file))
                 typeRuleErrorLoc(QString("Source type \"%1\" in attribute \"%2\" "
                                       "requires the file name to be specified "
                                       "in the additional attribute \"%3\" in "
                                       "element \"%4\".")
-                              .arg(src).arg(str::src).arg(str::file).arg(name));
+                              .arg(src).arg(xml::src).arg(xml::file).arg(name));
 
-            QString value = _attributes.top().value(str::file);
+            QString value = _attributes.top().value(xml::file);
             QString file = _reader->absoluteScriptFilePath(value);
 
             if (file.isEmpty())
@@ -325,11 +325,11 @@ bool TypeRuleParser::endElement(const QString &namespaceURI,
         default:
             typeRuleErrorLoc(QString("Source type \"%1\" unknown for attribute "
                                   "\"%2\" in element \"%3\".")
-                          .arg(src).arg(str::src).arg(name));
+                          .arg(src).arg(xml::src).arg(name));
         }
     }
     // <filter>
-    else if (name == str::filter) {
+    else if (name == xml::filter) {
         errorIfNull(_rule);
         // We require a non-empty filter
         if (_children.top().isEmpty())
@@ -386,68 +386,68 @@ const XmlSchema &TypeRuleParser::schema()
 {
     if (ruleSchema.isEmpty()) {
         const QStringList osfAttr(OsFilter::supportedFilters().keys());
-        const QStringList empty, match(str::match);
+        const QStringList empty, match(xml::match);
         QStringList children, intTypes, matchTypes, multiTypes;
 
         // root element
         ruleSchema.addElement(XmlSchema::rootElem(),
-                              QStringList(str::typeknowledge));
+                              QStringList(xml::typeknowledge));
         // <typeknowledge>
-        children << str::ruleincludes
-                 << str::scriptincludes
-                 << str::include
-                 << str::rules;
-        ruleSchema.addElement(str::typeknowledge, children, osfAttr);
+        children << xml::ruleincludes
+                 << xml::scriptincludes
+                 << xml::include
+                 << xml::rules;
+        ruleSchema.addElement(xml::typeknowledge, children, osfAttr);
 
         // <ruleincludes>
-        ruleSchema.addElement(str::ruleincludes, QStringList(str::ruleinclude));
+        ruleSchema.addElement(xml::ruleincludes, QStringList(xml::ruleinclude));
 
         // <ruleinclude>
-        ruleSchema.addElement(str::ruleinclude);
+        ruleSchema.addElement(xml::ruleinclude);
 
         // <scriptincludes>
-        ruleSchema.addElement(str::scriptincludes, QStringList(str::scriptinclude));
+        ruleSchema.addElement(xml::scriptincludes, QStringList(xml::scriptinclude));
 
         // <scriptinclude>
-        ruleSchema.addElement(str::scriptinclude);
+        ruleSchema.addElement(xml::scriptinclude);
 
         // <include>
-        ruleSchema.addElement(str::include);
+        ruleSchema.addElement(xml::include);
 
         // <rules>
-        ruleSchema.addElement(str::rules, QStringList(str::rule), osfAttr);
+        ruleSchema.addElement(xml::rules, QStringList(xml::rule), osfAttr);
 
         // <rule>
         children.clear();
-        children << str::name << str::description << str::filter << str::action;
-        ruleSchema.addElement(str::rule, children, osfAttr);
+        children << xml::name << xml::description << xml::filter << xml::action;
+        ruleSchema.addElement(xml::rule, children, osfAttr);
 
         // <name>
-        ruleSchema.addElement(str::name, empty, empty, empty, false);
+        ruleSchema.addElement(xml::name, empty, empty, empty, false);
 
         // <description>
-        ruleSchema.addElement(str::description, empty, empty, empty, false);
+        ruleSchema.addElement(xml::description, empty, empty, empty, false);
 
         // <action>
-        ruleSchema.addElement(str::action, empty, QStringList(str::file),
-                              QStringList(str::src), false);
+        ruleSchema.addElement(xml::action, empty, QStringList(xml::file),
+                              QStringList(xml::src), false);
 
         // <filter>
         children = VariableFilter::supportedFilters().keys();
         // Add <fields> as child to <filter>, not <field>
-        int f_idx = children.indexOf(str::field);
+        int f_idx = children.indexOf(xml::field);
         assert(f_idx >= 0);
-        children.replace(f_idx, str::fields);
-        ruleSchema.addElement(str::filter, children, empty, empty, false);
-        children.replace(f_idx, str::field);
+        children.replace(f_idx, xml::fields);
+        ruleSchema.addElement(xml::filter, children, empty, empty, false);
+        children.replace(f_idx, xml::field);
 
         // <fields>
-        ruleSchema.addElement(str::fields, QStringList(str::field));
+        ruleSchema.addElement(xml::fields, QStringList(xml::field));
 
         // Auto-add all children of <filter>
-        intTypes << str::size;
-        matchTypes << str::field << str::variablename << str::type_name;
-        multiTypes << str::field;
+        intTypes << xml::size;
+        matchTypes << xml::field << xml::variablename << xml::type_name;
+        multiTypes << xml::field;
         for (int i = 0; i < children.size(); ++i) {
             bool allowMatch = matchTypes.contains(children[i]);
             bool allowMultiple = multiTypes.contains(children[i]);

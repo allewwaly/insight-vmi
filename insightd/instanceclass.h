@@ -13,6 +13,13 @@
 #include <QStringList>
 #include "instance.h"
 
+namespace js
+{
+extern const char* getInstance;
+extern const char* instance;
+extern const char* length;
+}
+
 // Forward declarations
 class QScriptContext;
 class QScriptEngine;
@@ -63,5 +70,8 @@ private:
     QScriptValue _protoScriptVal;
     QScriptValue _ctor;
 };
+
+
+Q_DECLARE_METATYPE(InstanceClass*)
 
 #endif /* INSTANCECLASS_H_ */

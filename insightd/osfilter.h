@@ -6,7 +6,7 @@
 #include <QHash>
 #include "keyvaluestore.h"
 
-namespace str
+namespace xml
 {
 extern const char* architecture;
 extern const char* os;

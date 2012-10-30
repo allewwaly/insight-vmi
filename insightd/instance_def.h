@@ -10,23 +10,21 @@
 
 #include <QString>
 #include <QStringList>
+#include <QMetaType>
 
 #include "instancedata.h"
 #include "expressionresult.h"
+#include "memberlist.h"
 
 class BaseType;
 class VirtualMemory;
 class Instance;
-class StructuredMember;
 class Structured;
 class ColorPalette;
 class TypeRuleEngine;
 
 /// A list of Instance objects
 typedef QList<Instance> InstanceList;
-
-/// A list of constant struct/union member objects
-typedef QList<const StructuredMember*> ConstMemberList;
 
 /**
  * This class wraps a variable instance in a memory dump.
@@ -164,6 +162,16 @@ public:
      * @return the full name components of this instance
      */
     QStringList fullNameComponents() const;
+
+    /**
+     * Returns the name of member no. \a index. Calling "inst.memberName(i)" is
+     * much more efficient than calling "inst.member(i).mame()", since it does
+     * not construct an intermediate Instance object.
+     * @param index index into the member list
+     * @return name of member \a index
+     * \sa memberCount(), members(), memberNames()
+     */
+    const QString& memberName(int index) const;
 
     /**
      * Gives access to the names of all members if this instance.
@@ -747,5 +755,8 @@ private:
     static const TypeRuleEngine* _ruleEngine;
 };
 
+Q_DECLARE_METATYPE(Instance*)
+Q_DECLARE_METATYPE(Instance)
+Q_DECLARE_METATYPE(InstanceList)
 
 #endif /* INSTANCE_DEF_H_ */

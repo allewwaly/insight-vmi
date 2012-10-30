@@ -13,17 +13,27 @@
 #include "shell.h"
 #include "symfactory.h"
 #include "variable.h"
+#include "varsetter.h"
+#include "instanceclass.h"
 #include <QDir>
 
-namespace str
+namespace js
 {
-const char* includePath = "INCLUDE_PATH";
+const char* argv            = "ARGV";
+const char* includePath     = "INCLUDE_PATH";
+const char* print           = "print";
+const char* println         = "println";
+const char* include         = "include";
+//const char* instance        = "Instance";
+const char* symbols         = "Symbols";
+const char* memory          = "Memory";
+const char* path_sep        = ":";
 }
 
 
 ScriptEngine::ScriptEngine()
 	: _engine(0), _instClass(0), _symClass(0), _memClass(0),
-	  _lastEvalFailed(false)
+	  _lastEvalFailed(false), _initialized(false)
 {
 }
 
@@ -48,6 +58,7 @@ void ScriptEngine::reset()
 	    delete _memClass;
 	_lastError.clear();
 	_lastEvalFailed = false;
+	_initialized = false;
 }
 
 
@@ -85,9 +96,12 @@ int ScriptEngine::uncaughtExceptionLineNumber() const
 }
 
 
-void ScriptEngine::initScriptEngine(const QStringList &args,
-                                    const QStringList &includePaths)
+void ScriptEngine::initScriptEngine()
 {
+    // Was this already done?
+    if (_initialized)
+        return;
+
     // Prepare the script engine
     reset();
 
@@ -97,65 +111,69 @@ void ScriptEngine::initScriptEngine(const QStringList &args,
 	QScriptValue::PropertyFlags roFlags =
 			QScriptValue::ReadOnly | QScriptValue::Undeletable;
 
-    _engine->globalObject().setProperty("print",
+    _engine->globalObject().setProperty(js::print,
     		_engine->newFunction(scriptPrint),
     		roFlags|QScriptValue::SkipInEnumeration);
 
-    _engine->globalObject().setProperty("println",
-                                        _engine->newFunction(scriptPrintLn),
-                                        roFlags|QScriptValue::SkipInEnumeration);
+    _engine->globalObject().setProperty(js::println,
+            _engine->newFunction(scriptPrintLn),
+            roFlags|QScriptValue::SkipInEnumeration);
 
-    _engine->globalObject().setProperty("getInstance",
+    _engine->globalObject().setProperty(js::getInstance,
     		_engine->newFunction(scriptGetInstance, this),
     		roFlags);
 
-    _engine->globalObject().setProperty("include",
+    _engine->globalObject().setProperty(js::include,
     		_engine->newFunction(scriptInclude, 1),
     		roFlags|QScriptValue::KeepExistingFlags);
 
     _instClass = new InstanceClass(_engine);
-    _engine->globalObject().setProperty("Instance",
+    _engine->globalObject().setProperty(js::instance,
     		_instClass->constructor(),
     		roFlags);
 
     _symClass = new KernelSymbolsClass(_instClass);
-    _engine->globalObject().setProperty("Symbols",
+    _engine->globalObject().setProperty(js::symbols,
     		_engine->newQObject(_symClass,
     				QScriptEngine::QtOwnership,
     				QScriptEngine::ExcludeSuperClassContents),
     		roFlags);
 
     _memClass = new MemoryDumpsClass();
-    _engine->globalObject().setProperty("Memory",
+    _engine->globalObject().setProperty(js::memory,
             _engine->newQObject(_memClass,
                     QScriptEngine::QtOwnership,
                     QScriptEngine::ExcludeSuperClassContents),
             roFlags);
 
-    // Export parameters to the script
-    _engine->globalObject().setProperty("ARGV", _engine->toScriptValue(args),
-            QScriptValue::ReadOnly);
-
-    // Export SCRIPT_PATH to the script
-    _engine->globalObject().setProperty(str::includePath,
-            includePaths.join(":"),
-            QScriptValue::ReadOnly|
-            QScriptValue::Undeletable);
-
+    _initialized = true;
 }
 
 
-QScriptValue ScriptEngine::evaluate(const QString& program,
-		const QStringList& args, const QStringList& includePaths)
+void ScriptEngine::prepareEvaluation(const QStringList &argv,
+                                     const QStringList &includePaths)
 {
-	initScriptEngine(args, includePaths);
+    initScriptEngine();
 
-	QScriptValue ret;
+    // Export parameters to the script
+    _engine->globalObject().setProperty(js::argv, _engine->toScriptValue(argv),
+            QScriptValue::ReadOnly);
 
-	if (args.isEmpty())
-		ret = _engine->evaluate(program);
-	else
-		ret = _engine->evaluate(program, args.first());
+    // Export SCRIPT_PATH to the script
+    _engine->globalObject().setProperty(js::includePath,
+            includePaths.join(js::path_sep),
+            QScriptValue::ReadOnly|QScriptValue::Undeletable);
+}
+
+
+QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
+		const QStringList& argv, const QStringList& includePaths)
+{
+	prepareEvaluation(argv, includePaths);
+	// Make sure we re-initialization is forced after function exit
+	VarSetter<bool> setter(&_initialized, true, false);
+
+	QScriptValue ret(_engine->evaluate(program));
 
 	// Save the last error message
 	if (_engine->hasUncaughtException())
@@ -167,16 +185,42 @@ QScriptValue ScriptEngine::evaluate(const QString& program,
 }
 
 
-ScriptEngine::FuncExistsResult ScriptEngine::functionExists(
-		const QString& function, const QString& program,
-		const QStringList& args, const QStringList& includePaths)
+QScriptValue ScriptEngine::evaluate(const QString &code,
+		const QStringList &argv, const QStringList &includePaths)
 {
-	QScriptValue ret = evaluate(program, args, includePaths);
+	if (argv.isEmpty())
+		return evaluate(QScriptProgram(code), argv, includePaths);
+	else
+		return evaluate(QScriptProgram(code, argv.first()), argv, includePaths);
+}
+
+
+QScriptValue ScriptEngine::evaluateFunction(const QString &func,
+		const QScriptValueList &funcArgs, const QScriptProgram &program)
+{
+	QStringList argv(program.fileName());
+	QStringList includePaths(QFileInfo(program.fileName()).absoluteFilePath());
+	QScriptValue ret(evaluate(program, argv, includePaths));
+
+	if (_engine->hasUncaughtException() || ret.isError())
+		return ret;
+	// Obtain the function object
+	ret = _engine->globalObject().property(func);
+	return ret.call(QScriptValue(), funcArgs);
+}
+
+
+ScriptEngine::FuncExistsResult ScriptEngine::functionExists(const QString& func,
+		const QScriptProgram& program)
+{
+	QStringList argv(program.fileName());
+	QStringList includePaths(QFileInfo(program.fileName()).absoluteFilePath());
+	QScriptValue ret(evaluate(program, argv, includePaths));
 
 	if (_engine->hasUncaughtException() || ret.isError())
 		return feRuntimeError;
 
-	ret = _engine->globalObject().property(function);
+	ret = _engine->globalObject().property(func);
 	if (ret.isValid() && ret.isFunction())
 		return feExists;
 	else
@@ -184,15 +228,17 @@ ScriptEngine::FuncExistsResult ScriptEngine::functionExists(
 }
 
 
+QScriptValue ScriptEngine::toScriptValue(const Instance *inst)
+{
+	initScriptEngine();
+	return _instClass->newInstance(*inst);
+}
+
+
 QScriptSyntaxCheckResult ScriptEngine::checkSyntax(
 		const QString &program)
 {
-	// Make sure the engine is usable
-	if (!_engine) {
-		QStringList empty;
-		initScriptEngine(empty, empty);
-	}
-
+	initScriptEngine();
 	return _engine->checkSyntax(program);
 }
 
@@ -287,9 +333,9 @@ QScriptValue ScriptEngine::scriptInclude(QScriptContext *context,
 
         QString fileName = context->argument(0).toString();
 
-        QString paths = engine->globalObject().property(str::includePath,
+        QString paths = engine->globalObject().property(js::includePath,
         		QScriptValue::ResolveLocal).toString();
-        QStringList pathList = paths.split(QChar(':'));
+        QStringList pathList = paths.split(js::path_sep);
 
 		// Try all include paths in their order
 		QDir dir;

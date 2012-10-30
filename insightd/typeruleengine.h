@@ -6,6 +6,8 @@
 #include <QVector>
 #include <QSharedPointer>
 #include <QScriptProgram>
+#include <QScriptValue>
+#include "memberlist.h"
 
 class TypeRule;
 class TypeRuleReader;
@@ -47,6 +49,14 @@ typedef QHash<uint, const OsFilter*> OsFilterHash;
 class TypeRuleEngine
 {
 public:
+    /// Result of matching an Instance against the rule set
+    enum MatchResult {
+        mrNoMatch  = 0,         ///< no rule matches
+        mrMatch    = (1 << 0),  ///< one rule matches
+        mrDefer    = (1 << 1),  ///< one rule may match with further members given
+        mrMatchAndDefer = mrMatch|mrDefer ///< one rule matches, further rules might match with more members
+    };
+
     /**
      * Constructor
      */
@@ -127,9 +137,22 @@ public:
      */
     QString ruleFile(const TypeRule* rule) const;
 
-    bool match(const Instance* inst) const;
+    /**
+     * Matches the given Instance with the given member access pattern agains
+     * the rule set.
+     * @param inst instance to match
+     * @param members accessed members, originating from the structure pointed
+     *  to by \a inst
+     * @return bitwise combination of MatchResult values
+     * \a MatchResult
+     */
+    int match(const Instance* inst, const ConstMemberList &members,
+              Instance **newInst) const;
 
 private:
+    QScriptValue evaluateRule(const ActiveRule &arule, const Instance* inst,
+                              const ConstMemberList &members);
+
     void warnRule(const TypeRule *rule, const QString& msg) const;
     QString shortFileName(const QString& fileName) const;
 
