@@ -10,10 +10,11 @@
 #include "variable.h"
 #include <debug.h>
 
-//namespace js
-//{
-//const char* ignore_rule = "IGNORE_RULE";
-//}
+namespace js
+{
+const char* arguments = "arguments";
+const char* inlinefunc = "__inline_func__";
+}
 
 
 TypeRuleEngine::TypeRuleEngine()
@@ -100,7 +101,7 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
     if (!factory->symbolsAvailable())
         return;
 
-    ScriptEngine evalEng(Instance::ksNoRulesEngine);
+    ScriptEngine evalEng(Instance::ksNone);
 
     int i = -1;
     foreach (const TypeRule* rule, _rules) {
@@ -130,8 +131,12 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
                                     .arg(result.errorMessage()));
             }
             else {
+                // Wrap the code into a function so that the return statement
+                // is available to the code
+                QString code = QString("function %1() {\n%2\n}")
+                        .arg(js::inlinefunc).arg(rule->action());
                 prog = QScriptProgramPtr(
-                            new QScriptProgram(rule->action(), xmlFile,
+                            new QScriptProgram(code, xmlFile,
                                                rule->actionSrcLine() - 1));
             }
         }
@@ -273,23 +278,15 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                     // Only consider the first match
                     if (match && !(ret & mrMatch)) {
                         // Evaluate the rule
-                        Instance instRet(evaluateRule(it.value(), inst, members));
-//                        debugmsg(val.toString());
-//                        Instance inst = qvariant_cast<Instance>(val.data().toVariant());
+                        bool matched;
+                        Instance instRet(evaluateRule(it.value(), inst, members,
+                                                      &matched));
+                        if (matched)
+                            ret |= mrMatch;
                         if (instRet.isValid()) {
                             instRet.setOrigin(Instance::orRuleEngine);
                             *newInst = new Instance(instRet);
                         }
-                        // An Instance is returned as variant
-//                        if (val.isVariant()) {
-//                            *newInst = new Instance(val.toVariant().value<Instance>());
-//                            (*newInst)->setOrigin(Instance::orRuleEngine);
-//                        }
-                        // Consider the rules not as "matched" if the script
-                        // returned false, 0, or the like. However, if an error
-                        // occured, the rule actually did match!
-//                        else if (!val.isBoolean() && !val.isNumber())
-                            ret |= mrMatch;
                     }
                 }
             }
@@ -303,27 +300,41 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
 
 Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
                                       const Instance *inst,
-                                      const ConstMemberList &members) const
+                                      const ConstMemberList &members,
+                                      bool* matched) const
 {
     ScriptEngine eng(Instance::ksNoRulesEngine);
     eng.initScriptEngine();
 
-    // Create list of member indices
+    // Instance passed to the rule as 1. argument
+    QScriptValue instVal = eng.toScriptValue(inst);
+    // List of accessed member indices passed to the rule as 2. argument
     QScriptValue indexlist = eng.engine()->newArray(members.size());
     for (int i = 0; i < members.size(); ++i)
-        indexlist.setProperty(i, members[i]->index());
+        indexlist.setProperty(i, eng.engine()->toScriptValue( members[i]->index()));
+    // Which function to call?
+    QString funcName(js::inlinefunc);
+    if (arule.rule->actionType() == TypeRule::atFunction)
+        funcName = arule.rule->action();
 
     QScriptValueList args;
-    args << eng.toScriptValue(inst) << indexlist;
+    args << instVal << indexlist;
+    QScriptValue ret(eng.evaluateFunction(funcName, args, *arule.prog,
+                                          arule.rule->includePaths()));
 
-    QScriptValue ret(eng.evaluateFunction(arule.rule->action(), args, *arule.prog));
+    if (matched)
+        *matched = true;
 
     if (eng.lastEvaluationFailed())
         warnEvalError(&eng, arule.prog->fileName());
+    else if (ret.isBool() || ret.isNumber() || ret.isNull()) {
+        if (matched)
+            *matched = ret.toBool();
+    }
+    else
+        return qscriptvalue_cast<Instance>(ret);
 
-    debugmsg(ret.toString());
-
-    return ret.toVariant().value<Instance>();
+    return Instance();
 }
 
 

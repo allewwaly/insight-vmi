@@ -13,7 +13,6 @@
 #include <QStringList>
 #include "instance.h"
 #include "genericexception.h"
-#include "instancedata.h"
 
 
 /**
@@ -113,7 +112,7 @@
  * \sa Instance
  * \sa InstanceClass
  */
-class InstancePrototype : public QObject, public QScriptable
+class InstancePrototype : public QObject, protected QScriptable
 {
     Q_OBJECT
 
@@ -128,6 +127,25 @@ public:
      * Destructor
      */
     virtual ~InstancePrototype();
+
+    /**
+     * Returns the used knowledge sources when resolving members.
+     * \sa setKnowledgeSources()
+     */
+    inline Instance::KnowledgeSources knowledgeSources() const
+    {
+        return _knowSrc;
+    }
+
+    /**
+     * Sets the used knowledge sources when resolving members.
+     * @param src knowlege sources
+     * \sa knowledgeSources()
+     */
+    inline void setKnowledgeSources(Instance::KnowledgeSources src)
+    {
+        _knowSrc = src;
+    }
 
 public slots:
 	/**
@@ -776,6 +794,7 @@ private:
     inline Instance* thisInstance() const;
     inline void injectScriptError(const GenericException& e) const;
     inline void injectScriptError(const QString& msg) const;
+    Instance::KnowledgeSources _knowSrc;
 };
 
 #endif /* INSTANCEPROTOTYPE_H_ */

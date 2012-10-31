@@ -183,6 +183,16 @@ void ScriptEngine::checkEvalErrors(const QScriptValue &result)
 
 
 QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
+									const QStringList& includePaths)
+{
+	QStringList argv(program.fileName());
+	QStringList inc(QFileInfo(program.fileName()).absoluteFilePath());
+	inc += includePaths;
+	return evaluate(program, argv, inc);
+}
+
+
+QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
 		const QStringList& argv, const QStringList& includePaths)
 {
 	prepareEvaluation(argv, includePaths);
@@ -207,11 +217,10 @@ QScriptValue ScriptEngine::evaluate(const QString &code,
 
 
 QScriptValue ScriptEngine::evaluateFunction(const QString &func,
-		const QScriptValueList &funcArgs, const QScriptProgram &program)
+		const QScriptValueList &funcArgs, const QScriptProgram &program,
+		const QStringList& includePaths)
 {
-	QStringList argv(program.fileName());
-	QStringList includePaths(QFileInfo(program.fileName()).absoluteFilePath());
-	QScriptValue ret(evaluate(program, argv, includePaths));
+	QScriptValue ret(evaluate(program, includePaths));
 
 	if (_lastEvalFailed)
 		return ret;

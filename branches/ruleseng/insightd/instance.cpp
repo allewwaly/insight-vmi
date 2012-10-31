@@ -481,58 +481,91 @@ Instance Instance::member(const Structured* s, const ConstMemberList &members,
 	const StructuredMember* m = members.last();
 	int match = 0;
 
+	Instance ret;
+
+	// If allowed, and available, try the rule engine first
 	if (_ruleEngine && !(src & ksNoRulesEngine)) {
-		Instance* newInst = 0;
-		match = _ruleEngine->match(this, members, &newInst);
+		ConstMemberList mlist(members);
+		Instance* newInst = typeRuleMatchRek(mlist, &match);
 		if (match & TypeRuleEngine::mrMatch) {
 			if (newInst) {
-				QScopedPointer<Instance> instPtr(newInst);
-				return *newInst;
+				ret = *newInst;
+				delete newInst;
 			}
 			else
 				return Instance(Instance::orRuleEngine);
 		}
-//		match = 0;
 	}
 
-	int extraOffset = 0;
-	for (int i = 0; i + 1 < members.size(); ++i)
-		extraOffset += members[i]->offset();
-
-
-	if ( !(src & ksNoAltTypes )) {
-		// See how many candidates are compatible with this instance
-		int cndtIndex = -1;
-		for (int i = 0; i < m->altRefTypeCount(); ++i) {
-			if (m->altRefTypes().at(i).compatible(this)) {
-				// Is this the first compatible candidate?
-				if (cndtIndex < 0)
-					cndtIndex = i;
-				// More than one candidate
-				else {
-					cndtIndex = -1;
-					break;
+	// If no match through the rule engine, try to resolve ourself
+	if ( !(match & TypeRuleEngine::mrMatch) ) {
+		int extraOffset = 0;
+		for (int i = 0; i + 1 < members.size(); ++i)
+			extraOffset += members[i]->offset();
+		// Should we use candidate types
+		if (src & ksNoAltTypes) {
+			ret = m->toInstance(_d.address + extraOffset, _d.vmem, this,
+								resolveTypes, maxPtrDeref);
+		}
+		// Try the candidate type
+		else {
+			// See how many candidates are compatible with this instance
+			int cndtIndex = -1;
+			for (int i = 0; i < m->altRefTypeCount(); ++i) {
+				if (m->altRefTypes().at(i).compatible(this)) {
+					// Is this the first compatible candidate?
+					if (cndtIndex < 0)
+						cndtIndex = i;
+					// More than one candidate
+					else {
+						cndtIndex = -1;
+						break;
+					}
 				}
 			}
-		}
 
-		// If we found only one compabile candidate, we return that one
-		if (cndtIndex >= 0) {
-			Instance inst(memberCandidate(m, cndtIndex));
-			// Dereference instance again, if required
-			if (inst.type() && inst.type()->type() & resolveTypes)
-				inst = inst.dereference(resolveTypes,
-										maxPtrDeref > 0 ? maxPtrDeref - 1
-														: maxPtrDeref);
-			return inst;
+			// If we found only one compabile candidate, we return that one
+			if (cndtIndex >= 0) {
+				ret = memberCandidate(m, cndtIndex);
+				// Dereference instance again, if required
+				if (ret.type() && ret.type()->type() & resolveTypes)
+					ret = ret.dereference(resolveTypes,
+										  maxPtrDeref > 0 ? maxPtrDeref - 1
+														  : maxPtrDeref);
+			}
+			else
+				ret = m->toInstance(_d.address + extraOffset, _d.vmem, this,
+									resolveTypes, maxPtrDeref);
 		}
-		else
-			return m->toInstance(_d.address + extraOffset, _d.vmem, this,
-								 resolveTypes, maxPtrDeref);
 	}
 
-	return m->toInstance(_d.address + extraOffset, _d.vmem, this,
-						 resolveTypes, maxPtrDeref);
+	// Do we need to store this instance for further rule evaluation?
+	if (match & TypeRuleEngine::mrDefer) {
+		ret._d.parent = new InstanceData(_d);
+	}
+
+	return ret;
+}
+
+
+Instance* Instance::typeRuleMatchRek(ConstMemberList &members, int* match) const
+{
+	Instance* newInst = 0;
+	// Try the parent instance first
+	if (hasParent()) {
+		Instance p(parent());
+		members.prepend(_d.fromParent);
+		newInst = p.typeRuleMatchRek(members, match);
+	}
+
+	// Try this instance then
+	if ( !((*match) & TypeRuleEngine::mrMatch) ) {
+		if (hasParent())
+			members.pop_front();
+		*match = _ruleEngine->match(this, members, &newInst);
+	}
+
+	return newInst;
 }
 
 
@@ -542,9 +575,9 @@ Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && index >= 0 && index < s->members().size()) {
 		const StructuredMember* m = s->members().at(index);
-		ConstMemberList list;
-		list += m;
-		return member(s, list, resolveTypes, maxPtrDeref, src);
+//		ConstMemberList list;
+//		list += m;
+		return member(s, ConstMemberList() << m, resolveTypes, maxPtrDeref, src);
 	}
 	return Instance();
 }
@@ -1220,6 +1253,12 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
         return false;
     }
     return isValid;
+}
+
+
+Instance Instance::parent() const
+{
+    return _d.parent ? Instance(*_d.parent) : Instance();
 }
 
 

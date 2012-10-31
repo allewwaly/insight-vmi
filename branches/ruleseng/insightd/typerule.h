@@ -1,7 +1,7 @@
 #ifndef TYPERULE_H
 #define TYPERULE_H
 
-#include <QString>
+#include <QStringList>
 
 class InstanceFilter;
 class OsFilter;
@@ -136,6 +136,17 @@ public:
     inline void setScriptFile(const QString& file) { _scriptFile = file; }
 
     /**
+     * Returns the script include paths for this rule.
+     */
+    inline const QStringList& includePaths() const { return _includePaths; }
+
+    /**
+     * Sets the script include paths for this rule.
+     * @param paths list of include paths
+     */
+    inline void setIncludePaths(const QStringList& paths) { _includePaths = paths; }
+
+    /**
      * Returns the file index this rule was read from.
      */
     inline int srcFileIndex() const { return _srcFileIndex; }
@@ -211,6 +222,7 @@ private:
     ActionType _actionType;
     QString _action;
     QString _scriptFile;
+    QStringList _includePaths;
     int _srcFileIndex;
     int _srcLine;
     int _actionSrcLine;

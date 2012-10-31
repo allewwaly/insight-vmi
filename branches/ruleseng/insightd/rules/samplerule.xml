@@ -26,16 +26,15 @@
                     <field match="wildcard">*</field>
                 </fields>
             </filter>
-            <action src="file" file="samplerule.js">handleModules</action>
-<!--            <action src="inline">
-                // var inst = instance to check
-                // var fields = array of requested field(s)
-                for (var i = 0; i < ARGV.length
-                inst = inst.Member(fields[0]);
+<!--            <action src="file" file="samplerule.js">getModules</action>-->
+            <action src="inline">
+                var inst = arguments[0];
+                var members = arguments[1];
+                inst = inst.Member(members[0]);
                 inst.ChangeType("module");
-                inst.AddToAddress(inst.MemberOffset("list"));
+                inst.AddToAddress(-inst.MemberOffset("list"));
                 return inst;
-            </action>-->
+            </action>
         </rule>
 
         <rule>
@@ -52,14 +51,15 @@
                     <field match="wildcard">*</field>
                 </fields>
             </filter>
-            <action src="inline">
+            <action src="file" file="samplerule.js">getModuleList</action>
+<!--            <action src="inline">
                 // var inst = instance to check
                 // var fields = array of requested field(s)
                 inst = inst.Member(fields[0]);
                 inst.ChangeType("module");
                 inst.AddToAddress(inst.MemberOffset("list"));
                 return inst;
-            </action>
+            </action>-->
         </rule>
 
 <!--

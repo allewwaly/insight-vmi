@@ -18,6 +18,8 @@ namespace js
 extern const char* getInstance;
 extern const char* instance;
 extern const char* length;
+extern const char* useRules;
+extern const char* useCandidates;
 }
 
 // Forward declarations
@@ -55,6 +57,9 @@ public:
     QScriptValue prototype() const;
 
 private:
+    static QScriptValue getSetUseCandidates(QScriptContext *ctx, QScriptEngine *eng);
+    static QScriptValue getSetUseRules(QScriptContext *ctx, QScriptEngine *eng);
+
     static QScriptValue construct(QScriptContext* ctx, QScriptEngine* eng);
 
     static QScriptValue instToScriptValue(QScriptEngine* eng, const Instance& inst);
@@ -73,7 +78,6 @@ private:
     InstancePrototype* _proto;
     QScriptValue _protoScriptVal;
     QScriptValue _ctor;
-    Instance::KnowledgeSources _knowSrc;
 };
 
 
