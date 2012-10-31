@@ -32,10 +32,42 @@ typedef QList<Instance> InstanceList;
 class Instance
 {
 public:
+    /// How was this instance originally created?
+    enum Origin {
+        orUnknown = 0,   ///< unknown origin
+        orVariable,      ///< from a Variable object
+        orBaseType,      ///< from a BaseType object (manually)
+        orMember,        ///< from a regular member access
+        orCandidate,     ///< from a candidate type (ReferencingType::AltRefType)
+        orRuleEngine,    ///< from a scripted rule in the TypeRuleEngine
+        orMemMapNode     ///< from a MemoryMapNode
+    };
+
+    /// Which knowledge sources to use when accessing members?
+    enum KnowledgeSources {
+        ksAll = 0,                 ///< all sources
+        ksNoAltTypes      = (1 << 0), ///< do not use alternative types
+        ksNoRulesEngine   = (1 << 1), ///< do not use the rule engine
+        ksNone = ksNoAltTypes|ksNoRulesEngine ///< use only the declared types
+    };
+
+    /**
+     * Returns a string representation of origin \a o.
+     * @param o origin
+     * @return string
+     */
+    static const char* originToString(Origin o);
+
     /**
      * Constructor
      */
     Instance();
+
+    /**
+     * Constructor which sets the origin
+     * @param orig origin of this instance
+     */
+    Instance(Origin orig);
 
     /**
      * Constructor
@@ -64,6 +96,21 @@ public:
      * otherwise
      */
     int id() const;
+
+    /**
+     * Returns the origin of this instance.
+     * @return see Origin
+     * \sa setOrigin()
+     */
+    Origin origin() const;
+
+    /**
+     * Mark the origin of this instance as begin from \a orig. This value is
+     * of pure informational purpose.
+     * @param orig origin
+     * \sa origin()
+     */
+    void setOrigin(Origin orig);
 
     /**
      * @return the array index of the memory dump this instance belongs to
@@ -351,7 +398,7 @@ public:
      * \sa BaseType::TypeResolution
      */
     Instance member(int index, int resolveTypes = 0,
-                    int maxPtrDeref = -1, bool declaredType = false) const;
+                    int maxPtrDeref = -1, KnowledgeSources src = ksAll) const;
 
     /**
      * Retrieves a member (i.e., struct components) of this Instance, if it
@@ -373,7 +420,7 @@ public:
      * \sa BaseType::TypeResolution
      */
     Instance member(const QString& name, int resolveTypes = 0,
-                    int maxPtrDeref = -1, bool declaredType = false) const;
+                    int maxPtrDeref = -1, KnowledgeSources src = ksAll) const;
 
     /**
      * Obtain the member of this instance that has the given offset provided that
@@ -738,8 +785,8 @@ public:
 private:
     typedef QSet<quint64> VisitedSet;
 
-    Instance member(const Structured *s, const ConstMemberList& members, int resolveTypes, int maxPtrDeref,
-                    bool declaredType) const;
+    Instance member(const Structured *s, const ConstMemberList& members,
+                    int resolveTypes, int maxPtrDeref, KnowledgeSources src = ksAll) const;
 
     void differencesRek(const Instance& other, const QString& relParent,
             bool includeNestedStructs, QStringList& result,

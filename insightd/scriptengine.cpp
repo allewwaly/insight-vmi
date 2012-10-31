@@ -31,9 +31,9 @@ const char* path_sep        = ":";
 }
 
 
-ScriptEngine::ScriptEngine()
+ScriptEngine::ScriptEngine(int knowledgeSources)
 	: _engine(0), _instClass(0), _symClass(0), _memClass(0),
-	  _lastEvalFailed(false), _initialized(false)
+	  _lastEvalFailed(false), _initialized(false), _knowSrc(knowledgeSources)
 {
 }
 
@@ -127,7 +127,7 @@ void ScriptEngine::initScriptEngine()
     		_engine->newFunction(scriptInclude, 1),
     		roFlags|QScriptValue::KeepExistingFlags);
 
-    _instClass = new InstanceClass(_engine);
+    _instClass = new InstanceClass(_engine, (Instance::KnowledgeSources)_knowSrc);
     _engine->globalObject().setProperty(js::instance,
     		_instClass->constructor(),
     		roFlags);
@@ -166,6 +166,22 @@ void ScriptEngine::prepareEvaluation(const QStringList &argv,
 }
 
 
+void ScriptEngine::checkEvalErrors(const QScriptValue &result)
+{
+	// Save the last error message
+	if (_engine->hasUncaughtException()) {
+		_lastError = _engine->uncaughtException().toString();
+		_lastEvalFailed = true;
+	}
+	else if (result.isError()) {
+		_lastError = result.toString();
+		_lastEvalFailed = true;
+	}
+	else
+		_lastEvalFailed = false;
+}
+
+
 QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
 		const QStringList& argv, const QStringList& includePaths)
 {
@@ -174,12 +190,7 @@ QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
 	VarSetter<bool> setter(&_initialized, true, false);
 
 	QScriptValue ret(_engine->evaluate(program));
-
-	// Save the last error message
-	if (_engine->hasUncaughtException())
-		_lastError = _engine->uncaughtException().toString();
-	else if (ret.isError())
-		_lastError = ret.toString();
+	checkEvalErrors(ret);;
 
 	return ret;
 }
@@ -202,11 +213,14 @@ QScriptValue ScriptEngine::evaluateFunction(const QString &func,
 	QStringList includePaths(QFileInfo(program.fileName()).absoluteFilePath());
 	QScriptValue ret(evaluate(program, argv, includePaths));
 
-	if (_engine->hasUncaughtException() || ret.isError())
+	if (_lastEvalFailed)
 		return ret;
 	// Obtain the function object
-	ret = _engine->globalObject().property(func);
-	return ret.call(QScriptValue(), funcArgs);
+	QScriptValue f(_engine->globalObject().property(func));
+	ret = f.call(QScriptValue(), funcArgs);
+	checkEvalErrors(ret);
+
+	return ret;
 }
 
 
@@ -225,6 +239,15 @@ ScriptEngine::FuncExistsResult ScriptEngine::functionExists(const QString& func,
 		return feExists;
 	else
 		return feDoesNotExist;
+}
+
+
+void ScriptEngine::addGlobalProperty(const QString &name,
+									 const QScriptValue &value,
+									 const QScriptValue::PropertyFlags & flags)
+{
+	initScriptEngine();
+	_engine->globalObject().setProperty(name, value, flags);
 }
 
 

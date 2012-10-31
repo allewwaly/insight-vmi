@@ -10,6 +10,12 @@
 #include "variable.h"
 #include <debug.h>
 
+//namespace js
+//{
+//const char* ignore_rule = "IGNORE_RULE";
+//}
+
+
 TypeRuleEngine::TypeRuleEngine()
 {
 }
@@ -89,12 +95,12 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
 {
     _hits.fill(0, _rules.size());
     _activeRules.clear();
+    _rulesPerType.clear();
 
     if (!factory->symbolsAvailable())
         return;
 
-    ScriptEngine evalEng;
-    QStringList includes, args;
+    ScriptEngine evalEng(Instance::ksNoRulesEngine);
 
     int i = -1;
     foreach (const TypeRule* rule, _rules) {
@@ -238,14 +244,14 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     if (!inst || !inst->type())
         return mrNoMatch;
 
+    int ret = mrNoMatch;
+
     ActiveRuleHash::const_iterator it = _rulesPerType.find(inst->type()->id()),
             e = _rulesPerType.end();
 
-    int ret = mrNoMatch;
-
     // Rules with variable names might need to match inst->name(), so check all.
     // We can stop as soon as all possibly ORed values are included.
-    while (it != e && it.key() == inst->type()->id() && ret != mrMatchAndDefer)
+    for (; it != e && it.key() == inst->type()->id() && ret != mrMatchAndDefer; ++it)
     {
         const TypeRule* rule = it.value().rule;
         if (rule->match(inst)) {
@@ -266,9 +272,24 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                             match = false;
                     // Only consider the first match
                     if (match && !(ret & mrMatch)) {
-
-                        *newInst = new Instance();
-                        ret |= mrMatch;
+                        // Evaluate the rule
+                        Instance instRet(evaluateRule(it.value(), inst, members));
+//                        debugmsg(val.toString());
+//                        Instance inst = qvariant_cast<Instance>(val.data().toVariant());
+                        if (instRet.isValid()) {
+                            instRet.setOrigin(Instance::orRuleEngine);
+                            *newInst = new Instance(instRet);
+                        }
+                        // An Instance is returned as variant
+//                        if (val.isVariant()) {
+//                            *newInst = new Instance(val.toVariant().value<Instance>());
+//                            (*newInst)->setOrigin(Instance::orRuleEngine);
+//                        }
+                        // Consider the rules not as "matched" if the script
+                        // returned false, 0, or the like. However, if an error
+                        // occured, the rule actually did match!
+//                        else if (!val.isBoolean() && !val.isNumber())
+                            ret |= mrMatch;
                     }
                 }
             }
@@ -280,20 +301,50 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     return ret;
 }
 
-QScriptValue TypeRuleEngine::evaluateRule(const ActiveRule& arule,
-                                          const Instance *inst,
-                                          const ConstMemberList &members)
+Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
+                                      const Instance *inst,
+                                      const ConstMemberList &members) const
 {
-    // Prepare list of member indices
-    QVector<int> indexlist(members.size());
+    ScriptEngine eng(Instance::ksNoRulesEngine);
+    eng.initScriptEngine();
+
+    // Create list of member indices
+    QScriptValue indexlist = eng.engine()->newArray(members.size());
     for (int i = 0; i < members.size(); ++i)
-        indexlist[i] = members[i]->index();
+        indexlist.setProperty(i, members[i]->index());
 
-    ScriptEngine eng;
     QScriptValueList args;
-    args << eng.toScriptValue(inst) << eng.toScriptValue(indexlist);
+    args << eng.toScriptValue(inst) << indexlist;
 
-    return eng.evaluateFunction(arule.rule->action(), args, *arule.prog);
+    QScriptValue ret(eng.evaluateFunction(arule.rule->action(), args, *arule.prog));
+
+    if (eng.lastEvaluationFailed())
+        warnEvalError(&eng, arule.prog->fileName());
+
+    debugmsg(ret.toString());
+
+    return ret.toVariant().value<Instance>();
+}
+
+
+void TypeRuleEngine::warnEvalError(const ScriptEngine *eng,
+                                   const QString &fileName) const
+{
+    // Print errors as warnings
+    if (eng && eng->lastEvaluationFailed()) {
+        QString file(shortFileName(fileName));
+        shell->err() << shell->color(ctWarning) << "At "
+                     << shell->color(ctBold) << file
+                     << shell->color(ctWarning);
+        if (eng->hasUncaughtException()) {
+            shell->err() << ":"
+                         << shell->color(ctBold)
+                         << eng->uncaughtExceptionLineNumber()
+                         << shell->color(ctWarning);
+        }
+        shell->err() << ": " << eng->lastError()
+                     << shell->color(ctReset) << endl;
+    }
 }
 
 
@@ -302,24 +353,24 @@ void TypeRuleEngine::warnRule(const TypeRule* rule, const QString &msg) const
     if (!rule)
         return;
 
-    shell->out() << shell->color(ctWarningLight) << "Warning: "
+    shell->err() << shell->color(ctWarningLight) << "Warning: "
                  << shell->color(ctWarning) << "Rule ";
     if (!rule->name().isEmpty()) {
-        shell->out() << shell->color(ctBold) << rule->name()
+        shell->err() << shell->color(ctBold) << rule->name()
                      << shell->color(ctWarning) << " ";
     }
     if (rule->srcFileIndex() >= 0) {
         // Use as-short-as-possible file name
         QString file(shortFileName(ruleFile(rule)));
 
-        shell->out() << "defined in "
+        shell->err() << "defined in "
                      << shell->color(ctBold) << file << shell->color(ctWarning)
                      << " line "
                      << shell->color(ctBold) << rule->srcLine()
                      << shell->color(ctWarning) << " ";
     }
 
-    shell->out() << msg << shell->color((ctReset)) << endl;
+    shell->err() << msg << shell->color((ctReset)) << endl;
 }
 
 

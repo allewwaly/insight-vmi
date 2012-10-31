@@ -73,6 +73,7 @@ Instance StructuredMember::toInstance(size_t structAddress,
 		inst.setBitOffset(_bitOffset);
 	}
 
+	inst.setOrigin(Instance::orMember);
 	return inst;
 }
 

@@ -122,9 +122,11 @@ MemoryMapNode* MemoryMapNode::addChild(const Instance& inst)
 
 Instance MemoryMapNode::toInstance(bool includeParentNameComponents) const
 {
-    return Instance(_address, _type, _name,
+    Instance inst(_address, _type, _name,
             includeParentNameComponents ? parentNameComponents() : QStringList(),
             _belongsTo->vmem(), _id);
+    inst.setOrigin(Instance::orMemMapNode);
+    return inst;
 }
 
 

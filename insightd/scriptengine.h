@@ -22,8 +22,6 @@ class InstanceClass;
 class KernelSymbolsClass;
 class MemoryDumpsClass;
 
-Q_DECLARE_METATYPE(QVector<int>)
-
 /**
  * This class manages and executes the QtScript scripting engine.
  *
@@ -42,8 +40,11 @@ public:
 
 	/**
 	 * Constructor
+	 * @param knowledgeSources Which knowledge sources should be used when
+	 * resolving members?
+	 * \sa Instance::KnowledgeSources
 	 */
-	ScriptEngine();
+	ScriptEngine(int knowledgeSources = 0);
 
 	/**
 	 * Destructor
@@ -168,6 +169,21 @@ public:
     inline const QString& lastError() const { return _lastError; }
 
     /**
+     * Adds the given value as property with given name to the global object.
+     * This value will be globally addressable by this name from anywhere within
+     * the script.
+     * @param name property name
+     * @param value value for property
+     * @param flags changes the behavior of the property, e.g., ro/rw access
+     * \sa QScriptValue::PropertyFlags, toScriptValue()
+     */
+    void addGlobalProperty(const QString& name, const QScriptValue& value,
+            const QScriptValue::PropertyFlags &flags =
+                QScriptValue::ReadOnly|QScriptValue::Undeletable);
+
+    QScriptValue newArray(uint length = 0);
+
+    /**
      * Creates a QScriptValue from Instance \a inst.
      * @param inst Instance
      * @return script value
@@ -175,18 +191,25 @@ public:
     QScriptValue toScriptValue(const Instance* inst);
 
     /**
-     * Creates a QScriptValue from Instance \a inst.
-     * @param inst Instance
-     * @return script value
+     * Initializes the internal QScriptEngine, if not yet done. Call this
+     * function before accessing engine().
+     *
+     * \warning If the engine was used once to evaluate code and is used again,
+     * be sure to call initScriptEngine() \b before you create new scripting
+     * objects with engine->newXXX() for the next evaluation!
      */
-    template<class T>
-    inline QScriptValue toScriptValue(const T& val)
-    {
-        initScriptEngine();
-        return _engine->toScriptValue(val);
-    }
+    void initScriptEngine();
+
+    /**
+     * Gives access to the script engine used internally. This function returns
+     * \c null unless initScriptEngine() has been called.
+     * \sa initScriptEngine()
+     */
+    inline QScriptEngine* engine() { return _engine; }
 
 private:
+	void checkEvalErrors(const QScriptValue& result);
+
 	QScriptEngine* _engine;
 	InstanceClass* _instClass;
 	KernelSymbolsClass* _symClass;
@@ -194,8 +217,8 @@ private:
 	QString _lastError;
 	bool _lastEvalFailed;
 	bool _initialized;
+	int _knowSrc;
 
-	void initScriptEngine();
 	void prepareEvaluation(const QStringList &argv, const QStringList &includePaths);
 
     static QScriptValue scriptGetInstance(QScriptContext* ctx, QScriptEngine* eng, void* arg);
