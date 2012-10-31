@@ -11,8 +11,7 @@
 
 
 InstanceData::InstanceData()
-    : id(-1), address(0),  bitSize(-1), bitOffset(-1), type(0), vmem(0),
-      isNull(true), isValid(false)
+    : id(-1), address(0),  bitSize(-1), bitOffset(-1), origin(0), type(0), vmem(0)
 {
 }
 

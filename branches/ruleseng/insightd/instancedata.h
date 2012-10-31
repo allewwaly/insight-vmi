@@ -30,12 +30,11 @@ public:
     size_t address;
     qint8 bitSize;
     qint8 bitOffset;
+    quint8 origin;
     const BaseType* type;
     VirtualMemory* vmem;
     QString name;
     QStringList parentNames;
-    bool isNull;
-    bool isValid;
 
     QStringList fullNames() const;
 };

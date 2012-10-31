@@ -299,17 +299,20 @@ int InstancePrototype::MemberCount() const
 Instance InstancePrototype::Member(const QString& name, bool declaredType) const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ?
-            inst->member(name, BaseType::trAny, -1, declaredType) : Instance();
+	return ((inst = thisInstance()))
+			? inst->member(name, BaseType::trAny, -1,
+						 declaredType ? Instance::ksNone : Instance::ksAll)
+			: Instance();
 }
 
 
 Instance InstancePrototype::Member(int index, bool declaredType) const
 {
     Instance* inst;
-    return ((inst = thisInstance())) ?
-                inst->member(index, BaseType::trAny, -1, declaredType) :
-                Instance();
+    return ((inst = thisInstance()))
+            ? inst->member(index, BaseType::trAny, -1,
+                           declaredType ? Instance::ksNone : Instance::ksAll)
+            : Instance();
 }
 
 

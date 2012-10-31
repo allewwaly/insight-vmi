@@ -31,7 +31,7 @@ class InstancePrototype;
 class InstanceClass : public QScriptClass
 {
 public:
-    InstanceClass(QScriptEngine *eng);
+    InstanceClass(QScriptEngine *eng, Instance::KnowledgeSources src);
     ~InstanceClass();
 
     QScriptValue constructor();
@@ -58,7 +58,11 @@ private:
     static QScriptValue construct(QScriptContext* ctx, QScriptEngine* eng);
 
     static QScriptValue instToScriptValue(QScriptEngine* eng, const Instance& inst);
-    static void instFromScriptValue(const QScriptValue& obj, Instance& inst);
+    inline static void instFromScriptValue(const QScriptValue& obj, Instance& inst)
+    {
+        inst = qvariant_cast<Instance>(obj.data().toVariant());
+    }
+
 
     static QScriptValue membersToScriptValue(QScriptEngine* eng, const InstanceList& inst);
     static void membersFromScriptValue(const QScriptValue& obj, InstanceList& inst);
@@ -69,6 +73,7 @@ private:
     InstancePrototype* _proto;
     QScriptValue _protoScriptVal;
     QScriptValue _ctor;
+    Instance::KnowledgeSources _knowSrc;
 };
 
 

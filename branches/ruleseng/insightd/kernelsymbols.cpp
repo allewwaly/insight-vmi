@@ -35,7 +35,6 @@
 KernelSymbols::KernelSymbols()
 	: _factory(_memSpecs)
 {
-	Instance::setRuleEngine(&_ruleEngine);
 }
 
 
@@ -232,12 +231,19 @@ void KernelSymbols::loadRules(const QString &fileName, bool forceRead)
 
 void KernelSymbols::flushRules()
 {
+    Instance::setRuleEngine(0);
     _ruleEngine.clear();
 }
 
 
 void KernelSymbols::checkRules()
 {
+    Instance::setRuleEngine(0);
+
     OsSpecs specs(&_memSpecs);
     _ruleEngine.checkRules(&_factory, &specs);
+
+    // Enable engine only if we have active rules
+    if (!_ruleEngine.activeRules().isEmpty())
+        Instance::setRuleEngine(&_ruleEngine);
 }

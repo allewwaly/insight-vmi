@@ -15,6 +15,7 @@ class SymFactory;
 class OsFilter;
 class OsSpecs;
 class Instance;
+class ScriptEngine;
 
 typedef QSharedPointer<const QScriptProgram> QScriptProgramPtr;
 
@@ -51,10 +52,13 @@ class TypeRuleEngine
 public:
     /// Result of matching an Instance against the rule set
     enum MatchResult {
-        mrNoMatch  = 0,         ///< no rule matches
-        mrMatch    = (1 << 0),  ///< one rule matches
-        mrDefer    = (1 << 1),  ///< one rule may match with further members given
+        mrNoMatch         = 0,         ///< no rule matched
+        mrMatch           = (1 << 0),  ///< one rule matched and was evaluated
+        mrDefer           = (1 << 1),  ///< one rule may match with further members given
         mrMatchAndDefer = mrMatch|mrDefer ///< one rule matches, further rules might match with more members
+//        mrIgnoreRule      = (1 << 2)   ///< the matched rule asked to be ignored
+//        mrInvalidObject   = (1 << 3),  ///< the matched rule considers the returned object invalid
+//        mrInvalidChildren = (1 << 4)   ///< the matched rule considers all children of the returned object invalid
     };
 
     /**
@@ -150,9 +154,10 @@ public:
               Instance **newInst) const;
 
 private:
-    QScriptValue evaluateRule(const ActiveRule &arule, const Instance* inst,
-                              const ConstMemberList &members);
+    Instance evaluateRule(const ActiveRule &arule, const Instance* inst,
+                              const ConstMemberList &members) const;
 
+    void warnEvalError(const ScriptEngine* eng, const QString& fileName) const;
     void warnRule(const TypeRule *rule, const QString& msg) const;
     QString shortFileName(const QString& fileName) const;
 

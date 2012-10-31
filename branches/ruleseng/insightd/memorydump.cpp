@@ -247,7 +247,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	Instance result;
 	QString typeString, symbol, offsetString, candidate, arrayIndexString;
 	bool okay;
-    quint32 compatibleCnt = 0;
+//    quint32 compatibleCnt = 0;
 
 	// A component should have the form (symbol(-offset)?)?symbol(<candidate>)?([index])?
 #define SYMBOL "[A-Za-z0-9_]+"
@@ -333,47 +333,53 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
             result = instance.memberCandidate(symbol, candidateIndex - 1);
         }
         else {
-            // If the member has exactly one alternative type and the user did
-            // not explicitly request the original type, we return the
-            // alternative type
-            if (candidateIndex < 0 &&
-                instance.memberCandidatesCount(symbol) == 1)
-                result = instance.memberCandidate(symbol, 0);
-            else {
-                // If there is only one compatible candidate return that one.
-                for(int i = 0; i < instance.memberCandidatesCount(symbol); i++) {
-                    if(instance.memberCandidateCompatible(instance.indexOfMember(symbol), i)) {
-                        compatibleCnt++;
+//            // If the member has exactly one alternative type and the user did
+//            // not explicitly request the original type, we return the
+//            // alternative type
+//            if (candidateIndex < 0 &&
+//                instance.memberCandidatesCount(symbol) == 1)
+//                result = instance.memberCandidate(symbol, 0);
+//            else {
+//                // If there is only one compatible candidate return that one.
+//                for(int i = 0; i < instance.memberCandidatesCount(symbol); i++) {
+//                    if(instance.memberCandidateCompatible(instance.indexOfMember(symbol), i)) {
+//                        compatibleCnt++;
 
-                        if(compatibleCnt == 1)
-                            result = instance.memberCandidate(symbol, i);
-                        else
-                            break;
-                    }
+//                        if(compatibleCnt == 1)
+//                            result = instance.memberCandidate(symbol, i);
+//                        else
+//                            break;
+//                    }
 
-                }
+//                }
 
-                if (compatibleCnt != 1)
-                    result = instance.member(symbol, BaseType::trLexical, 0, true);
-            }
+//                if (compatibleCnt != 1)
+//                    result = instance.member(symbol, BaseType::trLexical, 0, true);
+//            }
+            result = instance.member(symbol, BaseType::trLexical);
         }
 
         if (!result.isValid()) {
-            if (!result.type())
-                queryError(QString("The type 0x%3 of member \"%1.%2\" is "
-                            "unresolved")
-                            .arg(instance.fullName())
-                            .arg(symbol)
-                            .arg(instance.typeIdOfMember(symbol), 0, 16));
-            else if (candidateIndex > 0)
+//            if (!result.type())
+//                queryError(QString("The type 0x%3 of member \"%1.%2\" is "
+//                            "unresolved")
+//                            .arg(instance.fullName())
+//                            .arg(symbol)
+//                            .arg(instance.typeIdOfMember(symbol), 0, 16));
+            if (candidateIndex > 0)
                 queryError(QString("The member candidate \"%1.%2<%3>\" is invalid")
                             .arg(instance.fullName())
                             .arg(symbol)
                             .arg(candidateIndex));
-            else
-                queryError(QString("The member \"%1.%2\" is invalid")
+            else if (result.origin() == Instance::orRuleEngine)
+                queryError(QString("The member \"%1.%2\" returned by the rule engine is invalid.")
                             .arg(instance.fullName())
                             .arg(symbol));
+            else
+                queryError(QString("The member \"%1.%2\" is invalid (origin: %3)")
+                           .arg(instance.fullName())
+                           .arg(symbol)
+                           .arg(Instance::originToString(result.origin())));
         }
 	}
 	

@@ -49,8 +49,8 @@ private:
 
 //------------------------------------------------------------------------------
 
-InstanceClass::InstanceClass(QScriptEngine *eng)
-    : QScriptClass(eng), _proto(0)
+InstanceClass::InstanceClass(QScriptEngine *eng, Instance::KnowledgeSources src)
+    : QScriptClass(eng), _proto(0), _knowSrc(src)
 {
     qScriptRegisterMetaType<Instance>(eng, instToScriptValue, instFromScriptValue);
     qScriptRegisterMetaType<InstanceList>(eng, membersToScriptValue, membersFromScriptValue);
@@ -117,9 +117,7 @@ QScriptValue InstanceClass::property(const QScriptValue& object,
 
     // If the member has exactly one alternative type, we return that instead of
     // the original member
-    Instance member = (inst->memberCandidatesCount(id) == 1) ?
-                inst->memberCandidate(id, 0) :
-                inst->member(id, BaseType::trAny, 1);
+    Instance member = inst->member(id, BaseType::trAny, 1, _knowSrc);
 
     return newInstance(member);
 }
@@ -194,12 +192,6 @@ QScriptValue InstanceClass::instToScriptValue(QScriptEngine* eng, const Instance
     if (!cls)
         return eng->newVariant(qVariantFromValue(inst));
     return cls->newInstance(inst);
-}
-
-
-void InstanceClass::instFromScriptValue(const QScriptValue& obj, Instance& inst)
-{
-    inst = qvariant_cast<Instance>(obj.data().toVariant());
 }
 
 
@@ -313,7 +305,7 @@ QScriptString InstanceClassPropertyIterator::name() const
 {
     Instance *inst = qscriptvalue_cast<Instance*>(object().data());
     return object().engine()->toStringHandle(
-            inst->member(m_last, BaseType::trAny).name());
+            inst->memberName(m_last));
 }
 
 

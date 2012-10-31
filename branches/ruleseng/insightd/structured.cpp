@@ -152,8 +152,6 @@ inline QList<T*> Structured::memberChain(const QString& memberName,
 }
 
 
-
-
 MemberList Structured::memberChain(const QString &memberName)
 {
     return memberChain<StructuredMember, Structured>(memberName);
