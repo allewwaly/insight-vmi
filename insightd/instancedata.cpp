@@ -10,12 +10,6 @@
 //-----------------------------------------------------------------------------
 
 
-InstanceData::InstanceData()
-    : id(-1), address(0),  bitSize(-1), bitOffset(-1), origin(0), type(0), vmem(0)
-{
-}
-
-
 QStringList InstanceData::fullNames() const
 {
     QStringList result = parentNames;

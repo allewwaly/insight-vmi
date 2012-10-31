@@ -26,6 +26,9 @@ public:
      */
     TypeRuleReader(TypeRuleEngine* engine, bool forceRead = false);
 
+    /**
+     * Deletes all data and resets to default values.
+     */
     void clear();
 
     /**
@@ -37,6 +40,9 @@ public:
      */
     void readFrom(const QString& fileName);
 
+    /**
+     * Returns the name of the file being currently processed.
+     */
     inline const QString& currFile() const { return _currFile; }
 
 private:    

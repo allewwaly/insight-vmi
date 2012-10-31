@@ -15,9 +15,15 @@
 
 namespace js
 {
-const char* getInstance = "getInstance";
-const char* instance    = "Instance";
-const char* length      = "length";
+const char* getInstance   = "getInstance";
+const char* instance      = "Instance";
+const char* length        = "length";
+const char* useRules      = "useRules";
+const char* useCandidates = "useCandidates";
+
+const int propIgnore        = -1;
+const int propUseRules      = -2;
+const int propUseCandidates = -3;
 }
 
 /**
@@ -50,13 +56,14 @@ private:
 //------------------------------------------------------------------------------
 
 InstanceClass::InstanceClass(QScriptEngine *eng, Instance::KnowledgeSources src)
-    : QScriptClass(eng), _proto(0), _knowSrc(src)
+    : QScriptClass(eng), _proto(0)
 {
     qScriptRegisterMetaType<Instance>(eng, instToScriptValue, instFromScriptValue);
     qScriptRegisterMetaType<InstanceList>(eng, membersToScriptValue, membersFromScriptValue);
     qScriptRegisterMetaType<QStringList>(eng, stringListToScriptValue, stringListFromScriptValue);
 
     _proto = new InstancePrototype();
+    _proto->setKnowledgeSources(src);
     _protoScriptVal = eng->newQObject(_proto,
                                QScriptEngine::QtOwnership,
                                QScriptEngine::SkipMethodsInEnumeration
@@ -67,6 +74,14 @@ InstanceClass::InstanceClass(QScriptEngine *eng, Instance::KnowledgeSources src)
 
     _ctor = eng->newFunction(construct, _protoScriptVal);
     _ctor.setData(qScriptValueFromValue(eng, this));
+    _ctor.setProperty(js::useCandidates, eng->newFunction(getSetUseCandidates),
+                      QScriptValue::Undeletable
+                      | QScriptValue::PropertyGetter
+                      | QScriptValue::PropertySetter);
+    _ctor.setProperty(js::useRules, eng->newFunction(getSetUseRules),
+                      QScriptValue::Undeletable
+                      | QScriptValue::PropertyGetter
+                      | QScriptValue::PropertySetter);
 }
 
 
@@ -84,18 +99,18 @@ QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue& object
     if (!inst)
         return 0;
 
-    // If we have a member with that index, we handle it as a property
     QString nameStr = name.toString();
+
+    // Check if a slot with the same name exists in the prototype class.
+    // Slots have precedence over members with the same name. The member
+    // is still accessible using Member("name").
+    QByteArray slotName = QString("%1()").arg(nameStr).toAscii();
+    if (_proto->metaObject()->indexOfSlot(slotName.constData()) >= 0)
+        return 0;
+
+    // If we have a member with that index, we handle it as a property
     int index = inst->indexOfMember(nameStr);
     if (index >= 0) {
-        // Check if a slot with the same name exists in the prototype class
-        QByteArray slotName = QString("%1()").arg(nameStr).toAscii();
-        if (_proto->metaObject()->indexOfSlot(slotName.constData()) >= 0) {
-            engine()->currentContext()->throwError(
-                    "Property clash for property \"" + nameStr + "\": is a "
-                    "struct member as well as a prototype function");
-            return 0;
-        }
     	*id = (uint) index;
         return flags;
     }
@@ -112,12 +127,10 @@ QScriptValue InstanceClass::property(const QScriptValue& object,
     Instance *inst = qscriptvalue_cast<Instance*>(object.data());
     if (!inst)
         return QScriptValue();
-    // We should never be called without a valid id
-    assert(id < (uint)inst->memberCount());
 
     // If the member has exactly one alternative type, we return that instead of
     // the original member
-    Instance member = inst->member(id, BaseType::trAny, 1, _knowSrc);
+    Instance member = inst->member(id, BaseType::trAny, 1, _proto->knowledgeSources());
 
     return newInstance(member);
 }
@@ -147,6 +160,70 @@ QString InstanceClass::name() const
 QScriptValue InstanceClass::prototype() const
 {
     return _protoScriptVal;
+}
+
+
+QScriptValue InstanceClass::getSetUseCandidates(QScriptContext *ctx, QScriptEngine *eng)
+{
+    Q_UNUSED(eng);
+
+    // Try to obtain the "this" object (set in the constructor)
+    InstanceClass *cls = qscriptvalue_cast<InstanceClass*>(ctx->thisObject().data());
+    if (!cls)
+        return QScriptValue();
+
+    Instance::KnowledgeSources src = cls->_proto->knowledgeSources();
+    QScriptValue result;
+    // One argument: called as setter
+    if (ctx->argumentCount() == 1) {
+        bool value = ctx->argument(0).toBool();
+        result = value;
+        src = (Instance::KnowledgeSources)
+                (value ? (src & ~Instance::ksNoAltTypes)
+                       : (src | Instance::ksNoAltTypes));
+        cls->_proto->setKnowledgeSources(src);
+//        debugmsg("Setting " << js::instance << "." << js::useCandidates << " to "
+//                 << (value ? "true" : "false") << ", knowSrc=" << cls->_knowSrc);
+    }
+    // Otherwise: called as getter
+    else {
+        bool value = !(src & Instance::ksNoAltTypes);
+        result = value;
+//        debugmsg("Getting " << js::instance << "." << js::useCandidates << "="
+//                 << (value ? "true" : "false") << ", knowSrc=" << cls->_knowSrc);
+    }
+    return result;
+}
+
+
+QScriptValue InstanceClass::getSetUseRules(QScriptContext *ctx, QScriptEngine *eng)
+{
+    Q_UNUSED(eng);
+
+    // Try to obtain the "this" object (set in the constructor)
+    InstanceClass *cls = qscriptvalue_cast<InstanceClass*>(ctx->thisObject().data());
+    if (!cls)
+        return QScriptValue();
+
+    Instance::KnowledgeSources src = cls->_proto->knowledgeSources();
+    QScriptValue result;
+    if (ctx->argumentCount() == 1) {
+        bool value = ctx->argument(0).toBool();
+        result = value;
+        src = (Instance::KnowledgeSources)
+                (value ? (src & ~Instance::ksNoRulesEngine)
+                       : (src | Instance::ksNoRulesEngine));
+        cls->_proto->setKnowledgeSources(src);
+//        debugmsg("Setting " << js::instance << "." << js::useRules << " to "
+//                 << (value ? "true" : "false") << ", knowSrc=" << cls->_knowSrc);
+    }
+    else {
+        bool value = !(src & Instance::ksNoRulesEngine);
+        result = value;
+//        debugmsg("Getting " << js::instance << "." << js::useRules << "="
+//                 << (value ? "true" : "false") << ", knowSrc=" << cls->_knowSrc);
+    }
+    return result;
 }
 
 

@@ -11,6 +11,7 @@
 #include <QString>
 #include <QStringList>
 #include <QMetaType>
+#include <QSharedDataPointer>
 
 #include "instancedata.h"
 #include "expressionresult.h"
@@ -771,6 +772,21 @@ public:
     bool isValidConcerningMagicNumbers(bool *constants = 0) const;
 
     /**
+     * Returns \c true if this instance has a parent set, \c false otherwise.
+     * \sa parent()
+     */
+    inline bool hasParent() const { return _d.parent != 0; }
+
+    /**
+     * Returns the parent instance, if available.
+     * \note Most instances do \b not have the parent available, in which case
+     * this function returns an invalid Instance. Be sure to check hasParent()
+     * before or isValid() afterwards!
+     * \sa hasParent(), isvalid()
+     */
+    Instance parent() const;
+
+    /**
      * Returns the global rule engine used by all instances.
      */
     inline static const TypeRuleEngine* ruleEngine() { return _ruleEngine; }
@@ -785,8 +801,12 @@ public:
 private:
     typedef QSet<quint64> VisitedSet;
 
+    inline Instance(const InstanceData& data) : _d(data) {}
+
     Instance member(const Structured *s, const ConstMemberList& members,
                     int resolveTypes, int maxPtrDeref, KnowledgeSources src = ksAll) const;
+
+    Instance *typeRuleMatchRek(ConstMemberList &members, int *match) const;
 
     void differencesRek(const Instance& other, const QString& relParent,
             bool includeNestedStructs, QStringList& result,

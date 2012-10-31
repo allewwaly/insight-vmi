@@ -193,7 +193,7 @@ QString OsFilter::toString() const
             commaIfNotFirst(s, first);
             s += xml::osLinux;
         }
-        if (_osFamilies & OsSpecs::ofLinux) {
+        if (_osFamilies & OsSpecs::ofWindows) {
             commaIfNotFirst(s, first);
             s += xml::osWindows;
         }

@@ -101,6 +101,16 @@ public:
 
     /**
      * Evaluates the script in \a program and returns the result of the
+     * evaluation. The \c ARGV array is initialized with only a single element,
+     * the name of the script file, determined with QScriptProgram::fileName().
+     * The include path is set to the directory containing the script file.
+     * @param program script code to be evaluated
+     * @return the result of the script evaluation
+     */
+    QScriptValue evaluate(const QScriptProgram& program, const QStringList &includePaths);
+
+    /**
+     * Evaluates the script in \a program and returns the result of the
      * evaluation. The arguments \a args are passed as array \c ARGV to the
      * scripting environment. The first element of \a args is set as the file
      * name to the QScriptEngine and is present in \c Error objects and
@@ -112,7 +122,7 @@ public:
      * @return the result of the script evaluation
      */
     QScriptValue evaluate(const QScriptProgram& program, const QStringList& argv,
-            const QStringList &includePaths);
+                          const QStringList& includePaths);
 
     /**
      * This is an overloaded convenience function that encapsulates \a code in a
@@ -138,7 +148,7 @@ public:
      * @return see evaluate()
      */
     QScriptValue evaluateFunction(const QString& func,
-            const QScriptValueList& funcArgs, const QScriptProgram &program);
+            const QScriptValueList& funcArgs, const QScriptProgram &program, const QStringList &includePaths);
 
     /**
      * Checks if the function named \a func is defined within the scope of
@@ -189,6 +199,11 @@ public:
      * @return script value
      */
     QScriptValue toScriptValue(const Instance* inst);
+
+//    inline static Instance fromScriptValue(const QScriptValue& value)
+//    {
+//        qscriptvalue_cast<Instance>(ret);
+//    }
 
     /**
      * Initializes the internal QScriptEngine, if not yet done. Call this

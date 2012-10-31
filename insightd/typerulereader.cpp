@@ -118,6 +118,7 @@ bool TypeRuleReader::includeRulesFile(const QString &fileName)
 void TypeRuleReader::appendRule(TypeRule *rule, const OsFilter* osf)
 {
     rule->setSrcFileIndex(_fileIndex);
+    rule->setIncludePaths(_scriptIncludes);
     _engine->appendRule(rule, osf);
 }
 
