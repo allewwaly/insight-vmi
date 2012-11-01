@@ -10,7 +10,7 @@ function showArgs(func, inst, members)
 
 function getModules(inst, members)
 {
-    showArgs("getModules", inst, members);
+//    showArgs("getModules", inst, members);
     // The next and prev members point to struct module objects
     inst = inst.Member(members[0]);
     inst.ChangeType("module");
@@ -23,13 +23,17 @@ function getModules(inst, members)
 
 function getModuleList(inst, members)
 {
-    showArgs("getModuleList", inst, members);
+//    showArgs("getModuleList", inst, members);
+    inst = inst.Member(members[0]).Member(members[1]);
+    // Compare to head of the list (which is no module)
+    var m = new Instance("modules");
+    if (m.Address() == inst.Address())
+        return m;
 
-//    inst = inst.Member(members[0], true);
-//    inst.ChangeType("module");
-//    var offset = inst.MemberOffset("list");
-//    inst.AddToAddress(-offset);
+    // Change type, fix offset
+    inst.ChangeType("module");
+    inst.AddToAddress(-inst.MemberOffset("list"));
 
-    return false;
+    return inst;
 }
 

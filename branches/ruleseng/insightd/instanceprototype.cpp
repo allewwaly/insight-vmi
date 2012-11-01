@@ -278,7 +278,19 @@ quint32 InstancePrototype::Size() const
 bool InstancePrototype::MemberExists(const QString& name) const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->memberExists(name) : false;
+	return ((inst = thisInstance())) ? inst->memberExists(name) : false;
+}
+
+
+int InstancePrototype::MemberOffset(int index) const
+{
+	Instance* inst = thisInstance();
+	if (!inst || index < 0)
+		return false;
+	const Structured* s = dynamic_cast<const Structured*>(
+				inst->type()->dereferencedBaseType());
+	return (s && index < s->members().size()) ?
+				s->members().at(index)->offset() : -1;
 }
 
 

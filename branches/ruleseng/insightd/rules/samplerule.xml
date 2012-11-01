@@ -62,19 +62,70 @@
             </action>-->
         </rule>
 
-<!--
-        <rule architecture="x86" os="linux" minversion="2.6.12" maxversion="2.6.38">
-            <name>Wildcards</name>
+        <rule>
+            <name>multi-level fields test</name>
             <filter>
-                <datatype>struct,union</datatype>
-                <variablename match="wildcard">__percpu__*</variablename>
-                <typename>bar</typename>
+                <datatype>struct</datatype>
+                <typename>vm_struct</typename>
                 <fields>
-                    <field>bar</field>
+                    <field>pages</field>
                 </fields>
             </filter>
-            <action src="file" file="samplerule.js">println</action>
+            <action src="inline">
+                println("Hier");
+                var inst = arguments[0];
+                var members = arguments[1];
+                var addr = inst.Address();
+                inst = inst.Member(members[0]);
+                inst.SetAddress(addr);
+                return inst;
+            </action>
+        </rule>
+<!--
+        <rule>
+            <name>task_struct.tasks</name>
+            <filter>
+                <datatype>struct</datatype>
+                <typename>task_struct</typename>
+                <fields>
+                    <field>tasks</field>
+                    <field match="wildcard">*</field>
+                </fields>
+            </filter>
+            <action src="inline">
+                var inst = arguments[0];
+                println("1", inst.comm + ":", inst.MemberName(arguments[1][0]));
+                inst = inst.Member(arguments[1][0]).Member(arguments[1][1]);
+                inst.ChangeType("task_struct");
+                inst.AddToAddress(-inst.MemberOffset(arguments[1][0]));
+                return inst;
+            </action>
         </rule>
 -->
+
+        <rule>
+            <name>task_struct.children</name>
+            <filter>
+                <datatype>struct</datatype>
+                <typename>task_struct</typename>
+                <fields>
+                    <field match="regex">^(tasks|children|sibling)$</field>
+                    <field match="wildcard">*</field>
+                </fields>
+            </filter>
+            <action src="inline">
+                var inst = arguments[0];
+                var typeId = inst.TypeId();
+<!--                println(inst.comm + ":", inst.MemberName(arguments[1][0]));-->
+                inst = inst.Member(arguments[1][0]).Member(arguments[1][1]);
+                inst.ChangeType(typeId);
+                var offsetMbr = inst.MemberName(arguments[1][0]);
+                if (inst.MemberName(arguments[1][0]) == "children")
+                    offsetMbr = "sibling";
+                inst.AddToAddress(-inst.MemberOffset(offsetMbr));
+                return inst;
+            </action>
+        </rule>
+
     </rules>
 </typeknowledge>

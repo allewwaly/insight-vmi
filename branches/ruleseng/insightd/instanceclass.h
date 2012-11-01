@@ -56,6 +56,9 @@ public:
 
     QScriptValue prototype() const;
 
+    Instance::KnowledgeSources knowledgeSources(Instance::KnowledgeSources src) const;
+    void setKnowledgeSources(Instance::KnowledgeSources src);
+
 private:
     static QScriptValue getSetUseCandidates(QScriptContext *ctx, QScriptEngine *eng);
     static QScriptValue getSetUseRules(QScriptContext *ctx, QScriptEngine *eng);

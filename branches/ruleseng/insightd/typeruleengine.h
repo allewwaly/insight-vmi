@@ -56,9 +56,6 @@ public:
         mrMatch           = (1 << 0),  ///< one rule matched and was evaluated
         mrDefer           = (1 << 1),  ///< one rule may match with further members given
         mrMatchAndDefer = mrMatch|mrDefer ///< one rule matches, further rules might match with more members
-//        mrIgnoreRule      = (1 << 2)   ///< the matched rule asked to be ignored
-//        mrInvalidObject   = (1 << 3),  ///< the matched rule considers the returned object invalid
-//        mrInvalidChildren = (1 << 4)   ///< the matched rule considers all children of the returned object invalid
     };
 
     /**
@@ -169,6 +166,7 @@ private:
     OsFilterHash _osFilters;
     QStringList _ruleFiles;
     QVector<int> _hits;
+    ScriptEngine *_eng;
 };
 
 #endif // TYPERULEENGINE_H

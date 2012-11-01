@@ -81,7 +81,7 @@ public:
     QString name;
     QStringList parentNames;
     InstanceData* parent;
-    StructuredMember* fromParent;
+    const StructuredMember* fromParent;
 };
 
 #endif /* INSTANCEDATA_H_ */
