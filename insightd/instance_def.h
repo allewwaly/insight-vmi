@@ -803,8 +803,8 @@ private:
 
     inline Instance(const InstanceData& data) : _d(data) {}
 
-    Instance member(const Structured *s, const ConstMemberList& members,
-                    int resolveTypes, int maxPtrDeref, KnowledgeSources src = ksAll) const;
+    Instance member(const ConstMemberList& members, int resolveTypes,
+                    int maxPtrDeref, KnowledgeSources src = ksAll) const;
 
     Instance *typeRuleMatchRek(ConstMemberList &members, int *match) const;
 

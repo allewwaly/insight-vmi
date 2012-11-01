@@ -163,6 +163,17 @@ QScriptValue InstanceClass::prototype() const
 }
 
 
+Instance::KnowledgeSources InstanceClass::knowledgeSources(Instance::KnowledgeSources src) const
+{
+    return _proto->knowledgeSources();
+}
+
+void InstanceClass::setKnowledgeSources(Instance::KnowledgeSources src)
+{
+    _proto->setKnowledgeSources(src);
+}
+
+
 QScriptValue InstanceClass::getSetUseCandidates(QScriptContext *ctx, QScriptEngine *eng)
 {
     Q_UNUSED(eng);
@@ -182,15 +193,11 @@ QScriptValue InstanceClass::getSetUseCandidates(QScriptContext *ctx, QScriptEngi
                 (value ? (src & ~Instance::ksNoAltTypes)
                        : (src | Instance::ksNoAltTypes));
         cls->_proto->setKnowledgeSources(src);
-//        debugmsg("Setting " << js::instance << "." << js::useCandidates << " to "
-//                 << (value ? "true" : "false") << ", knowSrc=" << cls->_knowSrc);
     }
     // Otherwise: called as getter
     else {
         bool value = !(src & Instance::ksNoAltTypes);
         result = value;
-//        debugmsg("Getting " << js::instance << "." << js::useCandidates << "="
-//                 << (value ? "true" : "false") << ", knowSrc=" << cls->_knowSrc);
     }
     return result;
 }
@@ -214,14 +221,10 @@ QScriptValue InstanceClass::getSetUseRules(QScriptContext *ctx, QScriptEngine *e
                 (value ? (src & ~Instance::ksNoRulesEngine)
                        : (src | Instance::ksNoRulesEngine));
         cls->_proto->setKnowledgeSources(src);
-//        debugmsg("Setting " << js::instance << "." << js::useRules << " to "
-//                 << (value ? "true" : "false") << ", knowSrc=" << cls->_knowSrc);
     }
     else {
         bool value = !(src & Instance::ksNoRulesEngine);
         result = value;
-//        debugmsg("Getting " << js::instance << "." << js::useRules << "="
-//                 << (value ? "true" : "false") << ", knowSrc=" << cls->_knowSrc);
     }
     return result;
 }

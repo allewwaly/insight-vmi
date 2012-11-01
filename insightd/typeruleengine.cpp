@@ -18,6 +18,7 @@ const char* inlinefunc = "__inline_func__";
 
 
 TypeRuleEngine::TypeRuleEngine()
+    : _eng(new ScriptEngine (Instance::ksNone))
 {
 }
 
@@ -25,6 +26,7 @@ TypeRuleEngine::TypeRuleEngine()
 TypeRuleEngine::~TypeRuleEngine()
 {
     clear();
+    delete _eng;
 }
 
 
@@ -101,8 +103,6 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
     if (!factory->symbolsAvailable())
         return;
 
-    ScriptEngine evalEng(Instance::ksNone);
-
     int i = -1;
     foreach (const TypeRule* rule, _rules) {
         ++i;
@@ -164,19 +164,19 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
             }
             // Check if the function exists
             ScriptEngine::FuncExistsResult ret =
-                    evalEng.functionExists(rule->action(), *prog);
+                    _eng->functionExists(rule->action(), *prog);
             if (ret == ScriptEngine::feRuntimeError) {
                 QString err;
-                if (evalEng.hasUncaughtException()) {
+                if (_eng->hasUncaughtException()) {
                     err = QString("Uncaught exception at line %0: %1")
-                            .arg(evalEng.uncaughtExceptionLineNumber())
-                            .arg(evalEng.lastError());
-                    QStringList bt = evalEng.uncaughtExceptionBacktrace();
+                            .arg(_eng->uncaughtExceptionLineNumber())
+                            .arg(_eng->lastError());
+                    QStringList bt = _eng->uncaughtExceptionBacktrace();
                     for (int i = 0; i < bt.size(); ++i)
                         err += "\n    " + bt[i];
                 }
                 else
-                    err = evalEng.lastError();
+                    err = _eng->lastError();
                 typeRuleError2(xmlFile,
                                rule->actionSrcLine(),
                                -1,
@@ -203,23 +203,12 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
 
         // Should we check variables or types?
         int hits = 0;
-        bool varRule = rule->filter()->filterActive(TypeFilter::ftVarNameAny);
-//        if (varRule) {
-//            foreach (const Variable* v, factory->vars()) {
-//                if (rule->match(v)) {
-//                    _rulesPerType.insertMulti(v->refType()->id(), arule);
-//                    ++hits;
-//                }
-//            }
-//        }
-//        else {
-            foreach (const BaseType* bt, factory->types()) {
-                if (rule->match(bt)) {
-                    _rulesPerType.insertMulti(bt->id(), arule);
-                    ++hits;
-                }
+        foreach (const BaseType* bt, factory->types()) {
+            if (rule->match(bt)) {
+                _rulesPerType.insertMulti(bt->id(), arule);
+                ++hits;
             }
-//        }
+        }
 
         // Warn if a rule does not match
         if (hits) {
@@ -227,8 +216,7 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
             _activeRules.append(arule);
         }
         else
-            warnRule(rule, QString("does not match any %1.")
-                                .arg(varRule ? "variable" : "type"));
+            warnRule(rule, "does not match any type.");
     }
 }
 
@@ -303,15 +291,14 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
                                       const ConstMemberList &members,
                                       bool* matched) const
 {
-    ScriptEngine eng(Instance::ksNoRulesEngine);
-    eng.initScriptEngine();
+    _eng->initScriptEngine();
 
     // Instance passed to the rule as 1. argument
-    QScriptValue instVal = eng.toScriptValue(inst);
+    QScriptValue instVal = _eng->toScriptValue(inst);
     // List of accessed member indices passed to the rule as 2. argument
-    QScriptValue indexlist = eng.engine()->newArray(members.size());
+    QScriptValue indexlist = _eng->engine()->newArray(members.size());
     for (int i = 0; i < members.size(); ++i)
-        indexlist.setProperty(i, eng.engine()->toScriptValue( members[i]->index()));
+        indexlist.setProperty(i, _eng->engine()->toScriptValue( members[i]->index()));
     // Which function to call?
     QString funcName(js::inlinefunc);
     if (arule.rule->actionType() == TypeRule::atFunction)
@@ -319,14 +306,14 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
 
     QScriptValueList args;
     args << instVal << indexlist;
-    QScriptValue ret(eng.evaluateFunction(funcName, args, *arule.prog,
-                                          arule.rule->includePaths()));
+    QScriptValue ret(_eng->evaluateFunction(funcName, args, *arule.prog,
+                                            arule.rule->includePaths()));
 
     if (matched)
         *matched = true;
 
-    if (eng.lastEvaluationFailed())
-        warnEvalError(&eng, arule.prog->fileName());
+    if (_eng->lastEvaluationFailed())
+        warnEvalError(_eng, arule.prog->fileName());
     else if (ret.isBool() || ret.isNumber() || ret.isNull()) {
         if (matched)
             *matched = ret.toBool();

@@ -470,14 +470,9 @@ Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCoun
 }
 
 
-Instance Instance::member(const Structured* s, const ConstMemberList &members,
-						  int resolveTypes, int maxPtrDeref, KnowledgeSources src) const
+Instance Instance::member(const ConstMemberList &members, int resolveTypes,
+						  int maxPtrDeref, KnowledgeSources src) const
 {
-	// In case the member is nested in an anonymous struct/union,
-	// we have to add that inter-offset here because m->toInstance()
-	// only adds the member's offset within its direct parent.
-	// That's why we need the extraOffset here.
-
 	const StructuredMember* m = members.last();
 	int match = 0;
 
@@ -499,9 +494,13 @@ Instance Instance::member(const Structured* s, const ConstMemberList &members,
 
 	// If no match through the rule engine, try to resolve ourself
 	if ( !(match & TypeRuleEngine::mrMatch) ) {
+		// In case the member is nested in an anonymous struct/union,
+		// we have to add that inter-offset here because m->toInstance()
+		// only adds the member's offset within its direct parent.
 		int extraOffset = 0;
 		for (int i = 0; i + 1 < members.size(); ++i)
 			extraOffset += members[i]->offset();
+
 		// Should we use candidate types
 		if (src & ksNoAltTypes) {
 			ret = m->toInstance(_d.address + extraOffset, _d.vmem, this,
@@ -541,7 +540,23 @@ Instance Instance::member(const Structured* s, const ConstMemberList &members,
 
 	// Do we need to store this instance for further rule evaluation?
 	if (match & TypeRuleEngine::mrDefer) {
+		// Start with first member
+		assert(ret._d.parent == 0);
 		ret._d.parent = new InstanceData(_d);
+		ret._d.fromParent = members.first();
+
+		// If we have more members, we need to build a chain of parents
+		for (int i = 1; i < members.size(); ++i) {
+			// Create instance of previous parent and access its member
+			Instance parent(*ret._d.parent);
+			Instance child(parent.member(members.mid(i), BaseType::trLexical, 0, ksNone));
+			// Child becomes new parent of ret
+			InstanceData* child_d = new InstanceData(child._d);
+			assert(child_d->parent == 0);
+			child_d->parent = ret._d.parent;
+			child_d->fromParent = members[i];
+			ret._d.parent = child_d;
+		}
 	}
 
 	return ret;
@@ -575,9 +590,7 @@ Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s && index >= 0 && index < s->members().size()) {
 		const StructuredMember* m = s->members().at(index);
-//		ConstMemberList list;
-//		list += m;
-		return member(s, ConstMemberList() << m, resolveTypes, maxPtrDeref, src);
+		return member(ConstMemberList() << m, resolveTypes, maxPtrDeref, src);
 	}
 	return Instance();
 }
@@ -590,9 +603,9 @@ Instance Instance::member(const QString& name, int resolveTypes,
 	if ( !(s = dynamic_cast<const Structured*>(_d.type)) )
 		return Instance();
 
-	ConstMemberList list = s->memberChain(name);
+	ConstMemberList list(s->memberChain(name));
 	if (!list.isEmpty())
-		return member(s, list, resolveTypes, maxPtrDeref, src);
+		return member(list, resolveTypes, maxPtrDeref, src);
 	return Instance();
 }
 

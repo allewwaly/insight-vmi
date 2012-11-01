@@ -59,6 +59,7 @@ void ScriptEngine::reset()
 	_lastError.clear();
 	_lastEvalFailed = false;
 	_initialized = false;
+	_contextPushed = false;
 }
 
 
@@ -154,12 +155,14 @@ void ScriptEngine::prepareEvaluation(const QStringList &argv,
                                      const QStringList &includePaths)
 {
     initScriptEngine();
+    // Reset knowledge sources to the default
+    _instClass->setKnowledgeSources((Instance::KnowledgeSources)_knowSrc);
 
     // Export parameters to the script
     _engine->globalObject().setProperty(js::argv, _engine->toScriptValue(argv),
             QScriptValue::ReadOnly);
 
-    // Export SCRIPT_PATH to the script
+    // Export the INCLUDE_PATH to the script
     _engine->globalObject().setProperty(js::includePath,
             includePaths.join(js::path_sep),
             QScriptValue::ReadOnly|QScriptValue::Undeletable);
@@ -195,9 +198,15 @@ QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
 QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
 		const QStringList& argv, const QStringList& includePaths)
 {
+	initScriptEngine();
+
+	if (_contextPushed)
+		_engine->popContext();
+	else
+		_contextPushed = true;
+	_engine->pushContext();
+
 	prepareEvaluation(argv, includePaths);
-	// Make sure we re-initialization is forced after function exit
-	VarSetter<bool> setter(&_initialized, true, false);
 
 	QScriptValue ret(_engine->evaluate(program));
 	checkEvalErrors(ret);;
@@ -225,7 +234,7 @@ QScriptValue ScriptEngine::evaluateFunction(const QString &func,
 	if (_lastEvalFailed)
 		return ret;
 	// Obtain the function object
-	QScriptValue f(_engine->globalObject().property(func));
+	QScriptValue f(_engine->currentContext()->activationObject().property(func));
 	ret = f.call(QScriptValue(), funcArgs);
 	checkEvalErrors(ret);
 
@@ -240,10 +249,11 @@ ScriptEngine::FuncExistsResult ScriptEngine::functionExists(const QString& func,
 	QStringList includePaths(QFileInfo(program.fileName()).absoluteFilePath());
 	QScriptValue ret(evaluate(program, argv, includePaths));
 
-	if (_engine->hasUncaughtException() || ret.isError())
+	if (_lastEvalFailed)
 		return feRuntimeError;
 
-	ret = _engine->globalObject().property(func);
+	// Obtain the function object
+	ret = _engine->currentContext()->activationObject().property(func);
 	if (ret.isValid() && ret.isFunction())
 		return feExists;
 	else

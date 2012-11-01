@@ -232,6 +232,7 @@ private:
 	QString _lastError;
 	bool _lastEvalFailed;
 	bool _initialized;
+	bool _contextPushed;
 	int _knowSrc;
 
 	void prepareEvaluation(const QStringList &argv, const QStringList &includePaths);
