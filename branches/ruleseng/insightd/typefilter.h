@@ -21,7 +21,7 @@ extern const char* type_name;
 extern const char* variablename;
 extern const char* filename;
 extern const char* size;
-extern const char* field;
+extern const char* member;
 extern const char* match;
 
 extern const char* regex;
@@ -43,15 +43,15 @@ enum PatternSyntax {
 
 
 /**
- * This class matches on a field within a Structured object.
+ * This class matches on a StructuredMember within a Structured object.
  */
-class FieldFilter
+class MemberFilter
 {
 public:
     /**
      * Default constructor
      */
-    FieldFilter() : _regEx(0), _syntax(Filter::psLiteral) {}
+    MemberFilter() : _regEx(0), _syntax(Filter::psLiteral) {}
 
     /**
      * Initializing constructor
@@ -59,31 +59,31 @@ public:
      * @param syntax syntax of \a name, will be guessed if \a syntax is
      *  Filter::psAuto (the default)
      */
-    FieldFilter(const QString& name,
+    MemberFilter(const QString& name,
                 Filter::PatternSyntax syntax = Filter::psAuto);
 
     /**
      * Copy constructor
      * @param from initialize from this object
      */
-    FieldFilter(const FieldFilter& from);
+    MemberFilter(const MemberFilter& from);
 
     /**
      * Destructor
      */
-    ~FieldFilter();
+    ~MemberFilter();
 
     /**
      * Comparison operator
      * @param other compare to
      */
-    bool operator==(const FieldFilter& other) const;
+    bool operator==(const MemberFilter& other) const;
 
     /**
      * Comparison operator
      * @param other compare to
      */
-    inline bool operator!=(const FieldFilter& other) const { return !operator==(other); }
+    inline bool operator!=(const MemberFilter& other) const { return !operator==(other); }
 
     /**
      * Returns the name or pattern of the field to match.
@@ -120,7 +120,7 @@ private:
 };
 
 /// List of FieldFilter objects
-typedef QList<FieldFilter> FieldFilterList;
+typedef QList<MemberFilter> MemberFilterList;
 
 
 /**
@@ -128,7 +128,7 @@ typedef QList<FieldFilter> FieldFilterList;
  */
 class TypeFilter
 {
-    friend class FieldFilter;
+    friend class MemberFilter;
 public:
     /// Filter options for variables and types
     enum FilterOptions {
@@ -169,10 +169,10 @@ public:
     inline int filters() const { return _filters; }
     inline bool filterActive(int options) const { return _filters & options; }
 
-    inline const FieldFilterList& fields() const { return _fields; }
-    inline void setFields(const FieldFilterList& fields) { _fields = fields; }
+    inline const MemberFilterList& fields() const { return _fields; }
+    inline void setFields(const MemberFilterList& fields) { _fields = fields; }
 
-    void appendField(const FieldFilter& field);
+    void appendField(const MemberFilter& field);
     inline void appendField(const QString& name,
                             Filter::PatternSyntax syntax = Filter::psAuto);
 
@@ -218,7 +218,7 @@ private:
     mutable QRegExp _typeRegEx;
     int _realType;
     quint32 _size;
-    FieldFilterList _fields;
+    MemberFilterList _fields;
 };
 
 

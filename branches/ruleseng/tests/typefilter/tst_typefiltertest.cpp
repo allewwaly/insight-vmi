@@ -853,7 +853,7 @@ void TypeFilterTest::setFields()
 {
     TypeFilter f;
     VariableFilter vf;
-    FieldFilterList fl;
+    MemberFilterList fl;
 
 #define TEST_SET_FIELD1(f1, s1, ta, tb) \
     f.clear(); \

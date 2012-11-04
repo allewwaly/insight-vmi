@@ -34,7 +34,7 @@ const char* rule = "rule";
 const char* name = "name";
 const char* description = "description";
 const char* filter = "filter";
-const char* fields = "fields";
+const char* members = "members";
 const char* action = "action";
 const char* src = "src";
 const char* file = "file";
@@ -434,26 +434,25 @@ const XmlSchema &TypeRuleParser::schema()
 
         // <filter>
         children = VariableFilter::supportedFilters().keys();
-        // Add <fields> as child to <filter>, not <field>
-        int f_idx = children.indexOf(xml::field);
+        // Add <members> instead of <member> as child of <filter>
+        int f_idx = children.indexOf(xml::member);
         assert(f_idx >= 0);
-        children.replace(f_idx, xml::fields);
+        children.replace(f_idx, xml::members);
         ruleSchema.addElement(xml::filter, children, empty, empty, false);
-        children.replace(f_idx, xml::field);
+        children.replace(f_idx, xml::member);
 
-        // <fields>
-        ruleSchema.addElement(xml::fields, QStringList(xml::field));
+        // <members>
+        ruleSchema.addElement(xml::members, QStringList(xml::member));
 
-        // Auto-add all children of <filter>
+        // Auto-add all children of <fitler>
         intTypes << xml::size;
-        matchTypes << xml::field << xml::variablename << xml::type_name;
-        multiTypes << xml::field;
+        matchTypes << xml::member << xml::variablename << xml::type_name;
+        multiTypes << xml::member;
         for (int i = 0; i < children.size(); ++i) {
             bool allowMatch = matchTypes.contains(children[i]);
             bool allowMultiple = multiTypes.contains(children[i]);
             XmlValueType vt = intTypes.contains(children[i]) ?
-                        vtInteger : vtString;
-
+                      vtInteger : vtString;
             ruleSchema.addElement(children[i], empty, allowMatch ? match : empty,
                                   empty, allowMultiple, vt);
         }

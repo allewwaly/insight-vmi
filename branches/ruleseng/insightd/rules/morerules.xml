@@ -18,9 +18,9 @@
             <filter>
                 <datatype>struct,union</datatype>
                 <typename>foo</typename>
-                <fields>
-                    <field>bar</field>
-                </fields>
+                <members>
+                    <member>bar</member>
+                </members>
             </filter>
             <action src="inline">
                 println("Hello, world");
