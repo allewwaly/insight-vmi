@@ -229,14 +229,14 @@ private Q_SLOTS:
     void parseVarName();
     void parseFileName();
     void parseSize();
-    void parseFields();
+    void parseMembers();
 
     void setDataType();
     void setTypeName();
     void setVarName();
     void setFileName();
     void setSize();
-    void setFields();
+    void setMembers();
 
 private:
     SymFactory* _factory;
@@ -555,166 +555,166 @@ void TypeFilterTest::parseSize()
 }
 
 
-void TypeFilterTest::parseFields()
+void TypeFilterTest::parseMembers()
 {
     TypeFilter f;
     VariableFilter vf;
 
-#define TEST_PARSE_FIELD1(f1, kv, ta, tb, va, vb) \
+#define TEST_PARSE_MEMBER1(f1, kv, ta, tb, va, vb) \
     f.clear(); \
     vf.clear(); \
-    f.parseOption("field", f1, kv); \
-    vf.parseOption("field", f1, kv); \
-    QVERIFY(f.fields().size() == 1); \
-    QVERIFY(vf.fields().size() == 1); \
+    f.parseOption("member", f1, kv); \
+    vf.parseOption("member", f1, kv); \
+    QVERIFY(f.members().size() == 1); \
+    QVERIFY(vf.members().size() == 1); \
     VERIFY_F_VF(ta, tb, false, va, vb)
 
-#define TEST_PARSE_FIELD2(f1, f2, kv, ta, tb, va, vb) \
+#define TEST_PARSE_MEMBER2(f1, f2, kv, ta, tb, va, vb) \
     f.clear(); \
     vf.clear(); \
-    f.parseOption("field", f1, kv); \
-    vf.parseOption("field", f1, kv); \
-    f.parseOption("field", f2, kv); \
-    vf.parseOption("field", f2, kv); \
-    QVERIFY(f.fields().size() == 2); \
-    QVERIFY(vf.fields().size() == 2); \
+    f.parseOption("member", f1, kv); \
+    vf.parseOption("member", f1, kv); \
+    f.parseOption("member", f2, kv); \
+    vf.parseOption("member", f2, kv); \
+    QVERIFY(f.members().size() == 2); \
+    QVERIFY(vf.members().size() == 2); \
     VERIFY_F_VF(ta, tb, false, va, vb)
 
-#define TEST_PARSE_FIELD3(f1, f2, f3, kv, ta, tb, va, vb) \
+#define TEST_PARSE_MEMBER3(f1, f2, f3, kv, ta, tb, va, vb) \
     f.clear(); \
     vf.clear(); \
-    f.parseOption("field", f1, kv); \
-    vf.parseOption("field", f1, kv); \
-    f.parseOption("field", f2, kv); \
-    vf.parseOption("field", f2, kv); \
-    f.parseOption("field", f3, kv); \
-    vf.parseOption("field", f3, kv); \
-    QVERIFY(f.fields().size() == 3); \
-    QVERIFY(vf.fields().size() == 3); \
+    f.parseOption("member", f1, kv); \
+    vf.parseOption("member", f1, kv); \
+    f.parseOption("member", f2, kv); \
+    vf.parseOption("member", f2, kv); \
+    f.parseOption("member", f3, kv); \
+    vf.parseOption("member", f3, kv); \
+    QVERIFY(f.members().size() == 3); \
+    QVERIFY(vf.members().size() == 3); \
     VERIFY_F_VF(ta, tb, false, va, vb)
 
     // Match none
-    TEST_PARSE_FIELD1("not_existing", 0, false, false, false, false);
+    TEST_PARSE_MEMBER1("not_existing", 0, false, false, false, false);
     // struct A
-    TEST_PARSE_FIELD1("l", 0, true, false, true, false);
-    TEST_PARSE_FIELD1("s", 0, true, false, true, false);
-    TEST_PARSE_FIELD1("i", 0, true, false, true, false);
-    TEST_PARSE_FIELD1("c", 0, true, false, true, false);
+    TEST_PARSE_MEMBER1("l", 0, true, false, true, false);
+    TEST_PARSE_MEMBER1("s", 0, true, false, true, false);
+    TEST_PARSE_MEMBER1("i", 0, true, false, true, false);
+    TEST_PARSE_MEMBER1("c", 0, true, false, true, false);
     // struct B
-    TEST_PARSE_FIELD1("j", 0, false, true, false, true);
-    TEST_PARSE_FIELD1("a", 0, false, true, false, true);
-    TEST_PARSE_FIELD1("pa", 0, false, true, false, true);
-    TEST_PARSE_FIELD1("array", 0, false, true, false, true);
-    TEST_PARSE_FIELD1("", 0, false, true, false, true);
-    TEST_PARSE_FIELD1("nested_i", 0, false, false, false, false);
+    TEST_PARSE_MEMBER1("j", 0, false, true, false, true);
+    TEST_PARSE_MEMBER1("a", 0, false, true, false, true);
+    TEST_PARSE_MEMBER1("pa", 0, false, true, false, true);
+    TEST_PARSE_MEMBER1("array", 0, false, true, false, true);
+    TEST_PARSE_MEMBER1("", 0, false, true, false, true);
+    TEST_PARSE_MEMBER1("nested_i", 0, false, false, false, false);
     // struct B nested
-    TEST_PARSE_FIELD2("a", "l", 0, false, true, false, true);
-    TEST_PARSE_FIELD2("a", "s", 0, false, true, false, true);
-    TEST_PARSE_FIELD2("a", "i", 0, false, true, false, true);
-    TEST_PARSE_FIELD2("a", "c", 0, false, true, false, true);
-    TEST_PARSE_FIELD2("a", "not_existing", 0, false, false, false, false);
-    TEST_PARSE_FIELD2("", "nested_i", 0, false, true, false, true);
-    TEST_PARSE_FIELD2("", "nested_f", 0, false, true, false, true);
-    TEST_PARSE_FIELD2("", "nested_a", 0, false, true, false, true);
+    TEST_PARSE_MEMBER2("a", "l", 0, false, true, false, true);
+    TEST_PARSE_MEMBER2("a", "s", 0, false, true, false, true);
+    TEST_PARSE_MEMBER2("a", "i", 0, false, true, false, true);
+    TEST_PARSE_MEMBER2("a", "c", 0, false, true, false, true);
+    TEST_PARSE_MEMBER2("a", "not_existing", 0, false, false, false, false);
+    TEST_PARSE_MEMBER2("", "nested_i", 0, false, true, false, true);
+    TEST_PARSE_MEMBER2("", "nested_f", 0, false, true, false, true);
+    TEST_PARSE_MEMBER2("", "nested_a", 0, false, true, false, true);
     // struct B 2x nested
-    TEST_PARSE_FIELD3("", "nested_a", "l", 0, false, true, false, true);
-    TEST_PARSE_FIELD3("", "nested_a", "s", 0, false, true, false, true);
-    TEST_PARSE_FIELD3("", "nested_a", "i", 0, false, true, false, true);
-    TEST_PARSE_FIELD3("", "nested_a", "c", 0, false, true, false, true);
-    TEST_PARSE_FIELD3("", "nested_a", "", 0, false, false, false, false);
-    TEST_PARSE_FIELD3("", "nested_a", "not_existing", 0, false, false, false, false);
+    TEST_PARSE_MEMBER3("", "nested_a", "l", 0, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "nested_a", "s", 0, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "nested_a", "i", 0, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "nested_a", "c", 0, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "nested_a", "", 0, false, false, false, false);
+    TEST_PARSE_MEMBER3("", "nested_a", "not_existing", 0, false, false, false, false);
 
     // whitespace
-    TEST_PARSE_FIELD1("  a", 0, false, true, false, true);
-    TEST_PARSE_FIELD1("a  ", 0, false, true, false, true);
-    TEST_PARSE_FIELD1(" a ", 0, false, true, false, true);
+    TEST_PARSE_MEMBER1("  a", 0, false, true, false, true);
+    TEST_PARSE_MEMBER1("a  ", 0, false, true, false, true);
+    TEST_PARSE_MEMBER1(" a ", 0, false, true, false, true);
     // case-insensitive
-    TEST_PARSE_FIELD1("aRrAy", 0, false, true, false, true);
-    TEST_PARSE_FIELD1("ARRAY", 0, false, true, false, true);
+    TEST_PARSE_MEMBER1("aRrAy", 0, false, true, false, true);
+    TEST_PARSE_MEMBER1("ARRAY", 0, false, true, false, true);
 
     KeyValueStore kv;
     kv["match"] = "wildcard";
 
     // Match none
-    TEST_PARSE_FIELD1("not_existing", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER1("not_existing", &kv, false, false, false, false);
     // struct A
-    TEST_PARSE_FIELD1("*l", &kv, true, false, true, false);
-    TEST_PARSE_FIELD1("*s*", &kv, true, false, true, false);
-    TEST_PARSE_FIELD1("?", &kv, true, true, true, true);
-    TEST_PARSE_FIELD1("c", &kv, true, false, true, false);
-    TEST_PARSE_FIELD1("C", &kv, true, false, true, false);
+    TEST_PARSE_MEMBER1("*l", &kv, true, false, true, false);
+    TEST_PARSE_MEMBER1("*s*", &kv, true, false, true, false);
+    TEST_PARSE_MEMBER1("?", &kv, true, true, true, true);
+    TEST_PARSE_MEMBER1("c", &kv, true, false, true, false);
+    TEST_PARSE_MEMBER1("C", &kv, true, false, true, false);
     // struct B
-    TEST_PARSE_FIELD1("p?", &kv, false, true, false, true);
-    TEST_PARSE_FIELD1("p*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD1("nested_*", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER1("p?", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER1("p*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER1("nested_*", &kv, false, false, false, false);
     // struct B nested
-    TEST_PARSE_FIELD2("a", "?", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2("?", "?", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2("*", "*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2("?", "nested_*", &kv, false, false, false, false);
-    TEST_PARSE_FIELD2("*", "nested_*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2("*", "l", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2("", "nested_*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2("", "nested_?", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2("", "nested_f", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2("", "nested_x", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER2("a", "?", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("?", "?", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("*", "*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("?", "nested_*", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER2("*", "nested_*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("*", "l", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("", "nested_*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("", "nested_?", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("", "nested_f", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("", "nested_x", &kv, false, false, false, false);
     // struct B 2x nested
-    TEST_PARSE_FIELD3("*", "*", "*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("*", "*", "?", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("*", "*", "l", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", "*", "*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", "*", "?", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", "*", "l", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("foobar", "*", "*", &kv, false, false, false, false);
-    TEST_PARSE_FIELD3("foobar", "*", "?", &kv, false, false, false, false);
-    TEST_PARSE_FIELD3("foobar", "*", "l", &kv, false, false, false, false);
-    TEST_PARSE_FIELD3("", "nested_*", "s", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", "nested_?", "i", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", "nested_a", "c", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", "nested_a", "nested_*", &kv, false, false, false, false);
-    TEST_PARSE_FIELD3("", "nested_a", "not_existing", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER3("*", "*", "*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("*", "*", "?", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("*", "*", "l", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "*", "*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "*", "?", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "*", "l", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("foobar", "*", "*", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER3("foobar", "*", "?", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER3("foobar", "*", "l", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER3("", "nested_*", "s", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "nested_?", "i", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "nested_a", "c", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "nested_a", "nested_*", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER3("", "nested_a", "not_existing", &kv, false, false, false, false);
 
     kv["match"] = "regex";
 
     // Match none
-    TEST_PARSE_FIELD1("not_existing", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER1("not_existing", &kv, false, false, false, false);
     // struct A
-    TEST_PARSE_FIELD1(".*l", &kv, true, false, true, false);
-    TEST_PARSE_FIELD1("^.*s.*$", &kv, true, false, true, false);
-    TEST_PARSE_FIELD1("l?", &kv, true, true, true, true);
-    TEST_PARSE_FIELD1("c", &kv, true, false, true, false);
-    TEST_PARSE_FIELD1("C", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER1(".*l", &kv, true, false, true, false);
+    TEST_PARSE_MEMBER1("^.*s.*$", &kv, true, false, true, false);
+    TEST_PARSE_MEMBER1("l?", &kv, true, true, true, true);
+    TEST_PARSE_MEMBER1("c", &kv, true, false, true, false);
+    TEST_PARSE_MEMBER1("C", &kv, false, false, false, false);
     // struct B
-    TEST_PARSE_FIELD1("p.", &kv, false, true, false, true);
-    TEST_PARSE_FIELD1("p.*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD1("nested_.", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER1("p.", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER1("p.*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER1("nested_.", &kv, false, false, false, false);
     // struct B nested
-    TEST_PARSE_FIELD2("a", ".", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2(".", ".", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2(".*", ".*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2(".", "nested_.*", &kv, false, false, false, false);
-    TEST_PARSE_FIELD2(".", "nested_.*", &kv, false, false, false, false);
-    TEST_PARSE_FIELD2(".*", "nested_.*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2(".", "l", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2(".*", "l", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2("", "nested_.*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2("", "nested_.", &kv, false, true, false, true);
-    TEST_PARSE_FIELD2("", "nested_f", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("a", ".", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2(".", ".", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2(".*", ".*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2(".", "nested_.*", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER2(".", "nested_.*", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER2(".*", "nested_.*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2(".", "l", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2(".*", "l", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("", "nested_.*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("", "nested_.", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER2("", "nested_f", &kv, false, true, false, true);
     // struct B 2x nested
-    TEST_PARSE_FIELD3(".*", ".*", ".*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3(".*", ".*", ".", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3(".*", ".*", "l", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", ".*", ".*", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", ".*", ".", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", ".*", "l", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("foobar", ".*", ".*", &kv, false, false, false, false);
-    TEST_PARSE_FIELD3("foobar", ".*", ".", &kv, false, false, false, false);
-    TEST_PARSE_FIELD3("foobar", ".*", "l", &kv, false, false, false, false);
-    TEST_PARSE_FIELD3("", "nested_.*", "s", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", "nested_.", "i", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", "nested_a", "c", &kv, false, true, false, true);
-    TEST_PARSE_FIELD3("", "nested_a", "nested_.*", &kv, false, false, false, false);
-    TEST_PARSE_FIELD3("", "nested_a", "not_existing", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER3(".*", ".*", ".*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3(".*", ".*", ".", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3(".*", ".*", "l", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", ".*", ".*", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", ".*", ".", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", ".*", "l", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("foobar", ".*", ".*", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER3("foobar", ".*", ".", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER3("foobar", ".*", "l", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER3("", "nested_.*", "s", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "nested_.", "i", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "nested_a", "c", &kv, false, true, false, true);
+    TEST_PARSE_MEMBER3("", "nested_a", "nested_.*", &kv, false, false, false, false);
+    TEST_PARSE_MEMBER3("", "nested_a", "not_existing", &kv, false, false, false, false);
 }
 
 
@@ -849,49 +849,50 @@ void TypeFilterTest::setSize()
               false, false, false, false, false);
 }
 
-void TypeFilterTest::setFields()
+
+void TypeFilterTest::setMembers()
 {
     TypeFilter f;
     VariableFilter vf;
     MemberFilterList fl;
 
-#define TEST_SET_FIELD1(f1, s1, ta, tb) \
+#define TEST_SET_MEMBER1(f1, s1, ta, tb) \
     f.clear(); \
     vf.clear(); \
     fl.clear(); \
-    fl.append(FieldFilter(f1, s1)); \
-    f.setFields(fl); \
-    vf.setFields(fl); \
-    QVERIFY(f.fields().size() == 1); \
-    QVERIFY(vf.fields().size() == 1); \
+    fl.append(MemberFilter(f1, s1)); \
+    f.setMembers(fl); \
+    vf.setMembers(fl); \
+    QVERIFY(f.members().size() == 1); \
+    QVERIFY(vf.members().size() == 1); \
     VERIFY_F_VF(ta, tb, false, ta, tb)
 
-#define TEST_SET_FIELD2(f1, s1, f2, s2, ta, tb) \
+#define TEST_SET_MEMBER2(f1, s1, f2, s2, ta, tb) \
     f.clear(); \
     vf.clear(); \
     fl.clear(); \
-    fl.append(FieldFilter(f1, s1)); \
-    fl.append(FieldFilter(f2, s2)); \
-    f.setFields(fl); \
-    vf.setFields(fl); \
-    QVERIFY(f.fields().size() == 2); \
-    QVERIFY(vf.fields().size() == 2); \
+    fl.append(MemberFilter(f1, s1)); \
+    fl.append(MemberFilter(f2, s2)); \
+    f.setMembers(fl); \
+    vf.setMembers(fl); \
+    QVERIFY(f.members().size() == 2); \
+    QVERIFY(vf.members().size() == 2); \
     VERIFY_F_VF(ta, tb, false, ta, tb)
 
-    TEST_SET_FIELD1("l", Filter::psLiteral, true, false);
-    TEST_SET_FIELD1("a", Filter::psLiteral, false, true);
-    TEST_SET_FIELD1("", Filter::psLiteral, false, true);
-    TEST_SET_FIELD1(".", Filter::psRegExp, true, true);
-    TEST_SET_FIELD1("..", Filter::psRegExp, false, true);
-    TEST_SET_FIELD1("?", Filter::psWildcard, true, true);
-    TEST_SET_FIELD1("??", Filter::psWildcard, false, true);
+    TEST_SET_MEMBER1("l", Filter::psLiteral, true, false);
+    TEST_SET_MEMBER1("a", Filter::psLiteral, false, true);
+    TEST_SET_MEMBER1("", Filter::psLiteral, false, true);
+    TEST_SET_MEMBER1(".", Filter::psRegExp, true, true);
+    TEST_SET_MEMBER1("..", Filter::psRegExp, false, true);
+    TEST_SET_MEMBER1("?", Filter::psWildcard, true, true);
+    TEST_SET_MEMBER1("??", Filter::psWildcard, false, true);
 
-    TEST_SET_FIELD2("?", Filter::psWildcard, "l", Filter::psLiteral, false, true);
-    TEST_SET_FIELD2("??", Filter::psWildcard, "l", Filter::psLiteral, false, false);
-    TEST_SET_FIELD2("?", Filter::psWildcard, "x?i", Filter::psRegExp, false, true);
-    TEST_SET_FIELD2("??", Filter::psWildcard, "p?a", Filter::psRegExp, false, false);
-    TEST_SET_FIELD2("^a?$", Filter::psRegExp, "^.*i$", Filter::psRegExp, false, true);
-    TEST_SET_FIELD2("^$", Filter::psRegExp, "nested_*", Filter::psWildcard, false, true);
+    TEST_SET_MEMBER2("?", Filter::psWildcard, "l", Filter::psLiteral, false, true);
+    TEST_SET_MEMBER2("??", Filter::psWildcard, "l", Filter::psLiteral, false, false);
+    TEST_SET_MEMBER2("?", Filter::psWildcard, "x?i", Filter::psRegExp, false, true);
+    TEST_SET_MEMBER2("??", Filter::psWildcard, "p?a", Filter::psRegExp, false, false);
+    TEST_SET_MEMBER2("^a?$", Filter::psRegExp, "^.*i$", Filter::psRegExp, false, true);
+    TEST_SET_MEMBER2("^$", Filter::psRegExp, "nested_*", Filter::psWildcard, false, true);
 }
 
 
