@@ -6,6 +6,7 @@
 #include <QStringList>
 #include <QRegExp>
 #include <QHash>
+#include <QFlags>
 #include "filterexception.h"
 #include "keyvaluestore.h"
 
@@ -28,30 +29,229 @@ extern const char* regex;
 extern const char* wildcard;
 }
 
-
+namespace str
+{
+extern const char* filterIndent;
+}
 
 namespace Filter
 {
 /// Pattern syntax to use for matching a name
-enum PatternSyntax {
+enum PatternSyntax_ {
     psAuto     = 0,        ///< try to guess correct type
     psLiteral  = (1 << 0), ///< literal name match
     psWildcard = (1 << 1), ///< match with waldcard expression
     psRegExp   = (1 << 2)  ///< match with regular expression
 };
+Q_DECLARE_FLAGS(PatternSyntax, PatternSyntax_)
+
+/// Filter options for variables and types
+enum Option {
+    ftNone             = 0,         ///< no filter set
+    ftVarName          = (1 << 0),  ///< literal name match
+    ftVarNameWildcard  = (1 << 1),  ///< wildcard name match
+    ftVarNameRegEx     = (1 << 2),  ///< regular expression name match
+    ftVarSymFileIndex  = (1 << 3),  ///< match original symbol file index of variable
+    ftTypeName         = (1 << 4),  ///< literal type name match
+    ftTypeNameWildcard = (1 << 5),  ///< wildcard name match
+    ftTypeNameRegEx    = (1 << 6),  ///< QRegExp type name match
+    ftRealType         = (1 << 7),  ///< match RealType of type
+    ftSize             = (1 << 8),   ///< match type size
+    ftTypeNameAny      = ftTypeName|ftTypeNameWildcard|ftTypeNameRegEx,  ///< any kind of type name matching
+    ftVarNameAny       = ftVarName|ftVarNameWildcard|ftVarNameRegEx  ///< any kind of variable name matching
+};
+Q_DECLARE_FLAGS(Options, Option)
+
 }
 
 
 /**
- * This class matches on a StructuredMember within a Structured object.
+ * This is the base class for other filters and provides data to match on a
+ * type's name, data type (RealType), and type size.
  */
-class MemberFilter
+class GenericFilter
 {
 public:
     /**
      * Default constructor
      */
-    MemberFilter() : _regEx(0), _syntax(Filter::psLiteral) {}
+    GenericFilter()
+        : _filters(Filter::ftNone), _typeRegEx(0),_realTypes(0), _size(0) {}
+
+    /**
+     * Copy constructor
+     * @param from initialize from this object
+     */
+    GenericFilter(const GenericFilter& from);
+
+    /**
+     * Destructor
+     */
+    virtual ~GenericFilter();
+
+    /**
+     * Resets all data to default values
+     */
+    virtual void clear();
+
+    /**
+     * Assignment operator
+     */
+    GenericFilter& operator=(const GenericFilter& src);
+
+    /**
+     * Comparison operator
+     * @param other compare to
+     */
+    bool operator==(const GenericFilter& other) const;
+
+    /**
+     * Comparison operator
+     * @param other compare to
+     */
+    inline bool operator!=(const GenericFilter& other) const { return !operator==(other); }
+
+    /**
+     * Parses a filter option specified as \a key and \a value.
+     * @param key the filter parameter
+     * @param value the value for the filter parameter
+     * @param keyVals an optional key-value store with additional parameters
+     * (if any were given)
+     * @return \c true if this filter understood and handled the specified
+     *  option, \c false otherwise
+     */
+    virtual bool parseOption(const QString& key, const QString& value,
+                             const KeyValueStore* keyVals = 0);
+
+    /**
+     * Matches the given type against this filter.
+     * @param type BaseType to match
+     * @return \c true if \a type matches this filter, \c false otherwise
+     */
+    virtual bool matchType(const BaseType *type) const;
+
+    /**
+     * Returns the type name or expression to match.
+     */
+    inline const QString& typeName() const { return _typeName; }
+
+    /**
+     * Sets the type name or corresponding expression to match.
+     * @param name type name or expression
+     * @param syntax syntax of \a name, will be guessed if \a syntax is
+     *  Filter::psAuto (the default)
+     * \sa typeName(), typeNameSyntax()
+     */
+    void setTypeName(const QString& name,
+                     Filter::PatternSyntax syntax = Filter::psAuto);
+
+    /**
+     * Returns the syntax for the type name that is currently used.
+     * \sa typeName(), setTypeName()
+     */
+    Filter::PatternSyntax typeNameSyntax() const;
+
+    /**
+     * Returns the RealTypes this filter matches.
+     * \sa setDataType(), RealType
+     */
+    inline int dataType() const { return _realTypes; }
+
+    /**
+     * Sets the RealTypes this filter matches.
+     * @param type OR'ed combination of RealType enum values
+     * \sa dataType(), RealType
+     */
+    inline void setDataType(int type) { _realTypes = type; _filters |= Filter::ftRealType; }
+
+    /**
+     * Returns the type size this filter matches
+     * @return type size
+     */
+    inline quint32 size() const { return _size; }
+
+    /**
+     * Sets the type size this filter matches
+     * @param size type size
+     */
+    inline void setSize(quint32 size) { _size = size; _filters |= Filter::ftSize; }
+
+    /**
+     * Returns the OR'ed combination of filter parameters set.
+     * @return
+     */
+    inline Filter::Options filters() const { return _filters; }
+
+    /**
+     * Checks if the given filter parameter is set.
+     * @param options parameter to test
+     * @return \c true if filter is set, \c false otherwise
+     */
+    inline bool filterActive(Filter::Options options) const { return _filters & options; }
+
+    /**
+     * Returns a string representation of this filter.
+     */
+    virtual QString toString() const;
+
+protected:
+    /**
+     * Parses a name matching pattern syntax.
+     * @param pattern given pattern.
+     * @param name variable to set according to \a pattern
+     * @param rx \a regular expression object to setup accoring to \a pattern
+     * @return used pattern syntax
+     */
+    static Filter::PatternSyntax parseNamePattern(const QString& pattern,
+                                                  QString& name, QRegExp &rx);
+
+    /**
+     * Sets a name matching pattern along with the pattern syntax. If syntax
+     * is Filter::psAuto, then the pattern type will be passed on to
+     * parseNamePattern() to guess the filter type. Otherwise the filter type
+     * specified in \a syntax will be used.
+     * @param pattern given pattern.
+     * @param name variable to set according to \a pattern
+     * @param rx \a regular expression object to setup accoring to \a pattern
+     * @param syntax the pattern syntax to use
+     * @return used pattern syntax, if \a syntax was Filter::psAuto, otherwise
+     *  \a syntax is returned
+     */
+    static Filter::PatternSyntax setNamePattern(const QString& pattern,
+                                                QString& name, QRegExp &rx,
+                                                Filter::PatternSyntax syntax);
+
+    /**
+     * Returns the filter syntax specified by key "match", which can be either
+     * "wildcard" or "regex". If no "match" key is present, then a literal
+     * match is assumed
+     * @param keyVal key-value store with user-specified parameters
+     * @return the syntax specified (see above)
+     */
+    static Filter::PatternSyntax givenSyntax(const KeyValueStore* keyVal);
+
+    bool matchTypeName(const QString& name) const;
+
+    Filter::Options _filters;
+
+private:
+    QString _typeName;
+    QRegExp *_typeRegEx;
+    int _realTypes;
+    quint32 _size;
+};
+
+
+/**
+ * This class matches on a StructuredMember within a Structured object.
+ */
+class MemberFilter: public GenericFilter
+{
+public:
+    /**
+     * Default constructor
+     */
+    MemberFilter() : _nameRegEx(0) {}
 
     /**
      * Initializing constructor
@@ -71,7 +271,12 @@ public:
     /**
      * Destructor
      */
-    ~MemberFilter();
+    virtual ~MemberFilter();
+
+    /**
+     * Assignment operator
+     */
+    MemberFilter& operator=(const MemberFilter& src);
 
     /**
      * Comparison operator
@@ -84,6 +289,12 @@ public:
      * @param other compare to
      */
     inline bool operator!=(const MemberFilter& other) const { return !operator==(other); }
+
+    /**
+     * \copydoc GenericFilter::parseOption()
+     */
+    virtual bool parseOption(const QString& key, const QString& value,
+                             const KeyValueStore* keyVals = 0);
 
     /**
      * Returns the name or pattern of the field to match.
@@ -104,7 +315,7 @@ public:
      * Returns the syntax of the name that is currently used.
      * \sa name(), setName()
      */
-    inline Filter::PatternSyntax nameSyntax() const { return _syntax; }
+     Filter::PatternSyntax nameSyntax() const;
 
     /**
      * Matches \a member against the defined name filter.
@@ -113,10 +324,14 @@ public:
      */
     bool match(const StructuredMember* member) const;
 
+    /**
+     * \copydoc GenericFilter::toString()
+     */
+    virtual QString toString() const;
+
 private:
     QString _name;
-    QRegExp *_regEx;
-    Filter::PatternSyntax _syntax;
+    QRegExp *_nameRegEx;
 };
 
 /// List of FieldFilter objects
@@ -126,99 +341,89 @@ typedef QList<MemberFilter> MemberFilterList;
 /**
  * This class allows to filter BaseType object.
  */
-class TypeFilter
+class TypeFilter: public GenericFilter
 {
     friend class MemberFilter;
 public:
-    /// Filter options for variables and types
-    enum FilterOptions {
-        ftVarName          = (1 << 0),  ///< literal name match
-        ftVarNameWildcard  = (1 << 1),  ///< wildcard name match
-        ftVarNameRegEx     = (1 << 2),  ///< regular expression name match
-        ftVarSymFileIndex  = (1 << 3),  ///< match original symbol file index of variable
-        ftTypeName         = (1 << 4),  ///< literal type name match
-        ftTypeNameWildcard = (1 << 5),  ///< wildcard name match
-        ftTypeNameRegEx    = (1 << 6),  ///< QRegExp type name match
-        ftRealType         = (1 << 7),  ///< match RealType of type
-        ftSize             = (1 << 8),   ///< match type size
-        ftTypeNameAny      = ftTypeName|ftTypeNameWildcard|ftTypeNameRegEx,  ///< any kind of type name matching
-        ftVarNameAny       = ftVarName|ftVarNameWildcard|ftVarNameRegEx  ///< any kind of variable name matching
-    };
+    /**
+     * Default constructor
+     */
+    TypeFilter() {}
 
-    TypeFilter() : _filters(0), _realType(0), _size(0) {}
-
+    /**
+     * \copydoc GenericFilter::clear()
+     */
     virtual void clear();
 
-    bool matchType(const BaseType* type) const;
-
+    /**
+     * Parses all specified filter options given in \a list. The filter values
+     * are specified as key:value strings in the list. This function then calls
+     * parseOption() for each of the filter options in \a list
+     * @param list list of filter values (see above)
+     * \sa parseOption()
+     */
     void parseOptions(const QStringList& list);
+
+    /**
+     * \copydoc GenericFilter::parseOption()
+     */
     virtual bool parseOption(const QString& key, const QString& value,
                              const KeyValueStore* keyVals = 0);
 
-    inline const QString& typeName() const { return _typeName; }
-    void setTypeName(const QString& name,
-                     Filter::PatternSyntax syntax = Filter::psAuto);
-    Filter::PatternSyntax typeNameSyntax() const;
+    /**
+     * \copydoc GenericFilter::matchType()
+     */
+    bool matchType(const BaseType* type) const;
 
-    inline int dataType() const { return _realType; }
-    inline void setDataType(int type) { _realType = type; _filters |= ftRealType; }
+    /**
+     * Returns the members this filter matches on.
+     * @return
+     */
+    inline const MemberFilterList& members() const { return _members; }
 
-    inline quint32 size() const { return _size; }
-    inline void setSize(quint32 size) { _size = size; _filters |= ftSize; }
+    /**
+     * Sets the members this filter matches on.
+     * @param members member list
+     */
+    inline void setMembers(const MemberFilterList& members) { _members = members; }
 
-    inline int filters() const { return _filters; }
-    inline bool filterActive(int options) const { return _filters & options; }
+    /**
+     * Appends the given member to the list of members this filter matches.
+     * @param member
+     */
+    void appendMember(const MemberFilter& member);
 
-    inline const MemberFilterList& fields() const { return _fields; }
-    inline void setFields(const MemberFilterList& fields) { _fields = fields; }
+    /**
+     * Creates a new MemberFilter from \a name and \a syntax and appends it
+     * to the member list.
+     * @param name name of the member
+     * @param syntax pattern syntax of \a name
+     */
+    inline void appendMember(const QString& name,
+                            Filter::PatternSyntax syntax = Filter::psAuto)
+    {
+        appendMember(MemberFilter(name, syntax));
+    }
 
-    void appendField(const MemberFilter& field);
-    inline void appendField(const QString& name,
-                            Filter::PatternSyntax syntax = Filter::psAuto);
-
+    /**
+     * \copydoc GenericFilter::toString()
+     */
     virtual QString toString() const;
 
+    /**
+     * Returns a key-value list of parameters this filter can parse. The key
+     * is the name of the parameter, the value holds a short description of the
+     * parameter and its values.
+     * @return key-value list of parameters this filter parses
+     * \sa parseOption()
+     */
     static const KeyValueStore& supportedFilters();
 
 protected:
-    /**
-     * Parses a name matching pattern syntax.
-     * @param pattern given pattern.
-     * @param name variable to set according to \a pattern
-     * @param rx \a regular expression object to setup accoring to \a pattern
-     * @return used pattern syntax
-     */
-    static Filter::PatternSyntax parseNamePattern(const QString& pattern,
-                                                  QString& name, QRegExp& rx);
-
-    /**
-     * Sets a name matching pattern along with the pattern syntax. If syntax
-     * is Filter::psAuto, then the pattern type will be passed on to
-     * parseNamePattern() to guess the filter type. Otherwise the filter type
-     * specified in \a syntax will be used.
-     * @param pattern given pattern.
-     * @param name variable to set according to \a pattern
-     * @param rx \a regular expression object to setup accoring to \a pattern
-     * @param syntax the pattern syntax to use
-     * @return used pattern syntax, if \a syntax was Filter::psAuto, otherwise
-     *  \a syntax is returned
-     */
-    static Filter::PatternSyntax setNamePattern(const QString& pattern,
-                                                QString& name, QRegExp& rx,
-                                                Filter::PatternSyntax syntax);
-
-    static Filter::PatternSyntax givenSyntax(const KeyValueStore* keyVal);
-
     bool matchFieldsRek(const BaseType* type, int index) const;
 
-    int _filters;
-
 private:
-    QString _typeName;
-    mutable QRegExp _typeRegEx;
-    int _realType;
-    quint32 _size;
-    MemberFilterList _fields;
+    MemberFilterList _members;
 };
 
 
@@ -228,27 +433,111 @@ private:
 class VariableFilter: public TypeFilter
 {
 public:
+    /**
+     * Constructor
+     * @param symFiles list of files the symbols in SymFactory were parsed from
+     */
     VariableFilter(const QStringList& symFiles = QStringList())
-        : _symFileIndex(-2), _symFiles(symFiles) {}
+        : _varRegEx(0), _symFileIndex(-2), _symFiles(symFiles) {}
 
+    /**
+     * Copy constructor
+     * @param from initialize from this object
+     */
+    VariableFilter(const VariableFilter& from);
+
+    /**
+     * Destructor
+     */
+    virtual ~VariableFilter();
+
+    /**
+     * Assignment operator
+     */
+    VariableFilter& operator=(const VariableFilter& src);
+
+    /**
+     * Comparison operator
+     * @param other compare to
+     */
+    inline bool operator==(const VariableFilter& other) const
+    {
+        // Do NOT compare the _varRegEx pointer
+        return TypeFilter::operator ==(other);
+    }
+
+    /**
+     * Comparison operator
+     * @param other compare to
+     */
+    inline bool operator!=(const VariableFilter& other) const
+    {
+        return !operator==(other);
+    }
+
+    /**
+     * \copydoc GenericFilter::clear()
+     */
     virtual void clear();
 
+    /**
+     * Matches the given variable against this filter
+     * @param var Variable
+     * @return \c true if \a var matches this filter, \c false otherwise
+     */
     bool matchVar(const Variable* var) const;
 
+    /**
+     * \copydoc GenericFilter::parseOption()
+     */
     virtual bool parseOption(const QString& key, const QString& value,
                              const KeyValueStore *keyVals = 0);
 
+    /**
+     * Returns the variable name or pattern this filter matches on.
+     * \sa setVarName()
+     */
     inline const QString& varName() const { return _varName; }
+
+    /**
+     * Sets the variable name or pattern this filter matches on.
+     * @param name variable name or pattern (depending on \a syntax)
+     * @param syntax the pattern syntax used in \a name
+     * \sa varName(), varNameSyntax()
+     */
     void setVarName(const QString& name,
                     Filter::PatternSyntax syntax = Filter::psAuto);
+
+    /**
+     * Returns the pattern syntax used for the variable name.
+     * \sa setVarName()
+     */
     Filter::PatternSyntax varNameSyntax() const;
 
+    /**
+     * Returns the index of the symbol file this variable filter matches on.
+     */
     inline int symFileIndex() const { return _symFileIndex; }
-    inline void setSymFileIndex(int i)
-    { _symFileIndex = i; _filters |= ftVarSymFileIndex; }
 
+    /**
+     * Sets the index of the symbol file this variable filter matches on.
+     * @param i file index
+     */
+    inline void setSymFileIndex(int i)
+    { _symFileIndex = i; _filters |= Filter::ftVarSymFileIndex; }
+
+    /**
+     * \copydoc GenericFilter::toString()
+     */
     virtual QString toString() const;
 
+    /**
+     * Returns a key-value list of parameters this filter can parse. The key
+     * is the name of the parameter, the value holds a short description of the
+     * parameter and its values.
+     * @return key-value list of parameters this filter parses
+     * \sa parseOption()
+     */
     static const KeyValueStore& supportedFilters();
 
 protected:
@@ -256,7 +545,7 @@ protected:
 
 private:
     QString _varName;
-    mutable QRegExp _varRegEx;
+    QRegExp* _varRegEx;
     int _symFileIndex;
     QStringList _symFiles;
 };
@@ -268,6 +557,11 @@ private:
 class InstanceFilter: public VariableFilter
 {
 public:
+    /**
+     * Matches the given instance against this filter
+     * @param inst Instance
+     * @return \c true if \a inst matches this filter, \c false otherwise
+     */
     bool matchInst(const Instance* inst) const;
 };
 

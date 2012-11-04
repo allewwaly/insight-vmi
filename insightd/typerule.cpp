@@ -60,6 +60,7 @@ bool TypeRule::match(const Instance *inst, const OsSpecs *specs) const
 QString TypeRule::toString() const
 {
     QString s;
+    static const QString indent(QString("\n%1").arg(str::filterIndent));
 
     if (!_name.isEmpty())
         s += "Name: " + _name + "\n";
@@ -67,13 +68,13 @@ QString TypeRule::toString() const
         s += "Description: " + _description + "\n";
     if (_osFilter) {
         QString f(_osFilter->toString().trimmed());
-        f.replace("\n", "\n | ");
-        s += "OS filter:\n | " + f + "\n";
+        f.replace("\n", indent);
+        s += "OS filter:" + indent + f + "\n";
     }
     if (_filter) {
         QString f(_filter->toString().trimmed());
-        f.replace("\n", "\n | ");
-        s += "Type filter:\n | " + f + "\n";
+        f.replace("\n", indent);
+        s += "Type filter:" + indent + f + "\n";
     }
     if (!_action.isEmpty()) {
         s += "Action";
@@ -88,8 +89,8 @@ QString TypeRule::toString() const
         }
         else {
             QString a(_action);
-            a.replace("\n", "\n | ");
-            s += " (inline):\n | " + a;
+            a.replace("\n", indent);
+            s += " (inline):" + indent + a;
         }
     }
     return s;
