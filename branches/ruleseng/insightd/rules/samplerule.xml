@@ -37,6 +37,7 @@
             </action>
         </rule>
 
+<!--
         <rule>
             <name>module.list</name>
             <description>
@@ -47,23 +48,24 @@
                 <datatype>struct</datatype>
                 <typename>module</typename>
                 <members>
-                    <member>list</member>
+                    <member datatype="struct" typename="list_head">list</member>
                     <member match="wildcard">*</member>
                 </members>
             </filter>
-            <action src="file" file="samplerule.js">getModuleList</action>
+            <action src="file" file="samplerule.js">getModuleList</action>-->
 <!--            <action src="inline">
                 // var inst = instance to check
-                // var fields = array of requested field(s)
-                inst = inst.Member(fields[0]);
+                // var members = array of requested member(s)
+                inst = inst.Member(members[0]);
                 inst.ChangeType("module");
                 inst.AddToAddress(inst.MemberOffset("list"));
                 return inst;
             </action>-->
-        </rule>
+<!--        </rule>-->
 
+<!--
         <rule>
-            <name>multi-level fields test</name>
+            <name>multi-level members test</name>
             <filter>
                 <datatype>struct</datatype>
                 <typename>vm_struct</typename>
@@ -81,7 +83,9 @@
                 return inst;
             </action>
         </rule>
-<!--
+-->
+
+
         <rule>
             <name>task_struct.tasks</name>
             <filter>
@@ -101,7 +105,7 @@
                 return inst;
             </action>
         </rule>
--->
+
 
         <rule>
             <name>task_struct.children</name>
@@ -116,7 +120,7 @@
             <action src="inline">
                 var inst = arguments[0];
                 var typeId = inst.TypeId();
-<!--                println(inst.comm + ":", inst.MemberName(arguments[1][0]));-->
+                // println(inst.comm + ":", inst.MemberName(arguments[1][0]));
                 inst = inst.Member(arguments[1][0]).Member(arguments[1][1]);
                 inst.ChangeType(typeId);
                 var offsetMbr = inst.MemberName(arguments[1][0]);
@@ -126,6 +130,31 @@
                 return inst;
             </action>
         </rule>
+
+        <rule>
+            <name>list_head generic</name>
+            <description>
+                Generic rule for list_head members embedded in other structs
+            </description>
+            <filter>
+                <datatype>struct</datatype>
+                <members>
+                    <member datatype="struct" typename="list_head" match="wildcard">*</member>
+                    <member match="wildcard">*</member>
+                </members>
+            </filter>
+            <action src="inline">
+                var inst = arguments[0];
+                var members = arguments[1];
+                var typeId = inst.TypeId();
+                println("Called with:", inst.Name(), inst.MemberName(members[0]), inst.MemberName(members[1]));
+                inst = inst.Member(members[0]).Member(members[1]);
+                inst.ChangeType(typeId);
+                inst.AddToAddress(-inst.MemberOffset(members[0]));
+                return inst;
+            </action>
+        </rule>
+
 
     </rules>
 </typeknowledge>
