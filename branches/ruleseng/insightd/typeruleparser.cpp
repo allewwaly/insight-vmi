@@ -453,8 +453,12 @@ const XmlSchema &TypeRuleParser::schema()
             bool allowMultiple = multiTypes.contains(children[i]);
             XmlValueType vt = intTypes.contains(children[i]) ?
                       vtInteger : vtString;
-            ruleSchema.addElement(children[i], empty, allowMatch ? match : empty,
-                                  empty, allowMultiple, vt);
+            QStringList optAttr(allowMatch ? match : empty);
+            // Allow some futher attributes for <member>
+            if (children[i] == xml::member)
+                optAttr << xml::type_name << xml::datatype << xml::size;
+            ruleSchema.addElement(children[i], empty, optAttr, empty,
+                                  allowMultiple, vt);
         }
     }
 

@@ -252,16 +252,16 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
             const InstanceFilter* filter = rule->filter();
             if (filter) {
                 // Not all fields given ==> defer
-                if (filter->fields().size() > members.size())
+                if (filter->members().size() > members.size())
                     ret |= mrDefer;
                 // To many fields given ==> no match
-                else if (rule->filter()->fields().size() < members.size())
+                else if (rule->filter()->members().size() < members.size())
                     continue;
                 // If all fields match ==> match
                 else {
                     bool match = true;
                     for (int i = 0; match && i< members.size(); ++i)
-                        if (!filter->fields().at(i).match(members[i]))
+                        if (!filter->members().at(i).match(members[i]))
                             match = false;
                     // Only consider the first match
                     if (match && !(ret & mrMatch)) {
