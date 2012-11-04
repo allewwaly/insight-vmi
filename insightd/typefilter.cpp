@@ -14,7 +14,7 @@ const char* type_name    = "typename";
 const char* variablename = "variablename";
 const char* filename     = "filename";
 const char* size         = "size";
-const char* field        = "field";
+const char* member       = "member";
 const char* match        = "match";
 
 const char* regex        = "regex";
@@ -45,14 +45,14 @@ using namespace Filter;
     } while (0)
 
 
-FieldFilter::FieldFilter(const QString& name, Filter::PatternSyntax syntax)
+MemberFilter::MemberFilter(const QString& name, Filter::PatternSyntax syntax)
     : _name(name), _regEx(0), _syntax(syntax)
 {
     setName(name, syntax);
 }
 
 
-FieldFilter::FieldFilter(const FieldFilter& from)
+MemberFilter::MemberFilter(const MemberFilter& from)
     : _name(from._name), _regEx(0), _syntax(from._syntax)
 {
     if (from._regEx)
@@ -60,14 +60,14 @@ FieldFilter::FieldFilter(const FieldFilter& from)
 }
 
 
-FieldFilter::~FieldFilter()
+MemberFilter::~MemberFilter()
 {
     if (_regEx)
         delete _regEx;
 }
 
 
-bool FieldFilter::operator==(const FieldFilter &other) const
+bool MemberFilter::operator==(const MemberFilter &other) const
 {
     if (_name != other._name || _syntax != other._syntax)
         return false;
@@ -79,7 +79,7 @@ bool FieldFilter::operator==(const FieldFilter &other) const
 }
 
 
-void FieldFilter::setName(const QString &name, PatternSyntax syntax)
+void MemberFilter::setName(const QString &name, PatternSyntax syntax)
 {
     QRegExp rx;
     _syntax = TypeFilter::setNamePattern(name, _name, rx, syntax);
@@ -91,7 +91,7 @@ void FieldFilter::setName(const QString &name, PatternSyntax syntax)
 }
 
 
-bool FieldFilter::match(const StructuredMember *member) const
+bool MemberFilter::match(const StructuredMember *member) const
 {
     if (!member)
         return false;
@@ -215,7 +215,7 @@ PatternSyntax TypeFilter::typeNameSyntax() const
 }
 
 
-void TypeFilter::appendField(const FieldFilter &field)
+void TypeFilter::appendField(const MemberFilter &field)
 {
     _fields.append(field);
 }
@@ -223,7 +223,7 @@ void TypeFilter::appendField(const FieldFilter &field)
 
 void TypeFilter::appendField(const QString &name, PatternSyntax syntax)
 {
-    appendField(FieldFilter(name, syntax));
+    appendField(MemberFilter(name, syntax));
 }
 
 
@@ -281,7 +281,7 @@ const KeyValueStore &TypeFilter::supportedFilters()
                 "/re/.";
         typeFilters[xml::datatype] = "Match actual type, e.g. \"FuncPointer\" or \"UInt*\".";
         typeFilters[xml::size] = "Match type size.";
-        typeFilters[xml::field] = "Match field name of a struct or union (specify multiple times to match nested structs' fields)";
+        typeFilters[xml::member] = "Match field name of a struct or union (specify multiple times to match nested structs' fields)";
     }
     return typeFilters;
 }
@@ -326,7 +326,7 @@ bool TypeFilter::matchFieldsRek(const BaseType* type, int index) const
     if (!s)
         return false;
 
-    const FieldFilter& f = _fields[index];
+    const MemberFilter& f = _fields[index];
     for (int i = 0; i < s->members().size(); ++i) {
         const StructuredMember* m = s->members().at(i);
         if (f.match(m) &&
@@ -418,7 +418,7 @@ bool TypeFilter::parseOption(const QString &key, const QString &value,
         }
         setDataType(realType);
     }
-    else if (QString(xml::field).startsWith(key)) {
+    else if (QString(xml::member).startsWith(key)) {
         appendField(v, givenSyntax(keyVals));
     }
     else

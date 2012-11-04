@@ -22,9 +22,9 @@
                 <datatype>struct</datatype>
                 <typename>list_head</typename>
                 <variablename>modules</variablename>
-                <fields>
-                    <field match="wildcard">*</field>
-                </fields>
+                <members>
+                    <member match="wildcard">*</member>
+                </members>
             </filter>
 <!--            <action src="file" file="samplerule.js">getModules</action>-->
             <action src="inline">
@@ -46,10 +46,10 @@
             <filter>
                 <datatype>struct</datatype>
                 <typename>module</typename>
-                <fields>
-                    <field>list</field>
-                    <field match="wildcard">*</field>
-                </fields>
+                <members>
+                    <member>list</member>
+                    <member match="wildcard">*</member>
+                </members>
             </filter>
             <action src="file" file="samplerule.js">getModuleList</action>
 <!--            <action src="inline">
@@ -67,9 +67,9 @@
             <filter>
                 <datatype>struct</datatype>
                 <typename>vm_struct</typename>
-                <fields>
-                    <field>pages</field>
-                </fields>
+                <members>
+                    <member>pages</member>
+                </members>
             </filter>
             <action src="inline">
                 println("Hier");
@@ -87,10 +87,10 @@
             <filter>
                 <datatype>struct</datatype>
                 <typename>task_struct</typename>
-                <fields>
-                    <field>tasks</field>
-                    <field match="wildcard">*</field>
-                </fields>
+                <members>
+                    <member>tasks</member>
+                    <member match="wildcard">*</member>
+                </members>
             </filter>
             <action src="inline">
                 var inst = arguments[0];
@@ -108,10 +108,10 @@
             <filter>
                 <datatype>struct</datatype>
                 <typename>task_struct</typename>
-                <fields>
-                    <field match="regex">^(tasks|children|sibling)$</field>
-                    <field match="wildcard">*</field>
-                </fields>
+                <members>
+                    <member match="regex">^(tasks|children|sibling)$</member>
+                    <member match="wildcard">*</member>
+                </members>
             </filter>
             <action src="inline">
                 var inst = arguments[0];
