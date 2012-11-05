@@ -166,7 +166,7 @@ bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct, const 
     quint64 offsetListHeadParent = i->address() - parentStruct->address();
 
     // Get the next pointer.
-    Instance next = i->member(0, 0, -1, true);
+    Instance next = i->member(0, 0, -1, Instance::ksNone);
     Instance nextDeref;
 
     // Is the next pointer valid?
@@ -215,7 +215,7 @@ bool MemoryMapHeuristics::validListHead(const Instance *i, bool defaultValid)
     // as it should.
 
     // Get the next pointer.
-    Instance next = i->member(0, 0, -1, true);
+    Instance next = i->member(0, 0, -1, Instance::ksNone);
 
     // Is the next pointer valid?
     if(next.isNull())
@@ -277,11 +277,11 @@ bool MemoryMapHeuristics::validCandidateBasedOnListHead(const Instance *listHead
         return false;
 
     // Get the instance of the 'next' member within the list_head
-    quint64 memberNext = (quint64)listHead->member(0, 0, -1, true).toPointer();
+    quint64 memberNext = (quint64)listHead->member(0, 0, -1, Instance::ksNone).toPointer();
 
     // If this list head points to itself, or is 0/-1 we do not need
     // to consider it anymore.
-    if (memberNext == listHead->member(0, 0, -1, true).address() ||
+    if (memberNext == listHead->member(0, 0, -1, Instance::ksNone).address() ||
             defaultValue(memberNext, listHead->vmem()->memSpecs()))
         return false;
 
@@ -298,7 +298,7 @@ bool MemoryMapHeuristics::validCandidateBasedOnListHead(const Instance *listHead
 
     // Sanity check: The prev pointer of the list_head must point back to the
     // original list_head
-    quint64 candListHeadPrev = (quint64)candListHead.member(1, 0, -1, true).toPointer();
+    quint64 candListHeadPrev = (quint64)candListHead.member(1, 0, -1, Instance::ksNone).toPointer();
 
     if(candListHeadPrev != memberNext)
         return false;

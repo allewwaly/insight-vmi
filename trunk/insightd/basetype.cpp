@@ -140,7 +140,9 @@ Instance BaseType::toInstance(size_t address, VirtualMemory* vmem,
         const QString& name, const QStringList& parentNames,
         int /*resolveTypes*/, int /*maxPtrDeref*/, int* /*derefCount*/) const
 {
-    return Instance(address, this, name, parentNames, vmem, -1);
+    Instance inst(address, this, name, parentNames, vmem, -1);
+    inst.setOrigin(Instance::orBaseType);
+    return inst;
 }
 
 

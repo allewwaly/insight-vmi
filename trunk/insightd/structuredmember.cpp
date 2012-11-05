@@ -35,6 +35,16 @@ StructuredMember::StructuredMember(SymFactory* factory, const TypeInfo& info)
 }
 
 
+int StructuredMember::index() const
+{
+    if (!_belongsTo)
+        return -1;
+    for(int i = 0; i < _belongsTo->members().size(); ++i)
+        if (_belongsTo->members().at(i) == this)
+            return i;
+    return -1;
+}
+
 
 QString StructuredMember::prettyName() const
 {
@@ -63,6 +73,7 @@ Instance StructuredMember::toInstance(size_t structAddress,
 		inst.setBitOffset(_bitOffset);
 	}
 
+	inst.setOrigin(Instance::orMember);
 	return inst;
 }
 

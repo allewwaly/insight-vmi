@@ -236,6 +236,60 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
     shellOut(s, true);
 }
 
+/*
+bool checkAltRefType(const ReferencingType::AltRefType& at)
+{
+    ASTConstExpressionList list;
+    list += at.expr()->findExpressions(etInclusiveOr);
+    list += at.expr()->findExpressions(etExclusiveOr);
+    list += at.expr()->findExpressions(etAnd);
+    list += at.expr()->findExpressions(etShiftLeft);
+    list += at.expr()->findExpressions(etShiftRight);
+    list += at.expr()->findExpressions(etMultiplicativeMult);
+    list += at.expr()->findExpressions(etMultiplicativeDiv);
+    list += at.expr()->findExpressions(etMultiplicativeMod);
+    return !list.isEmpty();
+}
+
+
+void checkAltRefTypes(const RefBaseType* rt)
+{
+    for (int i = 0; i < rt->altRefTypeCount(); ++i) {
+        const ReferencingType::AltRefType& at = rt->altRefTypes().at(i);
+        if (checkAltRefType(at)) {
+            QString s("0x%1 %2, cdt %3:\n%4");
+            s = s.arg(rt->id(), 0, 16).arg(rt->prettyName()).arg(i+1).arg(at.expr()->toString());
+            debugmsg(s);
+        }
+    }
+}
+
+
+void checkAltRefTypes(const Variable* v)
+{
+    for (int i = 0; i < v->altRefTypeCount(); ++i) {
+        const ReferencingType::AltRefType& at = v->altRefTypes().at(i);
+        if (checkAltRefType(at)) {
+            QString s("0x%1 %2, cdt %3:\n%4");
+            s = s.arg(v->id(), 0, 16).arg(v->prettyName()).arg(i+1).arg(at.expr()->toString());
+            debugmsg(s);
+        }
+    }
+}
+
+
+void checkAltRefTypes(const StructuredMember* m)
+{
+    for (int i = 0; i < m->altRefTypeCount(); ++i) {
+        const ReferencingType::AltRefType& at = m->altRefTypes().at(i);
+        if (checkAltRefType(at)) {
+            QString s("0x%1 %2, cdt %3:\n%4");
+            s = s.arg(m->id(), 0, 16).arg(m->prettyName()).arg(i+1).arg(at.expr()->toString());
+            debugmsg(s);
+        }
+    }
+}
+*/
 
 void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
 {
@@ -309,7 +363,7 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         // Read list of compile units
         _phase = phCompileUnits;
         in >> size;
-        for (qint32 i = 0; i < size; i++) {
+        for (qint32 i = 0; i < size && !shell->interrupted(); i++) {
             CompileUnit* c = new CompileUnit(_factory);
             if (!c)
                 genericError("Out of memory.");
@@ -318,10 +372,13 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
             checkOperationProgress();
         }
 
+        if (shell->interrupted())
+            return;
+
         // Read list of types
         _phase = phElementaryTypes;
         in >> size;
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < size && !shell->interrupted(); i++) {
             in >> type;
             BaseType* t = _factory->createEmptyType((RealType) type);
             if (!t)
@@ -338,6 +395,9 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
             checkOperationProgress();
         }
 
+        if (shell->interrupted())
+            return;
+
         // Read list of additional type-id-relations
         _phase = phTypeRelations;
         in >> size;
@@ -346,7 +406,7 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         typedef QLinkedList<IntInt> IntIntList;
         IntIntList typeRelations; // buffer for not-yet existing types
         const QString empty; // empty string
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < size && !shell->interrupted(); i++) {
             in >> source >> target;
             BaseType* t = _factory->findBaseTypeById(target);
             // Is the type already in the list?
@@ -358,9 +418,12 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
             checkOperationProgress();
         }
 
+        if (shell->interrupted())
+            return;
+
         IntIntList::iterator it = typeRelations.begin();
         int prev_size = typeRelations.size();
-        while (it != typeRelations.end()) {
+        while (it != typeRelations.end() && !shell->interrupted()) {
             source = it->first;
             target = it->second;
             BaseType* t = _factory->findBaseTypeById(target);
@@ -387,12 +450,16 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
                 it = typeRelations.begin();
                 prev_size = typeRelations.size();
             }
+            checkOperationProgress();
         }
+
+        if (shell->interrupted())
+            return;
 
         // Read list of variables
         _phase = phVariables;
         in >> size;
-        for (qint32 i = 0; i < size; i++) {
+        for (qint32 i = 0; i < size && !shell->interrupted(); i++) {
             Variable* v = new Variable(_factory);
             if (!v)
                 genericError("Out of memory.");
@@ -401,11 +468,14 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
             checkOperationProgress();
         }
 
+        if (shell->interrupted())
+            return;
+
         // Read list of types with alternative types
         _phase = phCandidateTypes;
         RefBaseType* rbt;
         in >> size;
-        for (qint32 i = 0; i < size; ++i) {
+        for (qint32 i = 0; i < size && !shell->interrupted(); ++i) {
             in >> id;
             if ( !(rbt = dynamic_cast<RefBaseType*>(
                        _factory->findBaseTypeById(id))) )
@@ -416,11 +486,14 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
             checkOperationProgress();
         }
 
+        if (shell->interrupted())
+            return;
+
         // Read list of struct members with alternative types
         Structured* s;
         StructuredMember* m;
         in >> size;
-        for (qint32 i = 0; i < size; ++i) {
+        for (qint32 i = 0; i < size && !shell->interrupted(); ++i) {
             in >> id >> belongsTo;
             if ( !(s = dynamic_cast<Structured*>(
                        _factory->findBaseTypeById(belongsTo))) )
@@ -442,10 +515,13 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
             checkOperationProgress();
         }
 
+        if (shell->interrupted())
+            return;
+
         // Read list of variables with alternative types
         Variable* v;
         in >> size;
-        for (qint32 i = 0; i < size; ++i) {
+        for (qint32 i = 0; i < size && !shell->interrupted(); ++i) {
             in >> id;
             if ( !(v = _factory->findVarById(id)) )
                 readerWriterError(QString("Varible with ID 0x%1 not found.")
@@ -453,6 +529,9 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
             v->readAltRefTypesFrom(in, _factory);
             checkOperationProgress();
         }
+
+        if (shell->interrupted())
+            return;
 
         // Since version 17: Read file names containing the orig. symbols
         if (in.kSymVersion() >= kSym::VERSION_17) {

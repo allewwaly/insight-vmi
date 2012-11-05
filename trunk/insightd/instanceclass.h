@@ -13,6 +13,15 @@
 #include <QStringList>
 #include "instance.h"
 
+namespace js
+{
+extern const char* getInstance;
+extern const char* instance;
+extern const char* length;
+extern const char* useRules;
+extern const char* useCandidates;
+}
+
 // Forward declarations
 class QScriptContext;
 class QScriptEngine;
@@ -24,7 +33,7 @@ class InstancePrototype;
 class InstanceClass : public QScriptClass
 {
 public:
-    InstanceClass(QScriptEngine *eng);
+    InstanceClass(QScriptEngine *eng, Instance::KnowledgeSources src);
     ~InstanceClass();
 
     QScriptValue constructor();
@@ -47,11 +56,21 @@ public:
 
     QScriptValue prototype() const;
 
+    Instance::KnowledgeSources knowledgeSources() const;
+    void setKnowledgeSources(Instance::KnowledgeSources src);
+
 private:
+    static QScriptValue getSetUseCandidates(QScriptContext *ctx, QScriptEngine *eng);
+    static QScriptValue getSetUseRules(QScriptContext *ctx, QScriptEngine *eng);
+
     static QScriptValue construct(QScriptContext* ctx, QScriptEngine* eng);
 
     static QScriptValue instToScriptValue(QScriptEngine* eng, const Instance& inst);
-    static void instFromScriptValue(const QScriptValue& obj, Instance& inst);
+    inline static void instFromScriptValue(const QScriptValue& obj, Instance& inst)
+    {
+        inst = qvariant_cast<Instance>(obj.data().toVariant());
+    }
+
 
     static QScriptValue membersToScriptValue(QScriptEngine* eng, const InstanceList& inst);
     static void membersFromScriptValue(const QScriptValue& obj, InstanceList& inst);
@@ -63,5 +82,8 @@ private:
     QScriptValue _protoScriptVal;
     QScriptValue _ctor;
 };
+
+
+Q_DECLARE_METATYPE(InstanceClass*)
 
 #endif /* INSTANCECLASS_H_ */

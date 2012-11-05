@@ -13,7 +13,6 @@
 #include <QStringList>
 #include "instance.h"
 #include "genericexception.h"
-#include "instancedata.h"
 
 
 /**
@@ -113,7 +112,7 @@
  * \sa Instance
  * \sa InstanceClass
  */
-class InstancePrototype : public QObject, public QScriptable
+class InstancePrototype : public QObject, protected QScriptable
 {
     Q_OBJECT
 
@@ -128,6 +127,25 @@ public:
      * Destructor
      */
     virtual ~InstancePrototype();
+
+    /**
+     * Returns the used knowledge sources when resolving members.
+     * \sa setKnowledgeSources()
+     */
+    inline Instance::KnowledgeSources knowledgeSources() const
+    {
+        return _knowSrc;
+    }
+
+    /**
+     * Sets the used knowledge sources when resolving members.
+     * @param src knowlege sources
+     * \sa knowledgeSources()
+     */
+    inline void setKnowledgeSources(Instance::KnowledgeSources src)
+    {
+        _knowSrc = src;
+    }
 
 public slots:
 	/**
@@ -262,6 +280,16 @@ public slots:
     QString FullName() const;
 
     /**
+     * Returns the name of member no. \a index. Calling "inst.MemberName(i)" is
+     * much more efficient than calling "inst.Member(i).Name()", since it does
+     * not construct an intermediate Instance object.
+     * @param index index into the member list
+     * @return name of member \a index
+     * \sa MemberCount(), Members(), MemberNames()
+     */
+    QString MemberName(int index) const;
+
+    /**
      * Gives access to the names of all members if this instance.
      * @return a list of the names of all direct members of this instance
      * \sa Members(), MemberExists()
@@ -349,8 +377,17 @@ public slots:
     /**
      * Calculates the offset of a member within a struct, if this is a struct
      * or union.
+     * @param index the index of the member
+     * @return offset of member \a name within the struct, or -1 if no such
+     * member exists or if this instance is no struct or union
+     */
+    int MemberOffset(int index) const;
+
+    /**
+     * Calculates the offset of a member within a struct, if this is a struct
+     * or union.
      * @param name the name of the member
-     * @return offset of member \a name within the struct, or 0 if no such
+     * @return offset of member \a name within the struct, or -1 if no such
      * member exists or if this instance is no struct or union
      */
     int MemberOffset(const QString& name) const;
@@ -766,6 +803,7 @@ private:
     inline Instance* thisInstance() const;
     inline void injectScriptError(const GenericException& e) const;
     inline void injectScriptError(const QString& msg) const;
+    Instance::KnowledgeSources _knowSrc;
 };
 
 #endif /* INSTANCEPROTOTYPE_H_ */

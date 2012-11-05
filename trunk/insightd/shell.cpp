@@ -40,6 +40,8 @@
 #include "kernelsourceparser.h"
 #include "function.h"
 #include "memspecparser.h"
+#include "typefilter.h"
+#include "typeruleexception.h"
 
 #ifdef CONFIG_MEMORY_MAP
 #include "memorymap.h"
@@ -197,6 +199,18 @@ Shell::Shell(bool listenOnSocket)
                 "                              dump <index2>"
 #endif
                 ));
+
+    _commands.insert("rules",
+             Command(
+                 &Shell::cmdRules,
+                 "Read and manage rule files",
+                 "This command allows to manage type knowledge rules.\n"
+                 "  rules load [-f] <file>   Loades the from <file>, flushes all\n"
+                 "                           rules first with -f\n"
+                 "  rules list               Lists all loaded rules\n"
+                 "  rules active             Lists all rules that are currently\n"
+                 "                           active\n"
+                 "  rules flush              Removes all rules"));
 
     _commands.insert("script",
             Command(
@@ -530,10 +544,28 @@ void Shell::run()
     _lastStatus = 0;
     _finished = false;
 
+	// Perform any initial action that might be given
+	switch (programOptions.action()) {
+	case acNone:
+		break;
+	case acParseSymbols:
+		cmdSymbolsParse(QStringList(programOptions.inFileName()));
+		break;
+	case acLoadSymbols:
+		cmdSymbolsLoad(QStringList(programOptions.inFileName()));
+		break;
+	case acUsage:
+		ProgramOptions::cmdOptionsUsage();
+		_finished = true;
+	}
+
     // Handle the command line params
-    for (int i = 0; i < programOptions.memFileNames().size(); ++i) {
+    for (int i = 0; !_interrupted && i < programOptions.memFileNames().size(); ++i) {
         cmdMemoryLoad(QStringList(programOptions.memFileNames().at(i)));
     }
+
+    if (_interrupted)
+        _out << endl << "Operation interrupted by user." << endl;
 
     // Read input from shell or from socket?
     if (_listenOnSocket) {
@@ -571,10 +603,9 @@ bool Shell::shuttingDown() const
 
 void Shell::interrupt()
 {
-    if (executing()) {
-        _interrupted = true;
+    _interrupted = true;
+    if (executing())
         _engine->terminateScript();
-    }
 }
 
 
@@ -768,12 +799,12 @@ int Shell::eval(QString command)
     		if (e.errorCode == QueryException::ecAmbiguousType) {
                 errMsg("Select a type by its ID from the following list:", true);
 
-                TypeListFilter filter;
+                TypeFilter filter;
                 filter.setTypeName(e.errorParam.toString());
 
     			QIODevice* outDev = _out.device();
     			_out.setDevice(_err.device());                
-                printTypeList(filter);
+                printTypeList(&filter);
     			_out.setDevice(outDev);
     		}
     	}
@@ -1020,18 +1051,18 @@ int Shell::cmdListSources(QStringList /*args*/)
 int Shell::cmdListTypes(QStringList args, int typeFilter)
 {
     if (!args.isEmpty() && args.first() == "help")
-        return printFilterHelp(TypeListFilter::filterHelp());
+        return printFilterHelp(TypeFilter::supportedFilters());
 
-    TypeListFilter filter;
+    TypeFilter filter;
     try {
         filter.parseOptions(args);
-        if (filter.filterActive(foRealType))
-            filter.setRealType(filter.realType() & typeFilter);
+        if (filter.filterActive(Filter::ftRealType))
+            filter.setDataType(filter.dataType() & typeFilter);
         else
-            filter.setRealType(typeFilter);
-        return printTypeList(filter);
+            filter.setDataType(typeFilter);
+        return printTypeList(&filter);
     }
-    catch (ListFilterException& e) {
+    catch (FilterException& e) {
         errMsg(e.message, true);
         _out << "Try \"list "
              << (typeFilter == rtFunction ? "functions" :  "types")
@@ -1041,7 +1072,7 @@ int Shell::cmdListTypes(QStringList args, int typeFilter)
 }
 
 
-int Shell::printFilterHelp(const QHash<QString, QString> help)
+int Shell::printFilterHelp(const KeyValueStore& help)
 {
     QStringList keys(help.uniqueKeys());
     keys.sort();
@@ -1051,8 +1082,8 @@ int Shell::printFilterHelp(const QHash<QString, QString> help)
         if (keys[i].size() > maxKeySize)
             maxKeySize = keys[i].size();
 
-    shell->out() << "Filters can be applied in the form \"key:value\". The "
-                    "following filter options are available:" << endl;
+    _out << "Filters can be applied in the form \"key:value\". The "
+            "following filter options are available:" << endl;
 
     QSize ts = termSize();
     for (int i = 0; i < keys.size(); ++i) {
@@ -1068,11 +1099,11 @@ int Shell::printFilterHelp(const QHash<QString, QString> help)
                 j += w;
             }
             else {
-                shell->out() << s << endl;
+                _out << s << endl;
                 s = QString(maxKeySize + 4, QChar(' '));
             }
         }
-        shell->out() << s << endl;
+        _out << s << endl;
         s.clear();
     }
 
@@ -1080,7 +1111,7 @@ int Shell::printFilterHelp(const QHash<QString, QString> help)
 }
 
 
-int Shell::printTypeList(const TypeListFilter& filter)
+int Shell::printTypeList(const TypeFilter *filter)
 {
     const BaseTypeList* types = &_sym.factory().types();
     CompileUnit* unit = 0;
@@ -1111,7 +1142,7 @@ int Shell::printTypeList(const TypeListFilter& filter)
         BaseType* type = types->at(i);
 
         // Skip all types not matching the filter
-        if (filter.filters() && !filter.match(type))
+        if (filter && filter->filters() && !filter->matchType(type))
             continue;
 
         // Print header if not yet done
@@ -1174,7 +1205,7 @@ int Shell::printTypeList(const TypeListFilter& filter)
 			_out << "Total types: " << color(ctBold) << dec << typeCount
 				 << color(ctReset) << endl;
 		}
-		else if (filter.filters())
+		else if (filter && filter->filters())
 			_out << "No types match the specified filters." << endl;
 	}
 
@@ -1391,15 +1422,15 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
 int Shell::cmdListVars(QStringList args)
 {
     if (!args.isEmpty() && args.first() == "help")
-        return printFilterHelp(VarListFilter::filterHelp());
+        return printFilterHelp(VariableFilter::supportedFilters());
 
     // Parse the filters
-    VarListFilter filter(_sym.factory().origSymFiles());
+    VariableFilter filter(_sym.factory().origSymFiles());
     try {
         filter.parseOptions(args);
-        return printVarList(filter);
+        return printVarList(&filter);
     }
-    catch (ListFilterException& e) {
+    catch (FilterException& e) {
         errMsg(e.message, true);
         _out << "Try \"list variables help\" for more information." << endl;
     }
@@ -1408,7 +1439,7 @@ int Shell::cmdListVars(QStringList args)
 }
 
 
-int Shell::printVarList(const VarListFilter& filter)
+int Shell::printVarList(const VariableFilter *filter)
 {
     const VariableList& vars = _sym.factory().vars();
     CompileUnit* unit = 0;
@@ -1441,7 +1472,7 @@ int Shell::printVarList(const VarListFilter& filter)
         Variable* var = vars[i];
 
         // Apply filter
-        if (filter.filters() && !filter.match(var))
+        if (filter && filter->filters() && !filter->matchVar(var))
             continue;
 
         // Print header if not yet done
@@ -1528,7 +1559,7 @@ int Shell::printVarList(const VarListFilter& filter)
             _out << "Total variables: " << color(ctBold) << dec << varCount
                  << color(ctReset) << endl;
         }
-        else if (filter.filters())
+        else if (filter && filter->filters())
             _out << "No variable matches the specified filters." << endl;
     }
 
@@ -2249,8 +2280,8 @@ int Shell::cmdMemoryDiffVisualize(int index)
     if (!_memDumps[index]->map() || _memDumps[index]->map()->pmemDiff().isEmpty())
     {
         _err << "The memory dump has not yet been compared to another dump "
-                << index << ". Try \"help memory\" to learn how to compare them."
-                << endl;
+             << index << ". Try \"help memory\" to learn how to compare them."
+             << endl;
         return 1;
     }
 
@@ -2259,7 +2290,7 @@ int Shell::cmdMemoryDiffVisualize(int index)
     return 1;
 #endif
 
-   memMapWindow->mapWidget()->setDiff(&_memDumps[index]->map()->pmemDiff());
+    memMapWindow->mapWidget()->setDiff(&_memDumps[index]->map()->pmemDiff());
 
     if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
         debugerr("Error invoking show() on memMapWindow");
@@ -2267,8 +2298,111 @@ int Shell::cmdMemoryDiffVisualize(int index)
     return ecOk;
 }
 
-#endif
+#endif /* CONFIG_MEMORY_MAP */
 
+
+int Shell::cmdRules(QStringList args)
+{
+    if (args.size() < 1) {
+        cmdHelp(QStringList("rules"));
+        return ecInvalidArguments;
+    }
+
+    QString cmd = args.front().toLower();
+    args.pop_front();
+
+    if (cmd.size() >= 2 && QString("load").startsWith(cmd))
+        return cmdRulesLoad(args);
+    else if (cmd.size() >= 2 && QString("list").startsWith(cmd))
+        return cmdRulesList(args);
+    else if (QString("active").startsWith(cmd))
+        return cmdRulesActive(args);
+    else if (QString("flush").startsWith(cmd))
+        return cmdRulesFlush(args);
+    else
+        cmdHelp(QStringList("rules"));
+
+    return ecInvalidArguments;
+}
+
+
+int Shell::cmdRulesLoad(QStringList args)
+{
+    bool flush = false;
+    if (!args.isEmpty() && (args.first() == "-f" || args.first() == "--flush"))
+    {
+        flush = true;
+        args.pop_front();
+    }
+
+    if (args.size() < 1) {
+        cmdHelp(QStringList("rules"));
+        return ecInvalidArguments;
+    }
+
+    try {
+        if (flush)
+            _sym.flushRules();
+
+        int noBefore = _sym.ruleEngine().rules().size();
+        _sym.loadRules(args.first());
+        int noAfter = _sym.ruleEngine().rules().size();
+
+        _out << "Loaded ";
+        if (noBefore)
+            _out << (noAfter - noBefore) << " new rules, a total of ";
+        _out << noAfter << " rules, "
+             << _sym.ruleEngine().activeRules().size()  << " are active."
+             << endl;
+    }
+    catch (TypeRuleException& e) {
+        // Shorten the path as much as possible
+        QString file = QDir::current().relativeFilePath(e.xmlFile);
+        if (file.size() > e.xmlFile.size())
+            file = e.xmlFile;
+
+        _err << "In file " << color(ctBold) << file << color(ctReset);
+        if (e.xmlLine > 0) {
+            _err << " line "
+                         << color(ctBold) << e.xmlLine << color(ctReset);
+        }
+        if (e.xmlColumn > 0) {
+            _err << " column "
+                         << color(ctBold) << e.xmlColumn << color(ctReset);
+        }
+        _err << ":" << endl
+                     << color(ctErrorLight) << e.message << color(ctReset)
+                     << endl;
+        return ecCaughtException;
+    }
+
+    return ecOk;
+}
+
+
+int Shell::cmdRulesList(QStringList args)
+{
+    Q_UNUSED(args)
+    debugmsg("Not implemented.");
+    return ecOk;
+}
+
+
+int Shell::cmdRulesActive(QStringList args)
+{
+    Q_UNUSED(args)
+    debugmsg("Not implemented.");
+    return ecOk;
+}
+
+
+int Shell::cmdRulesFlush(QStringList args)
+{
+    Q_UNUSED(args)
+    _sym.flushRules();
+    _out << "All rules have been deleted." << endl;
+    return ecOk;
+}
 
 int Shell::cmdScript(QStringList args)
 {
@@ -2285,7 +2419,7 @@ int Shell::cmdScript(QStringList args)
 
     QString fileName = args[0];
     QFile file(fileName);
-    QFileInfo includePathFileInfo(file);
+    QStringList includePaths(QDir::cleanPath(QFileInfo(file).absolutePath()));
 
     // Read script code from file or from args[1] if the file name is "eval"
     QString scriptCode;
@@ -2319,8 +2453,7 @@ int Shell::cmdScript(QStringList args)
 	QTime timer;
 	if (timing)
 		timer.start();
-	QScriptValue result = _engine->evaluate(scriptCode, args,
-											includePathFileInfo.absolutePath());
+	QScriptValue result = _engine->evaluate(scriptCode, args, includePaths);
 
 	if (_engine->hasUncaughtException()) {
 		_err << color(ctError) << "Exception occured on ";
@@ -2404,16 +2537,16 @@ int Shell::cmdShow(QStringList args)
                  << "\" is ambiguous:" << endl << endl;
 
     		if (!types.isEmpty()) {
-                TypeListFilter filter;
+                TypeFilter filter;
                 filter.setTypeName(s);
-                printTypeList(filter);
+                printTypeList(&filter);
     			if (!vars.isEmpty())
     				_out << endl;
     		}
             if (vars.size() > 0) {
-                VarListFilter filter;
+                VariableFilter filter;
                 filter.setVarName(s);
-                printVarList(filter);
+                printVarList(&filter);
             }
     		return 1;
     	}
@@ -2467,7 +2600,7 @@ int Shell::cmdShow(QStringList args)
 
                 if (! (s = dynamic_cast<const Structured*>(bt)) )
                     errorMsg = "Not a struct or a union: ";
-                else if ( (m = s->findMember(expr[i])) )
+                else if ( (m = s->member(expr[i])) )
                     bt = m->refType();
                 else {
                     if (expr[i].contains('<'))
@@ -3029,8 +3162,8 @@ int Shell::cmdSymbolsParse(QStringList args)
     if (BugReport::log()) {
         if (BugReport::log()->entries()) {
             BugReport::log()->close();
-            shell->out() << endl
-                         << BugReport::log()->bugSubmissionHint(BugReport::log()->entries());
+            _out << endl
+                 << BugReport::log()->bugSubmissionHint(BugReport::log()->entries());
         }
         delete BugReport::log();
         BugReport::setLog(0);
@@ -3092,7 +3225,7 @@ int Shell::cmdSymbolsStore(QStringList args)
 
 int Shell::cmdSysInfo(QStringList /*args*/)
 {
-    shell->out() << BugReport::systemInfo(false) << endl;
+    _out << BugReport::systemInfo(false) << endl;
 
     return ecOk;
 }
@@ -3372,7 +3505,7 @@ void Shell::printTimeStamp(const QTime& time)
 //    }
 
 //    Instance inst = _memDumps[index]->queryInstance(args[0]);
-//    // TODO implement me
+//    // TO DO implement me
 //}
 
 

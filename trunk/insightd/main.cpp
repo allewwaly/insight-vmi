@@ -400,22 +400,6 @@ int main(int argc, char* argv[])
 		QCoreApplication app(argc, argv);
 #endif
 	    shell = new Shell(daemonize);
-        KernelSymbols& sym = shell->symbols();
-
-	    // Perform any initial action that might be given
-	    switch (programOptions.action()) {
-	    case acNone:
-	        break;
-	    case acParseSymbols:
-	        sym.parseSymbols(programOptions.inFileName());
-	        break;
-	    case acLoadSymbols:
-	        sym.loadSymbols(programOptions.inFileName());
-	        break;
-	    case acUsage:
-	        ProgramOptions::cmdOptionsUsage();
-	        return 0;
-	    }
 
         // Start the interactive shell
 		shell->start();

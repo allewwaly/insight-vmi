@@ -27,11 +27,13 @@
 #include "shell.h"
 #include <debug.h>
 #include <bugreport.h>
+#include "typerulereader.h"
+#include "osfilter.h"
 
 
 //------------------------------------------------------------------------------
 KernelSymbols::KernelSymbols()
-    : _factory(_memSpecs)
+	: _factory(_memSpecs)
 {
 }
 
@@ -71,6 +73,9 @@ void KernelSymbols::parseSymbols(const QString& kernelSrc)
 	    shell->out()
 			<< "\rSuccessfully parsed the memory specifications in " << time
 			<< "." << endl;
+
+		// Check rules again
+		checkRules();
 	}
 	catch (MemSpecParserException& e) {
 		// Was the error caused during the memspec build process?
@@ -115,6 +120,13 @@ void KernelSymbols::loadSymbols(QIODevice* from)
         timer.start();
 
         reader.read();
+
+        // Revert everything if operation was interrupted
+        if (shell->interrupted()) {
+            _factory.clear();
+            return;
+        }
+
         _factory.symbolsFinished(SymFactory::rtLoading);
 
         // Print out some timing statistics
@@ -132,7 +144,10 @@ void KernelSymbols::loadSymbols(QIODevice* from)
         if (from->pos() > 0 && duration > 0)
             shell->out() << " (" << (int)((from->pos() / (float)duration * 1000)) << " byte/s)";
         shell->out() << "." << endl;
-    }
+
+		// Check rules again
+		checkRules();
+	}
     catch (GenericException& e) {
         shell->err()
             << "Caught a " << e.className() << " at " << e.file << ":"
@@ -203,4 +218,32 @@ void KernelSymbols::saveSymbols(const QString& fileName)
     saveSymbols(&file);
 
     file.close();
+}
+
+
+void KernelSymbols::loadRules(const QString &fileName, bool forceRead)
+{
+    TypeRuleReader reader(&_ruleEngine, forceRead);
+    reader.readFrom(fileName);
+    checkRules();
+}
+
+
+void KernelSymbols::flushRules()
+{
+    Instance::setRuleEngine(0);
+    _ruleEngine.clear();
+}
+
+
+void KernelSymbols::checkRules()
+{
+    Instance::setRuleEngine(0);
+
+    OsSpecs specs(&_memSpecs);
+    _ruleEngine.checkRules(&_factory, &specs);
+
+    // Enable engine only if we have active rules
+    if (!_ruleEngine.activeRules().isEmpty())
+        Instance::setRuleEngine(&_ruleEngine);
 }

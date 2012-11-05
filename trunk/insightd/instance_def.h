@@ -10,19 +10,22 @@
 
 #include <QString>
 #include <QStringList>
+#include <QMetaType>
+#include <QSharedDataPointer>
 
 #include "instancedata.h"
 #include "expressionresult.h"
+#include "memberlist.h"
 
 class BaseType;
 class VirtualMemory;
 class Instance;
-class StructuredMember;
+class Structured;
 class ColorPalette;
+class TypeRuleEngine;
 
 /// A list of Instance objects
 typedef QList<Instance> InstanceList;
-
 
 /**
  * This class wraps a variable instance in a memory dump.
@@ -30,10 +33,42 @@ typedef QList<Instance> InstanceList;
 class Instance
 {
 public:
+    /// How was this instance originally created?
+    enum Origin {
+        orUnknown = 0,   ///< unknown origin
+        orVariable,      ///< from a Variable object
+        orBaseType,      ///< from a BaseType object (manually)
+        orMember,        ///< from a regular member access
+        orCandidate,     ///< from a candidate type (ReferencingType::AltRefType)
+        orRuleEngine,    ///< from a scripted rule in the TypeRuleEngine
+        orMemMapNode     ///< from a MemoryMapNode
+    };
+
+    /// Which knowledge sources to use when accessing members?
+    enum KnowledgeSources {
+        ksAll = 0,                 ///< all sources
+        ksNoAltTypes      = (1 << 0), ///< do not use alternative types
+        ksNoRulesEngine   = (1 << 1), ///< do not use the rule engine
+        ksNone = ksNoAltTypes|ksNoRulesEngine ///< use only the declared types
+    };
+
+    /**
+     * Returns a string representation of origin \a o.
+     * @param o origin
+     * @return string
+     */
+    static const char* originToString(Origin o);
+
     /**
      * Constructor
      */
     Instance();
+
+    /**
+     * Constructor which sets the origin
+     * @param orig origin of this instance
+     */
+    Instance(Origin orig);
 
     /**
      * Constructor
@@ -62,6 +97,21 @@ public:
      * otherwise
      */
     int id() const;
+
+    /**
+     * Returns the origin of this instance.
+     * @return see Origin
+     * \sa setOrigin()
+     */
+    Origin origin() const;
+
+    /**
+     * Mark the origin of this instance as begin from \a orig. This value is
+     * of pure informational purpose.
+     * @param orig origin
+     * \sa origin()
+     */
+    void setOrigin(Origin orig);
 
     /**
      * @return the array index of the memory dump this instance belongs to
@@ -160,6 +210,16 @@ public:
      * @return the full name components of this instance
      */
     QStringList fullNameComponents() const;
+
+    /**
+     * Returns the name of member no. \a index. Calling "inst.memberName(i)" is
+     * much more efficient than calling "inst.member(i).mame()", since it does
+     * not construct an intermediate Instance object.
+     * @param index index into the member list
+     * @return name of member \a index
+     * \sa memberCount(), members(), memberNames()
+     */
+    const QString& memberName(int index) const;
 
     /**
      * Gives access to the names of all members if this instance.
@@ -325,10 +385,6 @@ public:
      * this instance is no struct/union or if the index is out of bounds, a
      * null Instance is returned.
      *
-     * This function is much more efficient than getting the whole list of
-     * members with the members() function and than accessing an individual
-     * member.
-     *
      * \note Make sure to check Instance::isNull() on the returned object to
      * see if it is valid or not.
      *
@@ -343,7 +399,29 @@ public:
      * \sa BaseType::TypeResolution
      */
     Instance member(int index, int resolveTypes = 0,
-                    int maxPtrDeref = -1, bool declaredType = false) const;
+                    int maxPtrDeref = -1, KnowledgeSources src = ksAll) const;
+
+    /**
+     * Retrieves a member (i.e., struct components) of this Instance, if it
+     * exists. If this struct or  union has no member \a name, all anonymous
+     * nested structs or unions are searched as well. This is conforming to the
+     * C standard.
+     *
+     * \note Make sure to check Instance::isNull() on the returned object to
+     * see if it is valid or not.
+     *
+     * @param name the name of the member
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
+     * @param maxPtrDeref the maximum levels of pointers that should be
+     * dereferenced
+     * @param declaredType selects if the candidate type (if it exists) or the
+     * declared types should be used, defaults to \c false
+     * @return Instance object of the specified member
+     * \sa BaseType::TypeResolution
+     */
+    Instance member(const QString& name, int resolveTypes = 0,
+                    int maxPtrDeref = -1, KnowledgeSources src = ksAll) const;
 
     /**
      * Obtain the member of this instance that has the given offset provided that
@@ -400,14 +478,14 @@ public:
     quint64 memberAddress(const QString& name, bool declaredType = false) const;
 
     /**
-     * Calculates the offset of a member within a struct, if this is a struct
+     * Returns the offset of member \a name within a struct, if this is a struct
      * or union.
      * @param name the name of the member
-     * @return offset of member \a name within the struct, or 0 if no such
+     * @return offset of member \a name within the struct, or -1 if no such
      * member exists or if this instance is no struct or union
      * \sa memberAddress()
      */
-    quint64 memberOffset(const QString& name) const;
+    int memberOffset(const QString& name) const;
 
     /**
      * Checks if a member with the given name \a name exists in this instance.
@@ -415,27 +493,6 @@ public:
      * @return \c true if that member exists, \c false otherwise
      */
     bool memberExists(const QString& name) const;
-
-    /**
-     * Retrieves a member (i.e., struct components) of this Instance, if it
-     * exists. If this struct or  union has no member \a name, all anonymous
-     * nested structs or unions are searched as well. This is conforming to the
-     * C standard.
-     *
-     * \note Make sure to check Instance::isNull() on the returned object to
-     * see if it is valid or not.
-     *
-     * @param name the name of the member to find
-     * @param resolveTypes which types to automatically resolve, see
-     * BaseType::TypeResolution
-     * @param declaredType selects if the candidate type (if it exists) or the
-     * declared types should be used, defaults to \c false
-     * @return a new Instance object if the member was found, or an empty
-     * object otherwise
-     * \sa BaseType::TypeResolution
-     */
-    Instance findMember(const QString& name, int resolveTypes,
-                        bool declaredType = false) const;
 
     /**
      * Retrieves the index of the member with name \a name. This index can be
@@ -712,10 +769,44 @@ public:
      * @return \c true if instance is considered as consistent. Also
      *         \c true if instance is not a structured type.
      */
-    bool isValidConcerningMagicNumbers(bool *constants = 0) const ;
+    bool isValidConcerningMagicNumbers(bool *constants = 0) const;
+
+    /**
+     * Returns \c true if this instance has a parent set, \c false otherwise.
+     * \sa parent()
+     */
+    inline bool hasParent() const { return _d.parent != 0; }
+
+    /**
+     * Returns the parent instance, if available.
+     * \note Most instances do \b not have the parent available, in which case
+     * this function returns an invalid Instance. Be sure to check hasParent()
+     * before or isValid() afterwards!
+     * \sa hasParent(), isvalid()
+     */
+    Instance parent() const;
+
+    /**
+     * Returns the global rule engine used by all instances.
+     */
+    inline static const TypeRuleEngine* ruleEngine() { return _ruleEngine; }
+
+    /**
+     * Sets the global rule engine used by all instances.
+     * @param engine engine to use
+     */
+    inline static void setRuleEngine(const TypeRuleEngine* engine)
+    { _ruleEngine = engine; }
 
 private:
     typedef QSet<quint64> VisitedSet;
+
+    inline Instance(const InstanceData& data) : _d(data) {}
+
+    Instance member(const ConstMemberList& members, int resolveTypes,
+                    int maxPtrDeref, KnowledgeSources src = ksAll) const;
+
+    Instance *typeRuleMatchRek(ConstMemberList &members, int *match) const;
 
     void differencesRek(const Instance& other, const QString& relParent,
             bool includeNestedStructs, QStringList& result,
@@ -727,7 +818,12 @@ private:
 								   int cndtIndex) const;
 
     InstanceData _d;
+
+    static const TypeRuleEngine* _ruleEngine;
 };
 
+Q_DECLARE_METATYPE(Instance*)
+Q_DECLARE_METATYPE(Instance)
+Q_DECLARE_METATYPE(InstanceList)
 
 #endif /* INSTANCE_DEF_H_ */

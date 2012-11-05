@@ -269,11 +269,11 @@ void SlubObjects::resolveObjSize()
 
         do {
             // Read name and size from memory
-            name = inst.findMember("name", BaseType::trLexical).toString();
+            name = inst.member("name", BaseType::trLexical).toString();
             name = name.remove('"');
             debugmsg("name = " << name);
             int size =
-                    inst.findMember("objsize", BaseType::trLexical).toInt32();
+                    inst.member("objsize", BaseType::trLexical).toInt32();
 
             // Find the cache in our list and set the size
             if (_indices.contains(name)) {
@@ -282,7 +282,7 @@ void SlubObjects::resolveObjSize()
             }
 
             // Proceed to next cache
-            inst = inst.findMember("list", BaseType::trLexical);
+            inst = inst.member("list", BaseType::trLexical);
             if (inst.memberCandidatesCount("next") == 1) {
                 inst = inst.memberCandidate("next", 0);
             }
