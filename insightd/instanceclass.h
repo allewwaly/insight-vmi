@@ -56,7 +56,7 @@ public:
 
     QScriptValue prototype() const;
 
-    Instance::KnowledgeSources knowledgeSources(Instance::KnowledgeSources src) const;
+    Instance::KnowledgeSources knowledgeSources() const;
     void setKnowledgeSources(Instance::KnowledgeSources src);
 
 private:

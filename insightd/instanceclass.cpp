@@ -163,7 +163,7 @@ QScriptValue InstanceClass::prototype() const
 }
 
 
-Instance::KnowledgeSources InstanceClass::knowledgeSources(Instance::KnowledgeSources src) const
+Instance::KnowledgeSources InstanceClass::knowledgeSources() const
 {
     return _proto->knowledgeSources();
 }
