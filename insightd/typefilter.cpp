@@ -17,6 +17,7 @@ const char* size         = "size";
 const char* member       = "member";
 const char* match        = "match";
 
+const char* any          = "any";
 const char* regex        = "regex";
 const char* wildcard     = "wildcard";
 }
@@ -159,7 +160,7 @@ bool GenericFilter::matchType(const BaseType *type) const
         return false;
     else if (filterActive(ftSize) && type->size() != _size)
         return false;
-    else if (filterActive(ftTypeNameAny) && !matchTypeName(type->name()))
+    else if (filterActive(ftTypeNameAll) && !matchTypeName(type->name()))
         return false;
     return true;
 }
@@ -169,11 +170,12 @@ void GenericFilter::setTypeName(const QString &name, PatternSyntax syntax)
 {
     QRegExp rx;
     syntax = setNamePattern(name, _typeName, rx, syntax);
-    _filters &= ~(ftTypeName|ftTypeNameRegEx|ftTypeNameWildcard);
+    _filters &= ~ftTypeNameAll;
 
     switch (syntax) {
     case psAuto: break;
-    case psLiteral:  _filters |= ftTypeName; break;
+    case psAny:      _filters |= ftTypeNameAny; break;
+    case psLiteral:  _filters |= ftTypeNameLiteral; break;
     case psRegExp:   _filters |= ftTypeNameRegEx; break;
     case psWildcard: _filters |= ftTypeNameWildcard; break;
     }
@@ -189,7 +191,9 @@ void GenericFilter::setTypeName(const QString &name, PatternSyntax syntax)
 
 PatternSyntax GenericFilter::typeNameSyntax() const
 {
-    if (filterActive(ftTypeNameRegEx))
+    if (filterActive(ftTypeNameAny))
+        return psAny;
+    else if (filterActive(ftTypeNameRegEx))
         return psRegExp;
     else if (filterActive(ftTypeNameWildcard))
         return psWildcard;
@@ -239,6 +243,10 @@ PatternSyntax GenericFilter::setNamePattern(
         name = pattern.trimmed();
 
         switch (syntax) {
+        case psAny:
+            name.clear();
+            break;
+
         case psRegExp:
             rx.setPatternSyntax(QRegExp::RegExp);
             rx.setCaseSensitivity(Qt::CaseSensitive);
@@ -247,6 +255,7 @@ PatternSyntax GenericFilter::setNamePattern(
                 filterError(QString("Invalid regular expression '%1': %2")
                                 .arg(name).arg(rx.errorString()));
             break;
+
         case psWildcard:
             rx.setPatternSyntax(QRegExp::WildcardUnix);
             rx.setCaseSensitivity(Qt::CaseInsensitive);
@@ -255,6 +264,7 @@ PatternSyntax GenericFilter::setNamePattern(
                 filterError(QString("Invalid wildcard expression '%1': %2")
                                 .arg(name).arg(rx.errorString()));
             break;
+
         default:
             break;
         }
@@ -267,12 +277,15 @@ PatternSyntax GenericFilter::setNamePattern(
 QString GenericFilter::toString() const
 {
     QString s;
-    if (filterActive(ftTypeName))
-        s += "Type name: " + _typeName + "\n";
+    if (filterActive(ftTypeNameAny))
+        s += QString("Type name: (%1)\n").arg(xml::any);
+    else if (filterActive(ftTypeNameLiteral))
+        s += QString("Type name: %1\n").arg(_typeName);
     else if (filterActive(ftTypeNameRegEx))
-        s += "Type name: " + _typeName + " (regex)\n";
+        s += QString("Type name (%1): %2\n").arg(xml::regex).arg(_typeName);
     else if (filterActive(ftTypeNameWildcard))
-        s += "Type name: " + _typeName + " (wildcard)\n";
+        s += QString("Type name (%1): %2\n").arg(xml::wildcard).arg(_typeName);
+
     if (filterActive(ftRealType)) {
         s += "Data type: ";
         bool first = true;
@@ -289,6 +302,7 @@ QString GenericFilter::toString() const
             s += "(none)";
         s += "\n";
     }
+
     if (filterActive(ftSize))
         s += "Type size: " + QString::number(size()) + "\n";
     return s;
@@ -304,7 +318,9 @@ PatternSyntax GenericFilter::givenSyntax(const KeyValueStore *keyVal)
 
     if (keyVal->contains(match)) {
         QString val = keyVal->value(match).toLower();
-        if (val == xml::regex)
+        if (val == xml::any)
+            return psAny;
+        else if (val == xml::regex)
             return psRegExp;
         else if (val == xml::wildcard)
             return psWildcard;
@@ -318,7 +334,7 @@ PatternSyntax GenericFilter::givenSyntax(const KeyValueStore *keyVal)
 
 bool GenericFilter::matchTypeName(const QString &name) const
 {
-    if (filterActive(ftTypeName) &&
+    if (filterActive(ftTypeNameLiteral) &&
         _typeName.compare(name, Qt::CaseInsensitive) != 0)
         return false;
     else if (filterActive(ftTypeNameWildcard) &&
@@ -414,18 +430,19 @@ void MemberFilter::setName(const QString &name, PatternSyntax syntax)
 {
     QRegExp rx;
     syntax = TypeFilter::setNamePattern(name, _name, rx, syntax);
-    _filters = _filters & ~ftVarNameAny;
+    _filters &= ~ftVarNameAll;
 
     switch (syntax) {
     case psAuto:
-    case psLiteral:  _filters |= ftVarName; break;
+    case psAny:      _filters |= ftVarNameAny; break;
+    case psLiteral:  _filters |= ftVarNameLiteral; break;
     case psWildcard: _filters |= ftVarNameWildcard; break;
     case psRegExp:   _filters |= ftVarNameRegEx; break;
     }
 
     if (_nameRegEx)
         delete _nameRegEx;
-    if (syntax != psLiteral)
+    if (syntax & (psWildcard|psRegExp))
         _nameRegEx = new QRegExp(rx);
     else
         _nameRegEx = 0;
@@ -434,7 +451,9 @@ void MemberFilter::setName(const QString &name, PatternSyntax syntax)
 
 Filter::PatternSyntax MemberFilter::nameSyntax() const
 {
-    if (_filters.testFlag(ftVarNameRegEx))
+    if (_filters.testFlag(ftVarNameAny))
+        return psAny;
+    else if (_filters.testFlag(ftVarNameRegEx))
         return psRegExp;
     else if (_filters.testFlag(ftVarNameWildcard))
         return psWildcard;
@@ -451,7 +470,7 @@ bool MemberFilter::match(const StructuredMember *member) const
     if (filterActive(Options(ftVarNameWildcard|ftVarNameRegEx)) &&
         _nameRegEx->indexIn(member->name()) < 0)
         return false;
-    else if (filterActive(ftVarName) &&
+    else if (filterActive(ftVarNameLiteral) &&
              QString::compare(_name, member->name(), Qt::CaseInsensitive) != 0)
         return false;
 
@@ -462,12 +481,14 @@ bool MemberFilter::match(const StructuredMember *member) const
 QString MemberFilter::toString() const
 {
     QString s(GenericFilter::toString());
-    if (filterActive(ftVarName))
-        s += "Name: " + _name + "\n";
+    if (filterActive(ftVarNameAny))
+        s += QString("Name: (%1)\n").arg(xml::any);
+    else if (filterActive(ftVarNameLiteral))
+        s += QString("Name: %1\n").arg(_name);
     else if (filterActive(ftVarNameRegEx))
-        s += "Name: " + _name + "   (regex)\n";
+        s += QString("Name (%1): %2\n").arg(xml::regex).arg(_name);
     else if (filterActive(ftVarNameWildcard))
-        s += "Name: " + _name + "   (wildcard)\n";
+        s += QString("Name (%1): %2\n").arg(xml::wildcard).arg(_name);
     return s;
 }
 
@@ -646,7 +667,7 @@ VariableFilter &VariableFilter::operator=(const VariableFilter &src)
 
 bool VariableFilter::matchVarName(const QString &name) const
 {
-    if (filterActive(ftVarName) &&
+    if (filterActive(ftVarNameLiteral) &&
         _varName.compare(name, Qt::CaseInsensitive) != 0)
         return false;
     else if (filterActive(ftVarNameWildcard) &&
@@ -665,7 +686,7 @@ bool VariableFilter::matchVar(const Variable *var) const
     if (!var)
         return false;
 
-    if (filterActive(ftVarNameAny) && !matchVarName(var->name()))
+    if (filterActive(ftVarNameAll) && !matchVarName(var->name()))
         return false;
     else if (filterActive(ftVarSymFileIndex) &&
              var->origFileIndex() != _symFileIndex)
@@ -689,20 +710,21 @@ void VariableFilter::clear()
 
 void VariableFilter::setVarName(const QString &name, PatternSyntax syntax)
 {
-    _filters &= ~(ftVarName|ftVarNameRegEx|ftVarNameWildcard);
+    _filters &= ~ftVarNameAll;
     QRegExp rx;
     syntax = setNamePattern(name, _varName, rx, syntax);
 
     switch (syntax) {
     case psAuto: break;
-    case psLiteral:  _filters |= ftVarName; break;
+    case psAny:      _filters |= ftVarNameAny; break;
+    case psLiteral:  _filters |= ftVarNameLiteral; break;
     case psRegExp:   _filters |= ftVarNameRegEx; break;
     case psWildcard: _filters |= ftVarNameWildcard; break;
     }
 
     if (_varRegEx)
         delete _varRegEx;
-    if (syntax != psLiteral)
+    if (syntax & (psRegExp|psWildcard))
         _varRegEx = new QRegExp(rx);
     else
         _varRegEx = 0;
@@ -711,7 +733,9 @@ void VariableFilter::setVarName(const QString &name, PatternSyntax syntax)
 
 PatternSyntax VariableFilter::varNameSyntax() const
 {
-    if (filterActive(ftVarNameRegEx))
+    if (filterActive(ftVarNameAny))
+        return psAny;
+    else if (filterActive(ftVarNameRegEx))
         return psRegExp;
     else if (filterActive(ftVarNameWildcard))
         return psWildcard;
@@ -723,12 +747,14 @@ PatternSyntax VariableFilter::varNameSyntax() const
 QString VariableFilter::toString() const
 {
     QString s(TypeFilter::toString());
-    if (filterActive(ftVarName))
-        s += "Var. name: " + _varName + "\n";
+    if (filterActive(ftVarNameAny))
+        s += QString("Var. name: (%1)\n").arg(xml::any);
+    else if (filterActive(ftVarNameLiteral))
+        s += QString("Var. name: %1\n").arg(_varName);
     else if (filterActive(ftVarNameRegEx))
-        s += "Var. name: " + _varName + "   (regex)\n";
+        s += QString("Var. name (%1): %2\n").arg(xml::regex).arg(_varName);
     else if (filterActive(ftVarNameWildcard))
-        s += "Var name: " + _varName + "   (wildcard)\n";
+        s += QString("Var. name (%1): %2\n").arg(xml::wildcard).arg(_varName);
     return s;
 }
 
@@ -742,7 +768,7 @@ const KeyValueStore &VariableFilter::supportedFilters()
         varFilters[xml::variablename] = "Match variable name, either by a "
                 "literal match, by a wildcard expression *glob*, or by a "
                 "regular expression /re/.";
-        varFilters["filename"] = "Match symbol file the variable belongs to, "
+        varFilters[xml::filename] = "Match symbol file the variable belongs to, "
                 "e.g. \"vmlinux\" or \"snd.ko\".";
     }
     return varFilters;
@@ -789,7 +815,7 @@ bool InstanceFilter::matchInst(const Instance *inst) const
     if (!inst)
         return false;
 
-    if (filterActive(ftVarNameAny) && !matchVarName(inst->name()))
+    if (filterActive(ftVarNameAll) && !matchVarName(inst->name()))
         return false;
     else if (filterActive(ftVarSymFileIndex) && inst->id() > 0) {
         const SymFactory* factory = inst->type() ? inst->type()->factory() : 0;

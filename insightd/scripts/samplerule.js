@@ -24,6 +24,7 @@ function getModules(inst, members)
 function getModuleList(inst, members)
 {
 //    showArgs("getModuleList", inst, members);
+    var typeId = inst.TypeId();
     inst = inst.Member(members[0]).Member(members[1]);
     // Compare to head of the list (which is no module)
     var m = new Instance("modules");
@@ -31,8 +32,8 @@ function getModuleList(inst, members)
         return m;
 
     // Change type, fix offset
-    inst.ChangeType("module");
-    inst.AddToAddress(-inst.MemberOffset("list"));
+    inst.ChangeType(typeId);
+    inst.AddToAddress(-inst.MemberOffset(members[0]));
 
     return inst;
 }

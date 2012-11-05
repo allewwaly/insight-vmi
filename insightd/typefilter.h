@@ -39,26 +39,29 @@ namespace Filter
 /// Pattern syntax to use for matching a name
 enum PatternSyntax_ {
     psAuto     = 0,        ///< try to guess correct type
-    psLiteral  = (1 << 0), ///< literal name match
-    psWildcard = (1 << 1), ///< match with waldcard expression
-    psRegExp   = (1 << 2)  ///< match with regular expression
+    psAny      = (1 << 0), ///< match any name
+    psLiteral  = (1 << 1), ///< literal name match
+    psWildcard = (1 << 2), ///< match with waldcard expression
+    psRegExp   = (1 << 3)  ///< match with regular expression
 };
 Q_DECLARE_FLAGS(PatternSyntax, PatternSyntax_)
 
 /// Filter options for variables and types
 enum Option {
     ftNone             = 0,         ///< no filter set
-    ftVarName          = (1 << 0),  ///< literal name match
-    ftVarNameWildcard  = (1 << 1),  ///< wildcard name match
-    ftVarNameRegEx     = (1 << 2),  ///< regular expression name match
-    ftVarSymFileIndex  = (1 << 3),  ///< match original symbol file index of variable
-    ftTypeName         = (1 << 4),  ///< literal type name match
-    ftTypeNameWildcard = (1 << 5),  ///< wildcard name match
-    ftTypeNameRegEx    = (1 << 6),  ///< QRegExp type name match
-    ftRealType         = (1 << 7),  ///< match RealType of type
-    ftSize             = (1 << 8),   ///< match type size
-    ftTypeNameAny      = ftTypeName|ftTypeNameWildcard|ftTypeNameRegEx,  ///< any kind of type name matching
-    ftVarNameAny       = ftVarName|ftVarNameWildcard|ftVarNameRegEx  ///< any kind of variable name matching
+    ftVarNameAny       = (1 << 0),  ///< match any name match
+    ftVarNameLiteral   = (1 << 1),  ///< literal name match
+    ftVarNameWildcard  = (1 << 2),  ///< wildcard name match
+    ftVarNameRegEx     = (1 << 3),  ///< regular expression name match
+    ftVarSymFileIndex  = (1 << 4),  ///< match original symbol file index of variable
+    ftTypeNameAny      = (1 << 5),  ///< match any type name
+    ftTypeNameLiteral  = (1 << 6),  ///< literal type name match
+    ftTypeNameWildcard = (1 << 7),  ///< wildcard name match
+    ftTypeNameRegEx    = (1 << 8),  ///< QRegExp type name match
+    ftRealType         = (1 << 9),  ///< match RealType of type
+    ftSize             = (1 << 10), ///< match type size
+    ftTypeNameAll      = ftTypeNameAny|ftTypeNameLiteral|ftTypeNameWildcard|ftTypeNameRegEx,  ///< any kind of type name matching
+    ftVarNameAll       = ftVarNameAny|ftVarNameLiteral|ftVarNameWildcard|ftVarNameRegEx  ///< any kind of variable name matching
 };
 Q_DECLARE_FLAGS(Options, Option)
 
