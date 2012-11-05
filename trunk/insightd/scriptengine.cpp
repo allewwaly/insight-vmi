@@ -353,6 +353,7 @@ QScriptValue ScriptEngine::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
             shell->out() << " ";
         shell->out() << ctx->argument(i).toString();
     }
+    shell->out() << flush;
 
     return eng->undefinedValue();
 }
