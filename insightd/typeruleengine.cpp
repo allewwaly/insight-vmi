@@ -103,9 +103,12 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
     if (!factory->symbolsAvailable())
         return;
 
-    int i = -1;
-    foreach (const TypeRule* rule, _rules) {
-        ++i;
+    // Checking the rules from last to first assures that rules in the
+    // _activeRules hash are processes first to last. That way, if multiple
+    // rules match the same instance, the first rule takes precedence.
+    for (int i = _rules.size() - 1; i >= 0; --i) {
+        const TypeRule* rule = _rules[i];
+
         // Check for OS filters first
         if (rule->osFilter() && !rule->osFilter()->match(specs))
             continue;
