@@ -10,6 +10,9 @@
 
 #include <QStringList>
 #include <QSet>
+#include <QSharedData>
+#include <QSharedPointer>
+
 
 // forward declarations
 class BaseType;
@@ -22,7 +25,7 @@ typedef QSet<QString> StringSet;
  * This class holds the data of an Instance object.
  * \sa Instance
  */
-class InstanceData
+class InstanceData: public QSharedData
 {
 public:
     inline InstanceData()
@@ -37,38 +40,6 @@ public:
           fromParent(0)
     {}
 
-    inline InstanceData(const InstanceData& other)
-        : id(other.id),
-          address(other.address),
-          bitSize(other.bitSize),
-          bitOffset(other.bitOffset),
-          origin(other.origin),
-          type(other.type),
-          vmem(other.vmem),
-          name(other.name),
-          parentNames(other.parentNames),
-          parent(other.parent ? new InstanceData(*other.parent) : 0),
-          fromParent(other.fromParent)
-    {}
-
-    inline ~InstanceData() { if (parent) delete parent; }
-
-    inline InstanceData& operator=(const InstanceData& other)
-    {
-        id = other.id;
-        address = other.address;
-        bitSize = other.bitSize;
-        bitOffset = other.bitOffset;
-        origin = other.origin;
-        type = other.type;
-        vmem = other.vmem;
-        name = other.name;
-        parentNames = other.parentNames;
-        parent = other.parent ? new InstanceData(*other.parent) : 0;
-        fromParent = other.fromParent;
-        return *this;
-    }
-
     QStringList fullNames() const;
 
     int id;
@@ -80,7 +51,7 @@ public:
     VirtualMemory* vmem;
     QString name;
     QStringList parentNames;
-    InstanceData* parent;
+    QSharedDataPointer<InstanceData> parent;
     const StructuredMember* fromParent;
 };
 
