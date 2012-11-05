@@ -127,7 +127,7 @@ const char *ColorPalette::color(ColorType ct) const
         C_YLW_B, // ctVariable
         C_CYN_B, // ctType
         C_BLU_B, // ctBuiltinType
-        C_BLK_B, // ctRealType
+        C_WHT,   // ctRealType
         C_GRN_B, // ctMember
         C_RED_L, // ctAddress
         C_RED_L, // ctOffset

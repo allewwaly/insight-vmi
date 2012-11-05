@@ -696,7 +696,8 @@ public:
 //    }
 
     /**
-     * @return a string representation of this instance
+     * Returns a string representation of this instance.
+     * @param col color palette to use for colorizing the output
      */
     QString toString(const ColorPalette *col = 0) const;
 

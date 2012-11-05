@@ -5,6 +5,7 @@
 #include "osfilter.h"
 #include "symfactory.h"
 #include "shell.h"
+#include "shellutil.h"
 #include "scriptengine.h"
 #include "basetype.h"
 #include "variable.h"
@@ -63,16 +64,6 @@ void TypeRuleEngine::appendRule(TypeRule *rule, const OsFilter *osf)
     const OsFilter* filter = insertOsFilter(osf);
     rule->setOsFilter(filter);
     _rules.append(rule);
-
-    QString s = rule->toString().trimmed();
-    s.replace("\n", "\n | ");
-    QString fileName;
-    if (rule->srcFileIndex() >= 0 && rule->srcFileIndex() < _ruleFiles.size()) {
-        fileName = QDir::current().relativeFilePath(_ruleFiles[rule->srcFileIndex()]);
-    }
-
-    debugmsg("New type rule from " << fileName << ":" << rule->srcLine()
-             << "\n | " << s << "\n");
 }
 
 
@@ -160,7 +151,7 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
                                rule->actionSrcLine(),
                                -1,
                                QString("Syntax error in file %1 line %2 column %3: %4")
-                                       .arg(shortFileName(rule->scriptFile()))
+                                       .arg(ShellUtil::shortFileName(rule->scriptFile()))
                                        .arg(result.errorLineNumber())
                                        .arg(result.errorColumnNumber())
                                        .arg(result.errorMessage()));
@@ -184,7 +175,7 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
                                rule->actionSrcLine(),
                                -1,
                                QString("Runtime error in file %1: %2")
-                                       .arg(shortFileName(rule->scriptFile()))
+                                       .arg(ShellUtil::shortFileName(rule->scriptFile()))
                                        .arg(err));
             }
             else if (ret == ScriptEngine::feDoesNotExist) {
@@ -193,7 +184,7 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
                                -1,
                                QString("Function \"%1\" is not defined in file \"%2\".")
                                        .arg(rule->action())
-                                       .arg(shortFileName(rule->scriptFile())));
+                                       .arg(ShellUtil::shortFileName(rule->scriptFile())));
             }
 
         }
@@ -333,7 +324,7 @@ void TypeRuleEngine::warnEvalError(const ScriptEngine *eng,
 {
     // Print errors as warnings
     if (eng && eng->lastEvaluationFailed()) {
-        QString file(shortFileName(fileName));
+        QString file(ShellUtil::shortFileName(fileName));
         shell->err() << shell->color(ctWarning) << "At "
                      << shell->color(ctBold) << file
                      << shell->color(ctWarning);
@@ -362,7 +353,7 @@ void TypeRuleEngine::warnRule(const TypeRule* rule, const QString &msg) const
     }
     if (rule->srcFileIndex() >= 0) {
         // Use as-short-as-possible file name
-        QString file(shortFileName(ruleFile(rule)));
+        QString file(ShellUtil::shortFileName(ruleFile(rule)));
 
         shell->err() << "defined in "
                      << shell->color(ctBold) << file << shell->color(ctWarning)
@@ -372,14 +363,6 @@ void TypeRuleEngine::warnRule(const TypeRule* rule, const QString &msg) const
     }
 
     shell->err() << msg << shell->color((ctReset)) << endl;
-}
-
-
-QString TypeRuleEngine::shortFileName(const QString &fileName) const
-{
-    // Use as-short-as-possible file name
-    QString relfile = QDir::current().relativeFilePath(fileName);
-    return (relfile.size() < fileName.size()) ? relfile : fileName;
 }
 
 

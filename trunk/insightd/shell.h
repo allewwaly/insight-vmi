@@ -34,6 +34,7 @@ class MuxerChannel;
 class QFileInfo;
 class TypeFilter;
 class VariableFilter;
+class TypeRule;
 
 /**
  * This class represents the interactive shell, which is the primary interface
@@ -194,12 +195,6 @@ public:
     int unloadMemDump(const QString& indexOrFileName, QString* unloadedFile = 0);
 
     /**
-     * Returns the size of the ANSI terminal in character rows and columns
-     * @return terminal size
-     */
-    QSize termSize() const;
-
-    /**
      * Returns the ANSI color code to produce the color for type \a ct.
      * @param ct the desired color type
      * @return color code to produce that color in an ANSI terminal
@@ -289,7 +284,7 @@ private:
     ScriptEngine* _engine;
     ColorPalette _color;
 
-    void printTimeStamp(const QTime& time);
+//    void printTimeStamp(const QTime& time);
     int memberNameLenth(const Structured* s, int indent) const;
     void printStructMembers(const Structured* s, int indent, int id_width = -1,
                             int offset_width = -1, int name_width = -1,
@@ -306,6 +301,12 @@ private:
     int printVarList(const VariableFilter* filter);
     int printTypeList(const TypeFilter* filter);
     int printFilterHelp(const KeyValueStore &help);
+    template<class list_t>
+    int printRulesList(const list_t& rules, const QString& totalDesc,
+                       const TypeRule* (*getRuleFunc)(const list_t& list, int index),
+                       int (*getIndexFunc)(const list_t& list, int index),
+                       bool reverse = false);
+    const TypeRule* parseRuleIndex(const QString& s);
 //---------------------------------
 //    int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
@@ -341,6 +342,9 @@ private:
     int cmdRulesList(QStringList args);
     int cmdRulesActive(QStringList args);
     int cmdRulesFlush(QStringList args);
+    int cmdRulesShow(QStringList args);
+    int cmdListTypesMatching(QStringList args);
+    int cmdListVarsMatching(QStringList args);
     int cmdScript(QStringList args);
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t, const QString& name = QString(),

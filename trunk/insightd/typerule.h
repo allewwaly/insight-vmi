@@ -9,6 +9,7 @@ class OsSpecs;
 class BaseType;
 class Variable;
 class Instance;
+class ColorPalette;
 
 /**
  * This class represents expert knowledge about the inspected system's type
@@ -210,9 +211,10 @@ public:
 
     /**
      * Returns a textual representation of this rule.
+     * @param col color palette to use for colorizing the output
      * @return
      */
-    QString toString() const;
+    QString toString(const ColorPalette *col = 0) const;
 
 private:
     QString _name;

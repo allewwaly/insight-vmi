@@ -10,9 +10,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <unistd.h>
-#ifndef _WIN32
-#include <sys/ioctl.h>
-#endif
 #include <insight/constdefs.h>
 #include <insight/devicemuxer.h>
 #include <insight/insight.h>
@@ -42,6 +39,8 @@
 #include "memspecparser.h"
 #include "typefilter.h"
 #include "typeruleexception.h"
+#include "typerule.h"
+#include "shellutil.h"
 
 #ifdef CONFIG_MEMORY_MAP
 #include "memorymap.h"
@@ -210,6 +209,7 @@ Shell::Shell(bool listenOnSocket)
                  "  rules list               Lists all loaded rules\n"
                  "  rules active             Lists all rules that are currently\n"
                  "                           active\n"
+                 "  rules show <index>       Shows details of rule <index>\n"
                  "  rules flush              Removes all rules"));
 
     _commands.insert("script",
@@ -948,18 +948,6 @@ int Shell::cmdColor(QStringList args)
 }
 
 
-
-int getFieldWidth(quint32 maxVal, int base = 16)
-{
-    int w = 0;
-    if (base == 16)
-        do { w++; } while ( (maxVal >>= 4) );
-    else
-        do { w++; } while ( (maxVal /= base) );
-    return w;
-}
-
-
 void Shell::hline(int width)
 {
 	const int bufLen = 256;
@@ -995,6 +983,9 @@ int Shell::cmdList(QStringList args)
         else if (s.length() >= 7 && QString("types-using").startsWith(s)) {
             return cmdListTypesUsing(args);
         }
+        else if (s.length() >= 7 && QString("types-matching").startsWith(s)) {
+            return cmdListTypesMatching(args);
+        }
         else if (s.length() > 9 && QString("types-by-id").startsWith(s)) {
             return cmdListTypesById(args);
         }
@@ -1004,8 +995,19 @@ int Shell::cmdList(QStringList args)
         else if (s.length() > 3 && QString("vars-using").startsWith(s)) {
             return cmdListVarsUsing(args);
         }
+        else if (s.length() > 3 && QString("vars-matching").startsWith(s)) {
+            return cmdListVarsMatching(args);
+        }
         else if (QString("variables").startsWith(s)) {
             return cmdListVars(args);
+        }
+        // Just for convenience: map "list rules" to "rules list"
+        else if (QString("rules").startsWith(s)) {
+            return cmdRulesList(args);
+        }
+        // Just for convenience: map "list active" to "rules active"
+        else if (QString("active").startsWith(s)) {
+            return cmdRulesActive(args);
         }
     }
 
@@ -1025,7 +1027,7 @@ int Shell::cmdListSources(QStringList /*args*/)
     }
 
     // Find out required field width (keys needs to be sorted for that)
-    int w = getFieldWidth(keys.last());
+    int w = ShellUtil::getFieldWidth(keys.last());
 
     _out << qSetFieldWidth(w) << right << "ID" << qSetFieldWidth(0) << "  "
          << qSetFieldWidth(0) << "File" << endl;
@@ -1085,7 +1087,7 @@ int Shell::printFilterHelp(const KeyValueStore& help)
     _out << "Filters can be applied in the form \"key:value\". The "
             "following filter options are available:" << endl;
 
-    QSize ts = termSize();
+    QSize ts = ShellUtil::termSize();
     for (int i = 0; i < keys.size(); ++i) {
         QString text = help[keys[i]];
         QString s = QString("  %1  ").arg(keys[i], -maxKeySize);
@@ -1122,7 +1124,7 @@ int Shell::printTypeList(const TypeFilter *filter)
     }
 
     // Find out required field width (the types are sorted by ascending ID)
-    QSize tsize = termSize();
+    QSize tsize = ShellUtil::termSize();
     const int w_id = 8;
     const int w_type = 12;
     const int w_size = 5;
@@ -1169,8 +1171,7 @@ int Shell::printTypeList(const TypeFilter *filter)
                 src = QString("(unknown id: %1)").arg(type->srcFile());
             else
                 src = QString("%1").arg(unit->name());
-            if (src.size() > w_src)
-                src = "..." + src.right(w_src - 3);
+            src = ShellUtil::abbrvStrLeft(src, w_src);
         }
         else
             src = "--";
@@ -1254,7 +1255,7 @@ int Shell::cmdListTypesUsing(QStringList args)
     qSort(types.begin(), types.end(), cmpIdLessThan);
 
     // Find out required field width (the types are sorted by ascending ID)
-    QSize tsize = termSize();
+    QSize tsize = ShellUtil::termSize();
     const int w_id = 8;
     const int w_type = 12;
     const int w_size = 5;
@@ -1311,7 +1312,7 @@ int Shell::cmdListTypesById(QStringList /*args*/)
     qSort(ids);
 
     // Find out required field width (the types are sorted by ascending ID)
-    QSize tsize = termSize();
+    QSize tsize = ShellUtil::termSize();
     const int w_id = 8;
     const int w_realId = 8;
     const int w_type = 12;
@@ -1374,7 +1375,7 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
     qSort(names);
 
     // Find out required field width (the types are sorted by ascending ID)
-    QSize tsize = termSize();
+    QSize tsize = ShellUtil::termSize();
     const int w_id = 8;
     const int w_type = 12;
     const int w_size = 5;
@@ -1451,8 +1452,8 @@ int Shell::printVarList(const VariableFilter *filter)
     }
 
     // Find out required field width (the types are sorted by ascending ID)
-    QSize tsize = termSize();
-    const int w_id = getFieldWidth(vars.last()->id());
+    QSize tsize = ShellUtil::termSize();
+    const int w_id = ShellUtil::getFieldWidth(vars.last()->id());
     const int w_datatype = 12;
     const int w_size = 5;
     const int w_src = 20;
@@ -1505,8 +1506,7 @@ int Shell::printVarList(const VariableFilter *filter)
             else
                 s_src = QString("%1").arg(unit->name());
 			// Shorten, if neccessary
-			if (s_src.length() > w_src)
-				s_src = "..." + s_src.right(w_src - 3);
+			s_src = ShellUtil::abbrvStrLeft(s_src, w_src);
         }
         else
             s_src = "--";
@@ -1522,9 +1522,8 @@ int Shell::printVarList(const VariableFilter *filter)
         else
             s_typename = QString("%1%2").arg(color(ctKeyword)).arg("void", -w_typename);
 
-        QString s_name = var->name().isEmpty() ? "(none)" : var->name();
-        if (s_name.length() > w_name)
-            s_name = s_name.left(w_name - 3) + "...";
+        QString s_name = ShellUtil::abbrvStrRight(
+                    var->name().isEmpty() ? "(none)" : var->name(), w_name);
 
         QString s_size = var->refType() ?
                     QString::number(var->refType()->size()) :
@@ -1620,8 +1619,8 @@ int Shell::cmdListVarsUsing(QStringList args)
     qSort(vars.begin(), vars.end(), cmpVarIdLessThan);
 
     // Find out required field width (the types are sorted by ascending ID)
-    QSize tsize = termSize();
-    const int w_id = getFieldWidth(vars.last()->id());
+    QSize tsize = ShellUtil::termSize();
+    const int w_id = ShellUtil::getFieldWidth(vars.last()->id());
     const int w_datatype = 12;
     const int w_size = 5;
     const int w_src = 20;
@@ -1667,8 +1666,7 @@ int Shell::cmdListVarsUsing(QStringList args)
             else
                 s_src = QString("%1").arg(unit->name());
             // Shorten, if neccessary
-            if (s_src.length() > w_src)
-                s_src = "..." + s_src.right(w_src - 3);
+            s_src = ShellUtil::abbrvStrLeft(s_src, w_src);
         }
         else
             s_src = "--";
@@ -1684,9 +1682,8 @@ int Shell::cmdListVarsUsing(QStringList args)
         else
             s_typename = QString("%1%2").arg(color(ctKeyword)).arg("void", -w_typename);
 
-        QString s_name = var->name().isEmpty() ? "(none)" : var->name();
-        if (s_name.length() > w_name)
-            s_name = s_name.left(w_name - 3) + "...";
+        QString s_name = ShellUtil::abbrvStrRight(
+                    var->name().isEmpty() ? "(none)" : var->name(), w_name);
 
         QString s_size = var->refType() ?
                     QString::number(var->refType()->size()) :
@@ -1909,20 +1906,6 @@ QString Shell::prettyNameInColor(const QString &name, ColorType nameType,
                                  const BaseType *t, int minLen, int maxLen) const
 {
     return _color.prettyNameInColor(name, nameType, t, minLen, maxLen);
-}
-
-
-QSize Shell::termSize() const
-{
-#ifdef _WIN32
-    return QSize(80, 24);
-#else
-    struct winsize w;
-    int ret = ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-    int r = (ret != -1 && w.ws_row > 0) ? w.ws_row : 24;
-    int c = (ret != -1 && w.ws_col > 0) ? w.ws_col : 80;
-    return QSize(c, r);
-#endif
 }
 
 
@@ -2301,6 +2284,28 @@ int Shell::cmdMemoryDiffVisualize(int index)
 #endif /* CONFIG_MEMORY_MAP */
 
 
+inline const TypeRule* getTypeRule(const TypeRuleList& list, int index)
+{
+    return list[index];
+}
+
+inline int getTypeRuleIndex(const TypeRuleList& list, int index)
+{
+    Q_UNUSED(list);
+    return index;
+}
+
+inline const TypeRule* getActiveRule(const ActiveRuleList& list, int index)
+{
+    return list[index].rule;
+}
+
+inline int getActiveRuleIndex(const ActiveRuleList& list, int index)
+{
+    return list[index].index;
+}
+
+
 int Shell::cmdRules(QStringList args)
 {
     if (args.size() < 1) {
@@ -2319,6 +2324,8 @@ int Shell::cmdRules(QStringList args)
         return cmdRulesActive(args);
     else if (QString("flush").startsWith(cmd))
         return cmdRulesFlush(args);
+    else if (QString("show").startsWith(cmd))
+        return cmdRulesShow(args);
     else
         cmdHelp(QStringList("rules"));
 
@@ -2382,16 +2389,136 @@ int Shell::cmdRulesLoad(QStringList args)
 
 int Shell::cmdRulesList(QStringList args)
 {
-    Q_UNUSED(args)
-    debugmsg("Not implemented.");
-    return ecOk;
+    if (!args.isEmpty()) {
+        cmdHelp(QStringList("rules"));
+        return ecInvalidArguments;
+    }
+
+    if (!_sym.hasRules()) {
+        _out << "No rules loaded." << endl;
+        return ecOk;
+    }
+
+    return printRulesList(_sym.ruleEngine().rules(),  "Total rules: ",
+                          getTypeRule, getTypeRuleIndex);
 }
 
 
 int Shell::cmdRulesActive(QStringList args)
 {
-    Q_UNUSED(args)
-    debugmsg("Not implemented.");
+    if (!args.isEmpty()) {
+        cmdHelp(QStringList("rules"));
+        return ecInvalidArguments;
+    }
+
+    if (_sym.ruleEngine().activeRules().isEmpty()) {
+        _out << "No rules active." << endl;
+        return ecOk;
+    }
+
+    return printRulesList(_sym.ruleEngine().activeRules(),
+                          "Total active rules: ",
+                          getActiveRule, getActiveRuleIndex, true);
+}
+
+
+template <class list_t>
+int Shell::printRulesList(const list_t& rules,
+                          const QString& totalDesc,
+                          const TypeRule* (*getRuleFunc)(const list_t& list,
+                                                         int index),
+                          int (*getIndexFunc)(const list_t& list, int index),
+                          bool reverse)
+{
+    // Find out required field width (the types are sorted by ascending ID)
+    QSize tsize = ShellUtil::termSize();
+    const int w_index = qMax(ShellUtil::getFieldWidth(rules.size(), 10),
+                             (int)qstrlen("No."));
+    const int w_name = 25;
+    const int w_matches = qstrlen("Match");
+    const int w_actionType = qstrlen("script inline");
+    const int w_src = 25;
+    const int w_colsep = 2;
+    const int avail = tsize.width() - (w_index + w_name + w_matches +
+                                       w_actionType + w_src + 5*w_colsep + 1);
+    const int w_desc = avail >= 4 ? avail : 0;
+    const int w_total = w_index + w_name + w_matches + w_actionType + w_src +
+            w_desc + (w_desc > 0 ? 5 : 4)*w_colsep;
+
+    bool headerPrinted = false;
+    QRegExp rx("\\s\\s+");
+
+    int i = reverse ? rules.size() - 1 : 0;
+    while ((!reverse && i < rules.size()) || (reverse && i >= 0)) {
+        const TypeRule* rule = getRuleFunc(rules, i);
+        int index = getIndexFunc(rules, i);
+
+        // Print header if not yet done
+        if (!headerPrinted) {
+            _out << color(ctBold)
+                 << qSetFieldWidth(w_index)  << right << "No."
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_name) << left << "Name"
+                 << qSetFieldWidth(w_colsep) << " ";
+            if (w_desc > 0) {
+                 _out << qSetFieldWidth(w_desc) << left
+                      << ShellUtil::abbrvStrRight("Description", w_desc)
+                      << qSetFieldWidth(w_colsep) << " ";
+            }
+            _out << qSetFieldWidth(w_matches)  << right << "Match"
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_actionType) << left << "Action"
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_src) << "Source"
+                 << qSetFieldWidth(0) << color(ctReset) << endl;
+
+            hline(w_total);
+            headerPrinted = true;
+        }
+
+        QString src = QString("%1:%2")
+                    .arg(_sym.ruleEngine().ruleFile(rule))
+                    .arg(rule->srcLine());
+
+        _out  << qSetFieldWidth(w_index)  << right << (index + 1)
+              << qSetFieldWidth(w_colsep) << " "
+              << qSetFieldWidth(w_name) << left
+              << ShellUtil::abbrvStrRight(rule->name().trimmed().replace(rx, " "), w_name)
+              << qSetFieldWidth(w_colsep) << " ";
+        if (w_desc > 0) {
+            _out << qSetFieldWidth(w_desc) << left
+                 << ShellUtil::abbrvStrRight(rule->description().trimmed().replace(rx, " "),
+                                 w_desc)
+                 << qSetFieldWidth(w_colsep) << " ";
+        }
+        _out << qSetFieldWidth(w_matches)  << right
+             << _sym.ruleEngine().ruleHits(index)
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_actionType) << left;
+
+        switch (rule->actionType()) {
+        case TypeRule::atFunction:   _out << "script func."; break;
+        case TypeRule::atInlineCode: _out << "script inline";   break;
+        case TypeRule::atNone:       _out << "none";            break;
+        }
+
+        _out << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_src) << ShellUtil::abbrvStrLeft(src, w_src)
+             << qSetFieldWidth(0) << endl;
+
+        i = reverse ? i - 1 : i + 1;
+    }
+
+    if (!_interrupted) {
+        if (headerPrinted) {
+            hline(w_total);
+            _out << totalDesc << " " << color(ctBold) << dec << rules.size()
+                 << color(ctReset) << endl;
+        }
+        else
+            _out << "No rules available." << endl;
+    }
+
     return ecOk;
 }
 
@@ -2403,6 +2530,92 @@ int Shell::cmdRulesFlush(QStringList args)
     _out << "All rules have been deleted." << endl;
     return ecOk;
 }
+
+
+const TypeRule* Shell::parseRuleIndex(const QString& s)
+{
+    if (!_sym.hasRules()) {
+        _out << "No rules available." << endl;
+        return 0;
+    }
+
+    bool ok;
+    int index = s.toUInt(&ok) - 1;
+    if (!ok) {
+        errMsg("No valid index: " + s);
+        return 0;
+    }
+    if (index < 0 || index >= _sym.ruleEngine().rules().size()) {
+        errMsg("Index " + s + " is out of bounds.");
+        return 0;
+    }
+
+    return _sym.ruleEngine().rules().at(index);
+}
+
+
+int Shell::cmdRulesShow(QStringList args)
+{
+    if (args.isEmpty()) {
+        cmdHelp(QStringList("rules"));
+        return ecInvalidArguments;
+    }
+
+    static const QString indent(QString("\n%1").arg(str::filterIndent));
+
+    for (int i = 0; i < args.size(); ++i) {
+        if (i > 0)
+            _out << endl;
+
+        const TypeRule* rule = parseRuleIndex(args[i]);
+        if (!rule)
+            return ecInvalidIndex;
+
+        QString src = _sym.ruleEngine().ruleFile(rule);
+        QString s = rule->toString(&_color).trimmed().replace(QChar('\n'), indent);
+
+        _out << "Showing rule " << color(ctBold) << args[i] << color(ctReset)
+             << ", defined in "
+             << color(ctBold) << ShellUtil::shortFileName(src) << color(ctReset)
+             << ":"
+             << color(ctBold) << rule->srcLine() << color(ctReset)
+             << ":" << endl;
+        _out << str::filterIndent << s << endl;
+    }
+
+    return ecOk;
+}
+
+
+int Shell::cmdListTypesMatching(QStringList args)
+{
+    if (args.size() != 1) {
+        cmdHelp(QStringList("list"));
+        return ecInvalidArguments;
+    }
+
+    const TypeRule* rule = parseRuleIndex(args.front());
+    if (rule)
+        return printTypeList(static_cast<const TypeFilter*>(rule->filter()));
+    else
+        return ecInvalidIndex;
+}
+
+
+int Shell::cmdListVarsMatching(QStringList args)
+{
+    if (args.size() != 1) {
+        cmdHelp(QStringList("list"));
+        return ecInvalidArguments;
+    }
+
+    const TypeRule* rule = parseRuleIndex(args.front());
+    if (rule)
+        return printVarList(static_cast<const VariableFilter*>(rule->filter()));
+    else
+        return ecInvalidIndex;
+}
+
 
 int Shell::cmdScript(QStringList args)
 {
@@ -3472,23 +3685,11 @@ int Shell::cmdDiffVectors(QStringList args)
 #endif
 */
 
-void Shell::printTimeStamp(const QTime& time)
-{
-    int elapsed = (time).elapsed();
-    int ms = elapsed % 1000;
-    elapsed /= 1000;
-    int s = elapsed % 60;
-    elapsed /= 60;
-    int m = elapsed % 60;
-    elapsed /= 60;
-    int h = elapsed;
+//void Shell::printTimeStamp(const QTime& time)
+//{
 
-    _out << QString("%1:%2:%3.%4 ")
-                            .arg(h)
-                            .arg(m, 2, 10, QChar('0'))
-                            .arg(s, 2, 10, QChar('0'))
-                            .arg(ms, 3, 10, QChar('0'));
-}
+//    _out << ShellUtil::elapsedTimeStamp(time) << " ";
+//}
 
 
 //int Shell::cmdBinaryInstance(QStringList args)

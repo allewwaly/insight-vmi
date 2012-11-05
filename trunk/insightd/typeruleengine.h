@@ -132,6 +132,16 @@ public:
     inline const QStringList& ruleFiles() const { return _ruleFiles; }
 
     /**
+     * Returns the no. of types the given rule hits a type.
+     * @param index index of rule
+     * @return number of hits, or -1 if index is invalid
+     */
+    inline int ruleHits(int index) const
+    {
+        return (index >= 0 && index < _hits.size()) ? _hits[index] : -1;
+    }
+
+    /**
      * Returns the file name in which \a rule was read from.
      * @param rule the rule
      * @return absolute file name of rules file
@@ -156,7 +166,6 @@ private:
 
     void warnEvalError(const ScriptEngine* eng, const QString& fileName) const;
     void warnRule(const TypeRule *rule, const QString& msg) const;
-    QString shortFileName(const QString& fileName) const;
 
     const OsFilter* insertOsFilter(const OsFilter* osf);
 

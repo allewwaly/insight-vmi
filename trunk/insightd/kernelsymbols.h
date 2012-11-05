@@ -78,6 +78,12 @@ public:
      */
     void flushRules();
 
+
+    /**
+     * Checks if there are rules available in the ruleEngine().
+     */
+    bool hasRules() const;
+
     /**
      * @return the symbol factory that holds all kernel symbols
      */
@@ -122,6 +128,12 @@ private:
     TypeRuleEngine _ruleEngine;
     QString _fileName;
 };
+
+
+inline bool KernelSymbols::hasRules() const
+{
+    return !_ruleEngine.rules().isEmpty();
+}
 
 
 inline SymFactory& KernelSymbols::factory()

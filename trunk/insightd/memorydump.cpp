@@ -333,39 +333,10 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
             result = instance.memberCandidate(symbol, candidateIndex - 1);
         }
         else {
-//            // If the member has exactly one alternative type and the user did
-//            // not explicitly request the original type, we return the
-//            // alternative type
-//            if (candidateIndex < 0 &&
-//                instance.memberCandidatesCount(symbol) == 1)
-//                result = instance.memberCandidate(symbol, 0);
-//            else {
-//                // If there is only one compatible candidate return that one.
-//                for(int i = 0; i < instance.memberCandidatesCount(symbol); i++) {
-//                    if(instance.memberCandidateCompatible(instance.indexOfMember(symbol), i)) {
-//                        compatibleCnt++;
-
-//                        if(compatibleCnt == 1)
-//                            result = instance.memberCandidate(symbol, i);
-//                        else
-//                            break;
-//                    }
-
-//                }
-
-//                if (compatibleCnt != 1)
-//                    result = instance.member(symbol, BaseType::trLexical, 0, true);
-//            }
             result = instance.member(symbol, BaseType::trLexical);
         }
 
         if (!result.isValid()) {
-//            if (!result.type())
-//                queryError(QString("The type 0x%3 of member \"%1.%2\" is "
-//                            "unresolved")
-//                            .arg(instance.fullName())
-//                            .arg(symbol)
-//                            .arg(instance.typeIdOfMember(symbol), 0, 16));
             if (candidateIndex > 0)
                 queryError(QString("The member candidate \"%1.%2<%3>\" is invalid")
                             .arg(instance.fullName())

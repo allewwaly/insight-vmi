@@ -1,4 +1,4 @@
-<typeknowledge os="linux">
+<typeknowledge os="linux" >
 <!--
     <ruleincludes>
         <ruleinclude>/path/to/rules</ruleinclude>
