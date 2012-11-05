@@ -11,8 +11,6 @@
 #include "shell.h"
 #include <debug.h>
 
-Q_DECLARE_METATYPE(Instance*)
-
 #define INT32MASK 0xFFFFFFFFULL
 
 InstancePrototype::InstancePrototype(QObject *parent)
@@ -208,7 +206,14 @@ QString InstancePrototype::ParentName() const
 QString InstancePrototype::FullName() const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->fullName() : QString();
+	return ((inst = thisInstance())) ? inst->fullName() : QString();
+}
+
+
+QString InstancePrototype::MemberName(int index) const
+{
+	Instance* inst;
+	return ((inst = thisInstance())) ? inst->memberName(index) : QString();
 }
 
 
@@ -273,14 +278,26 @@ quint32 InstancePrototype::Size() const
 bool InstancePrototype::MemberExists(const QString& name) const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->memberExists(name) : false;
+	return ((inst = thisInstance())) ? inst->memberExists(name) : false;
+}
+
+
+int InstancePrototype::MemberOffset(int index) const
+{
+	Instance* inst = thisInstance();
+	if (!inst || index < 0)
+		return false;
+	const Structured* s = dynamic_cast<const Structured*>(
+				inst->type()->dereferencedBaseType());
+	return (s && index < s->members().size()) ?
+				s->members().at(index)->offset() : -1;
 }
 
 
 int InstancePrototype::MemberOffset(const QString& name) const
 {
 	Instance* inst;
-	return ((inst = thisInstance())) ? inst->memberOffset(name) : 0;
+	return ((inst = thisInstance())) ? inst->memberOffset(name) : -1;
 }
 
 
@@ -294,17 +311,20 @@ int InstancePrototype::MemberCount() const
 Instance InstancePrototype::Member(const QString& name, bool declaredType) const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ?
-            inst->findMember(name, BaseType::trAny, declaredType) : Instance();
+	return ((inst = thisInstance()))
+			? inst->member(name, BaseType::trAny, -1,
+						 declaredType ? Instance::ksNone : _knowSrc)
+			: Instance();
 }
 
 
 Instance InstancePrototype::Member(int index, bool declaredType) const
 {
     Instance* inst;
-    return ((inst = thisInstance())) ?
-                inst->member(index, BaseType::trAny, -1, declaredType) :
-                Instance();
+    return ((inst = thisInstance()))
+            ? inst->member(index, BaseType::trAny, -1,
+                           declaredType ? Instance::ksNone : _knowSrc)
+            : Instance();
 }
 
 

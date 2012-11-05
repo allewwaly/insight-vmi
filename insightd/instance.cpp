@@ -15,19 +15,40 @@
 #include <debug.h>
 #include "array.h"
 #include "astexpression.h"
+#include "typeruleengine.h"
 #include <QScriptEngine>
 #include <QSharedData>
 
+static const QStringList emtpyStringList;
+static const QString emtpyString;
 
-Q_DECLARE_METATYPE(Instance)
-
-static const QStringList _emtpyStringList;
 
 //-----------------------------------------------------------------------------
+const TypeRuleEngine* Instance::_ruleEngine = 0;
+
+
+const char* Instance::originToString(Instance::Origin o)
+{
+	switch (o) {
+	case orVariable:   return "Variable object"; break;
+	case orBaseType:   return "BaseType object (manually)"; break;
+	case orMember:     return "member access"; break;
+	case orCandidate:  return "candidate type"; break;
+	case orRuleEngine: return "TypeRuleEngine"; break;
+	case orMemMapNode: return "MemoryMapNode"; break;
+	default:           return "unknown"; break;
+	}
+}
 
 
 Instance::Instance()
 {
+}
+
+
+Instance::Instance(Instance::Origin orig)
+{
+	_d.origin = orig;
 }
 
 
@@ -38,10 +59,8 @@ Instance::Instance(size_t address, const BaseType* type, VirtualMemory* vmem,
     _d.address = address;
     _d.type = type;
     _d.vmem = vmem;
-    _d.isValid = type != 0;
     if (_d.vmem && (_d.vmem->memSpecs().arch & MemSpecs::ar_i386))
         _d.address &= 0xFFFFFFFFUL;
-    _d.isNull = !_d.address;
 }
 
 
@@ -54,10 +73,8 @@ Instance::Instance(size_t address, const BaseType* type, const QString& name,
     _d.name = name;
     _d.parentNames = parentNames;
     _d.vmem = vmem;
-    _d.isValid = type != 0;
     if (_d.vmem && (_d.vmem->memSpecs().arch & MemSpecs::ar_i386))
         _d.address &= 0xFFFFFFFFUL;
-    _d.isNull = !_d.address;
 }
 
 
@@ -93,6 +110,14 @@ QStringList Instance::fullNameComponents() const
 }
 
 
+const QString &Instance::memberName(int index) const
+{
+    if (!_d.type || !(_d.type->type() & StructOrUnion))
+        return emtpyString;
+    return dynamic_cast<const Structured*>(_d.type)->memberNames().at(index);
+}
+
+
 int Instance::memberCount() const
 {
     if (!_d.type || !(_d.type->type() & StructOrUnion))
@@ -104,8 +129,8 @@ int Instance::memberCount() const
 const QStringList& Instance::memberNames() const
 {
     if (!_d.type || !(_d.type->type() & StructOrUnion))
-        return _emtpyStringList;
-	return dynamic_cast<const Structured*>(_d.type)->memberNames();
+        return emtpyStringList;
+    return dynamic_cast<const Structured*>(_d.type)->memberNames();
 }
 
 
@@ -425,9 +450,13 @@ Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCoun
 
     if (_d.type && (_d.type->type() & resolveTypes)) {
         int dcnt = 0;
+        // Save original value
+        Instance::Origin orig_o = origin();
         Instance ret = _d.type->toInstance(_d.address, _d.vmem, _d.name,
                                            _d.parentNames, resolveTypes,
                                            maxPtrDeref, &dcnt);
+        // Restore original value
+        ret.setOrigin(orig_o);
         // If only lexical types were dereferenced, preserve the bit-field location
         if (dcnt == 0) {
             ret.setBitSize(_d.bitSize);
@@ -441,14 +470,43 @@ Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCoun
 }
 
 
-Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
-						  bool declaredType) const
+Instance Instance::member(const ConstMemberList &members, int resolveTypes,
+						  int maxPtrDeref, KnowledgeSources src) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d.type);
-	if (s && index >= 0 && index < s->members().size()) {
-		const StructuredMember* m = s->members().at(index);
-		if (declaredType)
-			return m->toInstance(_d.address, _d.vmem, this, resolveTypes, maxPtrDeref);
+	const StructuredMember* m = members.last();
+	int match = 0;
+
+	Instance ret;
+
+	// If allowed, and available, try the rule engine first
+	if (_ruleEngine && !(src & ksNoRulesEngine)) {
+		ConstMemberList mlist(members);
+		Instance* newInst = typeRuleMatchRek(mlist, &match);
+		if (match & TypeRuleEngine::mrMatch) {
+			if (newInst) {
+				ret = *newInst;
+				delete newInst;
+			}
+			else
+				return Instance(Instance::orRuleEngine);
+		}
+	}
+
+	// If no match through the rule engine, try to resolve ourself
+	if ( !(match & TypeRuleEngine::mrMatch) ) {
+		// In case the member is nested in an anonymous struct/union,
+		// we have to add that inter-offset here because m->toInstance()
+		// only adds the member's offset within its direct parent.
+		int extraOffset = 0;
+		for (int i = 0; i + 1 < members.size(); ++i)
+			extraOffset += members[i]->offset();
+
+		// Should we use candidate types
+		if (src & ksNoAltTypes) {
+			ret = m->toInstance(_d.address + extraOffset, _d.vmem, this,
+								resolveTypes, maxPtrDeref);
+		}
+		// Try the candidate type
 		else {
 			// See how many candidates are compatible with this instance
 			int cndtIndex = -1;
@@ -467,18 +525,87 @@ Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
 
 			// If we found only one compabile candidate, we return that one
 			if (cndtIndex >= 0) {
-				Instance inst = memberCandidate(m, cndtIndex);
+				ret = memberCandidate(m, cndtIndex);
 				// Dereference instance again, if required
-				if (inst.type() && inst.type()->type() & resolveTypes)
-					inst = inst.dereference(resolveTypes,
-											maxPtrDeref == 0 ? 0 : maxPtrDeref - 1);
-				return inst;
+				if (ret.type() && ret.type()->type() & resolveTypes)
+					ret = ret.dereference(resolveTypes,
+										  maxPtrDeref > 0 ? maxPtrDeref - 1
+														  : maxPtrDeref);
 			}
 			else
-				return m->toInstance(_d.address, _d.vmem, this, resolveTypes,
-									 maxPtrDeref);
+				ret = m->toInstance(_d.address + extraOffset, _d.vmem, this,
+									resolveTypes, maxPtrDeref);
 		}
 	}
+
+	// Do we need to store this instance for further rule evaluation?
+	if (match & TypeRuleEngine::mrDefer) {
+		// Start with first member
+		assert(ret._d.parent == 0);
+		ret._d.parent = new InstanceData(_d);
+		ret._d.fromParent = members.first();
+
+		// If we have more members, we need to build a chain of parents
+		for (int i = 1; i < members.size(); ++i) {
+			// Create instance of previous parent and access its member
+			Instance parent(*ret._d.parent);
+			Instance child(parent.member(members.mid(i), BaseType::trLexical, 0, ksNone));
+			// Child becomes new parent of ret
+			InstanceData* child_d = new InstanceData(child._d);
+			assert(child_d->parent == 0);
+			child_d->parent = ret._d.parent;
+			child_d->fromParent = members[i];
+			ret._d.parent = child_d;
+		}
+	}
+
+	return ret;
+}
+
+
+Instance* Instance::typeRuleMatchRek(ConstMemberList &members, int* match) const
+{
+	Instance* newInst = 0;
+	// Try the parent instance first
+	if (hasParent()) {
+		Instance p(parent());
+		members.prepend(_d.fromParent);
+		newInst = p.typeRuleMatchRek(members, match);
+	}
+
+	// Try this instance then
+	if ( !((*match) & TypeRuleEngine::mrMatch) ) {
+		if (hasParent())
+			members.pop_front();
+		*match = _ruleEngine->match(this, members, &newInst);
+	}
+
+	return newInst;
+}
+
+
+Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
+						  KnowledgeSources src) const
+{
+	const Structured* s = dynamic_cast<const Structured*>(_d.type);
+	if (s && index >= 0 && index < s->members().size()) {
+		const StructuredMember* m = s->members().at(index);
+		return member(ConstMemberList() << m, resolveTypes, maxPtrDeref, src);
+	}
+	return Instance();
+}
+
+
+Instance Instance::member(const QString& name, int resolveTypes,
+							  int maxPtrDeref, KnowledgeSources src) const
+{
+	const Structured* s;
+	if ( !(s = dynamic_cast<const Structured*>(_d.type)) )
+		return Instance();
+
+	ConstMemberList list(s->memberChain(name));
+	if (!list.isEmpty())
+		return member(list, resolveTypes, maxPtrDeref, src);
 	return Instance();
 }
 
@@ -491,12 +618,12 @@ Instance Instance::memberByOffset(size_t off, bool exactMatch) const
     if (!s)
         return Instance();
 
-    const StructuredMember *sm = s->memberAtOffset(off, exactMatch);
+    const StructuredMember *m = s->memberAtOffset(off, exactMatch);
 
-    if (!sm)
+    if (!m)
         return Instance();
 
-    return sm->toInstance(this->address(), this->vmem(), this);
+    return m->toInstance(this->address(), this->vmem(), this);
 }
 
 
@@ -539,7 +666,7 @@ quint64 Instance::memberAddress(const QString &name, bool declaredType) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	const StructuredMember* m;
-	if (s && (m = s->findMember(name, false))) {
+	if (s && (m = s->member(name, false))) {
 		if (declaredType || m->altRefTypeCount() != 1)
 			return _d.address + m->offset();
 		else {
@@ -551,14 +678,13 @@ quint64 Instance::memberAddress(const QString &name, bool declaredType) const
 }
 
 
-quint64 Instance::memberOffset(const QString& name) const
+int Instance::memberOffset(const QString& name) const
 {
     if (!_d.type || !(_d.type->type() & StructOrUnion))
         return false;
 
-    const StructuredMember* m =
-            dynamic_cast<const Structured*>(_d.type)->findMember(name);
-    return m ? m->offset() : 0;
+    const Structured* s = dynamic_cast<const Structured*>(_d.type);
+    return s->memberOffset(name);
 }
 
 
@@ -568,21 +694,6 @@ bool Instance::memberExists(const QString& name) const
         return false;
 
 	return dynamic_cast<const Structured*>(_d.type)->memberExists(name);
-}
-
-
-Instance Instance::findMember(const QString& name, int resolveTypes,
-							  bool declaredType) const
-{
-	const Structured* s = dynamic_cast<const Structured*>(_d.type);
-	const StructuredMember* m = 0;
-	if ( !s || !(m = s->findMember(name)) )
-		return Instance();
-
-	if (declaredType || m->altRefTypeCount() != 1)
-		return m->toInstance(_d.address, _d.vmem, this, resolveTypes);
-	else
-		return memberCandidate(m, 0);
 }
 
 
@@ -597,7 +708,7 @@ int Instance::typeIdOfMember(const QString& name, bool declaredType) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	const StructuredMember* m = 0;
-	if ( !s || !(m = s->findMember(name)) )
+	if ( !s || !(m = s->member(name)) )
 		return 0;
 	else if (declaredType || m->altRefTypeCount() != 1)
 		return m->refTypeId();
@@ -610,7 +721,7 @@ int Instance::memberCandidatesCount(const QString &name) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	const StructuredMember* m = 0;
-	if ( !s || !(m = s->findMember(name)) )
+	if ( !s || !(m = s->member(name)) )
 		return -1;
 
 	return m->altRefTypeCount();
@@ -641,7 +752,7 @@ Instance Instance::memberCandidate(const QString &name, int cndtIndex) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s)
-		return memberCandidate(s->findMember(name, true), cndtIndex);
+		return memberCandidate(s->member(name, true), cndtIndex);
 
 	return Instance();
 }
@@ -661,7 +772,7 @@ bool Instance::memberCandidateCompatible(const QString &name, int cndtIndex) con
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d.type);
 	if (s)
-		return memberCandidateCompatible(s->findMember(name, true), cndtIndex);
+		return memberCandidateCompatible(s->member(name, true), cndtIndex);
 
 	return false;
 }
@@ -704,7 +815,7 @@ bool Instance::memberCandidateCompatible(const StructuredMember* m,
 
 ExpressionResult Instance::toExpressionResult() const
 {
-	if (_d.isNull)
+	if (isNull())
 		return ExpressionResult(erUndefined);
 
 	const BaseType* t = _d.type->dereferencedBaseType(BaseType::trLexical);
@@ -1079,7 +1190,7 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
                 if(constants) *constants = true;
                 //TODO check if type is String (Contains only ASCII Characters)
                 //Do not use toString Method, as is gives non-ascii charackers as dot.
-                if(memberInstance._d.isNull){
+                if(memberInstance.isNull()){
                     //There should be a string (at least a pointer to an address that contains 0x0)
                     memberValid = false;
                 }
@@ -1092,7 +1203,7 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
                     // We expect exceptions here
                     try {
                         qint64 ret;
-                        qint64 address;
+                        qint64 address = 0;
                         
                         //Get correct address of string
                         if (memberInstance._d.type->type() == rtArray){
@@ -1158,10 +1269,16 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
 }
 
 
+Instance Instance::parent() const
+{
+    return _d.parent ? Instance(*_d.parent) : Instance();
+}
+
+
 QString Instance::toString(const ColorPalette* col) const
 {
     static const QString nullStr("NULL");
-    if (_d.isNull)
+    if (isNull())
         return nullStr;
 
     const BaseType* bt;

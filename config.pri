@@ -4,6 +4,9 @@ isEmpty(PREFIX) {
     win32:PREFIX = quote(C:\\Program Files)
 }
 
+# Should the tests be built?
+#CONFIG += tests
+
 # Should the memory_map feature be built? Requires the X window system
 # for Unix. Disabled by default.
 CONFIG += memory_map

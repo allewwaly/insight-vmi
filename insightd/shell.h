@@ -19,10 +19,10 @@
 #include <QTime>
 #include <QMutex>
 #include <QSize>
+#include "keyvaluestore.h"
 #include "kernelsymbols.h"
 #include "memorydump.h"
 #include "colorpalette.h"
-#include "listfilter.h"
 
 // Forward declaration
 class QProcess;
@@ -32,6 +32,8 @@ class QLocalSocket;
 class DeviceMuxer;
 class MuxerChannel;
 class QFileInfo;
+class TypeFilter;
+class VariableFilter;
 
 /**
  * This class represents the interactive shell, which is the primary interface
@@ -87,7 +89,7 @@ public:
     /**
      * Destructor
      */
-    ~Shell();
+    virtual ~Shell();
 
     /**
      * Use this stream to write information on the console.
@@ -301,9 +303,9 @@ private:
     int evalLine();
     void hline(int width = 60);
     int parseMemDumpIndex(QStringList &args, int skip = 0, bool quiet = false);
-    int printVarList(const VarListFilter& filter);
-    int printTypeList(const TypeListFilter& filter);
-    int printFilterHelp(const QHash<QString, QString> help);
+    int printVarList(const VariableFilter* filter);
+    int printTypeList(const TypeFilter* filter);
+    int printFilterHelp(const KeyValueStore &help);
 //---------------------------------
 //    int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
@@ -334,6 +336,11 @@ private:
     int cmdMemoryDiffBuild(int index1, int index2);
     int cmdMemoryDiffVisualize(int index);
 #endif
+    int cmdRules(QStringList args);
+    int cmdRulesLoad(QStringList args);
+    int cmdRulesList(QStringList args);
+    int cmdRulesActive(QStringList args);
+    int cmdRulesFlush(QStringList args);
     int cmdScript(QStringList args);
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t, const QString& name = QString(),

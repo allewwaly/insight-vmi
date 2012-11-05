@@ -1,0 +1,164 @@
+<typeknowledge os="linux">
+<!--
+    <ruleincludes>
+        <ruleinclude>/path/to/rules</ruleinclude>
+        <ruleinclude>/path/to/more/rules</ruleinclude>
+    </ruleincludes>
+-->
+
+    <scriptincludes>
+        <scriptinclude>../scripts</scriptinclude>
+    </scriptincludes>
+
+<!--    <include>morerules.xml</include>-->
+
+    <rules>
+        <rule>
+            <name>modules</name>
+            <description>
+                Variable "modules" is head of "struct module" objects.
+            </description>
+            <filter>
+                <datatype>struct</datatype>
+                <typename>list_head</typename>
+                <variablename>modules</variablename>
+                <members>
+                    <member match="any" />
+                </members>
+            </filter>
+<!--            <action src="file" file="samplerule.js">getModules</action>-->
+            <action src="inline">
+                var inst = arguments[0];
+                var members = arguments[1];
+                inst = inst.Member(members[0]);
+                inst.ChangeType("module");
+                inst.AddToAddress(-inst.MemberOffset("list"));
+                return inst;
+            </action>
+        </rule>
+
+        <rule>
+            <name>module.list</name>
+            <description>
+                Field "list" in "struct module" points to further module
+                objects.
+            </description>
+            <filter>
+                <datatype>struct</datatype>
+                <typename>module</typename>
+                <members>
+                    <member datatype="struct" typename="list_head">list</member>
+                    <member match="any" />
+                </members>
+            </filter>
+            <action src="file" file="samplerule.js">getModuleList</action>
+<!--            <action src="inline">
+                var inst = arguments[0];
+                var members = arguments[1];
+                var typeId = inst.TypeId();
+                inst = inst.Member(members[0]).Member(members[1]);
+                // Compare to head of the list (which is no module)
+                var m = new Instance("modules");
+                if (m.Address() == inst.Address())
+                    return m;
+                // Change type, fix offset
+                inst.ChangeType(typeId);
+                inst.AddToAddress(-inst.MemberOffset(members[0]));
+                return inst;
+            </action>-->
+        </rule>
+
+<!--
+        <rule>
+            <name>multi-level members test</name>
+            <filter>
+                <datatype>struct</datatype>
+                <typename>vm_struct</typename>
+                <members>
+                    <member>pages</member>
+                </members>
+            </filter>
+            <action src="inline">
+                println("Hier");
+                var inst = arguments[0];
+                var members = arguments[1];
+                var addr = inst.Address();
+                inst = inst.Member(members[0]);
+                inst.SetAddress(addr);
+                return inst;
+            </action>
+        </rule>
+-->
+
+
+        <rule>
+            <name>task_struct.tasks</name>
+            <filter>
+                <datatype>struct</datatype>
+                <typename>task_struct</typename>
+                <members>
+                    <member>tasks</member>
+                    <member match="any"></member>
+                </members>
+            </filter>
+            <action src="inline">
+                var inst = arguments[0];
+                println("1", inst.comm + ":", inst.MemberName(arguments[1][0]));
+                inst = inst.Member(arguments[1][0]).Member(arguments[1][1]);
+                inst.ChangeType("task_struct");
+                inst.AddToAddress(-inst.MemberOffset(arguments[1][0]));
+                return inst;
+            </action>
+        </rule>
+
+        <rule>
+            <name>task_struct.children</name>
+            <filter>
+                <datatype>struct</datatype>
+                <typename>task_struct</typename>
+                <members>
+                    <member match="regex">^(tasks|children|sibling)$</member>
+                    <member match="any" />
+                </members>
+            </filter>
+            <action src="inline">
+                var inst = arguments[0];
+                var typeId = inst.TypeId();
+                // println(inst.comm + ":", inst.MemberName(arguments[1][0]));
+                inst = inst.Member(arguments[1][0]).Member(arguments[1][1]);
+                inst.ChangeType(typeId);
+                var offsetMbr = inst.MemberName(arguments[1][0]);
+                if (inst.MemberName(arguments[1][0]) == "children")
+                    offsetMbr = "sibling";
+                inst.AddToAddress(-inst.MemberOffset(offsetMbr));
+                return inst;
+            </action>
+        </rule>
+
+        <rule>
+            <name>list_head generic</name>
+            <description>
+                Generic rule for list_head members embedded in other structs
+            </description>
+            <filter>
+                <datatype>struct</datatype>
+                <members>
+                    <member datatype="struct" typename="list_head" match="any" />
+                    <member match="any" />
+                </members>
+            </filter>
+            <action src="inline">
+                var inst = arguments[0];
+                var members = arguments[1];
+                var typeId = inst.TypeId();
+                //println("Called list_head generic:", inst.TypeName(), members[0], members[1]);
+                inst = inst.Member(members[0]).Member(members[1]);
+                inst.ChangeType(typeId);
+                inst.AddToAddress(-inst.MemberOffset(members[0]));
+                return inst;
+            </action>
+        </rule>
+
+
+    </rules>
+</typeknowledge>

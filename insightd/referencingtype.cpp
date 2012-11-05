@@ -402,7 +402,7 @@ Instance ReferencingType::AltRefType::toInstance(
     // Evaluate pointer arithmetic for new address
     ExpressionResult result = _expr->result(inst);
     if (result.resultType & (erUndefined|erRuntime))
-        return Instance();
+        return Instance(Instance::orCandidate);
 
     quint64 newAddr = result.uvalue(esUInt64);
     // Retrieve new type
@@ -415,9 +415,13 @@ Instance ReferencingType::AltRefType::toInstance(
     newType = dynamic_cast<const Pointer*>(newType)->refType();
 
     // Create instance with new type at new address
-    return newType ?
-                newType->toInstance(newAddr, vmem, name, parentNames) :
-                Instance();
+    if (newType) {
+        Instance inst(newType->toInstance(newAddr, vmem, name, parentNames));
+        inst.setOrigin(Instance::orCandidate);
+        return inst;
+    }
+
+    return Instance(Instance::orCandidate);
 }
 
 

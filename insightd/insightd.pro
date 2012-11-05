@@ -24,7 +24,8 @@ CONFIG += console \
     debug_and_release
 
 QT += script \
-    network
+    network \
+    xml
 QT -= webkit
 
 # Required libraries for building
@@ -98,7 +99,13 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     memorymapverifier.cpp \
     memorymapnodesv.cpp \
     memorymapheuristics.cpp \
-    listfilter.cpp
+    typefilter.cpp \
+    typerule.cpp \
+    osfilter.cpp \
+    typeruleengine.cpp \
+    typeruleparser.cpp \
+    typerulereader.cpp \
+    xmlschema.cpp
 
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
@@ -161,7 +168,17 @@ HEADERS += kernelsourcetypeevaluator.h \
     memorymapverifier.h \
     memorymapnodesv.h \
     memorymapheuristics.h \
-    listfilter.h
+    typefilter.h \
+    typerule.h \
+    osfilter.h \
+    filterexception.h \
+    typeruleengine.h \
+    typeruleparser.h \
+    typerulereader.h \
+    typeruleexception.h \
+    keyvaluestore.h \
+    xmlschema.h \
+    memberlist.h
 
 # Things to do when the memory map builder and widget is to be built. Enabling
 # this feature requires InSight to run on an X server.
@@ -205,3 +222,6 @@ CONFIG(with_readline) {
     DEFINES += CONFIG_READLINE
     LIBS += -lreadline
 }
+
+OTHER_FILES += \
+    scripts/samplerule.js

@@ -13,10 +13,18 @@
 #include "basetype.h"
 #include <debug.h>
 
-Q_DECLARE_METATYPE(Instance)
-Q_DECLARE_METATYPE(Instance*)
-Q_DECLARE_METATYPE(InstanceClass*)
-Q_DECLARE_METATYPE(InstanceList)
+namespace js
+{
+const char* getInstance   = "getInstance";
+const char* instance      = "Instance";
+const char* length        = "length";
+const char* useRules      = "useRules";
+const char* useCandidates = "useCandidates";
+
+const int propIgnore        = -1;
+const int propUseRules      = -2;
+const int propUseCandidates = -3;
+}
 
 /**
  * This is an iterator for the properties of InstanceClass object.
@@ -47,7 +55,7 @@ private:
 
 //------------------------------------------------------------------------------
 
-InstanceClass::InstanceClass(QScriptEngine *eng)
+InstanceClass::InstanceClass(QScriptEngine *eng, Instance::KnowledgeSources src)
     : QScriptClass(eng), _proto(0)
 {
     qScriptRegisterMetaType<Instance>(eng, instToScriptValue, instFromScriptValue);
@@ -55,6 +63,7 @@ InstanceClass::InstanceClass(QScriptEngine *eng)
     qScriptRegisterMetaType<QStringList>(eng, stringListToScriptValue, stringListFromScriptValue);
 
     _proto = new InstancePrototype();
+    _proto->setKnowledgeSources(src);
     _protoScriptVal = eng->newQObject(_proto,
                                QScriptEngine::QtOwnership,
                                QScriptEngine::SkipMethodsInEnumeration
@@ -65,6 +74,14 @@ InstanceClass::InstanceClass(QScriptEngine *eng)
 
     _ctor = eng->newFunction(construct, _protoScriptVal);
     _ctor.setData(qScriptValueFromValue(eng, this));
+    _ctor.setProperty(js::useCandidates, eng->newFunction(getSetUseCandidates),
+                      QScriptValue::Undeletable
+                      | QScriptValue::PropertyGetter
+                      | QScriptValue::PropertySetter);
+    _ctor.setProperty(js::useRules, eng->newFunction(getSetUseRules),
+                      QScriptValue::Undeletable
+                      | QScriptValue::PropertyGetter
+                      | QScriptValue::PropertySetter);
 }
 
 
@@ -82,18 +99,18 @@ QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue& object
     if (!inst)
         return 0;
 
-    // If we have a member with that index, we handle it as a property
     QString nameStr = name.toString();
+
+    // Check if a slot with the same name exists in the prototype class.
+    // Slots have precedence over members with the same name. The member
+    // is still accessible using Member("name").
+    QByteArray slotName = QString("%1()").arg(nameStr).toAscii();
+    if (_proto->metaObject()->indexOfSlot(slotName.constData()) >= 0)
+        return 0;
+
+    // If we have a member with that index, we handle it as a property
     int index = inst->indexOfMember(nameStr);
     if (index >= 0) {
-        // Check if a slot with the same name exists in the prototype class
-        QByteArray slotName = QString("%1()").arg(nameStr).toAscii();
-        if (_proto->metaObject()->indexOfSlot(slotName.constData()) >= 0) {
-            engine()->currentContext()->throwError(
-                    "Property clash for property \"" + nameStr + "\": is a "
-                    "struct member as well as a prototype function");
-            return 0;
-        }
     	*id = (uint) index;
         return flags;
     }
@@ -110,14 +127,10 @@ QScriptValue InstanceClass::property(const QScriptValue& object,
     Instance *inst = qscriptvalue_cast<Instance*>(object.data());
     if (!inst)
         return QScriptValue();
-    // We should never be called without a valid id
-    assert(id < (uint)inst->memberCount());
 
     // If the member has exactly one alternative type, we return that instead of
     // the original member
-    Instance member = (inst->memberCandidatesCount(id) == 1) ?
-                inst->memberCandidate(id, 0) :
-                inst->member(id, BaseType::trAny, 1);
+    Instance member = inst->member(id, BaseType::trAny, 1, _proto->knowledgeSources());
 
     return newInstance(member);
 }
@@ -150,6 +163,73 @@ QScriptValue InstanceClass::prototype() const
 }
 
 
+Instance::KnowledgeSources InstanceClass::knowledgeSources() const
+{
+    return _proto->knowledgeSources();
+}
+
+void InstanceClass::setKnowledgeSources(Instance::KnowledgeSources src)
+{
+    _proto->setKnowledgeSources(src);
+}
+
+
+QScriptValue InstanceClass::getSetUseCandidates(QScriptContext *ctx, QScriptEngine *eng)
+{
+    Q_UNUSED(eng);
+
+    // Try to obtain the "this" object (set in the constructor)
+    InstanceClass *cls = qscriptvalue_cast<InstanceClass*>(ctx->thisObject().data());
+    if (!cls)
+        return QScriptValue();
+
+    Instance::KnowledgeSources src = cls->_proto->knowledgeSources();
+    QScriptValue result;
+    // One argument: called as setter
+    if (ctx->argumentCount() == 1) {
+        bool value = ctx->argument(0).toBool();
+        result = value;
+        src = (Instance::KnowledgeSources)
+                (value ? (src & ~Instance::ksNoAltTypes)
+                       : (src | Instance::ksNoAltTypes));
+        cls->_proto->setKnowledgeSources(src);
+    }
+    // Otherwise: called as getter
+    else {
+        bool value = !(src & Instance::ksNoAltTypes);
+        result = value;
+    }
+    return result;
+}
+
+
+QScriptValue InstanceClass::getSetUseRules(QScriptContext *ctx, QScriptEngine *eng)
+{
+    Q_UNUSED(eng);
+
+    // Try to obtain the "this" object (set in the constructor)
+    InstanceClass *cls = qscriptvalue_cast<InstanceClass*>(ctx->thisObject().data());
+    if (!cls)
+        return QScriptValue();
+
+    Instance::KnowledgeSources src = cls->_proto->knowledgeSources();
+    QScriptValue result;
+    if (ctx->argumentCount() == 1) {
+        bool value = ctx->argument(0).toBool();
+        result = value;
+        src = (Instance::KnowledgeSources)
+                (value ? (src & ~Instance::ksNoRulesEngine)
+                       : (src | Instance::ksNoRulesEngine));
+        cls->_proto->setKnowledgeSources(src);
+    }
+    else {
+        bool value = !(src & Instance::ksNoRulesEngine);
+        result = value;
+    }
+    return result;
+}
+
+
 QScriptValue InstanceClass::constructor()
 {
     return _ctor;
@@ -173,13 +253,11 @@ QScriptValue InstanceClass::construct(QScriptContext* ctx, QScriptEngine* eng)
         return QScriptValue();
     // Provide a copy-constructor, if argument was given
     QScriptValue arg = ctx->argument(0);
-    if (arg.instanceOf(ctx->callee())) {
-        debugmsg("Called copy-constructor");
+    if (arg.instanceOf(ctx->callee()))
         return cls->newInstance(qscriptvalue_cast<Instance>(arg));
-    }
     // Otherwise execute the "getInstance" function as constructor
     // First, get the "getInstance" function object
-    QScriptValue getInstance = eng->globalObject().property("getInstance");
+    QScriptValue getInstance = eng->globalObject().property(js::getInstance);
     if (!getInstance.isFunction())
     	return QScriptValue();
     // Second, call the function
@@ -189,17 +267,11 @@ QScriptValue InstanceClass::construct(QScriptContext* ctx, QScriptEngine* eng)
 
 QScriptValue InstanceClass::instToScriptValue(QScriptEngine* eng, const Instance& inst)
 {
-    QScriptValue ctor = eng->globalObject().property("Instance");
+    QScriptValue ctor = eng->globalObject().property(js::instance);
     InstanceClass *cls = qscriptvalue_cast<InstanceClass*>(ctor.data());
     if (!cls)
         return eng->newVariant(qVariantFromValue(inst));
     return cls->newInstance(inst);
-}
-
-
-void InstanceClass::instFromScriptValue(const QScriptValue& obj, Instance& inst)
-{
-    inst = qvariant_cast<Instance>(obj.data().toVariant());
 }
 
 
@@ -218,7 +290,7 @@ void InstanceClass::membersFromScriptValue(const QScriptValue& obj, InstanceList
     if (!obj.isArray())
         return;
 
-    QScriptValue lenVal = obj.property("length");
+    QScriptValue lenVal = obj.property(js::length);
     int len = lenVal.isNumber() ? lenVal.toNumber() : 0;
 
     for (int i = 0; i < len; ++i) {
@@ -244,7 +316,7 @@ void InstanceClass::stringListFromScriptValue(const QScriptValue& obj, QStringLi
     if (!obj.isArray())
         return;
 
-    QScriptValue lenVal = obj.property("length");
+    QScriptValue lenVal = obj.property(js::length);
     int len = lenVal.isNumber() ? lenVal.toNumber() : 0;
 
     for (int i = 0; i < len; ++i) {
@@ -313,7 +385,7 @@ QScriptString InstanceClassPropertyIterator::name() const
 {
     Instance *inst = qscriptvalue_cast<Instance*>(object().data());
     return object().engine()->toStringHandle(
-            inst->member(m_last, BaseType::trAny).name());
+            inst->memberName(m_last));
 }
 
 

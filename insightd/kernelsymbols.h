@@ -12,6 +12,7 @@
 #include "typeinfo.h"
 #include "genericexception.h"
 #include "memspecs.h"
+#include "typeruleengine.h"
 
 // Forward declaration
 class QIODevice;
@@ -66,6 +67,18 @@ public:
     void saveSymbols(const QString& fileName);
 
     /**
+     * Loads type knowledge rules from \a fileName into the rules engine.
+     * @param fileName file to load
+     * @param forceRead force to re-read files that have already been read
+     */
+    void loadRules(const QString& fileName, bool forceRead = false);
+
+    /**
+     * Deletes all rules within the engine
+     */
+    void flushRules();
+
+    /**
      * @return the symbol factory that holds all kernel symbols
      */
     SymFactory& factory();
@@ -81,6 +94,16 @@ public:
     const MemSpecs& memSpecs() const;
 
     /**
+     * Returns the rules engine.
+     */
+    TypeRuleEngine& ruleEngine();
+
+    /**
+     * Returns the rules engine (const version).
+     */
+    const TypeRuleEngine& ruleEngine() const;
+
+    /**
      * @return file name of the loaded kernel symbols, if any
      */
     const QString& fileName() const;
@@ -92,8 +115,11 @@ public:
     bool symbolsAvailable() const;
 
 private:
-	MemSpecs _memSpecs;
+	void checkRules();
+
+    MemSpecs _memSpecs;
     SymFactory _factory;
+    TypeRuleEngine _ruleEngine;
     QString _fileName;
 };
 
@@ -113,6 +139,18 @@ inline const SymFactory& KernelSymbols::factory() const
 inline const MemSpecs&  KernelSymbols::memSpecs() const
 {
     return _memSpecs;
+}
+
+
+inline TypeRuleEngine &KernelSymbols::ruleEngine()
+{
+    return _ruleEngine;
+}
+
+
+inline const TypeRuleEngine &KernelSymbols::ruleEngine() const
+{
+    return _ruleEngine;
 }
 
 
