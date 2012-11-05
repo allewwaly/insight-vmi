@@ -5,6 +5,7 @@
 #include "structured.h"
 #include "structuredmember.h"
 #include "instance_def.h"
+#include "shellutil.h"
 
 
 namespace xml
@@ -24,7 +25,7 @@ const char* wildcard     = "wildcard";
 
 namespace str
 {
-const char* filterIndent = " | ";
+const char* filterIndent = "  ";
 }
 
 using namespace Filter;
@@ -274,20 +275,36 @@ PatternSyntax GenericFilter::setNamePattern(
 }
 
 
-QString GenericFilter::toString() const
+QString GenericFilter::toString(const ColorPalette *col) const
 {
     QString s;
-    if (filterActive(ftTypeNameAny))
-        s += QString("Type name: (%1)\n").arg(xml::any);
-    else if (filterActive(ftTypeNameLiteral))
-        s += QString("Type name: %1\n").arg(_typeName);
-    else if (filterActive(ftTypeNameRegEx))
-        s += QString("Type name (%1): %2\n").arg(xml::regex).arg(_typeName);
-    else if (filterActive(ftTypeNameWildcard))
-        s += QString("Type name (%1): %2\n").arg(xml::wildcard).arg(_typeName);
+
+    if (filterActive(ftTypeNameAny)) {
+        s += QString("%0 %1\n")
+                .arg(ShellUtil::colorize("Type name:", ctColHead, col))
+                .arg(ShellUtil::colorize(QString("(%1)").arg(xml::any), ctType,
+                                         col));
+    }
+    else if (filterActive(ftTypeNameLiteral)) {
+        s += QString("%0 %1\n")
+                .arg(ShellUtil::colorize("Type name:", ctColHead, col))
+                .arg(ShellUtil::colorize(_typeName, ctType, col));
+    }
+    else if (filterActive(ftTypeNameRegEx)) {
+        s += QString("%0 %2\n")
+                .arg(ShellUtil::colorize("Type name (%1):", ctColHead, col))
+                .arg(xml::regex)
+                .arg(ShellUtil::colorize(_typeName, ctType, col));
+    }
+    else if (filterActive(ftTypeNameWildcard)) {
+        s += QString("%0 %2\n")
+                .arg(ShellUtil::colorize("Type name (%1):", ctColHead, col))
+                .arg(xml::wildcard)
+                .arg(ShellUtil::colorize(_typeName, ctType, col));
+    }
 
     if (filterActive(ftRealType)) {
-        s += "Data type: ";
+        s += ShellUtil::colorize("Data type:", ctColHead, col) + " ";
         bool first = true;
         for (int i = 1; i <= rtVaList; i <<= 1) {
             if (dataType() & i) {
@@ -295,7 +312,8 @@ QString GenericFilter::toString() const
                     first = false;
                 else
                     s += ", ";
-                s += realTypeToStr((RealType)i);
+                s += ShellUtil::colorize(realTypeToStr((RealType)i), ctRealType,
+                                         col);
             }
         }
         if (first)
@@ -303,8 +321,11 @@ QString GenericFilter::toString() const
         s += "\n";
     }
 
-    if (filterActive(ftSize))
-        s += "Type size: " + QString::number(size()) + "\n";
+    if (filterActive(ftSize)) {
+        s += ShellUtil::colorize("Type size:", ctColHead, col) + " " +
+             ShellUtil::colorize(QString::number(size()), ctNumber, col);
+    }
+
     return s;
 }
 
@@ -478,17 +499,34 @@ bool MemberFilter::match(const StructuredMember *member) const
 }
 
 
-QString MemberFilter::toString() const
+QString MemberFilter::toString(const ColorPalette *col) const
 {
-    QString s(GenericFilter::toString());
-    if (filterActive(ftVarNameAny))
-        s += QString("Name: (%1)\n").arg(xml::any);
-    else if (filterActive(ftVarNameLiteral))
-        s += QString("Name: %1\n").arg(_name);
-    else if (filterActive(ftVarNameRegEx))
-        s += QString("Name (%1): %2\n").arg(xml::regex).arg(_name);
-    else if (filterActive(ftVarNameWildcard))
-        s += QString("Name (%1): %2\n").arg(xml::wildcard).arg(_name);
+    QString s(GenericFilter::toString(col));
+
+    if (filterActive(ftVarNameAny)) {
+        s += QString("%0 %1\n")
+                .arg(ShellUtil::colorize("Name:", ctColHead, col))
+                .arg(ShellUtil::colorize(QString("(%1)").arg(xml::any),
+                                         ctMember, col));
+    }
+    else if (filterActive(ftVarNameLiteral)) {
+        s += QString("%0 %1\n")
+                .arg(ShellUtil::colorize("Name:", ctColHead, col))
+                .arg(ShellUtil::colorize(_name, ctMember, col));
+    }
+    else if (filterActive(ftVarNameRegEx)) {
+        s += QString("%0 %2\n")
+                .arg(ShellUtil::colorize("Name (%1):", ctColHead, col))
+                .arg(xml::regex)
+                .arg(ShellUtil::colorize(_name, ctMember, col));
+    }
+    else if (filterActive(ftVarNameWildcard)) {
+        s += QString("%0 %2\n")
+                .arg(ShellUtil::colorize("Name (%1):", ctColHead, col))
+                .arg(xml::wildcard)
+                .arg(ShellUtil::colorize(_name, ctMember, col));
+    }
+
     return s;
 }
 
@@ -503,17 +541,19 @@ void TypeFilter::appendMember(const MemberFilter &member)
 }
 
 
-QString TypeFilter::toString() const
+QString TypeFilter::toString(const ColorPalette *col) const
 {
     static const QString indent(QString("\n%1").arg(str::filterIndent));
-    QString s(GenericFilter::toString());
+
+    QString s(GenericFilter::toString(col));
     if (!_members.isEmpty()) {
         for (int i = 0; i < _members.size(); ++i) {
-            QString ms(_members[i].toString().trimmed());
-            s += QString("Member %1:").arg(i+1);
+            QString ms(_members[i].toString(col).trimmed());
+            s += ShellUtil::colorize(QString("Member %1:").arg(i+1), ctColHead, col);
             s += indent + ms.replace(QChar('\n'), indent) + "\n";
         }
     }
+
     return s;
 }
 
@@ -744,17 +784,34 @@ PatternSyntax VariableFilter::varNameSyntax() const
 }
 
 
-QString VariableFilter::toString() const
+QString VariableFilter::toString(const ColorPalette *col) const
 {
-    QString s(TypeFilter::toString());
-    if (filterActive(ftVarNameAny))
-        s += QString("Var. name: (%1)\n").arg(xml::any);
-    else if (filterActive(ftVarNameLiteral))
-        s += QString("Var. name: %1\n").arg(_varName);
-    else if (filterActive(ftVarNameRegEx))
-        s += QString("Var. name (%1): %2\n").arg(xml::regex).arg(_varName);
-    else if (filterActive(ftVarNameWildcard))
-        s += QString("Var. name (%1): %2\n").arg(xml::wildcard).arg(_varName);
+    QString s(TypeFilter::toString(col));
+
+    if (filterActive(ftVarNameAny)) {
+        s += QString("%0 %1\n")
+                .arg(ShellUtil::colorize("Var. name:", ctColHead, col))
+                .arg(ShellUtil::colorize(QString("(%1)").arg(xml::any),
+                                         ctVariable, col));
+    }
+    else if (filterActive(ftVarNameLiteral)) {
+        s += QString("%0 %1\n")
+                .arg(ShellUtil::colorize("Var. name:", ctColHead, col))
+                .arg(ShellUtil::colorize(_varName, ctVariable, col));
+    }
+    else if (filterActive(ftVarNameRegEx)) {
+        s += QString("%0 %2\n")
+                .arg(ShellUtil::colorize("Var. name (%1):", ctColHead, col))
+                .arg(xml::regex)
+                .arg(ShellUtil::colorize(_varName, ctVariable, col));
+    }
+    else if (filterActive(ftVarNameWildcard)) {
+        s += QString("%0 %2\n")
+                .arg(ShellUtil::colorize("Var. name (%1):", ctColHead, col))
+                .arg(xml::wildcard)
+                .arg(ShellUtil::colorize(_varName, ctVariable, col));
+    }
+
     return s;
 }
 

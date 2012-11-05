@@ -2,6 +2,7 @@
 #include "filterexception.h"
 #include <bitop.h>
 #include "memspecs.h"
+#include "shellutil.h"
 
 namespace xml
 {
@@ -174,7 +175,7 @@ bool OsFilter::match(const OsSpecs *specs) const
 }
 
 
-QString OsFilter::toString() const
+QString OsFilter::toString(const ColorPalette *col) const
 {
 #define commaIfNotFirst(str, first) suffixIfNotFirst(str, first, ", ")
 #define suffixIfNotFirst(str, first, suffix) \
@@ -187,7 +188,7 @@ QString OsFilter::toString() const
 
     QString s;
     if (_osFamilies) {
-        s += "OS type: ";
+        s += ShellUtil::colorize("OS type:", ctColHead, col) + " ";
         bool first = true;
         if (_osFamilies & OsSpecs::ofLinux) {
             commaIfNotFirst(s, first);
@@ -202,7 +203,7 @@ QString OsFilter::toString() const
         s += "\n";
     }
     if (_architectures) {
-        s += "Architecture: ";
+        s += ShellUtil::colorize("Architecture:", ctColHead, col) + " ";
         bool first = true;
         if (_architectures & OsSpecs::arX86) {
             commaIfNotFirst(s, first);
@@ -221,9 +222,11 @@ QString OsFilter::toString() const
         s += "\n";
     }
     if (!_minVer.isEmpty())
-        s += "Min. version: " + _minVer.join(".") + "\n";
+        s += ShellUtil::colorize("Min. version:", ctColHead, col) + " " +
+                _minVer.join(".") + "\n";
     if (!_maxVer.isEmpty())
-        s += "Max. version: " + _maxVer.join(".") + "\n";
+        s += ShellUtil::colorize("Max. version:", ctColHead, col) + " " +
+                _maxVer.join(".") + "\n";
     return s;
 }
 

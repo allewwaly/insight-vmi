@@ -105,7 +105,8 @@ SOURCES += kernelsourcetypeevaluator.cpp \
     typeruleengine.cpp \
     typeruleparser.cpp \
     typerulereader.cpp \
-    xmlschema.cpp
+    xmlschema.cpp \
+    shellutil.cpp
 
 HEADERS += kernelsourcetypeevaluator.h \
     kernelsourceparser.h \
@@ -178,7 +179,8 @@ HEADERS += kernelsourcetypeevaluator.h \
     typeruleexception.h \
     keyvaluestore.h \
     xmlschema.h \
-    memberlist.h
+    memberlist.h \
+    shellutil.h
 
 # Things to do when the memory map builder and widget is to be built. Enabling
 # this feature requires InSight to run on an X server.

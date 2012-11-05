@@ -1,5 +1,24 @@
 
-include("lib_string.js");
+var lib_str = "scripts/lib_string.js";
+try {
+    include(lib_str);
+}
+catch (e) {
+    lib_str = "lib_string.js";
+}
+try {
+    include(lib_str);
+}
+catch (e) {
+    lib_str = false;
+}
+
+if (lib_str)
+    include(lib_str);
+else {
+    println("Cannot find lib_string.js");
+    return false;
+}
 
 var uid_size = 4;
 var pid_size = 8;

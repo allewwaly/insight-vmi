@@ -1,6 +1,7 @@
 #include "typerule.h"
 #include "typefilter.h"
 #include "osfilter.h"
+#include "shellutil.h"
 #include <QDir>
 
 
@@ -57,40 +58,49 @@ bool TypeRule::match(const Instance *inst, const OsSpecs *specs) const
 }
 
 
-QString TypeRule::toString() const
+QString TypeRule::toString(const ColorPalette *col) const
 {
     QString s;
     static const QString indent(QString("\n%1").arg(str::filterIndent));
 
-    if (!_name.isEmpty())
-        s += "Name: " + _name + "\n";
-    if (!_description.isEmpty())
-        s += "Description: " + _description + "\n";
+    if (!_name.isEmpty()) {
+        s += QString("%1 %2\n")
+                .arg(ShellUtil::colorize("Name:", ctColHead, col))
+                .arg(_name);
+    }
+    if (!_description.isEmpty()) {
+        s += QString("%1 %2\n")
+                .arg(ShellUtil::colorize("Description:", ctColHead, col))
+                .arg(_description);
+    }
     if (_osFilter) {
-        QString f(_osFilter->toString().trimmed());
+        QString f(_osFilter->toString(col).trimmed());
         f.replace("\n", indent);
-        s += "OS filter:" + indent + f + "\n";
+        s += ShellUtil::colorize("OS filter:", ctColHead, col);
+        s +=  indent + f + "\n";
     }
     if (_filter) {
-        QString f(_filter->toString().trimmed());
+        QString f(_filter->toString(col).trimmed());
         f.replace("\n", indent);
-        s += "Type filter:" + indent + f + "\n";
+        s += ShellUtil::colorize("Type filter:", ctColHead, col);
+        s +=  indent + f + "\n";
     }
     if (!_action.isEmpty()) {
-        s += "Action";
         if (_actionType == atFunction) {
+            s += ShellUtil::colorize("Action:", ctColHead, col);
             // Take absolute or relative file name, which ever is shorter
             QString file = QDir::current().relativeFilePath(_scriptFile);
             if (file.size() > _scriptFile.size())
                 file = _scriptFile;
 
-            s += ": call " + _action + "() in file \"";
-            s += file + "\"\n";
+            s += " call " + ShellUtil::colorize(_action + "()", ctBold, col) +
+                    " in file " + ShellUtil::colorize(file, ctBold, col) + "\n";
         }
         else {
             QString a(_action);
             a.replace("\n", indent);
-            s += " (inline):" + indent + a;
+            s += ShellUtil::colorize("Action (inline):", ctColHead, col);
+            s += indent + a;
         }
     }
     return s;

@@ -15,6 +15,7 @@ extern const char* maxver;
 }
 
 struct MemSpecs;
+class ColorPalette;
 
 /**
  * This class describes the family, architecture and version of an operating
@@ -214,8 +215,9 @@ public:
 
     /**
      * Returns a string representation of this filter.
+     * @param col color palette to use for colorizing the output
      */
-    QString toString() const;
+    QString toString(const ColorPalette *col = 0) const;
 
     /**
      * Comparison operator

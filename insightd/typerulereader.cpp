@@ -51,8 +51,6 @@ void TypeRuleReader::readFromRek(const QString &fileName)
         ioError(QString("Error opening file \"%1\" for reading.").arg(_currFile));
     _fileIndex = _engine->indexForRuleFile(_currFile);
 
-    debugmsg("Reading file: " << _currFile);
-
     TypeRuleParser parser(this);
     QXmlInputSource src(&in);
     QXmlSimpleReader reader;

@@ -14,6 +14,7 @@ class BaseType;
 class Variable;
 class Instance;
 class StructuredMember;
+class ColorPalette;
 
 namespace xml
 {
@@ -194,8 +195,9 @@ public:
 
     /**
      * Returns a string representation of this filter.
+     * @param col color palette to use for colorizing the output
      */
-    virtual QString toString() const;
+    virtual QString toString(const ColorPalette* col = 0) const;
 
 protected:
     /**
@@ -330,7 +332,7 @@ public:
     /**
      * \copydoc GenericFilter::toString()
      */
-    virtual QString toString() const;
+    virtual QString toString(const ColorPalette* col = 0) const;
 
 private:
     QString _name;
@@ -411,7 +413,7 @@ public:
     /**
      * \copydoc GenericFilter::toString()
      */
-    virtual QString toString() const;
+    virtual QString toString(const ColorPalette* col = 0) const;
 
     /**
      * Returns a key-value list of parameters this filter can parse. The key
@@ -532,7 +534,7 @@ public:
     /**
      * \copydoc GenericFilter::toString()
      */
-    virtual QString toString() const;
+    virtual QString toString(const ColorPalette* col = 0) const;
 
     /**
      * Returns a key-value list of parameters this filter can parse. The key
