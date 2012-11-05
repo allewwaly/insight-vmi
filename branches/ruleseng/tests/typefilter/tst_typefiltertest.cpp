@@ -747,10 +747,19 @@ void TypeFilterTest::setTypeName()
 #define TEST_TYPE_NAME(n, s, ta, tb, ti, va, vb) \
     f.setTypeName(n, s); \
     vf.setTypeName(n, s); \
-    QVERIFY(f.typeName() == (n)); \
-    QVERIFY(f.typeNameSyntax() == (s)); \
-    QVERIFY(vf.typeName() == (n)); \
-    QVERIFY(vf.typeNameSyntax() == (s)); \
+    QCOMPARE(f.typeName(), QString(n)); \
+    QCOMPARE(f.typeNameSyntax(), (s)); \
+    QCOMPARE(vf.typeName(), QString(n)); \
+    QCOMPARE(vf.typeNameSyntax(), (s)); \
+    VERIFY_F_VF(ta, tb, ti, va, vb)
+
+#define TEST_TYPE_NAME_ANY(n, s, ta, tb, ti, va, vb) \
+    f.setTypeName(n, s); \
+    vf.setTypeName(n, s); \
+    QCOMPARE(f.typeName(), QString()); \
+    QCOMPARE(f.typeNameSyntax(), (s)); \
+    QCOMPARE(vf.typeName(), QString()); \
+    QCOMPARE(vf.typeNameSyntax(), (s)); \
     VERIFY_F_VF(ta, tb, ti, va, vb)
 
     TEST_TYPE_NAME("A", Filter::psLiteral, true, false, false, true, false);
@@ -780,6 +789,13 @@ void TypeFilterTest::setTypeName()
     TEST_TYPE_NAME("[ABab]", Filter::psRegExp, true, true, false, true, true);
     TEST_TYPE_NAME("A|B", Filter::psRegExp, true, true, false, true, true);
     TEST_TYPE_NAME("[z].*", Filter::psRegExp, false, false, false, false, false);
+
+    TEST_TYPE_NAME_ANY("", Filter::psAny, true, true, true, true, true);
+    TEST_TYPE_NAME_ANY("a", Filter::psAny, true, true, true, true, true);
+    TEST_TYPE_NAME_ANY("B", Filter::psAny, true, true, true, true, true);
+    TEST_TYPE_NAME_ANY("b", Filter::psAny, true, true, true, true, true);
+    TEST_TYPE_NAME_ANY("int", Filter::psAny, true, true, true, true, true);
+    TEST_TYPE_NAME_ANY(QString(), Filter::psAny, true, true, true, true, true);
 }
 
 
@@ -790,6 +806,13 @@ void TypeFilterTest::setVarName()
 #define TEST_VAR_NAME(n, s, va, vb) \
     vf.setVarName(n, s); \
     QCOMPARE(vf.varName(), QString(n)); \
+    QCOMPARE((int)vf.varNameSyntax(), (int)(s)); \
+    QCOMPARE(vf.matchVar(var_a), (va)); \
+    QCOMPARE(vf.matchVar(var_b), (vb));
+
+#define TEST_VAR_NAME_ANY(n, s, va, vb) \
+    vf.setVarName(n, s); \
+    QCOMPARE(vf.varName(), QString()); \
     QCOMPARE((int)vf.varNameSyntax(), (int)(s)); \
     QCOMPARE(vf.matchVar(var_a), (va)); \
     QCOMPARE(vf.matchVar(var_b), (vb));
@@ -816,6 +839,11 @@ void TypeFilterTest::setVarName()
     TEST_VAR_NAME("^[ab]$", Filter::psRegExp, true, true);
     TEST_VAR_NAME(".", Filter::psRegExp, true, true);
     TEST_VAR_NAME("z", Filter::psRegExp, false, false);
+
+    TEST_VAR_NAME_ANY("", Filter::psAny, true, true);
+    TEST_VAR_NAME_ANY(QString(), Filter::psAny, true, true);
+    TEST_VAR_NAME_ANY("a", Filter::psAny, true, true);
+    TEST_VAR_NAME_ANY("z", Filter::psAny, true, true);
 }
 
 
@@ -886,6 +914,8 @@ void TypeFilterTest::setMembers()
     TEST_SET_MEMBER1("..", Filter::psRegExp, false, true);
     TEST_SET_MEMBER1("?", Filter::psWildcard, true, true);
     TEST_SET_MEMBER1("??", Filter::psWildcard, false, true);
+    TEST_SET_MEMBER1("", Filter::psAny, true, true);
+    TEST_SET_MEMBER1(QString(), Filter::psAny, true, true);
 
     TEST_SET_MEMBER2("?", Filter::psWildcard, "l", Filter::psLiteral, false, true);
     TEST_SET_MEMBER2("??", Filter::psWildcard, "l", Filter::psLiteral, false, false);
@@ -893,6 +923,14 @@ void TypeFilterTest::setMembers()
     TEST_SET_MEMBER2("??", Filter::psWildcard, "p?a", Filter::psRegExp, false, false);
     TEST_SET_MEMBER2("^a?$", Filter::psRegExp, "^.*i$", Filter::psRegExp, false, true);
     TEST_SET_MEMBER2("^$", Filter::psRegExp, "nested_*", Filter::psWildcard, false, true);
+
+    TEST_SET_MEMBER2("", Filter::psAny, "l", Filter::psLiteral, false, true);
+    TEST_SET_MEMBER2("", Filter::psAny, "x?i", Filter::psRegExp, false, true);
+    TEST_SET_MEMBER2("", Filter::psAny, "p?a", Filter::psRegExp, false, true);
+    TEST_SET_MEMBER2("", Filter::psAny, "^.*i$", Filter::psRegExp, false, true);
+    TEST_SET_MEMBER2("", Filter::psAny, "?", Filter::psWildcard, false, true);
+    TEST_SET_MEMBER2("", Filter::psAny, "nested_*", Filter::psWildcard, false, true);
+    TEST_SET_MEMBER2("", Filter::psAny, "", Filter::psAny, false, true);
 }
 
 
