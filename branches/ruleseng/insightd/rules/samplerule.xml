@@ -23,7 +23,7 @@
                 <typename>list_head</typename>
                 <variablename>modules</variablename>
                 <members>
-                    <member match="wildcard">*</member>
+                    <member match="any" />
                 </members>
             </filter>
 <!--            <action src="file" file="samplerule.js">getModules</action>-->
@@ -37,11 +37,10 @@
             </action>
         </rule>
 
-<!--
         <rule>
             <name>module.list</name>
             <description>
-                Field "list" in "struct module" points to further  module
+                Field "list" in "struct module" points to further module
                 objects.
             </description>
             <filter>
@@ -49,19 +48,25 @@
                 <typename>module</typename>
                 <members>
                     <member datatype="struct" typename="list_head">list</member>
-                    <member match="wildcard">*</member>
+                    <member match="any" />
                 </members>
             </filter>
-            <action src="file" file="samplerule.js">getModuleList</action>-->
+            <action src="file" file="samplerule.js">getModuleList</action>
 <!--            <action src="inline">
-                // var inst = instance to check
-                // var members = array of requested member(s)
-                inst = inst.Member(members[0]);
-                inst.ChangeType("module");
-                inst.AddToAddress(inst.MemberOffset("list"));
+                var inst = arguments[0];
+                var members = arguments[1];
+                var typeId = inst.TypeId();
+                inst = inst.Member(members[0]).Member(members[1]);
+                // Compare to head of the list (which is no module)
+                var m = new Instance("modules");
+                if (m.Address() == inst.Address())
+                    return m;
+                // Change type, fix offset
+                inst.ChangeType(typeId);
+                inst.AddToAddress(-inst.MemberOffset(members[0]));
                 return inst;
             </action>-->
-<!--        </rule>-->
+        </rule>
 
 <!--
         <rule>
@@ -93,7 +98,7 @@
                 <typename>task_struct</typename>
                 <members>
                     <member>tasks</member>
-                    <member match="wildcard">*</member>
+                    <member match="any"></member>
                 </members>
             </filter>
             <action src="inline">
@@ -106,7 +111,6 @@
             </action>
         </rule>
 
-
         <rule>
             <name>task_struct.children</name>
             <filter>
@@ -114,7 +118,7 @@
                 <typename>task_struct</typename>
                 <members>
                     <member match="regex">^(tasks|children|sibling)$</member>
-                    <member match="wildcard">*</member>
+                    <member match="any" />
                 </members>
             </filter>
             <action src="inline">
@@ -139,15 +143,15 @@
             <filter>
                 <datatype>struct</datatype>
                 <members>
-                    <member datatype="struct" typename="list_head" match="wildcard">*</member>
-                    <member match="wildcard">*</member>
+                    <member datatype="struct" typename="list_head" match="any" />
+                    <member match="any" />
                 </members>
             </filter>
             <action src="inline">
                 var inst = arguments[0];
                 var members = arguments[1];
                 var typeId = inst.TypeId();
-                println("Called with:", inst.Name(), inst.MemberName(members[0]), inst.MemberName(members[1]));
+                //println("Called list_head generic:", inst.TypeName(), members[0], members[1]);
                 inst = inst.Member(members[0]).Member(members[1]);
                 inst.ChangeType(typeId);
                 inst.AddToAddress(-inst.MemberOffset(members[0]));
