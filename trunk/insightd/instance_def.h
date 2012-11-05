@@ -775,7 +775,7 @@ public:
      * Returns \c true if this instance has a parent set, \c false otherwise.
      * \sa parent()
      */
-    inline bool hasParent() const { return _d.parent != 0; }
+    inline bool hasParent() const { return _d->parent.data() != 0; }
 
     /**
      * Returns the parent instance, if available.
@@ -801,7 +801,7 @@ public:
 private:
     typedef QSet<quint64> VisitedSet;
 
-    inline Instance(const InstanceData& data) : _d(data) {}
+    inline Instance(QSharedDataPointer<InstanceData> data) : _d(data) {}
 
     Instance member(const ConstMemberList& members, int resolveTypes,
                     int maxPtrDeref, KnowledgeSources src = ksAll) const;
@@ -817,7 +817,7 @@ private:
 	bool memberCandidateCompatible(const StructuredMember* m,
 								   int cndtIndex) const;
 
-    InstanceData _d;
+	QSharedDataPointer<InstanceData> _d;
 
     static const TypeRuleEngine* _ruleEngine;
 };
