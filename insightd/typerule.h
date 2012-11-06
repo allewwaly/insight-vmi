@@ -10,6 +10,10 @@ class BaseType;
 class Variable;
 class Instance;
 class ColorPalette;
+class ASTExpression;
+class TypeRuleAction;
+class SymFactory;
+class QScriptProgram;
 
 /**
  * This class represents expert knowledge about the inspected system's type
@@ -21,13 +25,6 @@ class ColorPalette;
 class TypeRule
 {
 public:
-    /// Type of action that is performed when the rule filter hits
-    enum ActionType {
-        atNone,        ///< no action specified
-        atInlineCode,  ///< action() represents a script that is evaluated
-        atFunction     ///< action() is the name of a function in scriptFile() that is invoked
-    };
-
     /**
      * Constructor
      */
@@ -36,7 +33,7 @@ public:
     /**
      * Destructor
      */
-    ~TypeRule();
+    virtual ~TypeRule();
 
     /**
      * Returns the name of this rule.
@@ -91,61 +88,24 @@ public:
     inline void setOsFilter(const OsFilter* filter) { _osFilter = filter; }
 
     /**
-     * Returns the action that is performed when this rule hits. This can either
-     * be the name of a function within scriptFile() that is invoked, or script
-     * code that is evaluated, depending on the value of actionType().
-     * \sa setAction(), actionType(), scriptFile()
+     * Returns the action that is performed when this rule hits.
+     * \sa setAction()
      */
-    inline const QString& action() const { return _action; }
+    inline TypeRuleAction* action() { return _action; }
 
     /**
-     * Sets the action to be performed when the rule hits. How this value is
-     * interpreted depends on the action type.
+     * Returns the action that is performed when this rule hits.
+     * \sa setAction()
+     */
+    inline const TypeRuleAction* action() const { return _action; }
+
+    /**
+     * Sets the action to be performed when the rule hits. The rule takes over
+     * ownership of \a action and deletes it when it is itself destroyed.
      * @param action new action
-     * \sa action(), actionType(), scriptFile()
+     * \sa action()
      */
-    inline void setAction(const QString& action) { _action = action; }
-
-    /**
-     * Returns the specified type of action that is performed when the rule
-     * hits.
-     * \sa action(), scriptFile()
-     */
-    inline ActionType actionType() const { return _actionType; }
-
-    /**
-     * Sets a new action type.
-     * @param type type of action to be performed when this rule hits
-     * \sa actionType(), action(), scriptFile()
-     */
-    inline void setActionType(ActionType type) { _actionType = type; }
-
-    /**
-     * Returns the script file containing the function to be invoked if this
-     * rule hits. The script file is only read if actionType() is set to
-     * atFunction, otherwise this value is ignored.
-     * @return script file name
-     * \sa setScriptFile(), actionType(), action()
-     */
-    inline const QString& scriptFile() const { return _scriptFile; }
-
-    /**
-     * Sets the script file name containing the action code.
-     * @param file file name
-     * \sa scriptFile(), actionType(), action()
-     */
-    inline void setScriptFile(const QString& file) { _scriptFile = file; }
-
-    /**
-     * Returns the script include paths for this rule.
-     */
-    inline const QStringList& includePaths() const { return _includePaths; }
-
-    /**
-     * Sets the script include paths for this rule.
-     * @param paths list of include paths
-     */
-    inline void setIncludePaths(const QStringList& paths) { _includePaths = paths; }
+    void setAction(TypeRuleAction* action);
 
     /**
      * Returns the file index this rule was read from.
@@ -170,20 +130,6 @@ public:
      * @param line line number
      */
     inline void setSrcLine(int line) { _srcLine = line; }
-
-    /**
-     * Returns the line number of the action element within the file this rule
-     * was read from.
-     * @return line number
-     */
-    inline int actionSrcLine() const { return _actionSrcLine; }
-
-    /**
-     * Sets the line number of the action element within the file this rule was
-     * read from.
-     * @param line line number
-     */
-    inline void setActionSrcLine(int line) { _actionSrcLine = line; }
 
     /**
      * Matches the given type and OS specifications against this rule.
@@ -214,20 +160,343 @@ public:
      * @param col color palette to use for colorizing the output
      * @return
      */
-    QString toString(const ColorPalette *col = 0) const;
+    virtual QString toString(const ColorPalette *col = 0) const;
 
 private:
     QString _name;
     QString _description;
     const InstanceFilter *_filter;
     const OsFilter *_osFilter;
-    ActionType _actionType;
-    QString _action;
-    QString _scriptFile;
-    QStringList _includePaths;
+    TypeRuleAction *_action;
     int _srcFileIndex;
     int _srcLine;
-    int _actionSrcLine;
+};
+
+
+/**
+ * This abstract class represents an action that is performed when a TypeRule
+ * hits.
+ */
+class TypeRuleAction
+{
+public:
+    /// Type of action that is performed when the rule filter hits
+    enum ActionType {
+        atNone,        ///< no action specified
+        atExpression,  ///< action() represents a C expression
+        atInlineCode,  ///< action() represents a script that is evaluated
+        atFunction     ///< action() is the name of a function in scriptFile() that is invoked
+    };
+
+    /**
+     * Constructor
+     */
+    TypeRuleAction() : _srcLine(0) {}
+
+    /**
+     * Destructor
+     */
+    virtual ~TypeRuleAction() {}
+
+    /**
+     * Returns the line number of the action element within the file this rule
+     * was read from.
+     * @return line number
+     */
+    inline int srcLine() const { return _srcLine; }
+
+    /**
+     * Sets the line number of the action element within the file this rule was
+     * read from.
+     * @param line line number
+     */
+    inline void setSrcLine(int line) { _srcLine = line; }
+
+    /**
+     * Returns the specified type of action that is performed when the rule
+     * hits.
+     * \sa ActionType
+     */
+    virtual ActionType actionType() const = 0;
+
+    /**
+     * Performs sanity checks for this action, e.g., if all required information
+     * is available and sane.
+     * @param xmlFile the file name this action was read from
+     * @param factory the symbol factory this action should work for
+     * @return \c true if action is sane, \c false otherwise
+     */
+    virtual bool check(const QString& xmlFile, SymFactory *factory) = 0;
+
+    /**
+     * Returns a textual representation of this action.
+     * @param col color palette to use for colorizing the output
+     * @return human readable representation
+     */
+    virtual QString toString(const ColorPalette *col = 0) const = 0;
+
+private:
+    int _srcLine;
+};
+
+
+/**
+ * This is a generic TypeRuleAction for executing script code.
+ */
+class ScriptAction: public TypeRuleAction
+{
+public:
+    /**
+     * Constructor
+     */
+    ScriptAction() : _program(0) {}
+
+    /**
+     * Destructor
+     */
+    ~ScriptAction();
+
+    /**
+     * Returns the script include paths for this action.
+     */
+    inline const QStringList& includePaths() const { return _includePaths; }
+
+    /**
+     * Sets the script include paths for this action.
+     * @param paths list of include paths
+     */
+    inline void setIncludePaths(const QStringList& paths) { _includePaths = paths; }
+
+    /**
+     * Returns the compiled script program, ready to run. Requires that the
+     * check() function was executed before.
+     * @return script program
+     */
+    const QScriptProgram* program() const { return _program; }
+
+protected:
+    QScriptProgram* _program;
+
+private:
+    QStringList _includePaths;
+};
+
+
+/**
+ * This TypeRuleAction calls a function within a script file.
+ */
+class FuncCallScriptAction: public ScriptAction
+{
+public:
+    /**
+     * Returns the script file containing the function to be invoked if this
+     * action is triggered.
+     * @return script file name
+     * \sa setScriptFile()
+     */
+    inline const QString& scriptFile() const { return _scriptFile; }
+
+    /**
+     * Sets the script file name containing the action code.
+     * @param file file name
+     * \sa scriptFile(), actionType(), action()
+     */
+    inline void setScriptFile(const QString& file) { _scriptFile = file; }
+
+    /**
+     * Returns the name of the function to be called.
+     */
+    inline const QString& function() const { return _function; }
+
+    /**
+     * Sets the name of the function to be called. The function must be defined
+     * in scriptFile().
+     * @param func function name
+     */
+    inline void setFunction(const QString& func) { _function = func; }
+
+    /**
+     * \copydoc TypeRuleAction::actionType()
+     * @return TypeRuleAction::atFunction
+     */
+    ActionType actionType() const { return atFunction; }
+
+    /**
+     * \copydoc TypeRuleAction::check()
+     */
+    bool check(const QString& xmlFile, SymFactory *factory);
+
+    /**
+     * \copydoc TypeRuleAction::toString()
+     */
+    QString toString(const ColorPalette *col = 0) const;
+
+private:
+    QString _scriptFile;
+    QString _function;
+};
+
+
+/**
+ * This TypeRuleAction executes a script program.
+ */
+class ProgramScriptAction: public ScriptAction
+{
+public:
+    /**
+     * Returns the code of the program to be executed.
+     */
+    inline const QString& sourceCode() const { return _srcCode; }
+
+    /**
+     * Sets the code of the program to be executed.
+     * @param prog program code
+     */
+    inline void setSourceCode(const QString& code) { _srcCode = code; }
+
+    /**
+     * \copydoc TypeRuleAction::actionType()
+     * @return TypeRuleAction::atFunction
+     */
+    ActionType actionType() const { return atInlineCode; }
+
+    /**
+     * \copydoc TypeRuleAction::check()
+     */
+    bool check(const QString& xmlFile, SymFactory *factory);
+
+    /**
+     * \copydoc TypeRuleAction::toString()
+     */
+    QString toString(const ColorPalette *col = 0) const;
+
+private:
+    QString _srcCode;
+};
+
+
+/**
+ * This TypeRuleAction evaluates an ASTExpression.
+ */
+class ExpressionAction: public TypeRuleAction
+{
+public:
+    /**
+     * Constructor
+     */
+    ExpressionAction() : _expr(0), _srcType(0), _targetType(0) {}
+
+    /**
+     * Destructor
+     */
+    ~ExpressionAction();
+
+    /**
+     * Returns the source type of the expression, as a string.
+     * @return source type
+     */
+    inline const QString& sourceTypeStr() const { return _srcTypeStr; }
+
+    /**
+     * Sets the source type of the expression, as a string.
+     * @param src source type
+     */
+    inline void setSourceTypeStr(const QString& src) { _srcTypeStr = src; }
+
+    /**
+     * Returns the target type of the expression, as a string.
+     * @return target type
+     */
+    inline const QString& targetTypeStr() const { return _targetTypeStr; }
+
+    /**
+     * Sets the target type of the expression, as a string.
+     * @param target target type
+     */
+    inline void setTargetTypeStr(const QString& target) { _targetTypeStr = target; }
+
+    /**
+     * Returns the expression, as a string.
+     * @return expression
+     */
+    inline const QString& expressionStr() const { return _exprStr; }
+
+    /**
+     * Sets the expression, as a string.
+     * @param expr expression
+     */
+    inline void setExpressionStr(const QString& expr) { _exprStr = expr; }
+
+    /**
+     * Returns the expression to be evaluated.
+     * @return expression
+     */
+    inline const ASTExpression* expression() const { return _expr; }
+
+    /**
+     * Sets the expression to be evaluated. This rule will take ownership of the
+     * expression and delete it when it is itself destroyed.
+     * @param expr expression to be evaluated
+     */
+    inline void setExpression(ASTExpression* expr) { _expr = expr; }
+
+    /**
+     * Returns the source BaseType of this expression. This type corresponds to
+     * sourceTypeStr().
+     * @return source BaseType
+     */
+    inline const BaseType* sourceType() const { return _srcType; }
+
+    /**
+     * Sets the source BaseType of this expression. This type must corresponds
+     * to sourceTypeStr().
+     * @param src source BaseType
+     */
+    inline void setSourceType(const BaseType* src) { _srcType = src; }
+
+    /**
+     * Returns the target BaseType of this expression. This type corresponds to
+     * targetTypeStr().
+     * @return target BaseType
+     */
+    inline const BaseType* targetType() const { return _targetType; }
+
+    /**
+     * Sets the target BaseType of this expression. This type must corresponds
+     * to targetTypeStr().
+     * @param target target BaseType
+     */
+    inline void setTargetType(const BaseType* target) { _targetType = target; }
+
+    /**
+     * \copydoc TypeRuleAction::check()
+     */
+    bool check(const QString& xmlFile, SymFactory *factory);
+
+    /**
+     * \copydoc TypeRuleAction::actionType()
+     * @return TypeRuleAction::atExpression
+     */
+    ActionType actionType() const { return atExpression; }
+
+    /**
+     * \copydoc TypeRuleAction::toString()
+     */
+    QString toString(const ColorPalette *col = 0) const;
+
+private:
+    const BaseType* typeOfExpression(const QString &xmlFile, SymFactory *factory, const QString &what, const QString &shortCode,
+                                     const QByteArray& code, QString& id);
+
+    bool checkExprComplexity(const QString &xmlFile, const QString &what, const QString &expr) const;
+
+    QString _srcTypeStr;
+    QString _targetTypeStr;
+    QString _exprStr;
+    ASTExpression* _expr;
+    const BaseType* _srcType;
+    const BaseType* _targetType;
+    QList<ASTExpression*> _exprList;
 };
 
 #endif // TYPERULE_H

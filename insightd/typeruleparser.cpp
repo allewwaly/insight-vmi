@@ -36,9 +36,25 @@ const char* description = "description";
 const char* filter = "filter";
 const char* members = "members";
 const char* action = "action";
-const char* src = "src";
+const char* type = "type";
 const char* file = "file";
 const char* inlineCode = "inline";
+const char* srcType = "sourcetype";
+const char* targetType = "targettype";
+const char* expression = "expression";
+}
+
+
+TypeRuleAction::ActionType strToActionType(const QString& action)
+{
+    if (action == xml::expression)
+        return TypeRuleAction::atExpression;
+    else if (action == xml::file)
+        return TypeRuleAction::atFunction;
+    else if (action == xml::inlineCode)
+        return TypeRuleAction::atInlineCode;
+    else
+        return TypeRuleAction::atNone;
 }
 
 
@@ -217,9 +233,42 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
     // <filter>
     else if (name == xml::filter)
         _filter = new InstanceFilter();
+    // <action>
     else if (name == xml::action) {
         errorIfNull(_rule);
-        _rule->setActionSrcLine(_locator ? _locator->lineNumber() : -1);
+        TypeRuleAction::ActionType type = strToActionType(attributes[xml::type]);
+        TypeRuleAction* action = 0;
+
+        switch (type) {
+        case TypeRuleAction::atExpression:
+            action = new ExpressionAction();
+            break;
+
+        case TypeRuleAction::atFunction:
+            if (!attributes.contains(xml::file)) {
+                typeRuleErrorLoc(QString("Action type \"%1\" in attribute \"%2\" "
+                                      "requires the file name to be specified "
+                                      "in the additional attribute \"%3\" in "
+                                      "element \"%4\".")
+                                .arg(attributes[xml::type])
+                                .arg(xml::type)
+                                .arg(xml::file)
+                                .arg(name));
+            }
+            action = new FuncCallScriptAction();
+            break;
+
+        case TypeRuleAction::atInlineCode:
+            action = new ProgramScriptAction();
+            break;
+
+        default:
+            typeRuleErrorLoc(QString("Unknown action type: %1")
+                          .arg(attributes[xml::type]));
+        }
+
+        action->setSrcLine(_locator ? _locator->lineNumber() : 0);
+        _rule->setAction(action);
     }
 
     // Clear old data
@@ -232,17 +281,6 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
     _children.push(QSet<QString>());
 
     return true;
-}
-
-
-TypeRule::ActionType strToActionType(const QString& action)
-{
-    if (action == xml::file)
-        return TypeRule::atFunction;
-    else if (action == xml::inlineCode)
-        return TypeRule::atInlineCode;
-    else
-        return TypeRule::atNone;
 }
 
 
@@ -295,38 +333,74 @@ bool TypeRuleParser::endElement(const QString &namespaceURI,
     // <action>
     else if (name == xml::action) {
         errorIfNull(_rule);
-        QString src = _attributes.top().value(xml::src);
-        TypeRule::ActionType type = strToActionType(src);
-        _rule->setActionType(type);
-        _rule->setAction(type == TypeRule::atInlineCode ? _cdata : _cdata.trimmed());
+        errorIfNull(_rule->action());
 
-        switch (type) {
-        case TypeRule::atInlineCode:
-            // No more action required
+        switch (_rule->action()->actionType()) {
+        case TypeRuleAction::atInlineCode: {
+            ProgramScriptAction* action =
+                    dynamic_cast<ProgramScriptAction*>(_rule->action());
+            action->setSourceCode(_cdata);
             break;
-        case TypeRule::atFunction: {
-            if (!_attributes.top().contains(xml::file))
-                typeRuleErrorLoc(QString("Source type \"%1\" in attribute \"%2\" "
-                                      "requires the file name to be specified "
-                                      "in the additional attribute \"%3\" in "
-                                      "element \"%4\".")
-                              .arg(src).arg(xml::src).arg(xml::file).arg(name));
-
+        }
+        case TypeRuleAction::atFunction: {
             QString value = _attributes.top().value(xml::file);
             QString file = _reader->absoluteScriptFilePath(value);
-
             if (file.isEmpty())
                 typeRuleErrorLoc(QString("Unable to locate script file \"%1\".")
                          .arg(value));
-            _rule->setScriptFile(file);
 
+            FuncCallScriptAction* action =
+                    dynamic_cast<FuncCallScriptAction*>(_rule->action());
+            action->setFunction(_cdata.trimmed());
+            action->setScriptFile(file);
+            break;
+        }
+        case TypeRuleAction::atExpression: {
+            if (_children.isEmpty() ||
+                !_children.top().contains(xml::srcType) ||
+                !_children.top().contains(xml::targetType) ||
+                !_children.top().contains(xml::expression))
+            {
+                typeRuleErrorLoc(QString("Action type \"%1\" in element \"%2\" "
+                                         "requires the following child "
+                                         "elements: %3, %4, %5")
+                                 .arg(xml::expression)
+                                 .arg(name)
+                                 .arg(xml::srcType)
+                                 .arg(xml::targetType)
+                                 .arg(xml::expression));
             }
             break;
-        default:
-            typeRuleErrorLoc(QString("Source type \"%1\" unknown for attribute "
-                                  "\"%2\" in element \"%3\".")
-                          .arg(src).arg(xml::src).arg(name));
         }
+        default:
+            typeRuleErrorLoc(QString("Action type \"%1\" unknown for attribute "
+                                  "\"%2\" in element \"%3\".")
+                             .arg(_attributes.top().value(xml::type))
+                             .arg(xml::type)
+                             .arg(name));
+        }
+    }
+    // <sourcetype>
+    // <targettype>
+    // <expression>
+    else if (name == xml::srcType || name == xml::targetType ||
+             name == xml::expression)
+    {
+        errorIfNull(_rule);
+
+        ExpressionAction* action = dynamic_cast<ExpressionAction*>(_rule->action());
+        if (!action)
+            typeRuleErrorLoc(QString("Element \"%1\" only valid for action "
+                                     "type \"%2\".")
+                             .arg(name)
+                             .arg(xml::expression));
+
+        if (name == xml::srcType)
+            action->setSourceTypeStr(_cdata.trimmed());
+        else if (name == xml::targetType)
+            action->setTargetTypeStr(_cdata.trimmed());
+        else
+            action->setExpressionStr(_cdata.trimmed());
     }
     // <filter>
     else if (name == xml::filter) {
@@ -429,8 +503,19 @@ const XmlSchema &TypeRuleParser::schema()
         ruleSchema.addElement(xml::description, empty, empty, empty, false);
 
         // <action>
-        ruleSchema.addElement(xml::action, empty, QStringList(xml::file),
-                              QStringList(xml::src), false);
+        ruleSchema.addElement(xml::action,
+                              QStringList() << xml::srcType << xml::targetType
+                              << xml::expression, QStringList(xml::file),
+                              QStringList(xml::type), false);
+
+        // <sourcetype>
+        ruleSchema.addElement(xml::srcType);
+
+        // <targettype>
+        ruleSchema.addElement(xml::targetType);
+
+        // <expression>
+        ruleSchema.addElement(xml::expression);
 
         // <filter>
         children = VariableFilter::supportedFilters().keys();

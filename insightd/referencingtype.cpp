@@ -401,7 +401,7 @@ Instance ReferencingType::AltRefType::toInstance(
 {
     // Evaluate pointer arithmetic for new address
     ExpressionResult result = _expr->result(inst);
-    if (result.resultType & (erUndefined|erRuntime))
+    if (!result.isValid())
         return Instance(Instance::orCandidate);
 
     quint64 newAddr = result.uvalue(esUInt64);

@@ -26,15 +26,21 @@
                     <member match="any" />
                 </members>
             </filter>
-<!--            <action src="file" file="samplerule.js">getModules</action>-->
-            <action src="inline">
+            <action type="expression">
+                <sourcetype>struct list_head* src</sourcetype>
+                <targettype>struct module*</targettype>
+                <expression>src->next - 4</expression>
+            </action>
+
+<!--            <action type="file" file="samplerule.js">getModules</action>-->
+<!--            <action type="inline">
                 var inst = arguments[0];
                 var members = arguments[1];
                 inst = inst.Member(members[0]);
                 inst.ChangeType("module");
                 inst.AddToAddress(-inst.MemberOffset("list"));
                 return inst;
-            </action>
+            </action>-->
         </rule>
 
         <rule>
@@ -51,8 +57,8 @@
                     <member match="any" />
                 </members>
             </filter>
-            <action src="file" file="samplerule.js">getModuleList</action>
-<!--            <action src="inline">
+            <action type="file" file="samplerule.js">getModuleList</action>
+<!--            <action type="inline">
                 var inst = arguments[0];
                 var members = arguments[1];
                 var typeId = inst.TypeId();
@@ -78,7 +84,7 @@
                     <member>pages</member>
                 </members>
             </filter>
-            <action src="inline">
+            <action type="inline">
                 println("Hier");
                 var inst = arguments[0];
                 var members = arguments[1];
@@ -101,7 +107,7 @@
                     <member match="any"></member>
                 </members>
             </filter>
-            <action src="inline">
+            <action type="inline">
                 var inst = arguments[0];
                 println("1", inst.comm + ":", inst.MemberName(arguments[1][0]));
                 inst = inst.Member(arguments[1][0]).Member(arguments[1][1]);
@@ -121,7 +127,7 @@
                     <member match="any" />
                 </members>
             </filter>
-            <action src="inline">
+            <action type="inline">
                 var inst = arguments[0];
                 var typeId = inst.TypeId();
                 // println(inst.comm + ":", inst.MemberName(arguments[1][0]));
@@ -147,7 +153,7 @@
                     <member match="any" />
                 </members>
             </filter>
-            <action src="inline">
+            <action type="inline">
                 var inst = arguments[0];
                 var members = arguments[1];
                 var typeId = inst.TypeId();

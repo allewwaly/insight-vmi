@@ -12,6 +12,13 @@ class InstanceFilter;
 class OsFilter;
 class TypeRuleReader;
 
+namespace xml
+{
+extern const char* srcType;
+extern const char* targetType;
+extern const char* expression;
+}
+
 /**
  * This class parses the type rules from an XML file.
  */

@@ -1,13 +1,33 @@
 #include "typerule.h"
 #include "typefilter.h"
+#include "typeruleparser.h"
 #include "osfilter.h"
 #include "shellutil.h"
+#include "basetype.h"
+#include "scriptengine.h"
+#include "ioexception.h"
+#include "filenotfoundexception.h"
+#include "typeruleengine.h"
+#include "typeruleexception.h"
+#include "astexpression.h"
+#include "astexpressionevaluator.h"
+#include "symfactory.h"
+#include "memspecs.h"
+#include <abstractsyntaxtree.h>
+#include <astbuilder.h>
+#include <astscopemanager.h>
+#include <asttypeevaluator.h>
+#include <astnodefinder.h>
 #include <QDir>
+#include <QScriptProgram>
 
+//------------------------------------------------------------------------------
+// TypeRule
+//------------------------------------------------------------------------------
 
 TypeRule::TypeRule()
-    : _filter(0), _osFilter(0), _actionType(atNone), _srcFileIndex(-1),
-      _srcLine(0), _actionSrcLine(0)
+    : _filter(0), _osFilter(0), _action(0), _srcFileIndex(-1), _srcLine(0)
+
 {
 }
 
@@ -16,6 +36,8 @@ TypeRule::~TypeRule()
 {
     if (_filter)
         delete _filter;
+    if (_action)
+        delete _action;
     // We don't create _osFilter, so don't delete it
 }
 
@@ -25,6 +47,14 @@ void TypeRule::setFilter(const InstanceFilter *filter)
     if (_filter)
         delete _filter;
     _filter = filter;
+}
+
+
+void TypeRule::setAction(TypeRuleAction *action)
+{
+    if (_action)
+        delete _action;
+    _action = action;
 }
 
 
@@ -85,23 +115,350 @@ QString TypeRule::toString(const ColorPalette *col) const
         s += ShellUtil::colorize("Type filter:", ctColHead, col);
         s +=  indent + f + "\n";
     }
-    if (!_action.isEmpty()) {
-        if (_actionType == atFunction) {
-            s += ShellUtil::colorize("Action:", ctColHead, col);
-            // Take absolute or relative file name, which ever is shorter
-            QString file = QDir::current().relativeFilePath(_scriptFile);
-            if (file.size() > _scriptFile.size())
-                file = _scriptFile;
+    if (_action) {
+        QString a(_action->toString(col).trimmed());
+        a.replace("\n", indent);
+        s += ShellUtil::colorize("Action:", ctColHead, col);
+        s += indent + a + "\n";
+    }
+    return s;
+}
 
-            s += " call " + ShellUtil::colorize(_action + "()", ctBold, col) +
-                    " in file " + ShellUtil::colorize(file, ctBold, col) + "\n";
+
+//------------------------------------------------------------------------------
+// ScriptAction
+//------------------------------------------------------------------------------
+
+ScriptAction::~ScriptAction()
+{
+    if (_program)
+        delete _program;
+}
+
+
+//------------------------------------------------------------------------------
+// FuncCallScriptAction
+//------------------------------------------------------------------------------
+
+bool FuncCallScriptAction::check(const QString &xmlFile, SymFactory *factory)
+{
+    Q_UNUSED(factory);
+
+    // Delete old program
+    if (_program) {
+        delete _program;
+        _program = 0;
+    }
+
+    // Read the contents of the script file
+    QFile scriptFile(_scriptFile);
+    if (!scriptFile.open(QFile::ReadOnly))
+        ioError(QString("Error opening file \"%1\" for reading.")
+                    .arg(_scriptFile));
+    _program = new QScriptProgram(scriptFile.readAll(), _scriptFile);
+
+    // Basic syntax check
+    QScriptSyntaxCheckResult result =
+            QScriptEngine::checkSyntax(_program->sourceCode());
+    if (result.state() != QScriptSyntaxCheckResult::Valid) {
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("Syntax error in file %1 line %2 column %3: %4")
+                               .arg(ShellUtil::shortFileName(_scriptFile))
+                               .arg(result.errorLineNumber())
+                               .arg(result.errorColumnNumber())
+                               .arg(result.errorMessage()));
+    }
+    // Check if the function exists
+    ScriptEngine eng;
+    ScriptEngine::FuncExistsResult ret =
+            eng.functionExists(_function, *_program);
+    if (ret == ScriptEngine::feRuntimeError) {
+        QString err;
+        if (eng.hasUncaughtException()) {
+            err = QString("Uncaught exception at line %0: %1")
+                    .arg(eng.uncaughtExceptionLineNumber())
+                    .arg(eng.lastError());
+            QStringList bt = eng.uncaughtExceptionBacktrace();
+            for (int i = 0; i < bt.size(); ++i)
+                err += "\n    " + bt[i];
         }
-        else {
-            QString a(_action);
-            a.replace("\n", indent);
-            s += ShellUtil::colorize("Action (inline):", ctColHead, col);
-            s += indent + a;
+        else
+            err = eng.lastError();
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("Runtime error in file %1: %2")
+                               .arg(ShellUtil::shortFileName(_scriptFile))
+                               .arg(err));
+    }
+    else if (ret == ScriptEngine::feDoesNotExist) {
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("Function \"%1\" is not defined in file \"%2\".")
+                               .arg(_function)
+                               .arg(ShellUtil::shortFileName(_scriptFile)));
+    }
+
+    return true;
+}
+
+
+QString FuncCallScriptAction::toString(const ColorPalette *col) const
+{
+    QString file = ShellUtil::shortFileName(_scriptFile);
+
+    return QString("Call %1() in file %2")
+            .arg(ShellUtil::colorize(_function, ctBold, col))
+            .arg(ShellUtil::colorize(file, ctBold, col));
+}
+
+
+//------------------------------------------------------------------------------
+// ProgramScriptAction
+//------------------------------------------------------------------------------
+
+bool ProgramScriptAction::check(const QString &xmlFile, SymFactory *factory)
+{
+    Q_UNUSED(factory);
+
+    // Delete old program
+    if (_program) {
+        delete _program;
+        _program = 0;
+    }
+
+    QScriptSyntaxCheckResult result =
+            QScriptEngine::checkSyntax(_srcCode);
+    if (result.state() != QScriptSyntaxCheckResult::Valid) {
+        typeRuleError2(xmlFile,
+                       srcLine() + result.errorLineNumber() - 1,
+                       result.errorColumnNumber(),
+                       QString("Syntax error: %1")
+                            .arg(result.errorMessage()));
+    }
+    else {
+        // Wrap the code into a function so that the return statement
+        // is available to the code
+        QString code = QString("function %1() {\n%2\n}")
+                .arg(js::inlinefunc).arg(_srcCode);
+        _program = new QScriptProgram(code, xmlFile, srcLine() - 1);
+    }
+
+    return true;
+}
+
+
+QString ProgramScriptAction::toString(const ColorPalette *col) const
+{
+    Q_UNUSED(col);
+
+    QStringList prog(_srcCode.split(QChar('\n')));
+    // Remove empty lines at beginning and end
+    while (!prog.isEmpty() && prog.first().trimmed().isEmpty())
+        prog.pop_front();
+    while (!prog.isEmpty() && prog.last().trimmed().isEmpty())
+        prog.pop_back();
+    if (prog.isEmpty())
+        return QString();
+
+    // Find indent in first line and remove it for all lines
+    QString first(prog.first());
+    int cnt = 0;
+    const int tabWidth = 4;
+    for (int i = 0; i < first.size(); ++i) {
+        if (first[i] == QChar(' '))
+            ++cnt;
+        else if (first[i] == QChar('\t'))
+            cnt += tabWidth;
+        else break;
+    }
+    for (int i = 0; i < prog.size(); ++i) {
+        int c = 0, pos = 0;
+        while (c < cnt && pos < prog[i].size()) {
+            if (prog[i][pos] == QChar(' '))
+                ++c;
+            else if (prog[i][pos] == QChar('\t'))
+                c += tabWidth;
+            else break;
+            ++pos;
+        }
+        if (pos > 0)
+            prog[i] = prog[i].mid(pos);
+    }
+
+    return prog.join("\n");
+}
+
+
+//------------------------------------------------------------------------------
+// ExpressionAction
+//------------------------------------------------------------------------------
+
+
+ExpressionAction::~ExpressionAction()
+{
+    for (int i = 0; i < _exprList.size(); ++i)
+        delete _exprList[i];
+    _exprList.clear();
+}
+
+
+const BaseType* ExpressionAction::typeOfExpression(
+        const QString &xmlFile, SymFactory *factory, const QString& what,
+        const QString& shortCode, const QByteArray& code, QString& id)
+{
+    AbstractSyntaxTree ast;
+    ASTBuilder builder(&ast);
+
+    // Parse the code
+    if (builder.buildFrom(code) != 0)
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("Syntax error in %0: %1")
+                            .arg(what)
+                            .arg(shortCode));
+
+    // Does the declaration have an identifier?
+    QList<const ASTNode*> dd_nodes =
+            ASTNodeFinder::find(nt_direct_declarator, &ast);
+    id.clear();
+    foreach (const ASTNode* n, dd_nodes) {
+        if (n->u.direct_declarator.identifier) {
+            id = ast.antlrTokenToStr(n->u.direct_declarator.identifier);
+            break;
         }
     }
+
+    ASTTypeEvaluator t_eval(&ast, factory->memSpecs().sizeofLong,
+                           factory->memSpecs().sizeofPointer);
+
+    // Evaluate type of first (hopefully only) init_declarator
+    QList<const ASTNode*> initDecls =
+            ASTNodeFinder::find(nt_init_declarator, &ast);
+
+    ASTType* astType = 0;
+    if (!initDecls.isEmpty())
+        astType = t_eval.typeofNode(initDecls.first());
+    if (!astType)
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("Error parsing expression: %1")
+                            .arg(QString(code)));
+
+    // Search correspondig BaseType
+    FoundBaseTypes found =
+            factory->findBaseTypesForAstType(astType, &t_eval, false);
+    if (found.types.isEmpty())
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("Cannot find %1: %2")
+                            .arg(what)
+                            .arg(QString(code)));
+    else if (found.types.size() > 1)
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("The %1 is ambiguous, %2 types found for: %3")
+                            .arg(what)
+                            .arg(found.types.size())
+                            .arg(shortCode));
+    else
+        return found.types.first();
+
+    return 0;
+}
+
+
+bool ExpressionAction::checkExprComplexity(const QString& xmlFile,
+                                           const QString &what,
+                                           const QString &expr) const
+{
+    static const QString illegal("{};\"?");
+    QRegExp rx("[" + QRegExp::escape(illegal) + "]") ;
+    if (expr.contains(rx))
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("The %1 contains one of the following "
+                               "unsupported characters: %2")
+                            .arg(what)
+                            .arg(illegal));
+    return true;
+}
+
+
+bool ExpressionAction::check(const QString &xmlFile, SymFactory *factory)
+{
+    for (int i = 0; i < _exprList.size(); ++i)
+        delete _exprList[i];
+    _exprList.clear();
+    _srcType = 0;
+    _targetType = 0;
+    _expr = 0;
+
+    checkExprComplexity(xmlFile, _srcTypeStr, "source type");
+    checkExprComplexity(xmlFile, _targetTypeStr, "target type");
+    checkExprComplexity(xmlFile, _exprStr, "expression");
+
+    QString dstId("__dest__"), srcId;
+    QByteArray code;
+
+    // Check target type
+    code = _targetTypeStr.toAscii() + " " + dstId.toAscii() + ";";
+    _targetType = typeOfExpression(xmlFile, factory, "target type",
+                                   _targetTypeStr, code, dstId);
+
+    // Check source type
+    code = _srcTypeStr.toAscii() + ";";
+    _srcType = typeOfExpression(xmlFile, factory, "source type",
+                                _srcTypeStr, code, srcId);
+
+    // Is the srcId valid?
+    if (srcId.isEmpty())
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("The source type does not specify an identifier:"
+                               " %1")
+                            .arg(_srcTypeStr));
+
+    // Make sure the expression contains the srcId
+    if (!_exprStr.contains(QRegExp("\\b" + srcId + "\\b")))
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("The expression does not use identifier \"%1\" "
+                               "which was defined in the source type.")
+                            .arg(srcId));
+
+    // Check complete expression
+    AbstractSyntaxTree ast;
+    ASTBuilder builder(&ast);
+    code += " int " + dstId.toAscii() + " = " + _exprStr + ";";
+    if (builder.buildFrom(code) != 0)
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("Syntax error in expression: %1")
+                            .arg(_exprStr));
+
+    // We should finde exatcely one initializer
+    QList<const ASTNode*> init_nodes =
+            ASTNodeFinder::find(nt_initializer, &ast);
+    if (init_nodes.isEmpty())
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("Error parsing expression: %1")
+                            .arg(QString(code)));
+
+    // Try to evaluate expression
+    ASTTypeEvaluator t_eval(&ast, factory->memSpecs().sizeofLong,
+                            factory->memSpecs().sizeofPointer);
+    ASTExpressionEvaluator e_eval(&t_eval, factory);
+    ASTNodeNodeHash ptsTo;
+    _expr = e_eval.exprOfNode(init_nodes.first(), ptsTo);
+    if (_expr)
+        // Expression belongs to the evaluator, we need to clone it
+        _expr = _expr->clone(_exprList);
+    else
+        typeRuleError2(xmlFile, srcLine(), -1,
+                       QString("Error evaluating expression: %1")
+                            .arg(QString(_exprStr)));
+    return true;
+}
+
+
+QString ExpressionAction::toString(const ColorPalette *col) const
+{
+    QString s;
+    s += ShellUtil::colorize("Source type:", ctColHead, col) + " ";
+    s += (_srcType && col) ? col->prettyNameInColor(_srcType, 0) : _srcTypeStr;
+    s += "\n" + ShellUtil::colorize("Target type:", ctColHead, col) + " ";
+    s += (_targetType && col) ? col->prettyNameInColor(_targetType, 0) : _targetTypeStr;
+    s += "\n" + ShellUtil::colorize("Expression:", ctColHead, col) + "  ";
+    s += _expr ? _expr->toString() : _exprStr;
     return s;
 }
