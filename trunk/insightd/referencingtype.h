@@ -22,6 +22,11 @@ public:
     class AltRefType
     {
     public:
+        /**
+         * Constructor
+         * @param id the ID of the target BaseType
+         * @param expr the ASTExpression to compute the target type's address
+         */
         explicit AltRefType(int id = -1, const ASTExpression* expr = 0);
 
         /**

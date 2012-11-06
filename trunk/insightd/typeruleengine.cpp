@@ -85,7 +85,7 @@ bool TypeRuleEngine::fileAlreadyRead(const QString &fileName)
 }
 
 
-void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
+void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
 {
     _hits.fill(0, _rules.size());
     _activeRules.clear();
@@ -98,7 +98,7 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
     // _activeRules hash are processes first to last. That way, if multiple
     // rules match the same instance, the first rule takes precedence.
     for (int i = _rules.size() - 1; i >= 0; --i) {
-        const TypeRule* rule = _rules[i];
+        TypeRule* rule = _rules[i];
 
         // Check for OS filters first
         if (rule->osFilter() && !rule->osFilter()->match(specs))
@@ -110,88 +110,8 @@ void TypeRuleEngine::checkRules(const SymFactory *factory, const OsSpecs* specs)
             continue;
         }
 
-        QString xmlFile(ruleFile(rule));
+        rule->action()->check(ruleFile(rule), factory);
         QScriptProgramPtr prog;
-
-        // Check script syntax
-        if (rule->actionType() == TypeRule::atInlineCode) {
-            QScriptSyntaxCheckResult result =
-                    QScriptEngine::checkSyntax(rule->action());
-            if (result.state() != QScriptSyntaxCheckResult::Valid) {
-                typeRuleError2(xmlFile,
-                               rule->actionSrcLine() + result.errorLineNumber() - 1,
-                               result.errorColumnNumber(),
-                               QString("Syntax error: %1")
-                                    .arg(result.errorMessage()));
-            }
-            else {
-                // Wrap the code into a function so that the return statement
-                // is available to the code
-                QString code = QString("function %1() {\n%2\n}")
-                        .arg(js::inlinefunc).arg(rule->action());
-                prog = QScriptProgramPtr(
-                            new QScriptProgram(code, xmlFile,
-                                               rule->actionSrcLine() - 1));
-            }
-        }
-        else if (rule->actionType() == TypeRule::atFunction) {
-            // Read the contents of the script file
-            QFile scriptFile(rule->scriptFile());
-            if (!scriptFile.open(QFile::ReadOnly))
-                ioError(QString("Error opening file \"%1\" for reading.")
-                            .arg(rule->scriptFile()));
-            prog = QScriptProgramPtr(
-                        new QScriptProgram(scriptFile.readAll(), rule->scriptFile()));
-
-            // Basic syntax check
-            QScriptSyntaxCheckResult result =
-                    QScriptEngine::checkSyntax(prog->sourceCode());
-            if (result.state() != QScriptSyntaxCheckResult::Valid) {
-                typeRuleError2(xmlFile,
-                               rule->actionSrcLine(),
-                               -1,
-                               QString("Syntax error in file %1 line %2 column %3: %4")
-                                       .arg(ShellUtil::shortFileName(rule->scriptFile()))
-                                       .arg(result.errorLineNumber())
-                                       .arg(result.errorColumnNumber())
-                                       .arg(result.errorMessage()));
-            }
-            // Check if the function exists
-            ScriptEngine::FuncExistsResult ret =
-                    _eng->functionExists(rule->action(), *prog);
-            if (ret == ScriptEngine::feRuntimeError) {
-                QString err;
-                if (_eng->hasUncaughtException()) {
-                    err = QString("Uncaught exception at line %0: %1")
-                            .arg(_eng->uncaughtExceptionLineNumber())
-                            .arg(_eng->lastError());
-                    QStringList bt = _eng->uncaughtExceptionBacktrace();
-                    for (int i = 0; i < bt.size(); ++i)
-                        err += "\n    " + bt[i];
-                }
-                else
-                    err = _eng->lastError();
-                typeRuleError2(xmlFile,
-                               rule->actionSrcLine(),
-                               -1,
-                               QString("Runtime error in file %1: %2")
-                                       .arg(ShellUtil::shortFileName(rule->scriptFile()))
-                                       .arg(err));
-            }
-            else if (ret == ScriptEngine::feDoesNotExist) {
-                typeRuleError2(xmlFile,
-                               rule->actionSrcLine(),
-                               -1,
-                               QString("Function \"%1\" is not defined in file \"%2\".")
-                                       .arg(rule->action())
-                                       .arg(ShellUtil::shortFileName(rule->scriptFile())));
-            }
-
-        }
-        else {
-            warnRule(rule, "is ignored because it does not specify an action.");
-            continue;
-        }
 
         ActiveRule arule(i, rule, prog);
 
@@ -285,35 +205,59 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
                                       const ConstMemberList &members,
                                       bool* matched) const
 {
-    _eng->initScriptEngine();
-
-    // Instance passed to the rule as 1. argument
-    QScriptValue instVal = _eng->toScriptValue(inst);
-    // List of accessed member indices passed to the rule as 2. argument
-    QScriptValue indexlist = _eng->engine()->newArray(members.size());
-    for (int i = 0; i < members.size(); ++i)
-        indexlist.setProperty(i, _eng->engine()->toScriptValue( members[i]->index()));
-    // Which function to call?
-    QString funcName(js::inlinefunc);
-    if (arule.rule->actionType() == TypeRule::atFunction)
-        funcName = arule.rule->action();
-
-    QScriptValueList args;
-    args << instVal << indexlist;
-    QScriptValue ret(_eng->evaluateFunction(funcName, args, *arule.prog,
-                                            arule.rule->includePaths()));
-
-    if (matched)
-        *matched = true;
-
-    if (_eng->lastEvaluationFailed())
-        warnEvalError(_eng, arule.prog->fileName());
-    else if (ret.isBool() || ret.isNumber() || ret.isNull()) {
+    // Script actions
+    if (arule.rule->action()->actionType() == TypeRuleAction::atFunction ||
+        arule.rule->action()->actionType() == TypeRuleAction::atInlineCode)
+    {
         if (matched)
-            *matched = ret.toBool();
+            *matched = true;
+
+        const ScriptAction* action =
+                dynamic_cast<const ScriptAction*>(arule.rule->action());
+        if (!action->program())
+            return Instance();
+
+        _eng->initScriptEngine();
+
+        // Instance passed to the rule as 1. argument
+        QScriptValue instVal = _eng->toScriptValue(inst);
+        // List of accessed member indices passed to the rule as 2. argument
+        QScriptValue indexlist = _eng->engine()->newArray(members.size());
+        for (int i = 0; i < members.size(); ++i)
+            indexlist.setProperty(i, _eng->engine()->toScriptValue( members[i]->index()));
+        // Which function to call?
+        QString funcName(js::inlinefunc);
+        if (action->actionType() == TypeRuleAction::atFunction)
+            funcName = dynamic_cast<const FuncCallScriptAction*>(action)->function();
+
+        QScriptValueList args;
+        args << instVal << indexlist;
+        QScriptValue ret(_eng->evaluateFunction(funcName, args, *action->program(),
+                                                action->includePaths()));
+
+        if (_eng->lastEvaluationFailed())
+            warnEvalError(_eng, arule.prog->fileName());
+        else if (ret.isBool() || ret.isNumber() || ret.isNull()) {
+            if (matched)
+                *matched = ret.toBool();
+        }
+        else
+            return qscriptvalue_cast<Instance>(ret);
     }
-    else
-        return qscriptvalue_cast<Instance>(ret);
+    // Expression action
+    else if (arule.rule->action()->actionType() == TypeRuleAction::atExpression)
+    {
+        const ExpressionAction* action =
+                dynamic_cast<const ExpressionAction*>(arule.rule->action());
+
+        if (matched)
+            *matched = true;
+
+        ReferencingType::AltRefType art(action->targetType()->id(),
+                                        action->expression());
+        return art.toInstance(inst->vmem(), inst, inst->type()->factory(),
+                              members.last()->name(), inst->fullNameComponents());
+    }
 
     return Instance();
 }

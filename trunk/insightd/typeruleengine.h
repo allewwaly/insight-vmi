@@ -19,6 +19,13 @@ class ScriptEngine;
 
 typedef QSharedPointer<const QScriptProgram> QScriptProgramPtr;
 
+namespace js
+{
+extern const char* arguments;
+extern const char* inlinefunc;
+}
+
+
 /// Represents an active TypeRule
 struct ActiveRule
 {
@@ -109,13 +116,35 @@ public:
      * @param factory symbol factory to use for checking the rules
      * @param OS specification to match against the rules
      */
-    void checkRules(const SymFactory* factory, const OsSpecs* specs);
+    void checkRules(SymFactory *factory, const OsSpecs* specs);
 
     /**
      * Returns all rules that are stored in this engine.
      * \sa activeRules()
      */
     inline const TypeRuleList& rules() const { return _rules; }
+
+    /**
+     * Returns the number of rules that are stored in this engine.
+     * \sa rule()
+     */    
+    inline int count() const { return _rules.size(); }
+
+    /**
+     * Returns rule no. \a index from the rule database.
+     * @param index rule index
+     * @return type rule
+     * \sa count()
+     */
+    inline TypeRule* rule(int index) { return _rules[index]; }
+
+    /**
+     * Returns rule no. \a index from the rule database.
+     * @param index rule index
+     * @return type rule
+     * \sa count()
+     */
+    inline const TypeRule* rule(int index) const { return _rules[index]; }
 
     /**
      * Returns all rules that are stored in this engine. Call checkRules() to

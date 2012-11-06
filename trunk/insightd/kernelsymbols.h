@@ -132,7 +132,7 @@ private:
 
 inline bool KernelSymbols::hasRules() const
 {
-    return !_ruleEngine.rules().isEmpty();
+    return _ruleEngine.count() > 0;
 }
 
 

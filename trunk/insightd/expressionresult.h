@@ -77,6 +77,8 @@ struct ExpressionResult
         double d;
     } result;
 
+    inline bool isValid() const { return !(resultType & (erUndefined|erRuntime)); }
+
     qint64 value(ExpressionResultSize target = esUndefined) const;
 
     quint64 uvalue(ExpressionResultSize target = esUndefined) const;

@@ -2351,9 +2351,9 @@ int Shell::cmdRulesLoad(QStringList args)
         if (flush)
             _sym.flushRules();
 
-        int noBefore = _sym.ruleEngine().rules().size();
+        int noBefore = _sym.ruleEngine().count();
         _sym.loadRules(args.first());
-        int noAfter = _sym.ruleEngine().rules().size();
+        int noAfter = _sym.ruleEngine().count();
 
         _out << "Loaded ";
         if (noBefore)
@@ -2496,10 +2496,13 @@ int Shell::printRulesList(const list_t& rules,
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_actionType) << left;
 
-        switch (rule->actionType()) {
-        case TypeRule::atFunction:   _out << "script func."; break;
-        case TypeRule::atInlineCode: _out << "script inline";   break;
-        case TypeRule::atNone:       _out << "none";            break;
+        switch (rule->action() ?
+                rule->action()->actionType() : TypeRuleAction::atNone)
+        {
+        case TypeRuleAction::atExpression: _out << "expression"; break;
+        case TypeRuleAction::atFunction:   _out << "script func."; break;
+        case TypeRuleAction::atInlineCode: _out << "script inline";   break;
+        case TypeRuleAction::atNone:       _out << "none";            break;
         }
 
         _out << qSetFieldWidth(w_colsep) << " "
