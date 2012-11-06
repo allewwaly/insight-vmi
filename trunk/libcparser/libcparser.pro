@@ -28,7 +28,8 @@ HEADERS += include/ast_interface.h \
     antlr_generated/CParser.h \
     include/astsourceprinter.h \
     include/expressionevalexception.h \
-    include/bitop.h
+    include/bitop.h \
+    include/astnodefinder.h
 SOURCES += src/astscopemanager.cpp \
     src/astsymbol.cpp \
     src/realtypes.cpp \
@@ -42,7 +43,8 @@ SOURCES += src/astscopemanager.cpp \
     src/genericexception.cpp \
     antlr_generated/CLexer.c \
     antlr_generated/CParser.c \
-    src/astsourceprinter.cpp
+    src/astsourceprinter.cpp \
+    src/astnodefinder.cpp
 LIBS += -L../libantlr3c$$BUILD_DIR \
     -l$$ANTLR_LIB \
     -L../libdebug$$BUILD_DIR \
