@@ -752,7 +752,7 @@ private:
                             const BaseType* targetBaseType,
                             const ASTExpression *expr);
 
-    BaseTypeList typedefsOfType(BaseType* type);
+    BaseTypeList typedefsOfType(BaseType* type) const;
 
     /**
      * Generates a unique, artificial type ID (< 0) and returns it.

@@ -1824,7 +1824,7 @@ void SymFactory::insertUsedBy(FuncParam* param)
 }
 
 
-BaseTypeList SymFactory::typedefsOfType(BaseType* type)
+BaseTypeList SymFactory::typedefsOfType(BaseType* type) const
 {
     BaseTypeList ret;
 
