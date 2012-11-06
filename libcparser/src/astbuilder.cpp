@@ -23,14 +23,22 @@ ASTBuilder::~ASTBuilder()
 }
 
 
+void ASTBuilder::clear()
+{
+    _parentStack.clear();
+}
+
+
 int ASTBuilder::buildFrom(const QByteArray& asciiText)
 {
+    clear();
     return _ast->parse(asciiText, this);
 }
 
 
 int ASTBuilder::buildFrom(const QString& fileName)
 {
+    clear();
     return _ast->parse(fileName, this);
 }
 

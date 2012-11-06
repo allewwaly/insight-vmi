@@ -34,6 +34,11 @@ public:
     virtual ~ASTBuilder();
 
     /**
+     * Deletes all data.
+     */
+    void clear();
+
+    /**
      * Builds the AST from the contents of file \a fileName.
      * @param fileName the file to parse
      * @return In case of an unrecoverable error, the total number of errors
