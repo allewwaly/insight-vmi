@@ -11,6 +11,8 @@ class ASTExpression;
 class ASTVariableExpression;
 
 
+typedef QList<const ASTVariableExpression*> VarExprList;
+
 class AltRefType
 {
 public:
@@ -77,6 +79,11 @@ public:
     inline const ASTExpression* expr() const { return _expr; }
 
     /**
+     * Returns the variable expressions contained in expr().
+     */
+    inline const VarExprList& varExpressions() const { return _varExpr; }
+
+    /**
      * Sets the ASTExpression to compute the target type's address.
      * @param expr new expression
      */
@@ -90,7 +97,7 @@ private:
     void updateVarExpr();
     int _id;
     const ASTExpression* _expr;
-    QList<const ASTVariableExpression*> _varExpr;
+    VarExprList _varExpr;
 };
 
 #endif // ALTREFTYPE_H

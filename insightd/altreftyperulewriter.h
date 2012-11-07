@@ -56,6 +56,7 @@ private:
 
     const SymFactory* _factory;
     static int _indentation;
+    static const QString _srcVar;
 };
 
 #endif // ALTREFTYPERULEWRITER_H
