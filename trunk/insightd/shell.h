@@ -104,10 +104,11 @@ public:
      */
     QTextStream& err();
 
-
     void errMsg(const QString& s, bool newline = true);
 
     void errMsg(const char* s, bool newline = true);
+
+    void warnMsg(const QString& s, bool newline = true);
 
     /**
      * @return the KernelSymbol object of this Shell object

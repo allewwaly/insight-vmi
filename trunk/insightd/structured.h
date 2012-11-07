@@ -15,6 +15,12 @@
 #include <QStringList>
 #include "memberlist.h"
 
+namespace str
+{
+extern const char* anonymous;
+}
+
+
 /**
  * Base class for a struct or union type
  */

@@ -322,7 +322,7 @@ NamePartList ColorPalette::prettyNameInColor(const QString &name,
         parts.append(NamePart(t->type() == rtStruct ? "struct " : "union ",
                               color(ctKeyword)));
         if (t->name().isEmpty())
-            parts.append(NamePart("(anon.)", color(ctNoName)));
+            parts.append(NamePart(str::anonymous, color(ctNoName)));
         else
             parts.append(NamePart(t->name(), color(ctType)));
         break;

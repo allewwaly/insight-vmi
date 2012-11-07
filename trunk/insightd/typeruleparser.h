@@ -14,6 +14,24 @@ class TypeRuleReader;
 
 namespace xml
 {
+extern const int currentVer;
+extern const char* version;
+extern const char* typeknowledge;
+extern const char* ruleincludes;
+extern const char* ruleinclude;
+extern const char* scriptincludes;
+extern const char* scriptinclude;
+extern const char* include;
+extern const char* rules;
+extern const char* rule;
+extern const char* name;
+extern const char* description;
+extern const char* filter;
+extern const char* members;
+extern const char* action;
+extern const char* type;
+extern const char* file;
+extern const char* inlineCode;
 extern const char* srcType;
 extern const char* targetType;
 extern const char* expression;

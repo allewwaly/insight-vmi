@@ -2,6 +2,7 @@
 #define ALTREFTYPE_H
 
 #include <QStringList>
+#include <QXmlStreamWriter>
 #include "instance_def.h"
 #include "kernelsymbolstream.h"
 

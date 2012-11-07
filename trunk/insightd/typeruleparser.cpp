@@ -5,6 +5,8 @@
 #include "osfilter.h"
 #include "keyvaluestore.h"
 #include "xmlschema.h"
+#include "shell.h"
+#include "shellutil.h"
 #include <debug.h>
 
 #define typeRuleErrorLoc(x) \
@@ -23,6 +25,8 @@
 
 namespace xml
 {
+const int currentVer = 1;
+const char* version = "version";
 const char* typeknowledge = "typeknowledge";
 const char* ruleincludes = "ruleincludes";
 const char* ruleinclude = "ruleinclude";
@@ -225,8 +229,24 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
                       .arg(name));
     }
 
+    // <typeknowledge>
+    if (name == xml::typeknowledge) {
+        // Parse the version
+        bool ok;
+        float ver = atts.value(xml::version).toFloat(&ok);
+        if (!ok)
+            typeRuleErrorLoc(QString("Non-numeric version specified: %1")
+                          .arg(atts.value(xml::version)));
+        // Print a warning if version is newer than the current one
+        if (ver > xml::currentVer)
+            shell->warnMsg(QString("The rule file \"%1\" has version %2, our "
+                                   "version is %3.")
+                           .arg(ShellUtil::shortFileName(_reader->currFile()))
+                           .arg(ver)
+                           .arg(xml::currentVer));
+    }
     // <rule>
-    if (name == xml::rule) {
+    else if (name == xml::rule) {
         _rule = new TypeRule();
         _rule->setSrcLine(_locator ? _locator->lineNumber() : -1);
     }
@@ -466,12 +486,14 @@ const XmlSchema &TypeRuleParser::schema()
         // root element
         ruleSchema.addElement(XmlSchema::rootElem(),
                               QStringList(xml::typeknowledge));
+
         // <typeknowledge>
         children << xml::ruleincludes
                  << xml::scriptincludes
                  << xml::include
                  << xml::rules;
-        ruleSchema.addElement(xml::typeknowledge, children, osfAttr);
+        ruleSchema.addElement(xml::typeknowledge, children, osfAttr,
+                              QStringList(xml::version));
 
         // <ruleincludes>
         ruleSchema.addElement(xml::ruleincludes, QStringList(xml::ruleinclude));

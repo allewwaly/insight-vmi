@@ -10,6 +10,10 @@
 #include <debug.h>
 #include "shell.h"
 
+namespace str
+{
+const char* anonymous = "(anon.)";
+}
 
 Structured::Structured(SymFactory* factory)
 	: BaseType(factory)
@@ -458,8 +462,8 @@ RealType Struct::type() const
 
 QString Struct::prettyName() const
 {
-    return _name.isEmpty() ?
-                QString("struct (anon.)") : QString("struct %1").arg(_name);
+    return QString("struct %1").arg(_name.isEmpty() ?
+                                        QString(str::anonymous) : _name);
 }
 
 

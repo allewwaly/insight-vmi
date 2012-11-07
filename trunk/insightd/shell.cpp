@@ -381,6 +381,16 @@ void Shell::errMsg(const char *s, bool newline)
 }
 
 
+void Shell::warnMsg(const QString &s, bool newline)
+{
+    _err << color(ctWarning) << s << color(ctReset);
+    if (newline)
+        _err << endl;
+    else
+        _err << flush;
+}
+
+
 KernelSymbols& Shell::symbols()
 {
     return _sym;
