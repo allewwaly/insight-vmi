@@ -2,6 +2,9 @@
 #define TYPERULE_H
 
 #include <QStringList>
+#include "memberlist.h"
+#include "instance_def.h"
+#include "altreftype.h"
 
 class InstanceFilter;
 class OsFilter;
@@ -14,6 +17,7 @@ class ASTExpression;
 class TypeRuleAction;
 class SymFactory;
 class QScriptProgram;
+class ScriptEngine;
 
 /**
  * This class represents expert knowledge about the inspected system's type
@@ -160,7 +164,7 @@ public:
      * @param col color palette to use for colorizing the output
      * @return
      */
-    virtual QString toString(const ColorPalette *col = 0) const;
+    QString toString(const ColorPalette *col = 0) const;
 
 private:
     QString _name;
@@ -229,6 +233,19 @@ public:
     virtual bool check(const QString& xmlFile, SymFactory *factory) = 0;
 
     /**
+     * Evaluates this action and returns the instance according to this rule
+     * and the accessed members.
+     * @param inst the instance form which the member access originates
+     * @param members the members accessed, starting from \a inst
+     * @param eng the script engine to use for evaluation (if required)
+     * @param matched boolean return vaule if the rule actually matched or not
+     * @return next instance
+     */
+    virtual Instance evaluate(const Instance *inst,
+                              const ConstMemberList &members, ScriptEngine* eng,
+                              bool* matched) const = 0;
+
+    /**
      * Returns a textual representation of this action.
      * @param col color palette to use for colorizing the output
      * @return human readable representation
@@ -274,10 +291,23 @@ public:
      */
     const QScriptProgram* program() const { return _program; }
 
+    /**
+     * \copydoc TypeRuleAction::evaluate()
+     */
+    Instance evaluate(const Instance *inst, const ConstMemberList &members,
+                      ScriptEngine* eng, bool* matched) const;
+
 protected:
+    /**
+     * Retuns the name of the script function to call for evaluation.
+     */
+    virtual const QString& funcToCall() const = 0;
+
     QScriptProgram* _program;
 
 private:
+    void warnEvalError(const ScriptEngine *eng, const QString &fileName) const;
+
     QStringList _includePaths;
 };
 
@@ -331,6 +361,12 @@ public:
      */
     QString toString(const ColorPalette *col = 0) const;
 
+protected:
+    /**
+     * \copydoc ScriptAction::funcToCall()
+     */
+    inline const QString& funcToCall() const { return _function; }
+
 private:
     QString _scriptFile;
     QString _function;
@@ -370,7 +406,14 @@ public:
      */
     QString toString(const ColorPalette *col = 0) const;
 
+protected:
+    /**
+     * \copydoc ScriptAction::funcToCall()
+     */
+    inline const QString& funcToCall() const { return _inlineFunc; }
+
 private:
+    static const QString _inlineFunc;
     QString _srcCode;
 };
 
@@ -480,15 +523,23 @@ public:
     ActionType actionType() const { return atExpression; }
 
     /**
+     * \copydoc TypeRuleAction::evaluate()
+     */
+    Instance evaluate(const Instance *inst, const ConstMemberList &members,
+                      ScriptEngine* eng, bool* matched) const;
+
+    /**
      * \copydoc TypeRuleAction::toString()
      */
     QString toString(const ColorPalette *col = 0) const;
 
 private:
-    const BaseType* typeOfExpression(const QString &xmlFile, SymFactory *factory, const QString &what, const QString &shortCode,
+    const BaseType* typeOfExpression(const QString &xmlFile, SymFactory *factory,
+                                     const QString &what, const QString &shortCode,
                                      const QByteArray& code, QString& id);
 
-    bool checkExprComplexity(const QString &xmlFile, const QString &what, const QString &expr) const;
+    bool checkExprComplexity(const QString &xmlFile, const QString &what,
+                             const QString &expr) const;
 
     QString _srcTypeStr;
     QString _targetTypeStr;
@@ -497,6 +548,7 @@ private:
     const BaseType* _srcType;
     const BaseType* _targetType;
     QList<ASTExpression*> _exprList;
+    AltRefType _altRefType;
 };
 
 #endif // TYPERULE_H

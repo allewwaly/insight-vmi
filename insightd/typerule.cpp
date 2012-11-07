@@ -13,6 +13,7 @@
 #include "astexpressionevaluator.h"
 #include "symfactory.h"
 #include "memspecs.h"
+#include "shell.h"
 #include <abstractsyntaxtree.h>
 #include <astbuilder.h>
 #include <astscopemanager.h>
@@ -136,6 +137,64 @@ ScriptAction::~ScriptAction()
 }
 
 
+Instance ScriptAction::evaluate(const Instance *inst,
+                                const ConstMemberList &members,
+                                ScriptEngine *eng, bool *matched) const
+{
+    if (matched)
+        *matched = true;
+
+    if (!_program)
+        return Instance();
+
+    eng->initScriptEngine();
+
+    // Instance passed to the rule as 1. argument
+    QScriptValue instVal = eng->toScriptValue(inst);
+    // List of accessed member indices passed to the rule as 2. argument
+    QScriptValue indexlist = eng->engine()->newArray(members.size());
+    for (int i = 0; i < members.size(); ++i)
+        indexlist.setProperty(i, eng->engine()->toScriptValue(members[i]->index()));
+
+    QScriptValueList args;
+    args << instVal << indexlist;
+    QScriptValue ret(eng->evaluateFunction(funcToCall(), args, *_program,
+                                            _includePaths));
+
+    if (eng->lastEvaluationFailed())
+        warnEvalError(eng, _program->fileName());
+    else if (ret.isBool() || ret.isNumber() || ret.isNull()) {
+        if (matched)
+            *matched = ret.toBool();
+    }
+    else
+        return qscriptvalue_cast<Instance>(ret);
+
+    return Instance();
+}
+
+
+void ScriptAction::warnEvalError(const ScriptEngine *eng,
+                                 const QString &fileName) const
+{
+    // Print errors as warnings
+    if (eng && eng->lastEvaluationFailed()) {
+        QString file(ShellUtil::shortFileName(fileName));
+        shell->err() << shell->color(ctWarning) << "At "
+                     << shell->color(ctBold) << file
+                     << shell->color(ctWarning);
+        if (eng->hasUncaughtException()) {
+            shell->err() << ":"
+                         << shell->color(ctBold)
+                         << eng->uncaughtExceptionLineNumber()
+                         << shell->color(ctWarning);
+        }
+        shell->err() << ": " << eng->lastError()
+                     << shell->color(ctReset) << endl;
+    }
+}
+
+
 //------------------------------------------------------------------------------
 // FuncCallScriptAction
 //------------------------------------------------------------------------------
@@ -214,6 +273,9 @@ QString FuncCallScriptAction::toString(const ColorPalette *col) const
 // ProgramScriptAction
 //------------------------------------------------------------------------------
 
+// static member variable
+const QString ProgramScriptAction::_inlineFunc(js::inlinefunc);
+
 bool ProgramScriptAction::check(const QString &xmlFile, SymFactory *factory)
 {
     Q_UNUSED(factory);
@@ -290,7 +352,6 @@ QString ProgramScriptAction::toString(const ColorPalette *col) const
 //------------------------------------------------------------------------------
 // ExpressionAction
 //------------------------------------------------------------------------------
-
 
 ExpressionAction::~ExpressionAction()
 {
@@ -397,6 +458,8 @@ bool ExpressionAction::check(const QString &xmlFile, SymFactory *factory)
     code = _targetTypeStr.toAscii() + " " + dstId.toAscii() + ";";
     _targetType = typeOfExpression(xmlFile, factory, "target type",
                                    _targetTypeStr, code, dstId);
+    if (_targetType)
+        _targetType = _targetType->dereferencedBaseType(BaseType::trLexical);
 
     // Check source type
     code = _srcTypeStr.toAscii() + ";";
@@ -447,7 +510,53 @@ bool ExpressionAction::check(const QString &xmlFile, SymFactory *factory)
         typeRuleError2(xmlFile, srcLine(), -1,
                        QString("Error evaluating expression: %1")
                             .arg(QString(_exprStr)));
+
+    _altRefType.setId(_targetType->id());
+    _altRefType.setExpr(_expr);
+
     return true;
+}
+
+
+Instance ExpressionAction::evaluate(const Instance *inst,
+                                    const ConstMemberList &members,
+                                    ScriptEngine *eng, bool *matched) const
+{
+    Q_UNUSED(eng);
+
+    if (matched)
+        *matched = true;
+
+    if (!inst || !inst->type() || !_targetType || !_srcType || !_expr)
+        return Instance();
+
+    // The instance's type must match the target type, but be forgiving with
+    // pointer source types since the instance typically is dereferenced.
+    const BaseType* instType =
+            inst->type()->dereferencedBaseType(BaseType::trLexical);
+    const BaseType* srcType = _srcType;
+    while (srcType && instType->id() != srcType->id() &&
+           instType->hash() != srcType->hash())
+    {
+        if (srcType->type() & BaseType::trLexicalPointersArrays)
+            srcType = srcType->dereferencedBaseType(BaseType::trLexicalPointersArrays, 1);
+        else
+            return Instance();
+    }
+    // This should never become null!
+    if (!srcType)
+        return Instance();
+
+    const SymFactory* fac = inst->type()->factory();
+    QString name = members.isEmpty() ? QString() : members.last()->name();
+    QStringList parentNames(inst->fullNameComponents());
+    // If we have more than one member access, add all other names to the parent
+    // list
+    for (int i = 0; i + 1 < members.size(); ++i)
+        if (!members[i]->name().isEmpty())
+            parentNames += members[i]->name();
+
+    return _altRefType.toInstance(inst->vmem(), inst, fac, name, parentNames);
 }
 
 
