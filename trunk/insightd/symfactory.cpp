@@ -2997,12 +2997,12 @@ void SymFactory::mergeAlternativeTypes(const ReferencingType* src,
 
     // Check all alternative types of source
     for (int i = 0; i < src->altRefTypes().size(); ++i) {
-        const ReferencingType::AltRefType& src_art = src->altRefTypes().at(i);
+        const AltRefType& src_art = src->altRefTypes().at(i);
 
         // Compare to all alternative types of destination
         bool found = false;
         for (int j = 0; !found && j < dst->altRefTypes().size(); ++j) {
-            const ReferencingType::AltRefType& dst_art = dst->altRefTypes().at(j);
+            const AltRefType& dst_art = dst->altRefTypes().at(j);
             if (dst_art.expr() && dst_art.expr()->equals(src_art.expr()) &&
                 dst_art.id() == src_art.id())
                 found = true;

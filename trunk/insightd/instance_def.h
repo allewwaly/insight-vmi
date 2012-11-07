@@ -39,7 +39,7 @@ public:
         orVariable,      ///< from a Variable object
         orBaseType,      ///< from a BaseType object (manually)
         orMember,        ///< from a regular member access
-        orCandidate,     ///< from a candidate type (ReferencingType::AltRefType)
+        orCandidate,     ///< from a candidate type (AltRefType)
         orRuleEngine,    ///< from a scripted rule in the TypeRuleEngine
         orMemMapNode     ///< from a MemoryMapNode
     };

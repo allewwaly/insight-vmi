@@ -237,7 +237,7 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
 }
 
 /*
-bool checkAltRefType(const ReferencingType::AltRefType& at)
+bool checkAltRefType(const AltRefType& at)
 {
     ASTConstExpressionList list;
     list += at.expr()->findExpressions(etInclusiveOr);
@@ -255,7 +255,7 @@ bool checkAltRefType(const ReferencingType::AltRefType& at)
 void checkAltRefTypes(const RefBaseType* rt)
 {
     for (int i = 0; i < rt->altRefTypeCount(); ++i) {
-        const ReferencingType::AltRefType& at = rt->altRefTypes().at(i);
+        const AltRefType& at = rt->altRefTypes().at(i);
         if (checkAltRefType(at)) {
             QString s("0x%1 %2, cdt %3:\n%4");
             s = s.arg(rt->id(), 0, 16).arg(rt->prettyName()).arg(i+1).arg(at.expr()->toString());
@@ -268,7 +268,7 @@ void checkAltRefTypes(const RefBaseType* rt)
 void checkAltRefTypes(const Variable* v)
 {
     for (int i = 0; i < v->altRefTypeCount(); ++i) {
-        const ReferencingType::AltRefType& at = v->altRefTypes().at(i);
+        const AltRefType& at = v->altRefTypes().at(i);
         if (checkAltRefType(at)) {
             QString s("0x%1 %2, cdt %3:\n%4");
             s = s.arg(v->id(), 0, 16).arg(v->prettyName()).arg(i+1).arg(at.expr()->toString());
@@ -281,7 +281,7 @@ void checkAltRefTypes(const Variable* v)
 void checkAltRefTypes(const StructuredMember* m)
 {
     for (int i = 0; i < m->altRefTypeCount(); ++i) {
-        const ReferencingType::AltRefType& at = m->altRefTypes().at(i);
+        const AltRefType& at = m->altRefTypes().at(i);
         if (checkAltRefType(at)) {
             QString s("0x%1 %2, cdt %3:\n%4");
             s = s.arg(m->id(), 0, 16).arg(m->prettyName()).arg(i+1).arg(at.expr()->toString());

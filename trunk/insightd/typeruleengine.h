@@ -193,7 +193,7 @@ private:
     Instance evaluateRule(const ActiveRule &arule, const Instance* inst,
                               const ConstMemberList &members, bool *matched) const;
 
-    void warnEvalError(const ScriptEngine* eng, const QString& fileName) const;
+//    void warnEvalError(const ScriptEngine* eng, const QString& fileName) const;
     void warnRule(const TypeRule *rule, const QString& msg) const;
 
     const OsFilter* insertOsFilter(const OsFilter* osf);
