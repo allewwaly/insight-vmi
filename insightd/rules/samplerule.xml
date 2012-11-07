@@ -23,7 +23,7 @@
                 <typename>list_head</typename>
                 <variablename>modules</variablename>
                 <members>
-                    <member match="any" />
+                    <member>next</member>
                 </members>
             </filter>
             <action type="expression">
