@@ -444,7 +444,7 @@ void MemoryMapBuilderSV::processCandidates(Instance *inst, const ReferencingType
             continue;
 
         // Skip candidates based on heuristics
-        const ReferencingType::AltRefType& alt = type->altRefType(i);
+        const AltRefType& alt = type->altRefType(i);
         //Instance cand = alt.toInstance(inst->vmem(), inst, inst->,
         //                      m->name(), fullNameComponents());
     }

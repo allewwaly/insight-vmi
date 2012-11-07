@@ -800,7 +800,7 @@ Instance Instance::memberCandidate(const StructuredMember* m,
 	if (!m || cndtIndex < 0 || cndtIndex >= m->altRefTypeCount())
 		return Instance();
 	// Otherwise use the alternative type
-	const ReferencingType::AltRefType& alt = m->altRefType(cndtIndex);
+	const AltRefType& alt = m->altRefType(cndtIndex);
 	return alt.toInstance(_d->vmem, this, _d->type ? _d->type->factory() : 0,
 						  m->name(), fullNameComponents());
 }

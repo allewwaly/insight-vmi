@@ -101,7 +101,7 @@ Instance Variable::altRefTypeInstance(VirtualMemory* vmem, int index) const
 	if (index < 0 || index >= altRefTypeCount())
 		return Instance();
 
-	ReferencingType::AltRefType alt = altRefType(index);
+	AltRefType alt = altRefType(index);
 	Instance inst = toInstance(vmem);
 	return alt.toInstance(vmem, &inst, _factory, name(), QStringList());
 }
