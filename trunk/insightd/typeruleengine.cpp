@@ -205,82 +205,9 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
                                       const ConstMemberList &members,
                                       bool* matched) const
 {
-    // Script actions
-    if (arule.rule->action()->actionType() == TypeRuleAction::atFunction ||
-        arule.rule->action()->actionType() == TypeRuleAction::atInlineCode)
-    {
-        if (matched)
-            *matched = true;
-
-        const ScriptAction* action =
-                dynamic_cast<const ScriptAction*>(arule.rule->action());
-        if (!action->program())
-            return Instance();
-
-        _eng->initScriptEngine();
-
-        // Instance passed to the rule as 1. argument
-        QScriptValue instVal = _eng->toScriptValue(inst);
-        // List of accessed member indices passed to the rule as 2. argument
-        QScriptValue indexlist = _eng->engine()->newArray(members.size());
-        for (int i = 0; i < members.size(); ++i)
-            indexlist.setProperty(i, _eng->engine()->toScriptValue( members[i]->index()));
-        // Which function to call?
-        QString funcName(js::inlinefunc);
-        if (action->actionType() == TypeRuleAction::atFunction)
-            funcName = dynamic_cast<const FuncCallScriptAction*>(action)->function();
-
-        QScriptValueList args;
-        args << instVal << indexlist;
-        QScriptValue ret(_eng->evaluateFunction(funcName, args, *action->program(),
-                                                action->includePaths()));
-
-        if (_eng->lastEvaluationFailed())
-            warnEvalError(_eng, arule.prog->fileName());
-        else if (ret.isBool() || ret.isNumber() || ret.isNull()) {
-            if (matched)
-                *matched = ret.toBool();
-        }
-        else
-            return qscriptvalue_cast<Instance>(ret);
-    }
-    // Expression action
-    else if (arule.rule->action()->actionType() == TypeRuleAction::atExpression)
-    {
-        const ExpressionAction* action =
-                dynamic_cast<const ExpressionAction*>(arule.rule->action());
-
-        if (matched)
-            *matched = true;
-
-        ReferencingType::AltRefType art(action->targetType()->id(),
-                                        action->expression());
-        return art.toInstance(inst->vmem(), inst, inst->type()->factory(),
-                              members.last()->name(), inst->fullNameComponents());
-    }
-
-    return Instance();
-}
-
-
-void TypeRuleEngine::warnEvalError(const ScriptEngine *eng,
-                                   const QString &fileName) const
-{
-    // Print errors as warnings
-    if (eng && eng->lastEvaluationFailed()) {
-        QString file(ShellUtil::shortFileName(fileName));
-        shell->err() << shell->color(ctWarning) << "At "
-                     << shell->color(ctBold) << file
-                     << shell->color(ctWarning);
-        if (eng->hasUncaughtException()) {
-            shell->err() << ":"
-                         << shell->color(ctBold)
-                         << eng->uncaughtExceptionLineNumber()
-                         << shell->color(ctWarning);
-        }
-        shell->err() << ": " << eng->lastError()
-                     << shell->color(ctReset) << endl;
-    }
+    return arule.rule->action() ?
+                arule.rule->action()->evaluate(inst, members, _eng, matched) :
+                Instance();
 }
 
 
