@@ -120,6 +120,7 @@ struct MemSpecs
         QString machine;
         bool equals(const Version& other) const;
         QString toString() const;
+        QString toFileNameString() const;
     };
 
     /// Constructor

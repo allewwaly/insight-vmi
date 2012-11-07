@@ -6,6 +6,8 @@
  */
 
 #include "memspecs.h"
+#include <QDateTime>
+#include <QStringList>
 
 // Taken from <linux/include/linux/err.h>
 #define MAX_ERRNO 4095
@@ -389,4 +391,24 @@ QString MemSpecs::Version::toString() const
             .arg(release)
             .arg(machine)
             .arg(version);
+}
+
+
+QString MemSpecs::Version::toFileNameString() const
+{
+    QString ver(version);
+    // Try to parse the date and create a shorter version
+    QStringList verParts = version.split(QChar(' '), QString::SkipEmptyParts);
+    if (verParts.size() >= 6) {
+        verParts = verParts.mid(verParts.size() - 6);
+        verParts.removeAt(4); // get rid of time zone
+        QDateTime dt = QDateTime::fromString(verParts.join(" "), Qt::TextDate);
+        if (dt.isValid())
+            ver = dt.toString("yyyyMMdd-hhmmss");
+    }
+
+    QString s = sysname + "_" + release + "_" + machine + "_" + ver;
+    s.replace(QChar(' '), "_"); // space to underscore
+    s.replace(QRegExp("[^-_a-zA-Z0-9]+"), QString()); // remove all uncommon
+    return s;
 }

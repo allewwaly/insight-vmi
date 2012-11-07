@@ -313,6 +313,7 @@ private:
     int cmdExit(QStringList args);
     int cmdHelp(QStringList args);
     int cmdColor(QStringList args);
+
     int cmdList(QStringList args);
     int cmdListSources(QStringList args);
     int cmdListTypes(QStringList args, int typeFilter = -1);
@@ -321,6 +322,7 @@ private:
     int cmdListTypesUsing(QStringList args);
     int cmdListTypesById(QStringList args);
     int cmdListTypesByName(QStringList args);
+
     int cmdMemory(QStringList args);
     int cmdMemoryLoad(QStringList args);
     int cmdMemoryUnload(QStringList args);
@@ -338,6 +340,7 @@ private:
     int cmdMemoryDiffBuild(int index1, int index2);
     int cmdMemoryDiffVisualize(int index);
 #endif
+
     int cmdRules(QStringList args);
     int cmdRulesLoad(QStringList args);
     int cmdRulesList(QStringList args);
@@ -346,15 +349,19 @@ private:
     int cmdRulesShow(QStringList args);
     int cmdListTypesMatching(QStringList args);
     int cmdListVarsMatching(QStringList args);
+
     int cmdScript(QStringList args);
+
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t, const QString& name = QString(),
                         ColorType nameType = ctReset);
     int cmdShowVariable(const Variable* v);
+
     int cmdStats(QStringList args);
     int cmdStatsPostponed(QStringList args);
     int cmdStatsTypes(QStringList args);
     int cmdStatsTypesByHash(QStringList args);
+
     int cmdSymbols(QStringList args);
 #ifdef DEBUG_MERGE_TYPES_AFTER_PARSING
     int cmdSymbolsPostProcess(QStringList args);
@@ -363,7 +370,10 @@ private:
     int cmdSymbolsParse(QStringList args);
     int cmdSymbolsLoad(QStringList args);
     int cmdSymbolsStore(QStringList args);
+    int cmdSymbolsWriteRules(QStringList args);
+
     int cmdSysInfo(QStringList args);
+
     int cmdBinary(QStringList args);
     int cmdBinaryMemDumpList(QStringList args);
 //    int cmdBinaryInstance(QStringList args);

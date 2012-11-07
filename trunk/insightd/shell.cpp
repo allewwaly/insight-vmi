@@ -41,6 +41,7 @@
 #include "typeruleexception.h"
 #include "typerule.h"
 #include "shellutil.h"
+#include "altreftyperulewriter.h"
 
 #ifdef CONFIG_MEMORY_MAP
 #include "memorymap.h"
@@ -3274,6 +3275,8 @@ int Shell::cmdSymbols(QStringList args)
 #endif
     else if (QString("source").startsWith(action))
         return cmdSymbolsSource(args);
+    else if (QString("writerules").startsWith(action))
+        return cmdSymbolsWriteRules(args);
     else {
         cmdHelp(QStringList("symbols"));
         return 2;
@@ -3444,6 +3447,40 @@ int Shell::cmdSymbolsStore(QStringList args)
     }
 
     _sym.saveSymbols(fileName);
+
+    return ecOk;
+}
+
+
+int Shell::cmdSymbolsWriteRules(QStringList args)
+{
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() != 1) {
+        cmdHelp(QStringList("symbols"));
+        return ecInvalidArguments;
+    }
+
+    QDir baseDir(args[0]);
+    QString baseName = _sym.memSpecs().version.toFileNameString();
+    QString fileName = baseName + ".xml";
+
+    // Check file for existence
+    if (QFile::exists(baseDir.absoluteFilePath(fileName)) && _interactive) {
+        QString reply;
+        do {
+            _out << "File already exists: "
+                 << QDir::current().relativeFilePath(baseDir.absoluteFilePath(fileName))
+                 << endl;
+            reply = readLine("Ok to overwrite file? [Y/n] ").toLower();
+            if (reply.isEmpty())
+                reply = "y";
+            else if (reply == "n")
+                return ecOk;
+        } while (reply != "y");
+    }
+
+    AltRefTypeRuleWriter writer(&_sym.factory());
+    writer.write(baseName, baseDir.absolutePath());
 
     return ecOk;
 }
