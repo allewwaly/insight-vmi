@@ -12,6 +12,13 @@ extern const char* architecture;
 extern const char* os;
 extern const char* minver;
 extern const char* maxver;
+
+extern const char* arX86;
+extern const char* arX86PAE;
+extern const char* arAMD64;
+
+extern const char* osLinux;
+extern const char* osWindows;
 }
 
 struct MemSpecs;

@@ -8,8 +8,8 @@ namespace xml
 {
 const char* architecture = "architecture";
 const char* os           = "os";
-const char* minver       = "minversion";
-const char* maxver       = "maxversion";
+const char* minver       = "minosversion";
+const char* maxver       = "maxosversion";
 
 const char* arX86     = "x86";
 const char* arX86PAE  = "x86_pae";
