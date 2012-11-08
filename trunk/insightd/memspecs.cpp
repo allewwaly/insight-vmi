@@ -409,6 +409,6 @@ QString MemSpecs::Version::toFileNameString() const
 
     QString s = sysname + "_" + release + "_" + machine + "_" + ver;
     s.replace(QChar(' '), "_"); // space to underscore
-    s.replace(QRegExp("[^-_a-zA-Z0-9]+"), QString()); // remove all uncommon
+    s.replace(QRegExp("[^-._a-zA-Z0-9]+"), QString()); // remove all uncommon
     return s;
 }
