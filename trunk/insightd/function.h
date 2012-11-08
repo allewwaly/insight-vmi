@@ -63,11 +63,9 @@ public:
 	}
 
     /**
-     * This gives a pretty name of that type which may involve referencing
-     * types.
-     * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
+     * \copydoc Symbol::prettyName()
      */
-    virtual QString prettyName() const;
+    virtual QString prettyName(const QString& varName = QString()) const;
 
     /**
      * @param mem the memory device to read the data from

@@ -23,26 +23,19 @@ Variable::Variable(SymFactory* factory, const TypeInfo& info)
 }
 
 
-QString Variable::prettyName() const
+QString Variable::prettyName(const QString &varName) const
 {
-    QString s_typename;
+    Q_UNUSED(varName);
     const BaseType* t = refType();
     const FuncPointer *fp = dynamic_cast<const FuncPointer*>(
                 refTypeDeep(BaseType::trAnyButTypedef));
+
     if (fp)
         return fp->prettyName(_name, dynamic_cast<const RefBaseType*>(t));
-    else if (t) {
-        if (t->prettyName().isEmpty())
-            s_typename = "(anonymous type)";
-        else
-            s_typename = t->prettyName();
-    }
+    else if (t)
+        return t->prettyName(_name);
     else
-        s_typename = "(unresolved type)";
-
-    QString s_name = _name.isEmpty() ? "(none)" : _name;
-
-    return QString("%1 %2").arg(s_typename).arg(s_name);
+        return QString("(unresolved type 0x%1) %2").arg((uint)_refTypeId, 0, 16).arg(_name);
 }
 
 

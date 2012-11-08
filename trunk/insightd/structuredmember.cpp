@@ -46,15 +46,16 @@ int StructuredMember::index() const
 }
 
 
-QString StructuredMember::prettyName() const
+QString StructuredMember::prettyName(const QString &varName) const
 {
+    Q_UNUSED(varName);
     const BaseType* t = refType();
     const FuncPointer *fp = dynamic_cast<const FuncPointer*>(
                 refTypeDeep(BaseType::trAnyButTypedef));
     if (fp)
         return fp->prettyName(_name, dynamic_cast<const RefBaseType*>(t));
     else if (t)
-        return QString("%1 %2").arg(t->prettyName(), _name);
+        return t->prettyName(_name);
     else
         return QString("(unresolved type 0x%1) %2").arg((uint)_refTypeId, 0, 16).arg(_name);
 }
