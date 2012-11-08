@@ -10,6 +10,7 @@ enum ColorType {
     ctBold,
     ctUnderline,
     ctInverse,
+    ctDim,
     ctPrompt,
     ctVariable,
     ctType,

@@ -122,6 +122,7 @@ const char *ColorPalette::color(ColorType ct) const
         C_BLD,   // ctBold
         C_UDL,   // ctUnderline
         C_INV,   // ctInverse
+        C_BLK_L, // ctDim
 
         C_GRN,   // ctPrompt
         C_YLW_B, // ctVariable
@@ -151,6 +152,7 @@ const char *ColorPalette::color(ColorType ct) const
         C_BLD,   // ctBold
         C_UDL,   // ctUnderline
         C_INV,   // ctInverse
+        C_BLK_L, // ctDim
 
         C_BLU,   // ctPrompt
         C_RED_B, // ctVariable
