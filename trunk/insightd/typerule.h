@@ -536,7 +536,7 @@ public:
 private:
     const BaseType* typeOfExpression(const QString &xmlFile, SymFactory *factory,
                                      const QString &what, const QString &shortCode,
-                                     const QByteArray& code, QString& id);
+                                     const QString &code, QString& id);
 
     bool checkExprComplexity(const QString &xmlFile, const QString &what,
                              const QString &expr) const;

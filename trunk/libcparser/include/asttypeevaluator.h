@@ -16,6 +16,7 @@
 #include <QStack>
 #include <QStringList>
 #include <genericexception.h>
+#include <typeinfooracle.h>
 
 
 template <class Stack>
@@ -39,16 +40,23 @@ class ASTType
 
 public:
     ASTType()
-        : _type(rtUndefined), _next(0), _node(0), _flags(0), _arraySize(-1) {}
-    ASTType(RealType type, ASTType* next = 0)
-        : _type(type), _next(next), _node(0), _flags(0), _arraySize(-1) {}
-    ASTType(RealType type, const QString& identifier)
-    	: _type(type), _next(0), _identifier(identifier), _node(0),
-          _flags(0), _arraySize(-1) {}
-    ASTType(RealType type, const ASTNode* node)
-        : _type(type), _next(0), _node(node), _flags(0), _arraySize(-1) {}
-    ASTType(RealType type, const ASTNode* node, int arraySize)
-        : _type(type), _next(0), _node(node), _flags(0), _arraySize(arraySize) {}
+        : _type(rtUndefined), _next(0), _node(0), _flags(0), _arraySize(-1),
+          _typeId(0) {}
+    explicit ASTType(RealType type, ASTType* next = 0)
+        : _type(type), _next(next), _node(0), _flags(0), _arraySize(-1),
+          _typeId(0) {}
+    explicit ASTType(RealType type, const QString& identifier)
+        : _type(type), _next(0), _identifier(identifier), _node(0), _flags(0),
+          _arraySize(-1), _typeId(0) {}
+    explicit ASTType(RealType type, const ASTNode* node)
+        : _type(type), _next(0), _node(node), _flags(0), _arraySize(-1),
+          _typeId(0) {}
+    explicit ASTType(RealType type, const ASTNode* node, int arraySize)
+        : _type(type), _next(0), _node(node), _flags(0), _arraySize(arraySize),
+          _typeId(0) {}
+    explicit ASTType(RealType type, int typeId)
+        : _type(type), _next(0), _node(0), _flags(0), _arraySize(-1),
+          _typeId(typeId) {}
 
     inline bool isNull() const { return _type == 0; }
     inline RealType type() const { return _type; }
@@ -76,6 +84,8 @@ public:
     }
     inline int arraySize() const { return _arraySize; }
     inline void setArraySize(int size) { _arraySize = size; }
+    inline int typeId() const { return _typeId; }
+    inline void setTypeId(int id) { _typeId = id; }
 
     bool equalTo(const ASTType* other, bool exactMatch = false) const;
     QString toString() const;
@@ -87,6 +97,7 @@ private:
     const ASTNode* _node;
     quint8 _flags;
     int _arraySize;
+    int _typeId;
 };
 
 
@@ -211,7 +222,8 @@ public:
      * @param sizeofLong the size of a <tt>long int</tt> type, in bytes
      * @param sizeofPointer the size of a pointer type, in bytes
      */
-    ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong, int sizeofPointer);
+    ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong, int sizeofPointer,
+                     const TypeInfoOracle* oracle = 0);
     virtual ~ASTTypeEvaluator();
 
     bool evaluateTypes();
@@ -369,6 +381,7 @@ private:
     int _assignmentsTotal;
     QMultiHash<uint, uint> _pointsToDeadEnds;
     int _pointsToDeadEndHits;
+    const TypeInfoOracle* _oracle;
 };
 
 

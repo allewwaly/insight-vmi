@@ -9,10 +9,81 @@
 #include <abstractsyntaxtree.h>
 #include <astscopemanager.h>
 #include <cassert>
+#include <realtypes.h>
 #include <debug.h>
 
-ASTBuilder::ASTBuilder(AbstractSyntaxTree* ast)
-    : _ast(ast)
+namespace str
+{
+const int keyword_count = 63;
+const char* keyword_list[keyword_count] = {
+    "__alignof__",
+    "asm",
+    "__asm__",
+    "__attribute__",
+    "__attribute",
+    "auto",
+    "_Bool",
+    "break",
+    "__builtin_choose_expr",
+    "__builtin_constant_p",
+    "__builtin_expect",
+    "__builtin_extract_return_addr",
+    "__builtin_object_size",
+    "__builtin_offsetof",
+    "__builtin_prefetch",
+    "__builtin_return_address",
+    "__builtin_types_compatible_p",
+    "__builtin_va_arg",
+    "__builtin_va_copy",
+    "__builtin_va_end",
+    "__builtin_va_list",
+    "__builtin_va_start",
+    "case",
+    "char",
+    "const",
+    "__const__",
+    "continue",
+    "default",
+    "do",
+    "double",
+    "else",
+    "enum",
+    "__extension__",
+    "extern",
+    "float",
+    "for",
+    "goto",
+    "if",
+    "inline",
+    "__inline__",
+    "__inline",
+    "int",
+    "__label__",
+    "long",
+    "register",
+    "return",
+    "short",
+    "signed",
+    "__signed__",
+    "sizeof",
+    "static",
+    "struct",
+    "switch",
+    "typedef",
+    "typeof",
+    "__typeof__",
+    "__typeof",
+    "union",
+    "unsigned",
+    "void",
+    "volatile",
+    "__volatile__",
+    "while"
+};
+}
+
+ASTBuilder::ASTBuilder(AbstractSyntaxTree* ast, const TypeInfoOracle *oracle)
+    : _ast(ast), _oracle(oracle)
 {
     assert(_ast != 0);
 }
@@ -46,6 +117,10 @@ int ASTBuilder::buildFrom(const QString& fileName)
 bool ASTBuilder::isTypeName(pANTLR3_STRING name) const
 {
     QString s = _ast->antlrStringToStr(name);
+    // Ask the oracle, if given
+    if (_oracle && _oracle->isTypeName(s, rtTypedef))
+        return true;
+    // Try to find type ourself
     return _ast->_scopeMgr->currentScope() &&
            _ast->_scopeMgr->currentScope()
                ->find(s, ASTScope::ssTypedefs);

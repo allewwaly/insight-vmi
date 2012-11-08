@@ -38,6 +38,7 @@ class TypeEvalDetails;
 #include "memspecs.h"
 #include "astexpression.h"
 #include <astsymbol.h>
+#include <typeinfooracle.h>
 
 
 /**
@@ -172,7 +173,7 @@ typedef QVector<IdRevMapBucket> IdRevMapping;
 /**
  * Creates and holds all defined types and variables.
  */
-class SymFactory
+class SymFactory: public TypeInfoOracle
 {
     friend class Shell;
     friend class KernelSymbolReader;
@@ -518,7 +519,21 @@ public:
 
 	QMultiHash<int, int> seenMagicNumbers;
 
+	/**
+	 * Reimplementation from TypeInfoOracle::isTypeName()
+	 * \copydoc TypeInfoOracle::isTypeName()
+	 */
+	bool isTypeName(const QString& name, int types) const;
+
+	/**
+	 * Reimplementation from TypeInfoOracle::typeOfIdentifier()
+	 * \copydoc  TypeInfoOracle::typeOfIdentifier()
+	 */
+	ASTType* typeOfIdentifier(const QString& name, int types) const;
+
 protected:
+	ASTType* baseTypeToAstType(const BaseType* type) const;
+
 	void typeAlternateUsageStructMember(const TypeEvalDetails *ed,
 										const BaseType *targetBaseType,
 										ASTTypeEvaluator *eval);

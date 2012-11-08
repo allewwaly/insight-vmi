@@ -11,6 +11,7 @@
 #include <QString>
 #include <QStack>
 #include <astnode.h>
+#include <typeinfooracle.h>
 
 typedef QStack<pASTNode> ASTNodeQStack;
 
@@ -26,7 +27,7 @@ public:
      * Constructor
      * @param ast the AST this builder should work on
      */
-    ASTBuilder(AbstractSyntaxTree* ast);
+    ASTBuilder(AbstractSyntaxTree* ast, const TypeInfoOracle* oracle = 0);
 
     /**
      * Destructor
@@ -89,9 +90,12 @@ public:
      */
     inline AbstractSyntaxTree* ast() { return _ast; }
 
+    static const QSet<QString>& keywords();
+
 private:
     QStack<pASTNode> _parentStack;
     AbstractSyntaxTree* _ast;
+    const TypeInfoOracle* _oracle;
 };
 
 #endif /* ASTBUILDER_H_ */

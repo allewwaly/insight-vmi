@@ -1370,6 +1370,92 @@ void SymFactory::scanExternalVars(bool insertRemaining)
 }
 
 
+bool SymFactory::isTypeName(const QString &name, int types) const
+{
+    BaseTypeStringHash::const_iterator it = _typesByName.find(name);
+    while (it != _typesByName.constEnd() && it.key() == name) {
+        if (it.value()->type() & types)
+            return true;
+    }
+    return false;
+}
+
+
+ASTType *SymFactory::typeOfIdentifier(const QString &name, int types) const
+{
+    BaseTypeStringHash::const_iterator it = _typesByName.find(name);
+    while (it != _typesByName.constEnd() && it.key() == name) {
+        if (it.value()->type() & types) {
+            return baseTypeToAstType(it.value());
+        }
+    }
+    return 0;
+}
+
+
+ASTType* SymFactory::baseTypeToAstType(const BaseType* type) const
+{
+    ASTType *first = 0, *last = 0;
+
+    while (type) {
+        ASTType* t = 0;
+
+        switch (type->type()) {
+        case rtArray:
+            t = new ASTType(type->type(), 0,
+                            static_cast<const Array*>(type)->length());
+            break;
+
+        case rtBool16:
+        case rtBool32:
+        case rtBool64:
+        case rtBool8:
+        case rtInt16:
+        case rtInt32:
+        case rtInt64:
+        case rtInt8:
+        case rtUInt16:
+        case rtUInt32:
+        case rtUInt64:
+        case rtUInt8:
+        case rtDouble:
+        case rtFloat:
+        case rtFuncPointer:
+        case rtPointer:
+        case rtVoid:
+        case rtEnum:
+        case rtFunction:
+        case rtStruct:
+        case rtUnion:
+            t = new ASTType(type->type());
+            break;
+
+        default:
+            // Ignored
+            break;
+        }
+
+        if (t) {
+            t->setTypeId(type->id());
+            t->setIdentifier(type->name());
+            // Build ASTType chain in the same order that we see the BaseTypes
+            if (last)
+                last->setNext(t);
+            last = t;
+            if (!first)
+                first = last;
+        }
+        // Get next type in list
+        if (type->type() & RefBaseTypes)
+            type = dynamic_cast<const RefBaseType*>(type)->refType();
+        else
+            break;
+    }
+
+    return first;
+}
+
+
 void SymFactory::symbolsFinished(RestoreType rt)
 {
     // Replace all zero-sized structs
@@ -1865,8 +1951,14 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
     BaseTypeList baseTypes;
     bool isVarType = false, isNestedStruct = false;
 
+    // Did we create the ASTType ourself in baseTypeToAstType()?
+    if (astTypeNonPtr->typeId()) {
+        BaseType* nonPtrType = _typesById.value(astTypeNonPtr->typeId());
+        assert(nonPtrType != 0);
+        baseTypes += nonPtrType;
+    }
     // Is the context type a struct or union?
-    if (astTypeNonPtr->type() & (StructOrUnion|rtEnum)) {
+    else if (astTypeNonPtr->type() & (StructOrUnion|rtEnum)) {
         if (astTypeNonPtr->identifier().isEmpty()) {
             assert(astTypeNonPtr->node() != 0);
             // See if this struct appears in a typedef or a variable definition

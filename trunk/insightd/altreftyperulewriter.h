@@ -41,9 +41,11 @@ class Variable;
 class AltRefTypeRuleWriter
 {
 public:
-    AltRefTypeRuleWriter(const SymFactory* factory) : _factory(factory) {}
+    AltRefTypeRuleWriter(const SymFactory* factory): _factory(factory) {}
 
-    void write(const QString& name, const QString &baseDir) const;
+    int write(const QString& name, const QString &baseDir);
+
+    inline const QStringList& filesWritten() const { return _filesWritten; }
 
 private:
     QString write(const RefBaseType* rbt, const QDir &rulesDir) const;
@@ -55,6 +57,7 @@ private:
     QString fileNameEscape(QString s) const;
 
     const SymFactory* _factory;
+    QStringList _filesWritten;
     static int _indentation;
     static const QString _srcVar;
 };

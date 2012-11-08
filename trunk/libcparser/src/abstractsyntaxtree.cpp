@@ -10,6 +10,7 @@
 #include <abstractsyntaxtree.h>
 #include <astscopemanager.h>
 #include <debug.h>
+#include <QFile>
 
 AbstractSyntaxTree::AbstractSyntaxTree()
     : _scopeMgr(0), _rootNodes(0), _input(0), _lxr(0), _tstream(0), _psr(0)
@@ -61,7 +62,7 @@ void AbstractSyntaxTree::clear()
     }
 
     if (_tstream) {
-        _tstream ->free(_tstream);
+        _tstream->free(_tstream);
         _tstream = 0;
     }
 
@@ -71,7 +72,7 @@ void AbstractSyntaxTree::clear()
     }
 
     if (_input) {
-        _input->close(_input);
+        _input->close(_input); // also frees the data
         _input = 0;
     }
 }
@@ -94,6 +95,11 @@ int AbstractSyntaxTree::parse(const QByteArray& asciiText, ASTBuilder* builder)
 int AbstractSyntaxTree::parse(const QString& fileName, ASTBuilder* builder)
 {
     clear();
+
+    if (!QFile::exists(fileName)) {
+        debugerr("File not found: " << fileName);
+        return ANTLR3_ERR_NOFILE;
+    }
 
     _fileName = fileName;
     QByteArray s = fileName.toAscii();

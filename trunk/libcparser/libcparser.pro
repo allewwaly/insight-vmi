@@ -29,7 +29,8 @@ HEADERS += include/ast_interface.h \
     include/astsourceprinter.h \
     include/expressionevalexception.h \
     include/bitop.h \
-    include/astnodefinder.h
+    include/astnodefinder.h \
+    include/typeinfooracle.h
 SOURCES += src/astscopemanager.cpp \
     src/astsymbol.cpp \
     src/realtypes.cpp \

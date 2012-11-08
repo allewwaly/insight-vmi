@@ -161,11 +161,13 @@ Shell::Shell(bool listenOnSocket)
                 "  list types [<filter>]     List all types, optionally filtered by \n"
                 "                            filters <filter>\n"
                 "  list types-using <id>     List the types using type <id>\n"
+                "  list types-matching <id>  List the types matching rule <id>\n"
                 "  list types-by-id          List the types-by-ID hash\n"
                 "  list types-by-name        List the types-by-name hash\n"
                 "  list variables [<filter>] List all variables, optionally filtered by\n"
                 "                            filters <filter>\n"
-                "  list vars-using <id>      List the variables of type <id>"));
+                "  list vars-using <id>      List the variables of type <id>\n"
+                "  list vars-matching <id>   List the variables matching rule <id>"));
 
     _commands.insert("memory",
             Command(
@@ -2448,12 +2450,12 @@ int Shell::printRulesList(const list_t& rules,
     const int w_name = 25;
     const int w_matches = qstrlen("Match");
     const int w_actionType = qstrlen("script inline");
-    const int w_src = 25;
     const int w_colsep = 2;
     const int avail = tsize.width() - (w_index + w_name + w_matches +
-                                       w_actionType + w_src + 5*w_colsep + 1);
-    const int w_desc = avail >= 4 ? avail : 0;
-    const int w_total = w_index + w_name + w_matches + w_actionType + w_src +
+                                       w_actionType + 5*w_colsep + 1);
+    const int w_desc = avail >= 8 ? (avail >> 1) : 0;
+    const int w_file = avail - w_desc;
+    const int w_total = w_index + w_name + w_matches + w_actionType + w_file +
             w_desc + (w_desc > 0 ? 5 : 4)*w_colsep;
 
     bool headerPrinted = false;
@@ -2480,7 +2482,7 @@ int Shell::printRulesList(const list_t& rules,
                  << qSetFieldWidth(w_colsep) << " "
                  << qSetFieldWidth(w_actionType) << left << "Action"
                  << qSetFieldWidth(w_colsep) << " "
-                 << qSetFieldWidth(w_src) << "Source"
+                 << qSetFieldWidth(w_file) << "File:Line"
                  << qSetFieldWidth(0) << color(ctReset) << endl;
 
             hline(w_total);
@@ -2490,6 +2492,10 @@ int Shell::printRulesList(const list_t& rules,
         QString src = QString("%1:%2")
                     .arg(_sym.ruleEngine().ruleFile(rule))
                     .arg(rule->srcLine());
+
+        bool active = _sym.ruleEngine().ruleHits(index) > 0;
+        if (!active)
+            _out << color(ctDim);
 
         _out  << qSetFieldWidth(w_index)  << right << (index + 1)
               << qSetFieldWidth(w_colsep) << " "
@@ -2517,8 +2523,10 @@ int Shell::printRulesList(const list_t& rules,
         }
 
         _out << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_src) << ShellUtil::abbrvStrLeft(src, w_src)
+             << qSetFieldWidth(w_file) << ShellUtil::abbrvStrLeft(src, w_file)
              << qSetFieldWidth(0) << endl;
+        if (!active)
+            _out << color(ctReset);
 
         i = reverse ? i - 1 : i + 1;
     }
@@ -3480,7 +3488,14 @@ int Shell::cmdSymbolsWriteRules(QStringList args)
     }
 
     AltRefTypeRuleWriter writer(&_sym.factory());
-    writer.write(baseName, baseDir.absolutePath());
+    int ret = writer.write(baseName, baseDir.absolutePath());
+    if (!ret)
+        _out << "No file was written." << endl;
+    else
+        _out << "File " << color(ctBold)
+             << QDir::current().relativeFilePath(writer.filesWritten().first())
+             << color(ctReset) << " and "<< color(ctBold) << (ret - 1)
+             << color(ctReset) << " more have been written." << endl;
 
     return ecOk;
 }
