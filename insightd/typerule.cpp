@@ -363,13 +363,13 @@ ExpressionAction::~ExpressionAction()
 
 const BaseType* ExpressionAction::typeOfExpression(
         const QString &xmlFile, SymFactory *factory, const QString& what,
-        const QString& shortCode, const QByteArray& code, QString& id)
+        const QString& shortCode, const QString& code, QString& id)
 {
     AbstractSyntaxTree ast;
-    ASTBuilder builder(&ast);
+    ASTBuilder builder(&ast, factory);
 
     // Parse the code
-    if (builder.buildFrom(code) != 0)
+    if (builder.buildFrom(code.toAscii()) != 0)
         typeRuleError2(xmlFile, srcLine(), -1,
                        QString("Syntax error in %0: %1")
                             .arg(what)
@@ -387,7 +387,7 @@ const BaseType* ExpressionAction::typeOfExpression(
     }
 
     ASTTypeEvaluator t_eval(&ast, factory->memSpecs().sizeofLong,
-                           factory->memSpecs().sizeofPointer);
+                           factory->memSpecs().sizeofPointer, factory);
 
     // Evaluate type of first (hopefully only) init_declarator
     QList<const ASTNode*> initDecls =
@@ -398,17 +398,14 @@ const BaseType* ExpressionAction::typeOfExpression(
         astType = t_eval.typeofNode(initDecls.first());
     if (!astType)
         typeRuleError2(xmlFile, srcLine(), -1,
-                       QString("Error parsing expression: %1")
-                            .arg(QString(code)));
+                       QString("Error parsing expression: %1").arg(code));
 
     // Search correspondig BaseType
     FoundBaseTypes found =
             factory->findBaseTypesForAstType(astType, &t_eval, false);
     if (found.types.isEmpty())
         typeRuleError2(xmlFile, srcLine(), -1,
-                       QString("Cannot find %1: %2")
-                            .arg(what)
-                            .arg(QString(code)));
+                       QString("Cannot find %1: %2").arg(what).arg(code));
     else if (found.types.size() > 1)
         typeRuleError2(xmlFile, srcLine(), -1,
                        QString("The %1 is ambiguous, %2 types found for: %3")
@@ -452,17 +449,17 @@ bool ExpressionAction::check(const QString &xmlFile, SymFactory *factory)
     checkExprComplexity(xmlFile, _exprStr, "expression");
 
     QString dstId("__dest__"), srcId;
-    QByteArray code;
+    QString code;
 
     // Check target type
-    code = _targetTypeStr.toAscii() + " " + dstId.toAscii() + ";";
+    code = _targetTypeStr + " " + dstId + ";";
     _targetType = typeOfExpression(xmlFile, factory, "target type",
                                    _targetTypeStr, code, dstId);
     if (_targetType)
         _targetType = _targetType->dereferencedBaseType(BaseType::trLexical);
 
     // Check source type
-    code = _srcTypeStr.toAscii() + ";";
+    code = _srcTypeStr+ ";";
     _srcType = typeOfExpression(xmlFile, factory, "source type",
                                 _srcTypeStr, code, srcId);
 
@@ -482,9 +479,9 @@ bool ExpressionAction::check(const QString &xmlFile, SymFactory *factory)
 
     // Check complete expression
     AbstractSyntaxTree ast;
-    ASTBuilder builder(&ast);
-    code += " int " + dstId.toAscii() + " = " + _exprStr + ";";
-    if (builder.buildFrom(code) != 0)
+    ASTBuilder builder(&ast, factory);
+    code += " int " + dstId + " = " + _exprStr + ";";
+    if (builder.buildFrom(code.toAscii()) != 0)
         typeRuleError2(xmlFile, srcLine(), -1,
                        QString("Syntax error in expression: %1")
                             .arg(_exprStr));
@@ -563,10 +560,31 @@ Instance ExpressionAction::evaluate(const Instance *inst,
 QString ExpressionAction::toString(const ColorPalette *col) const
 {
     QString s;
+
     s += ShellUtil::colorize("Source type:", ctColHead, col) + " ";
-    s += (_srcType && col) ? col->prettyNameInColor(_srcType, 0) : _srcTypeStr;
+    if (_srcType) {
+        QString id = QString("0x%1").arg((uint)_srcType->id(), -8, 16);
+        if (col)
+            s += col->color(ctType) + id + col->color(ctReset) + " " +
+                    col->prettyNameInColor(_srcType, 0);
+        else
+            s += id + " " + _srcType->prettyName();
+    }
+    else
+        s += _srcTypeStr;
+
     s += "\n" + ShellUtil::colorize("Target type:", ctColHead, col) + " ";
-    s += (_targetType && col) ? col->prettyNameInColor(_targetType, 0) : _targetTypeStr;
+    if (_targetType) {
+        QString id = QString("0x%1").arg((uint)_targetType->id(), -8, 16);
+        if (col)
+            s += col->color(ctType) + id + col->color(ctReset) + " " +
+                    col->prettyNameInColor(_targetType, 0);
+        else
+            s += id + " " + _targetType->prettyName();
+    }
+    else
+        s += _targetTypeStr;
+
     s += "\n" + ShellUtil::colorize("Expression:", ctColHead, col) + "  ";
     s += _expr ? _expr->toString() : _exprStr;
     return s;

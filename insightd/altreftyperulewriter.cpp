@@ -19,8 +19,9 @@
 int AltRefTypeRuleWriter::_indentation = -1;
 const QString AltRefTypeRuleWriter::_srcVar("src");
 
-void AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir) const
+int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
 {
+    _filesWritten.clear();
     const MemSpecs& specs = _factory->memSpecs();
 
     // Check if directories exist
@@ -35,13 +36,14 @@ void AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir) co
         ioError(QString("Error opening file \"%1\" for writing.")
                     .arg(incFile.fileName()));
 
+    _filesWritten.append(incFile.fileName());
     QXmlStreamWriter writer(&incFile);
     writer.setAutoFormatting(true);
     writer.setAutoFormattingIndent(_indentation);
 
     // Begin document with a comment including guest OS details
     writer.writeStartDocument();
-    writer.writeComment(QString("\nFile created: %1\n%2")
+    writer.writeComment(QString("\nFile created on %1\n%2")
                            .arg(QDateTime::currentDateTime().toString())
                            .arg(specs.toString()));
 
@@ -74,8 +76,10 @@ void AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir) co
             const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(type);
             if (rbt->hasAltRefTypes()) {
                 fileName = write(rbt, rulesDir);
-                if (!fileName.isEmpty())
+                if (!fileName.isEmpty()) {
                     writer.writeTextElement(xml::include, fileName);
+                    _filesWritten.append(rulesDir.absoluteFilePath(fileName));
+                }
             }
         }
     }
@@ -83,13 +87,17 @@ void AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir) co
     foreach(const Variable* var, _factory->vars()) {
         if (var->hasAltRefTypes()) {
             fileName = write(var, rulesDir);
-            if (!fileName.isEmpty())
+            if (!fileName.isEmpty()) {
                 writer.writeTextElement(xml::include, fileName);
+                _filesWritten.append(rulesDir.absoluteFilePath(fileName));
+            }
         }
     }
 
     writer.writeEndElement(); // typeknowledge
     writer.writeEndDocument();
+
+    return _filesWritten.size();
 }
 
 
@@ -122,9 +130,9 @@ QString AltRefTypeRuleWriter::write(const Variable *var, const QDir &rulesDir) c
 
     // Begin document with a comment and type details
     writer.writeStartDocument();
-    writer.writeComment(QString("\nFile created: %1\n"
-                                "Variable:%2\n"
-                                "Variable ID:%3\n")
+    writer.writeComment(QString("\nFile created on %1\n"
+                                "Variable: %2\n"
+                                "Variable ID: 0x%3\n")
                             .arg(QDateTime::currentDateTime().toString())
                             .arg(var->prettyName())
                             .arg((uint)var->id(), 0, 16));
@@ -143,9 +151,8 @@ QString AltRefTypeRuleWriter::write(const Variable *var, const QDir &rulesDir) c
         assert(varExp->baseType() != 0);
         assert(art.expr() != 0);
 
-        QString srcTypePretty = varExp->baseType()->prettyName();
         QString exprStr = art.expr()->toString(true);
-        exprStr.replace("(" + srcTypePretty + ")", _srcVar);
+        exprStr.replace("(" + varExp->baseType()->prettyName() + ")", _srcVar);
 
          // Find the target base type
         const BaseType* target = var->factory()->findBaseTypeById(art.id());
@@ -187,7 +194,7 @@ QString AltRefTypeRuleWriter::write(const Variable *var, const QDir &rulesDir) c
 
         writer.writeStartElement(xml::action); // action
         writer.writeAttribute(xml::type, xml::expression);
-        writer.writeTextElement(xml::srcType, srcTypePretty + " " + _srcVar);
+        writer.writeTextElement(xml::srcType, varExp->baseType()->prettyName(_srcVar));
         writer.writeTextElement(xml::targetType, target->prettyName());
         writer.writeTextElement(xml::expression, exprStr);
         writer.writeEndElement(); // action
@@ -207,7 +214,8 @@ QString AltRefTypeRuleWriter::fileNameFromType(const BaseType *type) const
 {
     QString s = QString("type_%1.xml").arg(fileNameEscape(type->prettyName()));
     if (type->name().isEmpty())
-        s = s.replace(str::anonymous, QString("0x%1").arg((uint)type->id(), 0, 16));
+        s = s.replace(str::anonymous,
+                      QString("0x%1").arg((uint)type->id(), 0, 16));
     return s;
 }
 

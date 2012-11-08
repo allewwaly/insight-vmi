@@ -74,10 +74,10 @@ bool ASTType::equalTo(const ASTType* other, bool exactMatch) const
 
 
 ASTTypeEvaluator::ASTTypeEvaluator(AbstractSyntaxTree* ast, int sizeofLong,
-                                   int sizeofPointer)
+                                   int sizeofPointer, const TypeInfoOracle *oracle)
     : ASTWalker(ast), _sizeofLong(sizeofLong), _sizeofPointer(sizeofPointer),
       _phase(epFindSymbols), _pointsToRound(0), _assignments(0),
-      _assignmentsTotal(0), _pointsToDeadEndHits(0)
+      _assignmentsTotal(0), _pointsToDeadEndHits(0), _oracle(oracle)
 {
 }
 
@@ -4328,6 +4328,16 @@ ASTType* ASTTypeEvaluator::typeofTypeId(const ASTNode *node)
 	QString name = antlrTokenToStr(node->u.type_id.identifier);
 
 	const ASTSymbol* s = node->scope->find(name, ASTScope::ssTypedefs);
+	// If symbol not found, try the oracle
+	if (!s && _oracle) {
+		ASTType* type = _oracle->typeOfIdentifier(name, rtTypedef);
+		if (type) {
+			// Take ownership of objects and return the first
+			for (ASTType* t = type; t; t = t->next())
+				_allTypes.append(t);
+			return _types[node] = type;
+		}
+	}
 
 	if (!s || s->type() != stTypedef) {
 	    typeEvaluatorError(
