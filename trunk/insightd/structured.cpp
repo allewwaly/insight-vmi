@@ -460,10 +460,13 @@ RealType Struct::type() const
 }
 
 
-QString Struct::prettyName() const
+QString Struct::prettyName(const QString &varName) const
 {
-    return QString("struct %1").arg(_name.isEmpty() ?
-                                        QString(str::anonymous) : _name);
+    QString ret = QString("struct %1").arg(_name.isEmpty() ?
+                                               QString(str::anonymous) : _name);
+    if (!varName.isEmpty())
+        ret += " " + varName;
+    return ret;
 }
 
 
@@ -486,10 +489,13 @@ RealType Union::type() const
 }
 
 
-QString Union::prettyName() const
+QString Union::prettyName(const QString &varName) const
 {
-    return _name.isEmpty() ?
-                QString("union (anon.)") : QString("union %1").arg(_name);
+    QString ret = QString("union %1").arg(_name.isEmpty() ?
+                                              QString(str::anonymous) : _name);
+    if (!varName.isEmpty())
+        ret += " " + varName;
+    return ret;
 }
 
 

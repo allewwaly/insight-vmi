@@ -30,9 +30,12 @@ Symbol::~Symbol()
 }
 
 
-QString Symbol::prettyName() const
+QString Symbol::prettyName(const QString &varName) const
 {
-    return _name;
+    if (varName.isEmpty())
+        return _name;
+    else
+        return _name + " " + varName;
 }
 
 

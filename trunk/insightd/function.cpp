@@ -32,23 +32,24 @@ uint Function::hash(bool* isValid) const
 }
 
 
-QString Function::prettyName() const
+QString Function::prettyName(const QString &varName) const
 {
-	QString s, rt;
+	Q_UNUSED(varName);
+	QString param, func;
 	for (int i = 0; i < _params.size(); ++i) {
 		if (i > 0)
-			s += ", ";
-		s += _params[i]->prettyName();
+			param += ", ";
+		param += _params[i]->prettyName();
 	}
 	if (_refTypeId) {
 		if (refType())
-			rt = refType()->prettyName();
+			func = refType()->prettyName(_name);
 		else
-			rt = QString("(unresolved type 0x%1)").arg(_refTypeId, 0, 16);
+			func = QString("(unresolved type 0x%1) ").arg(_refTypeId, 0, 16) + _name;
 	}
 	else
-		rt = "void";
-	return QString("%1 %2(%3)").arg(rt).arg(_name).arg(s);
+		func = "void " + _name;
+	return func + "(" + param + ")";
 }
 
 

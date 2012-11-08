@@ -225,10 +225,9 @@ public:
 	virtual RealType type() const;
 
     /**
-     * This gives a pretty name of this struct.
-     * @return the pretty name of that type, e.g. "struct foo"
+     * \copydoc Symbol::prettyName()
      */
-    virtual QString prettyName() const;
+    virtual QString prettyName(const QString& varName = QString()) const;
 
 //    /**
 //     * @param mem the memory device to read the data from
@@ -264,10 +263,9 @@ public:
 	virtual RealType type() const;
 
     /**
-     * This gives a pretty name of this union.
-     * @return the pretty name of that type, e.g. "union foo"
+     * \copydoc Symbol::prettyName()
      */
-    virtual QString prettyName() const;
+    virtual QString prettyName(const QString& varName = QString()) const;
 
 //    /**
 //     * @param mem the memory device to read the data from

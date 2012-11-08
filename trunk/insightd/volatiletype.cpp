@@ -26,15 +26,16 @@ RealType VolatileType::type() const
 }
 
 
-QString VolatileType::prettyName() const
+QString VolatileType::prettyName(const QString& varName) const
 {
     const BaseType* t = refType();
     if (t)
-        return "volatile " + t->prettyName();
-    else if (refTypeId() == 0)
-        return "const void";
-    else
-        return "volatile";
+        return "volatile " + t->prettyName(varName);
+
+    QString ret(refTypeId() == 0 ? "volatile void" : "volatile");
+    if (!varName.isEmpty())
+        ret += " " + varName;
+    return ret;
 }
 
 

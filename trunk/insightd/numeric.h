@@ -51,32 +51,35 @@ public:
     }
 
     /**
-     * This gives a pretty name of that type which may involve referencing
-     * types.
-     * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
+     * \copydoc Symbol::prettyName()
      */
-    virtual QString prettyName() const
+    virtual QString prettyName(const QString& varName = QString()) const
     {
         if (!_name.isEmpty())
-            return BaseType::prettyName();
+            return BaseType::prettyName(varName);
 
+        QString ret;
         switch (realType) {
-        case rtInt8:   return "int8";
-        case rtUInt8:  return "uint8";
-        case rtBool8:  return "bool8";
-        case rtInt16:  return "int16";
-        case rtUInt16: return "uint16";
-        case rtBool16: return "bool16";
-        case rtInt32:  return "int32";
-        case rtUInt32: return "uint32";
-        case rtBool32: return "bool32";
-        case rtInt64:  return "int64";
-        case rtUInt64: return "uint64";
-        case rtBool64: return "bool64";
-        case rtFloat:  return "float";
-        case rtDouble: return "double";
-        default:       return QString();
+        case rtInt8:   ret = "int8"; break;
+        case rtUInt8:  ret = "uint8"; break;
+        case rtBool8:  ret = "bool8"; break;
+        case rtInt16:  ret = "int16"; break;
+        case rtUInt16: ret = "uint16"; break;
+        case rtBool16: ret = "bool16"; break;
+        case rtInt32:  ret = "int32"; break;
+        case rtUInt32: ret = "uint32"; break;
+        case rtBool32: ret = "bool32"; break;
+        case rtInt64:  ret = "int64"; break;
+        case rtUInt64: ret = "uint64"; break;
+        case rtBool64: ret = "bool64"; break;
+        case rtFloat:  ret = "float"; break;
+        case rtDouble: ret = "double"; break;
+        default: return varName;
         }
+
+        if (!varName.isEmpty())
+            ret += " " + varName;
+        return ret;
     }
 
 protected:

@@ -25,17 +25,16 @@ FuncPointer* FuncParam::belongsTo() const
 }
 
 
-QString FuncParam::prettyName() const
+QString FuncParam::prettyName(const QString &varName) const
 {
+    Q_UNUSED(varName);
     const BaseType* t = refType();
     const FuncPointer *fp = dynamic_cast<const FuncPointer*>(
                 refTypeDeep(BaseType::trAnyButTypedef));
     if (fp)
         return fp->prettyName(_name, dynamic_cast<const RefBaseType*>(t));
     else if (t)
-        return _name.isEmpty() ?
-                    t->prettyName() :
-                    QString("%1 %2").arg(t->prettyName()).arg(_name);
+        return t->prettyName(_name);
     else if (!_refTypeId)
         return _name.isEmpty() ?
                     QString("void") : QString("void %2").arg(_name);
