@@ -37,19 +37,19 @@ RealType Pointer::type() const
 }
 
 
-QString Pointer::prettyName() const
+QString Pointer::prettyName(const QString &varName) const
 {
     const BaseType* t = refType();
     const FuncPointer *fp = dynamic_cast<const FuncPointer*>(
                 refTypeDeep(trAnyButTypedef));
     if (fp)
-        return fp->prettyName(QString(), this);
+        return fp->prettyName(varName, this);
     else if (t)
-        return t->prettyName() + " *";
+        return t->prettyName(" *" + varName);
     else if (_refTypeId == 0)
-        return "void *";
+        return "void *" + varName;
     else
-    	return "(unresolved) *";
+        return "(unresolved) *" + varName;
 }
 
 

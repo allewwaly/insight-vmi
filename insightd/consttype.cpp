@@ -25,15 +25,16 @@ RealType ConstType::type() const
 }
 
 
-QString ConstType::prettyName() const
+QString ConstType::prettyName(const QString& varName) const
 {
     const BaseType* t = refType();
     if (t)
-        return "const " + t->prettyName();
-    else if (refTypeId() == 0)
-        return "const void";
-    else
-        return "const";
+        return "const " + t->prettyName(varName);
+
+    QString ret(refTypeId() == 0 ? "const void" : "const");
+    if (!varName.isEmpty())
+        ret += " " + varName;
+    return ret;
 }
 
 

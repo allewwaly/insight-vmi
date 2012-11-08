@@ -65,9 +65,9 @@ uint FuncPointer::hash(bool* isValid) const
 }
 
 
-QString FuncPointer::prettyName() const
+QString FuncPointer::prettyName(const QString& varName) const
 {
-    return prettyName(_name, 0);
+    return prettyName(varName, 0);
 }
 
 

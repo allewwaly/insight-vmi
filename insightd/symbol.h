@@ -60,9 +60,10 @@ public:
     /**
      * This gives a pretty name of that type which may involve referencing
      * types.
+     * @param varName optional name of a variable for pretty printing
      * @return the pretty name of that type, e.g. "const int[16]" or "const char *"
      */
-    virtual QString prettyName() const;
+    virtual QString prettyName(const QString& varName = QString()) const;
 
     /**
      * Returns the local ID of this type, as assigned by SymFactory.

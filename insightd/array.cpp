@@ -60,18 +60,19 @@ uint Array::hash(bool* isValid) const
 }
 
 
-QString Array::prettyName() const
+QString Array::prettyName(const QString &varName) const
 {
     QString len = (_length >= 0) ? QString::number(_length) : QString();
     const BaseType* t = refType();
     const FuncPointer *fp = dynamic_cast<const FuncPointer*>(
                 refTypeDeep(trAnyButTypedef));
+    QString ret = varName + QString("[%1]").arg(len);
     if (fp)
-        return fp->prettyName(QString(), this);
+        return fp->prettyName(ret, this);
     else if (t)
-        return QString("%1[%2]").arg(t->prettyName()).arg(len);
+        return t->prettyName(ret);
     else
-        return QString("[%1]").arg(len);
+        return "void " + ret;
 }
 
 
