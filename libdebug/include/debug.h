@@ -72,7 +72,15 @@ extern const char* userMailingList;
 #undef DEBUG_MERGE_TYPES_AFTER_PARSING
 //#define DEBUG_MERGE_TYPES_AFTER_PARSING 1
 
-
+#if !defined(_WIN32)
+#define DEBUG_COLOR_DIM "\033[" "0" ";" "90" "m"
+#define DEBUG_COLOR_ERR "\033[" "0" ";" "91" "m"
+#define DEBUG_COLOR_RST "\033[" "0" "m"
+#else
+#define DEBUG_COLOR_DIM ""
+#define DEBUG_COLOR_ERR ""
+#define DEBUG_COLOR_RST ""
+#endif
 
 // #	include <QTime>
 #	include <iomanip>
@@ -80,13 +88,13 @@ extern const char* userMailingList;
 
 #	ifndef assert
 #		define assert(x) if ( !(x) ) \
-					std::cerr << "(" << __FILE__ << ":" << __LINE__ << ") "\
-							<< " Assertion failed: " << #x << std::endl
+					std::cerr << DEBUG_COLOR_DIM "(" __FILE__ ":" << __LINE__ << ")"\
+								 DEBUG_COLOR_ERR " Assertion failed: " << #x << DEBUG_COLOR_RST << std::endl
 #	endif
 
-#	define debugerr(x) std::cerr << std::dec << "(" << __FILE__ << ":" << __LINE__ << ") " \
-								<< x << std::endl << std::flush
-#	define debugmsg(x) std::cout << std::dec << "(" __FILE__ ":" << __LINE__ << ") " \
+#	define debugerr(x) std::cerr << std::dec << DEBUG_COLOR_DIM "(" __FILE__ ":" << __LINE__ << ") " DEBUG_COLOR_ERR \
+								<< x << std::endl << DEBUG_COLOR_RST << std::flush
+#	define debugmsg(x) std::cout << std::dec << DEBUG_COLOR_DIM "(" __FILE__ ":" << __LINE__ << ") " DEBUG_COLOR_RST \
 								<< x << std::endl << std::flush
 /*#	define debugmsg(x) std::cout << std::dec << "(" << QTime::currentTime().toString("mm:ss.zzz").toStdString() << " " <<  __FILE__ << ":" << __LINE__ << ") " \
 								<< x << std::endl << std::flush*/
