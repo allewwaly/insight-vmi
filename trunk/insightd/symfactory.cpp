@@ -2548,7 +2548,7 @@ void SymFactory::typeAlternateUsageStructMember2(const TypeEvalDetails *ed,
                     ++_ambiguesAltTypes;
 
                 member->addAltRefType(targetBaseType->id(),
-                                      expr->clone(_expressions));
+                                      expr->copy(_expressions));
 
 //                if (ctxBaseTypes[i]->name() == "task_struct" &&
 //                    targetBaseType->prettyName().contains("task_struct"))
@@ -2682,7 +2682,7 @@ void SymFactory::typeAlternateUsageVar(const TypeEvalDetails* ed,
                     ++_ambiguesAltTypes;
 
                 vars[i]->addAltRefType(targetBaseType->id(),
-                                       expr->clone(_expressions));
+                                       expr->copy(_expressions));
             }
         }
         // Otherwise copy the type and apply the change to it

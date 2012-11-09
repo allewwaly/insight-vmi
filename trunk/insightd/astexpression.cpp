@@ -45,6 +45,23 @@ const char* expressionTypeToString(ExpressionType type)
 }
 
 
+ASTConstExpressionList ASTExpression::expandAlternatives(ASTConstExpressionList &list) const
+{
+    ASTConstExpressionList ret;
+    if (_alternative) {
+        // Clone ourself without the alternative
+        ASTExpression* self = this->copy(list, false);
+        self->_alternative = 0;
+        ret += self;
+        // Add all alternatives as separate elements
+        ret += _alternative->expandAlternatives(list);
+    }
+    else
+        ret += this;
+    return ret;
+}
+
+
 void ASTExpression::readFrom(KernelSymbolStream &in, SymFactory *factory)
 {
     // Read alternative
@@ -335,9 +352,10 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 }
 
 
-ASTExpression *ASTVariableExpression::clone(ASTExpressionList &list) const
+template<class list_t>
+ASTExpression* ASTVariableExpression::copyVarTempl(list_t &list, bool recursive) const
 {
-    ASTVariableExpression* expr = cloneTempl<ASTVariableExpression>(list);
+    ASTVariableExpression* expr = copyTempl<ASTVariableExpression>(list, recursive);
     // Set nodes to null
     for (int i = 0; i < expr->_transformations.size(); ++i)
         expr->_transformations[i].node = 0;
@@ -604,6 +622,34 @@ ExpressionResult ASTBinaryExpression::result(const Instance *inst) const
 }
 
 
+ASTConstExpressionList ASTBinaryExpression::expandAlternatives(ASTConstExpressionList &list) const
+{
+    ASTConstExpressionList llist, rlist, selflist, ret;
+    selflist = ASTExpression::expandAlternatives(list);
+    if (_left)
+        llist = _left->expandAlternatives(list);
+    if (_right)
+        rlist = _right->expandAlternatives(list);
+    // If we don't have alternatives, just return this' alternatives
+    if (llist.size() <= 1 && rlist.size() <= 1)
+        return selflist;
+    // For all alternatives of this, left and right, create new objects
+    for (int s = 0; s < selflist.size(); ++s) {
+        for (int l = 0; l < llist.size(); ++l) {
+            for (int r = 0; r < rlist.size(); ++r) {
+                ASTBinaryExpression* self =
+                        dynamic_cast<ASTBinaryExpression*>(
+                            selflist[s]->copy(list, false));
+                self->_left = const_cast<ASTExpression*>(llist[l]);
+                self->_right = const_cast<ASTExpression*>(rlist[r]);
+                ret += self;
+            }
+        }
+    }
+    return ret;
+}
+
+
 
 QString ASTBinaryExpression::operatorToString() const
 {
@@ -833,6 +879,29 @@ ExpressionResult ASTUnaryExpression::result(const Instance *inst) const
 }
 
 
+ASTConstExpressionList ASTUnaryExpression::expandAlternatives(ASTConstExpressionList &list) const
+{
+    ASTConstExpressionList clist, selflist, ret;
+    selflist = ASTExpression::expandAlternatives(list);
+    if (_child)
+        clist = _child->expandAlternatives(list);
+    // If we don't have alternatives, just return this' alternatives
+    if (clist.size() <= 1)
+        return selflist;
+    // For all alternatives of this, left and right, create new objects
+    for (int s = 0; s < selflist.size(); ++s) {
+        for (int c = 0; c < clist.size(); ++c) {
+                ASTUnaryExpression* self =
+                        dynamic_cast<ASTUnaryExpression*>(
+                                          selflist[s]->copy(list, false));
+                self->_child = const_cast<ASTExpression*>(clist[c]);
+                ret += self;
+        }
+    }
+    return ret;
+}
+
+
 QString ASTUnaryExpression::toString(bool compact) const
 {
     if (compact) {
@@ -859,6 +928,17 @@ void ASTUnaryExpression::writeTo(KernelSymbolStream &out) const
 {
     ASTExpression::writeTo(out);
     toStream(_child, out);
+}
+
+
+template<class list_t>
+ASTExpression* ASTUnaryExpression::copyUnaryTempl(list_t& list,
+                                                  bool recursive) const
+{
+    ASTUnaryExpression* expr = copyTempl<ASTUnaryExpression>(list, recursive);
+    if (recursive && _child)
+        expr->_child = _child->copy(list, recursive);
+    return expr;
 }
 
 

@@ -98,13 +98,13 @@ public:
      * Gives direct access to the alterantive referencing types
      * @return reference to the list of alternative types
      */
-    QList<AltRefType>& altRefTypes();
+    AltRefTypeList& altRefTypes();
 
     /**
      * Gives direct access to the alterantive referencing types (const version)
      * @return reference to the list of alternative types
      */
-    const QList<AltRefType>& altRefTypes() const;
+    const AltRefTypeList& altRefTypes() const;
 
     /**
      * When this symbol has alternative referencing type IDs and \a index is -1,
@@ -227,7 +227,7 @@ protected:
     mutable int _deepResolvedTypes;
     mutable quint32 _refTypeChangeClock;
 
-    QList<AltRefType> _altRefTypes; ///< a list of alternative types
+    AltRefTypeList _altRefTypes; ///< a list of alternative types
     static const AltRefType _emptyRefType;
 
 private:
@@ -284,12 +284,12 @@ inline int ReferencingType::altRefTypeCount() const
 }
 
 
-inline QList<AltRefType>& ReferencingType::altRefTypes()
+inline AltRefTypeList& ReferencingType::altRefTypes()
 {
     return _altRefTypes;
 }
 
-inline const QList<AltRefType>& ReferencingType::altRefTypes() const
+inline const AltRefTypeList& ReferencingType::altRefTypes() const
 {
     return _altRefTypes;
 }

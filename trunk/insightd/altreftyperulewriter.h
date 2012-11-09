@@ -3,7 +3,11 @@
 
 #include <QString>
 #include <QDir>
+#include <QFile>
+#include <QXmlStreamWriter>
+#include "memberlist.h"
 #include "genericexception.h"
+#include "altreftype.h"
 
 #define typeRuleWriterError(x) do { throw TypeRuleWriterException((x), __FILE__, __LINE__); } while (0)
 
@@ -52,9 +56,17 @@ private:
     QString write(const Structured* s, const QDir &rulesDir) const;
     QString write(const Variable* var, const QDir &rulesDir) const;
 
+    int write(QXmlStreamWriter &writer, const AltRefTypeList &altRefTypes,
+               const QString &varName, const BaseType *srcType,
+               const ConstMemberList &members) const;
+
+    void openXmlRuleFile(const QString& fileName, QFile& outFile,
+                     QXmlStreamWriter& writer, const QString &comment) const;
+
     QString fileNameFromType(const BaseType* type) const;
     QString fileNameFromVar(const Variable* var) const;
     QString fileNameEscape(QString s) const;
+    QString uniqueFileName(const QDir &dir, QString fileName) const;
 
     const SymFactory* _factory;
     QStringList _filesWritten;

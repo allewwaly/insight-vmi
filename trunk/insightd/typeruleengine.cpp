@@ -110,7 +110,18 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
             continue;
         }
 
-        rule->action()->check(ruleFile(rule), factory);
+        try {
+            rule->action()->check(ruleFile(rule), factory);
+        }
+        catch (GenericException& e) {
+            errRule(rule, QString("raised a %1 at %2:%3: %4")
+                    .arg(e.className())
+                    .arg(e.file)
+                    .arg(e.line)
+                    .arg(e.message));
+//            throw;
+        }
+
         QScriptProgramPtr prog;
 
         ActiveRule arule(i, rule, prog);
@@ -213,24 +224,38 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
 
 void TypeRuleEngine::warnRule(const TypeRule* rule, const QString &msg) const
 {
+    ruleMsg(rule, "Warning", msg, ctWarningLight, ctWarning);
+}
+
+
+void TypeRuleEngine::errRule(const TypeRule* rule, const QString &msg) const
+{
+    ruleMsg(rule, "Error", msg, ctErrorLight, ctError);
+}
+
+
+void TypeRuleEngine::ruleMsg(const TypeRule* rule, const QString &severity,
+                             const QString &msg,  ColorType light,
+                             ColorType normal) const
+{
     if (!rule)
         return;
 
-    shell->err() << shell->color(ctWarningLight) << "Warning: "
-                 << shell->color(ctWarning) << "Rule ";
+    shell->err() << shell->color(light) << severity << ": "
+                 << shell->color(normal) << "Rule ";
     if (!rule->name().isEmpty()) {
         shell->err() << shell->color(ctBold) << rule->name()
-                     << shell->color(ctWarning) << " ";
+                     << shell->color(normal) << " ";
     }
     if (rule->srcFileIndex() >= 0) {
         // Use as-short-as-possible file name
         QString file(ShellUtil::shortFileName(ruleFile(rule)));
 
         shell->err() << "defined in "
-                     << shell->color(ctBold) << file << shell->color(ctWarning)
+                     << shell->color(ctBold) << file << shell->color(normal)
                      << " line "
                      << shell->color(ctBold) << rule->srcLine()
-                     << shell->color(ctWarning) << " ";
+                     << shell->color(normal) << " ";
     }
 
     shell->err() << msg << shell->color((ctReset)) << endl;
