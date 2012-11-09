@@ -100,4 +100,6 @@ private:
     VarExprList _varExpr;
 };
 
+typedef QList<AltRefType> AltRefTypeList;
+
 #endif // ALTREFTYPE_H

@@ -130,7 +130,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(
                 ASTExpressionEvaluator other(_eval, _factory);
                 ASTExpression* expr = other.exprOfNode(node, ASTNodeNodeHash());
                 if (expr)
-                    expr = expr->clone(_allExpressions);
+                    expr = expr->copy(_allExpressions);
                 return expr;
             }
             // Otherwise raise an error

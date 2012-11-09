@@ -502,7 +502,7 @@ bool ExpressionAction::check(const QString &xmlFile, SymFactory *factory)
     _expr = e_eval.exprOfNode(init_nodes.first(), ptsTo);
     if (_expr)
         // Expression belongs to the evaluator, we need to clone it
-        _expr = _expr->clone(_exprList);
+        _expr = _expr->copy(_exprList);
     else
         typeRuleError2(xmlFile, srcLine(), -1,
                        QString("Error evaluating expression: %1")

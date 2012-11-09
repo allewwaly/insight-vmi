@@ -66,7 +66,11 @@ public:
     virtual ExpressionType type() const = 0;
     virtual int resultType() const = 0;
     virtual ExpressionResult result(const Instance* inst = 0) const = 0;
-    virtual ASTExpression* clone(ASTExpressionList& list) const = 0;
+    virtual ASTExpression* copy(ASTExpressionList& list,
+                                bool recursive = true) const = 0;
+    virtual ASTExpression* copy(ASTConstExpressionList& list,
+                                bool recursive = true) const = 0;
+    virtual ASTConstExpressionList expandAlternatives(ASTConstExpressionList &list) const;
     virtual QString toString(bool compact = false) const = 0;
 
     inline virtual bool equals(const ASTExpression* other) const
@@ -119,13 +123,13 @@ public:
     static void toStream(const ASTExpression *expr, KernelSymbolStream &out);
 
 protected:
-    template<class T>
-    T* cloneTempl(ASTExpressionList& list) const
+    template<class T, class list_t>
+    T* copyTempl(list_t& list, bool recursive) const
     {
         T* expr = new T(*dynamic_cast<const T*>(this));
         list.append(expr);
-        if (_alternative)
-            expr->_alternative = _alternative->clone(list);
+        if (recursive && _alternative)
+            expr->_alternative = _alternative->copy(list, recursive);
         return expr;
     }
 
@@ -134,6 +138,8 @@ protected:
     {
         if (type == this->type())
             list->append(this);
+        if (_alternative)
+            _alternative->findExpressions(type, list);
     }
 
     inline virtual void findExpressions(ExpressionType type,
@@ -170,9 +176,16 @@ public:
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 
-    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* copy(ASTExpressionList& list,
+                                       bool recursive = true) const
     {
-        return cloneTempl<ASTUndefinedExpression>(list);
+        return copyTempl<ASTUndefinedExpression>(list, recursive);
+    }
+
+    inline virtual ASTExpression* copy(ASTConstExpressionList& list,
+                                             bool recursive = true) const
+    {
+        return copyTempl<ASTUndefinedExpression>(list, recursive);
     }
 
     inline virtual QString toString(bool compact = false) const
@@ -204,9 +217,16 @@ public:
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 
-    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* copy(ASTExpressionList& list,
+                                       bool recursive = true) const
     {
-        return cloneTempl<ASTVoidExpression>(list);
+        return copyTempl<ASTVoidExpression>(list, recursive);
+    }
+
+    inline virtual ASTExpression* copy(ASTConstExpressionList& list,
+                                       bool recursive = true) const
+    {
+        return copyTempl<ASTVoidExpression>(list, recursive);
     }
 
     inline virtual QString toString(bool compact = false) const
@@ -238,9 +258,16 @@ public:
         return ExpressionResult(resultType(), esInt32, 0ULL);
     }
 
-    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* copy(ASTExpressionList& list,
+                                       bool recursive = true) const
     {
-        return cloneTempl<ASTRuntimeExpression>(list);
+        return copyTempl<ASTRuntimeExpression>(list, recursive);
+    }
+
+    inline virtual ASTExpression* copy(ASTConstExpressionList& list,
+                                       bool recursive = true) const
+    {
+        return copyTempl<ASTRuntimeExpression>(list, recursive);
     }
 
     inline virtual QString toString(bool compact = false) const
@@ -280,9 +307,16 @@ public:
         return _value;
     }
 
-    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* copy(ASTExpressionList& list,
+                                       bool recursive = true) const
     {
-        return cloneTempl<ASTConstantExpression>(list);
+        return copyTempl<ASTConstantExpression>(list, recursive);
+    }
+
+    inline virtual ASTExpression* copy(ASTConstExpressionList& list,
+                                       bool recursive = true) const
+    {
+        return copyTempl<ASTConstantExpression>(list, recursive);
     }
 
     inline virtual QString toString(bool compact = false) const
@@ -350,10 +384,20 @@ public:
         return _valueSet ? erConstant : erUndefined;
     }
 
-    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* copy(ASTExpressionList& list,
+                                       bool recursive = true) const
     {
         ASTEnumeratorExpression* expr =
-                cloneTempl<ASTEnumeratorExpression>(list);
+                copyTempl<ASTEnumeratorExpression>(list, recursive);
+        expr->_symbol = 0;
+        return expr;
+    }
+
+    inline virtual ASTExpression* copy(ASTConstExpressionList& list,
+                                       bool recursive = true) const
+    {
+        ASTEnumeratorExpression* expr =
+                copyTempl<ASTEnumeratorExpression>(list, recursive);
         expr->_symbol = 0;
         return expr;
     }
@@ -401,7 +445,17 @@ public:
 
     virtual ExpressionResult result(const Instance* inst = 0) const;
 
-    virtual ASTExpression* clone(ASTExpressionList& list) const;
+    inline virtual ASTExpression* copy(ASTExpressionList& list,
+                                       bool recursive = true) const
+    {
+        return copyVarTempl(list, recursive);
+    }
+
+    inline virtual ASTExpression* copy(ASTConstExpressionList& list,
+                                       bool recursive = true) const
+    {
+        return copyVarTempl(list, recursive);
+    }
 
     inline const BaseType* baseType() const
     {
@@ -421,6 +475,8 @@ public:
     virtual void writeTo(KernelSymbolStream &out) const;
 
 protected:
+    template<class list_t>
+    ASTExpression* copyVarTempl(list_t& list, bool recursive) const;
     const BaseType* _baseType;
     bool _global;
     SymbolTransformations _transformations;
@@ -470,15 +526,19 @@ public:
 
     virtual ExpressionResult result(const Instance* inst = 0) const;
 
-    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* copy(ASTExpressionList& list,
+                                       bool recursive = true) const
     {
-        ASTBinaryExpression* expr = cloneTempl<ASTBinaryExpression>(list);
-        if (_left)
-            expr->_left = _left->clone(list);
-        if (_right)
-            expr->_right = _right->clone(list);
-        return expr;
+        return copyBinaryTempl(list, recursive);
     }
+
+    inline virtual ASTExpression* copy(ASTConstExpressionList& list,
+                                       bool recursive = true) const
+    {
+        return copyBinaryTempl(list, recursive);
+    }
+
+    virtual ASTConstExpressionList expandAlternatives(ASTConstExpressionList& list) const;
 
     virtual QString toString(bool compact) const;
 
@@ -500,6 +560,18 @@ public:
     virtual void writeTo(KernelSymbolStream &out) const;
 
 protected:
+    template<class list_t>
+    inline ASTExpression* copyBinaryTempl(list_t& list, bool recursive) const
+    {
+        ASTBinaryExpression* expr = copyTempl<ASTBinaryExpression>(list, recursive);
+        if (recursive && _left)
+            expr->_left = _left->copy(list, recursive);
+        if (recursive && _right)
+            expr->_right = _right->copy(list, recursive);
+        return expr;
+    }
+
+
     QString operatorToString() const;
 
     inline virtual void findExpressions(ExpressionType type,
@@ -560,13 +632,19 @@ public:
 
     virtual ExpressionResult result(const Instance* inst = 0) const;
 
-    inline virtual ASTExpression* clone(ASTExpressionList& list) const
+    inline virtual ASTExpression* copy(ASTExpressionList& list,
+                                       bool recursive = true) const
     {
-        ASTUnaryExpression* expr = cloneTempl<ASTUnaryExpression>(list);
-        if (_child)
-            expr->_child = _child->clone(list);
-        return expr;
+        return copyUnaryTempl(list, recursive);
     }
+
+    inline virtual ASTExpression* copy(ASTConstExpressionList& list,
+                                       bool recursive = true) const
+    {
+        return copyUnaryTempl(list, recursive);
+    }
+
+    virtual ASTConstExpressionList expandAlternatives(ASTConstExpressionList& list) const;
 
     virtual QString toString(bool compact) const;
 
@@ -584,6 +662,9 @@ public:
     virtual void writeTo(KernelSymbolStream &out) const;
 
 protected:
+    template<class list_t>
+    ASTExpression* copyUnaryTempl(list_t& list, bool recursive) const;
+
     QString operatorToString() const;
 
     inline virtual void findExpressions(ExpressionType type,

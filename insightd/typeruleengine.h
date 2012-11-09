@@ -7,6 +7,7 @@
 #include <QSharedPointer>
 #include <QScriptProgram>
 #include <QScriptValue>
+#include "colorpalette.h"
 #include "memberlist.h"
 
 class TypeRule;
@@ -195,7 +196,9 @@ private:
 
 //    void warnEvalError(const ScriptEngine* eng, const QString& fileName) const;
     void warnRule(const TypeRule *rule, const QString& msg) const;
-
+    void errRule(const TypeRule *rule, const QString& msg) const;
+    void ruleMsg(const TypeRule* rule, const QString &severity,
+                 const QString &msg, ColorType light,  ColorType normal) const;
     const OsFilter* insertOsFilter(const OsFilter* osf);
 
     TypeRuleList _rules;
