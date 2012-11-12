@@ -364,35 +364,52 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 if (!varExp || skip)
                     continue;
 
-                // We expect that the members in the array match the ones
-                // within the transformations
-                int j = 0;
-                for (int i = 0; !skip && i < memberNames.size(); ++i) {
-                    // Skip anonymous member
-                    if (memberNames[i].isEmpty())
-                        continue;
-                    // Forward to the first member
-                    while (!skip && j < varExp->transformations().size() &&
-                           varExp->transformations().at(j).type != ttMember)
-                        ++j;
-                    if (j >= varExp->transformations().size() ||
-                        memberNames[i] != varExp->transformations().at(j).member)
-                    {
-                        skip = true;
-                        writer.writeComment(QString(" Member names in expression"
-                                                    " %1 do not match members "
-                                                    "in %2.%3. ")
-                                            .arg(expr->toString())
-                                            .arg(srcType->name())
-                                            .arg(memberNames.join("."))
-                                            .replace("--", "- - ")); // avoid "--" in comments
+                QString skipReason;
+                // Look for unsupported transformations in the form of
+                // 'member,dereference,member', e.g. 's->foo->bar'
+                bool m_found = false, m_deref_found = false;
+                int m_idx = 0;
+                foreach (const SymbolTransformation& trans,
+                         varExp->transformations())
+                {
+                    if (trans.type == ttMember) {
+                        m_found = true;
+                        // Skip transformations like 's->foo->bar'
+                        if (m_deref_found) {
+                            skip = true;
+                            skipReason =
+                                    QString("Expression %1 contains a member "
+                                            "access, dereference, " "and again "
+                                            "member access in %2.%3.")
+                                                .arg(expr->toString())
+                                                .arg(srcType->name())
+                                                .arg(memberNames.join("."));
+                        }
+                        // We expect that the members in the array match the ones
+                        // within the transformations
+                        else if (m_idx < memberNames.size() &&
+                                 trans.member != memberNames[m_idx])
+                        {
+                            skip = true;
+                            skipReason =
+                                    QString("Member names in expression %1 do "
+                                            "not match members in %2.%3.")
+                                                .arg(expr->toString())
+                                                .arg(srcType->name())
+                                                .arg(memberNames.join("."));
+                        }
+                        ++m_idx;
                     }
-                    else
-                        ++j;
+                    else if (trans.type == ttDereference && m_found)
+                        m_deref_found = true;
                 }
 
-                if (skip)
+                if (skip) {
+                    if (!skipReason.isEmpty())
+                        // avoid "--" in comments
+                        writer.writeComment(" " + skipReason.replace("--", "- - ") + " ");
                     continue;
+                }
 
                 QString exprStr = expr->toString(true);
                 exprStr.replace("(" + varExp->baseType()->prettyName() + ")", _srcVar);
@@ -426,11 +443,22 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 if (varExp->transformations().memberCount() > 0) {
                     writer.writeStartElement(xml::members); // members
                     // Add a filter rule for each member
+                    int i = 0;
                     foreach (const SymbolTransformation& trans,
                              varExp->transformations())
                     {
-                        if (trans.type == ttMember)
+                        if (trans.type == ttMember) {
+                            while (i < memberNames.size() &&
+                                   memberNames[i].isEmpty())
+                            {
+                                writer.writeTextElement(xml::member, QString());
+                                ++i;
+                            }
+                            assert(i >= memberNames.size() ||
+                                   memberNames[i] == trans.member);
+                            ++i;
                             writer.writeTextElement(xml::member, trans.member);
+                        }
                     }
                     writer.writeEndElement(); // members
                 }
