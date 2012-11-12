@@ -226,6 +226,7 @@ private Q_SLOTS:
 
     void parseDataType();
     void parseTypeName();
+    void parseTypeId();
     void parseVarName();
     void parseFileName();
     void parseSize();
@@ -233,6 +234,7 @@ private Q_SLOTS:
 
     void setDataType();
     void setTypeName();
+    void setTypeId();
     void setVarName();
     void setFileName();
     void setSize();
@@ -435,6 +437,42 @@ void TypeFilterTest::parseTypeName()
     QVERIFY(f.matchType(type_a));
     QVERIFY(f.matchType(type_b));
     QVERIFY(!f.matchType(type_int));
+}
+
+
+void TypeFilterTest::parseTypeId()
+{
+    TypeFilter f;
+
+    f.parseOption("typeid", QString("%1").arg(type_a->id(), 0, 16));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
+
+    f.parseOption("typeid", QString("0x%1").arg(type_a->id(), 0, 16));
+    QVERIFY(f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
+
+    f.parseOption("typeid", QString("%1").arg(type_b->id(), 0, 16));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
+
+    f.parseOption("typeid", QString("0x%1").arg(type_b->id(), 0, 16));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(f.matchType(type_b));
+    QVERIFY(!f.matchType(type_int));
+
+    f.parseOption("typeid", QString("%1").arg(type_int->id(), 0, 16));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
+
+    f.parseOption("typeid", QString("0x%1").arg(type_int->id(), 0, 16));
+    QVERIFY(!f.matchType(type_a));
+    QVERIFY(!f.matchType(type_b));
+    QVERIFY(f.matchType(type_int));
 }
 
 
@@ -796,6 +834,26 @@ void TypeFilterTest::setTypeName()
     TEST_TYPE_NAME_ANY("b", Filter::psAny, true, true, true, true, true);
     TEST_TYPE_NAME_ANY("int", Filter::psAny, true, true, true, true, true);
     TEST_TYPE_NAME_ANY(QString(), Filter::psAny, true, true, true, true, true);
+}
+
+
+void TypeFilterTest::setTypeId()
+{
+    TypeFilter f;
+    VariableFilter vf;
+
+#define TEST_TYPE_ID(id, ta, tb, ti) \
+    f.setTypeId(id); \
+    vf.setTypeId(id); \
+    QCOMPARE(f.typeId(), id); \
+    QCOMPARE(f.filterActive(Filter::ftTypeId), true); \
+    QCOMPARE(vf.typeId(), id); \
+    QCOMPARE(vf.filterActive(Filter::ftTypeId), true); \
+    VERIFY_F_VF(ta, tb, ti, ta, tb)
+
+    TEST_TYPE_ID(type_a->id(), true, false, false);
+    TEST_TYPE_ID(type_b->id(), false, true, false);
+    TEST_TYPE_ID(type_int->id(), false, false, true);
 }
 
 
