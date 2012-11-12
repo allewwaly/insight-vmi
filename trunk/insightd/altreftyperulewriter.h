@@ -8,6 +8,7 @@
 #include "memberlist.h"
 #include "genericexception.h"
 #include "altreftype.h"
+#include "longoperation.h"
 
 #define typeRuleWriterError(x) do { throw TypeRuleWriterException((x), __FILE__, __LINE__); } while (0)
 
@@ -42,14 +43,19 @@ class RefBaseType;
 class Structured;
 class Variable;
 
-class AltRefTypeRuleWriter
+class AltRefTypeRuleWriter: public LongOperation
 {
 public:
-    AltRefTypeRuleWriter(const SymFactory* factory): _factory(factory) {}
+    AltRefTypeRuleWriter(SymFactory* factory): _factory(factory) {}
 
     int write(const QString& name, const QString &baseDir);
 
     inline const QStringList& filesWritten() const { return _filesWritten; }
+
+    /**
+     * \copydoc LongOperation::operationProgress()
+     */
+    void operationProgress();
 
 private:
     QString write(const RefBaseType* rbt, const QDir &rulesDir) const;
@@ -68,8 +74,10 @@ private:
     QString fileNameEscape(QString s) const;
     QString uniqueFileName(const QDir &dir, QString fileName) const;
 
-    const SymFactory* _factory;
+    SymFactory* _factory;
     QStringList _filesWritten;
+    int _totalSymbols;
+    int _symbolsDone;
     static int _indentation;
     static const QString _srcVar;
 };

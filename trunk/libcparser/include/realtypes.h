@@ -113,6 +113,12 @@ static const int StructOrUnion =
     rtStruct |
     rtUnion;
 
+/// All descendents of BaseType
+static const int AllBaseTypes =
+    NumericTypes |
+    RefBaseTypes |
+    StructOrUnion;
+
 QString realTypeToStr(RealType type);
 
 #endif /* REALTYPES_H_ */

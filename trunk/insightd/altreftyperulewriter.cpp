@@ -10,6 +10,9 @@
 #include "refbasetype.h"
 #include "variable.h"
 #include "astexpression.h"
+#include "typerule.h"
+#include "typeruleexception.h"
+#include "shell.h"
 #include <debug.h>
 #include <QXmlStreamWriter>
 #include <QDir>
@@ -22,6 +25,10 @@ const QString AltRefTypeRuleWriter::_srcVar("src");
 
 int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
 {
+    _symbolsDone = 0;
+    _totalSymbols = _factory->types().size() + _factory->vars().size();
+    operationStarted();
+
     _filesWritten.clear();
     const MemSpecs& specs = _factory->memSpecs();
 
@@ -72,7 +79,11 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
 
     // Go through all variables and types and write the information
     QString fileName;
-    foreach(const BaseType* type, _factory->types()) {
+    for (int i = 0; !interrupted() && i < _factory->types().size(); ++i) {
+        ++_symbolsDone;
+        checkOperationProgress();
+
+        const BaseType* type = _factory->types().at(i);
         if (type->type() & RefBaseTypes) {
             const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(type);
             if (rbt->hasAltRefTypes()) {
@@ -93,7 +104,11 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
         }
     }
 
-    foreach(const Variable* var, _factory->vars()) {
+    for (int i = 0; !interrupted() && i < _factory->vars().size(); ++i) {
+        ++_symbolsDone;
+        checkOperationProgress();
+
+        const Variable* var = _factory->vars().at(i);
         if (var->hasAltRefTypes()) {
             fileName = write(var, rulesDir);
             if (!fileName.isEmpty()) {
@@ -106,7 +121,20 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
     writer.writeEndElement(); // typeknowledge
     writer.writeEndDocument();
 
+    operationStopped();
+    forceOperationProgress();
+
     return _filesWritten.size();
+}
+
+
+void AltRefTypeRuleWriter::operationProgress()
+{
+    QString s = QString("\rWriting rules (%0%), %1 elapsed, %2 files written")
+            .arg((int)((_symbolsDone / (float) _totalSymbols) * 100.0))
+            .arg(elapsedTime())
+            .arg(_filesWritten.size());
+    shellOut(s, false);
 }
 
 
@@ -142,6 +170,18 @@ QString AltRefTypeRuleWriter::write(const Structured *s, const QDir &rulesDir) c
     ConstMemberList members;
     QStack<int> memberIndex;
     const Structured *cur = s;
+    const BaseType* srcType = s;
+    // If s is an anonymous struct/union, try to find a typedef defining it
+    if (s->name().isEmpty()) {
+        BaseTypeList list = _factory->typesUsingId(s->id());
+        foreach (const BaseType* t, list) {
+            if (t->type() == rtTypedef) {
+                srcType = t;
+                break;
+            }
+        }
+    }
+
     int i = 0, count = 0;
     while (i < cur->members().size()) {
         const StructuredMember *m = cur->members().at(i);
@@ -155,7 +195,7 @@ QString AltRefTypeRuleWriter::write(const Structured *s, const QDir &rulesDir) c
                                     .arg((uint)s->id(), 0, 16));
             }
             // Write the rule
-            count += write(writer, m->altRefTypes(), QString(), s, members);
+            count += write(writer, m->altRefTypes(), QString(), srcType, members);
         }
 
         // Use members and memberIndex to recurse through nested structs
@@ -236,13 +276,41 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 continue;
 
             // Find non-pointer source type
-            const BaseType* srcTypeNonPtr = srcType->dereferencedBaseType();
+            const BaseType* srcTypeNonTypedef =
+                    srcType->dereferencedBaseType(BaseType::trLexical);
+            const BaseType* srcTypeNonPtr =
+                    srcTypeNonTypedef->dereferencedBaseType(BaseType::trAny);
+            // Check if we can use the target name or if we need to use the ID
+            bool srcUseId = srcTypeNonPtr->name().isEmpty();
 
             // Find the target base type
             const BaseType* target = _factory->findBaseTypeById(art.id());
+            const BaseType* targetNonPtr = target ?
+                        target->dereferencedBaseType(BaseType::trAny) : 0;
             if (!target)
                 typeRuleWriterError(QString("Cannot find base type with ID 0x%1.")
                                     .arg((uint)art.id(), 0, 16));
+            // Check if we can use the target name or if we need to use the ID
+            bool targetUseId = false;
+            if (!targetNonPtr || targetNonPtr->name().isEmpty() ||
+                _factory->findBaseTypesByName(targetNonPtr->name()).size() > 1)
+            {
+                try {
+                    QString s, targetStr = target->prettyName("__dest__");
+                    ExpressionAction action;
+                    const BaseType *t = action.parseTypeStr(QString(), 0, _factory,
+                                                            QString(),
+                                                            target->prettyName(),
+                                                            targetStr + ";", s);
+                    Q_UNUSED(t);
+                }
+                catch (TypeRuleException& e) {
+                    targetUseId =
+                            (e.errorCode == TypeRuleException::ecTypeAmbiguous) ||
+                            (e.errorCode == TypeRuleException::ecNotCompatible);
+                }
+            }
+
 
             // Flaten the expression tree of alternatives
             ASTConstExpressionList alternatives = art.expr()->expandAlternatives(tmpExp);
@@ -263,9 +331,9 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                         // to proceed
                         if (!veTypeNonPtr || srcTypeNonPtr->id() != veTypeNonPtr->id()) {
                             writer.writeComment(
-                                        QString("Source type in expression is "
+                                        QString(" Source type in expression is "
                                                 "'%1' does not match base type "
-                                                "'%2' of candidate %3.%4.")
+                                                "'%2' of candidate %3.%4. ")
                                                 .arg(expr->toString())
                                                 .arg(srcType->prettyName())
                                                 .arg(srcType->name())
@@ -311,9 +379,9 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                         memberNames[i] != varExp->transformations().at(j).member)
                     {
                         skip = true;
-                        writer.writeComment(QString("Member names in expression"
+                        writer.writeComment(QString(" Member names in expression"
                                                     " %1 do not match members "
-                                                    "in %2.%3.")
+                                                    "in %2.%3. ")
                                             .arg(expr->toString())
                                             .arg(srcType->name())
                                             .arg(memberNames.join("."))
@@ -342,8 +410,18 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 writer.writeStartElement(xml::filter); // filter
                 if (!varName.isEmpty())
                     writer.writeTextElement(xml::variablename, varName);
-                writer.writeTextElement(xml::datatype, realTypeToStr(srcType->type()));
-                writer.writeTextElement(xml::type_name, srcType->name());
+                writer.writeTextElement(xml::datatype,
+                                        realTypeToStr(srcTypeNonTypedef->type()));
+                // Use the type name, if we can, otherwise the type ID
+                // TODO: Check if type name + members is ambiguous
+                if (!srcUseId)
+                    writer.writeTextElement(xml::type_name,
+                                            srcTypeNonTypedef->name());
+                else {
+                    writer.writeComment(QString(" Source type '%1' is anonymous ").arg(srcTypeNonTypedef->prettyName()));
+                    writer.writeTextElement(xml::type_id,
+                                            QString("0x%0").arg((uint)srcTypeNonTypedef->id(), 0, 16));
+                }
 
                 if (varExp->transformations().memberCount() > 0) {
                     writer.writeStartElement(xml::members); // members
@@ -360,8 +438,25 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
 
                 writer.writeStartElement(xml::action); // action
                 writer.writeAttribute(xml::type, xml::expression);
-                writer.writeTextElement(xml::srcType, varExp->baseType()->prettyName(_srcVar));
-                writer.writeTextElement(xml::targetType, target->prettyName());
+                // Use the source type name, if it is unique
+                if (!srcUseId)
+                    writer.writeTextElement(xml::srcType, srcType->prettyName(_srcVar));
+                else {
+                    writer.writeComment(QString(" Source type '%1' is ambiguous ").arg(srcType->prettyName()));
+                    writer.writeTextElement(xml::srcType,
+                                            QString("0x%0 %1")
+                                                .arg((uint)srcType->id(), 0, 16)
+                                                .arg(_srcVar));
+                }
+                // Use the target type name, if it is unique
+                if (!targetUseId)
+                    writer.writeTextElement(xml::targetType, target->prettyName());
+                else {
+                    writer.writeComment(QString(" Target type '%1' is ambiguous ").arg(target->prettyName()));
+                    writer.writeTextElement(xml::targetType,
+                                            QString("0x%0").arg((uint)target->id(), 0, 16));
+                }
+
                 writer.writeTextElement(xml::expression, exprStr);
                 writer.writeEndElement(); // action
 

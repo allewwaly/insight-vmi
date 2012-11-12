@@ -322,6 +322,13 @@ QString GenericFilter::toString(const ColorPalette *col) const
                 .arg(ShellUtil::colorize(_typeName, ctType, col));
     }
 
+    else if (filterActive(ftTypeId)) {
+        QString id = QString("0x%0").arg((uint)_typeId, 0, 16);
+        s += QString("%0 %1\n")
+                .arg(ShellUtil::colorize("Type ID:", ctColHead, col))
+                .arg(ShellUtil::colorize(id, ctTypeId, col));
+    }
+
     if (filterActive(ftRealType)) {
         s += ShellUtil::colorize("Data type:", ctColHead, col) + " ";
         bool first = true;
