@@ -64,10 +64,16 @@ public:
     ColorPalette();
 
     /**
-     * @return the current enabled color mode
+     * Returns the current enabled color mode.
      * \sa ColorMode
      */
-    ColorMode colorMode() const;
+    inline ColorMode colorMode() const { return _allowColor ? _mode : cmOff; }
+
+    /**
+     * Sets the color mode
+     * @param mode
+     */
+    inline void setColorMode(ColorMode mode) { _mode = mode; }
 
     /**
      * @return \c true of color mode is currently enabled, \c false otherwise
@@ -113,6 +119,7 @@ private:
                                     const RefBaseType* from) const;
 
     bool _allowColor;
+    ColorMode _mode;
 };
 
 #endif // COLORPALETTE_H
