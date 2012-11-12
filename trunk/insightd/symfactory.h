@@ -220,11 +220,21 @@ public:
      * Retrieves a type by its name.
      * @param name the name of the type to retrieve
      * @return the requested type, if found, \c null otherwise
+     * \sa findBaseTypesByName()
 	 */
 	BaseType* findBaseTypeByName(const QString& name) const;
 
     /**
      * Searches for types based on wildcards or regular expressions
+     * @param name the pattern to match the types' name against
+     * @param realTypes OR'ed combinaction of accepted types
+     * @return a list of types with name \a name
+     */
+    BaseTypeList findBaseTypesByName(const QString& name,
+                                     int realTypes = AllBaseTypes) const;
+
+    /**
+     * Retrieves all BaseTypes with the given name.
      * @param pattern the pattern to match the types' name against
      * @param syntax the pattern syntax that was used
      * @param sensitivity case sensitivity for name match
@@ -232,11 +242,11 @@ public:
      *
      * \warning This function uses regular expressions which are costly to
      * evaluate. If you are searching one particular type, use the regular
-     * findBaseTypeByName() method instead.
+     * findBaseTypeByNames() method instead.
      */
     BaseTypeList findBaseTypesByName(
             const QString& pattern,
-            QRegExp::PatternSyntax syntax = QRegExp::WildcardUnix,
+            QRegExp::PatternSyntax syntax,
             Qt::CaseSensitivity sensitivity = Qt::CaseSensitive) const;
 
     /**
