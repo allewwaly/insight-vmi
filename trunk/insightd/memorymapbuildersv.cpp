@@ -15,6 +15,8 @@
 #include "array.h"
 #include "memorymapverifier.h"
 #include "memorymapheuristics.h"
+#include "structured.h"
+#include "structuredmember.h"
 #include <debug.h>
 
 

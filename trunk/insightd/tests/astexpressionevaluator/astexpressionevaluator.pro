@@ -4,6 +4,8 @@ include(../../../config.pri)
 TEMPLATE = app
 TARGET = astexpressionevaluatortester
 HEADERS += astexpressionevaluatortester.h \
+    ../../altreftype.h \
+    ../../altreftyperulewriter.h \
     ../../array.h \
     ../../astexpressionevaluator.h \
     ../../astexpression.h \
@@ -47,6 +49,7 @@ HEADERS += astexpressionevaluatortester.h \
     ../../referencingtype.h \
     ../../scriptengine.h \
     ../../shell.h \
+    ../../shellutil.h \
     ../../slubobjects.h \
     ../../sourceref.h \
     ../../structured.h \
@@ -63,6 +66,8 @@ HEADERS += astexpressionevaluatortester.h \
     ../../volatiletype.h
 
 SOURCES += astexpressionevaluatortester.cpp \
+    ../../altreftype.cpp \
+    ../../altreftyperulewriter.cpp \
     ../../array.cpp \
     ../../astexpression.cpp \
     ../../astexpressionevaluator.cpp \
@@ -105,6 +110,7 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../referencingtype.cpp \
     ../../scriptengine.cpp \
     ../../shell.cpp \
+    ../../shellutil.cpp \
     ../../shell_readline.cpp \
     ../../slubobjects.cpp \
     ../../sourceref.cpp \

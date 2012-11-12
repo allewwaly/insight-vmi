@@ -10,6 +10,7 @@
 #include "virtualmemory.h"
 #include "pointer.h"
 #include "funcpointer.h"
+#include "symfactory.h"
 #include <debug.h>
 
 StructuredMember::StructuredMember(SymFactory* factory)

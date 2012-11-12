@@ -53,9 +53,15 @@ public:
     inline static QString colorize(const QString& s, ColorType c,
                                    const ColorPalette *col)
     {
+        // Avoid unnecessary dependencies for test builds
+#ifndef QT_TESTLIB_LIB
         if (col)
             return col->color(c) + s + col->color(ctReset);
         else
+#else
+        Q_UNUSED(c);
+        Q_UNUSED(col);
+#endif /* TESTLIB */
             return s;
     }
 

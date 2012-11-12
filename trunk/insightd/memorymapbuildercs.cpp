@@ -13,6 +13,8 @@
 #include "virtualmemory.h"
 #include "virtualmemoryexception.h"
 #include "array.h"
+#include "structured.h"
+#include "structuredmember.h"
 #include <debug.h>
 
 

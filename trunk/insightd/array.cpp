@@ -10,6 +10,7 @@
 #include "virtualmemoryexception.h"
 #include <debug.h>
 #include "colorpalette.h"
+#include "symfactory.h"
 
 Array::Array(SymFactory* factory)
     : Pointer(factory), _length(-1)

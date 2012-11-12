@@ -6,6 +6,7 @@
  */
 
 #include "referencingtype.h"
+#include "symfactory.h"
 #include "basetype.h"
 #include "refbasetype.h"
 #include "pointer.h"

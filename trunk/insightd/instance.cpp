@@ -6,6 +6,7 @@
  */
 
 #include "instance.h"
+#include "symfactory.h"
 #include "variable.h"
 #include "instancedata.h"
 #include "structured.h"

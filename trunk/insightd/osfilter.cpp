@@ -187,6 +187,11 @@ QString OsFilter::toString(const ColorPalette *col) const
     } while (0)
 
     QString s;
+
+#ifdef QT_TESTLIB_LIB
+    // Avoid unnecessary dependencies of test classes
+    Q_UNUSED(col);
+#else
     if (_osFamilies) {
         s += ShellUtil::colorize("OS type:", ctColHead, col) + " ";
         bool first = true;
@@ -227,6 +232,8 @@ QString OsFilter::toString(const ColorPalette *col) const
     if (!_maxVer.isEmpty())
         s += ShellUtil::colorize("Max. version:", ctColHead, col) + " " +
                 _maxVer.join(".") + "\n";
+
+#endif /* QT_TESTLIB_LIB */
     return s;
 }
 
