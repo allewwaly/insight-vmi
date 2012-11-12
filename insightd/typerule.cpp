@@ -368,10 +368,12 @@ ExpressionAction::~ExpressionAction()
 const BaseType* ExpressionAction::parseTypeStr(
         const QString &xmlFile, const TypeRule *rule, SymFactory *factory,
         const QString& what, const QString& typeStr, const QString& typeCode,
-        QString& id) const
+        QString& id, bool *usesTypeId) const
 {
     // Did we get a type name or a type ID?
     if (typeStr.startsWith("0x")) {
+        if (usesTypeId)
+            *usesTypeId = true;
         QStringList typeStrParts = typeStr.split(QRegExp("\\s+"));
         if (typeStrParts.isEmpty() || typeStrParts.size() > 2)
             typeRuleError2(xmlFile, srcLine(), -1,
@@ -400,6 +402,8 @@ const BaseType* ExpressionAction::parseTypeStr(
             id = typeStrParts.last();
         return ret;
     }
+    else if (usesTypeId)
+        *usesTypeId = false;
 
     // We got a type name expression, so parse it with the C parser
     AbstractSyntaxTree ast;
@@ -520,17 +524,19 @@ bool ExpressionAction::check(const QString &xmlFile, const TypeRule *rule,
     QString code;
 
     // Check target type
+    bool targetUsesId = false;
     code = _targetTypeStr + " " + dstId + ";";
     _targetType = parseTypeStr(xmlFile, 0, factory, "target type",
-                               _targetTypeStr, code, dstId);
+                               _targetTypeStr, code, dstId, &targetUsesId);
 
     if (_targetType)
         _targetType = _targetType->dereferencedBaseType(BaseType::trLexical);
 
     // Check source type
+    bool srcUsesId = false;
     code = _srcTypeStr + ";";
     _srcType = parseTypeStr(xmlFile, rule, factory, "source type",
-                            _srcTypeStr, code, srcId);
+                            _srcTypeStr, code, srcId, &srcUsesId);
 
     // Is the srcId valid?
     if (srcId.isEmpty())
@@ -550,8 +556,8 @@ bool ExpressionAction::check(const QString &xmlFile, const TypeRule *rule,
     AbstractSyntaxTree ast;
     ASTBuilder builder(&ast, factory);
     // If the type was specified via ID, we have to use the type here
-    if (code.startsWith("0x"))
-        code = _srcType->prettyName(srcId) + ";";
+    if (srcUsesId)
+        code = QString("__0x%0__ %1;").arg((uint)_srcType->id(), 0, 16).arg(srcId);
     code += " int " + dstId + " = " + _exprStr + ";";
     if (builder.buildFrom(code.toAscii()) != 0)
         typeRuleError2(xmlFile, srcLine(), -1,
