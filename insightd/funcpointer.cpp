@@ -8,6 +8,7 @@
 #include "funcpointer.h"
 #include "array.h"
 #include "colorpalette.h"
+#include <bitop.h>
 
 FuncPointer::FuncPointer(SymFactory* factory)
     : RefBaseType(factory)

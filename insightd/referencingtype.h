@@ -297,8 +297,6 @@ inline const AltRefTypeList& ReferencingType::altRefTypes() const
 #endif /* REFERENCINGTYPE_H_ */
 
 
-#include "symfactory.h"
-
 #if !defined(REFERENCINGTYPE_H_INLINE) && defined(SYMFACTORY_DEFINED)
 #define REFERENCINGTYPE_H_INLINE
 

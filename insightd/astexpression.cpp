@@ -3,6 +3,7 @@
 #include "expressionevalexception.h"
 #include "instance.h"
 #include "structured.h"
+#include "symfactory.h"
 
 
 const char* expressionTypeToString(ExpressionType type)

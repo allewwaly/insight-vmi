@@ -40,6 +40,8 @@ CONFIG(with_readline) {
 }
 
 SOURCES += tst_typefiltertest.cpp \
+    $$ROOT_DIR/insightd/altreftype.cpp \
+    $$ROOT_DIR/insightd/altreftyperulewriter.cpp \
     $$ROOT_DIR/insightd/array.cpp \
     $$ROOT_DIR/insightd/astexpression.cpp \
     $$ROOT_DIR/insightd/astexpressionevaluator.cpp \
@@ -77,6 +79,7 @@ SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/referencingtype.cpp \
     $$ROOT_DIR/insightd/scriptengine.cpp \
     $$ROOT_DIR/insightd/shell.cpp \
+    $$ROOT_DIR/insightd/shellutil.cpp \
     $$ROOT_DIR/insightd/shell_readline.cpp \
     $$ROOT_DIR/insightd/sourceref.cpp \
     $$ROOT_DIR/insightd/structured.cpp \
@@ -96,11 +99,63 @@ SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/xmlschema.cpp \
     $$ROOT_DIR/libcparser/src/genericexception.cpp
 
-HEADERS += $$ROOT_DIR/insightd/typefilter.h \
+HEADERS += \
+    $$ROOT_DIR/insightd/altreftype.h \
+    $$ROOT_DIR/insightd/altreftyperulewriter.h \
+    $$ROOT_DIR/insightd/array.h \
+    $$ROOT_DIR/insightd/astexpression.h \
+    $$ROOT_DIR/insightd/astexpressionevaluator.h \
+    $$ROOT_DIR/insightd/basetype.h \
+    $$ROOT_DIR/insightd/colorpalette.h \
+    $$ROOT_DIR/insightd/compileunit.h \
+    $$ROOT_DIR/insightd/consttype.h \
+    $$ROOT_DIR/insightd/enum.h \
+    $$ROOT_DIR/insightd/expressionresult.h \
+    $$ROOT_DIR/insightd/funcparam.h \
+    $$ROOT_DIR/insightd/funcpointer.h \
+    $$ROOT_DIR/insightd/function.h \
+    $$ROOT_DIR/insightd/instanceclass.h \
+    $$ROOT_DIR/insightd/instance.h \
+    $$ROOT_DIR/insightd/instancedata.h \
     $$ROOT_DIR/insightd/instanceprototype.h \
+    $$ROOT_DIR/insightd/kernelsourceparser.h \
+    $$ROOT_DIR/insightd/kernelsourcetypeevaluator.h \
+    $$ROOT_DIR/insightd/kernelsymbolparser.h \
+    $$ROOT_DIR/insightd/kernelsymbolreader.h \
     $$ROOT_DIR/insightd/kernelsymbolsclass.h \
+    $$ROOT_DIR/insightd/kernelsymbols.h \
+    $$ROOT_DIR/insightd/kernelsymbolstream.h \
+    $$ROOT_DIR/insightd/kernelsymbolwriter.h \
+    $$ROOT_DIR/insightd/longoperation.h \
+    $$ROOT_DIR/insightd/memorydump.h \
     $$ROOT_DIR/insightd/memorydumpsclass.h \
+    $$ROOT_DIR/insightd/memspecparser.h \
+    $$ROOT_DIR/insightd/memspecs.h \
+    $$ROOT_DIR/insightd/numeric.h \
+    $$ROOT_DIR/insightd/osfilter.h \
+    $$ROOT_DIR/insightd/pointer.h \
+    $$ROOT_DIR/insightd/programoptions.h \
+    $$ROOT_DIR/insightd/refbasetype.h \
+    $$ROOT_DIR/insightd/referencingtype.h \
+    $$ROOT_DIR/insightd/scriptengine.h \
     $$ROOT_DIR/insightd/shell.h \
+    $$ROOT_DIR/insightd/shellutil.h \
+    $$ROOT_DIR/insightd/sourceref.h \
+    $$ROOT_DIR/insightd/structured.h \
+    $$ROOT_DIR/insightd/structuredmember.h \
+    $$ROOT_DIR/insightd/symbol.h \
+    $$ROOT_DIR/insightd/symfactory.h \
+    $$ROOT_DIR/insightd/typedef.h \
+    $$ROOT_DIR/insightd/typefilter.h \
+    $$ROOT_DIR/insightd/typeinfo.h \
+    $$ROOT_DIR/insightd/typerule.h \
+    $$ROOT_DIR/insightd/typeruleengine.h \
+    $$ROOT_DIR/insightd/typeruleparser.h \
+    $$ROOT_DIR/insightd/typerulereader.h \
+    $$ROOT_DIR/insightd/variable.h \
+    $$ROOT_DIR/insightd/virtualmemory.h \
+    $$ROOT_DIR/insightd/volatiletype.h \
+    $$ROOT_DIR/insightd/xmlschema.h \
     $$ROOT_DIR/libcparser/include/genericexception.h
 
 

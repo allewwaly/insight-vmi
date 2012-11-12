@@ -28,7 +28,9 @@ LIBS += -L$$ROOT_DIR/libdebug$$BUILD_DIR -l$$DEBUG_LIB
 
 SOURCES += tst_osfiltertest.cpp \
     $$ROOT_DIR/insightd/osfilter.cpp \
+    $$ROOT_DIR/insightd/shellutil.cpp \
     $$ROOT_DIR/libcparser/src/genericexception.cpp
 HEADERS += $$ROOT_DIR/insightd/osfilter.h \
+    $$ROOT_DIR/insightd/shellutil.h \
     $$ROOT_DIR/libcparser/include/genericexception.h
 

@@ -1,4 +1,5 @@
 #include "function.h"
+#include <bitop.h>
 
 Function::Function(SymFactory* factory)
 	: FuncPointer(factory), _inlined(false), _pcLow(0), _pcHigh(0)
