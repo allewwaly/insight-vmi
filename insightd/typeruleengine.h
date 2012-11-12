@@ -9,6 +9,7 @@
 #include <QScriptValue>
 #include "colorpalette.h"
 #include "memberlist.h"
+#include "longoperation.h"
 
 class TypeRule;
 class TypeRuleReader;
@@ -55,7 +56,7 @@ typedef QHash<uint, const OsFilter*> OsFilterHash;
 /**
  * This class manages a set of rules that have to be applied to certain types.
  */
-class TypeRuleEngine
+class TypeRuleEngine: protected LongOperation
 {
 public:
     /// Result of matching an Instance against the rule set
@@ -190,6 +191,11 @@ public:
     int match(const Instance* inst, const ConstMemberList &members,
               Instance **newInst) const;
 
+    /**
+     * \copydoc LongOperation::operationProgress()
+     */
+    void operationProgress();
+
 private:
     Instance evaluateRule(const ActiveRule &arule, const Instance* inst,
                               const ConstMemberList &members, bool *matched) const;
@@ -208,6 +214,7 @@ private:
     QStringList _ruleFiles;
     QVector<int> _hits;
     ScriptEngine *_eng;
+    int _rulesChecked;
 };
 
 #endif // TYPERULEENGINE_H
