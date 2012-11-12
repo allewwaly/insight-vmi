@@ -538,7 +538,8 @@ public:
     const BaseType* parseTypeStr(const QString &xmlFile, const TypeRule *rule,
                                  SymFactory *factory, const QString &what,
                                  const QString &typeStr,
-                                 const QString &typeCode, QString& id) const;
+                                 const QString &typeCode, QString& id,
+                                 bool *usesTypeId = 0) const;
 
 private:
     bool checkExprComplexity(const QString &xmlFile, const QString &what,

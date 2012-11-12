@@ -34,6 +34,10 @@
 
 #define factoryError(x) do { throw FactoryException((x), __FILE__, __LINE__); } while (0)
 
+namespace str
+{
+const char* rx_type_id_typedef = "__0x([0-9a-fA-F]+)__";
+}
 
 //------------------------------------------------------------------------------
 
@@ -1372,6 +1376,18 @@ void SymFactory::scanExternalVars(bool insertRemaining)
 
 bool SymFactory::isTypeName(const QString &name, int types) const
 {
+    // Type names in the form '__0xcafe__' are specially crafted by the
+    // ExpressionAction class and are directly mapped to the type name
+    if (name.startsWith("__")) {
+        QRegExp rx(str::rx_type_id_typedef);
+        if (rx.exactMatch(name)) {
+            bool ok;
+            int id = rx.cap(1).toUInt(&ok, 16);
+            if (ok)
+                return _typesById.contains(id);
+        }
+    }
+
     BaseTypeStringHash::const_iterator it = _typesByName.find(name);
     while (it != _typesByName.constEnd() && it.key() == name) {
         if (it.value()->type() & types)
@@ -1383,6 +1399,18 @@ bool SymFactory::isTypeName(const QString &name, int types) const
 
 ASTType *SymFactory::typeOfIdentifier(const QString &name, int types) const
 {
+    // Type names in the form '__0xcafe__' are specially crafted by the
+    // ExpressionAction class and are directly mapped to the type name
+    if (name.startsWith("__")) {
+        QRegExp rx(str::rx_type_id_typedef);
+        if (rx.exactMatch(name)) {
+            bool ok;
+            int id = rx.cap(1).toUInt(&ok, 16);
+            if (ok)
+                return baseTypeToAstType(_typesById.value(id));
+        }
+    }
+
     BaseTypeStringHash::const_iterator it = _typesByName.find(name);
     while (it != _typesByName.constEnd() && it.key() == name) {
         if (it.value()->type() & types) {
