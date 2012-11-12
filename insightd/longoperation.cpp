@@ -72,6 +72,12 @@ QString LongOperation::elapsedTimeVerbose() const
 }
 
 
+bool LongOperation::interrupted() const
+{
+    return shell && shell->interrupted();
+}
+
+
 void LongOperation::shellOut(const QString &s, bool newline)
 {
 

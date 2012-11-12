@@ -72,6 +72,11 @@ protected:
     QString elapsedTimeVerbose() const;
 
     /**
+     * Returns \c true if the operation was interrupted, \c false otherwise.
+     */
+    bool interrupted() const;
+
+    /**
      * Outputs string \a s to the shell, overwriting the complete last line
      * that was output without line break.
      * @param s the string to print
