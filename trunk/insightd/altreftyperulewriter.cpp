@@ -306,9 +306,20 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                     Q_UNUSED(t);
                 }
                 catch (TypeRuleException& e) {
-                    targetUseId =
-                            (e.errorCode == TypeRuleException::ecTypeAmbiguous) ||
-                            (e.errorCode == TypeRuleException::ecNotCompatible);
+                    if ((e.errorCode == TypeRuleException::ecTypeAmbiguous) ||
+                        (e.errorCode == TypeRuleException::ecNotCompatible))
+                        targetUseId = true;
+                    else {
+                        if (e.errorCode == TypeRuleException::ecSyntaxError) {
+                            debugmsg(QString("Soure type '%1' (0x%2) produced a syntax error for expression %3 = %4 (0x%5)")
+                                     .arg(srcType->prettyName())
+                                     .arg((uint)srcType->id(), 0, 16)
+                                     .arg(art.expr()->toString())
+                                     .arg(target->prettyName())
+                                     .arg((uint)target->id(), 0, 16));
+                        }
+                        throw;
+                    }
                 }
             }
 

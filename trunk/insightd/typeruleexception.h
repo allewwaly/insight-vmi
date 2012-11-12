@@ -26,6 +26,7 @@ class TypeRuleException: public GenericException
 public:
     enum ErrorCode {
         ecUnknown,
+        ecSyntaxError,
         ecTypeAmbiguous,
         ecNotCompatible
     };

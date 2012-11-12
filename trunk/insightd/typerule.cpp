@@ -411,7 +411,7 @@ const BaseType* ExpressionAction::parseTypeStr(
 
     // Parse the code
     if (builder.buildFrom(typeCode.toAscii()) != 0)
-        typeRuleError2(xmlFile, srcLine(), -1,
+        typeRuleError3(xmlFile, srcLine(), -1, TypeRuleException::ecSyntaxError,
                        QString("Syntax error in %0: %1")
                             .arg(what)
                             .arg(typeStr));
