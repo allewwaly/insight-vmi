@@ -20,6 +20,7 @@ namespace xml
 {
 extern const char* datatype;
 extern const char* type_name;
+extern const char* type_id;
 extern const char* variablename;
 extern const char* filename;
 extern const char* size;
@@ -59,8 +60,9 @@ enum Option {
     ftTypeNameLiteral  = (1 << 6),  ///< literal type name match
     ftTypeNameWildcard = (1 << 7),  ///< wildcard name match
     ftTypeNameRegEx    = (1 << 8),  ///< QRegExp type name match
-    ftRealType         = (1 << 9),  ///< match RealType of type
-    ftSize             = (1 << 10), ///< match type size
+    ftTypeId           = (1 << 9),  ///< match type ID
+    ftRealType         = (1 << 10), ///< match RealType of type
+    ftSize             = (1 << 11), ///< match type size
     ftTypeNameAll      = ftTypeNameAny|ftTypeNameLiteral|ftTypeNameWildcard|ftTypeNameRegEx,  ///< any kind of type name matching
     ftVarNameAll       = ftVarNameAny|ftVarNameLiteral|ftVarNameWildcard|ftVarNameRegEx  ///< any kind of variable name matching
 };
@@ -80,7 +82,8 @@ public:
      * Default constructor
      */
     GenericFilter()
-        : _filters(Filter::ftNone), _typeRegEx(0),_realTypes(0), _size(0) {}
+        : _filters(Filter::ftNone), _typeRegEx(0), _typeId(0), _realTypes(0),
+          _size(0) {}
 
     /**
      * Copy constructor
@@ -154,6 +157,18 @@ public:
      * \sa typeName(), setTypeName()
      */
     Filter::PatternSyntax typeNameSyntax() const;
+
+    /**
+     * Returns the type ID to match.
+     * @return type ID
+     */
+    inline int typeId() const { return _typeId; }
+
+    /**
+     * Sets the type ID to match
+     * @param id new type ID
+     */
+    inline void setTypeId(int id) { _typeId = id; _filters |= Filter::ftTypeId; }
 
     /**
      * Returns the RealTypes this filter matches.
@@ -242,6 +257,7 @@ protected:
 private:
     QString _typeName;
     QRegExp *_typeRegEx;
+    int _typeId;
     int _realTypes;
     quint32 _size;
 };
