@@ -100,7 +100,7 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
     // Checking the rules from last to first assures that rules in the
     // _activeRules hash are processes first to last. That way, if multiple
     // rules match the same instance, the first rule takes precedence.
-    for (int i = _rules.size() - 1; i >= 0; --i) {
+    for (int i = _rules.size() - 1; !interrupted() && i >= 0; --i) {
         ++_rulesChecked;
         checkOperationProgress();
 
