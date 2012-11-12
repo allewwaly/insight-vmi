@@ -373,9 +373,23 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                          varExp->transformations())
                 {
                     if (trans.type == ttMember) {
-                        m_found = true;
+                        // Does the source type has this member?
+                        if (!m_found) {
+                            m_found = true;
+                            const Structured* s =
+                                    dynamic_cast<const Structured*>(srcTypeNonPtr);
+                            if (!s || !s->memberExists(trans.member, true)) {
+                                skip = true;
+                                skipReason =
+                                        QString("Source type '%1' has no member"
+                                                " named %2 in expression %3.")
+                                                .arg(srcTypeNonPtr->prettyName())
+                                                .arg(trans.member)
+                                                .arg(expr->toString());
+                            }
+                        }
                         // Skip transformations like 's->foo->bar'
-                        if (m_deref_found) {
+                        else if (m_deref_found) {
                             skip = true;
                             skipReason =
                                     QString("Expression %1 contains a member "
@@ -387,8 +401,8 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                         }
                         // We expect that the members in the array match the ones
                         // within the transformations
-                        else if (m_idx < memberNames.size() &&
-                                 trans.member != memberNames[m_idx])
+                        if (m_idx < memberNames.size() &&
+                            trans.member != memberNames[m_idx])
                         {
                             skip = true;
                             skipReason =
