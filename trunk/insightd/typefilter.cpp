@@ -6,12 +6,14 @@
 #include "structuredmember.h"
 #include "instance_def.h"
 #include "shellutil.h"
+#include "symfactory.h"
 
 
 namespace xml
 {
 const char* datatype     = "datatype";
 const char* type_name    = "typename";
+const char* type_id      = "typeid";
 const char* variablename = "variablename";
 const char* filename     = "filename";
 const char* size         = "size";
@@ -51,13 +53,23 @@ using namespace Filter;
             filterError(QString("Illegal integer number: %1").arg(s)); \
     } while (0)
 
+#define parseUInt16(i, s, ok) \
+    do { \
+        if (s.startsWith("0x")) \
+            i = s.right(s.size() - 2).toUInt(ok, 16); \
+        else \
+            i = s.toUInt(ok, 16); \
+        if (!(*ok)) \
+            filterError(QString("Illegal integer number: %1").arg(s)); \
+    } while (0)
+
 //------------------------------------------------------------------------------
 // GenericFilter
 //------------------------------------------------------------------------------
 
 GenericFilter::GenericFilter(const GenericFilter& from)
     : _filters(from._filters), _typeName(from._typeName), _typeRegEx(0),
-      _realTypes(from._realTypes), _size(from._size)
+      _typeId(from._typeId), _realTypes(from._realTypes), _size(from._size)
 {
     if (from._typeRegEx)
         _typeRegEx = new QRegExp(*from._typeRegEx);
@@ -88,6 +100,7 @@ GenericFilter &GenericFilter::operator=(const GenericFilter &src)
 {
     _filters = src._filters;
     _typeName = src._typeName;
+    _typeId = src._typeId;
     _realTypes = src._realTypes;
     _size = src._size;
     if (_typeRegEx) {
@@ -120,6 +133,10 @@ bool GenericFilter::parseOption(const QString &key, const QString &value,
 
     if (QString(xml::type_name).startsWith(key))
         setTypeName(v, givenSyntax(keyVals));
+    else if (QString(xml::type_id).startsWith(key) && key.length() >= 5) {
+        parseUInt16(u, v, &ok);
+        setTypeId((int)u);
+    }
     else if (QString(xml::size).startsWith(key)) {
         parseUInt(u, v, &ok);
         setSize(u);
@@ -160,6 +177,8 @@ bool GenericFilter::matchType(const BaseType *type) const
     if (filterActive(ftRealType) && !(type->type() & _realTypes))
         return false;
     else if (filterActive(ftSize) && type->size() != _size)
+        return false;
+    else if (filterActive(ftTypeId) && type->id() != _typeId)
         return false;
     else if (filterActive(ftTypeNameAll) && !matchTypeName(type->name()))
         return false;
@@ -566,6 +585,7 @@ const KeyValueStore &TypeFilter::supportedFilters()
         typeFilters[xml::type_name] = "Match type name, either by a literal match, by a "
                 "wildcard expression *glob*, or by a regular expression "
                 "/re/.";
+        typeFilters[xml::type_id] = "Match type ID, given as hex number.";
         typeFilters[xml::datatype] = "Match actual type, e.g. \"FuncPointer\" or \"UInt*\".";
         typeFilters[xml::size] = "Match type size.";
         typeFilters[xml::member] = "Match field name of a struct or union (specify multiple times to match nested structs' fields)";
