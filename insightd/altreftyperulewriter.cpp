@@ -281,7 +281,8 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
             const BaseType* srcTypeNonPtr =
                     srcTypeNonTypedef->dereferencedBaseType(BaseType::trAny);
             // Check if we can use the target name or if we need to use the ID
-            bool srcUseId = srcTypeNonPtr->name().isEmpty();
+            bool srcUseId = (srcTypeNonPtr->type() & StructOrUnion) &&
+                    srcTypeNonPtr->name().isEmpty();
 
             // Find the target base type
             const BaseType* target = _factory->findBaseTypeById(art.id());
@@ -310,7 +311,6 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                             (e.errorCode == TypeRuleException::ecNotCompatible);
                 }
             }
-
 
             // Flaten the expression tree of alternatives
             ASTConstExpressionList alternatives = art.expr()->expandAlternatives(tmpExp);
