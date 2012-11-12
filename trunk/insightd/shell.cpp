@@ -2373,7 +2373,7 @@ int Shell::cmdRulesLoad(QStringList args)
         _sym.loadRules(args.first());
         int noAfter = _sym.ruleEngine().count();
 
-        _out << "Loaded ";
+        _out << endl << "Loaded ";
         if (noBefore)
             _out << (noAfter - noBefore) << " new rules, a total of ";
         _out << noAfter << " rules, "

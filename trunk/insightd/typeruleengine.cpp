@@ -87,6 +87,9 @@ bool TypeRuleEngine::fileAlreadyRead(const QString &fileName)
 
 void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
 {
+    operationStarted();
+
+    _rulesChecked = 0;
     _hits.fill(0, _rules.size());
     _activeRules.clear();
     _rulesPerType.clear();
@@ -98,6 +101,9 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
     // _activeRules hash are processes first to last. That way, if multiple
     // rules match the same instance, the first rule takes precedence.
     for (int i = _rules.size() - 1; i >= 0; --i) {
+        ++_rulesChecked;
+        checkOperationProgress();
+
         TypeRule* rule = _rules[i];
 
         // Check for OS filters first
@@ -143,6 +149,9 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
         else
             warnRule(rule, "does not match any type.");
     }
+
+    operationStopped();
+    forceOperationProgress();
 }
 
 
@@ -210,6 +219,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
 
     return ret;
 }
+
 
 Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
                                       const Instance *inst,
@@ -280,4 +290,14 @@ const OsFilter *TypeRuleEngine::insertOsFilter(const OsFilter *osf)
     _osFilters.insertMulti(hash, filter);
 
     return filter;
+}
+
+
+void TypeRuleEngine::operationProgress()
+{
+    QString s = QString("\rVerifying rules (%0%), %1 elapsed, %2 rules active")
+            .arg((int)((_rulesChecked / (float) _rules.size()) * 100.0))
+            .arg(elapsedTime())
+            .arg(_activeRules.size());
+    shellOut(s, false);
 }
