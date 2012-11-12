@@ -531,6 +531,13 @@ public:
 	 */
 	ASTType* typeOfIdentifier(const QString& name, int types) const;
 
+	/**
+	 * Reimplementation from TypeInfoOracle::typeOfMember()
+	 * \copydoc  TypeInfoOracle::typeOfMember()
+	 */
+	ASTType* typeOfMember(const ASTType* embeddingType,
+						  const QString& memberName) const;
+
 protected:
 	ASTType* baseTypeToAstType(const BaseType* type) const;
 

@@ -1393,6 +1393,46 @@ ASTType *SymFactory::typeOfIdentifier(const QString &name, int types) const
 }
 
 
+ASTType *SymFactory::typeOfMember(const ASTType *embeddingType,
+                                  const QString &memberName) const
+{
+    // We required a non-anonymous struct or union
+    if (!embeddingType || !(embeddingType->type() & StructOrUnion) ||
+        embeddingType->identifier().isNull())
+        return 0;
+
+    const BaseType* memberType = 0;
+
+    // Find all structs, unions, or typedefs with the given name
+    BaseTypeStringHash::const_iterator it =
+            _typesByName.find(embeddingType->identifier());
+    for (; it != _typesByName.constEnd() &&
+           it.key() == embeddingType->identifier(); ++it)
+    {
+        const BaseType* s_bt =
+                it.value()->dereferencedBaseType(BaseType::trLexical);
+        if (!(it.value()->type() & StructOrUnion))
+            continue;
+        const Structured* s = dynamic_cast<const Structured*>(s_bt);
+        const StructuredMember* m = s->member(memberName, true);
+        if (m) {
+            const BaseType* tmp = m->refTypeDeep(BaseType::trLexical);
+            // Do we have more than one type that matches?
+            if (memberType && tmp->hash() != memberType->hash())
+                factoryError(QString("Ambiguous member requested for %1.%2: "
+                                     "'%3' vs. '%4'")
+                             .arg(embeddingType->identifier())
+                             .arg(memberName)
+                             .arg(memberType->prettyName())
+                             .arg(tmp->prettyName()));
+            memberType = tmp;
+        }
+    }
+
+    return memberType ? baseTypeToAstType(memberType) : 0;
+}
+
+
 ASTType* SymFactory::baseTypeToAstType(const BaseType* type) const
 {
     ASTType *first = 0, *last = 0;

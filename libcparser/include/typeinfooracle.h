@@ -30,6 +30,16 @@ public:
 	 * @return the type, if \a name was found, \c null otherwise
 	 */
 	virtual ASTType* typeOfIdentifier(const QString& name, int types) const = 0;
+
+	/**
+	 * Retrieves the ASTType for member \a memberName within struct or union
+	 * \a embeddingType.
+	 * @param embeddingType the struct/union in which scope to search
+	 * @param memberName the name of the member
+	 * @return the ASTType of the member, if found, \c null otherwise
+	 */
+	virtual ASTType* typeOfMember(const ASTType* embeddingType,
+								  const QString& memberName) const = 0;
 };
 
 #endif // TYPEINFOORACLE_H

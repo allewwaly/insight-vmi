@@ -1996,6 +1996,15 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(const ASTNode *node)
                             .arg(pes->start->charPosition));
             }
 
+            // Ask the oracle, if it exists
+            if (_oracle) {
+                type = _oracle->typeOfMember(t, memberName);
+                // Take over the ownership of returned ASTTypes
+                for (ASTType* tmp = type; tmp; tmp = tmp->next())
+                    _allTypes.append(tmp);
+                break;
+            }
+
             // Queue for search of members in nested structs
             QList<const ASTNode*> queue;
 
