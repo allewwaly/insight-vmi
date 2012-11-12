@@ -1392,6 +1392,7 @@ bool SymFactory::isTypeName(const QString &name, int types) const
     while (it != _typesByName.constEnd() && it.key() == name) {
         if (it.value()->type() & types)
             return true;
+        ++it;
     }
     return false;
 }
