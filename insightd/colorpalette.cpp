@@ -1,7 +1,8 @@
 #include "colorpalette.h"
-#include "programoptions.h"
 #include "array.h"
 #include "funcpointer.h"
+#include "structured.h"
+#include "refbasetype.h"
 
 // ANSI color codes
 #define COLOR_BLACK    "30"
@@ -85,20 +86,8 @@
 
 
 ColorPalette::ColorPalette()
-    : _allowColor(true)
+    : _allowColor(true), _mode(cmDarkBg)
 {
-}
-
-
-ColorMode ColorPalette::colorMode() const
-{
-    if (_allowColor) {
-        if (programOptions.activeOptions() & opColorDarkBg)
-            return cmDarkBg;
-        else if (programOptions.activeOptions() & opColorLightBg)
-            return cmLightBg;
-    }
-    return cmOff;
 }
 
 

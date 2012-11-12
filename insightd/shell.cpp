@@ -332,6 +332,13 @@ void Shell::prepare()
     _err.setDevice(&_stderr);
 
     _engine = new ScriptEngine();
+
+    if (programOptions.activeOptions() & opColorDarkBg)
+        _color.setColorMode(cmDarkBg);
+    else if (programOptions.activeOptions() & opColorLightBg)
+        _color.setColorMode(cmLightBg);
+    else
+        _color.setColorMode(cmOff);
 }
 
 
@@ -941,22 +948,20 @@ int Shell::cmdColor(QStringList args)
     }
 
     QString value = args[0].toLower();
-    int options = programOptions.activeOptions() & ~(opColorDarkBg|opColorLightBg);
 
     // (Un)set the corresponding bits.
     if (QString("dark").startsWith(value))
-        options |= opColorDarkBg;
+        _color.setColorMode(cmDarkBg);
     else if (QString("light").startsWith(value))
-        options |= opColorLightBg;
+        _color.setColorMode(cmLightBg);
     else if (QString("off").startsWith(value)) {
-        // do nothing
+        _color.setColorMode(cmOff);
     }
     else {
         cmdHelp(QStringList("color"));
         return ecInvalidArguments;
     }
 
-    programOptions.setActiveOptions(options);
     return ecOk;
 }
 
