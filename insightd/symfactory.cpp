@@ -3147,6 +3147,22 @@ void SymFactory::mergeAlternativeTypes(const ReferencingType* src,
 }
 
 
+BaseTypeList SymFactory::findBaseTypesByName(const QString &name,
+                                             int realTypes) const
+{
+    BaseTypeList list;
+    BaseTypeStringHash::const_iterator it = _typesByName.find(name),
+            e = _typesByName.end();
+    while (it != e && it.key() == name) {
+        if (it.value()->type() & realTypes)
+            list += it.value();
+        ++it;
+    }
+
+    return list;
+}
+
+
 BaseTypeList SymFactory::findBaseTypesByName(const QString &pattern,
                                              QRegExp::PatternSyntax syntax,
                                              Qt::CaseSensitivity sensitivity) const
