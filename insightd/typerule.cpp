@@ -496,7 +496,7 @@ bool ExpressionAction::check(const QString &xmlFile, SymFactory *factory)
 
     // Try to evaluate expression
     ASTTypeEvaluator t_eval(&ast, factory->memSpecs().sizeofLong,
-                            factory->memSpecs().sizeofPointer);
+                            factory->memSpecs().sizeofPointer, factory);
     ASTExpressionEvaluator e_eval(&t_eval, factory);
     ASTNodeNodeHash ptsTo;
     _expr = e_eval.exprOfNode(init_nodes.first(), ptsTo);
