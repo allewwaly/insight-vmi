@@ -199,8 +199,10 @@ void ScriptAction::warnEvalError(const ScriptEngine *eng,
 // FuncCallScriptAction
 //------------------------------------------------------------------------------
 
-bool FuncCallScriptAction::check(const QString &xmlFile, SymFactory *factory)
+bool FuncCallScriptAction::check(const QString &xmlFile, const TypeRule *rule,
+                                 SymFactory *factory)
 {
+    Q_UNUSED(rule);
     Q_UNUSED(factory);
 
     // Delete old program
@@ -276,8 +278,10 @@ QString FuncCallScriptAction::toString(const ColorPalette *col) const
 // static member variable
 const QString ProgramScriptAction::_inlineFunc(js::inlinefunc);
 
-bool ProgramScriptAction::check(const QString &xmlFile, SymFactory *factory)
+bool ProgramScriptAction::check(const QString &xmlFile, const TypeRule *rule,
+                                SymFactory *factory)
 {
+    Q_UNUSED(rule);
     Q_UNUSED(factory);
 
     // Delete old program
@@ -361,19 +365,52 @@ ExpressionAction::~ExpressionAction()
 }
 
 
-const BaseType* ExpressionAction::typeOfExpression(
-        const QString &xmlFile, SymFactory *factory, const QString& what,
-        const QString& shortCode, const QString& code, QString& id)
+const BaseType* ExpressionAction::parseTypeStr(
+        const QString &xmlFile, const TypeRule *rule, SymFactory *factory,
+        const QString& what, const QString& typeStr, const QString& typeCode,
+        QString& id) const
 {
+    // Did we get a type name or a type ID?
+    if (typeStr.startsWith("0x")) {
+        QStringList typeStrParts = typeStr.split(QRegExp("\\s+"));
+        if (typeStrParts.isEmpty() || typeStrParts.size() > 2)
+            typeRuleError2(xmlFile, srcLine(), -1,
+                           QString("The specified %0 '%1' is invalid (expected "
+                                   "a type ID and an identifier, e.g. '0x89ab "
+                                   "src').")
+                                .arg(what)
+                                .arg(typeStr));
+
+        QString typeIdStr = typeStrParts.first();
+        bool ok = false;
+        int typeId = typeIdStr.right(typeIdStr.size() - 2).toUInt(&ok, 16);
+        if (!ok)
+            typeRuleError2(xmlFile, srcLine(), -1,
+                           QString("The type ID '%0' for the %1 is invalid.")
+                                .arg(typeIdStr)
+                                .arg(what));
+
+        const BaseType* ret = factory->findBaseTypeById(typeId);
+        if (!ret)
+            typeRuleError2(xmlFile, srcLine(), -1,
+                           QString("The type ID '%0' for the %1 does not exist.")
+                                .arg(typeIdStr)
+                                .arg(what));
+        if (typeStrParts.size() > 1)
+            id = typeStrParts.last();
+        return ret;
+    }
+
+    // We got a type name expression, so parse it with the C parser
     AbstractSyntaxTree ast;
     ASTBuilder builder(&ast, factory);
 
     // Parse the code
-    if (builder.buildFrom(code.toAscii()) != 0)
+    if (builder.buildFrom(typeCode.toAscii()) != 0)
         typeRuleError2(xmlFile, srcLine(), -1,
                        QString("Syntax error in %0: %1")
                             .arg(what)
-                            .arg(shortCode));
+                            .arg(typeStr));
 
     // Does the declaration have an identifier?
     QList<const ASTNode*> dd_nodes =
@@ -387,7 +424,7 @@ const BaseType* ExpressionAction::typeOfExpression(
     }
 
     ASTTypeEvaluator t_eval(&ast, factory->memSpecs().sizeofLong,
-                           factory->memSpecs().sizeofPointer, factory);
+                            factory->memSpecs().sizeofPointer, factory);
 
     // Evaluate type of first (hopefully only) init_declarator
     QList<const ASTNode*> initDecls =
@@ -398,20 +435,50 @@ const BaseType* ExpressionAction::typeOfExpression(
         astType = t_eval.typeofNode(initDecls.first());
     if (!astType)
         typeRuleError2(xmlFile, srcLine(), -1,
-                       QString("Error parsing expression: %1").arg(code));
+                       QString("Error parsing expression: %1").arg(typeCode));
 
     // Search correspondig BaseType
     FoundBaseTypes found =
             factory->findBaseTypesForAstType(astType, &t_eval, false);
     if (found.types.isEmpty())
         typeRuleError2(xmlFile, srcLine(), -1,
-                       QString("Cannot find %1: %2").arg(what).arg(code));
-    else if (found.types.size() > 1)
-        typeRuleError2(xmlFile, srcLine(), -1,
-                       QString("The %1 is ambiguous, %2 types found for: %3")
-                            .arg(what)
-                            .arg(found.types.size())
-                            .arg(shortCode));
+                       QString("Cannot find %1: %2").arg(what).arg(typeCode));
+    else if (found.types.size() > 1) {
+        static const int type_ambiguous = -1;
+        static const int no_type_found = -2;
+        int match_idx = type_ambiguous;
+
+        if (rule) {
+            match_idx = no_type_found;
+            // Find a unique type that matches the filter
+            for (int i = 0; i < found.types.size(); ++i) {
+                if (rule->match(found.types.at(i)) ||
+                    rule->match(found.typesNonPtr.at(i)))
+                {
+                    if (match_idx < 0)
+                        match_idx = i;
+                    else {
+                        match_idx = type_ambiguous;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (match_idx >= 0)
+            return found.types.at(match_idx);
+        else if (match_idx == type_ambiguous)
+            typeRuleError3(xmlFile, srcLine(), -1, TypeRuleException::ecTypeAmbiguous,
+                           QString("The %1 is ambiguous, %2 types found for: %3")
+                           .arg(what)
+                           .arg(found.types.size())
+                           .arg(typeStr));
+        else
+            typeRuleError3(xmlFile, srcLine(), -1, TypeRuleException::ecNotCompatible,
+                           QString("Cannot find any compatible type for the %1: %2")
+                           .arg(what).arg(typeStr));
+
+    }
     else
         return found.types.first();
 
@@ -435,7 +502,8 @@ bool ExpressionAction::checkExprComplexity(const QString& xmlFile,
 }
 
 
-bool ExpressionAction::check(const QString &xmlFile, SymFactory *factory)
+bool ExpressionAction::check(const QString &xmlFile, const TypeRule *rule,
+                             SymFactory *factory)
 {
     for (int i = 0; i < _exprList.size(); ++i)
         delete _exprList[i];
@@ -453,15 +521,16 @@ bool ExpressionAction::check(const QString &xmlFile, SymFactory *factory)
 
     // Check target type
     code = _targetTypeStr + " " + dstId + ";";
-    _targetType = typeOfExpression(xmlFile, factory, "target type",
-                                   _targetTypeStr, code, dstId);
+    _targetType = parseTypeStr(xmlFile, 0, factory, "target type",
+                               _targetTypeStr, code, dstId);
+
     if (_targetType)
         _targetType = _targetType->dereferencedBaseType(BaseType::trLexical);
 
     // Check source type
-    code = _srcTypeStr+ ";";
-    _srcType = typeOfExpression(xmlFile, factory, "source type",
-                                _srcTypeStr, code, srcId);
+    code = _srcTypeStr + ";";
+    _srcType = parseTypeStr(xmlFile, rule, factory, "source type",
+                            _srcTypeStr, code, srcId);
 
     // Is the srcId valid?
     if (srcId.isEmpty())
@@ -480,11 +549,14 @@ bool ExpressionAction::check(const QString &xmlFile, SymFactory *factory)
     // Check complete expression
     AbstractSyntaxTree ast;
     ASTBuilder builder(&ast, factory);
+    // If the type was specified via ID, we have to use the type here
+    if (code.startsWith("0x"))
+        code = _srcType->prettyName(srcId) + ";";
     code += " int " + dstId + " = " + _exprStr + ";";
     if (builder.buildFrom(code.toAscii()) != 0)
         typeRuleError2(xmlFile, srcLine(), -1,
                        QString("Syntax error in expression: %1")
-                            .arg(_exprStr));
+                            .arg(code));
 
     // We should finde exatcely one initializer
     QList<const ASTNode*> init_nodes =
@@ -565,7 +637,7 @@ QString ExpressionAction::toString(const ColorPalette *col) const
     if (_srcType) {
         QString id = QString("0x%1").arg((uint)_srcType->id(), -8, 16);
         if (col)
-            s += col->color(ctType) + id + col->color(ctReset) + " " +
+            s += col->color(ctTypeId) + id + col->color(ctReset) + " " +
                     col->prettyNameInColor(_srcType, 0);
         else
             s += id + " " + _srcType->prettyName();
@@ -577,7 +649,7 @@ QString ExpressionAction::toString(const ColorPalette *col) const
     if (_targetType) {
         QString id = QString("0x%1").arg((uint)_targetType->id(), -8, 16);
         if (col)
-            s += col->color(ctType) + id + col->color(ctReset) + " " +
+            s += col->color(ctTypeId) + id + col->color(ctReset) + " " +
                     col->prettyNameInColor(_targetType, 0);
         else
             s += id + " " + _targetType->prettyName();

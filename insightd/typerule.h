@@ -227,10 +227,12 @@ public:
      * Performs sanity checks for this action, e.g., if all required information
      * is available and sane.
      * @param xmlFile the file name this action was read from
+     * @param rule the type rule for this action
      * @param factory the symbol factory this action should work for
      * @return \c true if action is sane, \c false otherwise
      */
-    virtual bool check(const QString& xmlFile, SymFactory *factory) = 0;
+    virtual bool check(const QString& xmlFile, const TypeRule* rule,
+                       SymFactory *factory) = 0;
 
     /**
      * Evaluates this action and returns the instance according to this rule
@@ -354,7 +356,7 @@ public:
     /**
      * \copydoc TypeRuleAction::check()
      */
-    bool check(const QString& xmlFile, SymFactory *factory);
+    bool check(const QString& xmlFile, const TypeRule* rule, SymFactory *factory);
 
     /**
      * \copydoc TypeRuleAction::toString()
@@ -399,7 +401,7 @@ public:
     /**
      * \copydoc TypeRuleAction::check()
      */
-    bool check(const QString& xmlFile, SymFactory *factory);
+    bool check(const QString& xmlFile, const TypeRule* rule, SymFactory *factory);
 
     /**
      * \copydoc TypeRuleAction::toString()
@@ -514,7 +516,7 @@ public:
     /**
      * \copydoc TypeRuleAction::check()
      */
-    bool check(const QString& xmlFile, SymFactory *factory);
+    bool check(const QString& xmlFile, const TypeRule* rule, SymFactory *factory);
 
     /**
      * \copydoc TypeRuleAction::actionType()
@@ -533,11 +535,12 @@ public:
      */
     QString toString(const ColorPalette *col = 0) const;
 
-private:
-    const BaseType* typeOfExpression(const QString &xmlFile, SymFactory *factory,
-                                     const QString &what, const QString &shortCode,
-                                     const QString &code, QString& id);
+    const BaseType* parseTypeStr(const QString &xmlFile, const TypeRule *rule,
+                                 SymFactory *factory, const QString &what,
+                                 const QString &typeStr,
+                                 const QString &typeCode, QString& id) const;
 
+private:
     bool checkExprComplexity(const QString &xmlFile, const QString &what,
                              const QString &expr) const;
 

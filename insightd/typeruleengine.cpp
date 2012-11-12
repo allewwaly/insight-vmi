@@ -111,7 +111,7 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
         }
 
         try {
-            rule->action()->check(ruleFile(rule), factory);
+            rule->action()->check(ruleFile(rule), rule, factory);
         }
         catch (GenericException& e) {
             errRule(rule, QString("raised a %1 at %2:%3: %4")

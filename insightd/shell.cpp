@@ -3494,10 +3494,11 @@ int Shell::cmdSymbolsWriteRules(QStringList args)
 
     AltRefTypeRuleWriter writer(&_sym.factory());
     int ret = writer.write(baseName, baseDir.absolutePath());
+
     if (!ret)
-        _out << "No file was written." << endl;
+        _out << endl << "No file was written." << endl;
     else
-        _out << "File " << color(ctBold)
+        _out << endl << "File " << color(ctBold)
              << QDir::current().relativeFilePath(writer.filesWritten().first())
              << color(ctReset) << " and "<< color(ctBold) << (ret - 1)
              << color(ctReset) << " more have been written." << endl;
