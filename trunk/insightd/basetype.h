@@ -411,6 +411,17 @@ public:
      */
     bool operator==(const BaseType& other) const;
 
+    /**
+     * Comparison operator
+     * @param other BaseType to compare to
+     * @return \c true if the BaseTypes are equal, \c false otherwise
+     * \sa operator==()
+     */
+    inline bool operator!=(const BaseType& other) const
+    {
+        return !operator==(other);
+    }
+
 protected:
     quint32 _size;             ///< size of this type in byte
     mutable uint _hash;        ///< cashes the hash of this type
