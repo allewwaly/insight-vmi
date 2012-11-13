@@ -6,6 +6,7 @@
 #include <QFileInfo>
 #include <QStack>
 #include "typefilter.h"
+#include "longoperation.h"
 
 class TypeRuleEngine;
 class TypeRuleParser;
@@ -15,7 +16,7 @@ class OsFilter;
 /**
  * This class reads type knowlege rules from XML files.
  */
-class TypeRuleReader
+class TypeRuleReader: protected LongOperation
 {
     friend class TypeRuleParser;
 public:
@@ -44,6 +45,11 @@ public:
      * Returns the name of the file being currently processed.
      */
     inline const QString& currFile() const { return _currFile; }
+
+    /**
+     * \copydoc LongOperation::operationProgress()
+     */
+    void operationProgress();
 
 private:    
     /**
