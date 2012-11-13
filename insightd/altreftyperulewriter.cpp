@@ -156,17 +156,17 @@ QString AltRefTypeRuleWriter::write(const RefBaseType *rbt, const QDir &rulesDir
 }
 
 
-QString AltRefTypeRuleWriter::uniqueFileName(const QDir &dir, QString fileName) const
+QString AltRefTypeRuleWriter::uniqueFileName(const QDir &dir,
+                                             const QString& fileName) const
 {
+    QFileInfo info(fileName);
+    QString f(fileName);
     int i = 1;
-    while (_filesWritten.contains(
-               QDir::cleanPath(dir.absoluteFilePath(fileName))))
-    {
-        QFileInfo info(fileName);
-        fileName = QDir::cleanPath(info.path() + "/" + info.baseName() +
-                                   QString::number(i++) + "." + info.completeSuffix());
+    while (_filesWritten.contains(QDir::cleanPath(dir.absoluteFilePath(f)))) {
+        f = QDir::cleanPath(info.path() + "/" + info.baseName() +
+                            QString::number(i++) + "." + info.completeSuffix());
     }
-    return fileName;
+    return f;
 }
 
 
@@ -318,7 +318,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                         // If we don't have a base type or the variable's type
                         // does not match the given source type, we don't need
                         // to proceed
-                        if (!veTypeNonPtr || srcTypeNonPtr->id() != veTypeNonPtr->id()) {
+                        if (!veTypeNonPtr || *srcTypeNonPtr != *veTypeNonPtr) {
                             writer.writeComment(
                                         QString(" Source type in expression "
                                                 "'%1' does not match base type "
@@ -583,9 +583,11 @@ bool AltRefTypeRuleWriter::useTypeId(const BaseType* type) const
     const BaseType* typeNonPtr = type ?
                 type->dereferencedBaseType(BaseType::trAny) : 0;
 
+    int typeId = 0;
+
     if (typeNonPtr && (typeNonPtr->type() & StructOrUnion) &&
         typeNonPtr->name().isEmpty())
-        return true;
+        typeId = type->id();
     else if (!typeNonPtr || typeNonPtr->name().isEmpty() ||
              _factory->findBaseTypesByName(typeNonPtr->name()).size() > 1)
     {
@@ -600,11 +602,22 @@ bool AltRefTypeRuleWriter::useTypeId(const BaseType* type) const
         catch (TypeRuleException& e) {
             if ((e.errorCode == TypeRuleException::ecTypeAmbiguous) ||
                 (e.errorCode == TypeRuleException::ecNotCompatible))
-                return true;
+                typeId = type->id();
             else
                 throw;
         }
     }
 
-    return false;
+    // If our type ID is less than 0, find the original type's ID
+    if (typeId < 0) {
+        BaseTypeUIntHash::const_iterator
+                it = _factory->typesByHash().find(type->hash()),
+                e = _factory->typesByHash().end();
+        while (it != e && it.key() == type->hash()) {
+            if (it.value()->id() > 0 && *it.value() == *type)
+                return it.value()->id();
+            ++it;
+        }
+    }
+    return typeId;
 }
