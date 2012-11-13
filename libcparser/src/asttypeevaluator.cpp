@@ -4339,7 +4339,7 @@ ASTType* ASTTypeEvaluator::typeofTypeId(const ASTNode *node)
 	const ASTSymbol* s = node->scope->find(name, ASTScope::ssTypedefs);
 	// If symbol not found, try the oracle
 	if (!s && _oracle) {
-		ASTType* type = _oracle->typeOfIdentifier(name, rtTypedef);
+		ASTType* type = _oracle->typeOfIdentifier(name, rtTypedef|rtEnum);
 		if (type) {
 			// Take ownership of objects and return the first
 			for (ASTType* t = type; t; t = t->next())
