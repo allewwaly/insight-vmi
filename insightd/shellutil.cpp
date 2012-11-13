@@ -1,5 +1,7 @@
 #include "shellutil.h"
 
+#include <unistd.h>
+
 #include <QDir>
 #ifndef _WIN32
 #include <sys/ioctl.h>
