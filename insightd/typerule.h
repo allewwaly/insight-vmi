@@ -537,8 +537,7 @@ public:
 
     const BaseType* parseTypeStr(const QString &xmlFile, const TypeRule *rule,
                                  SymFactory *factory, const QString &what,
-                                 const QString &typeStr,
-                                 const QString &typeCode, QString& id,
+                                 const QString &typeStr, QString& id,
                                  bool *usesTypeId = 0) const;
 
 private:
