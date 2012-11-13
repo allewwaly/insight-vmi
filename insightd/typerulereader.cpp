@@ -29,13 +29,25 @@ void TypeRuleReader::clear()
 
 void TypeRuleReader::readFrom(const QString &fileName)
 {
+    operationStarted();
     clear();
-    readFromRek(fileName);
+    try {
+        readFromRek(fileName);
+        operationStopped();
+        operationProgress();
+        shellEndl();
+    }
+    catch (...) {
+        shellEndl();
+        throw;
+    }
 }
 
 
 void TypeRuleReader::readFromRek(const QString &fileName)
 {   
+    checkOperationProgress();
+
     QFileInfo fileInfo(_cwd, fileName);
     _cwd = fileInfo.absoluteDir();
     _currFile = QDir::cleanPath(fileInfo.absoluteFilePath());
@@ -115,6 +127,7 @@ bool TypeRuleReader::includeRulesFile(const QString &fileName)
 
 void TypeRuleReader::appendRule(TypeRule *rule, const OsFilter* osf)
 {
+    checkOperationProgress();
     rule->setSrcFileIndex(_fileIndex);
 
     ScriptAction* action = dynamic_cast<ScriptAction*>(rule->action());
@@ -166,3 +179,13 @@ QString TypeRuleReader::resolveIncFile(const QString &fileName,
 
     return QString();
 }
+
+
+void TypeRuleReader::operationProgress()
+{
+    QString s = QString("\rReading rules, %1 elapsed, %2 files read")
+            .arg(elapsedTime())
+            .arg(_engine->ruleFiles().size());
+    shellOut(s, false);
+}
+
