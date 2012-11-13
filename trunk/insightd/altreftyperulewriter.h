@@ -43,7 +43,7 @@ class RefBaseType;
 class Structured;
 class Variable;
 
-class AltRefTypeRuleWriter: public LongOperation
+class AltRefTypeRuleWriter: protected LongOperation
 {
 public:
     AltRefTypeRuleWriter(SymFactory* factory): _factory(factory) {}
