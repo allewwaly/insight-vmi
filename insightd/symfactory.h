@@ -350,6 +350,14 @@ public:
     }
 
     /**
+     * @return the hash of all types by their hash
+     */
+    inline const BaseTypeUIntHash& typesByHash() const
+    {
+        return _typesByHash;
+    }
+
+    /**
      * @return the hash of all compile units by their ID
      */
 	inline const CompileUnitIntHash& sources() const
