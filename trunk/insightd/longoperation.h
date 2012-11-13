@@ -83,13 +83,18 @@ protected:
      * @param newline set to \c true to insert a newline after \a s, \c set to
      * \c false otherwise
      */
-    void shellOut(const QString &s, bool newline);
+    void shellOut(const QString &s, bool newline) const;
 
     /**
      * Outputs string \a s to the shell's error stream.
      * @param s the string to print
      */
-    void shellErr(const QString &s);
+    void shellErr(const QString &s) const;
+
+    /**
+     * Forces a newline if the current line has been written to.
+     */
+    void shellEndl() const;
 
     /**
      * Convertes an amount of bytes to a String such as "4 kB", "12 MB" etc.
@@ -106,7 +111,7 @@ protected:
 
 private:
     QTime _timer;        ///< used internally to trigger progress events
-    int _lastLen;        ///< length of last output line before linebreak
+    mutable int _lastLen; ///< length of last output line before linebreak
 };
 
 #endif /* LONGOPERATION_H_ */
