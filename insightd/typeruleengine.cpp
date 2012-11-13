@@ -136,10 +136,33 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
 
         // Should we check variables or types?
         int hits = 0;
-        foreach (const BaseType* bt, factory->types()) {
-            if (rule->match(bt)) {
-                _rulesPerType.insertMulti(bt->id(), arule);
+        // If we have a type name or a type ID, we don't have to try all rules
+        if (rule->filter()->filterActive(Filter::ftTypeNameLiteral)) {
+            const QString& name = rule->filter()->typeName();
+            BaseTypeStringHash::const_iterator
+                    it = factory->typesByName().find(name),
+                    e = factory->typesByName().end();
+            while (it != e && it.key() == name) {
+                if (rule->match(it.value())) {
+                    _rulesPerType.insertMulti(it.value()->id(), arule);
+                    ++hits;
+                }
+                ++it;
+            }
+        }
+        else if (rule->filter()->filterActive(Filter::ftTypeId)) {
+            const BaseType* t = factory->findBaseTypeById(rule->filter()->typeId());
+            if (t && rule->match(t)) {
+                _rulesPerType.insertMulti(t->id(), arule);
                 ++hits;
+            }
+        }
+        else {
+            foreach (const BaseType* bt, factory->types()) {
+                if (rule->match(bt)) {
+                    _rulesPerType.insertMulti(bt->id(), arule);
+                    ++hits;
+                }
             }
         }
 
