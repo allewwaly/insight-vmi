@@ -2373,7 +2373,7 @@ int Shell::cmdRulesLoad(QStringList args)
         _sym.loadRules(args.first());
         int noAfter = _sym.ruleEngine().count();
 
-        _out << endl << "Loaded ";
+        _out << "Loaded ";
         if (noBefore)
             _out << (noAfter - noBefore) << " new rules, a total of ";
         _out << noAfter << " rules, "
@@ -3496,9 +3496,9 @@ int Shell::cmdSymbolsWriteRules(QStringList args)
     int ret = writer.write(baseName, baseDir.absolutePath());
 
     if (!ret)
-        _out << endl << "No file was written." << endl;
+        _out << "No file was written." << endl;
     else
-        _out << endl << "File " << color(ctBold)
+        _out << "File " << color(ctBold)
              << QDir::current().relativeFilePath(writer.filesWritten().first())
              << color(ctReset) << " and "<< color(ctBold) << (ret - 1)
              << color(ctReset) << " more have been written." << endl;

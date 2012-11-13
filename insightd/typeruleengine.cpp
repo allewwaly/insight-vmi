@@ -87,15 +87,17 @@ bool TypeRuleEngine::fileAlreadyRead(const QString &fileName)
 
 void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
 {
+    operationStarted();
     _rulesChecked = 0;
+    if (factory->symbolsAvailable() && !_rules.isEmpty())
+        forceOperationProgress();
+
     _hits.fill(0, _rules.size());
     _activeRules.clear();
     _rulesPerType.clear();
 
     if (!factory->symbolsAvailable() || _rules.isEmpty())
         return;
-
-    operationStarted();
 
     // Checking the rules from last to first assures that rules in the
     // _activeRules hash are processes first to last. That way, if multiple
@@ -151,7 +153,8 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
     }
 
     operationStopped();
-    forceOperationProgress();
+    operationProgress();
+    shellEndl();
 }
 
 
@@ -251,6 +254,7 @@ void TypeRuleEngine::ruleMsg(const TypeRule* rule, const QString &severity,
     if (!rule)
         return;
 
+    shellEndl();
     shell->err() << shell->color(light) << severity << ": "
                  << shell->color(normal) << "Rule ";
     if (!rule->name().isEmpty()) {

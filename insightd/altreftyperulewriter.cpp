@@ -45,84 +45,92 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
                     .arg(incFile.fileName()));
 
     _filesWritten.append(incFile.fileName());
-    QXmlStreamWriter writer(&incFile);
-    writer.setAutoFormatting(true);
-    writer.setAutoFormattingIndent(_indentation);
 
-    // Begin document with a comment including guest OS details
-    writer.writeStartDocument();
-    writer.writeComment(QString("\nFile created on %1\n%2")
-                           .arg(QDateTime::currentDateTime().toString())
-                           .arg(specs.toString()));
+    try {
+        QXmlStreamWriter writer(&incFile);
+        writer.setAutoFormatting(true);
+        writer.setAutoFormattingIndent(_indentation);
 
-    // Begin knowledge file
-    writer.writeStartElement(xml::typeknowledge); // typeknowledge
-    writer.writeAttribute(xml::version, QString::number(xml::currentVer));
+        // Begin document with a comment including guest OS details
+        writer.writeStartDocument();
+        writer.writeComment(QString("\nFile created on %1\n%2")
+                            .arg(QDateTime::currentDateTime().toString())
+                            .arg(specs.toString()));
 
-    // Write OS version information
-    writer.writeAttribute(xml::os, specs.version.sysname);
-    if (specs.arch == MemSpecs::ar_i386)
-        writer.writeAttribute(xml::architecture, xml::arX86);
-    else if (specs.arch == MemSpecs::ar_i386_pae)
-        writer.writeAttribute(xml::architecture, xml::arX86PAE);
-    else if (specs.arch == MemSpecs::ar_x86_64)
-        writer.writeAttribute(xml::architecture, xml::arAMD64);
-    else
-        typeRuleWriterError(QString("Unknown architecture: %1").arg(specs.arch));
-    writer.writeAttribute(xml::minver, specs.version.release);
-    writer.writeAttribute(xml::maxver, specs.version.release);
+        // Begin knowledge file
+        writer.writeStartElement(xml::typeknowledge); // typeknowledge
+        writer.writeAttribute(xml::version, QString::number(xml::currentVer));
 
-    // Rule includes
-    writer.writeStartElement(xml::ruleincludes); // ruleincludes
-    writer.writeTextElement(xml::ruleinclude, "./" + name);
-    writer.writeEndElement(); // ruleincludes
+        // Write OS version information
+        writer.writeAttribute(xml::os, specs.version.sysname);
+        if (specs.arch == MemSpecs::ar_i386)
+            writer.writeAttribute(xml::architecture, xml::arX86);
+        else if (specs.arch == MemSpecs::ar_i386_pae)
+            writer.writeAttribute(xml::architecture, xml::arX86PAE);
+        else if (specs.arch == MemSpecs::ar_x86_64)
+            writer.writeAttribute(xml::architecture, xml::arAMD64);
+        else
+            typeRuleWriterError(QString("Unknown architecture: %1").arg(specs.arch));
+        writer.writeAttribute(xml::minver, specs.version.release);
+        writer.writeAttribute(xml::maxver, specs.version.release);
 
-    // Go through all variables and types and write the information
-    QString fileName;
-    for (int i = 0; !interrupted() && i < _factory->types().size(); ++i) {
-        ++_symbolsDone;
-        checkOperationProgress();
+        // Rule includes
+        writer.writeStartElement(xml::ruleincludes); // ruleincludes
+        writer.writeTextElement(xml::ruleinclude, "./" + name);
+        writer.writeEndElement(); // ruleincludes
 
-        const BaseType* type = _factory->types().at(i);
-        if (type->type() & RefBaseTypes) {
-            const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(type);
-            if (rbt->hasAltRefTypes()) {
-                fileName = write(rbt, rulesDir);
+        // Go through all variables and types and write the information
+        QString fileName;
+        for (int i = 0; !interrupted() && i < _factory->types().size(); ++i) {
+            ++_symbolsDone;
+            checkOperationProgress();
+
+            const BaseType* type = _factory->types().at(i);
+            if (type->type() & RefBaseTypes) {
+                const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(type);
+                if (rbt->hasAltRefTypes()) {
+                    fileName = write(rbt, rulesDir);
+                    if (!fileName.isEmpty()) {
+                        writer.writeTextElement(xml::include, fileName);
+                        _filesWritten.append(rulesDir.absoluteFilePath(fileName));
+                    }
+                }
+            }
+            else if (type->type() & StructOrUnion) {
+                const Structured* s = dynamic_cast<const Structured*>(type);
+                fileName = write(s, rulesDir);
                 if (!fileName.isEmpty()) {
                     writer.writeTextElement(xml::include, fileName);
                     _filesWritten.append(rulesDir.absoluteFilePath(fileName));
                 }
             }
         }
-        else if (type->type() & StructOrUnion) {
-            const Structured* s = dynamic_cast<const Structured*>(type);
-            fileName = write(s, rulesDir);
-            if (!fileName.isEmpty()) {
-                writer.writeTextElement(xml::include, fileName);
-                _filesWritten.append(rulesDir.absoluteFilePath(fileName));
+
+        for (int i = 0; !interrupted() && i < _factory->vars().size(); ++i) {
+            ++_symbolsDone;
+            checkOperationProgress();
+
+            const Variable* var = _factory->vars().at(i);
+            if (var->hasAltRefTypes()) {
+                fileName = write(var, rulesDir);
+                if (!fileName.isEmpty()) {
+                    writer.writeTextElement(xml::include, fileName);
+                    _filesWritten.append(rulesDir.absoluteFilePath(fileName));
+                }
             }
         }
+
+        writer.writeEndElement(); // typeknowledge
+        writer.writeEndDocument();
     }
-
-    for (int i = 0; !interrupted() && i < _factory->vars().size(); ++i) {
-        ++_symbolsDone;
-        checkOperationProgress();
-
-        const Variable* var = _factory->vars().at(i);
-        if (var->hasAltRefTypes()) {
-            fileName = write(var, rulesDir);
-            if (!fileName.isEmpty()) {
-                writer.writeTextElement(xml::include, fileName);
-                _filesWritten.append(rulesDir.absoluteFilePath(fileName));
-            }
-        }
+    catch (...) {
+        shellEndl();
+        throw;
     }
-
-    writer.writeEndElement(); // typeknowledge
-    writer.writeEndDocument();
 
     operationStopped();
-    forceOperationProgress();
+    operationProgress();
+    shellEndl();
 
     return _filesWritten.size();
 }
@@ -293,16 +301,18 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                                     .arg((uint)art.id(), 0, 16));
             // Check if we can use the target name or if we need to use the ID
             bool targetUseId = false;
-            if (!targetNonPtr || targetNonPtr->name().isEmpty() ||
-                _factory->findBaseTypesByName(targetNonPtr->name()).size() > 1)
+            if (targetNonPtr && (targetNonPtr->type() & StructOrUnion) &&
+                targetNonPtr->name().isEmpty())
+                targetUseId = true;
+            else if (!targetNonPtr || targetNonPtr->name().isEmpty() ||
+                     _factory->findBaseTypesByName(targetNonPtr->name()).size() > 1)
             {
                 try {
-                    QString s, targetStr = target->prettyName("__dest__");
+                    QString s;
                     ExpressionAction action;
-                    const BaseType *t = action.parseTypeStr(QString(), 0, _factory,
-                                                            QString(),
-                                                            target->prettyName(),
-                                                            targetStr + ";", s);
+                    const BaseType *t = action.parseTypeStr(
+                                QString(), 0, _factory, QString(),
+                                target->prettyName(), s);
                     Q_UNUSED(t);
                 }
                 catch (TypeRuleException& e) {
@@ -311,7 +321,9 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                         targetUseId = true;
                     else {
                         if (e.errorCode == TypeRuleException::ecSyntaxError) {
-                            debugmsg(QString("Soure type '%1' (0x%2) produced a syntax error for expression %3 = %4 (0x%5)")
+                            debugmsg(QString("Soure type '%1' (0x%2) produced a"
+                                             " syntax error for expression %3 ="
+                                             " %4 (0x%5)")
                                      .arg(srcType->prettyName())
                                      .arg((uint)srcType->id(), 0, 16)
                                      .arg(art.expr()->toString())
@@ -342,7 +354,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                         // to proceed
                         if (!veTypeNonPtr || srcTypeNonPtr->id() != veTypeNonPtr->id()) {
                             writer.writeComment(
-                                        QString(" Source type in expression is "
+                                        QString(" Source type in expression "
                                                 "'%1' does not match base type "
                                                 "'%2' of candidate %3.%4. ")
                                                 .arg(expr->toString())
