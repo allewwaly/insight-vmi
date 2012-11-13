@@ -367,8 +367,8 @@ ExpressionAction::~ExpressionAction()
 
 const BaseType* ExpressionAction::parseTypeStr(
         const QString &xmlFile, const TypeRule *rule, SymFactory *factory,
-        const QString& what, const QString& typeStr, const QString& typeCode,
-        QString& id, bool *usesTypeId) const
+        const QString& what, const QString& typeStr, QString& id,
+        bool *usesTypeId) const
 {
     // Did we get a type name or a type ID?
     if (typeStr.startsWith("0x")) {
@@ -410,43 +410,50 @@ const BaseType* ExpressionAction::parseTypeStr(
     ASTBuilder builder(&ast, factory);
 
     // Parse the code
-    if (builder.buildFrom(typeCode.toAscii()) != 0)
+    QByteArray code = QString("void %1(%2);").arg("__FUNCTION__").arg(typeStr).toAscii();
+    if (builder.buildFrom(code) != 0)
         typeRuleError3(xmlFile, srcLine(), -1, TypeRuleException::ecSyntaxError,
                        QString("Syntax error in %0: %1")
                             .arg(what)
                             .arg(typeStr));
 
-    // Does the declaration have an identifier?
-    QList<const ASTNode*> dd_nodes =
-            ASTNodeFinder::find(nt_direct_declarator, &ast);
+    QList<const ASTNode*> paramNodes =
+            ASTNodeFinder::find(nt_parameter_declaration, &ast);
+    // We might have more than one parameter for function pointer types, but the
+    // first one is the one in __FUNCTION__()
+    assert(paramNodes.size() > 0);
+    const ASTNode* paramNode = paramNodes.first();
+
+    // Do we have a declarator with or without an identifier?
     id.clear();
-    foreach (const ASTNode* n, dd_nodes) {
-        if (n->u.direct_declarator.identifier) {
-            id = ast.antlrTokenToStr(n->u.direct_declarator.identifier);
-            break;
+    const ASTNode* d_ad = paramNode->u.parameter_declaration.declarator_list->item;
+    if (d_ad && d_ad->type == nt_declarator)  {
+        // Find the direct declaratior with identifier
+        const ASTNode* dd = d_ad->u.declarator.direct_declarator;
+        while (dd && !dd->u.direct_declarator.identifier) {
+            dd = dd->u.direct_declarator.declarator
+                   ->u.declarator.direct_declarator;
         }
+        assert(dd != 0);
+        assert(dd->u.direct_declarator.identifier);
+        id = ast.antlrTokenToStr(dd->u.direct_declarator.identifier);
     }
 
     ASTTypeEvaluator t_eval(&ast, factory->memSpecs().sizeofLong,
                             factory->memSpecs().sizeofPointer, factory);
 
-    // Evaluate type of first (hopefully only) init_declarator
-    QList<const ASTNode*> initDecls =
-            ASTNodeFinder::find(nt_init_declarator, &ast);
-
-    ASTType* astType = 0;
-    if (!initDecls.isEmpty())
-        astType = t_eval.typeofNode(initDecls.first());
+    // Evaluate type of parameter_declaration
+    ASTType* astType = t_eval.typeofNode(paramNode);
     if (!astType)
         typeRuleError2(xmlFile, srcLine(), -1,
-                       QString("Error parsing expression: %1").arg(typeCode));
+                       QString("Error parsing expression: %1").arg(QString(code)));
 
     // Search correspondig BaseType
     FoundBaseTypes found =
             factory->findBaseTypesForAstType(astType, &t_eval, false);
     if (found.types.isEmpty())
         typeRuleError2(xmlFile, srcLine(), -1,
-                       QString("Cannot find %1: %2").arg(what).arg(typeCode));
+                       QString("Cannot find %1: %2").arg(what).arg(QString(code)));
     else if (found.types.size() > 1) {
         static const int type_ambiguous = -1;
         static const int no_type_found = -2;
@@ -520,23 +527,20 @@ bool ExpressionAction::check(const QString &xmlFile, const TypeRule *rule,
     checkExprComplexity(xmlFile, _targetTypeStr, "target type");
     checkExprComplexity(xmlFile, _exprStr, "expression");
 
-    QString dstId("__dest__"), srcId;
-    QString code;
+    QString srcId;
 
     // Check target type
     bool targetUsesId = false;
-    code = _targetTypeStr + " " + dstId + ";";
     _targetType = parseTypeStr(xmlFile, 0, factory, "target type",
-                               _targetTypeStr, code, dstId, &targetUsesId);
+                               _targetTypeStr, srcId, &targetUsesId);
 
     if (_targetType)
         _targetType = _targetType->dereferencedBaseType(BaseType::trLexical);
 
     // Check source type
     bool srcUsesId = false;
-    code = _srcTypeStr + ";";
     _srcType = parseTypeStr(xmlFile, rule, factory, "source type",
-                            _srcTypeStr, code, srcId, &srcUsesId);
+                            _srcTypeStr, srcId, &srcUsesId);
 
     // Is the srcId valid?
     if (srcId.isEmpty())
@@ -555,14 +559,17 @@ bool ExpressionAction::check(const QString &xmlFile, const TypeRule *rule,
     // Check complete expression
     AbstractSyntaxTree ast;
     ASTBuilder builder(&ast, factory);
+    QString codeStr;
     // If the type was specified via ID, we have to use the type here
     if (srcUsesId)
-        code = QString("__0x%0__ %1;").arg((uint)_srcType->id(), 0, 16).arg(srcId);
-    code += " int " + dstId + " = " + _exprStr + ";";
-    if (builder.buildFrom(code.toAscii()) != 0)
+        codeStr = QString("__0x%0__ %1;").arg((uint)_srcType->id(), 0, 16).arg(srcId);
+    else
+        codeStr = _srcTypeStr + ";";
+    codeStr += " int __dest__ = " + _exprStr + ";";
+    if (builder.buildFrom(codeStr.toAscii()) != 0)
         typeRuleError2(xmlFile, srcLine(), -1,
                        QString("Syntax error in expression: %1")
-                            .arg(code));
+                            .arg(codeStr));
 
     // We should finde exatcely one initializer
     QList<const ASTNode*> init_nodes =
@@ -570,7 +577,7 @@ bool ExpressionAction::check(const QString &xmlFile, const TypeRule *rule,
     if (init_nodes.isEmpty())
         typeRuleError2(xmlFile, srcLine(), -1,
                        QString("Error parsing expression: %1")
-                            .arg(QString(code)));
+                            .arg(codeStr));
 
     // Try to evaluate expression
     ASTTypeEvaluator t_eval(&ast, factory->memSpecs().sizeofLong,
