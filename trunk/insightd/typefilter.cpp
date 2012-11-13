@@ -631,7 +631,7 @@ bool TypeFilter::matchFieldsRek(const BaseType* type, int index) const
     for (int i = 0; i < s->members().size(); ++i) {
         const StructuredMember* m = s->members().at(i);
         if (f.match(m) &&
-            matchFieldsRek(m->refTypeDeep(BaseType::trLexical), index + 1))
+            matchFieldsRek(m->refTypeDeep(BaseType::trLexicalPointersArrays), index + 1))
             return true;
     }
     return false;
