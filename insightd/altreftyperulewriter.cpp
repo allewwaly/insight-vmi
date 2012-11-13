@@ -44,7 +44,7 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
         ioError(QString("Error opening file \"%1\" for writing.")
                     .arg(incFile.fileName()));
 
-    _filesWritten.append(incFile.fileName());
+    _filesWritten.append(QDir::cleanPath(incFile.fileName()));
 
     try {
         QXmlStreamWriter writer(&incFile);
@@ -92,7 +92,7 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
                     fileName = write(rbt, rulesDir);
                     if (!fileName.isEmpty()) {
                         writer.writeTextElement(xml::include, fileName);
-                        _filesWritten.append(rulesDir.absoluteFilePath(fileName));
+                        _filesWritten.append(QDir::cleanPath(rulesDir.absoluteFilePath(fileName)));
                     }
                 }
             }
@@ -101,7 +101,7 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
                 fileName = write(s, rulesDir);
                 if (!fileName.isEmpty()) {
                     writer.writeTextElement(xml::include, fileName);
-                    _filesWritten.append(rulesDir.absoluteFilePath(fileName));
+                    _filesWritten.append(QDir::cleanPath(rulesDir.absoluteFilePath(fileName)));
                 }
             }
         }
@@ -115,7 +115,7 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
                 fileName = write(var, rulesDir);
                 if (!fileName.isEmpty()) {
                     writer.writeTextElement(xml::include, fileName);
-                    _filesWritten.append(rulesDir.absoluteFilePath(fileName));
+                    _filesWritten.append(QDir::cleanPath(rulesDir.absoluteFilePath(fileName)));
                 }
             }
         }
@@ -159,10 +159,12 @@ QString AltRefTypeRuleWriter::write(const RefBaseType *rbt, const QDir &rulesDir
 QString AltRefTypeRuleWriter::uniqueFileName(const QDir &dir, QString fileName) const
 {
     int i = 1;
-    while(_filesWritten.contains(dir.absoluteFilePath(fileName))) {
+    while (_filesWritten.contains(
+               QDir::cleanPath(dir.absoluteFilePath(fileName))))
+    {
         QFileInfo info(fileName);
-        fileName = info.path() + "/" + info.baseName() + QString::number(i++) +
-                "." + info.completeSuffix();
+        fileName = QDir::cleanPath(info.path() + "/" + info.baseName() +
+                                   QString::number(i++) + "." + info.completeSuffix());
     }
     return fileName;
 }
@@ -517,8 +519,8 @@ void AltRefTypeRuleWriter::openXmlRuleFile(const QString& fileName,
                                            const QString& comment) const
 {
     outFile.setFileName(fileName);
-    if (_filesWritten.contains(fileName))
-        debugmsg("Overwriting file " << outFile.fileName());
+    if (_filesWritten.contains(QDir::cleanPath(fileName)))
+        debugerr("Overwriting file " << outFile.fileName());
     if (!outFile.open(QIODevice::WriteOnly|QIODevice::Truncate))
         ioError(QString("Error opening file \"%1\" for writing.")
                     .arg(outFile.fileName()));
