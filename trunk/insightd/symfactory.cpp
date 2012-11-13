@@ -624,8 +624,7 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
             factoryError(QString("Hash for type 0x%1 is not valid!")
                          .arg(target->id(), 0, 16));
         // Add this type into the name relation table
-        if (!new_name.isEmpty())
-            _typesByName.insertMulti(new_name, target);
+       _typesByName.insertMulti(new_name, target);
 
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(target);
         Enum* en = 0;
@@ -1425,22 +1424,27 @@ ASTType *SymFactory::typeOfIdentifier(const QString &name, int types) const
 ASTType *SymFactory::typeOfMember(const ASTType *embeddingType,
                                   const QString &memberName) const
 {
-    // We required a non-anonymous struct or union
-    if (!embeddingType || !(embeddingType->type() & StructOrUnion) ||
-        embeddingType->identifier().isNull())
-        return 0;
-
     const BaseType* memberType = 0;
+    BaseTypeList types;
 
-    // Find all structs, unions, or typedefs with the given name
-    BaseTypeStringHash::const_iterator it =
-            _typesByName.find(embeddingType->identifier());
-    for (; it != _typesByName.constEnd() &&
-           it.key() == embeddingType->identifier(); ++it)
+    // If we got a type ID, it becomes straightforward
+    if (embeddingType->typeId()) {
+        types += _typesById.value(embeddingType->typeId());
+    }
+    // We required a non-anonymous struct or union
+    else if (embeddingType && (embeddingType->type() & StructOrUnion) &&
+        !embeddingType->identifier().isNull())
     {
-        const BaseType* s_bt =
-                it.value()->dereferencedBaseType(BaseType::trLexical);
-        if (!(it.value()->type() & StructOrUnion))
+        // Find all structs, unions, or typedefs with the given name
+        types = findBaseTypesByName(embeddingType->identifier(),
+                                    StructOrUnion|rtTypedef);
+    }
+
+    foreach (const BaseType* s_bt, types) {
+        if (!s_bt)
+            continue;
+        s_bt = s_bt->dereferencedBaseType(BaseType::trLexical);
+        if (!(s_bt->type() & StructOrUnion))
             continue;
         const Structured* s = dynamic_cast<const Structured*>(s_bt);
         const StructuredMember* m = s->member(memberName, true);
