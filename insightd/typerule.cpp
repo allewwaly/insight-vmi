@@ -426,7 +426,8 @@ const BaseType* ExpressionAction::parseTypeStr(
 
     // Do we have a declarator with or without an identifier?
     id.clear();
-    const ASTNode* d_ad = paramNode->u.parameter_declaration.declarator_list->item;
+    const ASTNode* d_ad = paramNode->u.parameter_declaration.declarator_list ?
+                paramNode->u.parameter_declaration.declarator_list->item : 0;
     if (d_ad && d_ad->type == nt_declarator)  {
         // Find the direct declaratior with identifier
         const ASTNode* dd = d_ad->u.declarator.direct_declarator;
