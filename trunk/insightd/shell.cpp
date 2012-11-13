@@ -3483,7 +3483,7 @@ int Shell::cmdSymbolsWriteRules(QStringList args)
         QString reply;
         do {
             _out << "File already exists: "
-                 << QDir::current().relativeFilePath(baseDir.absoluteFilePath(fileName))
+                 << ShellUtil::shortFileName(baseDir.absoluteFilePath(fileName))
                  << endl;
             reply = readLine("Ok to overwrite file? [Y/n] ").toLower();
             if (reply.isEmpty())

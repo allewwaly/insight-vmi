@@ -624,7 +624,8 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
             factoryError(QString("Hash for type 0x%1 is not valid!")
                          .arg(target->id(), 0, 16));
         // Add this type into the name relation table
-       _typesByName.insertMulti(new_name, target);
+        if (!new_name.isEmpty() || (target->type() & (rtStruct|rtUnion|rtEnum)))
+            _typesByName.insertMulti(new_name, target);
 
         RefBaseType* rbt = dynamic_cast<RefBaseType*>(target);
         Enum* en = 0;
