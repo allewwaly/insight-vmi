@@ -430,7 +430,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 if (!varName.isEmpty())
                     writer.writeTextElement(xml::variablename, varName);
                 writer.writeTextElement(xml::datatype,
-                                        realTypeToStr(srcTypeNonTypedef->type()));
+                                        realTypeToStr(srcTypeNonTypedef->type()).toLower());
                 // Use the type name, if we can, otherwise the type ID
                 // TODO: Check if type name + members is ambiguous
                 if (!srcUseId)
