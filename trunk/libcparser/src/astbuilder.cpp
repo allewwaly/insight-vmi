@@ -118,7 +118,7 @@ bool ASTBuilder::isTypeName(pANTLR3_STRING name) const
 {
     QString s = _ast->antlrStringToStr(name);
     // Ask the oracle, if given
-    if (_oracle && _oracle->isTypeName(s, rtTypedef))
+    if (_oracle && _oracle->isTypeName(s, rtTypedef|rtEnum))
         return true;
     // Try to find type ourself
     return _ast->_scopeMgr->currentScope() &&
