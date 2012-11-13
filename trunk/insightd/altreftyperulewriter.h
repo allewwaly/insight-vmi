@@ -73,7 +73,7 @@ private:
     QString fileNameFromVar(const Variable* var) const;
     QString fileNameEscape(QString s) const;
     QString uniqueFileName(const QDir &dir, const QString& fileName) const;
-    bool useTypeId(const BaseType *type) const;
+    int useTypeId(const BaseType *type) const;
 
     SymFactory* _factory;
     QStringList _filesWritten;

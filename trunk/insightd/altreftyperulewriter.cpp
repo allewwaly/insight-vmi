@@ -291,7 +291,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
             const BaseType* srcTypeNonPtr =
                     srcTypeNonTypedef->dereferencedBaseType(BaseType::trAny);
             // Check if we can use the target name or if we need to use the ID
-            bool srcUseId = useTypeId(srcType);
+            int srcUseId = useTypeId(srcType);
 
             // Find the target base type
             const BaseType* target = _factory->findBaseTypeById(art.id());
@@ -299,7 +299,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 typeRuleWriterError(QString("Cannot find base type with ID 0x%1.")
                                     .arg((uint)art.id(), 0, 16));
             // Check if we can use the target name or if we need to use the ID
-            bool targetUseId = useTypeId(target);
+            int targetUseId = useTypeId(target);
 
             // Flaten the expression tree of alternatives
             ASTConstExpressionList alternatives = art.expr()->expandAlternatives(tmpExp);
@@ -441,7 +441,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 else {
                     writer.writeComment(QString(" Source type '%1' is ambiguous ").arg(srcTypeNonTypedef->prettyName()));
                     writer.writeTextElement(xml::type_id,
-                                            QString("0x%0").arg((uint)srcTypeNonTypedef->id(), 0, 16));
+                                            QString("0x%0").arg((uint)srcUseId, 0, 16));
                 }
 
                 if (varExp->transformations().memberCount() > 0) {
@@ -477,7 +477,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                     writer.writeComment(QString(" Source type '%1' is ambiguous ").arg(srcType->prettyName()));
                     writer.writeTextElement(xml::srcType,
                                             QString("0x%0 %1")
-                                                .arg((uint)srcType->id(), 0, 16)
+                                                .arg((uint)srcUseId, 0, 16)
                                                 .arg(_srcVar));
                 }
                 // Use the target type name, if it is unique
@@ -486,7 +486,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 else {
                     writer.writeComment(QString(" Target type '%1' is ambiguous ").arg(target->prettyName()));
                     writer.writeTextElement(xml::targetType,
-                                            QString("0x%0").arg((uint)target->id(), 0, 16));
+                                            QString("0x%0").arg((uint)targetUseId, 0, 16));
                 }
 
                 writer.writeTextElement(xml::expression, exprStr);
@@ -578,7 +578,7 @@ QString AltRefTypeRuleWriter::fileNameEscape(QString s) const
 }
 
 
-bool AltRefTypeRuleWriter::useTypeId(const BaseType* type) const
+int AltRefTypeRuleWriter::useTypeId(const BaseType* type) const
 {
     const BaseType* typeNonPtr = type ?
                 type->dereferencedBaseType(BaseType::trAny) : 0;
