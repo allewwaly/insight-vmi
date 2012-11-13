@@ -246,6 +246,7 @@ Shell::Shell(bool listenOnSocket)
                 "                                 Parse the symbols from an objdump output, a\n"
                 "                                 System.map file and a kernel headers dir.\n"
                 "  symbols source <kernel_src_pp> Parse the pre-processed kernel source files\n"
+                "  symbols writerules <out_dir>   Write rules from candidate types into <out_dir>\n"
                 "  symbols store <ksym_file>      Saves the parsed symbols to a file\n"
                 "  symbols save <ksym_file>       Alias for \"store\"\n"
                 "  symbols load <ksym_file>       Loads previously stored symbols for usage"));
@@ -3499,7 +3500,7 @@ int Shell::cmdSymbolsWriteRules(QStringList args)
         _out << "No file was written." << endl;
     else
         _out << "File " << color(ctBold)
-             << QDir::current().relativeFilePath(writer.filesWritten().first())
+             << ShellUtil::shortFileName(writer.filesWritten().first())
              << color(ctReset) << " and "<< color(ctBold) << (ret - 1)
              << color(ctReset) << " more have been written." << endl;
 
