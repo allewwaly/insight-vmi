@@ -1736,7 +1736,20 @@ ASTType* ASTTypeEvaluator::typeofPrimaryExpression(const ASTNode *node)
         _types[node] = typeofNode(node->u.primary_expression.compound_braces_statement);
     else if (node->u.primary_expression.identifier) {
         const ASTSymbol* sym = findSymbolOfPrimaryExpression(node);
-        _types[node] = typeofSymbol(sym);
+        if (sym)
+            _types[node] = typeofSymbol(sym);
+        // If symbol not found, try the oracle
+        else if (_oracle) {
+            QString id = antlrTokenToStr(node->u.primary_expression.identifier);
+            ASTType* type = _oracle->typeOfIdentifier(id, rtTypedef|rtEnum);
+            if (type) {
+                // Take ownership of objects and return the first
+                for (ASTType* t = type; t; t = t->next())
+                    _allTypes.append(t);
+                _types[node] = type;
+            }
+        }
+
     }
 
     return _types[node];
