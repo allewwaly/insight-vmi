@@ -87,15 +87,15 @@ bool TypeRuleEngine::fileAlreadyRead(const QString &fileName)
 
 void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
 {
-    operationStarted();
-
     _rulesChecked = 0;
     _hits.fill(0, _rules.size());
     _activeRules.clear();
     _rulesPerType.clear();
 
-    if (!factory->symbolsAvailable())
+    if (!factory->symbolsAvailable() || _rules.isEmpty())
         return;
+
+    operationStarted();
 
     // Checking the rules from last to first assures that rules in the
     // _activeRules hash are processes first to last. That way, if multiple
