@@ -78,7 +78,7 @@ bool LongOperation::interrupted() const
 }
 
 
-void LongOperation::shellOut(const QString &s, bool newline)
+void LongOperation::shellOut(const QString &s, bool newline) const
 {
 
     shell->out() << qPrintable(s);
@@ -97,10 +97,19 @@ void LongOperation::shellOut(const QString &s, bool newline)
 }
 
 
-void LongOperation::shellErr(const QString &s)
+void LongOperation::shellErr(const QString &s) const
 {
-    shell->out() << endl << flush;
+    shellEndl();
     shell->err() << s << endl << flush;
+}
+
+
+void LongOperation::shellEndl() const
+{
+    if (_lastLen > 0) {
+        shell->out() << endl;
+        _lastLen = 0;
+    }
 }
 
 
