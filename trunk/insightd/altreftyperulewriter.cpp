@@ -289,51 +289,15 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
             const BaseType* srcTypeNonPtr =
                     srcTypeNonTypedef->dereferencedBaseType(BaseType::trAny);
             // Check if we can use the target name or if we need to use the ID
-            bool srcUseId = (srcTypeNonPtr->type() & StructOrUnion) &&
-                    srcTypeNonPtr->name().isEmpty();
+            bool srcUseId = useTypeId(srcType);
 
             // Find the target base type
             const BaseType* target = _factory->findBaseTypeById(art.id());
-            const BaseType* targetNonPtr = target ?
-                        target->dereferencedBaseType(BaseType::trAny) : 0;
             if (!target)
                 typeRuleWriterError(QString("Cannot find base type with ID 0x%1.")
                                     .arg((uint)art.id(), 0, 16));
             // Check if we can use the target name or if we need to use the ID
-            bool targetUseId = false;
-            if (targetNonPtr && (targetNonPtr->type() & StructOrUnion) &&
-                targetNonPtr->name().isEmpty())
-                targetUseId = true;
-            else if (!targetNonPtr || targetNonPtr->name().isEmpty() ||
-                     _factory->findBaseTypesByName(targetNonPtr->name()).size() > 1)
-            {
-                try {
-                    QString s;
-                    ExpressionAction action;
-                    const BaseType *t = action.parseTypeStr(
-                                QString(), 0, _factory, QString(),
-                                target->prettyName(), s);
-                    Q_UNUSED(t);
-                }
-                catch (TypeRuleException& e) {
-                    if ((e.errorCode == TypeRuleException::ecTypeAmbiguous) ||
-                        (e.errorCode == TypeRuleException::ecNotCompatible))
-                        targetUseId = true;
-                    else {
-                        if (e.errorCode == TypeRuleException::ecSyntaxError) {
-                            debugmsg(QString("Soure type '%1' (0x%2) produced a"
-                                             " syntax error for expression %3 ="
-                                             " %4 (0x%5)")
-                                     .arg(srcType->prettyName())
-                                     .arg((uint)srcType->id(), 0, 16)
-                                     .arg(art.expr()->toString())
-                                     .arg(target->prettyName())
-                                     .arg((uint)target->id(), 0, 16));
-                        }
-                        throw;
-                    }
-                }
-            }
+            bool targetUseId = useTypeId(target);
 
             // Flaten the expression tree of alternatives
             ASTConstExpressionList alternatives = art.expr()->expandAlternatives(tmpExp);
@@ -371,7 +335,8 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                         else {
                             // We expect exactly one type of variable expression
                             if (varExp->baseType()->id() != ve->baseType()->id()) {
-                                typeRuleWriterError(QString("Expression %1 for %2.%3 has %4 different variables.")
+                                typeRuleWriterError(QString("Expression %1 for %2.%3"
+                                                            "has %4 different variables.")
                                                     .arg(expr->toString())
                                                     .arg(srcType->name())
                                                     .arg(memberNames.join("."))
@@ -472,7 +437,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                     writer.writeTextElement(xml::type_name,
                                             srcTypeNonTypedef->name());
                 else {
-                    writer.writeComment(QString(" Source type '%1' is anonymous ").arg(srcTypeNonTypedef->prettyName()));
+                    writer.writeComment(QString(" Source type '%1' is ambiguous ").arg(srcTypeNonTypedef->prettyName()));
                     writer.writeTextElement(xml::type_id,
                                             QString("0x%0").arg((uint)srcTypeNonTypedef->id(), 0, 16));
                 }
@@ -608,4 +573,36 @@ QString AltRefTypeRuleWriter::fileNameEscape(QString s) const
     s = s.replace(QChar(' '), "_");
     s = s.replace(QChar('*'), "_ptr");
     return s;
+}
+
+
+bool AltRefTypeRuleWriter::useTypeId(const BaseType* type) const
+{
+    const BaseType* typeNonPtr = type ?
+                type->dereferencedBaseType(BaseType::trAny) : 0;
+
+    if (typeNonPtr && (typeNonPtr->type() & StructOrUnion) &&
+        typeNonPtr->name().isEmpty())
+        return true;
+    else if (!typeNonPtr || typeNonPtr->name().isEmpty() ||
+             _factory->findBaseTypesByName(typeNonPtr->name()).size() > 1)
+    {
+        try {
+            QString s;
+            ExpressionAction action;
+            const BaseType *t = action.parseTypeStr(
+                        QString(), 0, _factory, QString(),
+                        type->prettyName(), s);
+            Q_UNUSED(t);
+        }
+        catch (TypeRuleException& e) {
+            if ((e.errorCode == TypeRuleException::ecTypeAmbiguous) ||
+                (e.errorCode == TypeRuleException::ecNotCompatible))
+                return true;
+            else
+                throw;
+        }
+    }
+
+    return false;
 }
