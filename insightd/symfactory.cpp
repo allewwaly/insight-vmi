@@ -1414,9 +1414,9 @@ ASTType *SymFactory::typeOfIdentifier(const QString &name, int types) const
 
     BaseTypeStringHash::const_iterator it = _typesByName.find(name);
     while (it != _typesByName.constEnd() && it.key() == name) {
-        if (it.value()->type() & types) {
+        if (it.value()->type() & types)
             return baseTypeToAstType(it.value());
-        }
+        ++it;
     }
     return 0;
 }
