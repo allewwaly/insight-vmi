@@ -6,7 +6,7 @@
 #include "symfactory.h"
 
 
-const char* expressionTypeToString(ExpressionType type)
+const char* expressionTypeToString(ExpressionTypes type)
 {
     switch (type) {
     case etNull:                return "etNull";
@@ -87,7 +87,7 @@ ASTExpression* ASTExpression::fromStream(KernelSymbolStream &in,
 
     // A null type means a null expression
     if (type) {
-        expr = factory->createEmptyExpression((ExpressionType)type);
+        expr = factory->createEmptyExpression(ExpressionType(type));
         expr->readFrom(in, factory);
     }
 
@@ -415,7 +415,7 @@ ExpressionResult ASTBinaryExpression::result(const Instance *inst) const
     ExpressionResult lr = _left->result(inst);
     ExpressionResult rr = _right->result(inst);
     ExpressionResult ret(lr.resultType | rr.resultType);
-    ExpressionResultSize target = ret.size = binaryExprSize(lr, rr);
+    ExprResultSizes target = ret.size = binaryExprSize(lr, rr);
     // Is the expression decidable?
     if (ret.resultType & (erRuntime|erUndefined)) {
         // Undecidable, so return the combined result type
@@ -694,7 +694,7 @@ QString ASTBinaryExpression::toString(bool compact) const
 }
 
 
-ExpressionResultSize ASTBinaryExpression::binaryExprSize(
+ExprResultSizes ASTBinaryExpression::binaryExprSize(
         const ExpressionResult& r1, const ExpressionResult& r2)
 {
     /*
@@ -740,10 +740,10 @@ ExpressionResultSize ASTBinaryExpression::binaryExprSize(
     // Otherwise
     else {
         // Integral promition
-        ExpressionResultSize r1_size = (r1.size & (es8Bit|es16Bit)) ?
-                    esInt32 : r1.size;
-        ExpressionResultSize r2_size = (r2.size & (es8Bit|es16Bit)) ?
-                    esInt32 : r2.size;
+        ExprResultSizes r1_size = (r1.size & (es8Bit|es16Bit)) ?
+                    ExprResultSizes(esInt32) : r1.size;
+        ExprResultSizes r2_size = (r2.size & (es8Bit|es16Bit)) ?
+                    ExprResultSizes(esInt32) : r2.size;
         r1r2_size = r1_size | r2_size;
 
         // If either is unsigned long, the result is unsigned long

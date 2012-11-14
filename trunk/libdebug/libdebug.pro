@@ -18,7 +18,8 @@ SOURCES += src/debug.cpp \
 
 HEADERS += include/debug.h \
     include/bugreport.h \
-    include/log.h
+    include/log.h \
+    include/safeflags.h
 
 # Compiler defines for the version information
 SVN_REVISION = exported

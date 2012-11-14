@@ -1071,7 +1071,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfConstant(
         return 0;
 
     bool ok = false;
-    ExpressionResultSize size = esUndefined;
+    ExprResultSizes size = esUndefined;
     ASTConstantExpression *expr = 0;
 
     switch (node->type) {
@@ -1479,7 +1479,7 @@ bool ASTExpressionEvaluator::appendPostfixExpressionSuffixes(
 }
 
 
-ExpressionResultSize ASTExpressionEvaluator::realTypeToResultSize(RealType type)
+ExprResultSizes ASTExpressionEvaluator::realTypeToResultSize(RealType type)
 {
     switch (type) {
     case rtInt8:   return esInt8;

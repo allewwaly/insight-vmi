@@ -34,7 +34,7 @@ public:
 
     ASTExpression* exprOfNode(const ASTNode *node,
                               const ASTNodeNodeHash& ptsTo);
-    static ExpressionResultSize realTypeToResultSize(RealType type);
+    static ExprResultSizes realTypeToResultSize(RealType type);
 
     /**
      * Clears the internal cache of expressions and forces a re-evaluation

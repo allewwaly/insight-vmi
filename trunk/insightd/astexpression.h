@@ -4,6 +4,7 @@
 #include <QList>
 #include <astsymbol.h>
 #include <debug.h>
+#include <safeflags.h>
 #include "expressionresult.h"
 #include "kernelsymbolstream.h"
 
@@ -51,8 +52,9 @@ enum ExpressionType {
     etUnaryInv,
     etUnaryNot
 };
+DECLARE_SAFE_FLAGS(ExpressionTypes, ExpressionType)
 
-const char* expressionTypeToString(ExpressionType type);
+const char* expressionTypeToString(ExpressionTypes type);
 
 /**
  * Abstract base class for a syntax tree expression.
@@ -64,7 +66,7 @@ public:
 
     virtual ~ASTExpression(){}
     virtual ExpressionType type() const = 0;
-    virtual int resultType() const = 0;
+    virtual ExprResultTypes resultType() const = 0;
     virtual ExpressionResult result(const Instance* inst = 0) const = 0;
     virtual ASTExpression* copy(ASTExpressionList& list,
                                 bool recursive = true) const = 0;
@@ -78,14 +80,14 @@ public:
         return other && type() == other->type();
     }
 
-    inline ASTExpressionList findExpressions(ExpressionType type)
+    inline ASTExpressionList findExpressions(ExpressionTypes type)
     {
         ASTExpressionList list;
         this->findExpressions(type, &list);
         return list;
     }
 
-    inline ASTConstExpressionList findExpressions(ExpressionType type)
+    inline ASTConstExpressionList findExpressions(ExpressionTypes type)
         const
     {
         ASTConstExpressionList list;
@@ -133,7 +135,7 @@ protected:
         return expr;
     }
 
-    inline virtual void findExpressions(ExpressionType type,
+    inline virtual void findExpressions(ExpressionTypes type,
                                         ASTExpressionList *list)
     {
         if (type == this->type())
@@ -142,7 +144,7 @@ protected:
             _alternative->findExpressions(type, list);
     }
 
-    inline virtual void findExpressions(ExpressionType type,
+    inline virtual void findExpressions(ExpressionTypes type,
                                         ASTConstExpressionList *list) const
     {
         if (type == this->type())
@@ -165,7 +167,7 @@ public:
         return etUndefined;
     }
 
-    inline virtual int resultType() const
+    inline virtual ExprResultTypes resultType() const
     {
         return erUndefined;
     }
@@ -206,9 +208,9 @@ public:
         return etVoid;
     }
 
-    inline virtual int resultType() const
+    inline virtual ExprResultTypes resultType() const
     {
-        return etUndefined;
+        return erUndefined;
     }
 
     inline virtual ExpressionResult result(const Instance* inst = 0) const
@@ -247,7 +249,7 @@ public:
         return etRuntimeDependent;
     }
 
-    inline virtual int resultType() const
+    inline virtual ExprResultTypes resultType() const
     {
         return erRuntime;
     }
@@ -284,11 +286,11 @@ class ASTConstantExpression: public ASTExpression
 {
 public:
     ASTConstantExpression() {}
-    ASTConstantExpression(ExpressionResultSize size, quint64 value)
+    ASTConstantExpression(ExprResultSizes size, quint64 value)
         : _value(erConstant, size, value) {}
-    ASTConstantExpression(ExpressionResultSize size, float value)
+    ASTConstantExpression(ExprResultSizes size, float value)
         : _value(erConstant, size, value) {}
-    ASTConstantExpression(ExpressionResultSize size, double value)
+    ASTConstantExpression(ExprResultSizes size, double value)
         : _value(erConstant, size, value) {}
 
     inline virtual ExpressionType type() const
@@ -296,7 +298,7 @@ public:
         return etLiteralConstant;
     }
 
-    inline virtual int resultType() const
+    inline virtual ExprResultTypes resultType() const
     {
         return erConstant;
     }
@@ -334,19 +336,19 @@ public:
         return c && _value.uvalue() == c->_value.uvalue();
     }
 
-    inline void setValue(ExpressionResultSize size, quint64 value)
+    inline void setValue(ExprResultSizes size, quint64 value)
     {
         _value.size = size;
         _value.result.ui64 = value;
     }
 
-    inline void setValue(ExpressionResultSize size, float value)
+    inline void setValue(ExprResultSizes size, float value)
     {
         _value.size = size;
         _value.result.f = value;
     }
 
-    inline void setValue(ExpressionResultSize size, double value)
+    inline void setValue(ExprResultSizes size, double value)
     {
         _value.size = size;
         _value.result.d = value;
@@ -379,7 +381,7 @@ public:
         return etEnumerator;
     }
 
-    inline virtual int resultType() const
+    inline virtual ExprResultTypes resultType() const
     {
         return _valueSet ? erConstant : erUndefined;
     }
@@ -430,10 +432,10 @@ public:
         return etVariable;
     }
 
-    inline virtual int resultType() const
+    inline virtual ExprResultTypes resultType() const
     {
         if (!_baseType)
-            return etUndefined;
+            return erUndefined;
         return _global ? erGlobalVar : erLocalVar;
     }
 
@@ -517,11 +519,11 @@ public:
         return _type;
     }
 
-    inline virtual int resultType() const
+    inline virtual ExprResultTypes resultType() const
     {
         return (_left && _right) ?
                     _left->resultType() | _right->resultType() :
-                    erUndefined;
+                    ExprResultTypes(erUndefined);
     }
 
     virtual ExpressionResult result(const Instance* inst = 0) const;
@@ -553,7 +555,7 @@ public:
                 ((!_right && !b->_right) || _right->equals(b->_right));
     }
 
-    static ExpressionResultSize binaryExprSize(const ExpressionResult& r1,
+    static ExprResultSizes binaryExprSize(const ExpressionResult& r1,
                                                const ExpressionResult& r2);
 
     virtual void readFrom(KernelSymbolStream &in, SymFactory* factory);
@@ -574,7 +576,7 @@ protected:
 
     QString operatorToString() const;
 
-    inline virtual void findExpressions(ExpressionType type,
+    inline virtual void findExpressions(ExpressionTypes type,
                                         ASTExpressionList* list)
     {
         ASTExpression::findExpressions(type, list);
@@ -585,7 +587,7 @@ protected:
     }
 
 
-    inline virtual void findExpressions(ExpressionType type,
+    inline virtual void findExpressions(ExpressionTypes type,
                                         ASTConstExpressionList* list) const
     {
         ASTExpression::findExpressions(type, list);
@@ -625,9 +627,9 @@ public:
         return _type;
     }
 
-    inline virtual int resultType() const
+    inline virtual ExprResultTypes resultType() const
     {
-        return _child ? _child->resultType() : erUndefined;
+        return _child ? _child->resultType() : ExprResultTypes(erUndefined);
     }
 
     virtual ExpressionResult result(const Instance* inst = 0) const;
@@ -667,7 +669,7 @@ protected:
 
     QString operatorToString() const;
 
-    inline virtual void findExpressions(ExpressionType type,
+    inline virtual void findExpressions(ExpressionTypes type,
                                         ASTExpressionList* list)
     {
         ASTExpression::findExpressions(type, list);
@@ -675,7 +677,7 @@ protected:
             list->append(_child->findExpressions(type));
     }
 
-    inline virtual void findExpressions(ExpressionType type,
+    inline virtual void findExpressions(ExpressionTypes type,
                                         ASTConstExpressionList* list) const
     {
         ASTExpression::findExpressions(type, list);

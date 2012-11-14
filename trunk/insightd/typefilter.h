@@ -6,7 +6,7 @@
 #include <QStringList>
 #include <QRegExp>
 #include <QHash>
-#include <QFlags>
+#include <safeflags.h>
 #include "filterexception.h"
 #include "keyvaluestore.h"
 
@@ -46,7 +46,7 @@ enum PatternSyntax_ {
     psWildcard = (1 << 2), ///< match with waldcard expression
     psRegExp   = (1 << 3)  ///< match with regular expression
 };
-Q_DECLARE_FLAGS(PatternSyntax, PatternSyntax_)
+DECLARE_SAFE_FLAGS(PatternSyntax, PatternSyntax_)
 
 /// Filter options for variables and types
 enum Option {
@@ -66,7 +66,7 @@ enum Option {
     ftTypeNameAll      = ftTypeNameAny|ftTypeNameLiteral|ftTypeNameWildcard|ftTypeNameRegEx,  ///< any kind of type name matching
     ftVarNameAll       = ftVarNameAny|ftVarNameLiteral|ftVarNameWildcard|ftVarNameRegEx  ///< any kind of variable name matching
 };
-Q_DECLARE_FLAGS(Options, Option)
+DECLARE_SAFE_FLAGS(Options, Option)
 
 }
 
