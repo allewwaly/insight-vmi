@@ -2,26 +2,26 @@
 #define ASTEXPRESSIONRESULT_H
 
 #include <QString>
-//#include <QDataStream>
+#include <safeflags.h>
 #include "kernelsymbolstream.h"
 
 /**
  The type of an epxression result, which may be a bit-wise combination of the
  following enumeration values.
  */
-enum ExpressionResultType {
+enum ExprResultType {
     erNotSet    = 0,         ///< Result is not set
     erConstant  = (1 << 0),  ///< Expression is compile-time constant
     erGlobalVar = (1 << 1),  ///< Expression involves global variable
     erLocalVar  = (1 << 2),  ///< Expression involves local variable
     erParameter = (1 << 3),  ///< Expression involves function parameters
     erRuntime   = (1 << 4),  ///< Expression involves run-time dependencies
-//    erInvalid   = (1 << 5),  ///< Expression result cannot be determined
     erUndefined = (1 << 5)
 };
+DECLARE_SAFE_FLAGS(ExprResultTypes, ExprResultType)
 
 /// The size and type of an ExpressionResult
-enum ExpressionResultSize {
+enum ExprResultSize {
     esUndefined = 0,                  ///< size/type is undefined
     es8Bit      = (1 << 1),           ///< size is 8 bit
     es16Bit     = (1 << 2),           ///< size is 16 bit
@@ -41,6 +41,7 @@ enum ExpressionResultSize {
     esInteger   = es8Bit|es16Bit|es32Bit|es64Bit, ///< result is an integer of any size
     esReal      = esFloat|esDouble    ///< result is a real value of any size
 };
+DECLARE_SAFE_FLAGS(ExprResultSizes, ExprResultSize)
 
 
 /// The result of an expression
@@ -48,20 +49,23 @@ struct ExpressionResult
 {
     /// Constructor
     ExpressionResult() : resultType(erUndefined), size(esInt32) { this->result.i64 = 0; }
-    explicit ExpressionResult(int resultType)
+    explicit ExpressionResult(ExprResultTypes resultType)
         : resultType(resultType), size(esInt32) { this->result.i64 = 0; }
-    explicit ExpressionResult(int resultType, ExpressionResultSize size, quint64 result)
+    explicit ExpressionResult(ExprResultTypes resultType, ExprResultSizes size,
+                              quint64 result)
         : resultType(resultType), size(size) { this->result.ui64 = result; }
-    explicit ExpressionResult(int resultType, ExpressionResultSize size, float result)
+    explicit ExpressionResult(ExprResultTypes resultType, ExprResultSizes size,
+                              float result)
         : resultType(resultType), size(size) { this->result.f = result; }
-    explicit ExpressionResult(int resultType, ExpressionResultSize size, double result)
+    explicit ExpressionResult(ExprResultTypes resultType, ExprResultSizes size,
+                              double result)
         : resultType(resultType), size(size) { this->result.d = result; }
 
-    /// ORed combination of ExpressionResultType values
-    int resultType;
+    /// ORed combination of ExprResultType values
+    ExprResultTypes resultType;
 
     /// size of result of expression. \sa ExpressionResultSize
-    ExpressionResultSize size;
+    ExprResultSizes size;
 
     /// Expression result, if valid
     union Result {
@@ -79,9 +83,9 @@ struct ExpressionResult
 
     inline bool isValid() const { return !(resultType & (erUndefined|erRuntime)); }
 
-    qint64 value(ExpressionResultSize target = esUndefined) const;
+    qint64 value(ExprResultSizes target = esUndefined) const;
 
-    quint64 uvalue(ExpressionResultSize target = esUndefined) const;
+    quint64 uvalue(ExprResultSizes target = esUndefined) const;
 
     float fvalue() const;
 

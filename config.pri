@@ -7,6 +7,10 @@ isEmpty(PREFIX) {
 # Should the tests be built?
 #CONFIG += tests
 
+# Disable type-safe enums in release mode
+CONFIG(release): DEFINES += NO_TYPESAFE_FLAGS
+CONFIG(debug): DEFINES -= NO_TYPESAFE_FLAGS
+
 # Should the memory_map feature be built? Requires the X window system
 # for Unix. Disabled by default.
 CONFIG += memory_map

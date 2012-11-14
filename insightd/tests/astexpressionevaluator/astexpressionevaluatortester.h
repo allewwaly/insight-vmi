@@ -66,7 +66,7 @@ private slots:
 
 private:
     template <class T>
-    ExpressionResultSize exprSize(T x) const;
+    ExprResultSizes exprSize(T x) const;
 
     MemSpecs* _specs;
     SymFactory* _factory;

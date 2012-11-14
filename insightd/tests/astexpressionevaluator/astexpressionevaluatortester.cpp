@@ -2089,7 +2089,7 @@ TEST_FUNCTION(builtins)
 
 
 template <class T>
-ExpressionResultSize ASTExpressionEvaluatorTester::exprSize(T x) const
+ExprResultSizes ASTExpressionEvaluatorTester::exprSize(T x) const
 {
     // Float or integer type?
     x = 1.5;

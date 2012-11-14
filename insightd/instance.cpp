@@ -823,7 +823,7 @@ ExpressionResult Instance::toExpressionResult() const
 		return ExpressionResult(erUndefined);
 
 	const BaseType* t = _d->type->dereferencedBaseType(BaseType::trLexical);
-	ExpressionResultType ert = (_d->id > 0) ? erGlobalVar : erLocalVar;
+	ExprResultTypes ert = (_d->id > 0) ? erGlobalVar : erLocalVar;
 
 	switch (t->type()) {
 	case rtInt8:

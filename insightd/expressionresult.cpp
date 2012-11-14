@@ -3,7 +3,7 @@
 #include "expressionevalexception.h"
 #include <debug.h>
 
-qint64 ExpressionResult::value(ExpressionResultSize target) const
+qint64 ExpressionResult::value(ExprResultSizes target) const
 {
     qint64 ret;
 
@@ -11,7 +11,7 @@ qint64 ExpressionResult::value(ExpressionResultSize target) const
     if (target && ((target | size) & esUnsigned)) {
         // If the target is unsigned, return the unsigned  value instead.
         // If this value is unsigned, do not extend the sign!
-        ret = uvalue((ExpressionResultSize)(target | esUnsigned));
+        ret = uvalue(target | esUnsigned);
     }
     // No target specified, or both target and this value are signed, so
     // extend this value's sign to 64 bit
@@ -29,7 +29,7 @@ qint64 ExpressionResult::value(ExpressionResultSize target) const
 }
 
 
-quint64 ExpressionResult::uvalue(ExpressionResultSize target) const
+quint64 ExpressionResult::uvalue(ExprResultSizes target) const
 {
     quint64 ret;
 
@@ -161,8 +161,8 @@ KernelSymbolStream& operator>>(KernelSymbolStream& in, ExpressionResult& result)
 {
     qint32 size, resultType;
     in >> size >> resultType >> result.result.ui64;
-    result.size = (ExpressionResultSize)size;
-    result.resultType = resultType;
+    result.size = ExprResultSizes(size);
+    result.resultType = ExprResultTypes(resultType);
     return in;
 }
 
