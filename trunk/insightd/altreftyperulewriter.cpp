@@ -524,10 +524,12 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 writer.writeTextElement(xml::datatype,
                                         realTypeToStr(srcTypeNonTypedef->type()).toLower());
                 // Use the type name, if we can, otherwise the type ID
-                // TODO: Check if type name + members is ambiguous
-                if (!srcUseId)
-                    writer.writeTextElement(xml::type_name,
-                                            srcTypeNonTypedef->name());
+                if (!srcUseId) {
+                    // Only write type name for types that actually have names
+                    if (srcTypeNonTypedef->type() & (rtEnum|rtStruct|rtUnion|rtTypedef))
+                        writer.writeTextElement(xml::type_name,
+                                                srcTypeNonTypedef->name());
+                }
                 else {
                     writer.writeComment(QString(" Source type '%1' is ambiguous ").arg(srcTypeNonTypedef->prettyName()));
                     writer.writeTextElement(xml::type_id,
