@@ -531,7 +531,8 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                                                 srcTypeNonTypedef->name());
                 }
                 else {
-                    writer.writeComment(QString(" Source type '%1' is ambiguous ").arg(srcTypeNonTypedef->prettyName()));
+                    writer.writeComment(QString(" Source type '%1' is ambiguous ")
+                                            .arg(srcTypeNonTypedef->prettyName()));
                     writer.writeTextElement(xml::type_id,
                                             QString("0x%0").arg((uint)srcUseId, 0, 16));
                 }
@@ -566,7 +567,8 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 if (!srcUseId)
                     writer.writeTextElement(xml::srcType, srcType->prettyName(_srcVar));
                 else {
-                    writer.writeComment(QString(" Source type '%1' is ambiguous ").arg(srcType->prettyName()));
+                    writer.writeComment(QString(" Source type '%1' is ambiguous ")
+                                            .arg(srcType->prettyName()));
                     writer.writeTextElement(xml::srcType,
                                             QString("0x%0 %1")
                                                 .arg((uint)srcUseId, 0, 16)
@@ -679,7 +681,7 @@ int AltRefTypeRuleWriter::useTypeId(const BaseType* type) const
 
     if (typeNonPtr && (typeNonPtr->type() & StructOrUnion) &&
         typeNonPtr->name().isEmpty())
-        typeId = type->id();
+        typeId = type->dereferencedBaseType(BaseType::trLexical)->id();
     else if (!typeNonPtr || typeNonPtr->name().isEmpty() ||
              _factory->findBaseTypesByName(typeNonPtr->name()).size() > 1)
     {
@@ -694,7 +696,7 @@ int AltRefTypeRuleWriter::useTypeId(const BaseType* type) const
         catch (TypeRuleException& e) {
             if ((e.errorCode == TypeRuleException::ecTypeAmbiguous) ||
                 (e.errorCode == TypeRuleException::ecNotCompatible))
-                typeId = type->id();
+                typeId = type->dereferencedBaseType(BaseType::trLexical)->id();
             else
                 throw;
         }
