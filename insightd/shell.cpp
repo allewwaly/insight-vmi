@@ -101,7 +101,7 @@ QDataStream Shell::_ret;
 Shell::Shell(bool listenOnSocket)
     : _listenOnSocket(listenOnSocket), _interactive(!listenOnSocket),
       _clSocket(0), _srvSocket(0), _socketMuxer(0), _outChan(0), _errChan(0),
-      _binChan(0), _retChan(0), _engine(0)
+      _binChan(0), _retChan(0), _interrupted(false), _engine(0)
 {
 	qRegisterMetaType<QAbstractSocket::SocketState>();
 	qRegisterMetaType<QAbstractSocket::SocketError>();
