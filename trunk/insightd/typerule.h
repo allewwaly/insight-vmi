@@ -254,6 +254,19 @@ public:
      */
     virtual QString toString(const ColorPalette *col = 0) const = 0;
 
+    /**
+     * Returns a list of all supported action types
+     * @return
+     */
+    static const QStringList &supportedActionTypes();
+
+    /**
+     * Returns the action type for a string parameter
+     * @param action the action type as string
+     * @return the corresponding ActionType
+     */
+    static ActionType strToActionType(const QString& action);
+
 private:
     int _srcLine;
 };

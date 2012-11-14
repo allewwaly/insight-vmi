@@ -49,19 +49,6 @@ const char* expression = "expression";
 }
 
 
-TypeRuleAction::ActionType strToActionType(const QString& action)
-{
-    if (action == xml::expression)
-        return TypeRuleAction::atExpression;
-    else if (action == xml::file)
-        return TypeRuleAction::atFunction;
-    else if (action == xml::inlineCode)
-        return TypeRuleAction::atInlineCode;
-    else
-        return TypeRuleAction::atNone;
-}
-
-
 TypeRuleParser::TypeRuleParser(TypeRuleReader *reader)
     : _reader(reader), _rule(0), _filter(0), _locator(0)
 
@@ -256,7 +243,8 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
     // <action>
     else if (name == xml::action) {
         errorIfNull(_rule);
-        TypeRuleAction::ActionType type = strToActionType(attributes[xml::type]);
+        TypeRuleAction::ActionType type =
+                TypeRuleAction::strToActionType(attributes[xml::type]);
         TypeRuleAction* action = 0;
 
         switch (type) {
@@ -282,9 +270,12 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
             action = new ProgramScriptAction();
             break;
 
-        default:
-            typeRuleErrorLoc(QString("Unknown action type: %1")
-                          .arg(attributes[xml::type]));
+        default: {
+            typeRuleErrorLoc(QString("Unknown action type '%1', must be one "
+                                     "of: %2")
+                            .arg(attributes[xml::type])
+                            .arg(TypeRuleAction::supportedActionTypes().join(", ")));
+        }
         }
 
         action->setSrcLine(_locator ? _locator->lineNumber() : 0);
