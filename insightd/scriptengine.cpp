@@ -291,10 +291,18 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
 	assert(arg != 0);
 	ScriptEngine* this_eng = (ScriptEngine*)arg;
 
-    if (ctx->argumentCount() < 1 || ctx->argumentCount() > 2) {
-        ctx->throwError("Expected one or two arguments");
+    if (ctx->argumentCount() > 2) {
+        ctx->throwError("Expected at most two arguments:\n"
+                        "i = new Instance();\n"
+                        "i = new Instance(type_id);\n"
+                        "i = new Instance(\"query.string\");\n"
+                        "i = new Instance(\"query.string\", mem_index);");
         return QScriptValue();
     }
+
+    // Without any argument, return a null instance
+    if (ctx->argumentCount() == 0)
+        return this_eng->_instClass->newInstance(Instance());
 
     // First argument must be a query string or an ID
     QString queryStr;
@@ -323,7 +331,8 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
         if (index < 0 || index >= shell->memDumps().size() ||
         		!shell->memDumps()[index])
         {
-            ctx->throwError(QString("Invalid memory dump index: %1").arg(index));
+            ctx->throwError(QString("Invalid memory dump index: %1")
+                                .arg(ctx->argument(1).toString()));
             return QScriptValue();
         }
     }
