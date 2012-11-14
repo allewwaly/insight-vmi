@@ -1282,8 +1282,12 @@ Instance Instance::parent() const
 QString Instance::toString(const ColorPalette* col) const
 {
     static const QString nullStr("NULL");
-    if (isNull())
-        return nullStr;
+    if (isNull()) {
+        if (col)
+            return QString(col->color(ctAddress)) + nullStr + QString(col->color(ctReset));
+        else
+            return nullStr;
+    }
 
     const BaseType* bt;
     if (_d->bitSize >= 0 &&
