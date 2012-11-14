@@ -15,6 +15,8 @@
 #include "sourceref.h"
 #include <debug.h>
 
+class TypeRuleEngine;
+
 /**
  * This class represents a variable variable of a certain type.
  */
@@ -89,10 +91,12 @@ public:
      * @param vmem the virtual memory object to read data from
      * @param resolveTypes which types to automatically resolve, see
      * BaseType::TypeResolution
+     * @param src knowledge sources to use for resolving the member
      * @return an Instace object for this member
+     * \sa KnowledgeSources
      */
     Instance toInstance(VirtualMemory* vmem, int resolveTypes =
-            BaseType::trLexical) const;
+            BaseType::trLexical, KnowledgeSources src = ksAll) const;
 
     /**
      * Retrieves an Instance for the alternative referencing type no. \a index
@@ -119,6 +123,18 @@ public:
 	 */
 	virtual void writeTo(KernelSymbolStream& out) const;
 
+    /**
+     * Sets the global rule engine used by all memory dumps.
+     * @param engine engine to use
+     */
+    static void setRuleEngine(const TypeRuleEngine* engine);
+
+    /**
+     * Returns the global rule engine used by all memory dumps.
+     */
+    static const TypeRuleEngine* ruleEngine();
+
+
 protected:
     /**
      * Access function to the factory this symbol belongs to.
@@ -131,6 +147,7 @@ protected:
     virtual const SymFactory* fac() const;
 
     quint64 _offset;
+    static const TypeRuleEngine* _ruleEngine;
 };
 
 /**
@@ -173,5 +190,18 @@ inline SymFactory* Variable::fac()
 {
     return _factory;
 }
+
+
+inline void Variable::setRuleEngine(const TypeRuleEngine* engine)
+{
+    _ruleEngine = engine;
+}
+
+
+inline const TypeRuleEngine* Variable::ruleEngine()
+{
+    return _ruleEngine;
+}
+
 
 #endif /* VARIABLE_H_ */
