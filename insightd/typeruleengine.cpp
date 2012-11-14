@@ -212,21 +212,25 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
             // Are all required fields accessed?
             const InstanceFilter* filter = rule->filter();
             if (filter) {
+                bool defered = false;
                 // Not all fields given ==> defer
-                if (filter->members().size() > members.size())
+                if (filter->members().size() > members.size()) {
                     ret |= mrDefer;
+                    defered = true;
+                }
                 // To many fields given ==> no match
                 else if (rule->filter()->members().size() < members.size())
                     continue;
                 // If all fields match ==> match
                 else {
-                    bool match = true;
+                    bool match = true, evaluated = false;
                     for (int i = 0; match && i< members.size(); ++i)
                         if (!filter->members().at(i).match(members[i]))
                             match = false;
                     // Only consider the first match
                     if (match && !(ret & mrMatch)) {
                         // Evaluate the rule
+                        evaluated = true;
                         bool matched;
                         Instance instRet(evaluateRule(it.value(), inst, members,
                                                       &matched));
@@ -236,6 +240,12 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                             instRet.setOrigin(Instance::orRuleEngine);
                             *newInst = new Instance(instRet);
                         }
+                    }
+                    if (_verbose) {
+                        int m = match ? mrMatch : mrNoMatch;
+                        if (defered)
+                            m |= mrDefer;
+                        ruleMatchInfo(it.value(), inst, members, m, evaluated);
                     }
                 }
             }
@@ -259,33 +269,56 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
         ret = arule.rule->action()->evaluate(inst, members, _eng, &m);
         if (matched)
             *matched = m;
-        // Verbose output
-        if ((_verbose & veTestedRules) || ((_verbose & veMatchingRule) && m)) {
-            int w = ShellUtil::getFieldWidth(_rules.size(), 10);
-            shell->out() << "Rule " << shell->color(ctBold)
-                         << qSetFieldWidth(w) << (arule.index + 1)
-                         << qSetFieldWidth(0) << shell->color(ctReset)
-                         << " ";
-            if (m)
-                shell->out() << shell->color(ctMatched) << "hits";
-            else
-                shell->out() << shell->color(ctMissed) << "misses";
-
-            shell->out() << shell->color(ctReset) << " instance ";
-            if (inst)
-                shell->out() << shell->color(ctBold) << inst->fullName()
-                             << shell->color(ctReset);
-            for (int i = 0; i < members.size(); ++i) {
-                if (i > 0 || inst)
-                    shell->out() << ".";
-                shell->out() << shell->color(ctMember) << members[i]->name()
-                             << shell->color(ctReset);
-            }
-            shell->out() << endl;
-        }
     }
     ret.setOrigin(Instance::orRuleEngine);
     return ret;
+}
+
+
+void TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
+                                   const Instance *inst,
+                                   const ConstMemberList &members,
+                                   int matched, bool evaluated) const
+{
+    // Verbose output
+    if ((_verbose & veTestedRules) ||
+        ((_verbose & veMatchingRule) && matched))
+    {
+        int w = ShellUtil::getFieldWidth(_rules.size(), 10);
+        shell->out() << "Rule " << shell->color(ctBold)
+                     << qSetFieldWidth(w) << (arule.index + 1)
+                     << qSetFieldWidth(0) << shell->color(ctReset)
+                     << " ";
+        if (matched & mrMatch) {
+            shell->out() << shell->color(ctMatched) << "hits";
+            if ((matched & mrDefer))
+                shell->out() << " and " << shell->color(ctDeferred) << "defers";
+        }
+        else if ((matched & mrDefer))
+            shell->out() << shell->color(ctDeferred) << "defers";
+        else
+            shell->out() << shell->color(ctMissed) << "misses";
+
+        shell->out() << shell->color(ctReset) << " instance ";
+        if (inst)
+            shell->out() << shell->color(ctBold) << inst->fullName()
+                         << shell->color(ctReset);
+        for (int i = 0; i < members.size(); ++i) {
+            if (i > 0 || inst)
+                shell->out() << ".";
+            shell->out() << shell->color(ctMember) << members[i]->name()
+                         << shell->color(ctReset);
+        }
+
+        if (evaluated)
+            shell->out() << " and was " << shell->color(ctEvaluated)
+                         << "evaluated";
+        else
+            shell->out() << " but was " << shell->color(ctDeferred)
+                         << "ignored";
+
+        shell->out() << shell->color(ctReset) << endl;
+    }
 }
 
 

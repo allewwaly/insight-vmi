@@ -332,7 +332,7 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 
         case ttMember:
             tmp = tmp.member(_transformations[j].member,
-                             BaseType::trLexical, 0, Instance::ksNone);
+                             BaseType::trLexical, 0, ksNone);
             prettyType += "." + _transformations[j].member;
             break;
 

@@ -296,7 +296,7 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
         return;
 
     // Calculate the offset of the member within the struct
-    quint64 listHeadNext = (quint64)listHead->member(0, 0, -1, Instance::ksNone).toPointer();
+    quint64 listHeadNext = (quint64)listHead->member(0, 0, -1, ksNone).toPointer();
     quint64 memOffset = listHeadNext - firstListMember->address();
 
     Instance *listMember = firstListMember;
@@ -363,7 +363,7 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
         }
 
         // Update vars
-        listHeadNext = (quint64)tmp->member(0, 0, -1, Instance::ksNone).toPointer();
+        listHeadNext = (quint64)tmp->member(0, 0, -1, ksNone).toPointer();
         listMember->setAddress(listHeadNext - memOffset);
 
         // We have to update the name once
@@ -384,7 +384,7 @@ void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
         return;
 
     // Get the next and prev pointer.
-    Instance next = inst->member(0, 0, -1, Instance::ksNone);
+    Instance next = inst->member(0, 0, -1, ksNone);
 
     // Is the next pointer valid e.g. not Null
     if (!MemoryMapHeuristics::validPointer(&next, false))
@@ -393,7 +393,7 @@ void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
     // For Lists we can also verify the prev pointer in contrast
     // to HLists
     if (MemoryMapHeuristics::isListHead(inst)) {
-        Instance prev = inst->member(1, 0, -1, Instance::ksNone);
+        Instance prev = inst->member(1, 0, -1, ksNone);
 
         // Filter invalid or default pointers (next == prev)
         if (!MemoryMapHeuristics::validPointer(&prev, false) ||
@@ -537,7 +537,7 @@ void MemoryMapBuilderSV::processStruct(MemoryMapNodeSV *node, Instance *inst)
         // Notice that the performance could be improved if we do not try to create
         // an instance for each member, but just for interesting members like structs,
         // poiters, etc.
-        Instance mi = inst->member(i, 0, -1, Instance::ksNone);
+        Instance mi = inst->member(i, 0, -1, ksNone);
 
         if(!mi.isNull())
         {
@@ -572,7 +572,7 @@ void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance *inst, 
     }
 
     // Get the pointer array
-    Instance ary = inst->member("ary", BaseType::trLexical, 0, Instance::ksNone);
+    Instance ary = inst->member("ary", BaseType::trLexical, 0, ksNone);
 
     if (ary.isNull() || !ary.isValid()) {
         debugerr("Idr Layer has no member ary!");
@@ -676,7 +676,7 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *i
     quint32 heightInt = height.toInt32();
 
     // Get the slots
-    Instance radixSlots = inst->member("slots", BaseType::trLexical, 0, Instance::ksNone);
+    Instance radixSlots = inst->member("slots", BaseType::trLexical, 0, ksNone);
 
     if (radixSlots.isNull() || !radixSlots.isValid()) {
         debugerr("Radix Tree Node has no member slots!");

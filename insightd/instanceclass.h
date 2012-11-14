@@ -33,7 +33,7 @@ class InstancePrototype;
 class InstanceClass : public QScriptClass
 {
 public:
-    InstanceClass(QScriptEngine *eng, Instance::KnowledgeSources src);
+    InstanceClass(QScriptEngine *eng, KnowledgeSources src);
     ~InstanceClass();
 
     QScriptValue constructor();
@@ -56,8 +56,8 @@ public:
 
     QScriptValue prototype() const;
 
-    Instance::KnowledgeSources knowledgeSources() const;
-    void setKnowledgeSources(Instance::KnowledgeSources src);
+    KnowledgeSources knowledgeSources() const;
+    void setKnowledgeSources(KnowledgeSources src);
 
 private:
     static QScriptValue getSetUseCandidates(QScriptContext *ctx, QScriptEngine *eng);

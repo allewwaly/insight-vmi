@@ -13,6 +13,8 @@ enum ColorType {
     ctDim,
     ctMatched,
     ctMissed,
+    ctDeferred,
+    ctEvaluated,
     ctPrompt,
     ctVariable,
     ctType,

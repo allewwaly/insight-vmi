@@ -42,7 +42,7 @@ public:
 	 * Constructor
 	 * @param knowledgeSources Which knowledge sources should be used when
 	 * resolving members?
-	 * \sa Instance::KnowledgeSources
+	 * \sa KnowledgeSources
 	 */
 	ScriptEngine(int knowledgeSources = 0);
 

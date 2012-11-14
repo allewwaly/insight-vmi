@@ -13,6 +13,7 @@
 #include "symfactory.h"
 #include "variable.h"
 #include "shell.h"
+#include "typeruleengine.h"
 
 #ifdef CONFIG_MEMORY_MAP
 #include "memorymap.h"
@@ -150,7 +151,7 @@ void MemoryDump::init()
         try {
             struct MemSpecs::Version ver;
             Instance uts_ns = queryInstance(uts_ns_name);
-            uts_ns = getNextInstance("name", uts_ns);
+            uts_ns = getNextInstance("name", uts_ns, ksNone);
             // Read in all version information
             if (!_specs.version.machine.isEmpty())
                 ver.machine = trimQuotes(
@@ -242,7 +243,9 @@ Instance MemoryDump::getInstanceAt(const QString& type, const size_t address,
 }
 
 
-Instance MemoryDump::getNextInstance(const QString& component, const Instance& instance) const
+Instance MemoryDump::getNextInstance(const QString& component,
+									 const Instance& instance,
+									 KnowledgeSources src) const
 {
 	Instance result;
 	QString typeString, symbol, offsetString, candidate, arrayIndexString;
@@ -303,13 +306,11 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 			result = v->altRefTypeInstance(_vmem, candidateIndex - 1);
 		}
 		else {
-			// If variable has exactly one alternative type and the user did
-			// not explicitly request the original type, we return the
-			// alternative type
-			if (candidateIndex < 0 && v->altRefTypeCount() == 1)
-				result = v->altRefTypeInstance(_vmem, 0);
-            else
-				result = v->toInstance(_vmem, BaseType::trLexical);
+			KnowledgeSources tmpSrc = src;
+			// A candidate index of 0 means to ignore the alternative types
+			if (candidateIndex == 0)
+				tmpSrc = static_cast<KnowledgeSources>(tmpSrc|ksNoAltTypes);
+			result = v->toInstance(_vmem, BaseType::trLexical, tmpSrc);
 		}
 	}
 	else {
@@ -333,7 +334,7 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
             result = instance.memberCandidate(symbol, candidateIndex - 1);
         }
         else {
-            result = instance.member(symbol, BaseType::trLexical);
+            result = instance.member(symbol, BaseType::trLexical, src);
         }
 
         if (!result.isValid()) {
@@ -436,7 +437,9 @@ Instance MemoryDump::getNextInstance(const QString& component, const Instance& i
 	return result.dereference(BaseType::trAnyNonNull);
 }
 
-Instance MemoryDump::queryInstance(const QString& queryString) const
+
+Instance MemoryDump::queryInstance(const QString& queryString,
+                                   KnowledgeSources src) const
 {
     QStringList components = queryString.split('.', QString::SkipEmptyParts);
 
@@ -446,7 +449,7 @@ Instance MemoryDump::queryInstance(const QString& queryString) const
 	Instance result;
 	
 	while (!components.isEmpty()) {
-		result = getNextInstance(components.first(), result);
+		result = getNextInstance(components.first(), result, src);
 		components.pop_front();
 	}
 
@@ -454,7 +457,7 @@ Instance MemoryDump::queryInstance(const QString& queryString) const
 }
 
 
-Instance MemoryDump::queryInstance(const int queryId) const
+Instance MemoryDump::queryInstance(const int queryId, KnowledgeSources src) const
 {
     // The very first component must be a variable
     Variable* v = _factory->findVarById(queryId);
@@ -463,16 +466,16 @@ Instance MemoryDump::queryInstance(const int queryId) const
         queryError(QString("Variable with ID 0x%1 does not exist")
                 .arg(queryId, 0, 16));
 
-//    return v->toInstance(_vmem, rtArray);
-    return v->toInstance(_vmem, BaseType::trLexicalAndPointers);
+    return v->toInstance(_vmem, BaseType::trLexicalAndPointers, src);
 }
 
 
-QString MemoryDump::query(const int queryId, const ColorPalette& col) const
+QString MemoryDump::query(const int queryId, const ColorPalette& col,
+                          KnowledgeSources src) const
 {
     QString ret;
 
-    Instance instance = queryInstance(queryId);
+    Instance instance = queryInstance(queryId, src);
 
     QString s = QString("%1%2%3%4: ")
             .arg(col.color(ctTypeId))
@@ -503,7 +506,7 @@ QString MemoryDump::query(const int queryId, const ColorPalette& col) const
 
 
 QString MemoryDump::query(const QString& queryString,
-                          const ColorPalette& col) const
+                          const ColorPalette& col, KnowledgeSources src) const
 {
     QString ret;
 
@@ -517,17 +520,13 @@ QString MemoryDump::query(const QString& queryString,
         }
     }
     else {
-        Instance instance = queryInstance(queryString);
+        Instance instance = queryInstance(queryString, src);
 
         QString s = QString("%1%2%3: ")
                 .arg(col.color(ctBold))
                 .arg(queryString)
                 .arg(col.color(ctReset));
         if (instance.isValid()) {
-            // Can we access the instance's memory? If not, an exception is
-            // thrown.
-            _vmem->seek(instance.address());
-
             s += QString("%1%2%3 (ID%4 0x%5%6)")
                     .arg(col.color(ctType))
                     .arg(instance.typeName())
@@ -535,7 +534,15 @@ QString MemoryDump::query(const QString& queryString,
                     .arg(col.color(ctTypeId))
                     .arg((uint)instance.type()->id(), 0, 16)
                     .arg(col.color(ctReset));
-            ret = instance.toString(&col);
+            if (instance.isNull())
+                ret = QString(col.color(ctAddress)) + "NULL" + QString(col.color(ctReset));
+            else {
+                // Can we access the instance's memory? If not, an exception is
+                // thrown.
+                _vmem->seek(instance.address());
+
+                ret = instance.toString(&col);
+            }
         }
         else
             s += "(unresolved type)";
@@ -601,7 +608,7 @@ QString MemoryDump::dump(const QString& type, quint64 address,
 		components.pop_front();
 	
 		while (!components.isEmpty()) {
-			result = getNextInstance(components.first(), result);
+			result = getNextInstance(components.first(), result, ksNone);
 			components.pop_front();
 		}
 			

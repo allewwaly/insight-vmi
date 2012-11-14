@@ -19,6 +19,7 @@
 class QFile;
 class QIODevice;
 class SymFactory;
+class RuleEngine;
 
 #ifdef CONFIG_MEMORY_MAP
 class MemoryMap;
@@ -123,60 +124,60 @@ public:
     /**
      * Retrieves a string representation the variable with ID \a queryId.
      * @param queryId the ID of the queried variable
+     * @param src knowledge sources to use
      * @return an string representation of the symbol's value for the
      * specified symbol
      *
      * @exception QueryException the queried symbol does not exist or cannot
      * be read
+     * \sa KnowledgeSources
      */
-    QString query(const int queryId, const ColorPalette &col) const;
+    QString query(const int queryId, const ColorPalette &col,
+                  KnowledgeSources src = ksAll) const;
 
     /**
      * Retrieves a string representation a symbol specified in dotted notation,
      * e. g., "init_task.children.next". If \a queryString is empty, it returns
      * a list of all known global symbols, one per line.
      * @param queryString the symbol in dotted notation
+     * @param src knowledge sources to use
      * @return an string representation of the symbol's value for the
      * specified symbol
      *
      * @exception QueryException the queried symbol does not exist or cannot
      * be read
+     * \sa KnowledgeSources
      */
-    QString query(const QString& queryString, const ColorPalette &col) const;
+    QString query(const QString& queryString, const ColorPalette &col,
+                  KnowledgeSources src = ksAll) const;
 
     /**
      * Retrieves an Instance object for the variable with ID \a queryId.
      * @param queryId the ID of the queried variable
+     * @param src knowledge sources to use
      * @return an Instance object for the specified variable
      *
      * @exception QueryException the queried symbol does not exist or cannot
      * be read
+     * \sa KnowledgeSources
      */
-    Instance queryInstance(const int queryId) const;
+    Instance queryInstance(const int queryId,
+                           KnowledgeSources src = ksAll) const;
 
     /**
      * Retrieves an Instance object for a symbol specified in dotted notation,
      * e. g., "init_task.children.next".
      * @param queryString the symbol in dotted notation
+     * @param src knowledge sources to use
      * @return an Instance object for the specified symbol
      *
      * @exception QueryException the queried symbol does not exist or cannot
      * be read
+     * \sa KnowledgeSources
      */
-    Instance queryInstance(const QString& queryString) const;
-	
-	/**
-     * Retrieves the next Instance object following the given symbol,
-	 * e. g., "children", task_struct.
-     * @param component the symbol to follow
-	 * @param instance the instance object to start from
-     * @return an Instance object specified by the symbol and the given  instance
-     *
-     * @exception QueryException the queried symbol does not exist or cannot
-     * be read
-     */
-    Instance getNextInstance(const QString& component, const Instance& instance) const;
-	
+    Instance queryInstance(const QString& queryString,
+                           KnowledgeSources src = ksAll) const;
+
 	/**
 	 * Get an Instance object with the given type from the given address.
      * @param type the type of Instance object to be created
@@ -253,6 +254,21 @@ public:
 #endif
 
 private:
+    /**
+     * Retrieves the next Instance object following the given symbol,
+     * e. g., "children", task_struct.
+     * @param component the symbol to follow
+     * @param instance the instance object to start from
+     * @param src knowledge sources to use
+     * @return an Instance object specified by the symbol and the given  instance
+     *
+     * @exception QueryException the queried symbol does not exist or cannot
+     * be read
+     * \sa KnowledgeSources
+     */
+    Instance getNextInstance(const QString& component, const Instance& instance,
+                             KnowledgeSources src) const;
+
     void init();
 
     MemSpecs _specs;
