@@ -79,8 +79,22 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
         writer.writeTextElement(xml::ruleinclude, "./" + name);
         writer.writeEndElement(); // ruleincludes
 
-        // Go through all variables and types and write the information
         QString fileName;
+
+        // Go through all variables and write the rules
+        for (int i = 0; !interrupted() && i < _factory->vars().size(); ++i) {
+            ++_symbolsDone;
+            checkOperationProgress();
+
+            const Variable* var = _factory->vars().at(i);
+            fileName = write(var, rulesDir);
+            if (!fileName.isEmpty()) {
+                writer.writeTextElement(xml::include, fileName);
+                _filesWritten.append(QDir::cleanPath(rulesDir.absoluteFilePath(fileName)));
+            }
+        }
+
+        // Go through all types and write the rules
         for (int i = 0; !interrupted() && i < _factory->types().size(); ++i) {
             ++_symbolsDone;
             checkOperationProgress();
@@ -99,20 +113,6 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
             else if (type->type() & StructOrUnion) {
                 const Structured* s = dynamic_cast<const Structured*>(type);
                 fileName = write(s, rulesDir);
-                if (!fileName.isEmpty()) {
-                    writer.writeTextElement(xml::include, fileName);
-                    _filesWritten.append(QDir::cleanPath(rulesDir.absoluteFilePath(fileName)));
-                }
-            }
-        }
-
-        for (int i = 0; !interrupted() && i < _factory->vars().size(); ++i) {
-            ++_symbolsDone;
-            checkOperationProgress();
-
-            const Variable* var = _factory->vars().at(i);
-            if (var->hasAltRefTypes()) {
-                fileName = write(var, rulesDir);
                 if (!fileName.isEmpty()) {
                     writer.writeTextElement(xml::include, fileName);
                     _filesWritten.append(QDir::cleanPath(rulesDir.absoluteFilePath(fileName)));
@@ -174,9 +174,73 @@ QString AltRefTypeRuleWriter::write(const Structured *s, const QDir &rulesDir) c
 {
     QString fileName = rulesDir.relativeFilePath(
                 uniqueFileName(rulesDir, fileNameFromType(s)));
+    QString comment = QString("Type: %1\n" "Type ID: 0x%2\n")
+                        .arg(s->prettyName())
+                        .arg((uint)s->id(), 0, 16);
     QFile outFile(rulesDir.absoluteFilePath(fileName));
     QXmlStreamWriter writer;
 
+    // Does the struct type have candidate types, probably in nested members?
+    int count = writeStructDeep(s, QString(), comment, outFile, writer);
+
+    if (outFile.isOpen()) {
+        // Remove the file if we did not write any rules for it
+        if (count > 0) {
+            writer.writeEndDocument();
+            return fileName;
+        }
+        else
+            outFile.remove();
+    }
+    return QString();
+}
+
+
+QString AltRefTypeRuleWriter::write(const Variable *var, const QDir &rulesDir) const
+{
+    QString fileName = rulesDir.relativeFilePath(
+                uniqueFileName(rulesDir, fileNameFromVar(var)));
+    QString comment = QString("Variable: %1\n" "Variable ID: 0x%2\n")
+                        .arg(var->prettyName())
+                        .arg((uint)var->id(), 0, 16);
+    QFile outFile(rulesDir.absoluteFilePath(fileName));
+    QXmlStreamWriter writer;
+
+    int count = 0;
+
+    // Does the variable itself have any alternative types?
+    if (var->hasAltRefTypes()) {
+        // Prepare the XML file
+        openXmlRuleFile(outFile, writer, comment);
+        count += write(writer, var->altRefTypes(), var->name(), var->refType(),
+                       ConstMemberList());
+
+    }
+    // Does the variable's type have candidate types?
+    const BaseType* varType = var->refTypeDeep(BaseType::trLexicalPointersArrays);
+    if (varType && varType->type() & StructOrUnion)
+        count += writeStructDeep(dynamic_cast<const Structured*>(varType),
+                                 var->name(), comment, outFile, writer);
+
+    if (outFile.isOpen()) {
+        // Remove the file if we did not write any rules for it
+        if (count > 0) {
+            writer.writeEndDocument();
+            return fileName;
+        }
+        else
+            outFile.remove();
+    }
+    return QString();
+}
+
+
+int AltRefTypeRuleWriter::writeStructDeep(const Structured *s,
+                                          const QString& varName,
+                                          const QString& xmlComment,
+                                          QFile& outFile,
+                                          QXmlStreamWriter& writer) const
+{
     ConstMemberList members;
     QStack<int> memberIndex;
     const Structured *cur = s;
@@ -199,13 +263,10 @@ QString AltRefTypeRuleWriter::write(const Structured *s, const QDir &rulesDir) c
         if (m->hasAltRefTypes()) {
             // Prepare the XML file, if not yet done
             if (!outFile.isOpen()) {
-                openXmlRuleFile(rulesDir.absoluteFilePath(fileName), outFile, writer,
-                                QString("Type: %1\n" "Type ID: 0x%2\n")
-                                    .arg(s->prettyName())
-                                    .arg((uint)s->id(), 0, 16));
+                openXmlRuleFile(outFile, writer, xmlComment);
             }
             // Write the rule
-            count += write(writer, m->altRefTypes(), QString(), srcType, members);
+            count += write(writer, m->altRefTypes(), varName, srcType, members);
         }
 
         // Use members and memberIndex to recurse through nested structs
@@ -228,41 +289,8 @@ QString AltRefTypeRuleWriter::write(const Structured *s, const QDir &rulesDir) c
 
     }
 
-    if (outFile.isOpen()) {
-        writer.writeEndDocument();
-        outFile.close();
-        if (count > 0)
-            return fileName;
-        else
-            outFile.remove();
-    }
-    return QString();
+    return count;
 }
-
-
-QString AltRefTypeRuleWriter::write(const Variable *var, const QDir &rulesDir) const
-{
-    QString fileName = rulesDir.relativeFilePath(
-                uniqueFileName(rulesDir, fileNameFromVar(var)));
-    QFile outFile;
-    QXmlStreamWriter writer;
-    openXmlRuleFile(rulesDir.absoluteFilePath(fileName), outFile, writer,
-                    QString("Variable: %1\n" "Variable ID: 0x%2\n")
-                    .arg(var->prettyName())
-                    .arg((uint)var->id(), 0, 16));
-
-    int count = write(writer, var->altRefTypes(), var->name(), var->refType(),
-                      ConstMemberList());
-    writer.writeEndDocument();
-    outFile.close();
-
-    if (count > 0)
-        return fileName;
-    else
-        outFile.remove();
-    return QString();
-}
-
 
 
 int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
@@ -513,13 +541,11 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
 }
 
 
-void AltRefTypeRuleWriter::openXmlRuleFile(const QString& fileName,
-                                           QFile& outFile,
+void AltRefTypeRuleWriter::openXmlRuleFile(QFile& outFile,
                                            QXmlStreamWriter& writer,
                                            const QString& comment) const
 {
-    outFile.setFileName(fileName);
-    if (_filesWritten.contains(QDir::cleanPath(fileName)))
+    if (_filesWritten.contains(QDir::cleanPath(outFile.fileName())))
         debugerr("Overwriting file " << outFile.fileName());
     if (!outFile.open(QIODevice::WriteOnly|QIODevice::Truncate))
         ioError(QString("Error opening file \"%1\" for writing.")
@@ -557,10 +583,12 @@ QString AltRefTypeRuleWriter::fileNameFromVar(const Variable *var) const
     QString n(var->name());
     if (n.isEmpty())
         n = QString("0x%1").arg((uint)var->id(), 0, 16);
+    QString varTypeName = var->refType() ?
+                var->refType()->prettyName() : QString("void");
     QString s = QString("var_%1_%2.xml")
                     .arg(n)
-                    .arg(fileNameEscape(var->refType()->prettyName()));
-    if (var->refType()->name().isEmpty())
+                    .arg(fileNameEscape(varTypeName));
+    if (var->refType() && var->refType()->name().isEmpty())
         s = s.replace(str::anonymous,
                       QString("0x%1").arg((uint)var->refTypeId(), 0, 16));
     return s;
@@ -573,7 +601,7 @@ QString AltRefTypeRuleWriter::fileNameEscape(QString s) const
     s = s.replace(QRegExp("\\[([^\\]]*)\\]"), "_array\\1");
     s = s.replace(QChar('?'), "N");
     s = s.replace(QChar(' '), "_");
-    s = s.replace(QChar('*'), "_ptr");
+    s = s.replace(QChar('*'), "ptr");
     return s;
 }
 
@@ -614,8 +642,9 @@ int AltRefTypeRuleWriter::useTypeId(const BaseType* type) const
                 it = _factory->typesByHash().find(type->hash()),
                 e = _factory->typesByHash().end();
         while (it != e && it.key() == type->hash()) {
-            if (it.value()->id() > 0 && *it.value() == *type)
-                return it.value()->id();
+            const BaseType* t = it.value();
+            if (t->id() > 0 && *t == *type)
+                return t->id();
             ++it;
         }
     }
