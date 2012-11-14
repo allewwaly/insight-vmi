@@ -132,7 +132,7 @@ public:
      * Returns the used knowledge sources when resolving members.
      * \sa setKnowledgeSources()
      */
-    inline Instance::KnowledgeSources knowledgeSources() const
+    inline KnowledgeSources knowledgeSources() const
     {
         return _knowSrc;
     }
@@ -142,7 +142,7 @@ public:
      * @param src knowlege sources
      * \sa knowledgeSources()
      */
-    inline void setKnowledgeSources(Instance::KnowledgeSources src)
+    inline void setKnowledgeSources(KnowledgeSources src)
     {
         _knowSrc = src;
     }
@@ -803,7 +803,7 @@ private:
     inline Instance* thisInstance() const;
     inline void injectScriptError(const GenericException& e) const;
     inline void injectScriptError(const QString& msg) const;
-    Instance::KnowledgeSources _knowSrc;
+    KnowledgeSources _knowSrc;
 };
 
 #endif /* INSTANCEPROTOTYPE_H_ */

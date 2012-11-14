@@ -222,6 +222,8 @@ private:
     void errRule(const TypeRule *rule, const QString& msg) const;
     void ruleMsg(const TypeRule* rule, const QString &severity,
                  const QString &msg, ColorType light,  ColorType normal) const;
+    void ruleMatchInfo(const ActiveRule& arule, const Instance *inst,
+                       const ConstMemberList &members, int matched, bool evaluated) const;
     const OsFilter* insertOsFilter(const OsFilter* osf);
 
     TypeRuleList _rules;

@@ -128,7 +128,7 @@ void ScriptEngine::initScriptEngine()
     		_engine->newFunction(scriptInclude, 1),
     		roFlags|QScriptValue::KeepExistingFlags);
 
-    _instClass = new InstanceClass(_engine, (Instance::KnowledgeSources)_knowSrc);
+    _instClass = new InstanceClass(_engine, (KnowledgeSources)_knowSrc);
     _engine->globalObject().setProperty(js::instance,
     		_instClass->constructor(),
     		roFlags);
@@ -156,7 +156,7 @@ void ScriptEngine::prepareEvaluation(const QStringList &argv,
 {
     initScriptEngine();
     // Reset knowledge sources to the default
-    _instClass->setKnowledgeSources((Instance::KnowledgeSources)_knowSrc);
+    _instClass->setKnowledgeSources((KnowledgeSources)_knowSrc);
 
     // Export parameters to the script
     _engine->globalObject().setProperty(js::argv, _engine->toScriptValue(argv),

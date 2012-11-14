@@ -115,6 +115,9 @@ const char *ColorPalette::color(ColorType ct) const
 
         C_GRN_L, // ctMatched
         C_RED_L, // ctMissed
+        C_YLW_L, // ctDeferred
+        C_CYN,   // ctEvaluated
+
         C_GRN_L, // ctPrompt
         C_YLW_B, // ctVariable
         C_CYN_B, // ctType
@@ -147,6 +150,9 @@ const char *ColorPalette::color(ColorType ct) const
 
         C_GRN,   // ctMatched
         C_RED,   // ctMissed
+        C_YLW,   // ctDeferred
+        C_BLU,   // ctEvaluated
+
         C_BLU,   // ctPrompt
         C_RED_B, // ctVariable
         C_BLU_B, // ctType

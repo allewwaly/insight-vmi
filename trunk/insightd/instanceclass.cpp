@@ -55,7 +55,7 @@ private:
 
 //------------------------------------------------------------------------------
 
-InstanceClass::InstanceClass(QScriptEngine *eng, Instance::KnowledgeSources src)
+InstanceClass::InstanceClass(QScriptEngine *eng, KnowledgeSources src)
     : QScriptClass(eng), _proto(0)
 {
     qScriptRegisterMetaType<Instance>(eng, instToScriptValue, instFromScriptValue);
@@ -163,12 +163,12 @@ QScriptValue InstanceClass::prototype() const
 }
 
 
-Instance::KnowledgeSources InstanceClass::knowledgeSources() const
+KnowledgeSources InstanceClass::knowledgeSources() const
 {
     return _proto->knowledgeSources();
 }
 
-void InstanceClass::setKnowledgeSources(Instance::KnowledgeSources src)
+void InstanceClass::setKnowledgeSources(KnowledgeSources src)
 {
     _proto->setKnowledgeSources(src);
 }
@@ -183,20 +183,20 @@ QScriptValue InstanceClass::getSetUseCandidates(QScriptContext *ctx, QScriptEngi
     if (!cls)
         return QScriptValue();
 
-    Instance::KnowledgeSources src = cls->_proto->knowledgeSources();
+    KnowledgeSources src = cls->_proto->knowledgeSources();
     QScriptValue result;
     // One argument: called as setter
     if (ctx->argumentCount() == 1) {
         bool value = ctx->argument(0).toBool();
         result = value;
-        src = (Instance::KnowledgeSources)
-                (value ? (src & ~Instance::ksNoAltTypes)
-                       : (src | Instance::ksNoAltTypes));
+        src = (KnowledgeSources)
+                (value ? (src & ~ksNoAltTypes)
+                       : (src | ksNoAltTypes));
         cls->_proto->setKnowledgeSources(src);
     }
     // Otherwise: called as getter
     else {
-        bool value = !(src & Instance::ksNoAltTypes);
+        bool value = !(src & ksNoAltTypes);
         result = value;
     }
     return result;
@@ -212,18 +212,18 @@ QScriptValue InstanceClass::getSetUseRules(QScriptContext *ctx, QScriptEngine *e
     if (!cls)
         return QScriptValue();
 
-    Instance::KnowledgeSources src = cls->_proto->knowledgeSources();
+    KnowledgeSources src = cls->_proto->knowledgeSources();
     QScriptValue result;
     if (ctx->argumentCount() == 1) {
         bool value = ctx->argument(0).toBool();
         result = value;
-        src = (Instance::KnowledgeSources)
-                (value ? (src & ~Instance::ksNoRulesEngine)
-                       : (src | Instance::ksNoRulesEngine));
+        src = (KnowledgeSources)
+                (value ? (src & ~ksNoRulesEngine)
+                       : (src | ksNoRulesEngine));
         cls->_proto->setKnowledgeSources(src);
     }
     else {
-        bool value = !(src & Instance::ksNoRulesEngine);
+        bool value = !(src & ksNoRulesEngine);
         result = value;
     }
     return result;

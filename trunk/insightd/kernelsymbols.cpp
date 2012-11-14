@@ -239,11 +239,14 @@ void KernelSymbols::flushRules()
 void KernelSymbols::checkRules()
 {
     Instance::setRuleEngine(0);
+    Variable::setRuleEngine(0);
 
     OsSpecs specs(&_memSpecs);
     _ruleEngine.checkRules(&_factory, &specs);
 
     // Enable engine only if we have active rules
-    if (!_ruleEngine.activeRules().isEmpty())
+    if (!_ruleEngine.activeRules().isEmpty()) {
         Instance::setRuleEngine(&_ruleEngine);
+        Variable::setRuleEngine(&_ruleEngine);
+    }
 }

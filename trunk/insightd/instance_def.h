@@ -27,6 +27,15 @@ class TypeRuleEngine;
 /// A list of Instance objects
 typedef QList<Instance> InstanceList;
 
+/// Which knowledge sources to use when accessing members?
+enum KnowledgeSources {
+    ksAll = 0,                 ///< all sources
+    ksNoAltTypes      = (1 << 0), ///< do not use alternative types
+    ksNoRulesEngine   = (1 << 1), ///< do not use the rule engine
+    ksNone = ksNoAltTypes|ksNoRulesEngine ///< use only the declared types
+};
+
+
 /**
  * This class wraps a variable instance in a memory dump.
  */
@@ -42,14 +51,6 @@ public:
         orCandidate,     ///< from a candidate type (AltRefType)
         orRuleEngine,    ///< from a scripted rule in the TypeRuleEngine
         orMemMapNode     ///< from a MemoryMapNode
-    };
-
-    /// Which knowledge sources to use when accessing members?
-    enum KnowledgeSources {
-        ksAll = 0,                 ///< all sources
-        ksNoAltTypes      = (1 << 0), ///< do not use alternative types
-        ksNoRulesEngine   = (1 << 1), ///< do not use the rule engine
-        ksNone = ksNoAltTypes|ksNoRulesEngine ///< use only the declared types
     };
 
     /**
@@ -417,8 +418,9 @@ public:
      * dereferenced
      * @param declaredType selects if the candidate type (if it exists) or the
      * declared types should be used, defaults to \c false
+     * @param src knowledge sources to use for resolving the member
      * @return Instance object of the specified member
-     * \sa BaseType::TypeResolution
+     * \sa BaseType::TypeResolution, KnowledgeSources
      */
     Instance member(const QString& name, int resolveTypes = 0,
                     int maxPtrDeref = -1, KnowledgeSources src = ksAll) const;
@@ -797,7 +799,9 @@ public:
      * @param engine engine to use
      */
     inline static void setRuleEngine(const TypeRuleEngine* engine)
-    { _ruleEngine = engine; }
+    {
+        _ruleEngine = engine;
+    }
 
 private:
     typedef QSet<quint64> VisitedSet;

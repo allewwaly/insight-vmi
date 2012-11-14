@@ -92,6 +92,10 @@ QScriptValue KernelSymbolsClass::listTypes(QString filter, int index)
 
 inline Instance varToInst(const Variable* v, VirtualMemory* vmem)
 {
+	// TODO: Specify the knowlege sources to use
+//	QScriptValue instCtor = engine()->globalObject().property(js::instance);
+//	const InstanceClass* instClass = qscriptvalue_cast<InstanceClass*>(instCtor.data());
+
 	return v->toInstance(vmem, BaseType::trLexicalAndPointers);
 }
 
