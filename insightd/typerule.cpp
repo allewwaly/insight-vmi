@@ -675,3 +675,28 @@ QString ExpressionAction::toString(const ColorPalette *col) const
     s += _expr ? _expr->toString() : _exprStr;
     return s;
 }
+
+
+const QStringList &TypeRuleAction::supportedActionTypes()
+{
+    static QStringList types;
+    if (types.isEmpty())
+        types << xml::expression  << xml::inlineCode << xml::file;
+    return types;
+}
+
+
+TypeRuleAction::ActionType TypeRuleAction::strToActionType(const QString& action)
+{
+    if (action == xml::expression)
+        return TypeRuleAction::atExpression;
+    else if (action == xml::file)
+        return TypeRuleAction::atFunction;
+    else if (action == xml::inlineCode)
+        return TypeRuleAction::atInlineCode;
+    else
+        return TypeRuleAction::atNone;
+}
+
+
+
