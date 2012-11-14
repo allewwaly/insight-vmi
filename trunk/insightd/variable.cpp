@@ -8,8 +8,12 @@
 #include "variable.h"
 #include "basetype.h"
 #include "funcpointer.h"
+#include "typeruleengine.h"
 
 #include <assert.h>
+
+const TypeRuleEngine* Variable::_ruleEngine = 0;
+static const ConstMemberList emtpyMemberList;
 
 Variable::Variable(SymFactory* factory)
 	: Symbol(factory), _offset(0)
@@ -49,11 +53,40 @@ QString Variable::toString(QIODevice* mem) const
 }
 
 
-Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes) const
+Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes,
+							  KnowledgeSources src) const
 {
-	Instance inst(createRefInstance(_offset, vmem, _name, _id, resolveTypes));
-	inst.setOrigin(Instance::orVariable);
-	return inst;
+	Instance ret;
+	int match = 0;
+
+	// If allowed, and available, try the rule engine first
+	if (_ruleEngine && !(src & ksNoRulesEngine)) {
+		ret = createRefInstance(_offset, vmem, _name, _id, resolveTypes);
+		ret.setOrigin(Instance::orVariable);
+
+		Instance *newInst = 0;
+		match = _ruleEngine->match(&ret, emtpyMemberList, &newInst);
+		if ((match & TypeRuleEngine::mrMatch) && newInst) {
+			ret = *newInst;
+			delete newInst;
+		}
+	}
+
+	// If no match through the rule engine, fall back to defaults
+	if ( !(match & TypeRuleEngine::mrMatch) ) {
+		// If variable has exactly one alternative type and the user did
+		// not explicitly request the original type, we return the
+		// alternative type
+		if (!(src & ksNoAltTypes) && altRefTypeCount() == 1) {
+			ret = altRefTypeInstance(vmem, 0);
+		}
+		else {
+			ret = createRefInstance(_offset, vmem, _name, _id, resolveTypes);
+			ret.setOrigin(Instance::orVariable);
+		}
+	}
+
+	return ret;
 }
 
 
@@ -95,7 +128,7 @@ Instance Variable::altRefTypeInstance(VirtualMemory* vmem, int index) const
 		return Instance();
 
 	AltRefType alt = altRefType(index);
-	Instance inst = toInstance(vmem);
+	Instance inst = toInstance(vmem, BaseType::trLexical, ksNone);
 	return alt.toInstance(vmem, &inst, _factory, name(), QStringList());
 }
 
