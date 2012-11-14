@@ -45,7 +45,7 @@ QString Pointer::prettyName(const QString &varName) const
     if (fp)
         return fp->prettyName(varName, this);
     else if (t)
-        return t->prettyName(" *" + varName);
+        return t->prettyName("*" + varName);
     else if (_refTypeId == 0)
         return "void *" + varName;
     else
@@ -59,9 +59,7 @@ QString Pointer::toString(QIODevice* mem, size_t offset, const ColorPalette* col
 
     if (!p) {
         if (col)
-            return QString("%1NULL%2")
-                    .arg(col->color(ctAddress))
-                    .arg(col->color(ctReset));
+            return QString(col->color(ctAddress)) + "NULL" + QString(col->color(ctReset));
         else
             return "NULL";
     }
