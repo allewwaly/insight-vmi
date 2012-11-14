@@ -1231,7 +1231,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfPrimaryExpr(
         FoundBaseTypes found = _factory->findBaseTypesForAstType(type, _eval);
         const BaseType* bt = found.types.isEmpty() ?
                     0 : found.types.first();
-        expr = createExprNode<ASTVariableExpression>(bt);
+        expr = createExprNode<ASTVariableExpression>(bt, sym->isGlobal());
     }
     else if (node->u.primary_expression.constant)
         expr = exprOfNode(node->u.primary_expression.constant, ptsTo);

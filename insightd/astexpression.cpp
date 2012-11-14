@@ -395,6 +395,9 @@ void ASTVariableExpression::readFrom(KernelSymbolStream &in, SymFactory *factory
     if (id && !_baseType)
         genericError(QString("Cannot find base type with ID 0x%1 in factory!")
                      .arg((uint)id, 0, 16));
+    // Prior to version 18, all variables were erroneusly defined as being local
+    if (in.kSymVersion() <= kSym::VERSION_17)
+        _global = true;
 }
 
 
