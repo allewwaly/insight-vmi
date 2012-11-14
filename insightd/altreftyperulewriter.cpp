@@ -398,6 +398,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                     continue;
 
                 QString skipReason;
+                const BaseType* type = srcTypeNonTypedef;
                 // Look for unsupported transformations in the form of
                 // 'member,dereference,member', e.g. 's->foo->bar'
                 bool m_found = false, m_deref_found = false;
@@ -406,32 +407,25 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                          varExp->transformations())
                 {
                     if (trans.type == ttMember) {
-                        // Does the source type has this member?
                         if (!m_found) {
                             m_found = true;
-                            const Structured* s =
-                                    dynamic_cast<const Structured*>(srcTypeNonPtr);
-                            if (!s || !s->memberExists(trans.member, true)) {
-                                skip = true;
-                                skipReason =
-                                        QString("Source type '%1' has no member"
-                                                " named %2 in expression %3.")
-                                                .arg(srcTypeNonPtr->prettyName())
-                                                .arg(trans.member)
-                                                .arg(expr->toString());
-                            }
+                            // For the first member, skip any pointer if required
+                            if (!(type->type() & StructOrUnion))
+                                type = type->dereferencedBaseType();
                         }
                         // Skip transformations like 's->foo->bar'
                         else if (m_deref_found) {
                             skip = true;
                             skipReason =
                                     QString("Expression %1 contains a member "
-                                            "access, dereference, " "and again "
+                                            "access, dereference, and again "
                                             "member access in %2.%3.")
                                                 .arg(expr->toString())
                                                 .arg(srcType->name())
                                                 .arg(memberNames.join("."));
+                            break;
                         }
+
                         // We expect that the members in the array match the ones
                         // within the transformations
                         if (m_idx < memberNames.size() &&
@@ -444,17 +438,70 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                                                 .arg(expr->toString())
                                                 .arg(srcType->name())
                                                 .arg(memberNames.join("."));
+                            break;
                         }
                         ++m_idx;
+
+                        // Does the source type has this member?
+                        const Structured* s =
+                                dynamic_cast<const Structured*>(type);
+                        if (!s || !s->memberExists(trans.member, true)) {
+                            skip = true;
+                            skipReason =
+                                    QString("Type '%1' has no member named '%2'"
+                                            " in expression %3.")
+                                            .arg(type->prettyName())
+                                            .arg(trans.member)
+                                            .arg(expr->toString());
+                            break;
+                        }
+                        else
+                            type = s->member(trans.member, true)
+                                    ->refTypeDeep(BaseType::trLexical);
                     }
-                    else if (trans.type == ttDereference && m_found)
-                        m_deref_found = true;
+                    else if (trans.type & (ttDereference|ttArray)) {
+                        if (m_found)
+                            m_deref_found = true;
+                        // Type must be a pointer or array
+                        if (!(type->type() & (rtPointer|rtArray))) {
+                            // Be forgiving before the first member access
+                            if (m_found) {
+                                skip = true;
+                                skipReason =
+                                        QString("Type '%1' is no pointer or "
+                                                "array in expression %2.")
+                                        .arg(type->prettyName())
+                                        .arg(expr->toString());
+                                break;
+                            }
+                        }
+                        else
+                            type = type->dereferencedBaseType(
+                                        BaseType::trLexicalPointersArrays, 1);
+                    }
+                    else if (trans.type == ttFuncCall) {
+                        type = type->dereferencedBaseType(
+                                    BaseType::trLexicalPointersArrays, 1);
+                        if (!(type->type() & (FunctionTypes))) {
+                            skip = true;
+                            skipReason =
+                                    QString("Type '%1' is not a function or "
+                                            "function pointer in expression %2.")
+                                                .arg(type->prettyName())
+                                                .arg(expr->toString());
+                            break;
+                        }
+                        else
+                            type = type->dereferencedBaseType(
+                                        BaseType::trLexical|FunctionTypes);
+                    }
                 }
 
                 if (skip) {
-                    if (!skipReason.isEmpty())
+                    if (!skipReason.isEmpty()) {
                         // avoid "--" in comments
                         writer.writeComment(" " + skipReason.replace("--", "- - ") + " ");
+                    }
                     continue;
                 }
 
