@@ -306,6 +306,8 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
         memberNames += member->name();
 
     int count = 0;
+    const ExprResultTypes evalErr =
+            ExprResultTypes(erLocalVar|erParameter|erRuntime|erUndefined);
 
     try {
         foreach(const AltRefType& art, altRefTypes) {
@@ -334,6 +336,19 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
 
             foreach(const ASTExpression* expr, alternatives) {
                 bool skip = false;
+                // Skip all expressions that we cannot evaluate
+                ExprResultTypes resType = expr->resultType();
+                if (resType & evalErr) {
+                    writer.writeComment(
+                                QString(" Cannot evaluate expression '%0' for "
+                                        "candidate %1.%2. ")
+                                        .arg(expr->toString())
+                                        .arg(srcType->name())
+                                        .arg(memberNames.join("."))
+                                        .replace("--", "- - ")); // avoid "--" in comments
+                    continue;
+                }
+
                 // Find all variable expressions
                 ASTConstExpressionList varExpList = expr->findExpressions(etVariable);
                 const ASTVariableExpression* varExp = 0;
