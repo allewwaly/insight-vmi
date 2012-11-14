@@ -19,7 +19,7 @@ const char* inlinefunc = "__inline_func__";
 
 
 TypeRuleEngine::TypeRuleEngine()
-    : _eng(new ScriptEngine (Instance::ksNone))
+    : _eng(new ScriptEngine (Instance::ksNone)), _verbose(veOff)
 {
 }
 
@@ -252,9 +252,38 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
                                       const ConstMemberList &members,
                                       bool* matched) const
 {
-    return arule.rule->action() ?
-                arule.rule->action()->evaluate(inst, members, _eng, matched) :
-                Instance();
+    bool m = false;
+    Instance ret;
+    if (arule.rule->action()) {
+        ret = arule.rule->action()->evaluate(inst, members, _eng, &m);
+        if (matched)
+            *matched = m;
+        // Verbose output
+        if ((_verbose & veTestedRules) || ((_verbose & veMatchingRule) && m)) {
+            int w = ShellUtil::getFieldWidth(_rules.size(), 10);
+            shell->out() << "Rule " << shell->color(ctBold)
+                         << qSetFieldWidth(w) << (arule.index + 1)
+                         << qSetFieldWidth(0) << shell->color(ctReset)
+                         << " ";
+            if (m)
+                shell->out() << shell->color(ctMatched) << "hits";
+            else
+                shell->out() << shell->color(ctMissed) << "misses";
+
+            shell->out() << shell->color(ctReset) << " instance ";
+            if (inst)
+                shell->out() << shell->color(ctBold) << inst->fullName()
+                             << shell->color(ctReset);
+            for (int i = 0; i < members.size(); ++i) {
+                if (i > 0 || inst)
+                    shell->out() << ".";
+                shell->out() << shell->color(ctMember) << members[i]->name()
+                             << shell->color(ctReset);
+            }
+            shell->out() << endl;
+        }
+    }
+    return ret;
 }
 
 

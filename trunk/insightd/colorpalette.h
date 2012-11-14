@@ -11,6 +11,8 @@ enum ColorType {
     ctUnderline,
     ctInverse,
     ctDim,
+    ctMatched,
+    ctMissed,
     ctPrompt,
     ctVariable,
     ctType,

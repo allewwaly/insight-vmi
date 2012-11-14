@@ -347,6 +347,7 @@ private:
     int cmdRulesActive(QStringList args);
     int cmdRulesFlush(QStringList args);
     int cmdRulesShow(QStringList args);
+    int cmdRulesVerbose(QStringList args);
     int cmdListTypesMatching(QStringList args);
     int cmdListVarsMatching(QStringList args);
 

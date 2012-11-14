@@ -213,6 +213,8 @@ Shell::Shell(bool listenOnSocket)
                  "  rules active             Lists all rules that are currently\n"
                  "                           active\n"
                  "  rules show <index>       Shows details of rule <index>\n"
+                 "  rules verbose [<level>]  Sets the verbose level when evaluating\n"
+                 "                           rules, may be 0, 1, or 2\n"
                  "  rules flush              Removes all rules"));
 
     _commands.insert("script",
@@ -2345,6 +2347,8 @@ int Shell::cmdRules(QStringList args)
         return cmdRulesFlush(args);
     else if (QString("show").startsWith(cmd))
         return cmdRulesShow(args);
+    else if (QString("verbose").startsWith(cmd))
+        return cmdRulesVerbose(args);
     else
         cmdHelp(QStringList("rules"));
 
@@ -2609,6 +2613,41 @@ int Shell::cmdRulesShow(QStringList args)
              << color(ctBold) << rule->srcLine() << color(ctReset)
              << ":" << endl;
         _out << str::filterIndent << s << endl;
+    }
+
+    return ecOk;
+}
+
+
+int Shell::cmdRulesVerbose(QStringList args)
+{
+    if (args.isEmpty()) {
+        _out << "Verbose level is " << (int) _sym.ruleEngine().verbose();
+        switch (_sym.ruleEngine().verbose()) {
+        case TypeRuleEngine::veOff: _out << " (off)"; break;
+        case TypeRuleEngine::veMatchingRule: _out << " (show matching rule)"; break;
+        case TypeRuleEngine::veTestedRules: _out << " (show tested rules)"; break;
+        }
+        _out << endl;
+
+        return ecOk;
+    }
+    else if (args.size() != 1) {
+        cmdHelp(QStringList("rules"));
+        return ecInvalidArguments;
+    }
+
+    bool ok;
+    int i = args[0].toUInt(&ok);
+    if (ok && i >= TypeRuleEngine::veOff && i <= TypeRuleEngine::veTestedRules)
+        _sym.ruleEngine().setVerbose(static_cast<TypeRuleEngine::VerboseEvaluation>(i));
+    else if (args[0].toLower() == "off")
+        _sym.ruleEngine().setVerbose(TypeRuleEngine::veOff);
+    else if (args[0].toLower() == "on")
+        _sym.ruleEngine().setVerbose(TypeRuleEngine::veTestedRules);
+    else {
+        _err << "Illegal verbose mode: " << args[0] << endl;
+        return ecInvalidArguments;
     }
 
     return ecOk;

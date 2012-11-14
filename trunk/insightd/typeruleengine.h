@@ -67,6 +67,13 @@ public:
         mrMatchAndDefer = mrMatch|mrDefer ///< one rule matches, further rules might match with more members
     };
 
+    /// How verbose should we be during rule evaluation?
+    enum VerboseEvaluation {
+        veOff           = 0, ///< no verbose output
+        veMatchingRule  = 1, ///< print rule that matched
+        veTestedRules   = 2  ///< print all rules that were tested
+    };
+
     /**
      * Constructor
      */
@@ -192,13 +199,23 @@ public:
               Instance **newInst) const;
 
     /**
+     * Returns the current verbose mode for rule evaluation.
+     */
+    inline VerboseEvaluation verbose() const { return _verbose; }
+
+    /**
+     * Sets the new verbose mode for rule evaluation.
+     */
+    inline void setVerbose(VerboseEvaluation v) { _verbose = v; }
+
+    /**
      * \copydoc LongOperation::operationProgress()
      */
     void operationProgress();
 
 private:
     Instance evaluateRule(const ActiveRule &arule, const Instance* inst,
-                              const ConstMemberList &members, bool *matched) const;
+                          const ConstMemberList &members, bool *matched) const;
 
 //    void warnEvalError(const ScriptEngine* eng, const QString& fileName) const;
     void warnRule(const TypeRule *rule, const QString& msg) const;
@@ -215,6 +232,7 @@ private:
     QVector<int> _hits;
     ScriptEngine *_eng;
     int _rulesChecked;
+    VerboseEvaluation _verbose;
 };
 
 #endif // TYPERULEENGINE_H
