@@ -19,7 +19,7 @@ const char* inlinefunc = "__inline_func__";
 
 
 TypeRuleEngine::TypeRuleEngine()
-    : _eng(new ScriptEngine (Instance::ksNone)), _verbose(veOff)
+    : _eng(new ScriptEngine (ksNone)), _verbose(veOff)
 {
 }
 
@@ -37,6 +37,7 @@ void TypeRuleEngine::clear()
         delete _rules[i];
     _rules.clear();
     _activeRules.clear();
+    _rulesPerType.clear();
 
     for (OsFilterHash::const_iterator it = _osFilters.constBegin(),
          e = _osFilters.constEnd(); it != e; ++it)
@@ -283,6 +284,7 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
             shell->out() << endl;
         }
     }
+    ret.setOrigin(Instance::orRuleEngine);
     return ret;
 }
 
