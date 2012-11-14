@@ -62,12 +62,16 @@ private:
     QString write(const Structured* s, const QDir &rulesDir) const;
     QString write(const Variable* var, const QDir &rulesDir) const;
 
+    int writeStructDeep(const Structured *s, const QString& varName,
+                        const QString& xmlComment, QFile &outFile,
+                        QXmlStreamWriter &writer) const;
+
     int write(QXmlStreamWriter &writer, const AltRefTypeList &altRefTypes,
                const QString &varName, const BaseType *srcType,
                const ConstMemberList &members) const;
 
-    void openXmlRuleFile(const QString& fileName, QFile& outFile,
-                     QXmlStreamWriter& writer, const QString &comment) const;
+    void openXmlRuleFile(QFile& outFile, QXmlStreamWriter& writer,
+                         const QString &comment) const;
 
     QString fileNameFromType(const BaseType* type) const;
     QString fileNameFromVar(const Variable* var) const;
