@@ -9,6 +9,7 @@
 #include "basetype.h"
 #include "funcpointer.h"
 #include "typeruleengine.h"
+#include <QScopedPointer>
 
 #include <assert.h>
 
@@ -54,10 +55,12 @@ QString Variable::toString(QIODevice* mem) const
 
 
 Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes,
-							  KnowledgeSources src) const
+							  KnowledgeSources src, bool *ambiguous) const
 {
 	Instance ret;
 	int match = 0;
+	if (ambiguous)
+		*ambiguous = false;
 
 	// If allowed, and available, try the rule engine first
 	if (_ruleEngine && !(src & ksNoRulesEngine)) {
@@ -66,24 +69,41 @@ Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes,
 
 		Instance *newInst = 0;
 		match = _ruleEngine->match(&ret, emtpyMemberList, &newInst);
-		if ((match & TypeRuleEngine::mrMatch) && newInst) {
-			ret = *newInst;
-			delete newInst;
+
+		if (ambiguous)
+			*ambiguous = (match & TypeRuleEngine::mrMultiMatch);
+
+		if (match & TypeRuleEngine::mrMatch) {
+			// Auto-delete object later
+			QScopedPointer<Instance> newInstPtr(newInst);
+			// Was the match ambiguous?
+			if ( !(match & TypeRuleEngine::mrMultiMatch) ) {
+				if (!newInst)
+					return Instance(Instance::orRuleEngine);
+				else
+					ret = *newInst;
+			}
 		}
 	}
 
-	// If no match through the rule engine, fall back to defaults
-	if ( !(match & TypeRuleEngine::mrMatch) ) {
+	// If no match or multiple matches through the rule engine, try to resolve
+	// it ourself
+	if ( !(match & TypeRuleEngine::mrMatch) ||
+		 (match & TypeRuleEngine::mrMultiMatch) )
+	{
 		// If variable has exactly one alternative type and the user did
 		// not explicitly request the original type, we return the
 		// alternative type
-		if (!(src & ksNoAltTypes) && altRefTypeCount() == 1) {
-			ret = altRefTypeInstance(vmem, 0);
-		}
-		else {
+		if ((src & ksNoAltTypes) || (match & TypeRuleEngine::mrMultiMatch) ||
+			altRefTypeCount() != 1)
+		{
+			if (ambiguous)
+				*ambiguous = !(src & ksNoAltTypes) && (altRefTypeCount() > 1);
 			ret = createRefInstance(_offset, vmem, _name, _id, resolveTypes);
 			ret.setOrigin(Instance::orVariable);
 		}
+		else
+			ret = altRefTypeInstance(vmem, 0);
 	}
 
 	return ret;

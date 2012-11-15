@@ -396,11 +396,14 @@ public:
      * dereferenced
      * @param declaredType selects if the candidate type (if it exists) or the
      * declared types should be used, defaults to \c false
+     * @param ambiguous bool that is set \c true if multiple rules or
+     * candidates matched the member
      * @return Instance object of the specified member
      * \sa BaseType::TypeResolution
      */
     Instance member(int index, int resolveTypes = 0,
-                    int maxPtrDeref = -1, KnowledgeSources src = ksAll) const;
+                    int maxPtrDeref = -1, KnowledgeSources src = ksAll,
+                    bool *ambiguous = 0) const;
 
     /**
      * Retrieves a member (i.e., struct components) of this Instance, if it
@@ -419,11 +422,14 @@ public:
      * @param declaredType selects if the candidate type (if it exists) or the
      * declared types should be used, defaults to \c false
      * @param src knowledge sources to use for resolving the member
+     * @param ambiguous bool that is set \c true if multiple rules or
+     * candidates matched the member
      * @return Instance object of the specified member
      * \sa BaseType::TypeResolution, KnowledgeSources
      */
     Instance member(const QString& name, int resolveTypes = 0,
-                    int maxPtrDeref = -1, KnowledgeSources src = ksAll) const;
+                    int maxPtrDeref = -1, KnowledgeSources src = ksAll,
+                    bool *ambiguous = 0) const;
 
     /**
      * Obtain the member of this instance that has the given offset provided that
@@ -809,7 +815,8 @@ private:
     inline Instance(QSharedDataPointer<InstanceData> data) : _d(data) {}
 
     Instance member(const ConstMemberList& members, int resolveTypes,
-                    int maxPtrDeref, KnowledgeSources src = ksAll) const;
+                    int maxPtrDeref, KnowledgeSources src = ksAll,
+                    bool *ambiguous = 0) const;
 
     Instance *typeRuleMatchRek(ConstMemberList &members, int *match) const;
 

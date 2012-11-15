@@ -19,6 +19,7 @@
 #include "typeruleengine.h"
 #include <QScriptEngine>
 #include <QSharedData>
+#include <QScopedPointer>
 
 static const QStringList emtpyStringList;
 static const QString emtpyString;
@@ -476,29 +477,41 @@ Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCoun
 
 
 Instance Instance::member(const ConstMemberList &members, int resolveTypes,
-						  int maxPtrDeref, KnowledgeSources src) const
+						  int maxPtrDeref, KnowledgeSources src, bool *ambiguous) const
 {
 	const StructuredMember* m = members.last();
 	int match = 0;
+	if (ambiguous)
+		*ambiguous = false;
 
 	Instance ret;
 
 	// If allowed, and available, try the rule engine first
 	if (_ruleEngine && !(src & ksNoRulesEngine)) {
 		ConstMemberList mlist(members);
-		Instance* newInst = typeRuleMatchRek(mlist, &match);
+		Instance *newInst = typeRuleMatchRek(mlist, &match);
+
+		if (ambiguous)
+			*ambiguous = (match & TypeRuleEngine::mrMultiMatch);
+
 		if (match & TypeRuleEngine::mrMatch) {
-			if (newInst) {
-				ret = *newInst;
-				delete newInst;
+			// Auto-delete object later
+			QScopedPointer<Instance> newInstPtr(newInst);
+			// Was the match ambiguous?
+			if ( !(match & TypeRuleEngine::mrMultiMatch) ) {
+				if (!newInst)
+					return Instance(Instance::orRuleEngine);
+				else
+					ret = *newInst;
 			}
-			else
-				return Instance(Instance::orRuleEngine);
 		}
 	}
 
-	// If no match through the rule engine, try to resolve ourself
-	if ( !(match & TypeRuleEngine::mrMatch) ) {
+	// If no match or multiple matches through the rule engine, try to resolve
+	// it ourself
+	if ( !(match & TypeRuleEngine::mrMatch) ||
+		 (match & TypeRuleEngine::mrMultiMatch) )
+	{
 		// In case the member is nested in an anonymous struct/union,
 		// we have to add that inter-offset here because m->toInstance()
 		// only adds the member's offset within its direct parent.
@@ -506,8 +519,8 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 		for (int i = 0; i + 1 < members.size(); ++i)
 			extraOffset += members[i]->offset();
 
-		// Should we use candidate types
-		if (src & ksNoAltTypes) {
+		// Should we use candidate types?
+		if ((src & ksNoAltTypes) || (match & TypeRuleEngine::mrMultiMatch)) {
 			ret = m->toInstance(_d->address + extraOffset, _d->vmem, this,
 								resolveTypes, maxPtrDeref);
 		}
@@ -589,19 +602,21 @@ Instance* Instance::typeRuleMatchRek(ConstMemberList &members, int* match) const
 
 
 Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
-						  KnowledgeSources src) const
+						  KnowledgeSources src, bool *ambiguous) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d->type);
 	if (s && index >= 0 && index < s->members().size()) {
 		const StructuredMember* m = s->members().at(index);
-		return member(ConstMemberList() << m, resolveTypes, maxPtrDeref, src);
+		return member(ConstMemberList() << m, resolveTypes, maxPtrDeref, src,
+					  ambiguous);
 	}
 	return Instance();
 }
 
 
 Instance Instance::member(const QString& name, int resolveTypes,
-							  int maxPtrDeref, KnowledgeSources src) const
+						  int maxPtrDeref, KnowledgeSources src,
+						  bool *ambiguous) const
 {
 	const Structured* s;
 	if ( !(s = dynamic_cast<const Structured*>(_d->type)) )
@@ -609,7 +624,7 @@ Instance Instance::member(const QString& name, int resolveTypes,
 
 	ConstMemberList list(s->memberChain(name));
 	if (!list.isEmpty())
-		return member(list, resolveTypes, maxPtrDeref, src);
+		return member(list, resolveTypes, maxPtrDeref, src, ambiguous);
 	return Instance();
 }
 
