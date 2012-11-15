@@ -115,7 +115,7 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
 
         // Make sure a filter is specified
         if (!rule->filter()) {
-            warnRule(rule, "is ignored because it does not specify a filter.");
+            warnRule(rule, i, "is ignored because it does not specify a filter.");
             continue;
         }
 
@@ -123,12 +123,13 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
             rule->action()->check(ruleFile(rule), rule, factory);
         }
         catch (GenericException& e) {
-            errRule(rule, QString("raised a %1 at %2:%3: %4")
+            errRule(rule, i, QString("raised a %1 at %2:%3: %4")
                     .arg(e.className())
                     .arg(e.file)
                     .arg(e.line)
                     .arg(e.message));
 //            throw;
+            continue;
         }
 
         QScriptProgramPtr prog;
@@ -173,7 +174,7 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
             _activeRules.append(arule);
         }
         else
-            warnRule(rule, "does not match any type.");
+            warnRule(rule, i, "does not match any type.");
     }
 
     operationStopped();
@@ -199,20 +200,24 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
         return mrNoMatch;
 
     int ret = mrNoMatch;
+    *newInst = 0;
 
     ActiveRuleHash::const_iterator it = _rulesPerType.find(inst->type()->id()),
             e = _rulesPerType.end();
 
     // Rules with variable names might need to match inst->name(), so check all.
     // We can stop as soon as all possibly ORed values are included.
-    for (; it != e && it.key() == inst->type()->id() && ret != mrMatchAndDefer; ++it)
+    for (; it != e && it.key() == inst->type()->id() &&
+         ret != (mrMatch|mrMultiMatch|mrDefer); ++it)
     {
         const TypeRule* rule = it.value().rule;
-        if (rule->match(inst)) {
-            // Are all required fields accessed?
-            const InstanceFilter* filter = rule->filter();
-            if (filter) {
-                bool defered = false, match = false, evaluated = false;
+        const InstanceFilter* filter = rule->filter();
+        bool defered = false, match = false, evaluated = false;
+        if (filter) {
+            if (!filter->filterActive(Filter::ftVarNameAll) ||
+                filter->matchInst(inst))
+            {
+                // Are all required fields accessed?
                 // Not all fields given ==> defer
                 if (filter->members().size() > members.size()) {
                     ret |= mrDefer;
@@ -221,34 +226,44 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                 // To many fields given ==> no match, otherwise match
                 else if (rule->filter()->members().size() == members.size()) {
                     match = true;
-                    for (int i = 0; match && i< members.size(); ++i)
+                    for (int i = 0; match && i < members.size(); ++i)
                         if (!filter->members().at(i).match(members[i]))
                             match = false;
                     // Only consider the first match
-                    if (match && !(ret & mrMatch)) {
+                    if (match) {
                         // Evaluate the rule
                         evaluated = true;
-                        bool matched;
                         Instance instRet(evaluateRule(it.value(), inst, members,
-                                                      &matched));
-                        if (matched)
-                            ret |= mrMatch;
-                        if (instRet.isValid()) {
-                            instRet.setOrigin(Instance::orRuleEngine);
-                            *newInst = new Instance(instRet);
+                                                      &match));
+                        // Did another rule match previously?
+                        if ( (*newInst) && (ret & mrMatch) ) {
+                            // Compare this instance to the previous one
+                            if (instRet.address() != (*newInst)->address() ||
+                                instRet.type()->hash() != (*newInst)->type()->hash())
+                                // Ambiguous rules
+                                ret |= mrMultiMatch;
+                        }
+                        // No, this is the first match
+                        else {
+                            if (match)
+                                ret |= mrMatch;
+                            if (!(*newInst) && instRet.isValid()) {
+                                instRet.setOrigin(Instance::orRuleEngine);
+                                *newInst = new Instance(instRet);
+                            }
                         }
                     }
-                }
-                // Output information
-                if (_verbose) {
-                    int m = match ? mrMatch : mrNoMatch;
-                    if (defered)
-                        m |= mrDefer;
-                    ruleMatchInfo(it.value(), inst, members, m, evaluated);
                 }
             }
             else if (members.isEmpty())
                 ret |= mrMatch;
+        }
+        // Output information
+        if (_verbose) {
+            int m = match ? mrMatch : mrNoMatch;
+            if (defered)
+                m |= mrDefer;
+            ruleMatchInfo(it.value(), inst, members, m, evaluated);
         }
     }
 
@@ -301,7 +316,8 @@ void TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
 
         shell->out() << shell->color(ctReset) << " instance ";
         if (inst)
-            shell->out() << shell->color(ctBold) << inst->fullName()
+            shell->out() << shell->color(ctBold)
+                         << ShellUtil::abbrvStrLeft(inst->fullName(), 60)
                          << shell->color(ctReset);
         for (int i = 0; i < members.size(); ++i) {
             if (i > 0 || inst)
@@ -324,31 +340,34 @@ void TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
 }
 
 
-void TypeRuleEngine::warnRule(const TypeRule* rule, const QString &msg) const
+void TypeRuleEngine::warnRule(const TypeRule* rule, int index, const QString &msg) const
 {
-    ruleMsg(rule, "Warning", msg, ctWarningLight, ctWarning);
+    ruleMsg(rule, index, "Warning", msg, ctWarningLight, ctWarning);
 }
 
 
-void TypeRuleEngine::errRule(const TypeRule* rule, const QString &msg) const
+void TypeRuleEngine::errRule(const TypeRule* rule, int index, const QString &msg) const
 {
-    ruleMsg(rule, "Error", msg, ctErrorLight, ctError);
+    ruleMsg(rule, index, "Error", msg, ctErrorLight, ctError);
 }
 
 
-void TypeRuleEngine::ruleMsg(const TypeRule* rule, const QString &severity,
-                             const QString &msg,  ColorType light,
-                             ColorType normal) const
+void TypeRuleEngine::ruleMsg(const TypeRule* rule, int index,
+                             const QString &severity, const QString &msg,
+                             ColorType light, ColorType normal) const
 {
     if (!rule)
         return;
 
     shellEndl();
     shell->err() << shell->color(light) << severity << ": "
-                 << shell->color(normal) << "Rule ";
+                 << shell->color(normal) << "Rule "
+                 << shell->color(ctBold) << (index + 1)
+                 << shell->color(normal) << " ";
+
     if (!rule->name().isEmpty()) {
-        shell->err() << shell->color(ctBold) << rule->name()
-                     << shell->color(normal) << " ";
+        shell->err() << "(" << shell->color(ctBold) << rule->name()
+                     << shell->color(normal) << ") ";
     }
     if (rule->srcFileIndex() >= 0) {
         // Use as-short-as-possible file name
