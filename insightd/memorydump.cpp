@@ -336,24 +336,10 @@ Instance MemoryDump::getNextInstance(const QString& component,
         else {
             result = instance.member(symbol, BaseType::trLexical, src);
         }
-
-        if (!result.isValid()) {
-            if (candidateIndex > 0)
-                queryError(QString("The member candidate \"%1.%2<%3>\" is invalid")
-                            .arg(instance.fullName())
-                            .arg(symbol)
-                            .arg(candidateIndex));
-            else if (result.origin() == Instance::orRuleEngine)
-                queryError(QString("The member \"%1.%2\" returned by the rule engine is invalid.")
-                            .arg(instance.fullName())
-                            .arg(symbol));
-            else
-                queryError(QString("The member \"%1.%2\" is invalid (origin: %3)")
-                           .arg(instance.fullName())
-                           .arg(symbol)
-                           .arg(Instance::originToString(result.origin())));
-        }
 	}
+
+	if (!result.isValid())
+		return result;
 	
 	// Cast the instance if necessary
 	if (!typeString.isEmpty()) {
@@ -446,12 +432,30 @@ Instance MemoryDump::queryInstance(const QString& queryString,
     if (components.isEmpty())
         queryError("Empty query string given");
 
-	Instance result;
+	Instance result, prev;
 	
 	while (!components.isEmpty()) {
 		result = getNextInstance(components.first(), result, src);
-		components.pop_front();
-	}
+
+        if (!result.isValid()) {
+            if (result.origin() == Instance::orCandidate)
+                queryError(QString("The selected member candidate for \"%1.%2\" is invalid")
+                            .arg(prev.fullName())
+                            .arg(components.first()));
+            else if (result.origin() == Instance::orRuleEngine)
+                queryError(QString("The member \"%1.%2\" returned by the rule engine is invalid.")
+                            .arg(prev.fullName())
+                            .arg(components.first()));
+            else
+                queryError(QString("The member \"%1.%2\" is invalid (origin: %3)")
+                           .arg(prev.fullName())
+                           .arg(components.first())
+                           .arg(Instance::originToString(result.origin())));
+        }
+
+        prev = result;
+        components.pop_front();
+    }
 
 	return result;
 }
