@@ -65,6 +65,11 @@ void TypeRuleEngine::appendRule(TypeRule *rule, const OsFilter *osf)
     const OsFilter* filter = insertOsFilter(osf);
     rule->setOsFilter(filter);
     _rules.append(rule);
+
+    if (rule->filter()->filterActive(Filter::ftVarNameAll)) {
+        rule->setPriority(1);
+        debugmsg("Setting priority of rule to " << rule->priority());
+    }
 }
 
 
@@ -199,7 +204,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     if (!inst || !inst->type())
         return mrNoMatch;
 
-    int ret = mrNoMatch;
+    int ret = mrNoMatch, prio = 0;
     *newInst = 0;
 
     ActiveRuleHash::const_iterator it = _rulesPerType.find(inst->type()->id()),
@@ -207,13 +212,23 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
 
     // Rules with variable names might need to match inst->name(), so check all.
     // We can stop as soon as all possibly ORed values are included.
-    for (; it != e && it.key() == inst->type()->id() &&
-         ret != (mrMatch|mrMultiMatch|mrDefer); ++it)
-    {
+    for (; it != e && it.key() == inst->type()->id(); ++it) {
         const TypeRule* rule = it.value().rule;
+
+        // If the result is already clear, check only for higher priority rules
+        if (ret == (mrMatch|mrMultiMatch|mrDefer) && rule->priority() <= prio) {
+            // Output information
+            if (_verbose)
+                ruleMatchInfo(it.value(), inst, members, 0, false, true);
+            continue;
+        }
+
         const InstanceFilter* filter = rule->filter();
-        bool defered = false, match = false, evaluated = false;
-        if (filter) {
+        bool defered = false, match = false, evaluated = false, skipped = true;
+
+        // Ignore rules with a lower priority than the previously matched one
+        if (filter && (!(ret & mrMatch) || rule->priority() >= prio)) {
+            skipped = false;
             if (!filter->filterActive(Filter::ftVarNameAll) ||
                 filter->matchInst(inst))
             {
@@ -224,10 +239,10 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                     defered = true;
                 }
                 // Required no. of fields given ==> match
-                // However, we don't need to evaluate anymore if both mrMatch
-                // and mrMultiMatch are already set
+                // However, we don't need to evaluate anymore non-high-prio
+                // rules if both mrMatch and mrMultiMatch are already set
                 else if (rule->filter()->members().size() == members.size() &&
-                         ret != (mrMatch|mrMultiMatch))
+                         (ret != (mrMatch|mrMultiMatch) || rule->priority() > prio))
                 {
                     match = true;
                     for (int i = 0; match && i < members.size(); ++i)
@@ -239,20 +254,32 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                         evaluated = true;
                         Instance instRet(evaluateRule(it.value(), inst, members,
                                                       &match));
+                        instRet.setOrigin(Instance::orRuleEngine);
+
                         // Did another rule match previously?
                         if ( (*newInst) && (ret & mrMatch) ) {
+                            // If this rule has a higher priority, it overrides
+                            // the previous
+                            if (rule->priority() > prio) {
+                                prio = rule->priority();
+                                **newInst = instRet;
+                                ret &= ~mrMultiMatch;
+                            }
                             // Compare this instance to the previous one
-                            if (instRet.address() != (*newInst)->address() ||
-                                instRet.type()->hash() != (*newInst)->type()->hash())
+                            else if (instRet.address() != (*newInst)->address() ||
+                                     instRet.type()->hash() != (*newInst)->type()->hash())
+                            {
                                 // Ambiguous rules
                                 ret |= mrMultiMatch;
+                            }
                         }
                         // No, this is the first match
                         else {
-                            if (match)
+                            if (match) {
                                 ret |= mrMatch;
+                                prio = rule->priority();
+                            }
                             if (!(*newInst) && instRet.isValid()) {
-                                instRet.setOrigin(Instance::orRuleEngine);
                                 *newInst = new Instance(instRet);
                             }
                         }
@@ -267,7 +294,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
             int m = match ? mrMatch : mrNoMatch;
             if (defered)
                 m |= mrDefer;
-            ruleMatchInfo(it.value(), inst, members, m, evaluated);
+            ruleMatchInfo(it.value(), inst, members, m, evaluated, skipped);
         }
     }
 
@@ -310,7 +337,7 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
 void TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
                                    const Instance *inst,
                                    const ConstMemberList &members,
-                                   int matched, bool evaluated) const
+                                   int matched, bool evaluated, bool skipped) const
 {
     // Verbose output
     if ((_verbose >= veAllRules) ||
@@ -323,35 +350,39 @@ void TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
                      << qSetFieldWidth(w) << right << (arule.index + 1)
                      << qSetFieldWidth(0) << left << shell->color(ctReset)
                      << " ";
-        if (matched & mrMatch) {
-            shell->out() << shell->color(ctMatched) << "matches";
-            if ((matched & mrDefer))
-                shell->out() << " and " << shell->color(ctDeferred) << "defers";
-        }
-        else if ((matched & mrDefer))
-            shell->out() << shell->color(ctDeferred) << "defers ";
-        else
-            shell->out() << shell->color(ctMissed) << "misses ";
-
-        shell->out() << shell->color(ctReset) << " instance ";
-        if (inst)
-            shell->out() << shell->color(ctBold)
-                         << ShellUtil::abbrvStrLeft(inst->fullName(), 60)
-                         << shell->color(ctReset);
-        for (int i = 0; i < members.size(); ++i) {
-            if (i > 0 || inst)
-                shell->out() << ".";
-            shell->out() << shell->color(ctMember) << members[i]->name()
-                         << shell->color(ctReset);
-        }
-
-        if (matched & mrMatch) {
-            if (evaluated)
-                shell->out() << " and is " << shell->color(ctEvaluated)
-                             << "evaluated";
+        if (skipped)
+            shell->out() << "is " << shell->color(ctDim) << "skipped";
+        else {
+            if (matched & mrMatch) {
+                shell->out() << shell->color(ctMatched) << "matches";
+                if ((matched & mrDefer))
+                    shell->out() << " and " << shell->color(ctDeferred) << "defers";
+            }
+            else if ((matched & mrDefer))
+                shell->out() << shell->color(ctDeferred) << "defers ";
             else
-                shell->out() << " but is " << shell->color(ctDeferred)
-                             << "ignored";
+                shell->out() << shell->color(ctMissed) << "misses ";
+
+            shell->out() << shell->color(ctReset) << " instance ";
+            if (inst)
+                shell->out() << shell->color(ctBold)
+                             << ShellUtil::abbrvStrLeft(inst->fullName(), 60)
+                             << shell->color(ctReset);
+            for (int i = 0; i < members.size(); ++i) {
+                if (i > 0 || inst)
+                    shell->out() << ".";
+                shell->out() << shell->color(ctMember) << members[i]->name()
+                             << shell->color(ctReset);
+            }
+
+            if (matched & mrMatch) {
+                if (evaluated)
+                    shell->out() << " and is " << shell->color(ctEvaluated)
+                                 << "evaluated";
+                else
+                    shell->out() << " but is " << shell->color(ctDeferred)
+                                 << "ignored";
+            }
         }
 
         shell->out() << shell->color(ctReset) << endl;
