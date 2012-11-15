@@ -63,7 +63,8 @@ public:
     enum MatchResult {
         mrNoMatch         = 0,         ///< no rule matched
         mrMatch           = (1 << 0),  ///< one rule matched and was evaluated
-        mrDefer           = (1 << 1),  ///< one rule may match with further members given
+        mrMultiMatch      = (1 << 1),  ///< one rule matched and was evaluated
+        mrDefer           = (1 << 2),  ///< one rule may match with further members given
         mrMatchAndDefer = mrMatch|mrDefer ///< one rule matches, further rules might match with more members
     };
 
@@ -220,9 +221,9 @@ private:
                           const ConstMemberList &members, bool *matched) const;
 
 //    void warnEvalError(const ScriptEngine* eng, const QString& fileName) const;
-    void warnRule(const TypeRule *rule, const QString& msg) const;
-    void errRule(const TypeRule *rule, const QString& msg) const;
-    void ruleMsg(const TypeRule* rule, const QString &severity,
+    void warnRule(const TypeRule *rule, int index, const QString& msg) const;
+    void errRule(const TypeRule *rule, int index, const QString& msg) const;
+    void ruleMsg(const TypeRule* rule, int index, const QString &severity,
                  const QString &msg, ColorType light,  ColorType normal) const;
     void ruleMatchInfo(const ActiveRule& arule, const Instance *inst,
                        const ConstMemberList &members, int matched, bool evaluated) const;
