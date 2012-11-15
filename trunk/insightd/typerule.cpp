@@ -27,7 +27,8 @@
 //------------------------------------------------------------------------------
 
 TypeRule::TypeRule()
-    : _filter(0), _osFilter(0), _action(0), _srcFileIndex(-1), _srcLine(0)
+    : _filter(0), _osFilter(0), _action(0), _srcFileIndex(-1), _srcLine(0),
+      _priority(0)
 
 {
 }
@@ -104,6 +105,9 @@ QString TypeRule::toString(const ColorPalette *col) const
                 .arg(ShellUtil::colorize("Description:", ctColHead, col))
                 .arg(_description);
     }
+    s += QString("%1 %2\n")
+            .arg(ShellUtil::colorize("Priority:", ctColHead, col))
+            .arg(_priority);
     if (_osFilter) {
         QString f(_osFilter->toString(col).trimmed());
         f.replace("\n", indent);
