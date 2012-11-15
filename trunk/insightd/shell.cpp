@@ -2459,14 +2459,15 @@ int Shell::printRulesList(const list_t& rules,
                              (int)qstrlen("No."));
     const int w_name = 25;
     const int w_matches = qstrlen("Match");
+    const int w_prio = qstrlen("Prio.");
     const int w_actionType = qstrlen("script inline");
     const int w_colsep = 2;
-    const int avail = tsize.width() - (w_index + w_name + w_matches +
-                                       w_actionType + 5*w_colsep + 1);
+    const int avail = tsize.width() - (w_index + w_name + w_matches + w_prio +
+                                       w_actionType + 6*w_colsep + 1);
     const int w_desc = avail >= 8 ? (avail >> 1) : 0;
     const int w_file = avail - w_desc;
-    const int w_total = w_index + w_name + w_matches + w_actionType + w_file +
-            w_desc + (w_desc > 0 ? 5 : 4)*w_colsep;
+    const int w_total = w_index + w_name + w_matches + w_prio + w_actionType +
+            w_file + w_desc + (w_desc > 0 ? 6 : 5)*w_colsep;
 
     bool headerPrinted = false;
     QRegExp rx("\\s\\s+");
@@ -2489,6 +2490,8 @@ int Shell::printRulesList(const list_t& rules,
                       << qSetFieldWidth(w_colsep) << " ";
             }
             _out << qSetFieldWidth(w_matches)  << right << "Match"
+                 << qSetFieldWidth(w_colsep) << " "
+                 << qSetFieldWidth(w_prio) << right << "Prio."
                  << qSetFieldWidth(w_colsep) << " "
                  << qSetFieldWidth(w_actionType) << left << "Action"
                  << qSetFieldWidth(w_colsep) << " "
@@ -2520,6 +2523,8 @@ int Shell::printRulesList(const list_t& rules,
         }
         _out << qSetFieldWidth(w_matches)  << right
              << _sym.ruleEngine().ruleHits(index)
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_prio) << right << rule->priority()
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_actionType) << left;
 
