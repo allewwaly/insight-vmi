@@ -212,18 +212,15 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
             // Are all required fields accessed?
             const InstanceFilter* filter = rule->filter();
             if (filter) {
-                bool defered = false;
+                bool defered = false, match = false, evaluated = false;
                 // Not all fields given ==> defer
                 if (filter->members().size() > members.size()) {
                     ret |= mrDefer;
                     defered = true;
                 }
-                // To many fields given ==> no match
-                else if (rule->filter()->members().size() < members.size())
-                    continue;
-                // If all fields match ==> match
-                else {
-                    bool match = true, evaluated = false;
+                // To many fields given ==> no match, otherwise match
+                else if (rule->filter()->members().size() == members.size()) {
+                    match = true;
                     for (int i = 0; match && i< members.size(); ++i)
                         if (!filter->members().at(i).match(members[i]))
                             match = false;
@@ -241,12 +238,13 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                             *newInst = new Instance(instRet);
                         }
                     }
-                    if (_verbose) {
-                        int m = match ? mrMatch : mrNoMatch;
-                        if (defered)
-                            m |= mrDefer;
-                        ruleMatchInfo(it.value(), inst, members, m, evaluated);
-                    }
+                }
+                // Output information
+                if (_verbose) {
+                    int m = match ? mrMatch : mrNoMatch;
+                    if (defered)
+                        m |= mrDefer;
+                    ruleMatchInfo(it.value(), inst, members, m, evaluated);
                 }
             }
             else if (members.isEmpty())
@@ -281,23 +279,25 @@ void TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
                                    int matched, bool evaluated) const
 {
     // Verbose output
-    if ((_verbose & veTestedRules) ||
-        ((_verbose & veMatchingRule) && matched))
+    if ((_verbose >= veAllRules) ||
+        (_verbose >= veMatchingRules && (matched & mrMatch)) ||
+        (_verbose >= veDeferringRules && matched) ||
+        (_verbose >= veEvaluatedRules && evaluated))
     {
         int w = ShellUtil::getFieldWidth(_rules.size(), 10);
         shell->out() << "Rule " << shell->color(ctBold)
-                     << qSetFieldWidth(w) << (arule.index + 1)
-                     << qSetFieldWidth(0) << shell->color(ctReset)
+                     << qSetFieldWidth(w) << right << (arule.index + 1)
+                     << qSetFieldWidth(0) << left << shell->color(ctReset)
                      << " ";
         if (matched & mrMatch) {
-            shell->out() << shell->color(ctMatched) << "hits";
+            shell->out() << shell->color(ctMatched) << "matches";
             if ((matched & mrDefer))
                 shell->out() << " and " << shell->color(ctDeferred) << "defers";
         }
         else if ((matched & mrDefer))
-            shell->out() << shell->color(ctDeferred) << "defers";
+            shell->out() << shell->color(ctDeferred) << "defers ";
         else
-            shell->out() << shell->color(ctMissed) << "misses";
+            shell->out() << shell->color(ctMissed) << "misses ";
 
         shell->out() << shell->color(ctReset) << " instance ";
         if (inst)
@@ -310,12 +310,14 @@ void TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
                          << shell->color(ctReset);
         }
 
-        if (evaluated)
-            shell->out() << " and was " << shell->color(ctEvaluated)
-                         << "evaluated";
-        else
-            shell->out() << " but was " << shell->color(ctDeferred)
-                         << "ignored";
+        if (matched & mrMatch) {
+            if (evaluated)
+                shell->out() << " and is " << shell->color(ctEvaluated)
+                             << "evaluated";
+            else
+                shell->out() << " but is " << shell->color(ctDeferred)
+                             << "ignored";
+        }
 
         shell->out() << shell->color(ctReset) << endl;
     }

@@ -69,9 +69,11 @@ public:
 
     /// How verbose should we be during rule evaluation?
     enum VerboseEvaluation {
-        veOff           = 0, ///< no verbose output
-        veMatchingRule  = 1, ///< print rule that matched
-        veTestedRules   = 2  ///< print all rules that were tested
+        veOff = 0,        ///< no verbose output
+        veEvaluatedRules, ///< print rules that match and are evaluated
+        veMatchingRules,  ///< print rules that match
+        veDeferringRules, ///< print rules that match or defer
+        veAllRules        ///< print all rules (i.e., that match, defer, or miss)
     };
 
     /**
