@@ -223,13 +223,17 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                     ret |= mrDefer;
                     defered = true;
                 }
-                // To many fields given ==> no match, otherwise match
-                else if (rule->filter()->members().size() == members.size()) {
+                // Required no. of fields given ==> match
+                // However, we don't need to evaluate anymore if both mrMatch
+                // and mrMultiMatch are already set
+                else if (rule->filter()->members().size() == members.size() &&
+                         ret != (mrMatch|mrMultiMatch))
+                {
                     match = true;
                     for (int i = 0; match && i < members.size(); ++i)
                         if (!filter->members().at(i).match(members[i]))
                             match = false;
-                    // Only consider the first match
+
                     if (match) {
                         // Evaluate the rule
                         evaluated = true;
@@ -265,6 +269,21 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                 m |= mrDefer;
             ruleMatchInfo(it.value(), inst, members, m, evaluated);
         }
+    }
+
+    if (_verbose) {
+        shell->out() << "  Result: ";
+
+        if (ret & mrMatch)
+            shell->out() << shell->color(ctMatched) << "matched ";
+        if (ret & mrDefer)
+            shell->out() << shell->color(ctDeferred) << "deferred ";
+        if (ret & mrMultiMatch)
+            shell->out() << shell->color(ctMissed) << "ambiguous ";
+        if (!ret)
+            shell->out() << shell->color(ctMissed) << "missed ";
+
+        shell->out() << shell->color(ctReset) << endl;
     }
 
     return ret;
