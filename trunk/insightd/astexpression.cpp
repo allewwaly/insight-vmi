@@ -319,26 +319,38 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
 
     // Apply remaining suffixes
     Instance tmp(*inst);
+    int derefCnt = 0;
     for (int j = i; j < _transformations.size() && tmp.isValid(); ++j) {
         switch (_transformations[j].type) {
         case ttDereference:
-            // Dereference the instance exactly once
-            tmp = tmp.dereference(BaseType::trLexicalAndPointers, 1, &cnt);
-            // Make sure we followed a pointer, but don't be fuzzy for the first
-            // type as the context type normally is not a pointer type anyway
-            if ((j > 0 && cnt != 1) || !tmp.isValid())
-                return ExpressionResult(erUndefined);
+            if (derefCnt < 0)
+                ++derefCnt;
+            else {
+                // Dereference the instance exactly once
+                tmp = tmp.dereference(BaseType::trLexicalAndPointers, 1, &cnt);
+                // Make sure we followed a pointer, but don't be fuzzy for the first
+                // type as the context type normally is not a pointer type anyway
+                if ((j > 0 && cnt != 1) || !tmp.isValid())
+                    return ExpressionResult(erUndefined);
+            }
             break;
 
         case ttMember:
+            derefCnt = 0;
             tmp = tmp.member(_transformations[j].member,
                              BaseType::trLexical, 0, ksNone);
             prettyType += "." + _transformations[j].member;
             break;
 
         case ttArray:
+            derefCnt = 0;
             tmp = tmp.arrayElem(_transformations[j].arrayIndex);
             prettyType += QString("[%1]").arg(_transformations[j].arrayIndex);
+            break;
+
+        case ttAddress:
+            if (--derefCnt < -1)
+                return ExpressionResult(erUndefined);
             break;
 
         default:
