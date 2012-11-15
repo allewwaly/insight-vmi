@@ -438,18 +438,19 @@ Instance MemoryDump::queryInstance(const QString& queryString,
 		result = getNextInstance(components.first(), result, src);
 
         if (!result.isValid()) {
+            QString s(prev.fullName());
+            if (!s.isEmpty())
+                s += ".";
+            s += components.first();
             if (result.origin() == Instance::orCandidate)
-                queryError(QString("The selected member candidate for \"%1.%2\" is invalid")
-                            .arg(prev.fullName())
-                            .arg(components.first()));
+                queryError(QString("The selected member candidate for \"%1\" is invalid")
+                            .arg(s));
             else if (result.origin() == Instance::orRuleEngine)
-                queryError(QString("The member \"%1.%2\" returned by the rule engine is invalid.")
-                            .arg(prev.fullName())
-                            .arg(components.first()));
+                queryError(QString("The instance \"%1\" returned by the rule engine is invalid.")
+                           .arg(s));
             else
-                queryError(QString("The member \"%1.%2\" is invalid (origin: %3)")
-                           .arg(prev.fullName())
-                           .arg(components.first())
+                queryError(QString("The instance \"%1\" is invalid (origin: %2)")
+                           .arg(s)
                            .arg(Instance::originToString(result.origin())));
         }
 
