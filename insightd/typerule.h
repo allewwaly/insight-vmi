@@ -136,6 +136,17 @@ public:
     inline void setSrcLine(int line) { _srcLine = line; }
 
     /**
+     * Returns this rule's priority (higher value means higher priority).
+     */
+    inline int priority() const { return _priority; }
+
+    /**
+     * Sets this rule's priority.
+     * @param prio new priority, higher value means higher priority
+     */
+    inline void setPriority(int prio) { _priority = prio; }
+
+    /**
      * Matches the given type and OS specifications against this rule.
      * @param type type to match
      * @param specs current OS specifications (ignored if \c null)
@@ -174,6 +185,7 @@ private:
     TypeRuleAction *_action;
     int _srcFileIndex;
     int _srcLine;
+    int _priority;
 };
 
 
