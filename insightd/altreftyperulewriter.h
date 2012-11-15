@@ -58,7 +58,6 @@ public:
     void operationProgress();
 
 private:
-    QString write(const RefBaseType* rbt, const QDir &rulesDir) const;
     QString write(const Structured* s, const QDir &rulesDir) const;
     QString write(const Variable* var, const QDir &rulesDir) const;
 
