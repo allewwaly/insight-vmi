@@ -832,13 +832,20 @@ bool Instance::memberCandidateCompatible(const StructuredMember* m,
 }
 
 
-ExpressionResult Instance::toExpressionResult() const
+ExpressionResult Instance::toExpressionResult(bool addrOp) const
 {
 	if (isNull())
 		return ExpressionResult(erUndefined);
 
-	const BaseType* t = _d->type->dereferencedBaseType(BaseType::trLexical);
 	ExprResultTypes ert = (_d->id > 0) ? erGlobalVar : erLocalVar;
+
+	if (addrOp) {
+		return sizeofPointer() == 4 ?
+					ExpressionResult(ert, esUInt32, (quint64)((quint32)_d->address)) :
+					ExpressionResult(ert, esUInt64, (quint64)_d->address);
+	}
+
+	const BaseType* t = _d->type->dereferencedBaseType(BaseType::trLexical);
 
 	switch (t->type()) {
 	case rtInt8:

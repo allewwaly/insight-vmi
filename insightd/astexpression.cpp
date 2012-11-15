@@ -361,7 +361,7 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         }
     }
 
-    return tmp.toExpressionResult();
+    return tmp.toExpressionResult(derefCnt < 0);
 }
 
 
