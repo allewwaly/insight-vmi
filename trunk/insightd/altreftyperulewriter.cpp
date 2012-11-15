@@ -100,17 +100,7 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
             checkOperationProgress();
 
             const BaseType* type = _factory->types().at(i);
-            if (type->type() & RefBaseTypes) {
-                const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(type);
-                if (rbt->hasAltRefTypes()) {
-                    fileName = write(rbt, rulesDir);
-                    if (!fileName.isEmpty()) {
-                        writer.writeTextElement(xml::include, fileName);
-                        _filesWritten.append(QDir::cleanPath(rulesDir.absoluteFilePath(fileName)));
-                    }
-                }
-            }
-            else if (type->type() & StructOrUnion) {
+            if (type->type() & StructOrUnion) {
                 const Structured* s = dynamic_cast<const Structured*>(type);
                 fileName = write(s, rulesDir);
                 if (!fileName.isEmpty()) {
@@ -146,16 +136,6 @@ void AltRefTypeRuleWriter::operationProgress()
 }
 
 
-QString AltRefTypeRuleWriter::write(const RefBaseType *rbt, const QDir &rulesDir) const
-{
-    Q_UNUSED(rulesDir);
-    debugmsg(QString("Alt. ref. type in RefBaseType '%1' (0x%2)")
-                .arg(rbt->prettyName()).arg(rbt->id(), 0, 16));
-
-    return QString();
-}
-
-
 QString AltRefTypeRuleWriter::uniqueFileName(const QDir &dir,
                                              const QString& fileName) const
 {
@@ -172,6 +152,11 @@ QString AltRefTypeRuleWriter::uniqueFileName(const QDir &dir,
 
 QString AltRefTypeRuleWriter::write(const Structured *s, const QDir &rulesDir) const
 {
+    // Skip custom structs (id < 0) that are specific to a global variable and
+    // are not used by any type
+    if (s->id() < 0 && _factory->typesUsingId(s->id()).isEmpty())
+        return QString();
+
     QString fileName = rulesDir.relativeFilePath(
                 uniqueFileName(rulesDir, fileNameFromType(s)));
     QString comment = QString("Type: %1\n" "Type ID: 0x%2\n")
@@ -216,9 +201,11 @@ QString AltRefTypeRuleWriter::write(const Variable *var, const QDir &rulesDir) c
                        ConstMemberList());
 
     }
-    // Does the variable's type have candidate types?
+
+    // Does the variable's type have candidate types? But only write rules for
+    // variable-specific types (i.e., id < 0).
     const BaseType* varType = var->refTypeDeep(BaseType::trLexicalPointersArrays);
-    if (varType && varType->type() & StructOrUnion)
+    if (varType && varType->type() & StructOrUnion && varType->id() < 0)
         count += writeStructDeep(dynamic_cast<const Structured*>(varType),
                                  var->name(), comment, outFile, writer);
 
