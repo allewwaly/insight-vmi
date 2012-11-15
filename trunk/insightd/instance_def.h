@@ -688,10 +688,12 @@ public:
      * Pointer values will be converted to an unsigned 32 bit or 64 bit integer,
      * depending the memory specifications. Any other type will result in an
      * invalid value (erInvalid).
+     * @param addrOp set to \c true if desired result is the expression "&inst",
+     * otherwise set to \c false (the default)
      * @return a numeric representation of this instance
      * \sa pointerSize()
      */
-    ExpressionResult toExpressionResult() const;
+    ExpressionResult toExpressionResult(bool addrOp = false) const;
 
     /**
      * Explicit representation of this instance as QVariant.
