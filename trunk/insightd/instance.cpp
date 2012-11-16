@@ -712,7 +712,7 @@ bool Instance::memberExists(const QString& name) const
     if (!_d->type || !(_d->type->type() & StructOrUnion))
         return false;
 
-    return dynamic_cast<const Structured*>(_d->type)->memberExists(name);
+    return dynamic_cast<const Structured*>(_d->type)->memberExists(name, true);
 }
 
 

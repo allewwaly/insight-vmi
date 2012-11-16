@@ -8,6 +8,7 @@
 #include "instanceclass.h"
 #include <QScriptEngine>
 #include <QScriptClassPropertyIterator>
+#include <QMetaMethod>
 #include "instancedata.h"
 #include "instanceprototype.h"
 #include "basetype.h"
@@ -25,6 +26,9 @@ const int propIgnore        = -1;
 const int propUseRules      = -2;
 const int propUseCandidates = -3;
 }
+
+const uint MEMBER_NOT_FOUND = -1;
+const uint CALL_BY_NAME     = -2;
 
 /**
  * This is an iterator for the properties of InstanceClass object.
@@ -95,6 +99,18 @@ InstanceClass::~InstanceClass()
 QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue& object,
         const QScriptString& name, QueryFlags flags, uint* id)
 {
+    // Initialize set of callable methods for the first time
+    static QSet<QString> methodNames;
+    if (methodNames.isEmpty()) {
+        for (int i = 0; i < _proto->metaObject()->methodCount(); ++i) {
+            QString s(_proto->metaObject()->method(i).signature());
+            int pos = s.indexOf(QChar('('));
+            if (pos > 0)
+                s = s.left(pos);
+            methodNames.insert(s);
+        }
+    }
+
     Instance *inst = qscriptvalue_cast<Instance*>(object.data());
     if (!inst)
         return 0;
@@ -104,8 +120,7 @@ QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue& object
     // Check if a slot with the same name exists in the prototype class.
     // Slots have precedence over members with the same name. The member
     // is still accessible using Member("name").
-    QByteArray slotName = QString("%1()").arg(nameStr).toAscii();
-    if (_proto->metaObject()->indexOfSlot(slotName.constData()) >= 0)
+    if (methodNames.contains(nameStr))
         return 0;
 
     // If we have a member with that index, we handle it as a property
@@ -114,23 +129,34 @@ QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue& object
     	*id = (uint) index;
         return flags;
     }
+    // If the member is nested in an anonymous struct, we have to call it by
+    // name instead of by index
+    else if (inst->memberExists(nameStr)) {
+        *id = CALL_BY_NAME;
+        return flags;
+    }
     else
-    	*id = (uint) -1;
+        *id = MEMBER_NOT_FOUND;
+
     // Return zero to indicate we don't handle this property ourself
     return 0;
 }
 
 
 QScriptValue InstanceClass::property(const QScriptValue& object,
-		const QScriptString& /*name*/, uint id)
+        const QScriptString& name, uint id)
 {
     Instance *inst = qscriptvalue_cast<Instance*>(object.data());
     if (!inst)
         return QScriptValue();
 
-    // If the member has exactly one alternative type, we return that instead of
-    // the original member
-    Instance member = inst->member(id, BaseType::trAny, 1, _proto->knowledgeSources());
+    Instance member;
+    if (id == CALL_BY_NAME) {
+        QString nameStr = name.toString();
+        member = inst->member(nameStr, BaseType::trAny, 1, _proto->knowledgeSources());
+    }
+    else
+        member = inst->member(id, BaseType::trAny, 1, _proto->knowledgeSources());
 
     return newInstance(member);
 }

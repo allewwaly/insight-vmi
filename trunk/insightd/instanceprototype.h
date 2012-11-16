@@ -590,15 +590,15 @@ public slots:
     bool IsValid() const;
 
     /**
-     * Checks if this instance has a non-null address \e and references a valid
-     * type.  As JavaScript does not support 64-bit integers natively, one
+     * Checks if this instance has a non-null address.
+     * As JavaScript does not support 64-bit integers natively, one
      * would otherwise have to compare both the high and low values to test for
      * a null address:
      * \code
      * !AddressHigh() && !AddressLow()
      * \endcode
-     * @return \c true if this instance has a non-null address as well as a
-     * valid type, \c false otherwise
+     * @return \c true if this instance has a non-null address, \c false
+     * otherwise
      * \sa IsValid()
      */
     bool IsNull() const;
