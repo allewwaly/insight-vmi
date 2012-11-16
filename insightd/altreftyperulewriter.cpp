@@ -579,7 +579,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 writer.writeAttribute(xml::type, xml::expression);
                 // Use the source type name, if it is unique
                 if (!srcUseId)
-                    writer.writeTextElement(xml::srcType, srcType->prettyName(_srcVar));
+                    writer.writeTextElement(xml::srcType, varExp->baseType()->prettyName(_srcVar));
                 else {
                     writer.writeComment(QString(" Source type '%1' is ambiguous ")
                                             .arg(srcType->prettyName()));
