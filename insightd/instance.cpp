@@ -1249,10 +1249,32 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
                                         __LINE__);
                             }
                         }else if (memberInstance._d->type->type() == rtStruct){
+                            Instance member = (dynamic_cast<const Structured*>
+                                        (memberInstance._d->type->dereferencedBaseType(BaseType::trLexical)))->
+                                                memberAtOffset(0, true)->
+                                                toInstance(memberInstance._d->address, _d->vmem, &memberInstance);
+                            if (!member.isNull() && member._d->type->type() == rtArray){
+                                address = memberInstance._d->address;
+                            }
+                            else if(!member.isNull() &&  member._d->type->type() == rtPointer){
+                                // We have to consider the size of the pointer
+                                if (member._d->type->size() == 4) {
+                                    address = member.toUInt32();
+                                }
+                                else if (member._d->type->size() == 8) {
+                                    address = member.toUInt64();
+                                }
+                                else {
+                                    throw BaseTypeException(
+                                            "Illegal conversion of a non-pointer type to a pointer",
+                                            __FILE__,
+                                            __LINE__);
+                                }
+                            }
                         }
 
                         //TODO This must not be threaded
-                        if (!memberInstance._d->vmem->seek(address) ||
+                        if (!address || !memberInstance._d->vmem->seek(address) ||
                             (ret = memberInstance._d->vmem->read(buf, len)) != len ) {
                             memberValid = false;
                         }
