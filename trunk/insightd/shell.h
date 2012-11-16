@@ -287,7 +287,8 @@ private:
 
 //    void printTimeStamp(const QTime& time);
     int memberNameLenth(const Structured* s, int indent) const;
-    void printStructMembers(const Structured* s, int indent, int id_width = -1,
+    void printStructMembers(const Structured* s, const Variable *ctx_var, const Structured* ctx_s,
+                            ConstMemberList members, int indent, int id_width = -1,
                             int offset_width = -1, int name_width = -1,
                             bool printAlt = true, size_t offset = 0);
     void prepare();
@@ -307,6 +308,7 @@ private:
                        const TypeRule* (*getRuleFunc)(const list_t& list, int index),
                        int (*getIndexFunc)(const list_t& list, int index),
                        bool reverse = false);
+    void printMatchingRules(const ActiveRuleList& rules, int indent);
     const TypeRule* parseRuleIndex(const QString& s);
 //---------------------------------
 //    int cmdDiffVectors(QStringList args);
@@ -355,8 +357,12 @@ private:
 
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t, const QString& name = QString(),
-                        ColorType nameType = ctReset);
-    int cmdShowVariable(const Variable* v);
+                        ColorType nameType = ctReset,
+                        const ActiveRuleList& matchingRules = ActiveRuleList(),
+                        const Variable *ctx_var = 0, const Structured *ctx_s = 0,
+                        ConstMemberList members = ConstMemberList());
+    int cmdShowVariable(const Variable* v,
+                        const ActiveRuleList& matchingRules = ActiveRuleList());
 
     int cmdStats(QStringList args);
     int cmdStatsPostponed(QStringList args);

@@ -133,7 +133,7 @@ public:
      * TypeResolution
      * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
      * infinity
-     * @param depth how many types have been dereferenced
+     * @param depth how many pointers or arrays have been dereferenced
      * @return non-referencing base type if this is a referencing type, \c this
      * otherwise
      */
