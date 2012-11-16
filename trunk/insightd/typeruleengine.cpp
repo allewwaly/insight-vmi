@@ -52,8 +52,23 @@ void TypeRuleEngine::clear()
 
 void TypeRuleEngine::readFrom(const QString &fileName, bool forceRead)
 {
+    readFrom(QStringList(fileName), forceRead);
+}
+
+
+void TypeRuleEngine::readFrom(const QStringList &fileNames, bool forceRead)
+{
     TypeRuleReader reader(this, forceRead);
-    reader.readFrom(fileName);
+    try {
+        reader.readFrom(fileNames);
+    }
+    catch (...) {
+        // Remove this file from the list of read files
+        int index = _ruleFiles.indexOf(reader.currFile());
+        if (index >= 0)
+            _ruleFiles[index] = QString();
+        throw;
+    }
 }
 
 
@@ -86,24 +101,33 @@ bool TypeRuleEngine::fileAlreadyRead(const QString &fileName)
 }
 
 
-void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs)
+void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs, int from)
 {
     operationStarted();
     _rulesChecked = 0;
-    if (factory->symbolsAvailable() && !_rules.isEmpty())
-        forceOperationProgress();
 
-    _hits.fill(0, _rules.size());
-    _activeRules.clear();
-    _rulesPerType.clear();
+    // Full or partial check?
+    if (from <= 0) {
+        from = 0;
+        _hits.fill(0, _rules.size());
+        _activeRules.clear();
+        _rulesPerType.clear();
+        _rulesToCheck = _rules.size();
+    }
+    else {
+        _hits.resize(_rules.size());
+        _rulesToCheck = _rules.size() - from;
+    }
 
     if (!factory->symbolsAvailable() || _rules.isEmpty())
         return;
 
+    forceOperationProgress();
+
     // Checking the rules from last to first assures that rules in the
     // _activeRules hash are processes first to last. That way, if multiple
     // rules match the same instance, the first rule takes precedence.
-    for (int i = _rules.size() - 1; !interrupted() && i >= 0; --i) {
+    for (int i = _rules.size() - 1; !interrupted() && i >= from; --i) {
         ++_rulesChecked;
         checkOperationProgress();
 
@@ -546,7 +570,7 @@ const OsFilter *TypeRuleEngine::insertOsFilter(const OsFilter *osf)
 void TypeRuleEngine::operationProgress()
 {
     QString s = QString("\rVerifying rules (%0%), %1 elapsed, %2 rules active")
-            .arg((int)((_rulesChecked / (float) _rules.size()) * 100.0))
+            .arg(_rulesToCheck ? (int)((_rulesChecked / (float) _rulesToCheck) * 100.0) : 100)
             .arg(elapsedTime())
             .arg(_activeRules.size());
     shellOut(s, false);
