@@ -9,6 +9,7 @@
 #include "pointer.h"
 #include <debug.h>
 #include "shell.h"
+#include "shellutil.h"
 
 namespace str
 {
@@ -316,6 +317,9 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
             type_len = m->refType()->prettyName().length();
     }
 
+    // Limit type_len to half of console width
+    type_len = qMin(type_len, ShellUtil::termSize().width() >> 1);
+
     // Output all members
     for (int i = 0; i < _members.size(); ++i) {
         StructuredMember* m = _members[i];
@@ -418,8 +422,8 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
                 .arg(i, index_len)
                 .arg(m->offset(), offset_len, 16, QChar('0'))
                 .arg(name)
-                .arg(col ? col->prettyNameInColor(m->refType(), type_len)
-                         : m->refType()->prettyName(),
+                .arg(col ? col->prettyNameInColor(m->refType(), type_len, type_len)
+                         : ShellUtil::abbrvStrRight(m->refType()->prettyName(), type_len),
                      -type_len)
                 .arg(valueStr);
 
