@@ -2838,8 +2838,9 @@ int Shell::cmdShow(QStringList args)
     int id = (int)s.toUInt(&ok, 16);
 
     const BaseType* bt = 0;
-    const Variable * var = 0;
+    const Variable *var = 0, *ctx_var = 0;
     QList<IntEnumPair> enums;
+    ActiveRuleList rules;
     bool exprIsVar = false;
     bool exprIsId = false;
 
@@ -2904,8 +2905,10 @@ int Shell::cmdShow(QStringList args)
             exprIsVar = true;
             _out << "Found variable with name "
                  << color(ctVariable) << s << color(ctReset);
-            if (expr.size() > 1)
+            if (expr.size() > 1) {
+                ctx_var = vars.first();
                 bt = vars.first()->refType();
+            }
             else
                 var = vars.first();
 		}
@@ -2913,9 +2916,12 @@ int Shell::cmdShow(QStringList args)
 
     if (var) {
         _out << ":" << endl;
-        return cmdShowVariable(var);
+        rules = _sym.ruleEngine().rulesMatching(var, ConstMemberList());
+        return cmdShowVariable(var, rules);
     }
     else if (bt) {
+        const Structured* ctx_s = 0;
+        ConstMemberList members;
         if (expr.size() > 1) {
             _out << ", showing "
                  << (exprIsVar ? color(ctVariable) : color(ctType))
@@ -2926,11 +2932,20 @@ int Shell::cmdShow(QStringList args)
             _out << ":" << endl;
 
             // Resolve the expression
-            const Structured* s;
             const StructuredMember* m;
             QString errorMsg;
             for (int i = 1; i < expr.size(); ++i) {
-                bt = bt->dereferencedBaseType();
+                int ptrs = 0;
+                const Structured* s = 0;
+                bt = bt->dereferencedBaseType(BaseType::trLexicalAndPointers,
+                                              -1, &ptrs);
+                // Reset context struct and members after pointer dereferences
+                // except for the first member
+                if (i > 1 && ptrs > 0) {
+                    ctx_s = 0;
+                    ctx_var = 0;
+                    members.clear();
+                }
 
                 if (! (s = dynamic_cast<const Structured*>(bt)) )
                     errorMsg = "Not a struct or a union: ";
@@ -2954,14 +2969,26 @@ int Shell::cmdShow(QStringList args)
                     _err << color(ctReset) << endl;
                     return ecInvalidExpression;
                 }
+
+                // Set context type, if null
+                if (!ctx_s)
+                    ctx_s = s;
+                // Append all members that were accessed on the way
+                members.append(s->memberChain(expr[i]));
             }
             bt = bt->dereferencedBaseType(BaseType::trLexical);
         }
         else
             _out << ":" << endl;
 
+        if (ctx_var)
+            rules = _sym.ruleEngine().rulesMatching(ctx_var, members);
+        else if (ctx_s)
+            rules = _sym.ruleEngine().rulesMatching(ctx_s, members);
+
         return cmdShowBaseType(bt, exprIsId ? QString() : expr.last(),
-                               expr.size() > 1 ? ctMember : ctType);
+                               expr.size() > 1 ? ctMember : ctType,
+                               rules, ctx_var, ctx_s, members);
     }
     else if (!enums.isEmpty())
         return 0;
@@ -2973,8 +3000,67 @@ int Shell::cmdShow(QStringList args)
 }
 
 
+void Shell::printMatchingRules(const ActiveRuleList &rules, int indent)
+{
+	if (rules.isEmpty())
+		return;
+
+	const int w_idx = ShellUtil::getFieldWidth(rules.last().index + 1);
+
+	for (int i = 0; i < rules.size(); ++i) {
+		const TypeRuleAction* action = rules[i].rule->action();
+		if (!action)
+			continue;
+
+		_out << qSetFieldWidth(indent) << right
+			 << QString("Rule %0: ").arg(rules[i].index + 1, w_idx)
+			 << qSetFieldWidth(0);
+
+		switch (action->actionType())
+		{
+		case TypeRuleAction::atExpression: {
+			const ExpressionAction* ea =
+					dynamic_cast<const ExpressionAction*>(action);
+			const BaseType* t = ea->targetType();
+			if (t)
+				_out << color(ctTypeId)
+					 << QString("0x%2 ").arg((uint)t->id(), -8, 16)
+					 << prettyNameInColor(t) << color(ctReset);
+			else
+				_out << ea->targetTypeStr();
+
+			_out << ": " << ea->expression()->toString(true);
+			break;
+		}
+
+		case TypeRuleAction::atFunction: {
+			const FuncCallScriptAction* sa =
+					dynamic_cast<const FuncCallScriptAction*>(action);
+			_out << "Execute script function " << color(ctBold)
+				 << sa->function() << "()" << color(ctReset) << " in file "
+				 << color(ctBold) << ShellUtil::shortFileName(sa->scriptFile())
+				 << color(ctReset);
+			break;
+		}
+
+		case TypeRuleAction::atInlineCode: {
+			_out << "Execute inline script code";
+			break;
+		}
+
+		case TypeRuleAction::atNone:
+			break;
+		}
+
+		_out << endl;
+	}
+}
+
+
 int Shell::cmdShowBaseType(const BaseType* t, const QString &name,
-						   ColorType nameType)
+						   ColorType nameType, const ActiveRuleList& matchingRules,
+						   const Variable* ctx_var, const Structured* ctx_s,
+						   ConstMemberList members)
 {
 	_out << color(ctColHead) << "  ID:             "
 		 << color(ctTypeId) << "0x" << hex << (uint)t->id() << dec << endl;
@@ -3024,6 +3110,12 @@ int Shell::cmdShowBaseType(const BaseType* t, const QString &name,
 			 << ":" << t->srcLine() << endl;
 	}
 
+	if (!matchingRules.isEmpty()) {
+		_out << color(ctColHead) << "  Matching rules: " << color(ctReset)
+			 << matchingRules.size() << endl;
+		printMatchingRules(matchingRules, 18);
+	}
+
     const FuncPointer* fp = dynamic_cast<const FuncPointer*>(t);
 
     const RefBaseType* r;
@@ -3044,7 +3136,12 @@ int Shell::cmdShowBaseType(const BaseType* t, const QString &name,
                  << prettyNameInColor(t) << color(ctReset) << ": "
                  << r->altRefType(i).expr()->toString(true) << endl;
         }
-
+        // If we dereference a non-lexical type, the context type changes
+        if (r->type() & (rtPointer|rtArray|rtFuncPointer|rtFunction)) {
+            ctx_var = 0;
+            ctx_s = 0;
+            members.clear();
+        }
         t = r->refType();
         ++cnt;
     }
@@ -3053,7 +3150,7 @@ int Shell::cmdShowBaseType(const BaseType* t, const QString &name,
 	if (!fp && s) {
 		_out << color(ctColHead) << "  Members:        "
 			 << color(ctReset) << s->members().size() << endl;
-		printStructMembers(s, 4);
+		printStructMembers(s, ctx_var, ctx_s ? ctx_s : s, members, 4);
 	}
 
 	const Enum* e = dynamic_cast<const Enum*>(t);
@@ -3149,9 +3246,10 @@ int Shell::memberNameLenth(const Structured* s, int indent) const
 	return len;
 }
 
-void Shell::printStructMembers(const Structured* s, int indent, int id_width,
-							   int offset_width, int name_width, bool printAlt,
-							   size_t offset)
+void Shell::printStructMembers(const Structured* s, const Variable* ctx_var,
+							   const Structured *ctx_s, ConstMemberList members,
+							   int indent, int id_width, int offset_width,
+							   int name_width, bool printAlt, size_t offset)
 {
 	if (!s)
 		return;
@@ -3188,6 +3286,8 @@ void Shell::printStructMembers(const Structured* s, int indent, int id_width,
 		StructuredMember* m = s->members().at(i);
 		const BaseType* rt = m->refType();
 
+		members.append(m);
+
 		QString pretty = rt ?
 					prettyNameInColor(rt, 0, 0) :
 					QString("%0(unresolved type, 0x%1%2)")
@@ -3223,8 +3323,9 @@ void Shell::printStructMembers(const Structured* s, int indent, int id_width,
         if (rt && (rt->type() & StructOrUnion) && rt->name().isEmpty()) {
             _out << endl << qSetFieldWidth(indent) << "" << qSetFieldWidth(0) << "{" << endl;
             const Structured* ms = dynamic_cast<const Structured*>(rt);
-            printStructMembers(ms, indent + 2, id_width, offset_width,
-                               name_width - 2, true, m->offset() + offset);
+            printStructMembers(ms, ctx_var, ctx_s, members, indent + 2, id_width,
+                               offset_width, name_width - 2, true,
+                               m->offset() + offset);
             _out << qSetFieldWidth(indent) << "" << qSetFieldWidth(0) << "}";
         }
 
@@ -3252,11 +3353,22 @@ void Shell::printStructMembers(const Structured* s, int indent, int id_width,
 				 << ": " << m->altRefType(j).expr()->toString(true)
 				 << endl;
 		}
+
+		if (printAlt) {
+			ActiveRuleList rules;
+			if (ctx_var)
+				rules = _sym.ruleEngine().rulesMatching(ctx_var, members);
+			else
+				rules = _sym.ruleEngine().rulesMatching(ctx_s ? ctx_s : s, members);
+			printMatchingRules(rules, indent + w_sep + offset_width + w_sep + w_name);
+		}
+
+		members.pop_back();
 	}
 }
 
 
-int Shell::cmdShowVariable(const Variable* v)
+int Shell::cmdShowVariable(const Variable* v, const ActiveRuleList &matchingRules)
 {
 	assert(v != 0);
 
@@ -3301,9 +3413,14 @@ int Shell::cmdShowVariable(const Variable* v)
 			<< ":" << v->srcLine() << endl;
 	}
 
+	if (!matchingRules.isEmpty()) {
+		_out << color(ctColHead) << "  Matching rules:" << color(ctReset)<< endl;
+		printMatchingRules(matchingRules, 18);
+	}
+
 	if (rt) {
 		_out << "Corresponding type information:" << endl;
-		cmdShowBaseType(v->refType(), v->name(), ctVariable);
+		cmdShowBaseType(v->refType(), v->name(), ctVariable, ActiveRuleList(), v);
 	}
 
 	return ecOk;
