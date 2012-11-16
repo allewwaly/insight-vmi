@@ -99,7 +99,14 @@ public:
      * @param fileName file to read rules from
      * @param forceRead force to re-read files that have already been read
      */
-    void readFrom(const QString& fileName, bool forceRead = false);
+    void readFrom(const QString &fileName, bool forceRead = false);
+
+    /**
+     * Reads the rules from a list of file names
+     * @param fileNames list of files to read rules from
+     * @param forceRead force to re-read files that have already been read
+     */
+    void readFrom(const QStringList &fileNames, bool forceRead = false);
 
     /**
      * Adds the given rule along with the given OS filter to the rules list.
@@ -129,8 +136,9 @@ public:
      * Checks all rules for correctness and sets the relevant rules active.
      * @param factory symbol factory to use for checking the rules
      * @param OS specification to match against the rules
+     * @param from index where to start checking the rules from
      */
-    void checkRules(SymFactory *factory, const OsSpecs* specs);
+    void checkRules(SymFactory *factory, const OsSpecs* specs, int from = 0);
 
     /**
      * Returns all rules that are stored in this engine.
@@ -270,6 +278,7 @@ private:
     QVector<int> _hits;
     ScriptEngine *_eng;
     int _rulesChecked;
+    int _rulesToCheck;
     VerboseEvaluation _verbose;
 };
 

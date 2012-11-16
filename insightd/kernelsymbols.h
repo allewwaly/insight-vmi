@@ -128,7 +128,7 @@ public:
     bool symbolsAvailable() const;
 
 private:
-	void checkRules();
+    void checkRules(int from = 0);
 
     MemSpecs _memSpecs;
     SymFactory _factory;

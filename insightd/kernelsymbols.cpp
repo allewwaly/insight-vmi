@@ -223,17 +223,15 @@ void KernelSymbols::saveSymbols(const QString& fileName)
 
 void KernelSymbols::loadRules(const QString &fileName, bool forceRead)
 {
-    TypeRuleReader reader(&_ruleEngine, forceRead);
-    reader.readFrom(fileName);
-    checkRules();
+    loadRules(QStringList(fileName), forceRead);
 }
 
 
 void KernelSymbols::loadRules(const QStringList &fileNames, bool forceRead)
 {
-    TypeRuleReader reader(&_ruleEngine, forceRead);
-    reader.readFrom(fileNames);
-    checkRules();
+    int from = _ruleEngine.rules().size();
+    _ruleEngine.readFrom(fileNames, forceRead);
+    checkRules(from);
 }
 
 
@@ -244,13 +242,13 @@ void KernelSymbols::flushRules()
 }
 
 
-void KernelSymbols::checkRules()
+void KernelSymbols::checkRules(int from)
 {
     Instance::setRuleEngine(0);
     Variable::setRuleEngine(0);
 
     OsSpecs specs(&_memSpecs);
-    _ruleEngine.checkRules(&_factory, &specs);
+    _ruleEngine.checkRules(&_factory, &specs, from);
 
     // Enable engine only if we have active rules
     if (!_ruleEngine.activeRules().isEmpty()) {
