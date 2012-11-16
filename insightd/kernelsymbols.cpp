@@ -229,6 +229,14 @@ void KernelSymbols::loadRules(const QString &fileName, bool forceRead)
 }
 
 
+void KernelSymbols::loadRules(const QStringList &fileNames, bool forceRead)
+{
+    TypeRuleReader reader(&_ruleEngine, forceRead);
+    reader.readFrom(fileNames);
+    checkRules();
+}
+
+
 void KernelSymbols::flushRules()
 {
     Instance::setRuleEngine(0);

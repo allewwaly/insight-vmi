@@ -207,13 +207,15 @@ Shell::Shell(bool listenOnSocket)
                  &Shell::cmdRules,
                  "Read and manage rule files",
                  "This command allows to manage type knowledge rules.\n"
-                 "  rules load [-f] <file>   Loades the from <file>, flushes all\n"
+                 "  rules load [-f] <file>   Load rules from <file>, flushes all\n"
                  "                           rules first with -f\n"
-                 "  rules list               Lists all loaded rules\n"
-                 "  rules active             Lists all rules that are currently\n"
+                 "  rules load [-f] -a <dir> Automatically load the matching rules\n"
+                 "                           for the loaded kernel from <dir>\n"
+                 "  rules list               List all loaded rules\n"
+                 "  rules active             List all rules that are currently\n"
                  "                           active\n"
-                 "  rules show <index>       Shows details of rule <index>\n"
-                 "  rules verbose [<level>]  Sets the verbose level when evaluating\n"
+                 "  rules show <index>       Show details of rule <index>\n"
+                 "  rules verbose [<level>]  Set the verbose level when evaluating\n"
                  "                           rules, may be between 0 (off) and 4 (on)\n"
                  "  rules flush              Removes all rules"));
 
@@ -586,6 +588,16 @@ void Shell::run()
     for (int i = 0; !_interrupted && i < programOptions.memFileNames().size(); ++i) {
         cmdMemoryLoad(QStringList(programOptions.memFileNames().at(i)));
     }
+
+    QStringList ruleFiles;
+    if (programOptions.activeOptions() & opRulesDir)
+        // Auto-load matching rule file
+        ruleFiles << "-a" << programOptions.rulesAutoDir();
+    // Append user-specified rule files
+    ruleFiles += programOptions.ruleFileNames();
+    // Bulk-load all rule files en block
+    if (!ruleFiles.isEmpty())
+        cmdRulesLoad(ruleFiles);
 
     if (_interrupted)
         _out << endl << "Operation interrupted by user." << endl;
@@ -2358,11 +2370,19 @@ int Shell::cmdRules(QStringList args)
 
 int Shell::cmdRulesLoad(QStringList args)
 {
-    bool flush = false;
-    if (!args.isEmpty() && (args.first() == "-f" || args.first() == "--flush"))
-    {
-        flush = true;
-        args.pop_front();
+    bool autoLoad = false, flush = false;
+
+    while (!args.isEmpty()) {
+        if (args.first() == "-f" || args.first() == "--flush") {
+            flush = true;
+            args.pop_front();
+        }
+        else if (args.first() == "-a" || args.first() == "--auto") {
+            autoLoad = true;
+            args.pop_front();
+        }
+        else
+            break;
     }
 
     if (args.size() < 1) {
@@ -2370,12 +2390,29 @@ int Shell::cmdRulesLoad(QStringList args)
         return ecInvalidArguments;
     }
 
-    try {
-        if (flush)
-            _sym.flushRules();
+    if (flush)
+        _sym.flushRules();
 
+    if (autoLoad) {
+        // Auto-locate the correct rules file based on the loaded kernel
+        QDir baseDir(args.first());
+        if (!baseDir.exists()) {
+            errMsg("Directory not found: " + baseDir.absolutePath());
+            return ecFileNotFound;
+        }
+        QString fileName = _sym.memSpecs().version.toFileNameString() + ".xml";
+        if (!baseDir.exists(fileName)) {
+            warnMsg("No rules for the loaded kernel found in directory \"" +
+                    ShellUtil::shortFileName(baseDir.absolutePath()) + "\".");
+            return ecFileNotFound;
+        }
+        // Replace directory with located file name
+        args[0] = baseDir.absoluteFilePath(fileName);
+    }
+
+    try {
         int noBefore = _sym.ruleEngine().count();
-        _sym.loadRules(args.first());
+        _sym.loadRules(args);
         int noAfter = _sym.ruleEngine().count();
 
         _out << "Loaded ";

@@ -25,7 +25,8 @@ enum Options {
 	opDaemonize       = (1 << 0),
 	opForeground      = (1 << 1),
 	opColorLightBg    = (1 << 2),
-	opColorDarkBg     = (1 << 3)
+	opColorDarkBg     = (1 << 3),
+	opRulesDir        = (1 << 4)
 };
 
 /// The expected next token when parsing the command line arguments
@@ -33,7 +34,9 @@ enum NextToken {
     ntOption,
     ntInFileName,
     ntMemFileName,
-    ntColorMode
+    ntColorMode,
+    ntRulesFile,
+    ntRulesDir
 };
 
 /// Represents one command line option
@@ -85,55 +88,85 @@ public:
     static void cmdOptionsUsage();
 
     /**
-     * @return name of the input file
+     * Returns name of the input file.
      */
-    QString inFileName() const;
+    inline QString inFileName() const { return _inFileName; }
 
     /**
      * Sets the input file name
      * @param inFileName new file name
      */
-    void setInFileName(QString inFileName);
+    inline void setInFileName(QString inFileName) { _inFileName = inFileName; }
 
     /**
-     * @return the list of memory dump files
+     * Returns the list of memory dump files
      */
-    QStringList memFileNames() const;
+    inline const QStringList& memFileNames() const { return _memFileNames; }
 
     /**
      * Sets the memory dump files
      * @param memFiles the new memory dump files
      */
-    void setMemFileNames(const QStringList& memFiles);
+    inline void setMemFileNames(const QStringList& memFiles)
+    {
+        _memFileNames = memFiles;
+    }
 
     /**
-     * @return the initial action to perform
+     * Returns the initial action to perform
      */
-    Action action() const;
+    inline Action action() const { return _action; }
 
     /**
      * Sets the initial action to perform
      * @param action new initial action
      */
-    void setAction(Action action);
+    inline void setAction(Action action) { _action = action; }
 
     /**
-     * @return integer of bitwise or'ed options that were passed at the command
+     * Returns integer of bitwise or'ed options that were passed at the command
      * line
      */
-    int activeOptions() const;
+    inline int activeOptions() const { return _activeOptions; }
 
     /**
      * Sets the active options
      * @param options
      */
-    void setActiveOptions(int options);
+    inline void setActiveOptions(int options) { _activeOptions = options; }
+
+    /**
+     * Returns the directory where to auto-locate the rule files.
+     */
+    inline const QString& rulesAutoDir() const { return _rulesAutoDir; }
+
+    /**
+     * Sets the directory where to auto-locate the rule files.
+     * @param dir direcoty name
+     */
+    inline void setRulesAutoDir(const QString& dir) { _rulesAutoDir = dir; }
+
+    /**
+     * Returns the rule file names to load at startup.
+     */
+    inline const QStringList& ruleFileNames() const { return _ruleFiles; }
+
+    /**
+     * Sets the rule file names to load at startup.
+     * @param ruleFiles
+     */
+    inline void setRuleFileNames(const QStringList& ruleFiles)
+    {
+        _ruleFiles = ruleFiles;
+    }
 
 private:
     QString _inFileName;
     QStringList _memFileNames;
     Action _action;
     int _activeOptions;
+    QString _rulesAutoDir;
+    QStringList _ruleFiles;
 };
 
 /// Global options instance

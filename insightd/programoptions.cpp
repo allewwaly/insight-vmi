@@ -9,6 +9,7 @@
 #include <iostream>
 #include <iomanip>
 #include <QFileInfo>
+#include <QDir>
 #include <QCoreApplication>
 #include <debug.h>
 
@@ -19,73 +20,93 @@
 
 ProgramOptions programOptions;
 
-const int OPTION_COUNT = 7;
+const int OPTION_COUNT = 9;
 
 const struct Option options[OPTION_COUNT] = {
-        {
-                "-d",
-                "--daemon",
-                "Start as a background process and detach console",
-                acNone,
-                opDaemonize,
-                ntOption,
-                0 // conflicting options
-        },
-        {
-                "-f",
-                "--foreground",
-                "Start as daemon but don't detach console",
-                acNone,
-                opForeground,
-                ntOption,
-                0 // conflicting options
-        },
-        {
-                "-p",
-                "--parse",
-                "Parse the debugging symbols from the given kernel source directory",
-                acParseSymbols,
-                opNone,
-                ntInFileName,
-                0 // conflicting options
-        },
-        {
-                "-l",
-                "--load",
-                "Read in previously saved debugging symbols",
-                acLoadSymbols,
-                opNone,
-                ntInFileName,
-                0 // conflicting options
-        },
-        {
-                "-m",
-                "--memory",
-                "Load a memory dump",
-                acNone,
-                opNone,
-                ntMemFileName,
-                0 // conflicting options
-        },
-        {
-                "-c",
-                "--color",
-                "Set the terminal color mode: \"" CM_LIGHT "\", \"" CM_DARK
-                "\", or \"" CM_NONE "\"",
-                acNone,
-                opNone,
-                ntColorMode,
-                0 // conflicting options
-        },
-        {
-                "-h",
-                "--help",
-                "Show this help",
-                acUsage,
-                opNone,
-                ntOption,
-                0
-        }
+    {
+        "-d",
+        "--daemon",
+        "Start as a background process and detach console",
+        acNone,
+        opDaemonize,
+        ntOption,
+        0 // conflicting options
+    },
+    {
+        "-f",
+        "--foreground",
+        "Start as daemon but don't detach console",
+        acNone,
+        opForeground,
+        ntOption,
+        0 // conflicting options
+    },
+    {
+        "-p",
+        "--parse",
+        "Parse the debugging symbols from the given kernel source directory",
+        acParseSymbols,
+        opNone,
+        ntInFileName,
+        0 // conflicting options
+    },
+    {
+        "-l",
+        "--load",
+        "Read in previously saved debugging symbols",
+        acLoadSymbols,
+        opNone,
+        ntInFileName,
+        0 // conflicting options
+    },
+    {
+        "-m",
+        "--memory",
+        "Load a memory dump (may be specified multiple times)",
+        acNone,
+        opNone,
+        ntMemFileName,
+        0 // conflicting options
+    },
+    {
+        "-c",
+        "--color",
+        "Set the terminal color mode: \"" CM_LIGHT "\", \"" CM_DARK
+        "\", or \"" CM_NONE "\"",
+        acNone,
+        opNone,
+        ntColorMode,
+        0 // conflicting options
+    },
+    {
+        "-r",
+        "--rules",
+        "Load type knowledge rules from the given file (may be specified "
+        "multiple times)",
+        acNone,
+        opNone,
+        ntRulesFile,
+        0 // conflicting options
+    },
+    {
+        "-a",
+        "--auto-rules",
+        "Automatically load the matching type knowledge rules for the loaded "
+        "kernel from the given directoy",
+        acNone,
+        opRulesDir,
+        ntRulesDir,
+        0 // conflicting options
+    },
+    {
+        "-h",
+        "--help",
+        "Show this help",
+        acUsage,
+        opNone,
+        ntOption,
+        0
+    }
 };
 
 
@@ -103,7 +124,7 @@ void ProgramOptions::cmdOptionsUsage()
     appName = appName.right(appName.length() - appName.lastIndexOf('/') - 1);
 
     std::cout
-        << "Usage: " << appName.toStdString() << " [options]" << std::endl
+        << "Usage: " << qPrintable(appName) << " [options]" << std::endl
         << "Possible options are:" << std::endl;
 
     for (int i = 0; i < OPTION_COUNT; i++) {
@@ -120,7 +141,7 @@ void ProgramOptions::cmdOptionsUsage()
             opts += " <infile>";
 
         std::cout
-            << "  " << std::left << std::setw(24) << opts.toStdString()
+            << "  " << std::left << std::setw(24) << qPrintable(opts)
             << options[i].help
             << std::endl;
     }
@@ -165,7 +186,7 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
                     // Check for conflicting options
                     if (_activeOptions & options[i].conflictOptions) {
                         std::cerr
-                            << "The option \"" << arg.toStdString()
+                            << "The option \"" << qPrintable(arg)
                             << "\" conflicts a previously given option."
                             << std::endl;
                         return false;
@@ -190,7 +211,7 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
                 }
             }
             if (!found) {
-                std::cerr << "Unknown option: " << arg.toStdString() << std::endl;
+                std::cerr << "Unknown option: " << qPrintable(arg) << std::endl;
                 return false;
             }
             break;
@@ -199,7 +220,7 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
             QFileInfo info(arg);
             if (!info.exists()) {
                 std::cerr
-                    << "The file or directory \"" << arg.toStdString()
+                    << "The file or directory \"" << qPrintable(arg)
                     << "\" does not exist." << std::endl;
                 return false;
             }
@@ -212,7 +233,7 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
             QFileInfo info(arg);
             if (!info.exists()) {
                 std::cerr
-                    << "The file \"" << arg.toStdString()
+                    << "The file \"" << qPrintable(arg)
                     << "\" does not exist." << std::endl;
                 return false;
             }
@@ -235,6 +256,30 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
                              CM_LIGHT ", " CM_DARK  ", " CM_NONE << std::endl;
             }
             break;
+
+        case ntRulesFile: {
+            QFileInfo info(arg);
+            if (!info.exists()) {
+                std::cerr << "The file \"" << qPrintable(arg)
+                          << "\" does not exist." << std::endl;
+                return false;
+            }
+            _ruleFiles.append(info.absoluteFilePath());
+            nextToken = ntOption;
+            break;
+        }
+
+        case ntRulesDir: {
+            QDir info(arg);
+            if (!info.exists()) {
+                std::cerr << "The directory \"" << qPrintable(arg)
+                          << "\" does not exist." << std::endl;
+                return false;
+            }
+            _rulesAutoDir = QDir::cleanPath(info.absolutePath());
+            nextToken = ntOption;
+            break;
+        }
         }
     }
 
@@ -249,53 +294,5 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
 #endif
 
     return true;
-}
-
-
-QString ProgramOptions::inFileName() const
-{
-    return _inFileName;
-}
-
-
-void ProgramOptions::setInFileName(QString inFileName)
-{
-    this->_inFileName = inFileName;
-}
-
-
-QStringList ProgramOptions::memFileNames() const
-{
-    return _memFileNames;
-}
-
-
-void ProgramOptions::setMemFileNames(const QStringList& memFiles)
-{
-    this->_memFileNames = memFiles;
-}
-
-
-Action ProgramOptions::action() const
-{
-    return _action;
-}
-
-
-void ProgramOptions::setAction(Action action)
-{
-    this->_action = action;
-}
-
-
-int ProgramOptions::activeOptions() const
-{
-    return _activeOptions;
-}
-
-
-void ProgramOptions::setActiveOptions(int options)
-{
-    _activeOptions = options;
 }
 

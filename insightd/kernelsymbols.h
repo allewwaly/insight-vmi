@@ -74,10 +74,17 @@ public:
     void loadRules(const QString& fileName, bool forceRead = false);
 
     /**
+     * Loads type knowledge rules from all files passed in \a fileNames into
+     * the rules engine.
+     * @param fileNames list of files to load
+     * @param forceRead force to re-read files that have already been read
+     */
+    void loadRules(const QStringList& fileNames, bool forceRead = false);
+
+    /**
      * Deletes all rules within the engine
      */
     void flushRules();
-
 
     /**
      * Checks if there are rules available in the ruleEngine().
