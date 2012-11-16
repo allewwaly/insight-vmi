@@ -1,4 +1,4 @@
-<typeknowledge>
+<typeknowledge version="1">
 
     <ruleincludes>
         <ruleinclude>/tmp</ruleinclude>
@@ -12,7 +12,7 @@
     </scriptincludes>
 -->
 
-    <rules architecture="x86" os="linux">
+    <rules priority="100" architecture="x86" os="linux">
         <rule>
             <name>Hello</name>
             <filter>
@@ -22,7 +22,7 @@
                     <member>bar</member>
                 </members>
             </filter>
-            <action src="inline">
+            <action type="inline">
                 println("Hello, world");
             </action>
         </rule>
