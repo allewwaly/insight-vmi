@@ -308,8 +308,8 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                     }
                 }
             }
-            else if (members.isEmpty())
-                ret |= mrMatch;
+//            else if (members.isEmpty())
+//                ret |= mrMatch;
         }
         // Output information
         if (_verbose) {
