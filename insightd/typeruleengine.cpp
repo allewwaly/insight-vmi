@@ -199,7 +199,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     if (!inst || !inst->type())
         return mrNoMatch;
 
-    int ret = mrNoMatch, prio = 0;
+    int ret = mrNoMatch, prio = 0, usedRule = -1;
     *newInst = 0;
 
     ActiveRuleHash::const_iterator it = _rulesPerType.find(inst->type()->id()),
@@ -257,6 +257,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                             // the previous
                             if (rule->priority() > prio) {
                                 prio = rule->priority();
+                                usedRule = it.value().index;
                                 **newInst = instRet;
                                 ret &= ~mrMultiMatch;
                             }
@@ -266,6 +267,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                             {
                                 // Ambiguous rules
                                 ret |= mrMultiMatch;
+                                usedRule = -1;
                             }
                         }
                         // No, this is the first match
@@ -273,6 +275,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                             if (match) {
                                 ret |= mrMatch;
                                 prio = rule->priority();
+                                usedRule = it.value().index;
                             }
                             if (!(*newInst) && instRet.isValid()) {
                                 *newInst = new Instance(instRet);
@@ -294,10 +297,15 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     }
 
     if (_verbose) {
-        shell->out() << "  Result: ";
+        shell->out() << "==> Result: ";
+        if (usedRule >= 0)
+            shell->out() << "applied rule " << shell->color(ctBold)
+                         << (usedRule + 1) << shell->color(ctReset) << " ";
 
-        if (ret & mrMatch)
-            shell->out() << shell->color(ctMatched) << "matched ";
+        if (ret & mrMatch) {
+            shell->out() << "prio. " << prio << " "
+                         << shell->color(ctMatched) << "matched ";
+        }
         if (ret & mrDefer)
             shell->out() << shell->color(ctDeferred) << "deferred ";
         if (ret & mrMultiMatch)
@@ -343,10 +351,12 @@ void TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
         int w = ShellUtil::getFieldWidth(_rules.size(), 10);
         shell->out() << "Rule " << shell->color(ctBold)
                      << qSetFieldWidth(w) << right << (arule.index + 1)
-                     << qSetFieldWidth(0) << left << shell->color(ctReset)
-                     << " ";
+                     << qSetFieldWidth(0) << shell->color(ctReset)
+                     << " prio."
+                     << qSetFieldWidth(4) << right << arule.rule->priority()
+                     << qSetFieldWidth(0) << left << " ";
         if (skipped)
-            shell->out() << "is " << shell->color(ctDim) << "skipped";
+            shell->out() << shell->color(ctDim) << "skipped";
         else {
             if (matched & mrMatch) {
                 shell->out() << shell->color(ctMatched) << "matches";
