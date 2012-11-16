@@ -133,7 +133,7 @@ void ProgramOptions::cmdOptionsUsage()
     appName = appName.right(appName.length() - appName.lastIndexOf('/') - 1);
 
     std::cout
-        << "Usage: " << appName.toStdString() << " [options]" << std::endl
+        << "Usage: " << qPrintable(appName) << " [options]" << std::endl
         << "Possible options are:" << std::endl;
 
     for (int i = 0; i < OPTION_COUNT; i++) {
@@ -163,7 +163,7 @@ void ProgramOptions::cmdOptionsUsage()
         }
 
         std::cout
-            << "  " << std::left << std::setw(24) << opts.toStdString()
+            << "  " << std::left << std::setw(24) << qPrintable(opts)
             << "  " << options[i].help
             << std::endl;
     }
@@ -198,7 +198,7 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
                     // Check for conflicting options
                     if (_activeOptions & options[i].conflictOptions) {
                         std::cerr
-                            << "The option \"" << arg.toStdString()
+                            << "The option \"" << qPrintable(arg)
                             << "\" conflicts a previously given option."
                             << std::endl;
                         return false;
@@ -223,7 +223,7 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
                 }
             }
             if (!found) {
-                std::cerr << "Unknown option: " << arg.toStdString() << std::endl;
+                std::cerr << "Unknown option: " << qPrintable(arg) << std::endl;
                 return false;
             }
             break;
@@ -243,7 +243,7 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
             QFileInfo info(_fileName);
             if (!info.exists()) {
                 std::cerr
-                    << "The file or directory \"" << _fileName.toStdString()
+                    << "The file or directory \"" << qPrintable(_fileName)
                     << "\" does not exist." << std::endl;
                 return false;
             }
@@ -254,7 +254,7 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
         case ntMemFileName:
             if (!QFile::exists(arg)) {
                 std::cerr
-                    << "The file \"" << arg.toStdString()
+                    << "The file \"" << qPrintable(arg)
                     << "\" does not exist." << std::endl;
                 return false;
             }
