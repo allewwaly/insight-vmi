@@ -46,6 +46,7 @@ const char* inlineCode = "inline";
 const char* srcType = "sourcetype";
 const char* targetType = "targettype";
 const char* expression = "expression";
+const char* priority = "priority";
 }
 
 
@@ -146,7 +147,7 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
     }
 
     const XmlElement& elem = schema().element(name);
-    static const KeyValueStore filterAttr = OsFilter::supportedFilters();
+    static const KeyValueStore osFilterAttr = OsFilter::supportedFilters();
     OsFilter* osf = 0;
     QString attr;
 
@@ -157,14 +158,14 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
         // Compare attributes case-insensitive
         attr = atts.localName(i).toLower();
         // Is the attribute known to OsFilter?
-        if (filterAttr.contains(attr)) {
+        if (osFilterAttr.contains(attr)) {
             // Create a new OS filter, if not yet done
             if (!osf) {
                 // Are OS filters allowed here?
                 if (!elem.optionalAttributes.contains(attr))
                     typeRuleErrorLoc(QString("Operating system filters are not "
-                                          "allowed for element \"%1\".")
-                                  .arg(name));
+                                             "allowed for element \"%1\".")
+                                     .arg(name));
 
                 // Create new filter based on the stack top (if exists)
                 osf = _osfStack.isEmpty() ?
@@ -179,13 +180,23 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
             QStringList list(elem.requiredAttributes);
             list.append(elem.optionalAttributes);
             typeRuleErrorLoc(QString("Unknown attribute \"%1\" for element \"%2\". "
-                                  "Allowed attributes are: %3")
-                          .arg(attr)
-                          .arg(name)
-                          .arg(list.isEmpty() ? QString("(none)") : list.join(", ")));
+                                     "Allowed attributes are: %3")
+                             .arg(attr)
+                             .arg(name)
+                             .arg(list.isEmpty() ? QString("(none)") : list.join(", ")));
         }
-        else
+        else {
             attributes[attr] = atts.value(i);
+
+            if (attr == xml::priority) {
+                bool ok;
+                int prio = atts.value(i).toInt(&ok);
+                if (!ok)
+                    typeRuleErrorLoc(QString("Not a valid integer number: %1")
+                                     .arg(atts.value(i)));
+                _priorities.push(PriorityScope(name, prio));
+            }
+        }
     }
 
     // Did we find all required attributes?
@@ -314,6 +325,8 @@ bool TypeRuleParser::endElement(const QString &namespaceURI,
         if (!_children.top().contains(xml::action))
             typeRuleErrorLoc(QString("No action specified for rule in line %1.")
                              .arg(_rule->srcLine()));
+        // Set the priority
+        _rule->setPriority(_priorities.isEmpty() ? 0 : _priorities.top().prio);
         // Pass the rule on to the reader
         _reader->appendRule(_rule, _osfStack.isEmpty() ? 0 : _osfStack.top().osf);
         _rule = 0;
@@ -436,6 +449,10 @@ bool TypeRuleParser::endElement(const QString &namespaceURI,
         _osfStack.pop();
     }
 
+    // See if the scope of the priority is at its end
+    if (!_priorities.isEmpty() && _priorities.top().elem == name)
+        _priorities.pop();
+
     // Pop element from stack
     _elems.pop();
     _children.pop();
@@ -470,7 +487,8 @@ static XmlSchema ruleSchema;
 const XmlSchema &TypeRuleParser::schema()
 {
     if (ruleSchema.isEmpty()) {
-        const QStringList osfAttr(OsFilter::supportedFilters().keys());
+        QStringList osfAttr(OsFilter::supportedFilters().keys());
+        osfAttr.prepend(xml::priority);
         const QStringList empty, match(xml::match);
         QStringList children, intTypes, matchTypes, multiTypes;
 

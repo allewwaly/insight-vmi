@@ -501,7 +501,6 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                                         "returns the variable itself.")
                                             .arg(expr->toString())
                                             .arg(target->prettyName());
-                        debugmsg(skipReason);
                     }
                 }
 

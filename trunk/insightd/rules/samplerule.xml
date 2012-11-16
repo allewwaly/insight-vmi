@@ -12,7 +12,7 @@
 
 <!--    <include>morerules.xml</include>-->
 
-    <rules>
+    <rules priority="100" >
         <rule>
             <name>modules</name>
             <description>

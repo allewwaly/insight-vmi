@@ -65,11 +65,6 @@ void TypeRuleEngine::appendRule(TypeRule *rule, const OsFilter *osf)
     const OsFilter* filter = insertOsFilter(osf);
     rule->setOsFilter(filter);
     _rules.append(rule);
-
-    if (rule->filter()->filterActive(Filter::ftVarNameAll)) {
-        rule->setPriority(1);
-        debugmsg("Setting priority of rule to " << rule->priority());
-    }
 }
 
 
