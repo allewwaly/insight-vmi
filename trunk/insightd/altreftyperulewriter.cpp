@@ -512,6 +512,12 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                     continue;
                 }
 
+                // Calculate rules priority: each non-trivial transformation
+                // increases the prio, vars have a base of 10
+                int prio = nonTrivCnt;
+                if (!varName.isEmpty())
+                    prio += 10;
+
                 QString exprStr = expr->toString(true);
                 exprStr.replace("(" + varExp->baseType()->prettyName() + ")", _srcVar);
 
@@ -520,6 +526,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                     ruleName += "." + memberNames.join(".");
 
                 writer.writeStartElement(xml::rule); // rule
+                writer.writeAttribute(xml::priority, QString::number(prio));
 
                 writer.writeTextElement(xml::name, ruleName);
                 writer.writeTextElement(xml::description, expr->toString() +
