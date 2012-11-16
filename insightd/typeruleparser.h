@@ -35,6 +35,7 @@ extern const char* inlineCode;
 extern const char* srcType;
 extern const char* targetType;
 extern const char* expression;
+extern const char* priority;
 }
 
 /**
@@ -69,14 +70,25 @@ private:
     /// Binds an OS filter to its scope: the XML element it was specified for
     struct OsFilterScope
     {
-        OsFilterScope() {}
+        OsFilterScope(): osf(0) {}
         OsFilterScope(const QString& elem, const OsFilter* osf)
             : elem(elem), osf(osf) {}
         QString elem;
         const OsFilter *osf;
     };
-
     typedef QStack<OsFilterScope> OsFilterStack;
+
+    /// Binds a priority value to its scope: the XML element it was specified for
+    struct PriorityScope
+    {
+        PriorityScope(): prio(0) {}
+        PriorityScope(const QString& elem, int prio)
+            : elem(elem), prio(prio) {}
+        QString elem;
+        int prio;
+    };
+    typedef QStack<PriorityScope> PriorityStack;
+
 
     void handleError(const QString &severity, const QXmlParseException& exception);
 
@@ -84,6 +96,7 @@ private:
     QStack<QString> _elems;
     QStack< QSet<QString> > _children;
     QStack<KeyValueStore> _attributes;
+    PriorityStack _priorities;
     TypeRule* _rule;
     InstanceFilter* _filter;
     OsFilterStack _osfStack;
