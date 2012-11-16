@@ -42,6 +42,15 @@ public:
     void readFrom(const QString& fileName);
 
     /**
+     * Reads rules from file all files in list \a fileNames.
+     * @param fileNames list of input file
+     * @throws FileNotFoundException if \a fileName does not exist
+     * @throws IOException if read/write a error occurs
+     * @throws TypeRuleException in case of a parser error
+     */
+    void readFrom(const QStringList& fileNames);
+
+    /**
      * Returns the name of the file being currently processed.
      */
     inline const QString& currFile() const { return _currFile; }
