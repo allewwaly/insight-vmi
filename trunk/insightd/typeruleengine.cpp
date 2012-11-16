@@ -236,7 +236,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                 // Required no. of fields given ==> match
                 // However, we don't need to evaluate anymore non-high-prio
                 // rules if both mrMatch and mrMultiMatch are already set
-                else if (rule->filter()->members().size() == members.size() &&
+                else if (filter->members().size() == members.size() &&
                          (ret != (mrMatch|mrMultiMatch) || rule->priority() > prio))
                 {
                     match = true;
@@ -317,6 +317,89 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     }
 
     return ret;
+}
+
+template<class T>
+ActiveRuleList rulesMatchingTempl(const T *t, const ConstMemberList &members,
+                                  const ActiveRuleHash& rules,
+                                  const BaseType* (*get_type_func)(const T*))
+{
+    ActiveRuleList ret;
+    const BaseType* srcType;
+
+    if (!t || !(srcType = get_type_func(t)) )
+        return ret;
+
+    int prio = 0;
+    ActiveRuleHash::const_iterator it = rules.find(srcType->id()),
+            e = rules.end();
+
+    // Check out all matching rules
+    for (; it != e && it.key() == srcType->id(); ++it) {
+        const TypeRule* rule = it.value().rule;
+        const InstanceFilter* filter = rule->filter();
+
+        // Ignore rules with a lower priority than the previously matched one
+        if (rule->priority() >= prio && filter &&
+            filter->members().size() == members.size() &&
+            rule->match(t))
+        {
+            bool match = true;
+            for (int i = 0; match && i < members.size(); ++i)
+                if (!filter->members().at(i).match(members[i]))
+                    match = false;
+             if (!match)
+                    continue;
+            // If this rule has higher priority, remove all other rules
+            if (rule->priority() > prio)
+                ret.clear();
+            if (ret.isEmpty())
+                prio = rule->priority();
+            // Append this rule to the list
+            ret += it.value();
+        }
+    }
+
+    return ret;
+}
+
+
+inline const BaseType* get_inst_type(const Instance* inst)
+{
+    return inst->type();
+}
+
+
+ActiveRuleList TypeRuleEngine::rulesMatching(const Instance *inst,
+                                             const ConstMemberList &members) const
+{
+    return rulesMatchingTempl(inst, members, _rulesPerType, &get_inst_type);
+}
+
+
+inline const BaseType* get_var_type(const Variable* var)
+{
+    return var->refType();
+}
+
+
+ActiveRuleList TypeRuleEngine::rulesMatching(const Variable *var,
+                                             const ConstMemberList &members) const
+{
+    return rulesMatchingTempl(var, members, _rulesPerType, &get_var_type);
+}
+
+
+inline const BaseType* get_bt_type(const BaseType* type)
+{
+    return type;
+}
+
+
+ActiveRuleList TypeRuleEngine::rulesMatching(const BaseType *type,
+                                             const ConstMemberList &members) const
+{
+    return rulesMatchingTempl(type, members, _rulesPerType, &get_bt_type);
 }
 
 

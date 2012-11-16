@@ -18,6 +18,8 @@ class OsFilter;
 class OsSpecs;
 class Instance;
 class ScriptEngine;
+class Variable;
+class BaseType;
 
 typedef QSharedPointer<const QScriptProgram> QScriptProgramPtr;
 
@@ -200,6 +202,36 @@ public:
      */
     int match(const Instance* inst, const ConstMemberList &members,
               Instance **newInst) const;
+
+    /**
+     * Returns a list of all rules that match instance \a inst.
+     * @param inst instance to match
+     * @param members accessed members, originating from the structure pointed
+     *  to by \a inst
+     * @return list of matching rules
+     */
+    ActiveRuleList rulesMatching(const Instance* inst,
+                                 const ConstMemberList &members) const;
+
+    /**
+     * Returns a list of all rules that match variable \a var.
+     * @param var variable to match
+     * @param members accessed members, originating from the structure pointed
+     *  to by \a inst
+     * @return list of matching rules
+     */
+    ActiveRuleList rulesMatching(const Variable* var,
+                                 const ConstMemberList &members) const;
+
+    /**
+     * Returns a list of all rules that match type \a type.
+     * @param type base type to match
+     * @param members accessed members, originating from the structure pointed
+     *  to by \a inst
+     * @return list of matching rules
+     */
+    ActiveRuleList rulesMatching(const BaseType* type,
+                                 const ConstMemberList &members) const;
 
     /**
      * Returns the current verbose mode for rule evaluation.
