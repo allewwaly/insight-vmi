@@ -402,18 +402,40 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers_initializer(
     if (!memberName.isEmpty()){
         StructuredMember *member = (StructuredMember*) structured->member(memberName);
         if(member){
-            if(member->hasNotConstValue() || 
-               !(localNode->u.assignment_expression.initializer &&
-                 localNode->u.assignment_expression.initializer->u.initializer.assignment_expression &&
-                 localNode->u.assignment_expression.initializer->u.initializer.assignment_expression
-                          ->u.assignment_expression.conditional_expression)) return;
+            //Member is not constant
+            if(member->hasNotConstValue()){
+                return;
+            }
+            //Member may have constant value
+            else if(localNode->u.assignment_expression.initializer &&
+                    localNode->u.assignment_expression.initializer->u.initializer.assignment_expression &&
+                    localNode->u.assignment_expression.initializer->u.initializer.assignment_expression
+                             ->u.assignment_expression.conditional_expression)
+            {
+                evaluateMagicNumbers_constant(localNode->u.assignment_expression.initializer
+                        ->u.initializer.assignment_expression
+                        ->u.assignment_expression.conditional_expression,
+                        &intConst, &resultInt, 
+                        &stringConst, &resultString,
+                        string);
+            }
+            //Member itself is a struct with an own initializer
+            else if(localNode->u.assignment_expression.initializer &&
+                    localNode->u.assignment_expression.initializer->u.initializer.initializer_list){
+                //Have a look on internal object
 
-            evaluateMagicNumbers_constant(localNode->u.assignment_expression.initializer
-                    ->u.initializer.assignment_expression
-                    ->u.assignment_expression.conditional_expression,
-                    &intConst, &resultInt, 
-                    &stringConst, &resultString,
-                    string);
+                const Structured* memberStruct = dynamic_cast<const Structured*>(member->refType());
+                ASTNodeList* initList = localNode->u.assignment_expression.initializer->u.initializer.initializer_list;
+                while(initList){
+                    if(initList->item->u.initializer.assignment_expression){
+                        evaluateMagicNumbers_initializer(initList->item, memberStruct, string);
+                    }else{
+                        //TODO debug!
+                    }
+                    initList = initList->next;
+                }
+                return;
+            }
 
             if ((!intConst && !stringConst)){
                 member->evaluateMagicNumberFoundNotConstant();
