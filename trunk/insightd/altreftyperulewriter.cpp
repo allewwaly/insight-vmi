@@ -414,6 +414,12 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                             break;
                         }
 
+                        // Skip all anonymous members
+                        while (m_idx < memberNames.size() &&
+                               !trans.member.isEmpty() &&
+                               memberNames[m_idx].isEmpty())
+                            ++m_idx;
+
                         // We expect that the members in the array match the ones
                         // within the transformations
                         if (m_idx < memberNames.size() &&
@@ -522,8 +528,10 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 exprStr.replace("(" + varExp->baseType()->prettyName() + ")", _srcVar);
 
                 QString ruleName(varName.isEmpty() ? srcType->name() : varName);
-                if (!memberNames.isEmpty())
+                if (!memberNames.isEmpty()) {
                     ruleName += "." + memberNames.join(".");
+                    ruleName.replace(QRegExp("\\.\\.+"), ".");
+                }
 
                 writer.writeStartElement(xml::rule); // rule
                 writer.writeAttribute(xml::priority, QString::number(prio));
