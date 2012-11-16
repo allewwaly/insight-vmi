@@ -52,12 +52,12 @@ function printList(p)
 	// Find the candidate index for tasks.next that is compatible to a
 	// task_struct instance
 	var cndIdx = -1;
-	var cnt = p.tasks.MemberCandidatesCount("next");
-	for (var i = 0; i < cnt && cndIdx < 0; ++i) {
-		if (p.tasks.MemberCandidateCompatible("next", i)) {
-			cndIdx = i;
-		}
-	}
+//	var cnt = p.tasks.MemberCandidatesCount("next");
+//	for (var i = 0; i < cnt && cndIdx < 0; ++i) {
+//		if (p.tasks.MemberCandidateCompatible("next", i)) {
+//			cndIdx = i;
+//		}
+//	}
 //	println("Using candidate", cndIdx, "for \"tasks.next\"");
 	
 	printHdr();

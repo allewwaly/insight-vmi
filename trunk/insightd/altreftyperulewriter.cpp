@@ -389,11 +389,12 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 // Look for unsupported transformations in the form of
                 // 'member,dereference,member', e.g. 's->foo->bar'
                 bool m_found = false, m_deref_found = false;
-                int m_idx = 0;
+                int m_idx = 0, nonTrivCnt = 0;
                 foreach (const SymbolTransformation& trans,
                          varExp->transformations())
                 {
                     if (trans.type == ttMember) {
+                        ++nonTrivCnt;
                         if (!m_found) {
                             m_found = true;
                             // For the first member, skip any pointer if required
@@ -447,6 +448,8 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                                     ->refTypeDeep(BaseType::trLexical);
                     }
                     else if (trans.type & (ttDereference|ttArray)) {
+                        if (trans.arrayIndex > 0)
+                            ++nonTrivCnt;
                         if (m_found)
                             m_deref_found = true;
                         // Type must be a pointer or array
@@ -467,6 +470,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                                         BaseType::trLexicalPointersArrays, 1);
                     }
                     else if (trans.type == ttFuncCall) {
+                        ++nonTrivCnt;
                         type = type->dereferencedBaseType(
                                     BaseType::trLexicalPointersArrays, 1);
                         if (!(type->type() & (FunctionTypes))) {
@@ -481,6 +485,23 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                         else
                             type = type->dereferencedBaseType(
                                         BaseType::trLexical|FunctionTypes);
+                    }
+                }
+
+                // Is this a trivial expression that just returns itself?
+                if (nonTrivCnt == 0) {
+                    ASTConstExpressionList list = expr->flaten();
+                    const BaseType* targetNonPtr = target->dereferencedBaseType();
+                    if (list.size() == 1 && (srcTypeNonPtr == targetNonPtr ||
+                                             *srcTypeNonPtr == *targetNonPtr))
+                    {
+                        skip = true;
+                        skipReason =
+                                QString("Expression %0 => '%1' is trivial and just "
+                                        "returns the variable itself.")
+                                            .arg(expr->toString())
+                                            .arg(target->prettyName());
+                        debugmsg(skipReason);
                     }
                 }
 
