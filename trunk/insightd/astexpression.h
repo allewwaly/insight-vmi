@@ -61,6 +61,8 @@ const char* expressionTypeToString(ExpressionTypes type);
  */
 class ASTExpression
 {
+    friend class ASTBinaryExpression;
+    friend class ASTUnaryExpression;
 public:
     ASTExpression() : _alternative(0) {}
 
@@ -72,6 +74,21 @@ public:
                                 bool recursive = true) const = 0;
     virtual ASTExpression* copy(ASTConstExpressionList& list,
                                 bool recursive = true) const = 0;
+
+    inline ASTExpressionList flaten()
+    {
+        ASTExpressionList list;
+        flaten(list);
+        return list;
+    }
+
+    inline ASTConstExpressionList flaten() const
+    {
+        ASTConstExpressionList list;
+        flaten(list);
+        return list;
+    }
+
     virtual ASTConstExpressionList expandAlternatives(ASTConstExpressionList &list) const;
     virtual QString toString(bool compact = false) const = 0;
 
@@ -133,6 +150,16 @@ protected:
         if (recursive && _alternative)
             expr->_alternative = _alternative->copy(list, recursive);
         return expr;
+    }
+
+    inline virtual void flaten(ASTExpressionList& list)
+    {
+        list += this;
+    }
+
+    inline virtual void flaten(ASTConstExpressionList& list) const
+    {
+        list += this;
     }
 
     inline virtual void findExpressions(ExpressionTypes type,
@@ -573,17 +600,32 @@ protected:
         return expr;
     }
 
+    inline virtual void flaten(ASTExpressionList& list)
+    {
+        ASTExpression::flaten(list);
+        if (_left)
+            _left->flaten(list);
+        if (_right)
+            _right->flaten(list);
+    }
 
-    QString operatorToString() const;
+    inline virtual void flaten(ASTConstExpressionList& list) const
+    {
+        ASTExpression::flaten(list);
+        if (_left)
+            _left->flaten(list);
+        if (_right)
+            _right->flaten(list);
+    }
 
     inline virtual void findExpressions(ExpressionTypes type,
                                         ASTExpressionList* list)
     {
         ASTExpression::findExpressions(type, list);
         if (_left)
-            list->append(_left->findExpressions(type));
+            _left->findExpressions(type, list);
         if (_right)
-            list->append(_right->findExpressions(type));
+            _right->findExpressions(type, list);
     }
 
 
@@ -592,10 +634,12 @@ protected:
     {
         ASTExpression::findExpressions(type, list);
         if (_left)
-            list->append(((const ASTExpression*)_left)->findExpressions(type));
+            _left->findExpressions(type, list);
         if (_right)
-            list->append(((const ASTExpression*)_right)->findExpressions(type));
+            _right->findExpressions(type, list);
     }
+
+    QString operatorToString() const;
 
     ExpressionType _type;
     ASTExpression* _left;
@@ -667,14 +711,26 @@ protected:
     template<class list_t>
     ASTExpression* copyUnaryTempl(list_t& list, bool recursive) const;
 
-    QString operatorToString() const;
+    inline void flaten(ASTExpressionList& list)
+    {
+        ASTExpression::flaten(list);
+        if (_child)
+            _child->flaten(list);
+    }
+
+    inline void flaten(ASTConstExpressionList& list) const
+    {
+        ASTExpression::flaten(list);
+        if (_child)
+            _child->flaten(list);
+    }
 
     inline virtual void findExpressions(ExpressionTypes type,
                                         ASTExpressionList* list)
     {
         ASTExpression::findExpressions(type, list);
         if (_child)
-            list->append(_child->findExpressions(type));
+            _child->findExpressions(type, list);
     }
 
     inline virtual void findExpressions(ExpressionTypes type,
@@ -682,8 +738,10 @@ protected:
     {
         ASTExpression::findExpressions(type, list);
         if (_child)
-            list->append(((const ASTExpression*)_child)->findExpressions(type));
+            _child->findExpressions(type, list);
     }
+
+    QString operatorToString() const;
 
     ExpressionType _type;
     ASTExpression* _child;
