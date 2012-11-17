@@ -435,9 +435,15 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
     bool m = false;
     Instance ret;
     if (arule.rule->action()) {
-        ret = arule.rule->action()->evaluate(inst, members, _eng, &m);
-        if (matched)
-            *matched = m;
+        try {
+            ret = arule.rule->action()->evaluate(inst, members, _eng, &m);
+            if (matched)
+                *matched = m;
+        }
+        catch (GenericException& e) {
+            errRule(arule.rule, arule.index, QString("raised an exception."));
+            throw;
+        }
     }
     ret.setOrigin(Instance::orRuleEngine);
     return ret;
