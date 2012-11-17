@@ -1261,18 +1261,29 @@ int Shell::cmdListTypesUsing(QStringList args)
         return ecInvalidArguments;
     }
 
+    QList<BaseType*> types;
     QString s = args.front();
     if (s.startsWith("0x"))
         s = s.right(s.size() - 2);
     bool ok = false;
     int id = (int)s.toUInt(&ok, 16);
 
-    if (!ok) {
-        errMsg( "Invalid type ID given.");
-        return ecInvalidId;
+    // Did we parse an ID?
+    if (ok) {
+        types = _sym.factory().typesUsingId(id);
     }
+    // No ID given, so try to find the type by name
+    else {
+        QList<BaseType*> tmp = _sym.factory().typesByName().values(s);
+        if (tmp.isEmpty()) {
+            errMsg("No type found with that name.");
+            return ecInvalidId;
 
-    QList<BaseType*> types = _sym.factory().typesUsingId(id);
+        }
+
+        for (int i = 0; i < tmp.size(); ++i)
+            types += _sym.factory().typesUsingId(tmp[i]->id());
+    }
 
     if (types.isEmpty()) {
         if (_sym.factory().equivalentTypes(id).isEmpty()) {
