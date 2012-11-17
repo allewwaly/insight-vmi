@@ -4,6 +4,7 @@
 #include "instance.h"
 #include "structured.h"
 #include "symfactory.h"
+#include "refbasetype.h"
 
 
 const char* expressionTypeToString(ExpressionTypes type)
@@ -241,18 +242,30 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
     const uint instHash = inst->type()->hash();
 
     if (_transformations.isEmpty()) {
-        // Check if the type hashes match.
-        if (instHash == _baseType->hash() ||
-            instHash ==
-                _baseType->dereferencedBaseType(BaseType::trLexical)->hash())
-            return inst->toExpressionResult();
-        else
-            exprEvalError(QString("Type hash of instance \"%1\" (0x%2) is different "
-                                  "from our type \"%3\" (0x%4)")
-                          .arg(inst->type()->prettyName())
-                          .arg((uint)inst->type()->id(), 0, 16)
-                          .arg(_baseType->prettyName())
-                          .arg((uint)_baseType->id(), 0, 16));
+        // Check if the type hashes match. If we except a pointer type but the
+        // given instance is the corresponding object, we take its address as
+        // the result
+        const BaseType* t = _baseType;
+        bool takeAddress = false;
+        do {
+            if (instHash == t->hash())
+                return inst->toExpressionResult(takeAddress);
+            // Dereference the type, if possible
+            if (t->type() & RefBaseTypes) {
+                if (t->type() & (rtPointer|rtArray))
+                    takeAddress = true;
+                t = dynamic_cast<const RefBaseType*>(t)->refType();
+            }
+            else
+                break;
+        } while (t);
+
+        exprEvalError(QString("Type hash of instance \"%1\" (0x%2) is different "
+                              "from our type \"%3\" (0x%4)")
+                      .arg(inst->type()->prettyName())
+                      .arg((uint)inst->type()->id(), 0, 16)
+                      .arg(_baseType->prettyName())
+                      .arg((uint)_baseType->id(), 0, 16));
     }
 
     const BaseType* bt = _baseType;
