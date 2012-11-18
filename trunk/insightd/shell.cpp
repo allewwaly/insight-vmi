@@ -1750,7 +1750,7 @@ int Shell::cmdListVarsUsing(QStringList args)
 
     // Find out required field width (the types are sorted by ascending ID)
     QSize tsize = ShellUtil::termSize();
-    int w_id = ShellUtil::getFieldWidth(vars.last()->id());
+    int w_id = vars.isEmpty() ? 0 : ShellUtil::getFieldWidth(vars.last()->id());
     if (!varsIndirect.isEmpty())
         w_id = qMax(w_id, ShellUtil::getFieldWidth(varsIndirect.last().first->id()));
     const int w_datatype = 12;
@@ -3099,7 +3099,7 @@ int Shell::cmdShow(QStringList args)
             for (int i = 1; i < expr.size(); ++i) {
                 int ptrs = 0;
                 const Structured* s = 0;
-                bt = bt->dereferencedBaseType(BaseType::trLexicalAndPointers,
+                bt = bt->dereferencedBaseType(BaseType::trLexicalPointersArrays,
                                               -1, &ptrs);
                 // Reset context struct and members after pointer dereferences
                 // except for the first member
@@ -3109,8 +3109,10 @@ int Shell::cmdShow(QStringList args)
                     members.clear();
                 }
 
-                if (! (s = dynamic_cast<const Structured*>(bt)) )
-                    errorMsg = "Not a struct or a union: ";
+                if (! (s = dynamic_cast<const Structured*>(bt)) ) {
+                    errorMsg = "Not a struct or a union, but a \"" +
+                            bt->prettyName() + "\": ";
+                }
                 else if ( (m = s->member(expr[i])) )
                     bt = m->refType();
                 else {
