@@ -314,6 +314,11 @@ Instance MemoryDump::getNextInstance(const QString& component,
 		}
 	}
 	else {
+		// Did we get a null instance?
+		if (!(instance.type()->type() & StructOrUnion) &&
+			(instance.isNull() || !instance.toPointer()))
+			queryError(QString("Member \"%1\" is null")
+					   .arg(instance.fullName()));
 		// We have a instance therefore we resolve the member
 		if (!(instance.type()->type() & StructOrUnion))
             queryError(QString("Member \"%1\" is not a struct or union")
