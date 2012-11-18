@@ -33,7 +33,7 @@
                 <expression>src->next - 4</expression>
             </action>
 
-<!--            <action type="file" file="samplerule.js">getModules</action>-->
+<!--            <action type="function" file="samplerule.js">getModules</action>-->
 <!--            <action type="inline">
                 var inst = arguments[0];
                 var members = arguments[1];
@@ -58,7 +58,7 @@
                     <member match="any" />
                 </members>
             </filter>
-            <action type="file" file="samplerule.js">getModuleList</action>
+            <action type="function" file="samplerule.js">getModuleList</action>
 <!--            <action type="inline">
                 var inst = arguments[0];
                 var members = arguments[1];
