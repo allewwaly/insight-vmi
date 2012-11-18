@@ -309,3 +309,49 @@ struct vfsmount *alloc_vfsmnt(const char *name)
 More examples:
  * hd_struct.dkstats: http://lxr.linux.no/#linux+v2.6.32.58/include/linux/genhd.h#L252
  * percpu_counter.counters: http://lxr.linux.no/#linux+v2.6.32.58/lib/percpu_counter.c#L29
+
+
+*Type rules handling these cases:*
+{{{
+<rule priority="90">
+	<name>per_cpu__*</name>
+	<description>Returns the first entry of a per-cpu variable for x86.</description>
+	<filter>
+		<variablename match="wildcard">per_cpu__*</variablename>
+	</filter>
+	<action type="inline">
+		var inst = arguments[0];
+		var offsets = new Instance("__per_cpu_offset");
+		// Is this an SMP system?
+		if (offsets.IsValid()) {
+			var offset = offsets.ArrayElem(0);
+			inst.AddToAddress(offset.toULong(16));
+		}
+		return inst;
+	</action>
+</rule>
+
+<rule priority="101">
+	<name>vfsmount.mnt_writer</name>
+	<description>Member "mnt_writer" is a per-cpu variable.</description>
+	<filter>
+		<datatype>struct</datatype>
+		<typename>vfsmount</typename>
+		<members>
+			<member>mnt_writers</member>
+		</members>
+	</filter>
+	<action type="inline">
+		var inst = arguments[0];
+		var members = arguments[1];
+		inst = inst.Member(members[0]);
+		var offsets = new Instance("__per_cpu_offset");
+		// Is this an SMP system?
+		if (offsets.IsValid()) {
+			var offset = offsets.ArrayElem(0);
+			inst.AddToAddress(offset.toULong(16));
+		}
+		return inst;
+	</action>
+</rule>
+}}}
