@@ -400,7 +400,7 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers_initializer(
     }
     
     if (!memberName.isEmpty()){
-        StructuredMember *member = (StructuredMember*) structured->member(memberName);
+        StructuredMember *member = const_cast<StructuredMember*>(structured->member(memberName));
         if(member){
             //Member is not constant
             if(member->hasNotConstValue()){
@@ -424,7 +424,20 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers_initializer(
                     localNode->u.assignment_expression.initializer->u.initializer.initializer_list){
                 //Have a look on internal object
 
-                const Structured* memberStruct = dynamic_cast<const Structured*>(member->refType());
+                // Dereference all lexical types (typedef/const/volatile)
+                const Structured* memberStruct =
+                        dynamic_cast<const Structured*>(member->refTypeDeep(BaseType::trLexical));
+
+                // Make sure the pointer is valid!
+                if (!memberStruct) {
+                    debugerr(QString("Member \"%1\" in %2 (0x%3) is not a struct/union, but \"%4\".")
+                             .arg(memberName)
+                             .arg(structured->prettyName())
+                             .arg((uint)structured->id(), 0, 16)
+                             .arg(member->refTypeDeep(BaseType::trLexical)->prettyName()));
+                    return;
+                }
+
                 ASTNodeList* initList = localNode->u.assignment_expression.initializer->u.initializer.initializer_list;
                 while(initList){
                     if(initList->item->u.initializer.assignment_expression){
