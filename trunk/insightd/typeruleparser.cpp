@@ -42,6 +42,7 @@ const char* members = "members";
 const char* action = "action";
 const char* type = "type";
 const char* file = "file";
+const char* function = "function";
 const char* inlineCode = "inline";
 const char* srcType = "sourcetype";
 const char* targetType = "targettype";

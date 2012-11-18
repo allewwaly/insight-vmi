@@ -31,6 +31,7 @@ extern const char* members;
 extern const char* action;
 extern const char* type;
 extern const char* file;
+extern const char* function;
 extern const char* inlineCode;
 extern const char* srcType;
 extern const char* targetType;
