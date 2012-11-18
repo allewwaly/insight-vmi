@@ -201,6 +201,14 @@ public slots:
     void AddToAddress(int offset);
 
     /**
+     * Adds \a offset to the virtual address. The address must be given as hex
+     * encoded string, which may optionally start with "0x".
+     * @param offset the hex encoded offset to add
+     * \sa Address(), SetAddress()
+     */
+    void AddToAddress(QString offset);
+
+    /**
      * Treats this Instance as an array and returns a new instance
      * at index \a index. The behavior depends on the Type():
      *

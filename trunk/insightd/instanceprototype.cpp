@@ -102,6 +102,22 @@ void InstancePrototype::AddToAddress(int offset)
 }
 
 
+void InstancePrototype::AddToAddress(QString offset)
+{
+    Instance* inst = thisInstance();
+    if (!inst)
+        return;
+    bool ok = false;
+    if (offset.startsWith("0x"))
+        offset.remove(0, 2);
+    quint64 off = offset.toULongLong(&ok, 16);
+    if (ok)
+        inst->addToAddress(off);
+    else
+        injectScriptError(QString("Illegal hex number: %1").arg(offset));
+}
+
+
 Instance InstancePrototype::ArrayElem(int index) const
 {
     Instance* inst = thisInstance();
