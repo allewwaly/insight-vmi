@@ -1727,11 +1727,12 @@ int Shell::cmdListVarsUsing(QStringList args)
             vars += _sym.factory().varsUsingId(types[i]->id());
     }
 
+    const int max_vars_indirect = 30;
     // Find some indirect type usages if we don't have many variables
     QList<QPair<const Variable*, QStringList> > varsIndirect;
     if (vars.size() < 10) {
         foreach(const BaseType* type, types)
-            varsIndirect += varsUsingType(type, 30);
+            varsIndirect += varsUsingType(type, max_vars_indirect);
     }
 
     if (vars.isEmpty() && varsIndirect.isEmpty()) {
@@ -1906,6 +1907,10 @@ int Shell::cmdListVarsUsing(QStringList args)
 
         ++varCount;
     }
+
+    if (varsIndirect.size() >= max_vars_indirect)
+        _out << "(Recursive search for variables limited to "
+             << max_vars_indirect << ")" << endl;
 
     hline(w_total);
     _out << "Total variables: " << color(ctBold) << dec << varCount
