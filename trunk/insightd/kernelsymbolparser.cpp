@@ -392,7 +392,7 @@ void KernelSymbolParser::WorkerThread::parseParam(const ParamSymbolType param,
         }
         else
             parseInt(i, rxBound.cap(1), &ok);
-        if (i > 0)
+        if (i >= 0)
             _info->addUpperBound(i);
         break;
     }
