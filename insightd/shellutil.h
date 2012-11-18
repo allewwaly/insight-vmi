@@ -17,12 +17,18 @@ public:
 
     inline static QString abbrvStrRight(const QString& s, int width)
     {
-        if (s.size() > width)
+        if (s.size() > width) {
     #if 1 //defined(_WIN32)
-            return s.left(width - 3) + "...";
+            if (width > 3)
+                return s.left(width - 3) + "...";
+            else if (width > 0)
+                return QString(width, '.');
+            else
+                return QString();
     #else
             return s.left(width - 1) + QString::fromUtf8("…");
     #endif
+        }
         else
             return s;
     }
@@ -30,12 +36,18 @@ public:
 
     inline static QString abbrvStrLeft(const QString& s, int width)
     {
-        if (s.size() > width)
+        if (s.size() > width) {
     #if 1 //defined(_WIN32)
-            return "..." + s.right(width - 3);
+            if (width > 3)
+                return "..." + s.right(width - 3);
+            else if (width > 0)
+                return QString(width, '.');
+            else
+                return QString();
     #else
             return QString::fromUtf8("…") + s.right(width - 1);
     #endif
+        }
         else
             return s;
     }
