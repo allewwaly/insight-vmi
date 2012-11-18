@@ -69,6 +69,8 @@ private:
                const QString &varName, const BaseType *srcType,
                const ConstMemberList &members) const;
 
+    void writeComment(QXmlStreamWriter &writer, QString comment) const;
+
     void openXmlRuleFile(QFile& outFile, QXmlStreamWriter& writer,
                          const QString &comment) const;
 
