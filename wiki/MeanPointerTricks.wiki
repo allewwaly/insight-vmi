@@ -192,6 +192,36 @@ static inline void *radix_tree_indirect_to_ptr(void *ptr)
 }
 }}}
 
+*Type rule handling this case:*
+{{{
+<rule priority="101">
+	<name>radix_tree_root.rnode</name>
+	<description>
+		Based on the last bit of the pointer that points to the next
+		node in a radix tree, the pointer may either be directly
+		dereferenceable or not.
+	</description>
+	<filter>
+		<datatype>struct</datatype>
+		<typename>radix_tree_root</typename>
+		<members>
+			<member>rnode</member>
+		</members>
+	</filter>
+	<action type="inline">
+		var RADIX_TREE_INDIRECT_PTR = 1;
+		var root = arguments[0];
+		var rnode = root.rnode;
+		if (!rnode.IsNull()) {
+			var addr_low = rnode.AddressLow();
+			if (addr_low &amp; RADIX_TREE_INDIRECT_PTR)
+				rnode.SetAddressLow(addr_low &amp; ~RADIX_TREE_INDIRECT_PTR);
+		}
+		return rnode;
+	</action>
+</rule>
+}}}
+
 = Percpu Variables =
 http://lxr.linux.no/#linux+v2.6.32.58/include/linux/percpu.h#L191
 
