@@ -21,6 +21,7 @@
 #include <QMutexLocker>
 #include <QTimer>
 #include <QBitArray>
+#include <QStack>
 #include <bugreport.h>
 #include "compileunit.h"
 #include "variable.h"
@@ -1610,9 +1611,82 @@ int Shell::printVarList(const VariableFilter *filter)
 }
 
 
-bool cmpVarIdLessThan(const Variable* v1, const Variable* v2)
+QList<QPair<const BaseType*, QStringList> >
+Shell::typesUsingTypeRek(const BaseType* usedType, const QStringList& members,
+                         int depth, QStack<int>& visited) const
+{
+    QList<QPair<const BaseType*, QStringList> > ret;
+    if (depth < 0 || visited.contains(usedType->id()))
+        return ret;
+
+    visited.push(usedType->id());
+    BaseTypeList types = _sym.factory().typesUsingId(usedType->id());
+
+    foreach(const BaseType* t, types) {
+        // For structs/unions, find the member that uses usedType
+        if (t->type() & StructOrUnion) {
+            if (depth > 0) {
+                const Structured* s = dynamic_cast<const Structured*>(t);
+                foreach (const StructuredMember* m, s->members()) {
+                    if (*m->refType() == *usedType) {
+                        QStringList mbrs(members);
+                        if (!m->name().isEmpty())
+                            mbrs.prepend(m->name());
+                        ret += typesUsingTypeRek(t, mbrs, depth - 1, visited);
+                    }
+                }
+            }
+        }
+        else {
+            if (depth == 0)
+                ret += QPair<const BaseType*, QStringList>(t, members);
+            if (!(t->type() & FunctionTypes))
+                ret += typesUsingTypeRek(t, members, depth, visited);
+        }
+    }
+
+    visited.pop();
+    return ret;
+}
+
+
+QList<QPair<const Variable*, QStringList> >
+Shell::varsUsingType(const BaseType* usedType, int maxCount) const
+{
+    QList<QPair<const Variable*, QStringList> > ret;
+
+    int depth = 0;
+    while (ret.size() < maxCount && depth <= 5) {
+        QStack<int> visited;
+        QList<QPair<const BaseType*, QStringList> > list =
+                typesUsingTypeRek(usedType, QStringList(), depth, visited);
+
+        for (int i = 0; i < list.size(); ++i) {
+            // Find variables using that type
+            VariableList vars = _sym.factory().varsUsingId(list[i].first->id());
+
+            // Add each variable along with the members to the result
+            foreach(const Variable* v, vars)
+                ret += QPair<const Variable*, QStringList>(v, list[i].second);
+        }
+
+        ++depth;
+    }
+
+    return ret;
+}
+
+
+inline bool cmpVarIdLessThan(const Variable* v1, const Variable* v2)
 {
     return ((uint)v1->id()) < ((uint)v2->id());
+}
+
+
+inline bool cmpPairVarIdLessThan(const QPair<const Variable*, QStringList>& v1,
+                                 const QPair<const Variable*, QStringList>& v2)
+{
+    return ((uint)v1.first->id()) < ((uint)v2.first->id());
 }
 
 
@@ -1625,6 +1699,7 @@ int Shell::cmdListVarsUsing(QStringList args)
     }
 
     QList<Variable*> vars;
+    QList<BaseType*> types;
 
     QString s = args.front();
     if (s.startsWith("0x"))
@@ -1634,11 +1709,14 @@ int Shell::cmdListVarsUsing(QStringList args)
 
     // Did we parse an ID?
     if (ok) {
-        vars = _sym.factory().varsUsingId(id);
+        if (_sym.factory().typesById().contains(id)) {
+            vars = _sym.factory().varsUsingId(id);
+            types += _sym.factory().findBaseTypeById(id);
+        }
     }
     // No ID given, so try to find the type by name
     else {
-        QList<BaseType*> types = _sym.factory().typesByName().values(s);
+        types = _sym.factory().typesByName().values(s);
         if (types.isEmpty()) {
             errMsg("No type found with that name.");
             return ecInvalidId;
@@ -1649,7 +1727,14 @@ int Shell::cmdListVarsUsing(QStringList args)
             vars += _sym.factory().varsUsingId(types[i]->id());
     }
 
-    if (vars.isEmpty()) {
+    // Find some indirect type usages if we don't have many variables
+    QList<QPair<const Variable*, QStringList> > varsIndirect;
+    if (vars.size() < 10) {
+        foreach(const BaseType* type, types)
+            varsIndirect += varsUsingType(type, 30);
+    }
+
+    if (vars.isEmpty() && varsIndirect.isEmpty()) {
         if (ok && _sym.factory().equivalentTypes(id).isEmpty()) {
             errMsg(QString("No type with id %1 found.").arg(args.front()));
             return ecInvalidId;
@@ -1661,10 +1746,13 @@ int Shell::cmdListVarsUsing(QStringList args)
     }
 
     qSort(vars.begin(), vars.end(), cmpVarIdLessThan);
+    qSort(varsIndirect.begin(), varsIndirect.end(), cmpPairVarIdLessThan);
 
     // Find out required field width (the types are sorted by ascending ID)
     QSize tsize = ShellUtil::termSize();
-    const int w_id = ShellUtil::getFieldWidth(vars.last()->id());
+    int w_id = ShellUtil::getFieldWidth(vars.last()->id());
+    if (!varsIndirect.isEmpty())
+        w_id = qMax(w_id, ShellUtil::getFieldWidth(varsIndirect.last().first->id()));
     const int w_datatype = 12;
     const int w_size = 5;
     const int w_src = 20;
@@ -1673,7 +1761,7 @@ int Shell::cmdListVarsUsing(QStringList args)
     int avail = tsize.width() - (w_id + w_datatype + w_size +  w_src + 5*w_colsep + 1);
     if (avail < 0)
         avail = 2*24;
-    const int w_name = (avail + 1) / 2;
+    const int w_name = varsIndirect.isEmpty() ? (avail + 1) / 2 : ((avail + 1) / 3) << 1;
     const int w_typename = avail - w_name;
     const int w_total = w_id + w_datatype + w_typename + w_name + w_size + w_src + 5*w_colsep;
 
@@ -1698,7 +1786,7 @@ int Shell::cmdListVarsUsing(QStringList args)
     CompileUnit* unit = 0;
 
     for (int i = 0; i < vars.size() && !_interrupted; i++) {
-        Variable* var = vars[i];
+        const Variable* var = vars[i];
 
         // Construct name and line of the source file
         QString s_src;
@@ -1740,7 +1828,6 @@ int Shell::cmdListVarsUsing(QStringList args)
             << qSetFieldWidth(w_datatype) << left << s_datatype
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(0) << s_typename
-//            << qSetFieldWidth(w_typename) << left << s_typename
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(0) << color(ctVariable)
             << qSetFieldWidth(w_name) << s_name
@@ -1749,9 +1836,73 @@ int Shell::cmdListVarsUsing(QStringList args)
             << qSetFieldWidth(w_size)  << right << right << s_size
             << qSetFieldWidth(w_colsep) << " "
             << qSetFieldWidth(w_src) << left << s_src
-//            << qSetFieldWidth(w_colsep) << " "
-//            << qSetFieldWidth(w_line) << right << dec << var->srcLine()
             << qSetFieldWidth(0) << endl;
+
+        ++varCount;
+    }
+
+    for (int i = 0; i < varsIndirect.size() && !_interrupted; i++) {
+        const Variable* var = varsIndirect[i].first;
+        const QStringList& members = varsIndirect[i].second;
+
+        // Construct name and line of the source file
+        QString s_src;
+        if (var->srcFile() >= 0) {
+            if (!unit || unit->id() != var->srcFile())
+                unit = _sym.factory().sources().value(var->srcFile());
+            if (!unit)
+                s_src = QString("(unknown id: %1)").arg(var->srcFile());
+            else
+                s_src = QString("%1").arg(unit->name());
+            // Shorten, if neccessary
+            s_src = ShellUtil::abbrvStrLeft(s_src, w_src);
+        }
+        else
+            s_src = "--";
+
+        // Find out the basic data type of this variable
+        const BaseType* base = var->refTypeDeep(BaseType::trLexical);
+        QString s_datatype = base ? realTypeToStr(base->type()) : "(undef)";
+
+        // Shorten the type name, if required
+        QString s_typename;
+        if (var->refType())
+            s_typename = prettyNameInColor(var->refType(), w_typename, w_typename);
+        else
+            s_typename = QString("%1%2").arg(color(ctKeyword)).arg("void", -w_typename);
+
+        QString s_name = ShellUtil::abbrvStrRight(
+                    var->name().isEmpty() ? "(none)" : var->name(), w_name);
+        int s_name_len = s_name.size();
+        s_name = color(ctVariable) + s_name + color(ctReset);
+        for (int i = 0; s_name_len < w_name && i < members.size(); ++i) {
+            s_name += ".";
+            ++s_name_len;
+            QString m = ShellUtil::abbrvStrRight(members[i], w_name - s_name_len);
+            s_name_len += m.size();
+            s_name += color(ctMember) + m + color(ctReset);
+        }
+        if (s_name_len < w_name)
+            s_name += QString(w_name - s_name_len, ' ');
+
+        QString s_size = var->refType() ?
+                    QString::number(var->refType()->size()) :
+                    QString("n/a");
+
+        _out << color(ctTypeId)
+             << qSetFieldWidth(w_id)  << right << hex << (uint)var->id()
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(0) << color(ctRealType)
+             << qSetFieldWidth(w_datatype) << left << s_datatype
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(0) << s_typename
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(0) << s_name
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_size)  << right << right << s_size
+             << qSetFieldWidth(w_colsep) << " "
+             << qSetFieldWidth(w_src) << left << s_src
+             << qSetFieldWidth(0) << endl;
 
         ++varCount;
     }

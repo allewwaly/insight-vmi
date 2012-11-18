@@ -310,6 +310,13 @@ private:
                        bool reverse = false);
     void printMatchingRules(const ActiveRuleList& rules, int indent);
     const TypeRule* parseRuleIndex(const QString& s);
+
+    QList<QPair<const BaseType*, QStringList> >
+    typesUsingTypeRek(const BaseType* usedType, const QStringList& members,
+                      int depth, QStack<int> &visited) const;
+
+    QList<QPair<const Variable*, QStringList> >
+    varsUsingType(const BaseType *usedType, int maxCount) const;
 //---------------------------------
 //    int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
