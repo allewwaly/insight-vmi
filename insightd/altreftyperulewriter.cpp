@@ -53,9 +53,9 @@ int AltRefTypeRuleWriter::write(const QString& name, const QString& baseDir)
 
         // Begin document with a comment including guest OS details
         writer.writeStartDocument();
-        writer.writeComment(QString("\nFile created on %1\n%2")
-                            .arg(QDateTime::currentDateTime().toString())
-                            .arg(specs.toString()));
+        writeComment(writer, QString("\nFile created on %1\n%2")
+                                .arg(QDateTime::currentDateTime().toString())
+                                .arg(specs.toString()));
 
         // Begin knowledge file
         writer.writeStartElement(xml::typeknowledge); // typeknowledge
@@ -294,7 +294,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
 
     int count = 0;
     const ExprResultTypes evalErr =
-            ExprResultTypes(erLocalVar|erParameter|erRuntime|erUndefined);
+            ExprResultTypes(erParameter|erRuntime|erUndefined);
 
     try {
         foreach(const AltRefType& art, altRefTypes) {
@@ -306,7 +306,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
             const BaseType* srcTypeNonTypedef =
                     srcType->dereferencedBaseType(BaseType::trLexical);
             const BaseType* srcTypeNonPtr =
-                    srcTypeNonTypedef->dereferencedBaseType(BaseType::trAny);
+                    srcTypeNonTypedef->dereferencedBaseType(BaseType::trLexicalPointersArrays);
             // Check if we can use the target name or if we need to use the ID
             int srcUseId = useTypeId(srcType);
 
@@ -326,13 +326,12 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 // Skip all expressions that we cannot evaluate
                 ExprResultTypes resType = expr->resultType();
                 if (resType & evalErr) {
-                    writer.writeComment(
-                                QString(" Cannot evaluate expression '%0' for "
-                                        "candidate %1.%2. ")
-                                        .arg(expr->toString())
-                                        .arg(srcType->name())
-                                        .arg(memberNames.join("."))
-                                        .replace("--", "- - ")); // avoid "--" in comments
+                    writeComment(writer,
+                                 QString("Cannot evaluate expression '%0' for "
+                                         "candidate %1.%2.")
+                                         .arg(expr->toString())
+                                         .arg(srcType->name())
+                                         .arg(memberNames.join(".")));
                     continue;
                 }
 
@@ -349,15 +348,14 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                         // does not match the given source type, we don't need
                         // to proceed
                         if (!veTypeNonPtr || *srcTypeNonPtr != *veTypeNonPtr) {
-                            writer.writeComment(
-                                        QString(" Source type in expression "
-                                                "'%1' does not match base type "
-                                                "'%2' of candidate %3.%4. ")
-                                                .arg(expr->toString())
-                                                .arg(srcType->prettyName())
-                                                .arg(srcType->name())
-                                                .arg(memberNames.join("."))
-                                                .replace("--", "- - ")); // avoid "--" in comments
+                            writeComment(writer,
+                                         QString(" Source type in expression "
+                                                 "'%1' does not match base type "
+                                                 "'%2' of candidate %3.%4. ")
+                                                 .arg(expr->toString())
+                                                 .arg(srcType->prettyName())
+                                                 .arg(srcType->name())
+                                                 .arg(memberNames.join(".")));
                             skip = true;
                             break;
                         }
@@ -511,10 +509,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 }
 
                 if (skip) {
-                    if (!skipReason.isEmpty()) {
-                        // avoid "--" in comments
-                        writer.writeComment(" " + skipReason.replace("--", "- - ") + " ");
-                    }
+                    writeComment(writer, skipReason);
                     continue;
                 }
 
@@ -553,8 +548,8 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                                                 srcTypeNonTypedef->name());
                 }
                 else {
-                    writer.writeComment(QString(" Source type '%1' is ambiguous ")
-                                            .arg(srcTypeNonTypedef->prettyName()));
+                    writeComment(writer, QString("Source type '%1' is ambiguous")
+                                                 .arg(srcTypeNonTypedef->prettyName()));
                     writer.writeTextElement(xml::type_id,
                                             QString("0x%0").arg((uint)srcUseId, 0, 16));
                 }
@@ -589,7 +584,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 if (!srcUseId)
                     writer.writeTextElement(xml::srcType, varExp->baseType()->prettyName(_srcVar));
                 else {
-                    writer.writeComment(QString(" Source type '%1' is ambiguous ")
+                    writeComment(writer, QString(" Source type '%1' is ambiguous ")
                                             .arg(srcType->prettyName()));
                     writer.writeTextElement(xml::srcType,
                                             QString("0x%0 %1")
@@ -600,7 +595,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 if (!targetUseId)
                     writer.writeTextElement(xml::targetType, target->prettyName());
                 else {
-                    writer.writeComment(QString(" Target type '%1' is ambiguous ").arg(target->prettyName()));
+                    writeComment(writer, QString(" Target type '%1' is ambiguous ").arg(target->prettyName()));
                     writer.writeTextElement(xml::targetType,
                                             QString("0x%0").arg((uint)targetUseId, 0, 16));
                 }
@@ -629,6 +624,21 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
 }
 
 
+void AltRefTypeRuleWriter::writeComment(QXmlStreamWriter &writer,
+                                        QString comment) const
+{
+    if (!comment.isEmpty()) {
+        // avoid "--" in comments
+        comment.replace("--", "- - ");
+        if (comment.startsWith(' ') || comment.startsWith('\n'))
+            writer.writeComment(comment);
+        else
+            writer.writeComment(" " + comment + " ");
+    }
+
+}
+
+
 void AltRefTypeRuleWriter::openXmlRuleFile(QFile& outFile,
                                            QXmlStreamWriter& writer,
                                            const QString& comment) const
@@ -645,10 +655,9 @@ void AltRefTypeRuleWriter::openXmlRuleFile(QFile& outFile,
 
     writer.writeStartDocument();
     // Begin document with a comment
-    QString c(comment);
-    writer.writeComment(QString("\nFile created on %1\n%2")
+    writeComment(writer, QString("\nFile created on %1\n%2")
                             .arg(QDateTime::currentDateTime().toString())
-                            .arg(c.replace("--", "- - ")));
+                            .arg(comment));
 
     writer.writeStartElement(xml::typeknowledge); // typeknowledge
     writer.writeAttribute(xml::version, QString::number(xml::currentVer));
