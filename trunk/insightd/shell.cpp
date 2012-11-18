@@ -1909,7 +1909,7 @@ int Shell::cmdListVarsUsing(QStringList args)
     }
 
     if (varsIndirect.size() >= max_vars_indirect)
-        _out << "(Recursive search for variables limited to "
+        _out << dec << "(Recursive search for variables limited to "
              << max_vars_indirect << ")" << endl;
 
     hline(w_total);
@@ -2664,7 +2664,7 @@ int Shell::printRulesList(const list_t& rules,
     const int w_name = 25;
     const int w_matches = qstrlen("Match");
     const int w_prio = qstrlen("Prio.");
-    const int w_actionType = qstrlen("script inline");
+    const int w_actionType = qstrlen("inline");
     const int w_colsep = 2;
     const int avail = tsize.width() - (w_index + w_name + w_matches + w_prio +
                                        w_actionType + 6*w_colsep + 1);
@@ -2735,10 +2735,10 @@ int Shell::printRulesList(const list_t& rules,
         switch (rule->action() ?
                 rule->action()->actionType() : TypeRuleAction::atNone)
         {
-        case TypeRuleAction::atExpression: _out << "expression"; break;
-        case TypeRuleAction::atFunction:   _out << "script func."; break;
-        case TypeRuleAction::atInlineCode: _out << "script inline";   break;
-        case TypeRuleAction::atNone:       _out << "none";            break;
+        case TypeRuleAction::atExpression: _out << "expr.";  break;
+        case TypeRuleAction::atFunction:   _out << "func.";  break;
+        case TypeRuleAction::atInlineCode: _out << "inline"; break;
+        case TypeRuleAction::atNone:       _out << "none";   break;
         }
 
         _out << qSetFieldWidth(w_colsep) << " "
@@ -3205,7 +3205,7 @@ void Shell::printMatchingRules(const ActiveRuleList &rules, int indent)
 		case TypeRuleAction::atFunction: {
 			const FuncCallScriptAction* sa =
 					dynamic_cast<const FuncCallScriptAction*>(action);
-			_out << "Execute script function " << color(ctBold)
+			_out << "Execute function " << color(ctBold)
 				 << sa->function() << "()" << color(ctReset) << " in file "
 				 << color(ctBold) << ShellUtil::shortFileName(sa->scriptFile())
 				 << color(ctReset);
