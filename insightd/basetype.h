@@ -324,32 +324,7 @@ public:
      * @return the value at @a offset as the desired type
      * @warning This function should only be called for a pointer type!
      */
-    inline void* toPointer(QIODevice* mem, size_t offset) const
-    {
-    	// We have to consider the size of the pointer
-    	if (_size == 4) {
-    		quint32 p = toUInt32(mem, offset);
-#ifdef __x86_64__
-            return (void*)(quint64)p;
-#else
-    		return (void*)p;
-#endif
-    	}
-    	else if (_size == 8) {
-    		quint64 p = toUInt64(mem, offset);
-#ifdef __x86_64__
-            return (void*)p;
-#else
-            return (void*)(quint32)p;
-#endif
-    	}
-    	else {
-    		throw BaseTypeException(
-    				"Illegal conversion of a non-pointer type to a pointer",
-    				__FILE__,
-    				__LINE__);
-    	}
-    }
+    void* toPointer(QIODevice* mem, size_t offset) const;
 
     /**
      * @param mem the memory device to read the data from
