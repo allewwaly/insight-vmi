@@ -80,12 +80,11 @@ inline base_t* ReferencingType::refTypeDeepTempl(ref_t *ref, int resolveTypes)
     if (!ref->_refTypeDeep || resolveTypes != ref->_deepResolvedTypes) {
         ref->_deepResolvedTypes = resolveTypes;
         base_t* t = ref->refType();
-        if ( !t || !(t->type() & resolveTypes) )
-            return t;
-
-        ref_base_t* rbt = dynamic_cast<ref_base_t*>(t);
-        while (rbt && (rbt->type() & resolveTypes)) {
-            rbt = dynamic_cast<ref_base_t*>(t = rbt->refType());
+        if ( t && (t->type() & resolveTypes) ) {
+            ref_base_t* rbt = dynamic_cast<ref_base_t*>(t);
+            while (rbt && (rbt->type() & resolveTypes)) {
+                rbt = dynamic_cast<ref_base_t*>(t = rbt->refType());
+            }
         }
         ref->_refTypeDeep = const_cast<BaseType*>(t);
     }
