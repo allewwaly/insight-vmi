@@ -661,7 +661,7 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *i
                    addChildIfNotExistend((*inst), node, _index, inst->address(), false));
 
     if (!nextNode) {
-        debugerr("Could cast Node to MemoryMapNodeSV!");
+        debugerr("Could not cast Node to MemoryMapNodeSV!");
         return;
     }
 
