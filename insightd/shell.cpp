@@ -43,9 +43,9 @@
 #include "typerule.h"
 #include "shellutil.h"
 #include "altreftyperulewriter.h"
-
-#ifdef CONFIG_MEMORY_MAP
 #include "memorymap.h"
+
+#ifdef CONFIG_WITH_X_SUPPORT
 #include "memorymapwindow.h"
 #include "memorymapwidget.h"
 #endif
@@ -109,7 +109,6 @@ Shell::Shell(bool listenOnSocket)
 
     // Register all commands
 /*
-#ifdef CONFIG_MEMORY_MAP
     _commands.insert("diff",
             Command(
                 &Shell::cmdDiffVectors,
@@ -118,7 +117,6 @@ Shell::Shell(bool listenOnSocket)
                 "have changed in a series of memory dumps. The memory dump files can "
                 "be specified by a shell file glob pattern or by explicit file names.\n"
                 "  diff [min. probability] <file pattern 1> [<file pattern 2> ...]"));
-#endif
 */
 
     _commands.insert("exit",
@@ -191,16 +189,20 @@ Shell::Shell(bool listenOnSocket)
                 "                              a valid type name, or a valid type id.\n"
 				"                              Notice, that a type name or a type id\n"
 				"                              can be followed by a query string in case\n"
-				"                              a member of a struct should be dumped."
-#ifdef CONFIG_MEMORY_MAP
-                "\n"
+				"                              a member of a struct should be dumped.\n"
+#ifdef CONFIG_WITH_X_SUPPORT
                 "  memory revmap [index] build|visualize\n"
                 "                              Build or visualize a reverse mapping for \n"
                 "                              dump <index>\n"
                 "  memory diff [index1] build <index2>|visualize\n"
-                "                              Compare ore visualize a memory dump with\n"
+                "                              Compare or visualize a memory dump with\n"
                 "                              dump <index2>"
-#endif
+#else
+                 "  memory revmap [index] build"
+                 "                              Build a reverse mapping for dump <index>\n"
+                 "  memory diff [index1] build <index2>\n"
+                 "                              Compare a memory dump with dump <index2>"
+#endif /* CONFIG_WITH_X_SUPPORT */
                 ));
 
     _commands.insert("rules",
@@ -1946,14 +1948,12 @@ int Shell::cmdMemory(QStringList args)
     else if (QString("dump").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryDump(args);
     }
-#ifdef CONFIG_MEMORY_MAP
     else if (QString("revmap").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryRevmap(args);
     }
     else if (QString("diff").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryDiff(args);
     }
-#endif
     else {
         cmdHelp(QStringList("memory"));
         return 1;
@@ -2211,7 +2211,6 @@ int Shell::cmdMemoryDump(QStringList args)
     return 2;
 }
 
-#ifdef CONFIG_MEMORY_MAP
 
 int Shell::cmdMemoryRevmap(QStringList args)
 {
@@ -2234,12 +2233,14 @@ int Shell::cmdMemoryRevmap(QStringList args)
             args.pop_front();
             return cmdMemoryRevmapDumpInit(index, args);
         }
+#ifdef CONFIG_WITH_X_SUPPORT
         else if (QString("visualize").startsWith(args[0])) {
             if (args.size() > 1)
                 return cmdMemoryRevmapVisualize(index, args[1]);
             else
                 return cmdMemoryRevmapVisualize(index);
         }
+#endif /* CONFIG_WITH_X_SUPPORT */
         else {
             _err << color(ctErrorLight) << "Unknown command: " << color(ctError) << args[0] << color(ctReset) << endl;
             return 2;
@@ -2330,6 +2331,7 @@ int Shell::cmdMemoryRevmapDump(int index, QStringList args)
     return ecOk;
 }
 
+
 int Shell::cmdMemoryRevmapDumpInit(int index, QStringList args)
 {
     if (args.size() < 1 || args.size() > 2) {
@@ -2368,6 +2370,8 @@ int Shell::cmdMemoryRevmapDumpInit(int index, QStringList args)
 }
 
 
+#ifdef CONFIG_WITH_X_SUPPORT
+
 int Shell::cmdMemoryRevmapVisualize(int index, QString type)
 {
     if (!_memDumps[index]->map() || _memDumps[index]->map()->vmemMap().isEmpty())
@@ -2377,11 +2381,6 @@ int Shell::cmdMemoryRevmapVisualize(int index, QString type)
                 << endl;
         return 1;
     }
-
-#ifndef CONFIG_WITH_X_SUPPORT
-    _err << "No X Support configured!" << endl;
-    return 1;
-#endif
 
     int ret = 0;
     /*if (QString("physical").startsWith(type) || QString("pmem").startsWith(type))
@@ -2403,6 +2402,7 @@ int Shell::cmdMemoryRevmapVisualize(int index, QString type)
     return ret;
 }
 
+#endif /* CONFIG_WITH_X_SUPPORT */
 
 int Shell::cmdMemoryDiff(QStringList args)
 {
@@ -2420,9 +2420,11 @@ int Shell::cmdMemoryDiff(QStringList args)
                 return cmdHelp(QStringList("memory"));
             return cmdMemoryDiffBuild(index, index2);
         }
+#ifdef CONFIG_WITH_X_SUPPORT
         else if (QString("visualize").startsWith(args[0])) {
             return cmdMemoryDiffVisualize(index);
         }
+#endif /* CONFIG_WITH_X_SUPPORT */
         else {
             _err << color(ctErrorLight) << "Unknown command: " << color(ctError)
                  << args[0] << color(ctReset) << endl;
@@ -2455,6 +2457,7 @@ int Shell::cmdMemoryDiffBuild(int index1, int index2)
     return ecOk;
 }
 
+#ifdef CONFIG_WITH_X_SUPPORT
 
 int Shell::cmdMemoryDiffVisualize(int index)
 {
@@ -2466,11 +2469,6 @@ int Shell::cmdMemoryDiffVisualize(int index)
         return 1;
     }
 
-#ifndef CONFIG_WITH_X_SUPPORT
-    _err << "No X Support configured!" << endl;
-    return 1;
-#endif
-
     memMapWindow->mapWidget()->setDiff(&_memDumps[index]->map()->pmemDiff());
 
     if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
@@ -2479,7 +2477,7 @@ int Shell::cmdMemoryDiffVisualize(int index)
     return ecOk;
 }
 
-#endif /* CONFIG_MEMORY_MAP */
+#endif /* CONFIG_WITH_X_SUPPORT */
 
 
 inline const TypeRule* getTypeRule(const TypeRuleList& list, int index)
@@ -3941,7 +3939,6 @@ int Shell::cmdBinaryMemDumpList(QStringList /*args*/)
 }
 
 /*
-#ifdef CONFIG_MEMORY_MAP
 
 int Shell::cmdDiffVectors(QStringList args)
 {
@@ -4137,7 +4134,6 @@ int Shell::cmdDiffVectors(QStringList args)
     return ecOk;
 }
 
-#endif
 */
 
 //void Shell::printTimeStamp(const QTime& time)

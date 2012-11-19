@@ -26,7 +26,8 @@ CONFIG += console \
 QT += script \
     network \
     xml
-QT -= webkit
+QT -= gui \
+    webkit
 
 # Required libraries for building
 LIBS += \
@@ -45,183 +46,176 @@ INCLUDEPATH += ../libinsight/include \
     ../libantlr3c/include \
     ../libcparser/include
 
-SOURCES += kernelsourcetypeevaluator.cpp \
-    kernelsourceparser.cpp \
-    memorydumpsclass.cpp \
-    scriptengine.cpp \
-    kernelsymbolsclass.cpp \
-    instancedata.cpp \
-    instance.cpp \
-    instanceprototype.cpp \
-    instanceclass.cpp \
-    memspecs.cpp \
-    memspecparser.cpp \
-    virtualmemory.cpp \
-    memorydump.cpp \
-    programoptions.cpp \
-    longoperation.cpp \
-    kernelsymbolparser.cpp \
-    kernelsymbolwriter.cpp \
-    kernelsymbolreader.cpp \
-    volatiletype.cpp \
-    funcpointer.cpp \
-    refbasetype.cpp \
-    typedef.cpp \
-    consttype.cpp \
-    symbol.cpp \
+SOURCES += altreftype.cpp \
+    altreftyperulewriter.cpp \
     array.cpp \
-    compileunit.cpp \
-    sourceref.cpp \
-    shell.cpp \
-    referencingtype.cpp \
-    structuredmember.cpp \
-    structured.cpp \
-    typeinfo.cpp \
-    symfactory.cpp \
-    kernelsymbols.cpp \
-    variable.cpp \
-    pointer.cpp \
-    numeric.cpp \
-    main.cpp \
-    basetype.cpp \
-    enum.cpp \
-    funcparam.cpp \
-    function.cpp \
-    shell_readline.cpp \
-    astexpressionevaluator.cpp \
     astexpression.cpp \
-    expressionresult.cpp \
-    kernelsymbolstream.cpp \
+    astexpressionevaluator.cpp \
+    basetype.cpp \
     colorpalette.cpp \
-    slubobjects.cpp \
-    memorymapbuildersv.cpp \
+    compileunit.cpp \
+    consttype.cpp \
+    enum.cpp \
+    expressionresult.cpp \
+    funcparam.cpp \
+    funcpointer.cpp \
+    function.cpp \
+    instanceclass.cpp \
+    instance.cpp \
+    instancedata.cpp \
+    instanceprototype.cpp \
+    kernelsourceparser.cpp \
+    kernelsourcetypeevaluator.cpp \
+    kernelsymbolparser.cpp \
+    kernelsymbolreader.cpp \
+    kernelsymbolsclass.cpp \
+    kernelsymbols.cpp \
+    kernelsymbolstream.cpp \
+    kernelsymbolwriter.cpp \
+    longoperation.cpp \
+    main.cpp \
+    memorydifftree.cpp \
+    memorydump.cpp \
+    memorydumpsclass.cpp \
+    memorymapbuilder.cpp \
     memorymapbuildercs.cpp \
-    memorymapverifier.cpp \
-    memorymapnodesv.cpp \
+    memorymapbuildersv.cpp \
+    memorymap.cpp \
     memorymapheuristics.cpp \
-    typefilter.cpp \
-    typerule.cpp \
+    memorymapnode.cpp \
+    memorymapnodesv.cpp \
+    memorymaprangetree.cpp \
+    memorymapverifier.cpp \
+    memspecparser.cpp \
+    memspecs.cpp \
+    numeric.cpp \
     osfilter.cpp \
+    pointer.cpp \
+    programoptions.cpp \
+    refbasetype.cpp \
+    referencingtype.cpp \
+    scriptengine.cpp \
+    shell.cpp \
+    shell_readline.cpp \
+    shellutil.cpp \
+    slubobjects.cpp \
+    sourceref.cpp \
+    structured.cpp \
+    structuredmember.cpp \
+    symbol.cpp \
+    symfactory.cpp \
+    typedef.cpp \
+    typefilter.cpp \
+    typeinfo.cpp \
+    typerule.cpp \
     typeruleengine.cpp \
     typeruleparser.cpp \
     typerulereader.cpp \
-    xmlschema.cpp \
-    shellutil.cpp \
-    altreftype.cpp \
-    altreftyperulewriter.cpp
+    variable.cpp \
+    virtualmemory.cpp \
+    volatiletype.cpp \
+    xmlschema.cpp
 
-HEADERS += kernelsourcetypeevaluator.h \
-    kernelsourceparser.h \
-    memorydumpsclass.h \
-    scriptengine.h \
-    kernelsymbolsclass.h \
-    instance_def.h \
-    priorityqueue.h \
-    varsetter.h \
-    instancedata.h \
-    instance.h \
-    instanceprototype.h \
-    instanceclass.h \
-    virtualmemoryexception.h \
-    memspecs.h \
-    memspecparser.h \
-    virtualmemory.h \
-    ioexception.h \
-    filenotfoundexception.h \
-    memorydump.h \
-    programoptions.h \
-    longoperation.h \
-    parserexception.h \
-    readerwriterexception.h \
-    kernelsymbolconsts.h \
-    kernelsymbolparser.h \
-    kernelsymbolwriter.h \
-    kernelsymbolreader.h \
-    volatiletype.h \
-    funcpointer.h \
-    refbasetype.h \
-    typedef.h \
-    consttype.h \
-    symbol.h \
+
+HEADERS += altreftype.h \
+    altreftyperulewriter.h \
     array.h \
-    compileunit.h \
-    sourceref.h \
-    shell.h \
-    referencingtype.h \
-    structuredmember.h \
-    structured.h \
-    typeinfo.h \
-    symfactory.h \
-    kernelsymbols.h \
-    variable.h \
-    pointer.h \
-    numeric.h \
-    basetype.h \
-    enum.h \
-    funcparam.h \
-    function.h \
     astexpressionevaluator.h \
     astexpression.h \
-    expressionresult.h \
-    kernelsymbolstream.h \
+    basetype.h \
     colorpalette.h \
-    slubobjects.h \
-    memorymapbuildersv.h \
-    memorymapbuildercs.h \
-    memorymapverifier.h \
-    memorymapnodesv.h \
-    memorymapheuristics.h \
-    typefilter.h \
-    typerule.h \
-    osfilter.h \
+    compileunit.h \
+    consttype.h \
+    enum.h \
+    expressionresult.h \
+    filenotfoundexception.h \
     filterexception.h \
+    funcparam.h \
+    funcpointer.h \
+    function.h \
+    instanceclass.h \
+    instancedata.h \
+    instance_def.h \
+    instance.h \
+    instanceprototype.h \
+    ioexception.h \
+    kernelsourceparser.h \
+    kernelsourcetypeevaluator.h \
+    kernelsymbolconsts.h \
+    kernelsymbolparser.h \
+    kernelsymbolreader.h \
+    kernelsymbolsclass.h \
+    kernelsymbols.h \
+    kernelsymbolstream.h \
+    kernelsymbolwriter.h \
+    keyvaluestore.h \
+    longoperation.h \
+    memberlist.h \
+    memorydifftree.h \
+    memorydump.h \
+    memorydumpsclass.h \
+    memorymapbuildercs.h \
+    memorymapbuilder.h \
+    memorymapbuildersv.h \
+    memorymap.h \
+    memorymapheuristics.h \
+    memorymapnode.h \
+    memorymapnodesv.h \
+    memorymaprangetree.h \
+    memorymapverifier.h \
+    memoryrangetree.h \
+    memspecparser.h \
+    memspecs.h \
+    numeric.h \
+    osfilter.h \
+    parserexception.h \
+    pointer.h \
+    priorityqueue.h \
+    programoptions.h \
+    readerwriterexception.h \
+    refbasetype.h \
+    referencingtype.h \
+    scriptengine.h \
+    shell.h \
+    shellutil.h \
+    slubobjects.h \
+    sourceref.h \
+    structured.h \
+    structuredmember.h \
+    symbol.h \
+    symfactory.h \
+    typedef.h \
+    typefilter.h \
+    typeinfo.h \
     typeruleengine.h \
+    typeruleexception.h \
+    typerule.h \
     typeruleparser.h \
     typerulereader.h \
-    typeruleexception.h \
-    keyvaluestore.h \
-    xmlschema.h \
-    memberlist.h \
-    shellutil.h \
-    altreftype.h \
-    altreftyperulewriter.h
+    variable.h \
+    varsetter.h \
+    virtualmemoryexception.h \
+    virtualmemory.h \
+    volatiletype.h \
+    xmlschema.h
 
 # Things to do when the memory map builder and widget is to be built. Enabling
 # this feature requires InSight to run on an X server.
-CONFIG(memory_map) {
-    unix:warning(Enabled compilation of the memory_map features. The resulting binary will must be run on an X windows system!)
+CONFIG(mem_map_vis) {
+    unix:warning(Enabled memory map visualization. The resulting binary will must be run on an X windows system!)
 
-    DEFINES += CONFIG_MEMORY_MAP
+    DEFINES += CONFIG_WITH_X_SUPPORT
 
     FORMS += memorymapwindow.ui
 
-    SOURCES += memorydifftree.cpp \
-        memorymaprangetree.cpp \
-        memorymapbuilder.cpp \
-        memorymapwindow.cpp \
-        memorymapwidget.cpp \
-        memorymapnode.cpp \
-        memorymap.cpp
+    SOURCES += memorymapwindow.cpp \
+        memorymapwidget.cpp
 
-    HEADERS += memorydifftree.h \
-        memorymaprangetree.h \
-        memoryrangetree.h \
-        memorymapbuilder.h \
-        memorymapwindow.h \
-        memorymapwidget.h \
-        memorymapnode.h \
-        memorymap.h
-}
-CONFIG(WITH_X_SUPPORT){
-    unix:warning(Enabled X support. Needed for example for some memory_map features.)
-    
-    DEFINES += CONFIG_WITH_X
+    HEADERS += memorymapwindow.h \
+        memorymapwidget.h
+
     QT += gui
 }
-
-#!CONFIG(WITH_X_SUPPORT) {
-#    QT -= gui
-#}
 
 # Enable or disable libreadline support
 CONFIG(with_readline) {

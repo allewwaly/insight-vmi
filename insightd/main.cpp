@@ -111,7 +111,7 @@
 #include "genericexception.h"
 #include "programoptions.h"
 
-#ifdef CONFIG_MEMORY_MAP
+#ifdef CONFIG_WITH_X_SUPPORT
 #include "memorymapwindow.h"
 #endif
 
@@ -360,7 +360,7 @@ void init_daemon()
  */
 int main(int argc, char* argv[])
 {
-#ifdef CONFIG_MEMORY_MAP
+#ifdef CONFIG_WITH_X_SUPPORT
 	memMapWindow = 0;
 #endif
 	shell = 0;
@@ -384,7 +384,7 @@ int main(int argc, char* argv[])
 			init_daemon();
 		    // Start a new logging session
 			log_message(QString("InSight started with PID %1.").arg(getpid()));
-#endif
+#endif /* _WIN32 */
 		}
 
 		// Delay creation of QApplication until AFTER possible fork()!
@@ -398,7 +398,7 @@ int main(int argc, char* argv[])
 		}
 #else
 		QCoreApplication app(argc, argv);
-#endif
+#endif /* CONFIG_WITH_X_SUPPORT */
 	    shell = new Shell(daemonize);
 
         // Start the interactive shell
@@ -431,7 +431,7 @@ int main(int argc, char* argv[])
 		delete shell;
 	}
 
-#ifdef CONFIG_MEMORY_MAP
+#ifdef CONFIG_WITH_X_SUPPORT
 //	if (memMapWindow)
 //	    delete memMapWindow;
 #endif
