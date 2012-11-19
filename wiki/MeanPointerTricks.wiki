@@ -332,13 +332,37 @@ More examples:
 </rule>
 
 <rule priority="101">
-	<name>vfsmount.mnt_writer</name>
-	<description>Member "mnt_writer" is a per-cpu variable.</description>
+	<name>vfsmount.mnt_writers</name>
+	<description>Member "mnt_writers" is a per-cpu variable.</description>
 	<filter>
 		<datatype>struct</datatype>
 		<typename>vfsmount</typename>
 		<members>
 			<member>mnt_writers</member>
+		</members>
+	</filter>
+	<action type="inline">
+		var inst = arguments[0];
+		var members = arguments[1];
+		inst = inst.Member(members[0]);
+		var offsets = new Instance("__per_cpu_offset");
+		// Is this an SMP system?
+		if (offsets.IsValid()) {
+			var offset = offsets.ArrayElem(0);
+			inst.AddToAddress(offset.toULong(16));
+		}
+		return inst;
+	</action>
+</rule>
+
+<rule priority="101">
+	<name>percpu_counter.counters</name>
+	<description>Member "counters" is a per-cpu variable.</description>
+	<filter>
+		<datatype>struct</datatype>
+		<typename>percpu_counter</typename>
+		<members>
+			<member>counters</member>
 		</members>
 	</filter>
 	<action type="inline">
