@@ -39,8 +39,10 @@ public:
 	 * \a kernelSrc. The Linux kernel \c vmlinux with debugging symbols and the
 	 * \c System.map file must be directly located in \a kernelSrc.
 	 * @param kernelSrc path to configured and built kernel source
+	 * @param kernelOnly set to \c true if only the kernel should be parsed,
+	 * set to \c false if kernel and modules should be parsed
 	 */
-	void parseSymbols(const QString& kernelSrc);
+	void parseSymbols(const QString& kernelSrc, bool kernelOnly = false);
 
 	/**
 	 * Loads the kernel debugging symbols from the given device.

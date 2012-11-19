@@ -617,7 +617,7 @@ void KernelSymbolParser::parse(QIODevice *from)
 }
 
 
-void KernelSymbolParser::parse()
+void KernelSymbolParser::parse(bool kernelOnly)
 {
     // Make sure the source directoy exists
     if (!_srcDir.exists()) {
@@ -670,7 +670,7 @@ void KernelSymbolParser::parse()
     QDirIterator dit(_srcPath, QDir::Files|QDir::NoSymLinks|QDir::NoDotAndDotDot,
                      QDirIterator::Subdirectories);
 
-    while (!shell->interrupted() && dit.hasNext()) {
+    while (!kernelOnly && !shell->interrupted() && dit.hasNext()) {
         dit.next();
         // Find all modules outside the lib/modules/ directory
         if (dit.fileInfo().suffix() == "ko" &&
