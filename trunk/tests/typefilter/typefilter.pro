@@ -67,8 +67,18 @@ SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/kernelsymbolstream.cpp \
     $$ROOT_DIR/insightd/kernelsymbolwriter.cpp \
     $$ROOT_DIR/insightd/longoperation.cpp \
+    $$ROOT_DIR/insightd/memorydifftree.cpp \
     $$ROOT_DIR/insightd/memorydump.cpp \
     $$ROOT_DIR/insightd/memorydumpsclass.cpp \
+    $$ROOT_DIR/insightd/memorymapbuilder.cpp \
+    $$ROOT_DIR/insightd/memorymapbuildercs.cpp \
+    $$ROOT_DIR/insightd/memorymapbuildersv.cpp \
+    $$ROOT_DIR/insightd/memorymap.cpp \
+    $$ROOT_DIR/insightd/memorymapheuristics.cpp \
+    $$ROOT_DIR/insightd/memorymapnode.cpp \
+    $$ROOT_DIR/insightd/memorymapnodesv.cpp \
+    $$ROOT_DIR/insightd/memorymaprangetree.cpp \
+    $$ROOT_DIR/insightd/memorymapverifier.cpp \
     $$ROOT_DIR/insightd/memspecparser.cpp \
     $$ROOT_DIR/insightd/memspecs.cpp \
     $$ROOT_DIR/insightd/numeric.cpp \
@@ -81,6 +91,7 @@ SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/shell.cpp \
     $$ROOT_DIR/insightd/shellutil.cpp \
     $$ROOT_DIR/insightd/shell_readline.cpp \
+    $$ROOT_DIR/insightd/slubobjects.cpp \
     $$ROOT_DIR/insightd/sourceref.cpp \
     $$ROOT_DIR/insightd/structured.cpp \
     $$ROOT_DIR/insightd/structuredmember.cpp \
@@ -127,8 +138,19 @@ HEADERS += \
     $$ROOT_DIR/insightd/kernelsymbolstream.h \
     $$ROOT_DIR/insightd/kernelsymbolwriter.h \
     $$ROOT_DIR/insightd/longoperation.h \
+    $$ROOT_DIR/insightd/memorydifftree.h \
     $$ROOT_DIR/insightd/memorydump.h \
     $$ROOT_DIR/insightd/memorydumpsclass.h \
+    $$ROOT_DIR/insightd/memorymapbuildercs.h \
+    $$ROOT_DIR/insightd/memorymapbuilder.h \
+    $$ROOT_DIR/insightd/memorymapbuildersv.h \
+    $$ROOT_DIR/insightd/memorymap.h \
+    $$ROOT_DIR/insightd/memorymapheuristics.h \
+    $$ROOT_DIR/insightd/memorymapnode.h \
+    $$ROOT_DIR/insightd/memorymapnodesv.h \
+    $$ROOT_DIR/insightd/memorymaprangetree.h \
+    $$ROOT_DIR/insightd/memorymapverifier.h \
+    $$ROOT_DIR/insightd/memoryrangetree.h \
     $$ROOT_DIR/insightd/memspecparser.h \
     $$ROOT_DIR/insightd/memspecs.h \
     $$ROOT_DIR/insightd/numeric.h \
@@ -157,14 +179,3 @@ HEADERS += \
     $$ROOT_DIR/insightd/volatiletype.h \
     $$ROOT_DIR/insightd/xmlschema.h \
     $$ROOT_DIR/libcparser/include/genericexception.h
-
-
-#INCLUDEPATH += ../../src \
-#    ../../include \
-#    ../../../libdebug/include \
-#    ../../antlr_generated \
-#    ../../../libantlr3c/include
-
-#LIBS += -L../..$$BUILD_DIR -l$$CPARSER_LIB \
-#        -L../../../libdebug$$BUILD_DIR -l$$DEBUG_LIB \
-#        -L../../../libantlr3c$$BUILD_DIR -l$$ANTLR_LIB

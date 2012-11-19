@@ -339,14 +339,16 @@ private:
     int cmdMemorySpecs(QStringList args);
     int cmdMemoryQuery(QStringList args);
     int cmdMemoryDump(QStringList args);
-#ifdef CONFIG_MEMORY_MAP
     int cmdMemoryRevmap(QStringList args);
     int cmdMemoryRevmapBuild(int index, QStringList args);
+#ifdef CONFIG_WITH_X_SUPPORT
     int cmdMemoryRevmapVisualize(int index, QString type = "v");
+#endif
     int cmdMemoryRevmapDump(int index, QStringList args);
     int cmdMemoryRevmapDumpInit(int index, QStringList args);
     int cmdMemoryDiff(QStringList args);
     int cmdMemoryDiffBuild(int index1, int index2);
+#ifdef CONFIG_WITH_X_SUPPORT
     int cmdMemoryDiffVisualize(int index);
 #endif
 

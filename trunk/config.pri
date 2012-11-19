@@ -11,9 +11,9 @@ isEmpty(PREFIX) {
 CONFIG(release): DEFINES += NO_TYPESAFE_FLAGS
 CONFIG(debug): DEFINES -= NO_TYPESAFE_FLAGS
 
-# Should the memory_map feature be built? Requires the X window system
+# Should the memory map visualization be built? Requires the X window system
 # for Unix. Disabled by default.
-CONFIG += memory_map
+CONFIG += mem_map_vis
 
 # Build with readline support? Default yes for Unix, no for Windows
 unix:CONFIG += with_readline

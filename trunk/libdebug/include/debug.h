@@ -37,10 +37,6 @@ extern const char* userMailingList;
 #endif /* __cplusplus */
 
 
-// Enabled the code for memory map building (requires the X window system)
-//#define CONFIG_MEMORY_MAP 1
-
-
 #if (DEBUG == 1) && defined(__cplusplus)
 
 // Enable debug output for symbol parsing

@@ -32,13 +32,19 @@ HEADERS += astexpressionevaluatortester.h \
     ../../kernelsymbolstream.h \
     ../../kernelsymbolwriter.h \
     ../../longoperation.h \
+    ../../memorydifftree.h \
     ../../memorydump.h \
     ../../memorydumpsclass.h \
     ../../memorymapbuildercs.h \
+    ../../memorymapbuilder.h \
     ../../memorymapbuildersv.h \
+    ../../memorymap.h \
     ../../memorymapheuristics.h \
+    ../../memorymapnode.h \
     ../../memorymapnodesv.h \
+    ../../memorymaprangetree.h \
     ../../memorymapverifier.h \
+    ../../memoryrangetree.h \
     ../../memspecparser.h \
     ../../memspecs.h \
     ../../numeric.h \
@@ -93,12 +99,17 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../kernelsymbolstream.cpp \
     ../../kernelsymbolwriter.cpp \
     ../../longoperation.cpp \
+    ../../memorydifftree.cpp \
     ../../memorydump.cpp \
     ../../memorydumpsclass.cpp \
+    ../../memorymapbuilder.cpp \
     ../../memorymapbuildercs.cpp \
     ../../memorymapbuildersv.cpp \
+    ../../memorymap.cpp \
     ../../memorymapheuristics.cpp \
+    ../../memorymapnode.cpp \
     ../../memorymapnodesv.cpp \
+    ../../memorymaprangetree.cpp \
     ../../memorymapverifier.cpp \
     ../../memspecparser.cpp \
     ../../memspecs.cpp \
@@ -135,7 +146,9 @@ QT += core \
     network \
     xml \
     testlib
-QT -= webkit
+QT -= gui \
+    webkit
+
 CONFIG += qtestlib debug_and_release
 INCLUDEPATH += ../../src \
 	../../../libdebug/include \
@@ -151,37 +164,7 @@ LIBS += -L../../../libcparser$$BUILD_DIR -l$$CPARSER_LIB \
 QMAKE_CXXFLAGS_DEBUG += -w
 QMAKE_CXXFLAGS_RELEASE += -w
 
-# Things to do when the memory map builder and widget is to be built. Enabling
-# this feature requires InSight to run on an X server.
-CONFIG += memory_map
-CONFIG(memory_map) {
-    unix:warning(Enabled compilation of the memory_map features. The resulting binary will must be run on an X windows system!)
 
-    DEFINES += CONFIG_MEMORY_MAP
-    QT += gui
-
-    FORMS += ../../memorymapwindow.ui
-
-    SOURCES += ../../memorydifftree.cpp \
-        ../../memorymaprangetree.cpp \
-        ../../memorymapbuilder.cpp \
-        ../../memorymapwindow.cpp \
-        ../../memorymapwidget.cpp \
-        ../../memorymapnode.cpp \
-        ../../memorymap.cpp
-
-    HEADERS += ../../memorydifftree.h \
-        ../../memorymaprangetree.h \
-        ../../memoryrangetree.h \
-        ../../memorymapbuilder.h \
-        ../../memorymapwindow.h \
-        ../../memorymapwidget.h \
-        ../../memorymapnode.h \
-        ../../memorymap.h
-}
-!CONFIG(memory_map) {
-    QT -= gui
-}
 # Enable or disable libreadline support
 CONFIG(with_readline) {
     DEFINES += CONFIG_READLINE

@@ -20,10 +20,7 @@ class QFile;
 class QIODevice;
 class SymFactory;
 class RuleEngine;
-
-#ifdef CONFIG_MEMORY_MAP
 class MemoryMap;
-#endif
 
 /**
  * Exception class for queries
@@ -227,7 +224,6 @@ public:
      */
     int index() const;
 
-#ifdef CONFIG_MEMORY_MAP
     /**
      * @return the memory map of this dump
      */
@@ -251,7 +247,6 @@ public:
      * @param other
      */
     void setupDiff(MemoryDump* other);
-#endif
 
 private:
     /**
@@ -276,9 +271,7 @@ private:
     QString _fileName;
     const SymFactory* _factory;
     VirtualMemory* _vmem;
-#ifdef CONFIG_MEMORY_MAP
     MemoryMap* _map;
-#endif
     int _index;
 };
 
@@ -306,8 +299,6 @@ inline int MemoryDump::index() const
 }
 
 
-#ifdef CONFIG_MEMORY_MAP
-
 inline const MemoryMap* MemoryDump::map() const
 {
     return _map;
@@ -319,7 +310,6 @@ inline MemoryMap* MemoryDump::map()
     return _map;
 }
 
-#endif
 
 inline VirtualMemory* MemoryDump::vmem()
 {

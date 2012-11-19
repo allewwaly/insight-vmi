@@ -23,7 +23,7 @@ MemoryMapNodeWatcher::MemoryMapNodeWatcher(MemoryMapNodeSV *node,
 
 }
     
-MemoryMapNodeWatcher::~MemoryMapNodeWatcher(){};
+MemoryMapNodeWatcher::~MemoryMapNodeWatcher(){}
 
 bool MemoryMapNodeWatcher::getForceHalt() const
 {

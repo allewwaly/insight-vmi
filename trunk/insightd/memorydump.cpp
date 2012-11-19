@@ -14,10 +14,8 @@
 #include "variable.h"
 #include "shell.h"
 #include "typeruleengine.h"
-
-#ifdef CONFIG_MEMORY_MAP
 #include "memorymap.h"
-#endif
+
 
 #define queryError(msg) do { throw QueryException((msg), __FILE__, __LINE__); } while (0)
 #define queryError2(msg, err) do { \
@@ -34,9 +32,7 @@ MemoryDump::MemoryDump(const MemSpecs& specs, QIODevice* mem,
       _file(0),
       _factory(factory),
       _vmem(new VirtualMemory(specs, mem, index)),
-#ifdef CONFIG_MEMORY_MAP
       _map(new MemoryMap(_factory, _vmem)),
-#endif
       _index(index)
 {
     init();
@@ -49,9 +45,7 @@ MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
       _file(new QFile(fileName)),
       _factory(factory),
       _vmem(new VirtualMemory(_specs, _file, index)),
-#ifdef CONFIG_MEMORY_MAP
       _map(new MemoryMap(_factory, _vmem)),
-#endif
       _index(index)
 {
     _fileName = fileName;
@@ -67,10 +61,8 @@ MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
 
 MemoryDump::~MemoryDump()
 {
-#ifdef CONFIG_MEMORY_MAP
     if (_map)
         delete _map;
-#endif
     if (_vmem)
         delete _vmem;
     // Delete the file object if we created one
@@ -641,8 +633,6 @@ QString MemoryDump::dump(const QString& type, quint64 address,
 }
 
 
-#ifdef CONFIG_MEMORY_MAP
-
 void MemoryDump::setupRevMap(MemoryMapBuilderType type, float minProbability,
                              const QString& slubObjFile)
 {
@@ -655,4 +645,3 @@ void MemoryDump::setupDiff(MemoryDump* other)
     _map->diffWith(other->map());
 }
 
-#endif
