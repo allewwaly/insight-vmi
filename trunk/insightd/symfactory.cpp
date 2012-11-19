@@ -26,6 +26,7 @@
 #include "function.h"
 #include "kernelsourcetypeevaluator.h"
 #include "astexpressionevaluator.h"
+#include "programoptions.h"
 #include <string.h>
 #include <asttypeevaluator.h>
 #include <astnode.h>
@@ -108,7 +109,7 @@ void SymFactory::clear()
 	_varsByName.clear();
 	_varsById.clear();
 	_idRevMapping.clear();
-	_idRevMapping.reserve(QThread::idealThreadCount());
+	_idRevMapping.reserve(programOptions.threadCount());
 	_origSymFiles.clear();
 
 	// Reset other vars
@@ -3060,7 +3061,7 @@ int SymFactory::mapToInternalId(int fileIndex, int origSymId)
             i = freeIdx;
         // No, so enlarge the vector
         else {
-            if (i == QThread::idealThreadCount())
+            if (i == programOptions.threadCount())
                 debugmsg("About to create bucket " << (i+1));
             _idRevMapping.resize(i + 1);
         }

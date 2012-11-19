@@ -17,6 +17,7 @@
 #include "shell.h"
 #include "funcparam.h"
 #include "bugreport.h"
+#include "programoptions.h"
 #include <debug.h>
 
 #define parseInt(i, s, pb) \
@@ -700,7 +701,7 @@ void KernelSymbolParser::parse(bool kernelOnly)
 #if defined(DEBUG_SYM_PARSING)
     const int THREAD_COUNT = 1;
 #else
-    const int THREAD_COUNT = QThread::idealThreadCount();
+    const int THREAD_COUNT = programOptions.threadCount();
 #endif
 
     for (int i = 0; i < THREAD_COUNT; ++i)
