@@ -7,7 +7,7 @@
 #include "shell.h"
 #include "shellutil.h"
 #include "scriptengine.h"
-#include "basetype.h"
+#include "refbasetype.h"
 #include "variable.h"
 #include <debug.h>
 
@@ -101,6 +101,28 @@ bool TypeRuleEngine::fileAlreadyRead(const QString &fileName)
 }
 
 
+int TypeRuleEngine::addAllLexicalTypes(const BaseType* type, ActiveRule& arule)
+{
+    if (!type)
+        return 0;
+
+    int hits = 0;
+    // If the rule matches the original type, we add it for all lexical types
+    // as well
+    if (arule.rule->match(type)) {
+        do {
+            _rulesPerType.insertMulti(type->id(), arule);
+            ++hits;
+            if (type->type() & BaseType::trLexical)
+                type = dynamic_cast<const RefBaseType*>(type)->refType();
+            else
+                break;
+        } while (type);
+    }
+    return hits;
+}
+
+
 void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs, int from)
 {
     operationStarted();
@@ -169,26 +191,17 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs, int f
                     it = factory->typesByName().find(name),
                     e = factory->typesByName().end();
             while (it != e && it.key() == name) {
-                if (rule->match(it.value())) {
-                    _rulesPerType.insertMulti(it.value()->id(), arule);
-                    ++hits;
-                }
+                hits += addAllLexicalTypes(it.value(), arule);
                 ++it;
             }
         }
         else if (rule->filter()->filterActive(Filter::ftTypeId)) {
             const BaseType* t = factory->findBaseTypeById(rule->filter()->typeId());
-            if (t && rule->match(t)) {
-                _rulesPerType.insertMulti(t->id(), arule);
-                ++hits;
-            }
+            hits += addAllLexicalTypes(t, arule);
         }
         else {
             foreach (const BaseType* bt, factory->types()) {
-                if (rule->match(bt)) {
-                    _rulesPerType.insertMulti(bt->id(), arule);
-                    ++hits;
-                }
+                hits += addAllLexicalTypes(bt, arule);
             }
         }
 

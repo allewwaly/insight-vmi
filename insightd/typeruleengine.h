@@ -269,6 +269,7 @@ private:
                        const ConstMemberList &members, int matched,
                        bool evaluated, bool skipped) const;
     const OsFilter* insertOsFilter(const OsFilter* osf);
+    int addAllLexicalTypes(const BaseType* type, ActiveRule& arule);
 
     TypeRuleList _rules;
     ActiveRuleList _activeRules;
