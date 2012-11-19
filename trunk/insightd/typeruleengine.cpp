@@ -454,8 +454,13 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
                 *matched = m;
         }
         catch (GenericException& e) {
-            errRule(arule.rule, arule.index, QString("raised an exception."));
-            throw;
+//            errRule(arule.rule, arule.index, QString("raised an exception."));
+            errRule(arule.rule, arule.index, QString("raised a %1 at %2:%3: %4")
+                    .arg(e.className())
+                    .arg(e.file)
+                    .arg(e.line)
+                    .arg(e.message));
+            throw e;
         }
     }
     ret.setOrigin(Instance::orRuleEngine);
