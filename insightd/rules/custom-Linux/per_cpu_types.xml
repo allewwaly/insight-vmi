@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Various rules for per-cpu variables and members.
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+    <rules>
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/include/linux/percpu-defs.h#L8
+			http://lxr.linux.no/#linux+v2.6.32.58/include/asm-generic/percpu.h#L18
+			http://lxr.linux.no/#linux+v2.6.32.58/include/asm-generic/percpu.h#L54
+		-->
+		<rule priority="90">
+			<name>per_cpu__*</name>
+			<description>Returns the first entry of a per-cpu variable</description>
+			<filter>
+				<variablename match="wildcard">per_cpu__*</variablename>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_var</action>
+		</rule>
+		
+		<!-- 
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/kernel/kexec.c#L1142
+		-->
+		<rule priority="110">
+			<name>crash_notes</name>
+			<description>crash_notes is a per-cpu variable</description>
+			<filter>
+				<variablename>crash_notes</variablename>
+				<datatype>pointer</datatype>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_var</action>
+		</rule>
+		
+		<!-- 
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/arch/x86/kernel/acpi/cstate.c#L169
+		-->
+		<rule priority="110">
+			<name>cpu_cstate_entry</name>
+			<description>cpu_cstate_entry is a per-cpu variable</description>
+			<filter>
+				<variablename>cpu_cstate_entry</variablename>
+				<datatype>pointer</datatype>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_var</action>
+		</rule>
+		
+		<!-- 
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/arch/x86/kernel/cpu/cpufreq/acpi-cpufreq.c#L478
+		-->
+		<rule priority="110">
+			<name>acpi_perf_data</name>
+			<description>acpi_perf_data is a per-cpu variable</description>
+			<filter>
+				<variablename>acpi_perf_data</variablename>
+				<datatype>pointer</datatype>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_var</action>
+		</rule>
+		
+		<!-- 
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/fs/namespace.c#L154
+		-->
+		<rule priority="101">
+			<name>vfsmount.mnt_writers</name>
+			<description>Member "mnt_writers" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>vfsmount</typename>
+				<members>
+					<member>mnt_writers</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/kernel/sched.c#L10847
+		-->
+		<rule priority="101">
+			<name>srcu_struct.per_cpu_ref</name>
+			<description>Member "per_cpu_ref" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>srcu_struct</typename>
+				<members>
+					<member>per_cpu_ref</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/kernel/workqueue.c#L842
+		-->
+		<rule priority="101">
+			<name>workqueue_struct.cpu_wq</name>
+			<description>Member "cpu_wq" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>workqueue_struct</typename>
+				<members>
+					<member>cpu_wq</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/lib/percpu_counter.c#L75
+		-->
+		<rule priority="101">
+			<name>percpu_counter.counters</name>
+			<description>Member "counters" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>percpu_counter</typename>
+				<members>
+					<member>counters</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/kernel/sched.c#L10847
+		-->
+		<rule priority="101">
+			<name>cpuacct.cpuusage</name>
+			<description>Member "cpuusage" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>cpuacct</typename>
+				<members>
+					<member>cpuusage</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/net/core/neighbour.c#L1422
+		-->
+		<rule priority="102">
+			<name>net.core.inuse</name>
+			<description>Member "core.inuse" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>net</typename>
+				<members>
+					<member>core</member>
+					<member>inuse</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+		
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/net/netfilter/nf_conntrack_core.c#L1308
+		-->
+		<rule priority="102">
+			<name>net.ct.stat</name>
+			<description>Member "ct.stat" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>net</typename>
+				<members>
+					<member>ct</member>
+					<member>stat</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/net/core/neighbour.c#L1422
+		-->
+		<rule priority="101">
+			<name>neigh_table.stats</name>
+			<description>Member "stats" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>neigh_table</typename>
+				<members>
+					<member>stats</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/net/xfrm/xfrm_ipcomp.c#L299
+		-->
+		<!--
+		<rule priority="101">
+			<name>ipcomp_tfms.tfms</name>
+			<description>Member "tfms" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>ipcomp_tfms</typename>
+				<members>
+					<member>tfms</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+		-->
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/crypto/cryptd.c#L72
+		-->
+		<!--
+		<rule priority="101">
+			<name>cryptd_queue.cpu_queue</name>
+			<description>Member "cpu_queue" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>cryptd_queue</typename>
+				<members>
+					<member>cpu_queue</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+		-->
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/kernel/trace/blktrace.c#L453
+		-->
+		<rule priority="101">
+			<name>blk_trace.sequence</name>
+			<description>Member "sequence" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>blk_trace</typename>
+				<members>
+					<member>sequence</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/drivers/infiniband/hw/ehca/ehca_irq.c#L906
+		-->
+		<!--
+		<rule priority="101">
+			<name>ehca_comp_pool.cpu_comp_tasks</name>
+			<description>Member "cpu_comp_tasks" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>ehca_comp_pool</typename>
+				<members>
+					<member>cpu_comp_tasks</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+		-->
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/drivers/dma/dmaengine.c#L732
+		-->
+		<rule priority="101">
+			<name>dma_chan.local</name>
+			<description>Member "local" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>dma_chan</typename>
+				<members>
+					<member>local</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/include/scsi/libfc.h#L777
+		-->
+		<!--
+		<rule priority="101">
+			<name>fc_lport.dev_stats</name>
+			<description>Member "dev_stats" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>fc_lport</typename>
+				<members>
+					<member>dev_stats</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+		-->
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/include/linux/genhd.h#L275
+		-->
+		<rule priority="101">
+			<name>hd_struct.dkstats</name>
+			<description>Member "dkstats" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>hd_struct</typename>
+				<members>
+					<member>dkstats</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/fs/ext4/mballoc.c#L2462
+		-->
+		<!--
+		<rule priority="101">
+			<name>ext4_sb_info.s_locality_groups</name>
+			<description>Member "s_locality_groups" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>ext4_sb_info</typename>
+				<members>
+					<member>s_locality_groups</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+		-->
+
+		<!--
+			References:
+			http://lxr.linux.no/#linux+v2.6.32.58/fs/xfs/xfs_mount.c#L2074
+		-->
+		<!--
+		<rule priority="101">
+			<name>xfs_mount_t.m_sb_cnts</name>
+			<description>Member "m_sb_cnts" is a per-cpu variable.</description>
+			<filter>
+				<datatype>typedef</datatype>
+				<typename>xfs_mount_t</typename>
+				<members>
+					<member>m_sb_cnts</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+		-->
+
+	</rules>
+</typeknowledge>

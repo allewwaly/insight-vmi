@@ -12,11 +12,9 @@
 		<scriptinclude>../scripts</scriptinclude>
 	</scriptincludes>
 
+	<include>per_cpu_types.xml</include>
 	<include>type_struct_page.xml</include>
-	<include>type_struct_percpu_counter.xml</include>
 	<include>type_struct_radix_tree_root.xml</include>
-	<include>type_struct_vfsmount.xml</include>
 	<include>var_modules_struct_list_head.xml</include>
-	<include>var_per_cpu__generic.xml</include>
 
 </typeknowledge>

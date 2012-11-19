@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1.0" os="linux" >
+
+	<rules>
+		<!--
+			http://lxr.linux.no/#linux+v2.6.32.58/drivers/net/loopback.c#L140
+		-->
+		<rule priority="101">			
+			<name>net_device.ml_priv</name>
+			<description>
+				The loopback device uses a "struct pcpu_lstats" as a per-cpu 
+				type for ml_priv.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>net_device</typename>
+				<members>
+					<member>ml_priv</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var dev = arguments[0];
+				var members = arguments[1];
+				// see http://lxr.linux.no/#linux+v2.6.32.58/include/linux/if_arp.h#L67
+				var ARPHRD_LOOPBACK = 772;
+				if (dev.isInvalid() || dev.IsNull() || dev.type != ARPHRD_LOOPBACK)
+					return false;
+				
+				var lstats = dev.ml_priv;
+				lstats.ChangeType("pcpu_lstats");
+				var offsets = new Instance("__per_cpu_offset");
+				// Is this an SMP system?
+				if (offsets.IsValid()) {
+					var offset = offsets.ArrayElem(0);
+					lstats.AddToAddress(offset.toULong(16));
+				}
+				return lstats;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
