@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1.0" os="linux" >
+
+	<rules priority="100" >
+		<rule priority="100">
+			<name>page.mapping</name>
+			<description>
+				<!-- http://lxr.linux.no/#linux+v3.6.6/include/linux/mm.h#L769 -->
+				On an anonymous page mapped into a user virtual memory area,
+				page->mapping points to its anon_vma, not to a struct address_space;
+				with the PAGE_MAPPING_ANON bit set to distinguish it.  See rmap.h.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>page</typename>
+				<members>
+					<member></member>
+					<member></member>
+					<member>mapping</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var mapping = arguments[0].mapping;
+				if (!mapping.IsNull()) {
+					var PAGE_MAPPING_ANON = 1;
+					var PAGE_MAPPING_FLAGS = 3;
+					var addr = mapping.AddressLow();
+					if (addr &amp; PAGE_MAPPING_ANON)
+						mapping.ChangeType("anon_vma");
+					mapping.SetAddressLow(addr &amp; ~PAGE_MAPPING_FLAGS);
+				}
+				return mapping;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>

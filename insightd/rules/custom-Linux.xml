@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1.0" os="linux" >
+
+	<ruleincludes>
+		<ruleinclude>./custom-Linux</ruleinclude>
+	</ruleincludes>
+
+	<scriptincludes>
+		<scriptinclude>../scripts</scriptinclude>
+	</scriptincludes>
+
+	<include>type_struct_page.xml</include>
+	<include>type_struct_percpu_counter.xml</include>
+	<include>type_struct_radix_tree_root.xml</include>
+	<include>type_struct_vfsmount.xml</include>
+	<include>var_modules_struct_list_head.xml</include>
+	<include>var_per_cpu__generic.xml</include>
+
+</typeknowledge>
