@@ -5,7 +5,7 @@
 #include "structured.h"
 #include "symfactory.h"
 #include "refbasetype.h"
-
+#include "pointer.h"
 
 const char* expressionTypeToString(ExpressionTypes type)
 {
@@ -847,9 +847,19 @@ ExpressionResult ASTUnaryExpression::result(const Instance *inst) const
         UNARY_PREFIX(--);
         break;
 
-        /// @todo Fixme
-//        case etUnaryStar:
-//        case etUnaryAmp:
+    case etUnaryStar: {
+        if (!inst || !inst->type() || !inst->type()->factory())
+            exprEvalError("Star operator requires a valid instance with a valid type.");
+        Pointer p(inst->type()->factory());
+        if (inst->vmem()->memSpecs().sizeofPointer == 4)
+            res.result.ui64 = (quint64)p.toPointer(inst->vmem(), res.result.ui32);
+        else
+            res.result.ui64 = (quint64)p.toPointer(inst->vmem(), res.result.ui64);
+        break;
+    }
+
+    /// @todo Fixme
+//    case etUnaryAmp:
 
     case etUnaryMinus:
         if (res.size & esInteger) {
