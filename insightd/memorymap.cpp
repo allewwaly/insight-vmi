@@ -194,7 +194,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 
     // How many threads to create?
 //    _shared->threadCount =
-//            qMin(qMax(QThread::idealThreadCount(), 1), MAX_BUILDER_THREADS);
+//            qMin(qMax(programOptions.threadCount(), 1), MAX_BUILDER_THREADS);
     _shared->threadCount = 1;
 
 //    debugmsg("Building reverse map with " << _shared->threadCount << " threads.");

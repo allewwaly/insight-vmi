@@ -12,6 +12,7 @@
 #include <QDir>
 #include <QCoreApplication>
 #include <debug.h>
+#include <QThread>
 
 // Color modes for console output
 #define CM_DARK  "dark"
@@ -20,7 +21,7 @@
 
 ProgramOptions programOptions;
 
-const int OPTION_COUNT = 9;
+const int OPTION_COUNT = 10;
 
 const struct Option options[OPTION_COUNT] = {
     {
@@ -99,6 +100,15 @@ const struct Option options[OPTION_COUNT] = {
         0 // conflicting options
     },
     {
+        "-t",
+        "--max-threads",
+        "Limits the maximum number of allowed threads for parallel processing",
+        acNone,
+        opNone,
+        ntMaxThreads,
+        0 // conflicting options
+    },
+    {
         "-h",
         "--help",
         "Show this help",
@@ -113,7 +123,7 @@ const struct Option options[OPTION_COUNT] = {
 //------------------------------------------------------------------------------
 
 ProgramOptions::ProgramOptions()
-    : _action(acNone), _activeOptions(0)
+    : _action(acNone), _activeOptions(0), _maxThreads(-1)
 {
 }
 
@@ -151,6 +161,15 @@ void ProgramOptions::cmdOptionsUsage()
             << "Detailed information on how to use "
             << ProjectInfo::projectName << " can be found online at:" << std::endl
             << ProjectInfo::homePage << std::endl;
+}
+
+
+int ProgramOptions::threadCount() const
+{
+    if (_maxThreads > 0 && _maxThreads < QThread::idealThreadCount())
+        return _maxThreads;
+    else
+        return QThread::idealThreadCount();
 }
 
 
@@ -279,6 +298,16 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
             _rulesAutoDir = QDir::cleanPath(info.absolutePath());
             nextToken = ntOption;
             break;
+        }
+        case ntMaxThreads: {
+            bool ok;
+            int threads = arg.toInt(&ok);
+            if (!ok) {
+                std::cerr << "Illegal numeric value: \"" << qPrintable(arg)
+                          << "\"" << std::endl;
+                return false;
+            }
+            _maxThreads = threads;
         }
         }
     }
