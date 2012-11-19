@@ -43,7 +43,7 @@ KernelSymbols::~KernelSymbols()
 }
 
 
-void KernelSymbols::parseSymbols(const QString& kernelSrc)
+void KernelSymbols::parseSymbols(const QString& kernelSrc, bool kernelOnly)
 {
 	_factory.clear();
 
@@ -60,7 +60,7 @@ void KernelSymbols::parseSymbols(const QString& kernelSrc)
             << "Parsing memory specifications..." << flush;
 
 	    // Parse the memory specifications
-	    _memSpecs = specParser.parse();
+		_memSpecs = specParser.parse();
 
         // Print out some timing statistics
         int duration = timer.elapsed();
@@ -102,7 +102,7 @@ void KernelSymbols::parseSymbols(const QString& kernelSrc)
     KernelSymbolParser symParser(kernelSrc, &_factory);
 
 	// Parse the debugging symbols
-	symParser.parse();
+	symParser.parse(kernelOnly);
 }
 
 

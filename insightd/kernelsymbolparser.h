@@ -90,8 +90,10 @@ public:
 
     /**
      * Starts the parsing of the debugging symbols
+     * @param kernelOnly set to \c true if only the kernel should be parsed,
+     * set to \c false if kernel and modules should be parsed
      */
-    void parse();
+    void parse(bool kernelOnly = false);
 
     /**
      * Starts the parsing of the debugging symbols from device \a from. This

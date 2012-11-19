@@ -244,13 +244,11 @@ Shell::Shell(bool listenOnSocket)
                 "Allows to load, store or parse the kernel symbols",
                 "This command allows to load, store or parse the kernel "
                 "debugging symbols that are to be used.\n"
-                "  symbols parse <kernel_src>     Parse the symbols from a kernel source\n"
+                "  symbols parse [-k] <src_dir>   Parse the symbols from a kernel source\n"
                 "                                 tree. Uses \"vmlinux\" and \"System.map\"\n"
-                "                                 from that directory.\n"
-                "  symbols parse <objdump> <System.map> <kernel_headers>\n"
-                "                                 Parse the symbols from an objdump output, a\n"
-                "                                 System.map file and a kernel headers dir.\n"
-                "  symbols source <kernel_src_pp> Parse the pre-processed kernel source files\n"
+                "                                 from that directory. With \"-k\", only the\n"
+                "                                 kernel is processed, but no modules.\n"
+                "  symbols source <src_dir_pp>    Parse the pre-processed kernel source files\n"
                 "  symbols writerules <out_dir>   Write rules from candidate types into <out_dir>\n"
                 "  symbols store <ksym_file>      Saves the parsed symbols to a file\n"
                 "  symbols save <ksym_file>       Alias for \"store\"\n"
@@ -3712,6 +3710,12 @@ int Shell::cmdSymbolsParse(QStringList args)
 {
     QString objdump, sysmap, kernelSrc;
 
+    bool kernelOnly = false;
+    if (!args.isEmpty() && (args[0] == "-k" || args[0] == "--kernel")) {
+        kernelOnly = true;
+        args.pop_front();;
+    }
+
     // If we only got one argument, it must be the directory of a compiled
     // kernel source, and we extract the symbols from the kernel on-the-fly
     if (args.size() == 1) {
@@ -3766,7 +3770,7 @@ int Shell::cmdSymbolsParse(QStringList args)
                 parseSources = true;
         }
 
-        _sym.parseSymbols(kernelSrc);
+        _sym.parseSymbols(kernelSrc, kernelOnly);
         if (parseSources && !interrupted())
             cmdSymbolsSource(QStringList(ppSrc));
     }
