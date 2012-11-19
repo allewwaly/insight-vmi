@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<rule priority="101">
+			<!--
+				References:
+				http://lxr.linux.no/#linux+v2.6.32.58/fs/namespace.c#L154
+			-->
+			<name>vfsmount.mnt_writers</name>
+			<description>Member "mnt_writers" is a per-cpu variable.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>vfsmount</typename>
+				<members>
+					<member>mnt_writers</member>
+				</members>
+			</filter>
+			<action type="function" file="per_cpu.js">per_cpu_member</action>
+		</rule>
+	</rules>
+</typeknowledge>

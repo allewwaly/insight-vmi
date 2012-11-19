@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<rule priority="101">
+			<name>radix_tree_root.rnode</name>
+			<description>
+				Based on the last bit of the pointer that points to the next
+				node in a radix tree, the pointer may either be directly
+				dereferenceable or not.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>radix_tree_root</typename>
+				<members>
+					<member>rnode</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var RADIX_TREE_INDIRECT_PTR = 1;
+				var root = arguments[0];
+				var rnode = root.rnode;
+				if (!rnode.IsNull()) {
+					var addr_low = rnode.AddressLow();
+					if (addr_low &amp; RADIX_TREE_INDIRECT_PTR)
+						rnode.SetAddressLow(addr_low &amp; ~RADIX_TREE_INDIRECT_PTR);
+				}
+				return rnode;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
