@@ -17,6 +17,7 @@
 #include "memorymapheuristics.h"
 #include "structured.h"
 #include "structuredmember.h"
+#include "typeruleengine.h"
 #include <debug.h>
 
 
@@ -406,10 +407,19 @@ void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
         // Handle candidates
         Instance nextDeref;
 
-        // Are there candidates?
-        switch (inst->memberCandidatesCount(0)) {
+        // Can we rely on the rules enginge?
+        if (Instance::ruleEngine() && Instance::ruleEngine()->count() > 0) {
+            bool ambiguous;
+            nextDeref = inst->member(0, 0, 0, ksAll, &ambiguous);
+            // If the rules are ambiguous, fall back to default
+            if (ambiguous)
+                nextDeref = next.dereference(BaseType::trLexicalAndPointers);
+        }
+        else {
+            // Are there candidates?
+            switch (inst->memberCandidatesCount(0)) {
             case 0:
-                nextDeref = next.dereference(BaseType::trLexicalPointersArrays);
+                nextDeref = next.dereference(BaseType::trLexicalAndPointers);
                 break;
             case 1:
                 nextDeref = inst->memberCandidate(0, 0);
@@ -417,6 +427,7 @@ void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
             default:
                 /// todo: Consider candidates
                 return;
+            }
         }
 
         // verify
@@ -559,6 +570,11 @@ void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance *inst, 
     if (!inst || inst->isNull() || !inst->isValid())
         return;
 
+    if (layers > 32) {
+        debugerr("Not processing IDR with " << layers << " layers: " << inst->fullName());
+        return;
+    }
+
     // Add current node
     MemoryMapNodeSV *nextNode = NULL;
 
@@ -567,7 +583,7 @@ void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance *inst, 
                    addChildIfNotExistend((*inst), node, _index, inst->address(), false));
 
     if (!nextNode) {
-        debugerr("Could cast node to MemoryMapNodeSV!");
+        debugerr("Could not cast node to MemoryMapNodeSV!");
         return;
     }
 
