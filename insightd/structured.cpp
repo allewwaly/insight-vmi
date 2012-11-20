@@ -334,7 +334,7 @@ QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* 
 
         if (m->refType()) {
             // Output all types except structured types
-            if (m->refType()->dereferencedType() & StructOrUnion) {
+            if (m->refType()->dereferencedType(BaseType::trLexicalPointersArrays) & StructOrUnion) {
                 // Resolve the memory address of that struct
                 quint64 addr = offset + m->offset();
                 const BaseType* t = m->refType();

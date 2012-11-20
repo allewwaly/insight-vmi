@@ -244,7 +244,7 @@ InstanceList InstancePrototype::Members(bool declaredTypes) const
 {
 	Instance* inst;
 	return ((inst = thisInstance())) ?
-				inst->members(declaredTypes) : InstanceList();
+				inst->members(declaredTypes ? ksNone : _knowSrc) : InstanceList();
 }
 
 
@@ -304,7 +304,7 @@ int InstancePrototype::MemberOffset(int index) const
 	if (!inst || index < 0)
 		return false;
 	const Structured* s = dynamic_cast<const Structured*>(
-				inst->type()->dereferencedBaseType());
+				inst->type()->dereferencedBaseType(BaseType::trLexicalAndPointers));
 	return (s && index < s->members().size()) ?
 				s->members().at(index)->offset() : -1;
 }
@@ -328,7 +328,7 @@ Instance InstancePrototype::Member(const QString& name, bool declaredType) const
 {
 	Instance* inst;
 	return ((inst = thisInstance()))
-			? inst->member(name, BaseType::trAny, -1,
+			? inst->member(name, BaseType::trLexicalAndPointers, -1,
 						 declaredType ? ksNone : _knowSrc)
 			: Instance();
 }
@@ -338,7 +338,7 @@ Instance InstancePrototype::Member(int index, bool declaredType) const
 {
     Instance* inst;
     return ((inst = thisInstance()))
-            ? inst->member(index, BaseType::trAny, -1,
+            ? inst->member(index, BaseType::trLexicalAndPointers, -1,
                            declaredType ? ksNone : _knowSrc)
             : Instance();
 }
@@ -348,8 +348,9 @@ int InstancePrototype::TypeIdOfMember(const QString& name,
 									  bool declaredType) const
 {
 	Instance* inst;
-	return ((inst = thisInstance())) ?
-				inst->typeIdOfMember(name, declaredType) : -1;
+	return ((inst = thisInstance()))
+			? inst->typeIdOfMember(name, 0, 0, declaredType ? ksNone : _knowSrc)
+			: -1;
 }
 
 
@@ -403,7 +404,8 @@ bool InstancePrototype::MemberCandidateCompatible(int mbrIndex, int cndtIndex) c
 }
 
 
-bool InstancePrototype::MemberCandidateCompatible(const QString &name, int cndtIndex) const
+bool InstancePrototype::MemberCandidateCompatible(const QString &name,
+												  int cndtIndex) const
 {
 	Instance* inst;
 	return ((inst = thisInstance())) ?
@@ -414,9 +416,11 @@ bool InstancePrototype::MemberCandidateCompatible(const QString &name, int cndtI
 QString InstancePrototype::MemberAddress(int index, bool declaredType) const
 {
 	Instance* inst;
-	return ((inst = thisInstance())) ?
-				QString::number(inst->memberAddress(index, declaredType), 16) :
-				QString("0");
+	return ((inst = thisInstance()))
+			? QString::number(inst->memberAddress(index, 0, 0, declaredType ?
+													  ksNone : _knowSrc),
+								16)
+			: QString("0");
 }
 
 
@@ -424,9 +428,11 @@ QString InstancePrototype::MemberAddress(const QString &name,
 										 bool declaredType) const
 {
 	Instance* inst;
-	return ((inst = thisInstance())) ?
-				QString::number(inst->memberAddress(name, declaredType), 16) :
-				QString("0");
+	return ((inst = thisInstance()))
+			? QString::number(inst->memberAddress(name, 0, 0, declaredType ?
+													  ksNone : _knowSrc),
+							  16)
+			: QString("0");
 }
 
 

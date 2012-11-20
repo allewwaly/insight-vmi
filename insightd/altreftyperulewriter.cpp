@@ -306,7 +306,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
             const BaseType* srcTypeNonTypedef =
                     srcType->dereferencedBaseType(BaseType::trLexical);
             const BaseType* srcTypeNonPtr =
-                    srcTypeNonTypedef->dereferencedBaseType(BaseType::trLexicalPointersArrays);
+                    srcTypeNonTypedef->dereferencedBaseType(BaseType::trLexicalAndPointers);
             // Check if we can use the target name or if we need to use the ID
             int srcUseId = useTypeId(srcType);
 
@@ -343,7 +343,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                             dynamic_cast<const ASTVariableExpression*>(varExpList[i]);
                     if (ve) {
                         const BaseType* veTypeNonPtr = ve->baseType() ?
-                                    ve->baseType()->dereferencedBaseType() : 0;
+                                    ve->baseType()->dereferencedBaseType(BaseType::trLexicalAndPointers) : 0;
                         // If we don't have a base type or the variable's type
                         // does not match the given source type, we don't need
                         // to proceed
@@ -397,7 +397,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                             m_found = true;
                             // For the first member, skip any pointer if required
                             if (!(type->type() & StructOrUnion))
-                                type = type->dereferencedBaseType();
+                                type = type->dereferencedBaseType(BaseType::trLexicalAndPointers);
                         }
                         // Skip transformations like 's->foo->bar'
                         else if (m_deref_found) {
@@ -495,7 +495,7 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                 // Is this a trivial expression that just returns itself?
                 if (nonTrivCnt == 0) {
                     ASTConstExpressionList list = expr->flaten();
-                    const BaseType* targetNonPtr = target->dereferencedBaseType();
+                    const BaseType* targetNonPtr = target->dereferencedBaseType(BaseType::trLexicalAndPointers);
                     if (list.size() == 1 && (srcTypeNonPtr == targetNonPtr ||
                                              *srcTypeNonPtr == *targetNonPtr))
                     {
@@ -706,7 +706,7 @@ QString AltRefTypeRuleWriter::fileNameEscape(QString s) const
 int AltRefTypeRuleWriter::useTypeId(const BaseType* type) const
 {
     const BaseType* typeNonPtr = type ?
-                type->dereferencedBaseType(BaseType::trAny) : 0;
+                type->dereferencedBaseType(BaseType::trLexicalAndPointers) : 0;
 
     int typeId = 0;
 

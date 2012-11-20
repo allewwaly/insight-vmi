@@ -234,11 +234,12 @@ public:
      * one candidate type, this type will be used instead of the originally
      * declared type of the member. To have the declared types instead, set
      * \a declaredTypes to \c true.
-     * @param declaredTypes selects if candidate types or declared types should
+     * @param src selects which sources of knowledge to use when accessing
+     *  members
      * be used, where applicable
      * @return a list of instances of all members
      */
-    InstanceList members(bool declaredTypes = false) const;
+    InstanceList members(KnowledgeSources src = ksAll) const;
 
     /**
      * Gives access to the concrete BaseType of this instance.
@@ -394,12 +395,12 @@ public:
      * BaseType::TypeResolution
      * @param maxPtrDeref the maximum levels of pointers that should be
      * dereferenced
-     * @param declaredType selects if the candidate type (if it exists) or the
-     * declared types should be used, defaults to \c false
+     * @param src selects which sources of knowledge to use when accessing
+     *  members
      * @param ambiguous bool that is set \c true if multiple rules or
      * candidates matched the member
      * @return Instance object of the specified member
-     * \sa BaseType::TypeResolution
+     * \sa BaseType::TypeResolution KnowledgeSources
      */
     Instance member(int index, int resolveTypes = 0,
                     int maxPtrDeref = -1, KnowledgeSources src = ksAll,
@@ -419,9 +420,8 @@ public:
      * BaseType::TypeResolution
      * @param maxPtrDeref the maximum levels of pointers that should be
      * dereferenced
-     * @param declaredType selects if the candidate type (if it exists) or the
-     * declared types should be used, defaults to \c false
-     * @param src knowledge sources to use for resolving the member
+     * @param src selects which sources of knowledge to use when accessing
+     *  members
      * @param ambiguous bool that is set \c true if multiple rules or
      * candidates matched the member
      * @return Instance object of the specified member
@@ -457,33 +457,53 @@ public:
      * @param index index into the member list
      * @param resolveTypes which types to automatically resolve, see
      * BaseType::TypeResolution
-     * @param declaredType selects if the candidate type (if it exists) or the
-     * declared types should be used, defaults to \c false
+     * @param maxPtrDeref the maximum levels of pointers that should be
+     * dereferenced
+     * @param src selects which sources of knowledge to use when accessing
+     *  members
+     * @param ambiguous bool that is set \c true if multiple rules or
+     * candidates matched the member
      * @return pointer to the type of member \a index, or 0 if this is no struct
      * or union or \a index is out of bounds
      */
     const BaseType* memberType(int index, int resolveTypes = 0,
-                               bool declaredType = false) const;
+                               int maxPtrDeref = -1, KnowledgeSources src = ksAll,
+                               bool *ambiguous = 0) const;
 
     /**
      * Calculates the virtual address of a member, if this is a struct or union.
      * @param index index into the member list
-     * @param declaredType selects if the candidate type (if it exists) or the
-     * declared types should be used, defaults to \c false
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
+     * @param maxPtrDeref the maximum levels of pointers that should be
+     * dereferenced
+     * @param src selects which sources of knowledge to use when accessing
+     *  members
+     * @param ambiguous bool that is set \c true if multiple rules or
+     * candidates matched the member
      * @return the virtual address of member \a index, or 0 if this is no struct
      * or union
      */
-    quint64 memberAddress(int index, bool declaredType = false) const;
+    quint64 memberAddress(int index, int resolveTypes = 0, int maxPtrDeref = -1,
+                          KnowledgeSources src = ksAll, bool *ambiguous = 0) const;
 
     /**
      * Calculates the virtual address of a member, if this is a struct or union.
      * @param name the name of the member
-     * @param declaredType selects if the candidate type (if it exists) or the
-     * declared types should be used, defaults to \c false
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
+     * @param maxPtrDeref the maximum levels of pointers that should be
+     * dereferenced
+     * @param src selects which sources of knowledge to use when accessing
+     *  members
+     * @param ambiguous bool that is set \c true if multiple rules or
+     * candidates matched the member
      * @return the virtual address of member \a index, or 0 if this is no struct
      * or union
      */
-    quint64 memberAddress(const QString& name, bool declaredType = false) const;
+    quint64 memberAddress(const QString& name, int resolveTypes = 0,
+                          int maxPtrDeref = -1, KnowledgeSources src = ksAll,
+                          bool *ambiguous = 0) const;
 
     /**
      * Returns the offset of member \a name within a struct, if this is a struct
@@ -513,11 +533,19 @@ public:
     /**
      * Retrieves the type ID of the member \a name.
      * @param name the name of the member
-     * @param declaredType selects if the candidate type (if it exists) or the
-     * declared types should be used, defaults to \c false
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
+     * @param maxPtrDeref the maximum levels of pointers that should be
+     * dereferenced
+     * @param src selects which sources of knowledge to use when accessing
+     *  members
+     * @param ambiguous bool that is set \c true if multiple rules or
+     * candidates matched the member
      * @return the ID of the type, if that member exists, \c 0 otherwise.
      */
-    int typeIdOfMember(const QString& name, bool declaredType = false) const;
+    int typeIdOfMember(const QString& name, int resolveTypes = 0,
+                       int maxPtrDeref = -1, KnowledgeSources src = ksAll,
+                       bool *ambiguous = 0) const;
 
     /**
      * Returns the number of candidate types for a particular member.

@@ -306,32 +306,35 @@ Instance MemoryDump::getNextInstance(const QString& component,
 		}
 	}
 	else {
-		// Did we get a null instance?
-		if (!(instance.type()->type() & StructOrUnion) &&
-			(instance.isNull() || !instance.toPointer()))
-			queryError(QString("Member \"%1\" is null")
-					   .arg(instance.fullName()));
-		// We have a instance therefore we resolve the member
-		if (!(instance.type()->type() & StructOrUnion))
-            queryError(QString("Member \"%1\" is not a struct or union")
-                        .arg(instance.fullName()));
+		// Dereference any pointers/arrays first
+		result = instance.dereference(BaseType::trAnyNonNull);
 
-        if (!instance.memberExists(symbol))
+		// Did we get a null instance?
+		if (!(result.type()->type() & StructOrUnion) &&
+			(result.isNull() || !result.toPointer()))
+			queryError(QString("Member \"%1\" is null")
+					   .arg(result.fullName()));
+		// We have a instance therefore we resolve the member
+		if (!(result.type()->type() & StructOrUnion))
+            queryError(QString("Member \"%1\" is not a struct or union")
+                        .arg(result.fullName()));
+
+        if (!result.memberExists(symbol))
             queryError(QString("Struct \"%1\" has no member named \"%2\"")
-                        .arg(instance.typeName())
+                        .arg(result.typeName())
                         .arg(symbol));
 
         // Do we have a candidate index?
         if (candidateIndex > 0) {
-            if (instance.memberCandidatesCount(symbol) < candidateIndex)
+            if (result.memberCandidatesCount(symbol) < candidateIndex)
                 queryError(QString("Member \"%1\" does not have a candidate "
                                    "with index %2")
                             .arg(symbol)
                             .arg(candidateIndex));
-            result = instance.memberCandidate(symbol, candidateIndex - 1);
+            result = result.memberCandidate(symbol, candidateIndex - 1);
         }
         else {
-            result = instance.member(symbol, BaseType::trLexical, src);
+            result = result.member(symbol, BaseType::trLexical, src);
         }
 	}
 
@@ -417,7 +420,7 @@ Instance MemoryDump::getNextInstance(const QString& component,
 		
 	}
 	// Try to dereference this instance as deep as possible
-	return result.dereference(BaseType::trAnyNonNull);
+	return result.dereference(BaseType::trLexicalAndPointers);
 }
 
 
