@@ -15,6 +15,18 @@
 Pointer::Pointer(SymFactory* factory)
 	: RefBaseType(factory)
 {
+	if (factory) {
+		setSize(factory->memSpecs().sizeofPointer);
+		// Make sure the host system can handle the pointer size of the guest
+		if (_size > sizeof(void*)) {
+			throw BaseTypeException(
+					QString("The guest system has wider pointers (%1 byte) than"
+							" the host system (%2 byte).")
+							.arg(_size).arg(sizeof(void*)),
+					__FILE__,
+					__LINE__);
+		}
+	}
 }
 
 
@@ -24,7 +36,8 @@ Pointer::Pointer(SymFactory* factory, const TypeInfo& info)
 	// Make sure the host system can handle the pointer size of the guest
 	if (_size > 0 && _size > sizeof(void*)) {
 		throw BaseTypeException(
-				QString("The guest system has wider pointers (%1 byte) than the host system (%2 byte).").arg(_size).arg(sizeof(void*)),
+				QString("The guest system has wider pointers (%1 byte) than the"
+						" host system (%2 byte).").arg(_size).arg(sizeof(void*)),
 				__FILE__,
 				__LINE__);
 	}
