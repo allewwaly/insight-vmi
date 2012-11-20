@@ -10,6 +10,7 @@
 #include "instance.h"
 #include "structured.h"
 #include "variable.h"
+#include "typeruleengine.h"
 
 SlubObjects::SlubObjects(const SymFactory* factory, VirtualMemory *vmem)
     : _factory(factory), _vmem(vmem)
@@ -188,6 +189,11 @@ SlubObjects::ObjectValidity SlubObjects::isInstanceEmbedded(const Instance *inst
 
 void SlubObjects::parsePreproc(const QString &fileName)
 {
+    clear();
+
+    if (fileName.isEmpty())
+        fileNotFoundError("No slub file specified.");
+
     QFile in(fileName);
     if (!in.exists())
         fileNotFoundError(QString("File \"%1\" does not exist")
@@ -271,7 +277,7 @@ void SlubObjects::resolveObjSize()
             // Read name and size from memory
             name = inst.member("name", BaseType::trLexical).toString();
             name = name.remove('"');
-            debugmsg("name = " << name);
+//            debugmsg("name = " << name);
             int size =
                     inst.member("objsize", BaseType::trLexical).toInt32();
 
@@ -282,14 +288,12 @@ void SlubObjects::resolveObjSize()
             }
 
             // Proceed to next cache
-            inst = inst.member("list", BaseType::trLexical);
-            if (inst.memberCandidatesCount("next") == 1) {
-                inst = inst.memberCandidate("next", 0);
-            }
-            else {
-                debugerr("ERROR: Candidate for \"(" << name << ").list.next\" "
-                         "is ambiguous.");
-                return;
+            inst = inst.member("list").member("next");
+            // If the type magic was not automatically resolved, fix it manually
+            if (!inst.isValid() || inst.typeHash() != start.typeHash()) {
+                inst.setType(start.type());
+                if (!inst.isNull())
+                    inst.addToAddress(-start.memberOffset("list"));
             }
         } while (start.address() != inst.address() && !inst.isNull());
     }
