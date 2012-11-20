@@ -140,7 +140,7 @@ const QStringList& Instance::memberNames() const
 }
 
 
-InstanceList Instance::members(bool declaredTypes) const
+InstanceList Instance::members(KnowledgeSources src) const
 {
     if (!_d->type || !(_d->type->type() & StructOrUnion))
         return InstanceList();
@@ -150,7 +150,7 @@ InstanceList Instance::members(bool declaredTypes) const
 	for (int i = 0; i < list.count(); ++i) {
 		const StructuredMember* m = list[i];
 		// Use declared or candidate type?
-		if (declaredTypes || m->altRefTypeCount() != 1)
+		if (src || m->altRefTypeCount() != 1)
 			ret.append(m->toInstance(_d->address, _d->vmem, this,
 										   BaseType::trLexical));
 		else
@@ -267,8 +267,8 @@ bool Instance::equals(const Instance& other) const
     case rtTypedef:
     case rtVolatile: {
         int cnt1, cnt2;
-        Instance inst1 = dereference(BaseType::trAny, -1, &cnt1);
-        Instance inst2 = other.dereference(BaseType::trAny, -1, &cnt2);
+        Instance inst1 = dereference(BaseType::trLexicalAndPointers, -1, &cnt1);
+        Instance inst2 = other.dereference(BaseType::trLexicalAndPointers, -1, &cnt2);
 
         if (cnt1 != cnt2)
             return false;
@@ -381,8 +381,8 @@ void Instance::differencesRek(const Instance& other,
     case rtTypedef:
     case rtVolatile: {
         int cnt1, cnt2;
-        Instance inst1 = dereference(BaseType::trAny, -1, &cnt1);
-        Instance inst2 = other.dereference(BaseType::trAny, -1, &cnt2);
+        Instance inst1 = dereference(BaseType::trLexicalAndPointers, -1, &cnt1);
+        Instance inst2 = other.dereference(BaseType::trLexicalAndPointers, -1, &cnt2);
 
         if (cnt1 != cnt2)
             result.append(relParent);
@@ -647,53 +647,28 @@ Instance Instance::memberByOffset(size_t off, bool exactMatch) const
 
 
 const BaseType* Instance::memberType(int index, int resolveTypes,
-									 bool declaredType) const
+									 int maxPtrDeref, KnowledgeSources src,
+									 bool *ambiguous) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
-	if (s && index >= 0 && index < s->members().size()) {
-		const StructuredMember* m = s->members().at(index);
-		if (declaredType || m->altRefTypeCount() != 1)
-			return m->refTypeDeep(resolveTypes);
-		else {
-			const BaseType* ret = m->altRefBaseType(0);
-			if (ret && resolveTypes)
-				ret = ret->dereferencedBaseType(resolveTypes);
-			return ret;
-		}
-	}
-	return 0;
+	Instance m(member(index, resolveTypes, maxPtrDeref, src, ambiguous));
+	return m.type();
 }
 
 
-quint64 Instance::memberAddress(int index, bool declaredType) const
+quint64 Instance::memberAddress(int index, int resolveTypes, int maxPtrDeref,
+								KnowledgeSources src, bool *ambiguous) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
-	if (s && index >= 0 && index < s->members().size()) {
-        const StructuredMember* m = s->members().at(index);
-		if (declaredType || m->altRefTypeCount() != 1)
-			return _d->address + m->offset();
-		else {
-			Instance inst = memberCandidate(m, 0);
-			return inst.address();
-		}
-	}
-	return 0;
+	Instance m(member(index, resolveTypes, maxPtrDeref, src, ambiguous));
+	return m.address();
 }
 
 
-quint64 Instance::memberAddress(const QString &name, bool declaredType) const
+quint64 Instance::memberAddress(const QString &name, int resolveTypes,
+								int maxPtrDeref, KnowledgeSources src,
+								bool *ambiguous) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
-	const StructuredMember* m;
-	if (s && (m = s->member(name, false))) {
-		if (declaredType || m->altRefTypeCount() != 1)
-			return _d->address + m->offset();
-		else {
-			Instance inst = memberCandidate(m, 0);
-			return inst.address();
-		}
-	}
-	return 0;
+	Instance m(member(name, resolveTypes, maxPtrDeref, src, ambiguous));
+	return m.address();
 }
 
 
@@ -723,16 +698,12 @@ int Instance::indexOfMember(const QString& name) const
 }
 
 
-int Instance::typeIdOfMember(const QString& name, bool declaredType) const
+int Instance::typeIdOfMember(const QString& name, int resolveTypes,
+							 int maxPtrDeref, KnowledgeSources src,
+							 bool *ambiguous) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
-	const StructuredMember* m = 0;
-	if ( !s || !(m = s->member(name)) )
-		return 0;
-	else if (declaredType || m->altRefTypeCount() != 1)
-		return m->refTypeId();
-	else
-		return m->altRefType(0).id();
+	Instance m(member(name, resolveTypes, maxPtrDeref, src, ambiguous));
+	return m.type()	? m.type()->id() : 0;
 }
 
 
@@ -976,8 +947,8 @@ bool Instance::compareInstance(const Instance& inst,
         else
         {
           int i = 1;
-          for(; member.memberAddress(i) < inst.address() && i < member.memberCount(); i++);
-          member = member.member(i-1);
+          for(; member.memberAddress(i, 0, 0, ksNone) < inst.address() && i < member.memberCount(); i++);
+          member = member.member(i-1, 0, 0, ksNone);
         }
         
         member = (member.type() && member.type()->type() & BaseType::trLexical) ?

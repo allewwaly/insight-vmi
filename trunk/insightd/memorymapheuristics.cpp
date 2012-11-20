@@ -176,7 +176,7 @@ bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct, const 
     // Are there candidates?
     switch(i->memberCandidatesCount(0)) {
         case 0:
-            nextDeref = next.dereference(BaseType::trLexicalPointersArrays);
+            nextDeref = next.dereference(BaseType::trLexicalAndPointers);
             break;
         case 1:
             nextDeref = i->memberCandidate(0, 0);

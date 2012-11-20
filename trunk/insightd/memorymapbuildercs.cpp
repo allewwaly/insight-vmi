@@ -167,13 +167,13 @@ void MemoryMapBuilderCS::addMembers(const Instance *inst, MemoryMapNode* node)
     for (int i = 0; i < inst->memberCount(); ++i) {
 
         // Get declared type of this member
-        const BaseType* mBaseType = inst->memberType(i, BaseType::trLexical, true);
+        const BaseType* mBaseType = inst->memberType(i, BaseType::trLexical, 0, ksNone);
         if (!mBaseType)
             continue;
 
         // Consider the members of nested structs recurisvely
         if (mBaseType->type() & StructOrUnion) {
-            Instance mi = inst->member(i, BaseType::trLexical, true);
+            Instance mi = inst->member(i, BaseType::trLexical);
             // Adjust instance name to reflect full path
             if (node->name() != inst->name())
                 mi.setName(inst->name() + "." + mi.name());
@@ -189,22 +189,23 @@ void MemoryMapBuilderCS::addMembers(const Instance *inst, MemoryMapNode* node)
         // No candidate types
         if (!candidateCnt) {
             try {
-                Instance m = inst->member(i, BaseType::trLexical, true);
+                Instance m = inst->member(i, BaseType::trLexical);
                 // Only add pointer members with valid address
                 if (m.type() && m.type()->type() == rtPointer &&
                     _map->addressIsWellFormed(m))
                 {
                     int cnt;
-                    m = m.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
+                    m = m.dereference(BaseType::trLexicalAndPointers, -1, &cnt);
                     if (cnt) {
                         // Adjust instance name to reflect full path
                         if (node->name() != inst->name())
                             m.setName(inst->name() + "." + m.name());
-                        _map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i));
+                        _map->addChildIfNotExistend(m, node, _index,
+                                                    inst->memberAddress(i, 0, 0, ksNone));
                     }
                 }
             }
-            catch (GenericException& e) {
+            catch (GenericException&) {
                 // Do nothing
             }
         }
@@ -215,12 +216,13 @@ void MemoryMapBuilderCS::addMembers(const Instance *inst, MemoryMapNode* node)
                 if (_map->addressIsWellFormed(m) && m.type()) {
                     int cnt = 1;
                     if (m.type()->type() == rtPointer)
-                        m = m.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
+                        m = m.dereference(BaseType::trLexicalAndPointers, -1, &cnt);
                     if (cnt || (m.type()->type() & StructOrUnion)) {
                         // Adjust instance name to reflect full path
                         if (node->name() != inst->name())
                             m.setName(inst->name() + "." + m.name());
-                        _map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i));
+                        _map->addChildIfNotExistend(m, node, _index,
+                                                    inst->memberAddress(i, 0, 0, ksNone));
                     }
                 }
             }

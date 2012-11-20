@@ -2058,7 +2058,7 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                     baseTypes = _typesByName.values(id);
                     for (int i = baseTypes.size() - 1; i >= 0; --i) {
                         // Dereference any pointers or typedefs
-                        baseTypes[i] = baseTypes[i]->dereferencedBaseType();
+                        baseTypes[i] = baseTypes[i]->dereferencedBaseType(BaseType::trLexicalPointersArrays);
                         // See if the type matches
                         if (baseTypes[i]->type() == astTypeNonPtr->type())
                             // Add all typedefs of that type to a separate list
@@ -2193,7 +2193,8 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
     for (int i = baseTypes.size() - 1; i >= 0; --i) {
         // Compare the dereferenced type
         if (baseTypes[i] &&
-            (baseTypes[i]->dereferencedType() != astTypeNonPtr->type()))
+            (baseTypes[i]->dereferencedType(
+                 BaseType::trLexicalPointersArrays) != astTypeNonPtr->type()))
             baseTypes.removeAt(i);
     }
 

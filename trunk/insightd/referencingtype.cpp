@@ -346,7 +346,7 @@ const AltRefType& ReferencingType::altRefType(int index) const
         for (int i = 0; i < _altRefTypes.size(); ++i) {
             if (!(t = altRefBaseType(i)))
                 continue;
-            RealType curType = t->dereferencedType();
+            RealType curType = t->dereferencedType(BaseType::trLexicalAndPointers);
             // Init variables
             if (useIndex < 0) {
                 useType = curType;

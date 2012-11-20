@@ -122,9 +122,8 @@ public:
      * @return non-referencing RealType if this is a referencing type, type()
      * otherwise
      */
-    RealType dereferencedType(
-            int resolveTypes = trLexicalPointersArrays, int maxPtrDeref = -1,
-            int *depth = 0) const;
+    RealType dereferencedType(int resolveTypes, int maxPtrDeref = -1,
+                              int *depth = 0) const;
 
     /**
      * If this is a referencing type, all types are successively dereferenced
@@ -137,9 +136,8 @@ public:
      * @return non-referencing base type if this is a referencing type, \c this
      * otherwise
      */
-    const BaseType* dereferencedBaseType(
-            int resolveTypes = trLexicalPointersArrays, int maxPtrDeref = -1,
-            int *depth = 0) const;
+    const BaseType* dereferencedBaseType(int resolveTypes, int maxPtrDeref = -1,
+                                         int *depth = 0) const;
 
     /**
      * If this is a referencing type, all types are successively dereferenced
@@ -152,8 +150,7 @@ public:
      * @return non-referencing base type if this is a referencing type, \c this
      * otherwise
      */
-    BaseType* dereferencedBaseType(
-            int resolveTypes = trLexicalPointersArrays, int maxPtrDeref = -1,
+    BaseType* dereferencedBaseType(int resolveTypes, int maxPtrDeref = -1,
             int *depth = 0);
 
     /**

@@ -250,9 +250,9 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         do {
             if (instHash == t->hash())
                 return inst->toExpressionResult(takeAddress);
-            // Dereference the type, if possible
+            // Dereference the type, if possible, but no arrays, only pointers
             if (t->type() & RefBaseTypes) {
-                if (t->type() & (rtPointer|rtArray))
+                if (t->type() & rtPointer)
                     takeAddress = true;
                 t = dynamic_cast<const RefBaseType*>(t)->refType();
             }
