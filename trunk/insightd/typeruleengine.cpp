@@ -237,7 +237,6 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
         return mrNoMatch;
 
     int ret = mrNoMatch, prio = 0, usedRule = -1;
-    uint newInstHash = 0;
     *newInst = 0;
 
     ActiveRuleHash::const_iterator it = _rulesPerType.find(inst->type()->id()),
@@ -288,7 +287,6 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                         Instance instRet(evaluateRule(it.value(), inst, members,
                                                       &match));
                         instRet.setOrigin(Instance::orRuleEngine);
-                        uint instHash = instRet.type() ?  instRet.type()->hash() : 0;
 
                         // Did another rule match previously?
                         if ( (*newInst) && (ret & mrMatch) ) {
@@ -298,12 +296,11 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                                 prio = rule->priority();
                                 usedRule = it.value().index;
                                 **newInst = instRet;
-                                newInstHash = instHash;
                                 ret &= ~mrMultiMatch;
                             }
                             // Compare this instance to the previous one
                             else if (instRet.address() != (*newInst)->address() ||
-                                     (instHash != newInstHash))
+                                     (instRet.typeHash() != (*newInst)->typeHash()))
                             {
                                 // Ambiguous rules
                                 ret |= mrMultiMatch;
@@ -319,7 +316,6 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                             }
                             if (!(*newInst) && instRet.isValid()) {
                                 *newInst = new Instance(instRet);
-                                newInstHash = instHash;
                             }
                         }
                     }
@@ -456,6 +452,10 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
             ret = arule.rule->action()->evaluate(inst, members, _eng, &m);
             if (matched)
                 *matched = m;
+        }
+        catch (VirtualMemoryException& /*e*/) {
+            // ignored
+            return Instance(Instance::orRuleEngine);
         }
         catch (GenericException& e) {
 //            errRule(arule.rule, arule.index, QString("raised an exception."));
