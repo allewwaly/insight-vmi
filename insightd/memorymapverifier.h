@@ -145,7 +145,7 @@ public:
      * @param slubFile the full path to the slub file that should be parsed
      * @returns true if the slub file could be parsed, false otherwise.
      */
-    bool parseSlubData(const char *slubFile = 0);
+    bool parseSlubData(const QString &slubFile = QString());
 
     /**
      * Collect and print statistics about the current memory map.
