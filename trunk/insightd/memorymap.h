@@ -61,8 +61,7 @@ typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
  */
 struct BuilderSharedState
 {
-    BuilderSharedState(const SymFactory* factory, VirtualMemory* vmem)
-        : slubs(factory, vmem)
+    BuilderSharedState()
     {
         reset();
     }
@@ -76,7 +75,6 @@ struct BuilderSharedState
         lastNode = 0;
         for (int i = 0; i < MAX_BUILDER_THREADS; ++i)
             currAddresses[i] = 0;
-        slubs.clear();
     }
 
     float minProbability;
@@ -92,7 +90,6 @@ struct BuilderSharedState
         typeInstancesLock, pointersToLock, vmemReadingLock, vmemWritingLock,
         mapNodeLock;
     QWaitCondition vmemReadingDone, vmemWritingDone;
-    SlubObjects slubs;
 
 #ifdef DEBUG
 	mutable quint32 degPerGenerationCnt;

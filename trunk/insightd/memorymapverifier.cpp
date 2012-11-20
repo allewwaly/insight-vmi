@@ -160,12 +160,12 @@ void MemoryMapVerifier::resetWatchNodes()
     _watchNodes.clear();
 }
 
-bool MemoryMapVerifier::parseSlubData(const char *slubFile)
+bool MemoryMapVerifier::parseSlubData(const QString& slubFile)
 {
     QMutexLocker(&this->verifierMutex);
-    if(_slubDataAvailable || slubFile) {
+    if(_slubDataAvailable || !slubFile.isEmpty()) {
         try {
-            if(slubFile)
+            if (!slubFile.isEmpty())
                 _slub.parsePreproc(slubFile);
             else
                 _slub.parsePreproc(_slubFile);

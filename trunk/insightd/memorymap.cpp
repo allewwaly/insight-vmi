@@ -39,8 +39,8 @@ const QString& MemoryMap::insertName(const QString& name)
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _threads(0), _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
       _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
-      _isBuilding(false), _shared(new BuilderSharedState(factory, vmem)),
-      _verifier(this, "/home/vogls/doc/projects/insight/slub/objects-20121009-181800.log")
+      _isBuilding(false), _shared(new BuilderSharedState()),
+      _verifier(this)
 {
     clear();
 }
@@ -188,9 +188,12 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 
     // Read slubs object file, if given
     if (!slubObjFile.isEmpty()) {
-        _shared->slubs.parsePreproc(slubObjFile);
-
+        _verifier.parseSlubData(slubObjFile);
     }
+    else {
+        debugmsg("No slub object file given.");
+    }
+
 
     // How many threads to create?
 //    _shared->threadCount =
