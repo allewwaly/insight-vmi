@@ -156,6 +156,7 @@ public:
 	 * @return an Instance object based on this node
 	 */
     Instance toInstance(bool includeParentNameComponents = true) const;
+
 protected:
 	/**
 	 * Re-calculates the probability of this node being "sane" and used by the
@@ -184,6 +185,7 @@ protected:
 	const BaseType* _type;   ///< type of this node
     int _id;                 ///< ID of this node, if based on a variable
     float _probability;      ///< probability of "correctness" of this node
+    Instance* _origInst;
 };
 
 
