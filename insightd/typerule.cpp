@@ -493,7 +493,6 @@ const BaseType* ExpressionAction::parseTypeStr(
             typeRuleError3(xmlFile, srcLine(), -1, TypeRuleException::ecNotCompatible,
                            QString("Cannot find any compatible type for the %1: %2")
                            .arg(what).arg(typeStr));
-
     }
     else
         return found.types.first();
@@ -565,7 +564,7 @@ bool ExpressionAction::check(const QString &xmlFile, const TypeRule *rule,
     AbstractSyntaxTree ast;
     ASTBuilder builder(&ast, factory);
     QString codeStr;
-    // If the type was specified via ID, we have to use the type here
+    // If the type was specified via ID, we have to use the pseudo typedef here
     if (srcUsesId)
         codeStr = QString("__0x%0__ %1;").arg((uint)_srcType->id(), 0, 16).arg(srcId);
     else
@@ -605,6 +604,33 @@ bool ExpressionAction::check(const QString &xmlFile, const TypeRule *rule,
 }
 
 
+bool ExpressionAction::match(const BaseType *type, const OsSpecs *specs) const
+{
+    Q_UNUSED(specs);
+    if (!type || !_srcType)
+        return false;
+
+    // The given type must match the target type, but be forgiving with
+    // pointer source types since the instance typically is dereferenced.
+    const BaseType *srcType = _srcType, *last = _srcType;
+    type = type->dereferencedBaseType(BaseType::trLexical);
+    while (srcType && (*type != *srcType))
+    {
+        if (srcType->type() & BaseType::trLexicalAndPointers) {
+            last = srcType;
+            srcType = srcType->dereferencedBaseType(BaseType::trLexicalAndPointers, 1);
+            // void* pointers are not dereferenced anymore
+            if (srcType == last)
+                srcType = 0;
+        }
+        else
+            return false;
+    }
+
+    return srcType != 0;
+}
+
+
 Instance ExpressionAction::evaluate(const Instance *inst,
                                     const ConstMemberList &members,
                                     ScriptEngine *eng, bool *matched) const
@@ -617,21 +643,8 @@ Instance ExpressionAction::evaluate(const Instance *inst,
     if (!inst || !inst->type() || !_targetType || !_srcType || !_expr)
         return Instance();
 
-    // The instance's type must match the target type, but be forgiving with
-    // pointer source types since the instance typically is dereferenced.
-    const BaseType* instType =
-            inst->type()->dereferencedBaseType(BaseType::trLexical);
-    const BaseType* srcType = _srcType;
-    while (srcType && instType->id() != srcType->id() &&
-           instType->hash() != srcType->hash())
-    {
-        if (srcType->type() & BaseType::trLexicalPointersArrays)
-            srcType = srcType->dereferencedBaseType(BaseType::trLexicalPointersArrays, 1);
-        else
-            return Instance();
-    }
-    // This should never become null!
-    if (!srcType)
+    // The instance's type must match our source type
+    if (!match(inst->type()))
         return Instance();
 
     const SymFactory* fac = inst->type()->factory();
@@ -678,6 +691,14 @@ QString ExpressionAction::toString(const ColorPalette *col) const
     s += "\n" + ShellUtil::colorize("Expression:", ctColHead, col) + "  ";
     s += _expr ? _expr->toString() : _exprStr;
     return s;
+}
+
+
+bool TypeRuleAction::match(const BaseType *type, const OsSpecs *specs) const
+{
+    Q_UNUSED(type);
+    Q_UNUSED(specs);
+    return true;
 }
 
 
