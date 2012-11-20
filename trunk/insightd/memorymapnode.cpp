@@ -17,7 +17,7 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
         quint64 address, const BaseType* type, int id, MemoryMapNode* parent)
 	: _belongsTo(belongsTo), _parent(parent),
 	  _name(MemoryMap::insertName(name)), _address(address), _type(type),
-	  _id(id), _probability(1.0)
+	  _id(id), _probability(1.0), _origInst(0)
 {
     if (_belongsTo && (_belongsTo->vmem()->memSpecs().arch & MemSpecs::ar_i386))
         if (_address >= (1ULL << 32))
@@ -31,12 +31,14 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
         MemoryMapNode* parent)
     : _belongsTo(belongsTo), _parent(parent),
       _name(getNameFromInstance(parent, inst)), _address(inst.address()),
-      _type(inst.type()), _id(inst.id()), _probability(1.0)
+      _type(inst.type()), _id(inst.id()), _probability(1.0),
+      _origInst(0)
 {
     if (_belongsTo && _address > _belongsTo->vmem()->memSpecs().vaddrSpaceEnd())
             genericError(QString("Address 0x%1 exceeds 32 bit address space")
                     .arg(_address, 0, 16));
-
+    if (inst.hasParent())
+        _origInst = new Instance(inst);
 //    updateProbability(&inst);
 }
 
@@ -45,7 +47,10 @@ MemoryMapNode::~MemoryMapNode()
 {
     for (NodeList::iterator it = _children.begin(); it != _children.end(); ++it)
         delete *it;
+    if (_origInst)
+        delete _origInst;
 }
+
 
 const QString & MemoryMapNode::getNameFromInstance(MemoryMapNode* parent, const Instance &inst)
 {
@@ -122,6 +127,10 @@ MemoryMapNode* MemoryMapNode::addChild(const Instance& inst)
 
 Instance MemoryMapNode::toInstance(bool includeParentNameComponents) const
 {
+    // Return the stored instance, if it exists
+    if (_origInst)
+        return *_origInst;
+
     Instance inst(_address, _type, _name,
             includeParentNameComponents ? parentNameComponents() : QStringList(),
             _belongsTo->vmem(), _id);

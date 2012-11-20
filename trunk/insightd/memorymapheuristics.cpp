@@ -1,4 +1,5 @@
 #include "memorymapheuristics.h"
+#include "typeruleengine.h"
 
 #define MINUS_ONE_32 ((quint32)-1)
 #define MINUS_ONE_64 -1ULL
@@ -173,8 +174,17 @@ bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct, const 
     if (next.isNull())
         return false;
 
-    // Are there candidates?
-    switch(i->memberCandidatesCount(0)) {
+    // Can we rely on the rules enginge?
+    if (Instance::ruleEngine() && Instance::ruleEngine()->count() > 0) {
+        bool ambiguous;
+        nextDeref = i->member(0, 0, 0, ksNoAltTypes, &ambiguous);
+        // If the rules are ambiguous, fall back to default
+        if (ambiguous)
+            nextDeref = next.dereference(BaseType::trLexicalAndPointers);
+    }
+    else {
+        // Are there candidates?
+        switch(i->memberCandidatesCount(0)) {
         case 0:
             nextDeref = next.dereference(BaseType::trLexicalAndPointers);
             break;
@@ -184,6 +194,7 @@ bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct, const 
         default:
             /// todo: Consider candidates
             return false;
+        }
     }
 
     // verify

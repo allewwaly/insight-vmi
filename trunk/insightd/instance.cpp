@@ -518,11 +518,15 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 		int extraOffset = 0;
 		for (int i = 0; i + 1 < members.size(); ++i)
 			extraOffset += members[i]->offset();
+		bool addrInBounds = (_d->vmem->memSpecs().arch & MemSpecs::ar_x86_64) ||
+				(_d->address + m->offset() + extraOffset < (1ULL << 32));
 
 		// Should we use candidate types?
 		if ((src & ksNoAltTypes) || (match & TypeRuleEngine::mrMultiMatch)) {
-			ret = m->toInstance(_d->address + extraOffset, _d->vmem, this,
-								resolveTypes, maxPtrDeref);
+			// Make sure the address does not exceed 32-bit bounds
+			if (addrInBounds)
+				ret = m->toInstance(_d->address + extraOffset, _d->vmem, this,
+									resolveTypes, maxPtrDeref);
 		}
 		// Try the candidate type
 		else {
@@ -550,7 +554,7 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 										  maxPtrDeref > 0 ? maxPtrDeref - 1
 														  : maxPtrDeref);
 			}
-			else
+			else if (addrInBounds)
 				ret = m->toInstance(_d->address + extraOffset, _d->vmem, this,
 									resolveTypes, maxPtrDeref);
 		}
@@ -1073,6 +1077,10 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
                 memberIterator != members.end(); ++memberIterator)
         {
             QString debugString;
+
+            if ((_d->vmem->memSpecs().arch & MemSpecs::ar_i386) &&
+                (_d->address + (*memberIterator)->offset() >= (1ULL << 32)))
+                return false;
 
             Instance memberInstance = 
                 (*memberIterator)->toInstance(_d->address, _d->vmem, this);

@@ -316,14 +316,16 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
     do {
         // Verify that this is indeed a list_head, for this purpose we have to consider
         // nested structs as well.
-        if (tmp)
+        if (tmp) {
             delete tmp;
+            tmp = 0;
+        }
 
         valid = false;
         // Get all structs thay may encompass the member we are looking for
         member = resolveStructs(listMember, memOffset);
 
-        for (int i = member->size(); i > 0 ; --i) {
+        while (!member->isEmpty()) {
             memP = member->takeFirst();
 
             // Is one of the structs either a list_head in case we process a list
@@ -333,6 +335,8 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
             if (memP && ((MemoryMapHeuristics::isListHead(memP) && !hlist) ||
                          (MemoryMapHeuristics::isHListNode(memP) && hlist))) {
                 valid = true;
+                if (tmp)
+                    delete tmp;
                 tmp = memP;
             }
             else
@@ -410,7 +414,7 @@ void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
         // Can we rely on the rules enginge?
         if (Instance::ruleEngine() && Instance::ruleEngine()->count() > 0) {
             bool ambiguous;
-            nextDeref = inst->member(0, 0, 0, ksAll, &ambiguous);
+            nextDeref = inst->member(0, 0, 0, ksNoAltTypes, &ambiguous);
             // If the rules are ambiguous, fall back to default
             if (ambiguous)
                 nextDeref = next.dereference(BaseType::trLexicalAndPointers);
@@ -474,17 +478,16 @@ void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst)
     if (inst && inst->type() && inst->type()->type() & rtPointer &&
             !MemoryMapHeuristics::isFunctionPointer(inst) &&
             MemoryMapHeuristics::validPointer(inst, false) &&
-            !MemoryMapHeuristics::userLandPointer(inst) &&
-            // Filter self pointers
-            inst->address() != (quint64)inst->toPointer() &&
-            (node->address() > (quint64)inst->toPointer() ||
-             node->address() + node->size() < (quint64)inst->toPointer()))
+            !MemoryMapHeuristics::userLandPointer(inst))
     {
-        try
-        {
-            // Add pointer to the _pointerTo map
+        try {
+            // Filter self pointers
             quint64 addr = (quint64) inst->toPointer();
+            if (inst->address() == addr ||
+                (node->address() <= addr && node->address() + node->size() >= addr))
+                return;
 
+            // Add pointer to the _pointerTo map
             _map->_shared->pointersToLock.lock();
             _map->_pointersTo.insert(addr, node);
             _map->_shared->pointersToLock.unlock();
@@ -548,7 +551,20 @@ void MemoryMapBuilderSV::processStruct(MemoryMapNodeSV *node, Instance *inst)
         // Notice that the performance could be improved if we do not try to create
         // an instance for each member, but just for interesting members like structs,
         // poiters, etc.
-        Instance mi = inst->member(i, 0, -1, ksNone);
+        bool ambiguous = false;
+        Instance mi = inst->member(i, 0, 0, ksNoAltTypes, &ambiguous);
+
+        // If the rules engine has retrieved a new type, we can't handle it as
+        // an embedded type
+        if (mi.type() && !ambiguous &&
+            mi.type() != inst->memberType(i, 0, 0, ksNone))
+        {
+            if (!mi.isNull() && !existsNode(&mi))
+                _map->addChildIfNotExistend(mi, node, _index, inst->address());
+
+            return;
+        }
+
 
         if(!mi.isNull())
         {
