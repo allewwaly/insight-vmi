@@ -109,7 +109,7 @@ int TypeRuleEngine::addAllLexicalTypes(const BaseType* type, ActiveRule& arule)
     int hits = 0;
     // If the rule matches the original type, we add it for all lexical types
     // as well
-    if (arule.rule->match(type)) {
+    if (arule.rule->match(type) && arule.rule->action()->match(type)) {
         do {
             _rulesPerType.insertMulti(type->id(), arule);
             ++hits;
@@ -238,6 +238,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
 
     int ret = mrNoMatch, prio = 0, usedRule = -1;
     *newInst = 0;
+    int rulesConsidered = 0;
 
     ActiveRuleHash::const_iterator it = _rulesPerType.find(inst->type()->id()),
             e = _rulesPerType.end();
@@ -246,6 +247,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     // We can stop as soon as all possibly ORed values are included.
     for (; it != e && it.key() == inst->type()->id(); ++it) {
         const TypeRule* rule = it.value().rule;
+        ++rulesConsidered;
 
         // If the result is already clear, check only for higher priority rules
         if (ret == (mrMatch|mrMultiMatch|mrDefer) && rule->priority() <= prio) {
@@ -333,7 +335,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
         }
     }
 
-    if (_verbose) {
+    if (_verbose && rulesConsidered > 0) {
         shell->out() << "==> Result: ";
         if (usedRule >= 0)
             shell->out() << "applied rule " << shell->color(ctBold)

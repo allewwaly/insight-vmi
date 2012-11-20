@@ -150,7 +150,7 @@ public:
      * Matches the given type and OS specifications against this rule.
      * @param type type to match
      * @param specs current OS specifications (ignored if \c null)
-     * @return \c true if \a type \specs match this rule, \c false otherwise
+     * @return \c true if \a type \a specs match this rule, \c false otherwise
      */
     bool match(const BaseType* type, const OsSpecs* specs = 0) const;
 
@@ -245,6 +245,17 @@ public:
      */
     virtual bool check(const QString& xmlFile, const TypeRule* rule,
                        SymFactory *factory) = 0;
+
+    /**
+     * Matches the given type and OS specifications against this action. Thi
+     * function can be reimplemented in derived classes to signal whether the
+     * action can be evaluated for the given type or not. The default
+     * implementation always returns true.
+     * @param type the type to match
+     * @param specs current OS specifications (can be \c null)
+     * @return \c true if \a type \specs match this rule, \c false otherwise
+     */
+    virtual bool match(const BaseType* type, const OsSpecs* specs = 0) const;
 
     /**
      * Evaluates this action and returns the instance according to this rule
@@ -542,6 +553,20 @@ public:
      * \copydoc TypeRuleAction::check()
      */
     bool check(const QString& xmlFile, const TypeRule* rule, SymFactory *factory);
+
+    /**
+     * Matches the given type and OS specifications against this exressino
+     * action. If this action can be evaluated with \a type, this function
+     * returns \c true, otherwise it returns \c false.
+     *
+     * \note The method ExpressionAction::check() has to be called first before
+     * this method is usable.
+     *
+     * @param type the type to match
+     * @param specs current OS specifications (ignored)
+     * @return whether or not this action can be evaluated with \a type
+     */
+    virtual bool match(const BaseType* type, const OsSpecs* specs = 0) const;
 
     /**
      * \copydoc TypeRuleAction::actionType()
