@@ -171,7 +171,7 @@ int KernelSourceTypeEvaluator::evaluateIntExpression(const ASTNode* node, bool* 
     return 0;
 }
 
-#define DEBUGMAGICNUMBERS   1
+//#define DEBUGMAGICNUMBERS   1
 
 void KernelSourceTypeEvaluator::evaluateMagicNumbers_constant(const ASTNode *node, 
             bool *intConst, qint64 *resultInt, 
@@ -430,11 +430,13 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers_initializer(
 
                 // Make sure the pointer is valid!
                 if (!memberStruct) {
+#ifdef DEBUGMAGICNUMBERS
                     debugerr(QString("Member \"%1\" in %2 (0x%3) is not a struct/union, but \"%4\".")
                              .arg(memberName)
                              .arg(structured->prettyName())
                              .arg((uint)structured->id(), 0, 16)
                              .arg(member->refTypeDeep(BaseType::trLexical)->prettyName()));
+#endif /* DEBUGMAGICNUMBERS */
                     return;
                 }
 
@@ -635,8 +637,8 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
 #ifdef DEBUGMAGICNUMBERS
                                 string.append(QString("Unknown Type: %1\n").arg(ast_node_type_to_str(list->item)));
                                 debugmsg(string);
-                                return;
 #endif /* DEBUGMAGICNUMBERS */
+                                return;
                         }
                     }
                     if (!structured)
