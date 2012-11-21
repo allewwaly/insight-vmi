@@ -59,10 +59,15 @@ bool MemoryMapHeuristics::validPointer(const Instance *p, bool defaultValid)
         return false;
 
     // Get the address where the pointer is pointing to
-    quint64 targetAdr = (quint64)p->toPointer();
+    try {
+        quint64 targetAdr = (quint64)p->toPointer();
 
-    // Is the address valid?
-    return validAddress(targetAdr, p->vmem(), defaultValid);
+        // Is the address valid?
+        return validAddress(targetAdr, p->vmem(), defaultValid);
+    }
+    catch (VirtualMemoryException&) {
+        return false;
+    }
 }
 
 bool MemoryMapHeuristics::isFunctionPointer(const Instance *p)
@@ -97,9 +102,14 @@ bool MemoryMapHeuristics::validFunctionPointer(const Instance *p, bool defaultVa
                                (*p) :
                                p->dereference(BaseType::trLexicalAndPointers);
 
-    // Does the pointer have an default value
-    if (MemoryMapHeuristics::defaultValue((quint64)p->toPointer(), p->vmem()->memSpecs()))
-        return defaultValid;
+    try {
+        // Does the pointer have an default value
+        if (MemoryMapHeuristics::defaultValue((quint64)p->toPointer(), p->vmem()->memSpecs()))
+            return defaultValid;
+    }
+    catch (VirtualMemoryException&) {
+        return false;
+    }
 
     // Is the address the pointer points to valid?
     if (!validAddress(functionPointer.address(), p->vmem(), false))
@@ -202,7 +212,14 @@ bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct, const 
         return false;
 
     // Get the offset of the list_head in the next member
-    quint64 nextAdr = (quint64)next.toPointer();
+    quint64 nextAdr;
+    try {
+        nextAdr = (quint64)next.toPointer();
+    }
+    catch (VirtualMemoryException&) {
+        return false;
+    }
+
     quint64 offsetInNextMember = nextAdr - nextDeref.address();
 
     // If this is the head of the list either the type of the instances
@@ -227,30 +244,36 @@ bool MemoryMapHeuristics::validListHead(const Instance *i, bool defaultValid)
 
     // Get the next pointer.
     Instance next = i->member(0, 0, -1, ksNone);
+    quint64 nextPrevAdr = 0;
 
     // Is the next pointer valid?
     if(next.isNull())
         return false;
 
-    // Get the value of the next and prev pointer
-    quint64 nextAdr = (quint64) next.toPointer();
-    quint64 prevAdr = (quint64) next.type()->toPointer(i->vmem(), next.address() +
-                                                       next.type()->size());
-
-    // Check for possible default values.
-    // We allow that a pointer can be 0, -1, next == prev, or
-    // LIST_POISON1/LIST_POISON2 since this are actually valid values.
-    if (defaultValue(nextAdr, i->vmem()->memSpecs()) ||
-        defaultValue(prevAdr, i->vmem()->memSpecs()) || nextAdr == prevAdr)
-        return defaultValid;
-
-    // Can we obtain the address that the next pointer points to
-    if(!i->vmem()->safeSeek(nextAdr))
-        return false;
-
-    // Get the value of the next.prev pointer
-    quint64 nextPrevAdr = (quint64) next.type()->toPointer(i->vmem(), nextAdr +
+    try {
+        // Get the value of the next and prev pointer
+        quint64 nextAdr = (quint64) next.toPointer();
+        quint64 prevAdr = (quint64) next.type()->toPointer(i->vmem(), next.address() +
                                                            next.type()->size());
+
+        // Check for possible default values.
+        // We allow that a pointer can be 0, -1, next == prev, or
+        // LIST_POISON1/LIST_POISON2 since this are actually valid values.
+        if (defaultValue(nextAdr, i->vmem()->memSpecs()) ||
+            defaultValue(prevAdr, i->vmem()->memSpecs()) || nextAdr == prevAdr)
+            return defaultValid;
+
+        // Can we obtain the address that the next pointer points to
+        if(!i->vmem()->safeSeek(nextAdr))
+            return false;
+
+        // Get the value of the next.prev pointer
+        nextPrevAdr = (quint64) next.type()->toPointer(i->vmem(), nextAdr +
+                                                               next.type()->size());
+    }
+    catch (VirtualMemoryException&) {
+        return false;
+    }
 
     // The next.prev pointer should point back to the address of the list_head.
     if(i->address() != nextPrevAdr)
@@ -287,33 +310,37 @@ bool MemoryMapHeuristics::validCandidateBasedOnListHead(const Instance *listHead
     if(!validListHead(listHead, false))
         return false;
 
-    // Get the instance of the 'next' member within the list_head
-    quint64 memberNext = (quint64)listHead->member(0, 0, -1, ksNone).toPointer();
+    try {
+        // Get the instance of the 'next' member within the list_head
+        quint64 memberNext = (quint64)listHead->member(0, 0, -1, ksNone).toPointer();
 
-    // If this list head points to itself, or is 0/-1 we do not need
-    // to consider it anymore.
-    if (memberNext == listHead->member(0, 0, -1, ksNone).address() ||
+        // If this list head points to itself, or is 0/-1 we do not need
+        // to consider it anymore.
+        if (memberNext == listHead->member(0, 0, -1, ksNone).address() ||
             defaultValue(memberNext, listHead->vmem()->memSpecs()))
+            return false;
+
+        // Get the offset of the list_head struct within the candidate type
+        quint64 candOffset = memberNext - cand->address();
+
+        // Find the member based on the calculated offset within the candidate type
+        Instance candListHead = cand->memberByOffset(candOffset);
+
+        // The member within the candidate type that the next pointer points to
+        // must be a list_head.
+        if(candListHead.isNull() || !isListHead(&candListHead))
+            return false;
+
+        // Sanity check: The prev pointer of the list_head must point back to the
+        // original list_head
+        quint64 candListHeadPrev = (quint64)candListHead.member(1, 0, -1, ksNone).toPointer();
+
+        if(candListHeadPrev != memberNext)
+            return false;
+    }
+    catch (VirtualMemoryException&) {
         return false;
-
-    // Get the offset of the list_head struct within the candidate type
-    quint64 candOffset = memberNext - cand->address();
-
-    // Find the member based on the calculated offset within the candidate type
-    Instance candListHead = cand->memberByOffset(candOffset);
-
-    // The member within the candidate type that the next pointer points to
-    // must be a list_head.
-    if(candListHead.isNull() || !isListHead(&candListHead))
-        return false;
-
-    // Sanity check: The prev pointer of the list_head must point back to the
-    // original list_head
-    quint64 candListHeadPrev = (quint64)candListHead.member(1, 0, -1, ksNone).toPointer();
-
-    if(candListHeadPrev != memberNext)
-        return false;
-
+    }
 
     // At this point we know that the list_head struct within the candidate
     // points indeed back to the list_head struct of the instance. However,
