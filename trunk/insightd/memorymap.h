@@ -13,6 +13,7 @@
 #include <QMultiHash>
 #include <QMultiMap>
 #include <QPair>
+#include <QVector>
 #include <QMutex>
 #include <QWaitCondition>
 #include <QReadWriteLock>
@@ -28,6 +29,7 @@
 
 class SymFactory;
 class VirtualMemory;
+class Variable;
 class MemoryMapVerifier;
 class MemoryMapBuilder;
 
@@ -265,6 +267,7 @@ public:
     float calculateNodeProbability(const Instance *inst,
                                    float parentProbability = 0) const;
 
+    bool useRuleEngine() const;
 
 private:
     /// Holds the static list of kernel object names. \sa insertName()
@@ -337,6 +340,18 @@ private:
      */
     bool builderRunning() const;
 
+    /**
+     * Returns the list of per-cpu offsets.
+     * \warning This code is entirely Linux-specific and is superseded by the
+     * logic of the TypeRuleEngine. Its usage is discuraged!
+     * @return
+     */
+    QVector<quint64> perCpuOffsets();
+
+    void addVariableWithCandidates(const Variable* var);
+    void addVariableWithRules(const Variable* var);
+    void addInstance(const Instance& inst);
+
     MemoryMapBuilder** _threads;
     const SymFactory* _factory;  ///< holds the SymFactory to operate on
     VirtualMemory* _vmem;        ///< the virtual memory object this map is being built for
@@ -349,6 +364,10 @@ private:
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
     BuilderSharedState* _shared; ///< all variables that are shared amount the builder threads
+    bool _useRuleEngine;
+    KnowledgeSources _knowSrc;
+    QVector<quint64> _perCpuOffset;
+    MemoryMapBuilderType _buildType;
 
 #if MEMORY_MAP_VERIFICATION == 1
     MemoryMapVerifier _verifier; ///< provides debug checks for the creation of the memory map
@@ -440,6 +459,11 @@ inline float MemoryMap::calculateNodeProbability(const Instance *inst, float par
     if (_threads && _threads[0])
         return _threads[0]->calculateNodeProbability(inst, parentProbability);
     return 1.0;
+}
+
+inline bool MemoryMap::useRuleEngine() const
+{
+    return _useRuleEngine;
 }
 
 #endif /* MEMORYMAP_H_ */

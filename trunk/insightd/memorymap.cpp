@@ -35,24 +35,18 @@ const QString& MemoryMap::insertName(const QString& name)
 
 //------------------------------------------------------------------------------
 
-#if MEMORY_MAP_VERIFICATION == 1
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _threads(0), _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
       _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
       _isBuilding(false), _shared(new BuilderSharedState()),
-      _verifier(this)
+      _useRuleEngine(false), _knowSrc(ksAll), _buildType(btChrschn)
+#if MEMORY_MAP_VERIFICATION == 1
+    , _verifier(this)
+    #endif
 {
     clear();
 }
-#else
-MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
-    : _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
-      _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
-      _isBuilding(false), _shared(new BuilderSharedState(factory, vmem))
-{
-	clear();
-}
-#endif
+
 
 MemoryMap::~MemoryMap()
 {
@@ -120,18 +114,105 @@ bool MemoryMap::builderRunning() const
 }
 
 
+QVector<quint64> MemoryMap::perCpuOffsets()
+{
+    // Get all the data that we need to handle per_cpu variables.
+    quint32 nr_cpus = 1;
+
+    // Get the number of cpus from the dump if possible
+    Variable *var = _factory->findVarByName("nr_cpu_ids");
+    if (var != 0)
+        nr_cpus = var->value<quint32>(_vmem);
+
+    // Get the per_cpu offsets
+    QVector<quint64> per_cpu_offset(nr_cpus, 0);
+
+    // Get the variable
+    var = _factory->findVarByName("__per_cpu_offset");
+    Instance inst = var ?
+                var->toInstance(_vmem, BaseType::trLexical, ksNone) :
+                Instance();
+    // Fill the array
+    for (quint32 i = 0; i < nr_cpus; ++i) {
+        if (!inst.isNull()) {
+            per_cpu_offset[i] = inst.toULong();
+            // Go to next array field
+            inst.addToAddress(_vmem->memSpecs().sizeofLong);
+        }
+        else
+            per_cpu_offset[i] = -1ULL;
+    }
+
+    return per_cpu_offset;
+
+}
+
+
+void MemoryMap::addVariableWithCandidates(const Variable *var)
+{
+    // Check manually: Is this a per_cpu variable?
+    if (var->name().startsWith("per_cpu__")) {
+
+        // Dereference the variable for each cpu
+        for (int i = 0; i < _perCpuOffset.size(); i++) {
+            Instance inst = var->toInstance(_vmem, BaseType::trLexical, ksNone);
+
+            // Add offset
+            if (!inst.isNull() && _perCpuOffset[i] != -1ULL)
+                inst.addToAddress(_perCpuOffset[i]);
+
+            addInstance(inst);
+        }
+    }
+    else {
+        addInstance(var->toInstance(_vmem, BaseType::trLexical, _knowSrc));
+    }
+}
+
+
+void MemoryMap::addVariableWithRules(const Variable *var)
+{
+    addInstance(var->toInstance(_vmem, BaseType::trLexical, _knowSrc));
+}
+
+
+void MemoryMap::addInstance(const Instance& inst)
+{
+    if (inst.isNull() || !fitsInVmem(inst.address(), inst.size()) ||
+        !inst.isAccessible())
+        return;
+
+    MemoryMapNode* node = 0;
+
+    switch(_buildType) {
+    case btChrschn:
+        node = new MemoryMapNode(this, inst);
+        break;
+    case btSibi:
+        node = new MemoryMapNodeSV(this, inst, 0, 0, false);
+        break;
+    }
+
+    _roots.append(node);
+    _vmemMap.insert(node);
+    _vmemAddresses.insert(node->address());
+    _shared->queue.insert(node->probability(), node);
+}
+
+
 void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
                       const QString& slubObjFile)
 {
     // Set _isBuilding to true now and to false later
     VarSetter<bool> building(&_isBuilding, true, false);
+    _buildType = type;
 
     // Clean up everything
     clearRevmap();
     _shared->reset();
     _shared->minProbability = minProbability;
 
-    if(type == btSibi)
+    if (type == btSibi)
         _verifier.resetWatchNodes();
 
     QTime timer, totalTimer;
@@ -139,50 +220,26 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     totalTimer.start();
     qint64 prev_queue_size = 0;
 
-    // Variable that temporarily stores the value of each insight variable
-    quint64 var_value = 0;
-
-    // Get all the data that we need to handle per_cpu variables.
-    quint32 nr_cpus = 1;
 
     if (!_factory || !_vmem) {
         debugerr("Factory or VirtualMemory is NULL! Aborting!");
         return;
     }
 
-    // Get the number of cpus from the dump if possible
-    Variable *nr_cpu_tmp = _factory->findVarByName("nr_cpu_ids");
-    if (nr_cpu_tmp != 0)
-                nr_cpus = nr_cpu_tmp->value<quint32>(_vmem);
-
-    // Get the per_cpu offsets
-    quint64 *per_cpu_offset = (quint64 *)malloc(sizeof(quint64) * nr_cpus);
-
-    if (!per_cpu_offset) {
-        debugerr("Could not reserve memory for the per_cpu_offset array!");
-        return;
+    if (Instance::ruleEngine() && Instance::ruleEngine()->count() > 0) {
+        _useRuleEngine = true;
+        _knowSrc = ksNoAltTypes;
+        debugmsg("Building map with TYPE RULES");
+    }
+    else {
+        _useRuleEngine = false;
+        _knowSrc = ksNoRulesEngine;
+        debugmsg("Building map with CANDIDATE TYPES");
     }
 
-    // Get the variable
-    nr_cpu_tmp = _factory->findVarByName("__per_cpu_offset");
-    Instance per_cpu_offset_inst = nr_cpu_tmp ?
-                                   nr_cpu_tmp->toInstance(_vmem, BaseType::trLexical) :
-                                   Instance();
-    // Fill the array
-    for (quint32 i = 0; i < nr_cpus; ++i) {
-        if (!per_cpu_offset_inst.isNull()) {
-            per_cpu_offset[i] = (_vmem->memSpecs().arch & MemSpecs::ar_i386) ?
-                                 per_cpu_offset_inst.toUInt32() :
-                                 per_cpu_offset_inst.toUInt64();
-
-            // Update address
-            (_vmem->memSpecs().arch & MemSpecs::ar_i386) ?
-             per_cpu_offset_inst.addToAddress(4) :
-             per_cpu_offset_inst.addToAddress(8);
-        }
-        else
-            per_cpu_offset[i] = -1ULL;
-    }
+    // Initialization of non-rule engine based map
+    if (!_useRuleEngine)
+        _perCpuOffset = perCpuOffsets();
 
     // NON-PARALLEL PART OF BUILDING PROCESS
 
@@ -227,93 +284,16 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 //         if (v->name() != "init_task")
 //            continue;
 
-//       if (v->name() != "init_ipc_ns")
-//            continue;
-
         // For now ignore all symbols that have been defined in modules
         if (v->symbolSource() == ssModule)
             continue;
 
-//        if (v->hasAltRefTypes())
-//            debugmsg(QString("Variable \"%1\" (0x%2) has %3 candidate types.")
-//                     .arg(v->name())
-//                     .arg(v->id(), 0, 16)
-//                     .arg(v->altRefTypeCount()));
-
-        // Filter variables that are NULL or cannot be dereferenced
+        // Process all variables
         try {
-            if ((_vmem->memSpecs().arch & MemSpecs::ar_i386)) {
-                if ((var_value = v->value<quint32>(_vmem)) == 0 ||
-                        !_vmem->safeSeek(var_value))
-                    continue;
-            }
-            else {
-                if ((var_value = v->value<quint64>(_vmem)) == 0 ||
-                        !_vmem->safeSeek(var_value))
-                    continue;
-            }
-        }
-        catch(VirtualMemoryException &e) {
-            // Variable cannot be dereferenced thus continue
-            continue;
-        }
-
-        // Process Variable
-        try {
-            // Is this a per_cpu variable
-            if (v->name().startsWith("per_cpu__")) {
-                // Dereference the variable for each cpu
-                for (quint32 i = 0; i < nr_cpus; i++) {
-                    Instance inst = (v->altRefTypeCount() == 1) ?
-                                v->altRefTypeInstance(_vmem, 0) :
-                                v->toInstance(_vmem, BaseType::trLexical);
-
-                    // Add offset
-                    if (!inst.isNull() && per_cpu_offset[i] != -1ULL) {
-                        inst.addToAddress(per_cpu_offset[i]);
-                    }
-
-                    if (!inst.isNull() && fitsInVmem(inst.address(), inst.size())) {
-                        MemoryMapNode* node = 0;
-                        switch(type) {
-                        case btChrschn:
-                            node = new MemoryMapNode(this, inst);
-                            break;
-                        case btSibi:
-                            node = new MemoryMapNodeSV(this, inst, 0, 0, false);
-                            break;
-                        }
-
-                        _roots.append(node);
-                        _vmemMap.insert(node);
-                        _vmemAddresses.insert(node->address());
-                        _shared->queue.insert(node->probability(), node);
-                    }
-                }
-            }
-            else {
-                // Use a variable's alternative type if it has exactly one
-                Instance inst = (v->altRefTypeCount() == 1) ?
-                            v->altRefTypeInstance(_vmem, 0) :
-                            v->toInstance(_vmem, BaseType::trLexical);
-
-                if (!inst.isNull() && fitsInVmem(inst.address(), inst.size())) {
-                    MemoryMapNode* node = 0;
-                    switch(type) {
-                    case btChrschn:
-                        node = new MemoryMapNode(this, inst);
-                        break;
-                    case btSibi:
-                        node = new MemoryMapNodeSV(this, inst, 0, 0, false);
-                        break;
-                    }
-
-                    _roots.append(node);
-                    _vmemMap.insert(node);
-                    _vmemAddresses.insert(node->address());
-                    _shared->queue.insert(node->probability(), node);
-                }
-            }
+            if (_useRuleEngine)
+                addVariableWithRules(v);
+            else
+                addVariableWithCandidates(v);
         }
         catch (ExpressionEvalException& e) {
             // Do nothing
@@ -401,9 +381,6 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 
     // Restore previous value
     _vmem->setThreadSafety(wasThreadSafe);
-
-    // Delete per_cpu_offsets
-    delete per_cpu_offset;
 
 //#define SHOW_STATISTICS 1
 
@@ -862,9 +839,9 @@ bool MemoryMap::objectIsSane(const Instance& inst,
     if (_vmemMap.isEmpty())
         return true;
 
-    //do not analyze trFuncPointers
-    //TODO how to cope with trFuncPointer types?
-    if(inst.type()->type() & rtFuncPointer)
+    //do not analyze rtFuncPointers
+    //TODO how to cope with rtFuncPointer types?
+    if(inst.type()->type() & FunctionTypes)
         return false;
    
     //do not analyze instances with no size
@@ -893,7 +870,8 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
 {
     MemoryMapNode *child = existsNode(inst);
     // Return child if it already exists in virtual memory.
-    if(child) return child;
+    if (child)
+        return child;
 
     static const int interestingTypes =
             BaseType::trLexical |
@@ -939,7 +917,8 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
 
             _shared->mapNodeLock.lock();
             try {
-                MemoryMapNodeSV* parent_sv = dynamic_cast<MemoryMapNodeSV*>(parent);
+                MemoryMapNodeSV* parent_sv = _buildType == btSibi ?
+                            dynamic_cast<MemoryMapNodeSV*>(parent) : 0;
                 if (parent_sv)
                     child = parent_sv->addChild(i, addrInParent, hasCandidates);
                 else
