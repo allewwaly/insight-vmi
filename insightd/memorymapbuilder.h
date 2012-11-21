@@ -22,8 +22,8 @@ class MemoryMapBuilder: public QThread
 public:
     MemoryMapBuilder(MemoryMap* map, int index);
 
-    void interrupt();
-    int index() const;
+    inline void interrupt() { _interrupted = true; }
+    inline int index() const { return _index; }
 
     /**
      * Calculates the probability for the given Instance \a inst and
@@ -46,5 +46,6 @@ enum MemoryMapBuilderType {
     btSibi,
     btChrschn
 };
+
 
 #endif /* MEMORYMAPBUILDER_H_ */

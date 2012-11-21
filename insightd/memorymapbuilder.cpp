@@ -21,16 +21,3 @@ MemoryMapBuilder::MemoryMapBuilder(MemoryMap* map, int index)
     : _index(index), _map(map), _interrupted(false)
 {
 }
-
-
-void MemoryMapBuilder::interrupt()
-{
-    _interrupted = true;
-}
-
-
-int MemoryMapBuilder::index() const
-{
-    return _index;
-}
-
