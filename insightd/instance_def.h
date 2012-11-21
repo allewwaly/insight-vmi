@@ -826,6 +826,14 @@ public:
     Instance parent() const;
 
     /**
+     * Sets the parent for this instance. This is normally done
+     * automatically and only required for Variable::toInstance().
+     * @param parent the parent instance
+     * @param fromParent the member to reach this instance from \a parent
+     */
+    void setParent(const Instance& parent, const StructuredMember* fromParent);
+
+    /**
      * Returns the global rule engine used by all instances.
      */
     inline static const TypeRuleEngine* ruleEngine() { return _ruleEngine; }
