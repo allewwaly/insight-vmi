@@ -14,15 +14,21 @@
 #include <QProcess>
 #include <QRegExp>
 #include <QDateTime>
+#include <QLinkedList>
 #include <debug.h>
 
 #define MEMSPEC_C_BODY "%MEMSPEC_BODY%"
+
+const char* generated_includes[] = {
+    "compile.h",
+    0
+};
+
 const char* memspec_c_file = "memspec.c";
 const char* memspec_c_src =
-    "#include <linux/compile.h>\n"
+    "#include <linux/vermagic.h>\n"
     "#include <linux/uts.h>\n"
     "#include <linux/utsname.h>\n"
-    "#include <linux/utsrelease.h>\n"
     "#include <linux/version.h>\n"
     "#include <linux/kernel.h>\n"
     "#include <linux/module.h>\n"
@@ -200,6 +206,62 @@ void MemSpecParser::writeSrcFile(const QString& fileName, const QString& src)
 }
 
 
+QString MemSpecParser::findGeneratedHeaders() const
+{
+    QLinkedList<QString> fileNames, dirs, nextDirs;
+    for (int i = 0; generated_includes[i] != 0; ++i)
+        fileNames += QString(generated_includes[i]);
+
+    QDir kdir(_kernelSrcDir);
+    if (!kdir.cd("include"))
+        memSpecParserError(QString("Include directory \"%1\" cannot be found.")
+                           .arg(kdir.absolutePath()));
+
+    QString ret;
+    dirs.append(kdir.absolutePath());
+
+    // Implemented a BFS of files
+    QLinkedList<QString>::iterator f_it;
+    while (!fileNames.isEmpty() && !dirs.isEmpty()) {
+        // Change to the next directory
+        QDir currDir(dirs.first());
+        dirs.pop_front();
+        // Search for all missing files in current directory
+        f_it = fileNames.begin();
+        while (f_it != fileNames.end()) {
+            QFileInfo info(currDir, *f_it);
+            if (info.exists() && info.isFile()) {
+                ret += "#include <" + kdir.relativeFilePath(info.absoluteFilePath()) + ">\n";
+                f_it = fileNames.erase(f_it);
+            }
+            else
+                ++f_it;
+        }
+
+        // Append all directories to the list
+        foreach (QString d, currDir.entryList(QDir::Dirs|QDir::NoDotAndDotDot))
+            nextDirs.push_back(currDir.absoluteFilePath(d));
+
+        // Switch to the next directory level
+        if (dirs.isEmpty()) {
+            dirs = nextDirs;
+            nextDirs.clear();
+        }
+    }
+
+    // Did we find all headers? If not, then try to compile it anyway...
+    if (!fileNames.isEmpty()) {
+        QString s;
+        for (f_it = fileNames.begin(); f_it != fileNames.end(); ++f_it)
+            s += "\n" + *f_it;
+        debugerr("Failed to find the following headers in \""
+                 << kdir.absolutePath() << "\":" << s);
+    }
+
+    return ret;
+}
+
+
 void MemSpecParser::setupBuildDir()
 {
     QDir tmp = QDir::temp();
@@ -262,8 +324,8 @@ void MemSpecParser::setupBuildDir()
             .replace(MEMPRINT_C_BODY, pm_body);
     writeSrcFile(_buildDir + "/" + memprint_c_file, pm_c_src);
 
-    QString ms_c_src = QString(memspec_c_src)
-    		.replace(MEMSPEC_C_BODY, ms_body);
+    QString ms_c_src = findGeneratedHeaders() +
+            QString(memspec_c_src).replace(MEMSPEC_C_BODY, ms_body);
     writeSrcFile(_buildDir + "/" + memspec_c_file, ms_c_src);
 
     QString makesrc = QString(memspec_makefile)

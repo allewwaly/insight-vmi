@@ -120,6 +120,11 @@ public:
 
 private:
     /**
+     * Returns the include directives for the generated headers.
+     */
+    QString findGeneratedHeaders() const;
+
+    /**
      * Creates a temporary build directory and sets up all necessary files.
      * \sa buildDir()
      */
