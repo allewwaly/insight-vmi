@@ -204,10 +204,9 @@ QString AltRefTypeRuleWriter::write(const Variable *var, const QDir &rulesDir) c
 
     // Does the variable's type have candidate types? But only write rules for
     // variable-specific types (i.e., id < 0).
-    const BaseType* varType = var->refTypeDeep(BaseType::trLexicalPointersArrays);
-    if (varType && varType->type() & StructOrUnion && varType->id() < 0)
-        count += writeStructDeep(dynamic_cast<const Structured*>(varType),
-                                 var->name(), comment, outFile, writer);
+    const BaseType* varType = var->refTypeDeep(BaseType::trLexicalAndPointers);
+    if (varType && (varType->type() & (StructOrUnion|rtArray)) && varType->id() < 0)
+        count += writeStructDeep(varType, var->name(), comment, outFile, writer);
 
     if (outFile.isOpen()) {
         // Remove the file if we did not write any rules for it
@@ -222,7 +221,7 @@ QString AltRefTypeRuleWriter::write(const Variable *var, const QDir &rulesDir) c
 }
 
 
-int AltRefTypeRuleWriter::writeStructDeep(const Structured *s,
+int AltRefTypeRuleWriter::writeStructDeep(const BaseType* srcType,
                                           const QString& varName,
                                           const QString& xmlComment,
                                           QFile& outFile,
@@ -230,10 +229,11 @@ int AltRefTypeRuleWriter::writeStructDeep(const Structured *s,
 {
     ConstMemberList members;
     QStack<int> memberIndex;
-    const Structured *cur = s;
-    const BaseType* srcType = s;
+    const Structured *s, *cur;
+    cur = s = dynamic_cast<const Structured*>(
+                srcType->dereferencedBaseType(BaseType::trLexicalPointersArrays));
     // If s is an anonymous struct/union, try to find a typedef defining it
-    if (s->name().isEmpty()) {
+    if (s && s->name().isEmpty()) {
         BaseTypeList list = _factory->typesUsingId(s->id());
         foreach (const BaseType* t, list) {
             if (t->type() == rtTypedef) {
@@ -244,7 +244,7 @@ int AltRefTypeRuleWriter::writeStructDeep(const Structured *s,
     }
 
     int i = 0, count = 0;
-    while (i < cur->members().size()) {
+    while (cur && i < cur->members().size()) {
         const StructuredMember *m = cur->members().at(i);
         members.append(m);
         if (m->hasAltRefTypes()) {
@@ -307,6 +307,9 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                     srcType->dereferencedBaseType(BaseType::trLexical);
             const BaseType* srcTypeNonPtr =
                     srcTypeNonTypedef->dereferencedBaseType(BaseType::trLexicalAndPointers);
+            const BaseType* srcTypeNonArray =
+                    (srcTypeNonPtr && srcTypeNonPtr->type() == rtArray) ?
+                    srcTypeNonPtr->dereferencedBaseType(rtArray, 1) : 0;
             // Check if we can use the target name or if we need to use the ID
             int srcUseId = useTypeId(srcType);
 
@@ -342,12 +345,24 @@ int AltRefTypeRuleWriter::write(QXmlStreamWriter &writer,
                     const ASTVariableExpression* ve =
                             dynamic_cast<const ASTVariableExpression*>(varExpList[i]);
                     if (ve) {
-                        const BaseType* veTypeNonPtr = ve->baseType() ?
-                                    ve->baseType()->dereferencedBaseType(BaseType::trLexicalAndPointers) : 0;
+                        const BaseType* veTypeNonPtr = ve->baseType()
+                                ? ve->baseType()->dereferencedBaseType(
+                                            BaseType::trLexicalAndPointers)
+                                : 0;
+                        const BaseType* veTypeNonArray =
+                                (veTypeNonPtr && veTypeNonPtr->type() == rtArray)
+                                    ? veTypeNonPtr->dereferencedBaseType(rtArray, 1)
+                                    : 0;
                         // If we don't have a base type or the variable's type
                         // does not match the given source type, we don't need
                         // to proceed
-                        if (!veTypeNonPtr || *srcTypeNonPtr != *veTypeNonPtr) {
+                        if ( !veTypeNonPtr ||
+                             ( (*srcTypeNonPtr != *veTypeNonPtr) &&
+                               // For array types, we ignore the array length by
+                               // comparing the arrays' ref. type directly
+                               (!srcTypeNonArray || !veTypeNonArray ||
+                                *srcTypeNonArray != *veTypeNonArray) ) )
+                        {
                             writeComment(writer,
                                          QString(" Source type in expression "
                                                  "'%1' does not match base type "

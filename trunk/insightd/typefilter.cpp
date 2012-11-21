@@ -607,7 +607,7 @@ bool TypeFilter::matchType(const BaseType *type) const
         return false;
 
     if (!_members.isEmpty()) {
-        const BaseType* dt = type->dereferencedBaseType(BaseType::trLexicalAndPointers);
+        const BaseType* dt = type->dereferencedBaseType(BaseType::trLexicalPointersArrays);
         if (!(dt->type() & StructOrUnion))
             return false;
         if (!matchFieldsRek(dt, 0))

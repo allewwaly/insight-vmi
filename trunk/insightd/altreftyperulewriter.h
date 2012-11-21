@@ -61,7 +61,7 @@ private:
     QString write(const Structured* s, const QDir &rulesDir) const;
     QString write(const Variable* var, const QDir &rulesDir) const;
 
-    int writeStructDeep(const Structured *s, const QString& varName,
+    int writeStructDeep(const BaseType *srcType, const QString& varName,
                         const QString& xmlComment, QFile &outFile,
                         QXmlStreamWriter &writer) const;
 

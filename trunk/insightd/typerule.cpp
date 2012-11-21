@@ -612,9 +612,19 @@ bool ExpressionAction::match(const BaseType *type, const OsSpecs *specs) const
 
     // The given type must match the target type, but be forgiving with
     // pointer source types since the instance typically is dereferenced.
-    const BaseType *srcType = _srcType, *last = _srcType;
+    const BaseType *srcType = _srcType, *last = _srcType, *typeNonArray;
     type = type->dereferencedBaseType(BaseType::trLexical);
-    while (srcType && (*type != *srcType))
+    typeNonArray = type->dereferencedBaseType(BaseType::trLexicalAndPointers);
+    typeNonArray = typeNonArray->type() == rtArray ?
+                typeNonArray->dereferencedBaseType(rtArray, 1) : 0;
+
+    while (srcType &&
+           ( (*type != *srcType) &&
+             !(type->type() == rtArray && srcType->type() == rtArray &&
+               // For array types, we ignore the array length by comparing the
+               // arrays' referencing type directly
+               typeNonArray && srcType->type() == rtArray &&
+               (*typeNonArray == *srcType->dereferencedBaseType(rtArray, 1)) ) ) )
     {
         if (srcType->type() & BaseType::trLexicalAndPointers) {
             last = srcType;
@@ -626,7 +636,6 @@ bool ExpressionAction::match(const BaseType *type, const OsSpecs *specs) const
         else
             return false;
     }
-
     return srcType != 0;
 }
 
