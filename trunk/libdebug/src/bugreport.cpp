@@ -109,11 +109,11 @@ void BugReport::close()
 
 QString BugReport::bugSubmissionHint(int errorCount) const
 {
-    QString errors("some errors");
+    QString errors("several problems");
     if  (errorCount == 1)
-        errors = "one error";
-    else if (errorCount > 1)
-        errors = QString("a total of %1 errors").arg(errorCount);
+        errors = "one problem";
+//    else if (errorCount > 1)
+//        errors = QString("a total of %1 problems").arg(errorCount);
 
     return QString("During the last operation, %1 occured. Details can be "
                    "found in the following log file:\n"
