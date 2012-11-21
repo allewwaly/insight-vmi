@@ -106,6 +106,12 @@ Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes,
 			ret = altRefTypeInstance(vmem, 0);
 	}
 
+	// If we need this instance for further rule evaluation, we make ret
+	// a parent of itself. That way, it will be the parent of any instance
+	// resulting from Instance::dereference().
+	if (match & TypeRuleEngine::mrDefer)
+		ret.setParent(ret, 0);
+
 	return ret;
 }
 

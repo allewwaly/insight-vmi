@@ -461,8 +461,12 @@ Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCoun
         Instance ret = _d->type->toInstance(_d->address, _d->vmem, _d->name,
                                            _d->parentNames, resolveTypes,
                                            maxPtrDeref, &dcnt);
-        // Restore original value
+        // Restore origin and parent
         ret.setOrigin(orig_o);
+        if (hasParent()) {
+            ret._d->parent = _d->parent;
+            ret._d->fromParent = _d->fromParent;
+        }
         // If only lexical types were dereferenced, preserve the bit-field location
         if (dcnt == 0) {
             ret.setBitSize(_d->bitSize);
@@ -587,16 +591,20 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 Instance* Instance::typeRuleMatchRek(ConstMemberList &members, int* match) const
 {
 	Instance* newInst = 0;
-	// Try the parent instance first
-	if (hasParent()) {
-		Instance p(parent());
-		members.prepend(_d->fromParent);
+	bool memberPrepended = false;
+	// Try the parent instance first, but avoid endless recursions
+	if (hasParent() && _d->parent.data() != _d.data()) {
+		Instance p(_d->parent);
+		if (_d->fromParent) {
+			members.prepend(_d->fromParent);
+			memberPrepended = true;
+		}
 		newInst = p.typeRuleMatchRek(members, match);
 	}
 
 	// Try this instance then
 	if ( !((*match) & TypeRuleEngine::mrMatch) ) {
-		if (hasParent())
+		if (memberPrepended)
 			members.pop_front();
 		*match = _ruleEngine->match(this, members, &newInst);
 	}
@@ -1299,6 +1307,13 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
 Instance Instance::parent() const
 {
     return Instance(_d->parent);
+}
+
+
+void Instance::setParent(const Instance &parent, const StructuredMember *fromParent)
+{
+    _d->parent = parent._d;
+    _d->fromParent = fromParent;
 }
 
 
