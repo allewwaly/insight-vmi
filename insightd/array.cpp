@@ -11,6 +11,7 @@
 #include <debug.h>
 #include "colorpalette.h"
 #include "symfactory.h"
+#include "shellutil.h"
 
 Array::Array(SymFactory* factory)
     : Pointer(factory), _length(-1)
@@ -97,14 +98,29 @@ QString Array::toString(QIODevice* mem, size_t offset, const ColorPalette* col) 
     }
     else {
         if (_length >= 0) {
-            // Output all array members
-            QString s = "(";
-            for (int i = 0; i < _length; i++) {
-                s += t->toString(mem, offset + i * t->size(), col);
-                if (i+1 < _length)
-                    s += ", ";
+            QString s;
+            if (t->type() & StructOrUnion) {
+                int w = ShellUtil::getFieldWidth(_length, 10);
+                QString indent = QChar('\n') + QString(w + 5, QChar(' '));
+                // Output all array members
+                for (int i = 0; i < _length; i++) {
+                    if (i > 0)
+                        s += '\n';
+                    s += QString("[%1] = ").arg(i, w) +
+                            t->toString(mem, offset + i * t->size(), col)
+                                .replace('\n', indent);
+                }
             }
-            s += ")";
+            else {
+                // Output all array members
+                s = "(";
+                for (int i = 0; i < _length; i++) {
+                    s += t->toString(mem, offset + i * t->size(), col);
+                    if (i+1 < _length)
+                        s += ", ";
+                }
+                s += ")";
+            }
             return s;
         }
         else
