@@ -23,7 +23,8 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
         if (_address >= (1ULL << 32))
             genericError(QString("Address 0x%1 exceeds 32 bit address space")
                     .arg(_address, 0, 16));
-//    updateProbability();
+    if (_belongsTo->buildType() == btChrschn)
+        updateProbability();
 }
 
 
@@ -39,7 +40,8 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
                     .arg(_address, 0, 16));
     if (inst.hasParent())
         _origInst = new Instance(inst);
-//    updateProbability(&inst);
+    if (_belongsTo->buildType() == btChrschn)
+        updateProbability();
 }
 
 

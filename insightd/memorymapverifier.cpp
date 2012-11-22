@@ -374,7 +374,8 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
     qint32 nodeProbability = 0;
     MemoryMapNodeSV* node_sv = dynamic_cast<MemoryMapNodeSV*>(node);
     if(node_sv) nodeProbability = node_sv->getCandidateProbability() * 10;
-    else debugmsg(QString("Uncastable node: %1").arg(i.fullName()));
+    else if (_map->buildType() == btSibi)
+        debugmsg(QString("Uncastable node: %1").arg(i.fullName()));
     if(nodeProbability == 10) nodeProbability = 9;
 
     switch(v) {
@@ -407,7 +408,7 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
             if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
                 _maxInvalidProbability = node_sv->getCandidateProbability();
             _slubInvalidDistribution[nodeProbability]++;
-            if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (conflict) object with prob 1: %1").arg(i.fullName()));
+            if(node_sv && node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (conflict) object with prob 1: %1").arg(i.fullName()));
             break;
         case SlubObjects::ovNotFound:
             //debugmsg("Instance Type: " << i.type()->prettyName() << " (" << i.type()->id() << ")");
@@ -448,7 +449,7 @@ void MemoryMapVerifier::statisticsCountNode(MemoryMapNode *node)
         if(node_sv && _maxInvalidProbability < node_sv->getCandidateProbability())
             _maxInvalidProbability = node_sv->getCandidateProbability();
         _magicnumberInvalidDistribution[nodeProbability]++; 
-        if(node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (magicnum) object with prob 1: %1").arg(i.fullName()));
+        if(node_sv && node_sv->getCandidateProbability() == 1) debugmsg(QString("Invalid (magicnum) object with prob 1: %1").arg(i.fullName()));
     }
 }
 

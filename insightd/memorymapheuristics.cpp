@@ -41,12 +41,12 @@ bool MemoryMapHeuristics::validAddress(quint64 address, VirtualMemory *vmem,
     }
 
     // Is the adress 0 or -1?
-    if(defaultValue(address, vmem->memSpecs()))
+    if (defaultValue(address, vmem->memSpecs()))
         return defaultValid;
 
     // Try to resolve it
     if (vmem && address > vmem->memSpecs().pageOffset &&
-            !vmem->safeSeek(address))
+        !vmem->safeSeek(address))
         return false;
 
     return true;
@@ -78,9 +78,9 @@ bool MemoryMapHeuristics::isFunctionPointer(const Instance *p)
     // Find the BaseType of the type that is referenced this instance if any
     // This is necessary to identify function pointers which may be labled as
     // pointers to a function pointer
-    const BaseType* instRefType = (p->type()->type() & rtPointer) ?
-                                   p->type()->dereferencedBaseType(BaseType::trLexicalAndPointers) :
-                                   0;
+    const BaseType* instRefType = (p->type()->type() & rtPointer)
+            ? p->type()->dereferencedBaseType(BaseType::trLexicalAndPointers)
+            : 0;
 
     if (!(p->type()->type() & rtFuncPointer) &&
             (!instRefType || !(instRefType->type() & rtFuncPointer)))
@@ -98,13 +98,14 @@ bool MemoryMapHeuristics::validFunctionPointer(const Instance *p, bool defaultVa
         return false;
 
     // Get the function pointer
-    Instance functionPointer = (p->type()->type() & rtFuncPointer) ?
-                               (*p) :
-                               p->dereference(BaseType::trLexicalAndPointers);
+    Instance functionPointer = (p->type()->type() & rtFuncPointer)
+            ? *p
+            : p->dereference(BaseType::trLexicalAndPointers);
 
     try {
         // Does the pointer have an default value
-        if (MemoryMapHeuristics::defaultValue((quint64)p->toPointer(), p->vmem()->memSpecs()))
+        if (MemoryMapHeuristics::defaultValue((quint64)p->toPointer(),
+                                              p->vmem()->memSpecs()))
             return defaultValid;
     }
     catch (VirtualMemoryException&) {
@@ -384,3 +385,58 @@ bool MemoryMapHeuristics::callExclusionHeuristics(const Instance *instance, int 
     
     return true;
 }
+
+
+bool MemoryMapHeuristics::fitsInAddrSpace(const Instance& inst)
+{
+    return fitsInAddrSpace(inst.address(), inst.size(), inst.vmem()->memSpecs());
+}
+
+
+bool MemoryMapHeuristics::fitsInAddrSpace(quint64 addr, quint64 size,
+                                          const MemSpecs& specs)
+{
+    if (specs.arch == MemSpecs::ar_x86_64)
+        return addr + size > addr;
+    else
+        return addr <= VADDR_SPACE_X86 && addr + size <= VADDR_SPACE_X86;
+}
+
+
+bool MemoryMapHeuristics::addressIsWellFormed(quint64 address,
+                                              const MemSpecs& specs)
+{
+    // Make sure the address is within the virtual address space
+    if ((specs.arch & MemSpecs::ar_i386) &&
+        address > VADDR_SPACE_X86)
+        return false;
+    else {
+        // Is the 64 bit address in canonical form?
+        quint64 high_bits = address >> 47;
+        if (high_bits != 0 && high_bits != 0x1FFFFUL)
+            return false;
+    }
+
+   // Throw out user-land addresses
+   if (address < specs.pageOffset)
+       return false;
+
+   // Check for invalid addresses
+   if(address == 0 ||
+      address == 0xffffffffULL ||
+        address == 0xffffffffffffffffULL ||
+        (address & 0x3) != 0)
+       return false;
+
+    return true;
+}
+
+
+bool MemoryMapHeuristics::addressIsWellFormed(const Instance& inst)
+{
+    return addressIsWellFormed(inst.address(), inst.vmem()->memSpecs()) &&
+            fitsInAddrSpace(inst.address(), inst.size(), inst.vmem()->memSpecs());
+}
+
+
+

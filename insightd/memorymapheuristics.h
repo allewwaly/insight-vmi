@@ -194,6 +194,38 @@ public:
      * @return \c true if the value seems to be a default value, \c false otherwise
      */
     static bool defaultValue(quint64 value, const MemSpecs &specs);
+
+	/**
+	 * This function basically checks, if \a addr + \a size of a kernel object
+	 * exceeds the bounds of the virtual address space.
+	 * @param addr the virtual address of the kernel object
+	 * @param size the size of the kernel object
+	 * @return \c true if the object fits within the address space, \c false
+	 * otherwise
+	 */
+	static bool fitsInAddrSpace(quint64 addr, quint64 size, const MemSpecs& specs);
+
+	/**
+	 * This is an overloaded convenience function.
+	 * \sa fitsInAddrSpace()
+	 */
+	static bool fitsInAddrSpace(const Instance& inst);
+
+	/**
+	 * Checks if a given address appears to be valid.
+	 * @param address the address to check
+	 * @return \c true if the address is valid, \c false otherwise
+	 */
+	static bool addressIsWellFormed(quint64 address, const MemSpecs &specs);
+
+	/**
+	 * Checks if the address of a given Instance appears to be valid.
+	 * @param inst the Instance object to check
+	 * @return \c true if the address if \a inst is valid, \c false otherwise
+	 */
+	static bool addressIsWellFormed(const Instance& inst);
+
+
 };
 
 #endif // MEMORYMAPHEURISTICS_H

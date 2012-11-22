@@ -37,8 +37,13 @@ public:
 protected:
     virtual void run();
 
+    void processNode(MemoryMapNode* node);
+    void processPointer(MemoryMapNode* node);
+    void processArray(MemoryMapNode* node);
+    void processStructured(MemoryMapNode* node);
+
 private:
-    void addMembers(const Instance *inst, MemoryMapNode* node);
+    void addMembers(const Instance &inst, MemoryMapNode* node);
 };
 
 #endif /* MEMORYMAPBUILDERCS_H_ */

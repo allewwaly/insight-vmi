@@ -194,6 +194,8 @@ void signal_handler(int sig_num, siginfo_t * info, void * ucontext)
                 std::string trace(messages[i]);
                 // attempt to demangle
                 {
+                    // TODO: Use addr2line utility, as described here:
+                    // http://stackoverflow.com/questions/3151779/how-its-better-to-invoke-gdb-from-program-to-print-its-stacktrace/4611112#4611112
                     std::string::size_type begin, end;
 
                     // find the beginning and the end of the useful part of the trace

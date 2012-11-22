@@ -269,33 +269,13 @@ public:
 
     bool useRuleEngine() const;
 
+    KnowledgeSources knowSrc() const;
+
+    MemoryMapBuilderType buildType() const;
+
 private:
     /// Holds the static list of kernel object names. \sa insertName()
 	static StringSet _names;
-
-	/**
-	 * This function basically checks, if \a addr + \a size of a kernel object
-	 * exceeds the bounds of the virtual address space.
-	 * @param addr the virtual address of the kernel object
-	 * @param size the size of the kernel object
-	 * @return \c true if the object fits within the address space, \c false
-	 * otherwise
-	 */
-	bool fitsInVmem(quint64 addr, quint64 size) const;
-
-	/**
-	 * Checks if a given address appears to be valid.
-	 * @param address the address to check
-	 * @return \c true if the address is valid, \c false otherwise
-	 */
-	bool addressIsWellFormed(quint64 address) const;
-
-	/**
-	 * Checks if the address of a given Instance appears to be valid.
-	 * @param inst the Instance object to check
-	 * @return \c true if the address if \a inst is valid, \c false otherwise
-	 */
-    bool addressIsWellFormed(const Instance& inst) const;
 
     /**
      * Checks if a given Instance object already exists in the virtual memory
@@ -454,7 +434,8 @@ inline MemoryMapVerifier& MemoryMap::verifier()
 }
 #endif
 
-inline float MemoryMap::calculateNodeProbability(const Instance *inst, float parentProbability) const
+inline float MemoryMap::calculateNodeProbability(const Instance *inst,
+                                                 float parentProbability) const
 {
     if (_threads && _threads[0])
         return _threads[0]->calculateNodeProbability(inst, parentProbability);
@@ -464,6 +445,17 @@ inline float MemoryMap::calculateNodeProbability(const Instance *inst, float par
 inline bool MemoryMap::useRuleEngine() const
 {
     return _useRuleEngine;
+}
+
+inline KnowledgeSources MemoryMap::knowSrc() const
+{
+    return _knowSrc;
+}
+
+
+inline MemoryMapBuilderType MemoryMap::buildType() const
+{
+    return _buildType;
 }
 
 #endif /* MEMORYMAP_H_ */
