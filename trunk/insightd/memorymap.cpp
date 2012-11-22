@@ -16,6 +16,7 @@
 #include "shell.h"
 #include "varsetter.h"
 #include "memorymapbuilder.h"
+#include "memorymapheuristics.h"
 #include <debug.h>
 #include <expressionevalexception.h>
 
@@ -94,15 +95,6 @@ void MemoryMap::clearDiff()
 }
 
 
-bool MemoryMap::fitsInVmem(quint64 addr, quint64 size) const
-{
-    if (_vmem->memSpecs().arch == MemSpecs::ar_x86_64)
-        return addr + size > addr;
-    else
-        return addr + size <= (1ULL << 32);
-}
-
-
 bool MemoryMap::builderRunning() const
 {
     for (int i = 0; i < _shared->threadCount; ++i) {
@@ -178,7 +170,7 @@ void MemoryMap::addVariableWithRules(const Variable *var)
 
 void MemoryMap::addInstance(const Instance& inst)
 {
-    if (inst.isNull() || !fitsInVmem(inst.address(), inst.size()) ||
+    if (inst.isNull() || !MemoryMapHeuristics::fitsInAddrSpace(inst) ||
         !inst.isAccessible())
         return;
 
@@ -281,8 +273,8 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     {
         const Variable* v = *it;
         // For testing now only start with this one variable
-//         if (v->name() != "init_task")
-//            continue;
+         if (v->name() != "init_task")
+            continue;
 
         // For now ignore all symbols that have been defined in modules
         if (v->symbolSource() == ssModule)
@@ -313,7 +305,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 
     // Let the builders do the work, but regularly output some statistics
     while (!shell->interrupted() &&
-           !_shared->queue.isEmpty() &&
+           //!_shared->queue.isEmpty() &&
            (!_shared->lastNode ||
             _shared->lastNode->probability() >= _shared->minProbability) &&
            builderRunning())
@@ -360,6 +352,15 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 
         // Sleep for 100ms
         usleep(100*1000);
+
+        bool isRunning = false;
+        for (int i = _shared->threadCount - 1; i >= 0; i--) {
+            if (_threads[i]->isRunning())
+                isRunning = true;
+        }
+
+        if (!isRunning)
+            break;
     }
     shell->out() << endl;
 
@@ -751,41 +752,6 @@ bool MemoryMap::dumpInit(const QString &fileName, const quint32 level) const
 }
 
 
-bool MemoryMap::addressIsWellFormed(quint64 address) const
-{
-    // Make sure the address is within the virtual address space
-    if ((_vmem->memSpecs().arch & MemSpecs::ar_i386) &&
-        address > VADDR_SPACE_X86)
-        return false;
-    else {
-        // Is the 64 bit address in canonical form?
-        quint64 high_bits = address >> 47;
-        if (high_bits != 0 && high_bits != 0x1FFFFUL)
-        	return false;
-    }
-
-   // Throw out user-land addresses
-   if (address < _vmem->memSpecs().pageOffset)
-       return false;
-
-   // Check for invalid addresses
-   if(address == 0 ||
-      address == 0xffffffffULL ||
-        address == 0xffffffffffffffffULL ||
-        (address & 0x3) != 0)
-       return false;
-
-    return true;
-}
-
-
-bool MemoryMap::addressIsWellFormed(const Instance& inst) const
-{
-    return addressIsWellFormed(inst.address()) &&
-            fitsInVmem(inst.address(), inst.size());
-}
-
-
 MemoryMapNode* MemoryMap::existsNode(const Instance& inst)
 {
   // Increase the reading counter
@@ -955,7 +921,7 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
             _shared->vmemWritingLock.unlock();
 
             // Insert the new node into the queue
-            if(addToQueue) {
+            if (addToQueue) {
                 _shared->queueLock.lock();
                 _shared->queue.insert(child->probability(), child);
                 _shared->queueLock.unlock();

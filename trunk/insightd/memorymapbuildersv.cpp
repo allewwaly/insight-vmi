@@ -412,9 +412,9 @@ void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
         Instance nextDeref;
 
         // Can we rely on the rules enginge?
-        if (Instance::ruleEngine() && Instance::ruleEngine()->count() > 0) {
+        if (_map->useRuleEngine()) {
             bool ambiguous;
-            nextDeref = inst->member(0, 0, 0, ksNoAltTypes, &ambiguous);
+            nextDeref = inst->member(0, 0, 0, _map->knowSrc(), &ambiguous);
             // If the rules are ambiguous, fall back to default
             if (ambiguous)
                 nextDeref = next.dereference(BaseType::trLexicalAndPointers);
@@ -552,7 +552,7 @@ void MemoryMapBuilderSV::processStruct(MemoryMapNodeSV *node, Instance *inst)
         // an instance for each member, but just for interesting members like structs,
         // poiters, etc.
         bool ambiguous = false;
-        Instance mi = inst->member(i, 0, 0, ksNoAltTypes, &ambiguous);
+        Instance mi = inst->member(i, 0, 0, _map->knowSrc(), &ambiguous);
 
         // If the rules engine has retrieved a new type, we can't handle it as
         // an embedded type
@@ -1114,7 +1114,7 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) 
             const StructuredMember* m = *it;
 
             // Create an instance if possible
-            Instance mi = Instance();
+            Instance mi;
 
             try {
                 mi = m->toInstance(inst->address(), _map->_vmem, inst);
@@ -1122,7 +1122,7 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) 
             catch(GenericException& ge)
             {
                 // Address invalid
-                mi = Instance();
+//                mi = Instance();
             }
 
             // List Heads
