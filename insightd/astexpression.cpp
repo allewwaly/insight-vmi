@@ -239,7 +239,11 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
     if (!inst || !_baseType)
         return ExpressionResult(erUndefined);
 
-    const uint instHash = inst->type()->hash();
+    const uint instHash = inst->typeHash();
+    const BaseType* instNoArrayType = inst->type()->dereferencedBaseType(BaseType::trLexicalAndPointers);
+    instNoArrayType = instNoArrayType->type() == rtArray ?
+                instNoArrayType->dereferencedBaseType(rtArray, 1) : 0;
+    const uint instNoArrayHash = instNoArrayType ? instNoArrayType->hash() : 0;
 
     if (_transformations.isEmpty()) {
         // Check if the type hashes match. If we except a pointer type but the
@@ -248,7 +252,10 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         const BaseType* t = _baseType;
         bool takeAddress = false;
         do {
-            if (instHash == t->hash())
+            // For array types, ignore the length parameter
+            if (instHash == t->hash() ||
+                (instNoArrayType && t->type() == rtArray &&
+                 instNoArrayHash == dynamic_cast<const RefBaseType*>(t)->refType()->hash()))
                 return inst->toExpressionResult(takeAddress);
             // Dereference the type, if possible, but no arrays, only pointers
             if (t->type() & RefBaseTypes) {
