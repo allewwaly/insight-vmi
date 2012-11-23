@@ -7,7 +7,7 @@
 enum ExclusionHeuristics
 {
 	ehMagicNumber = 0,          //!< MagicNumber Evaluation
-	ehListHead    = (1 <<  0),  //!< ListHead Evaluation
+	ehListHead    = (1 <<  0)   //!< ListHead Evaluation
 };
 
 /// Bitmask with all signed integer-based RealType's
@@ -25,28 +25,28 @@ public:
      * @return \c true if this object is of type 'struct list_head', \c false
      * otherwise
      */
-    static bool isListHead(const Instance *i);
+    static bool isListHead(const Instance &i);
 
     /**
      * Checks if this instance is of type 'struct hlist_head'.
      * @return \c true if this object is of type 'struct hlist_head', \c false
      * otherwise
      */
-    static bool isHListHead(const Instance *i);
+    static bool isHListHead(const Instance &i);
 
     /**
      * Checks if this instance is of type 'struct hlist_node'.
      * @return \c true if this object is of type 'struct hlist_node', \c false
      * otherwise
      */
-    static bool isHListNode(const Instance *i);
+    static bool isHListNode(const Instance &i);
 
     /**
      * Checks if this instance is of type 'struct radix_tree_root'.
      * @return \c true if this object is of type 'struct radix_tree_root', \c false
      * otherwise
      */
-    static bool isRadixTreeRoot(const Instance *i);
+    static bool isRadixTreeRoot(const Instance &i);
 
     /**
      * Checks if this instance is of type 'struct idr'.
@@ -55,18 +55,33 @@ public:
      * @return \c true if this object is of type 'struct idr', \c false
      * otherwise
      */
-    static bool isIdr(const Instance *i);
+    static bool isIdr(const Instance &i);
 
     /**
-     * Checks if the given is address is valid based on heuristics.
+     * Checks if the given is address points into one of the Linux kernel's
+     * address space mappings
      * @param address the address to verify
-     * @param vmem a pointer to the VirtualMemory that the address is part of
+     * @param specs memory specifications
      * @param defaultValid specifies whether default values such as 0 or -1 should
      * be considered as valid values or as invalid values while verifying the given
      * \a address. By default all default values are considered to be valid.
      * @return true if the address seems to be valid, false otherwise
+     * \sa hasValidAddress()
      */
-    static bool validAddress(quint64 address, VirtualMemory *vmem, bool defaultValid = true);
+    static bool isValidAddress(quint64 address, const MemSpecs &specs,
+                               bool defaultValid = true);
+
+    /**
+     * Checks if the instance's address points into one of the Linux kernel's
+     * address space mappings.
+     * @param inst the instance to check
+     * @param defaultValid specifies whether default values such as 0 or -1 should
+     * be considered as valid values or as invalid values while verifying the given
+     * \a address. By default all default values are considered to be valid.
+     * @return true if the address seems to be valid, false otherwise
+     * \sa isValidAddress()
+     */
+    static bool hasValidAddress(const Instance& inst, bool defaultValid = true);
 
     /**
      * Checks if the given pointer points to a valid address.
@@ -76,7 +91,17 @@ public:
      * instance \a i. By default all default values are considered to be valid.
      * @return true if the pointer is valid, false otherwise
      */
-    static bool validPointer(const Instance *p, bool defaultValid = true);
+    static bool isValidPointer(const Instance &p, bool defaultValid = true);
+
+    /**
+     * Checks if the given pointer points to a valid kernel or user-land address.
+     * @param p the pointer instance to verify
+     * @param defaultValid specifies whether default values such as 0 or -1 should
+     * be considered as valid values or as invalid values while verifying the given
+     * instance \a i. By default all default values are considered to be valid.
+     * @return true if the pointer is valid, false otherwise
+     */
+    static bool isValidUserLandPointer(const Instance &p, bool defaultValid = true);
 
     /**
      * Checks if the given pointer is a function pointer.
@@ -86,7 +111,7 @@ public:
      * \a address. By default all default values are considered to be valid.
      * @return true if the pointer is valid, false otherwise
      */
-    static bool isFunctionPointer(const Instance *p);
+    static bool isFunctionPointer(const Instance &p);
 
     /**
      * Checks if the given pointer is a valid function pointer.
@@ -95,24 +120,21 @@ public:
      * @param p the pointer instance to verify
      * @return true if the pointer is valid, false otherwise
      */
-    static bool validFunctionPointer(const Instance *p, bool defaultValid = true);
+    static bool isValidFunctionPointer(const Instance &p, bool defaultValid = true);
 
     /**
-     * Checks if the diven pointer is a userland pointer.
+     * Checks if the given address points to user-land.
+     * @param address the pointer instance to verify
+     * @return true if the pointer is a userland pointer, false otherwise
+     */
+    static bool isUserLandAddress(quint64 address, const MemSpecs& specs);
+
+    /**
+     * Checks if the given pointer is a userland pointer.
      * @param p the pointer instance to verify
      * @return true if the pointer is a userland pointer, false otherwise
      */
-    static bool userLandPointer(const Instance *p);
-
-    /**
-     * Checks if the given pointer is a valid userland pointer.
-     * @param p the pointer instance to verify
-     * @param defaultValid specifies whether default values such as 0 or -1 should
-     * be considered as valid values or as invalid values while verifying the given
-     * instance \a i. By default all default values are considered to be valid.
-     * @return true if the pointer is a valid userland pointer, false otherwise
-     */
-    static bool validUserLandPointer(const Instance *p, bool defaultValid = true);
+    static bool isUserLandObject(const Instance &p);
 
     /**
      * Checks if the given instance is a valid 'struct list_head'.
@@ -130,7 +152,7 @@ public:
      * instance \a i. By default all default values are considered to be valid.
      * @return true of the instance is a valid list_head false otherwise.
      */
-    static bool validListHead(const Instance *i, bool defaultValid = true);
+    static bool isValidListHead(const Instance &i, bool defaultValid = true);
 
     /**
      * Check if the given candidate is a valid candidate for the given list head.
@@ -143,7 +165,7 @@ public:
      * to the given list head
      * @return \c true if the candidate is compatbible \c false otherwise
      */
-    static bool validCandidateBasedOnListHead(const Instance *listHead, const Instance *cand);
+    static bool isValidCandBasedOnListHead(const Instance &listHead, const Instance &cand);
 
     /**
      * Check if the given list_head is the HEAD of the list or a member of the list.
@@ -158,7 +180,7 @@ public:
      * the list
      * @return \c true if \a i is considered to be the head of the list, \c false otherwise
      */
-    static bool isHeadOfList(const MemoryMapNode *parentStruct, const Instance *i);
+    static bool isHeadOfList(const MemoryMapNode *parentStruct, const Instance &i);
 
     /**
      * Checks if the given instance is valid.
@@ -168,7 +190,7 @@ public:
      * @param i the instance to verify
      * @return \c true if the instance \a is considered to be valid, \c false otherwise
      */
-    static bool validInstance(const Instance *i);
+    static bool isValidInstance(const Instance &i);
 
     /**
      * Use all the available heuristics to check whether the given candidate is
@@ -178,7 +200,7 @@ public:
      * @param cand the candidate that we want to check for compatability.
      * @return true if the candidate is compatible, false otherwise
      */
-    static bool compatibleCandidate(const Instance *parent, const Instance *cand);
+    static bool isCompatibleCandidate(const Instance &parent, const Instance &cand);
 
     /**
      * Call all Heuristics which allow to exclude an object
@@ -186,46 +208,14 @@ public:
      * @param eh ExclusionHeuristics to use in test.
      * @return true if the instances existence is plausible, false otherwise
      */
-    static bool callExclusionHeuristics(const Instance *instance, int eh);
+    static bool callExclusionHeuristics(const Instance &inst, int eh);
 
     /**
      * Is the given value a default value like 0, -1, or ERR
      * @param the value to check
      * @return \c true if the value seems to be a default value, \c false otherwise
      */
-    static bool defaultValue(quint64 value, const MemSpecs &specs);
-
-	/**
-	 * This function basically checks, if \a addr + \a size of a kernel object
-	 * exceeds the bounds of the virtual address space.
-	 * @param addr the virtual address of the kernel object
-	 * @param size the size of the kernel object
-	 * @return \c true if the object fits within the address space, \c false
-	 * otherwise
-	 */
-	static bool fitsInAddrSpace(quint64 addr, quint64 size, const MemSpecs& specs);
-
-	/**
-	 * This is an overloaded convenience function.
-	 * \sa fitsInAddrSpace()
-	 */
-	static bool fitsInAddrSpace(const Instance& inst);
-
-	/**
-	 * Checks if a given address appears to be valid.
-	 * @param address the address to check
-	 * @return \c true if the address is valid, \c false otherwise
-	 */
-	static bool addressIsWellFormed(quint64 address, const MemSpecs &specs);
-
-	/**
-	 * Checks if the address of a given Instance appears to be valid.
-	 * @param inst the Instance object to check
-	 * @return \c true if the address if \a inst is valid, \c false otherwise
-	 */
-	static bool addressIsWellFormed(const Instance& inst);
-
-
+    static bool isDefaultValue(quint64 value, const MemSpecs &specs);
 };
 
 #endif // MEMORYMAPHEURISTICS_H

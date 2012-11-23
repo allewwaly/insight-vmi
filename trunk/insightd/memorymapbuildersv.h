@@ -33,14 +33,14 @@ public:
      * @param inst Instance to calculate probability for
      * @return calculated probability
      */
-    virtual float calculateNodeProbability(const Instance *inst,
+    virtual float calculateNodeProbability(const Instance &inst,
                                            float parentProbability = 1.0) const;
 
 protected:
     virtual void run();
 
 private:
-    void addMembers(const Instance *inst, MemoryMapNodeSV *node);
+    void addMembers(const Instance &inst, MemoryMapNodeSV *node);
 
     /**
      * Is there already a node that represents the given instance.
@@ -48,7 +48,7 @@ private:
      * @returns a pointer to the node if a node for this instance already exists,
      * null otherwise
      */
-    MemoryMapNodeSV* existsNode(Instance *inst);
+    MemoryMapNodeSV* existsNode(Instance &inst);
 
     /**
      * Get all innermost structs within a possibly nested struct that lie at the
@@ -60,7 +60,7 @@ private:
      * @param offset the offset that we are looking for
      * @return a list of all innermost structs that encompass the given offset
      */
-    QList<Instance *> *resolveStructs(const Instance *inst, quint64 offset);
+    QList<Instance> resolveStructs(const Instance &inst, quint64 offset);
 
     /**
      * If we encounter a list we process the complete list before we continue.
@@ -72,19 +72,19 @@ private:
      * listHead.next points to. All members of the list will have the same type and
      * offset as the first member.
      */
-    void processList(MemoryMapNodeSV *node, Instance *listHead, Instance *firstListMember);
+    void processList(MemoryMapNodeSV *node, Instance &listHead, Instance &firstListMember);
 
-    void processListHead(MemoryMapNodeSV *node, Instance *inst);
-    void processCandidates(Instance *inst, const ReferencingType *ref);
-    void processPointer(MemoryMapNodeSV *node, Instance *inst);
-    void processArray(MemoryMapNodeSV *node, Instance *inst);
-    void processStruct(MemoryMapNodeSV *node, Instance *inst);
-    void processUnion(MemoryMapNodeSV *node, Instance *inst);
-    void processRadixTreeNode(MemoryMapNodeSV *node, Instance *inst);
-    void processRadixTree(MemoryMapNodeSV *node, Instance *inst);
-    void processIdr(MemoryMapNodeSV *node, Instance *inst);
-    void processIdrLayer(MemoryMapNodeSV *node, Instance *inst, quint32 layers);
-    void processNode(MemoryMapNodeSV *node, Instance *inst = NULL,
+    void processListHead(MemoryMapNodeSV *node, Instance &inst);
+    void processCandidates(Instance &inst, const ReferencingType *ref);
+    void processPointer(MemoryMapNodeSV *node, Instance &inst);
+    void processArray(MemoryMapNodeSV *node, Instance &inst);
+    void processStruct(MemoryMapNodeSV *node, Instance &inst);
+    void processUnion(MemoryMapNodeSV *node, Instance &inst);
+    void processRadixTreeNode(MemoryMapNodeSV *node, Instance &inst);
+    void processRadixTree(MemoryMapNodeSV *node, Instance &inst);
+    void processIdr(MemoryMapNodeSV *node, Instance &inst);
+    void processIdrLayer(MemoryMapNodeSV *node, Instance &inst, quint32 layers);
+    void processNode(MemoryMapNodeSV *node, Instance inst = Instance(),
                      const ReferencingType *ref = NULL);
 
     static QMutex builderMutex;

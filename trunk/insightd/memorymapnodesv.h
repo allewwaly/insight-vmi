@@ -180,13 +180,6 @@ public:
      */
     void encountered();
 
-    void setSeemsValid();
-
-    inline bool seemsValid()
-    {
-        return _seemsValid;
-    }
-
 private:
     /**
      * Calculate the intial probability of this node. This function should only
@@ -215,7 +208,6 @@ private:
                                                             ///  keeping our single parent paradigm.
 
     QMutex nodeMutex;
-    bool _seemsValid;
 };
 
 

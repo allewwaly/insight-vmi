@@ -40,7 +40,8 @@ MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
     : _threads(0), _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
       _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
       _isBuilding(false), _shared(new BuilderSharedState()),
-      _useRuleEngine(false), _knowSrc(ksAll), _buildType(btChrschn)
+      _useRuleEngine(false), _knowSrc(ksAll), _buildType(btChrschn),
+      _probPropagation(false)
 #if MEMORY_MAP_VERIFICATION == 1
     , _verifier(this)
     #endif
@@ -170,7 +171,7 @@ void MemoryMap::addVariableWithRules(const Variable *var)
 
 void MemoryMap::addInstance(const Instance& inst)
 {
-    if (inst.isNull() || !MemoryMapHeuristics::fitsInAddrSpace(inst) ||
+    if (inst.isNull() || !MemoryMapHeuristics::hasValidAddress(inst, false) ||
         !inst.isAccessible())
         return;
 
@@ -204,8 +205,13 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     _shared->reset();
     _shared->minProbability = minProbability;
 
-    if (type == btSibi)
+    if (type == btSibi) {
         _verifier.resetWatchNodes();
+        _probPropagation = true;
+    }
+    else {
+        _probPropagation = false;
+    }
 
     QTime timer, totalTimer;
     timer.start();
@@ -330,14 +336,13 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 //                    << ", probability = " << (node ? node->probability() : 1.0));
             shell->out()
                     << "\rProcessed " << _shared->processed << " instances"
-                    << ", vmemAddr = " << _vmemAddresses.size()
-                    << ", objects = " << _vmemMap.size()
-                    << ", vmemMap nodes = " << _vmemMap.nodeCount()
-                    << ", pmemMap nodes = " << _pmemMap.nodeCount()
-                    << ", queue = " << queue_size << " " << indicator
-                    << ", probability = " << (node ? node->probability() : 1.0)
-                    << ", max_prob " << _shared->queue.largest()->probability()
-                    << ", min_prob " << _shared->queue.smallest()->probability()
+                    << ", vmemAddr: " << _vmemAddresses.size()
+                    << ", objects: " << _vmemMap.size()
+                    << ", vmemMap: " << _vmemMap.nodeCount()
+                    << ", pmemMap: " << _pmemMap.nodeCount()
+                    << ", queue: " << queue_size << " " << indicator
+                    << ", prob: " << (node ? node->probability() : 1.0)
+                    << ", min_prob: " << _shared->queue.smallest()->probability()
                     << endl;
             prev_queue_size = queue_size;
         }
@@ -921,7 +926,7 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
             _shared->vmemWritingLock.unlock();
 
             // Insert the new node into the queue
-            if (addToQueue) {
+            if (addToQueue && i.isAccessible()) {
                 _shared->queueLock.lock();
                 _shared->queue.insert(child->probability(), child);
                 _shared->queueLock.unlock();

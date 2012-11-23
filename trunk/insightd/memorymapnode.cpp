@@ -11,13 +11,14 @@
 #include "genericexception.h"
 #include "virtualmemory.h"
 #include "virtualmemoryexception.h"
+#include "memorymapheuristics.h"
 
 
 MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
         quint64 address, const BaseType* type, int id, MemoryMapNode* parent)
 	: _belongsTo(belongsTo), _parent(parent),
 	  _name(MemoryMap::insertName(name)), _address(address), _type(type),
-	  _id(id), _probability(1.0), _origInst(0)
+	  _id(id), _probability(1.0), _origInst(0), _seemsValid(false)
 {
     if (_belongsTo && (_belongsTo->vmem()->memSpecs().arch & MemSpecs::ar_i386))
         if (_address >= (1ULL << 32))
@@ -33,7 +34,7 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
     : _belongsTo(belongsTo), _parent(parent),
       _name(getNameFromInstance(parent, inst)), _address(inst.address()),
       _type(inst.type()), _id(inst.id()), _probability(1.0),
-      _origInst(0)
+      _origInst(0), _seemsValid(false)
 {
     if (_belongsTo && _address > _belongsTo->vmem()->memSpecs().vaddrSpaceEnd())
             genericError(QString("Address 0x%1 exceeds 32 bit address space")
@@ -141,23 +142,22 @@ Instance MemoryMapNode::toInstance(bool includeParentNameComponents) const
 }
 
 
-void MemoryMapNode::updateProbability(const Instance* givenInst)
+void MemoryMapNode::updateProbability()
 {
     float parentProb = _parent ? _parent->probability() : -1.0;
     float prob;
-    if (givenInst)
-        prob = _belongsTo->calculateNodeProbability(givenInst, parentProb);
-    else {
-        Instance inst = toInstance(false);
-        prob = _belongsTo->calculateNodeProbability(&inst, parentProb);
-    }
+    Instance inst(toInstance(false));
+    prob = _belongsTo->calculateNodeProbability(inst, parentProb);
 
     // Only set new probability if it has changed
     if (prob != _probability) {
         _probability = prob;
-        // All children need to update the probability as well
-        for (int i = 0; i < _children.size(); ++i)
-            _children[i]->updateProbability();
+        // Only update children's probability if this is required
+        if (_belongsTo->probabilityPropagation()) {
+            // All children need to update the probability as well
+            for (int i = 0; i < _children.size(); ++i)
+                _children[i]->updateProbability();
+        }
     }
 }
 
@@ -174,3 +174,14 @@ quint64 MemoryMapNode::endAddress() const
 }
 
 
+void MemoryMapNode::setSeemsValid(bool valid)
+{
+    const Instance i(toInstance());
+    if (_seemsValid != valid &&
+       !MemoryMapHeuristics::isListHead(i))
+    {
+        _seemsValid = valid;
+        if (_parent)
+            _parent->setSeemsValid(valid);
+    }
+}

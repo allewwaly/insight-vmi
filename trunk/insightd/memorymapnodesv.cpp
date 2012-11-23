@@ -20,8 +20,7 @@ MemoryMapNodeSV::MemoryMapNodeSV(MemoryMap* belongsTo, const QString& name,
         quint64 addrInParent, bool hasCandidates)
     : MemoryMapNode(belongsTo, name, address, type, id, parent),
        _encountered(1), _addrInParent(addrInParent), _hasCandidates(hasCandidates),
-      _candidatesComplete(false), nodeMutex(QMutex::Recursive),
-      _seemsValid(false)
+      _candidatesComplete(false), nodeMutex(QMutex::Recursive)
 {
     calculateInitialProbability();
 
@@ -142,10 +141,10 @@ void MemoryMapNodeSV::calculateInitialProbability(const Instance* givenInst)
 {
     QMutexLocker(&this->nodeMutex);
     if (givenInst)
-        _initialProb = _belongsTo->calculateNodeProbability(givenInst);
+        _initialProb = _belongsTo->calculateNodeProbability(*givenInst);
     else {
         Instance inst = toInstance(false);
-       _initialProb = _belongsTo->calculateNodeProbability(&inst);
+       _initialProb = _belongsTo->calculateNodeProbability(inst);
     }
 }
 
@@ -290,14 +289,4 @@ bool MemoryMapNodeSV::memberProcessed(quint64 addressInParent, quint64 address)
 void MemoryMapNodeSV::encountered()
 {
     _encountered++;
-}
-
-void MemoryMapNodeSV::setSeemsValid()
-{
-    const Instance i = this->toInstance();
-    if(!_seemsValid && dynamic_cast<MemoryMapNodeSV*>(_parent) &&
-            !MemoryMapHeuristics::isListHead(&i)){
-        _seemsValid = true;
-        (dynamic_cast<MemoryMapNodeSV*>(_parent))->setSeemsValid();
-    }
 }

@@ -157,15 +157,17 @@ public:
 	 */
     Instance toInstance(bool includeParentNameComponents = true) const;
 
+    void setSeemsValid(bool valid = true);
+
+    bool seemsValid() const;
+
 protected:
 	/**
 	 * Re-calculates the probability of this node being "sane" and used by the
 	 * operating system.
 	 * \sa probability()
-	 * @param givenInst pointer to the instance this node was created from,
-	 * if available
 	 */
-	void updateProbability(const Instance* givenInst = 0);
+	void updateProbability();
 
     /**
      * Identifies the correct name of the node based on its parent and the instance
@@ -186,6 +188,7 @@ protected:
     int _id;                 ///< ID of this node, if based on a variable
     float _probability;      ///< probability of "correctness" of this node
     Instance* _origInst;
+    bool _seemsValid;
 };
 
 
@@ -279,6 +282,12 @@ inline const BaseType* MemoryMapNode::type() const
 inline float MemoryMapNode::probability() const
 {
     return _probability;
+}
+
+
+inline bool MemoryMapNode::seemsValid() const
+{
+    return _seemsValid;
 }
 
 
