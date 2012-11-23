@@ -432,7 +432,18 @@ void SlubObjects::addObject(const QString &name, quint64 addr)
     _caches[index].objects.append(addr);
 }
 
-quint64 SlubObjects::numberOfObjects() const
+
+int SlubObjects::numberOfObjects() const
 {
     return _objects.count();
+}
+
+
+int SlubObjects::numberOfObjectsWithType() const
+{
+    int count = 0;
+    for (int i = 0; i < _caches.size(); ++i)
+        if (_caches[i].baseType)
+            count += _caches[i].objects.count();
+    return count;
 }
