@@ -264,7 +264,7 @@ public:
      */
     const SymFactory * symfactory() const;
 
-    float calculateNodeProbability(const Instance *inst,
+    float calculateNodeProbability(const Instance &inst,
                                    float parentProbability = 0) const;
 
     bool useRuleEngine() const;
@@ -272,6 +272,12 @@ public:
     KnowledgeSources knowSrc() const;
 
     MemoryMapBuilderType buildType() const;
+
+    /**
+     * Returns \c true if changes to a node's probability should be propagated
+     * recursively to its parents.
+     */
+    bool probabilityPropagation() const;
 
 private:
     /// Holds the static list of kernel object names. \sa insertName()
@@ -348,6 +354,7 @@ private:
     KnowledgeSources _knowSrc;
     QVector<quint64> _perCpuOffset;
     MemoryMapBuilderType _buildType;
+    bool _probPropagation;
 
 #if MEMORY_MAP_VERIFICATION == 1
     MemoryMapVerifier _verifier; ///< provides debug checks for the creation of the memory map
@@ -434,7 +441,7 @@ inline MemoryMapVerifier& MemoryMap::verifier()
 }
 #endif
 
-inline float MemoryMap::calculateNodeProbability(const Instance *inst,
+inline float MemoryMap::calculateNodeProbability(const Instance &inst,
                                                  float parentProbability) const
 {
     if (_threads && _threads[0])
@@ -456,6 +463,12 @@ inline KnowledgeSources MemoryMap::knowSrc() const
 inline MemoryMapBuilderType MemoryMap::buildType() const
 {
     return _buildType;
+}
+
+
+inline bool MemoryMap::probabilityPropagation() const
+{
+    return _probPropagation;
 }
 
 #endif /* MEMORYMAP_H_ */

@@ -31,7 +31,7 @@ public:
      * Passing a negative number means that \a inst has no parent.
      * @return calculated probability
      */
-    virtual float calculateNodeProbability(const Instance *inst,
+    virtual float calculateNodeProbability(const Instance &inst,
                                            float parentProbability) const;
 
 protected:

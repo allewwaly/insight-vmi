@@ -170,7 +170,7 @@ void MemoryMapBuilderSV::run()
 
 }
 
-MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance * /*inst*/)
+MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance & /*inst*/)
 {
     // Increase the reading counter
     _map->_shared->vmemReadingLock.lock();
@@ -178,7 +178,7 @@ MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance * /*inst*/)
     _map->_shared->vmemReadingLock.unlock();
 
 /*
-    MemMapSet nodes = _map->vmemMapsInRange(inst->address(), inst->endAddress());
+    MemMapSet nodes = _map->vmemMapsInRange(inst.address(), inst.endAddress());
 
     for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
         MemoryMapNodeSV* otherNode = const_cast<MemoryMapNodeSV*>((*it));
@@ -214,22 +214,22 @@ MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance * /*inst*/)
     return NULL;
 }
 
-QList<Instance *> * MemoryMapBuilderSV::resolveStructs(const Instance *inst, quint64 offset)
+QList<Instance> MemoryMapBuilderSV::resolveStructs(const Instance &inst, quint64 offset)
 {
-    QList<Instance *> *result = new QList<Instance *>();
-    QList<Instance *> *tmpResult = 0;
-    Instance *tmp = 0;
+    QList<Instance> result;
+    QList<Instance> tmpResult;
+    Instance tmp;
     Instance next;
     Instance last;
 
     const Structured *sTmp = 0;
 
-    if (!inst || inst->isNull() || !inst->isValid() || offset > inst->size())
+    if (inst.isNull() || !inst.isValid() || offset > inst.size())
         return result;
 
-    sTmp = dynamic_cast<const Structured *>(inst->type());
-    next = (*inst);
-    last = (*inst);
+    sTmp = dynamic_cast<const Structured *>(inst.type());
+    next = inst;
+    last = inst;
 
     while (sTmp && !next.isNull() && next.isValid()) {
         if (sTmp->type() & rtUnion) {
@@ -238,21 +238,19 @@ QList<Instance *> * MemoryMapBuilderSV::resolveStructs(const Instance *inst, qui
                 if (sTmp->members().at(i)->refType()->type() & ( rtStruct | rtUnion)) {
                     last = sTmp->members().at(i)->toInstance(next.address(),
                                                              next.vmem(), &next);
-                    tmpResult = resolveStructs(&last, offset - (last.address() - inst->address()));
+                    tmpResult = resolveStructs(last, offset -
+                                               (last.address() - inst.address()));
 
                     // Process results, add valid ones, delete the rest
-                    if (tmpResult && tmpResult->size() > 0) {
-                        for (int j = tmpResult->size(); j > 0; --j) {
-                            tmp = tmpResult->takeFirst();
+                    if (tmpResult.size() > 0) {
+                        for (int j = tmpResult.size(); j > 0; --j) {
+                            tmp = tmpResult.takeFirst();
 
-                            if (tmp && tmp->isValid() && !tmp->isNull())
-                                result->append(tmp);
-                            else
-                                delete tmp;
+                            if (tmp.isValid() && !tmp.isNull())
+                                result.append(tmp);
                         }
                     }
 
-                    delete tmpResult;
                 }
             }
 
@@ -262,32 +260,31 @@ QList<Instance *> * MemoryMapBuilderSV::resolveStructs(const Instance *inst, qui
         else {
             // In the case of a struct we just try to go a level deeper
             last = next;
-            next = next.memberByOffset(offset - (next.address() - inst->address()), false);
+            next = next.memberByOffset(offset - (next.address() - inst.address()), false);
             sTmp = dynamic_cast<const Structured *>(next.type());
         }
     }
 
-    result->append(new Instance(last.address(), last.type(), last.name(),
-                                last.fullNameComponents(), last.vmem()));
+    result.append(Instance(last.address(), last.type(), last.name(),
+                           last.fullNameComponents(), last.vmem()));
 
     return result;
 }
 
 
 void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
-                                     Instance *listHead,
-                                     Instance *firstListMember)
+                                     Instance &listHead,
+                                     Instance &firstListMember)
 {
     // Inital checks
-    if (!listHead || !firstListMember ||
-            !MemoryMapHeuristics::validInstance(listHead) ||
-            !MemoryMapHeuristics::validInstance(firstListMember))
+    if (!MemoryMapHeuristics::isValidInstance(listHead) ||
+        !MemoryMapHeuristics::isValidInstance(firstListMember))
         return;
 
     // Is this is an invalid list head or if we already processed this
     // member return
-    if (!MemoryMapHeuristics::validListHead(listHead, false) ||
-            node->memberProcessed(listHead->address(), firstListMember->address()))
+    if (!MemoryMapHeuristics::isValidListHead(listHead, false) ||
+            node->memberProcessed(listHead.address(), firstListMember.address()))
         return;
 
     // Do not consider lists that just consist of list_heads or list_node, since we
@@ -297,14 +294,13 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
         return;
 
     // Calculate the offset of the member within the struct
-    quint64 listHeadNext = (quint64)listHead->member(0, 0, -1, ksNone).toPointer();
-    quint64 memOffset = listHeadNext - firstListMember->address();
+    quint64 listHeadNext = (quint64)listHead.member(0, 0, -1, ksNone).toPointer();
+    quint64 memOffset = listHeadNext - firstListMember.address();
 
-    Instance *listMember = firstListMember;
+    Instance listMember(firstListMember);
     MemoryMapNodeSV *currentNode = node;
-    Instance *tmp = 0;
-    QList<Instance *> *member = 0;
-    Instance *memP = 0;
+    QList<Instance> member;
+    Instance memP;
     bool valid = false;
     bool nameUpdated = false;
     bool hlist = false;
@@ -316,49 +312,42 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
     do {
         // Verify that this is indeed a list_head, for this purpose we have to consider
         // nested structs as well.
-        if (tmp) {
-            delete tmp;
-            tmp = 0;
-        }
 
         valid = false;
         // Get all structs thay may encompass the member we are looking for
         member = resolveStructs(listMember, memOffset);
 
-        while (!member->isEmpty()) {
-            memP = member->takeFirst();
+        while (!member.isEmpty()) {
+            memP = member.takeFirst();
 
             // Is one of the structs either a list_head in case we process a list
             // or an hlist_node in case we process a Hlist.
             // Notice that if multiple structs are returnded the last struct that
             // fulfills the criteria below is considered!
-            if (memP && ((MemoryMapHeuristics::isListHead(memP) && !hlist) ||
-                         (MemoryMapHeuristics::isHListNode(memP) && hlist))) {
+            if ((MemoryMapHeuristics::isListHead(memP) && !hlist) ||
+                (MemoryMapHeuristics::isHListNode(memP) && hlist))
+            {
                 valid = true;
-                if (tmp)
-                    delete tmp;
-                tmp = memP;
             }
-            else
-                // Cleanup
-                delete memP;
         }
 
-        // Cleanup
-        delete member;
 
         // If tmp is not valid it is not a list_head
         if (!valid) {
             debugerr("Identfied member in struct "
-                     << listMember->name() << " @ 0x" << std::hex <<
-                     listMember->address() << std::dec << " is no list_head!");
+                     << listMember.name() << " @ 0x" << std::hex <<
+                     listMember.address() << std::dec << " is no list_head!");
             return;
         }
 
         // Only valid add non existing instances
-        if (MemoryMapHeuristics::validInstance(listMember) && !existsNode(listMember)) {
-          currentNode = dynamic_cast<MemoryMapNodeSV *>(_map->addChildIfNotExistend((*listMember), currentNode,
-                                                    _index, (currentNode->address() + memOffset)));
+        if (MemoryMapHeuristics::isValidInstance(listMember) &&
+            !existsNode(listMember))
+        {
+          currentNode = dynamic_cast<MemoryMapNodeSV *>(
+                      _map->addChildIfNotExistend(listMember, currentNode,
+                                                  _index,
+                                                  (currentNode->address() + memOffset)));
         }
 
         // Verify cast
@@ -368,40 +357,42 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
         }
 
         // Update vars
-        listHeadNext = (quint64)tmp->member(0, 0, -1, ksNone).toPointer();
-        listMember->setAddress(listHeadNext - memOffset);
+        listHeadNext = (quint64)memP.member(0, 0, -1, ksNone).toPointer();
+        listMember.setAddress(listHeadNext - memOffset);
 
         // We have to update the name once
         if (!nameUpdated) {
-                listMember->setName(tmp->name() + "." + listMember->name());
+                listMember.setName(memP.name() + "." + listMember.name());
                 nameUpdated = true;
         }
     }
     // listHeadNext must either point to the beginning of the list in case of a
     // "normal" list or it must be 0 in case of an hlist.
-    while (listMember && listHeadNext != listHead->address() && listHeadNext);
+    while (listMember.isValid() && listHeadNext &&
+           listHeadNext != listHead.address());
 }
 
-void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
+
+void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance &inst)
 {
     // Ignore lists with default values
-    if (!MemoryMapHeuristics::validListHead(inst, false))
+    if (!MemoryMapHeuristics::isValidListHead(inst, false))
         return;
 
     // Get the next and prev pointer.
-    Instance next = inst->member(0, 0, -1, ksNone);
+    Instance next(inst.member(0, 0, -1, ksNone));
 
     // Is the next pointer valid e.g. not Null
-    if (!MemoryMapHeuristics::validPointer(&next, false))
+    if (!MemoryMapHeuristics::isValidPointer(next, false))
         return;
 
     // For Lists we can also verify the prev pointer in contrast
     // to HLists
     if (MemoryMapHeuristics::isListHead(inst)) {
-        Instance prev = inst->member(1, 0, -1, ksNone);
+        Instance prev = inst.member(1, 0, -1, ksNone);
 
         // Filter invalid or default pointers (next == prev)
-        if (!MemoryMapHeuristics::validPointer(&prev, false) ||
+        if (!MemoryMapHeuristics::isValidPointer(prev, false) ||
                 next.toPointer() == prev.toPointer())
             return;
     }
@@ -414,19 +405,19 @@ void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
         // Can we rely on the rules enginge?
         if (_map->useRuleEngine()) {
             bool ambiguous;
-            nextDeref = inst->member(0, 0, 0, _map->knowSrc(), &ambiguous);
+            nextDeref = inst.member(0, 0, 0, _map->knowSrc(), &ambiguous);
             // If the rules are ambiguous, fall back to default
             if (ambiguous)
                 nextDeref = next.dereference(BaseType::trLexicalAndPointers);
         }
         else {
             // Are there candidates?
-            switch (inst->memberCandidatesCount(0)) {
+            switch (inst.memberCandidatesCount(0)) {
             case 0:
                 nextDeref = next.dereference(BaseType::trLexicalAndPointers);
                 break;
             case 1:
-                nextDeref = inst->memberCandidate(0, 0);
+                nextDeref = inst.memberCandidate(0, 0);
                 break;
             default:
                 /// todo: Consider candidates
@@ -435,21 +426,21 @@ void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance *inst)
         }
 
         // verify
-        if (!MemoryMapHeuristics::validInstance(&nextDeref))
+        if (!MemoryMapHeuristics::isValidInstance(nextDeref))
             return;
 
-        processList(node, inst, &nextDeref);
+        processList(node, inst, nextDeref);
     }
 }
 
-void MemoryMapBuilderSV::processCandidates(Instance *inst, const ReferencingType *ref)
+void MemoryMapBuilderSV::processCandidates(Instance &inst, const ReferencingType *ref)
 {
 #if MEMORY_MAP_PROCESS_NODES_WITH_ALT == 1
-    const RefBaseType type = dynamic_cast<const RefBaseType*>(inst->type());
+    const RefBaseType type = dynamic_cast<const RefBaseType*>(inst.type());
 
     if(!type)
     {
-        debugmsg("Instance %s is no referencing type!\n", inst->name());
+        debugmsg("Instance %s is no referencing type!\n", inst.name());
         return;
     }
 
@@ -462,7 +453,7 @@ void MemoryMapBuilderSV::processCandidates(Instance *inst, const ReferencingType
 
         // Skip candidates based on heuristics
         const AltRefType& alt = type->altRefType(i);
-        //Instance cand = alt.toInstance(inst->vmem(), inst, inst->,
+        //Instance cand = alt.toInstance(inst.vmem(), inst, inst.,
         //                      m->name(), fullNameComponents());
     }
 #else
@@ -471,19 +462,19 @@ void MemoryMapBuilderSV::processCandidates(Instance *inst, const ReferencingType
 #endif
 }
 
-void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst)
+void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance &inst)
 {
     // Filter pointers that have default values, since we do not need to
     // process them further
-    if (inst && inst->type() && inst->type()->type() & rtPointer &&
+    if (inst.type() && inst.type()->type() & rtPointer &&
             !MemoryMapHeuristics::isFunctionPointer(inst) &&
-            MemoryMapHeuristics::validPointer(inst, false) &&
-            !MemoryMapHeuristics::userLandPointer(inst))
+            MemoryMapHeuristics::isValidPointer(inst, false) &&
+            !MemoryMapHeuristics::isUserLandObject(inst))
     {
         try {
             // Filter self pointers
-            quint64 addr = (quint64) inst->toPointer();
-            if (inst->address() == addr ||
+            quint64 addr = (quint64) inst.toPointer();
+            if (inst.address() == addr ||
                 (node->address() <= addr && node->address() + node->size() >= addr))
                 return;
 
@@ -494,12 +485,12 @@ void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst)
 
             // Add dereferenced type to the map, if not already in it
             int cnt = 0;
-            Instance i = inst->dereference(BaseType::trLexicalAndPointers, -1, &cnt);
+            Instance i(inst.dereference(BaseType::trLexicalAndPointers, -1, &cnt));
 
-            if (cnt && !existsNode(&i))
-                _map->addChildIfNotExistend(i, node, _index, inst->address());
+            if (cnt && !existsNode(i))
+                _map->addChildIfNotExistend(i, node, _index, inst.address());
         }
-        catch (GenericException& e)
+        catch (GenericException&)
         {
             // Do nothing
         }
@@ -511,9 +502,9 @@ void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance *inst)
     }
 }
 
-void MemoryMapBuilderSV::processArray(MemoryMapNodeSV *node, Instance *inst)
+void MemoryMapBuilderSV::processArray(MemoryMapNodeSV *node, Instance &inst)
 {
-    const Array* a = dynamic_cast<const Array*>(inst->type());
+    const Array* a = dynamic_cast<const Array*>(inst.type());
 
     if (a->length() > 0)
     {
@@ -522,15 +513,15 @@ void MemoryMapBuilderSV::processArray(MemoryMapNodeSV *node, Instance *inst)
         {
             try
             {
-                Instance e = inst->arrayElem(i);
+                Instance e(inst.arrayElem(i));
 
                 // We do not need to process nodes with default values
-                if (MemoryMapHeuristics::validAddress(e.address(), e.vmem(), false))
-                    processNode(node, &e, a);
+                if (MemoryMapHeuristics::hasValidAddress(e, false))
+                    processNode(node, e, a);
 
                    // _map->addChildIfNotExistend(e, node, _index, node->address() + (i * e.size()));
             }
-            catch (GenericException& e)
+            catch (GenericException&)
             {
                 // Do nothing
             }
@@ -538,29 +529,29 @@ void MemoryMapBuilderSV::processArray(MemoryMapNodeSV *node, Instance *inst)
     }
 }
 
-void MemoryMapBuilderSV::processStruct(MemoryMapNodeSV *node, Instance *inst)
+void MemoryMapBuilderSV::processStruct(MemoryMapNodeSV *node, Instance &inst)
 {
     // Struct without members?
-    if (!inst->memberCount())
+    if (!inst.memberCount())
         return;
 
     // Add all struct members to the stack that haven't been visited
-    for (int i = 0; i < inst->memberCount(); ++i)
+    for (int i = 0; i < inst.memberCount(); ++i)
     {
         // Process each member
         // Notice that the performance could be improved if we do not try to create
         // an instance for each member, but just for interesting members like structs,
         // poiters, etc.
         bool ambiguous = false;
-        Instance mi = inst->member(i, 0, 0, _map->knowSrc(), &ambiguous);
+        Instance mi = inst.member(i, 0, 0, _map->knowSrc(), &ambiguous);
 
         // If the rules engine has retrieved a new type, we can't handle it as
         // an embedded type
         if (mi.type() && !ambiguous &&
-            mi.type() != inst->memberType(i, 0, 0, ksNone))
+            mi.type() != inst.memberType(i, 0, 0, ksNone))
         {
-            if (!mi.isNull() && !existsNode(&mi))
-                _map->addChildIfNotExistend(mi, node, _index, inst->address());
+            if (!mi.isNull() && !existsNode(mi))
+                _map->addChildIfNotExistend(mi, node, _index, inst.address());
 
             return;
         }
@@ -569,25 +560,25 @@ void MemoryMapBuilderSV::processStruct(MemoryMapNodeSV *node, Instance *inst)
         if(!mi.isNull())
         {
             // Get the structured member for the instance
-            const Structured* s = dynamic_cast<const Structured*>(inst->type());
-            processNode(node, &mi, dynamic_cast<const ReferencingType*>(s->members().at(i)));
+            const Structured* s = dynamic_cast<const Structured*>(inst.type());
+            processNode(node, mi, dynamic_cast<const ReferencingType*>(s->members().at(i)));
         }
 
      }
 }
 
-void MemoryMapBuilderSV::processUnion(MemoryMapNodeSV */*node*/, Instance */*inst*/)
+void MemoryMapBuilderSV::processUnion(MemoryMapNodeSV */*node*/, Instance &/*inst*/)
 {
     // Ignore Unions for now.
 }
 
-void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance *inst, quint32 layers)
+void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance &inst, quint32 layers)
 {
-    if (!inst || inst->isNull() || !inst->isValid())
+    if (inst.isNull() || !inst.isValid())
         return;
 
     if (layers > 32) {
-        debugerr("Not processing IDR with " << layers << " layers: " << inst->fullName());
+        debugerr("Not processing IDR with " << layers << " layers: " << inst.fullName());
         return;
     }
 
@@ -596,7 +587,7 @@ void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance *inst, 
 
     if (!existsNode(inst))
         nextNode = dynamic_cast<MemoryMapNodeSV *>(_map->
-                   addChildIfNotExistend((*inst), node, _index, inst->address(), false));
+                   addChildIfNotExistend(inst, node, _index, inst.address(), false));
 
     if (!nextNode) {
         debugerr("Could not cast node to MemoryMapNodeSV!");
@@ -604,7 +595,7 @@ void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance *inst, 
     }
 
     // Get the pointer array
-    Instance ary = inst->member("ary", BaseType::trLexical, 0, ksNone);
+    Instance ary(inst.member("ary", BaseType::trLexical, 0, ksNone));
 
     if (ary.isNull() || !ary.isValid()) {
         debugerr("Idr Layer has no member ary!");
@@ -622,21 +613,21 @@ void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance *inst, 
             try
             {
                 derefCnt = 0;
-                Instance e = ary.arrayElem(i).dereference(BaseType::trLexicalAndPointers,
-                                                          -1, &derefCnt);
+                Instance e(ary.arrayElem(i).dereference(BaseType::trLexicalAndPointers,
+                                                        -1, &derefCnt));
 
                 // Filter invalid pointer
-                if (!derefCnt || !MemoryMapHeuristics::validInstance(&e))
+                if (!derefCnt || !MemoryMapHeuristics::isValidInstance(e))
                     continue;
 
                 if (layers > 1)
-                    processIdrLayer(nextNode, &e, (--layers));
+                    processIdrLayer(nextNode, e, (--layers));
                 else
-                    unknownPointer.insert(inst->address() +
+                    unknownPointer.insert(inst.address() +
                                           (i * e.sizeofPointer()), e.address());
 
             }
-            catch (GenericException& e)
+            catch (GenericException&)
             {
                 // Do nothing
             }
@@ -644,53 +635,53 @@ void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance *inst, 
     }
 }
 
-void MemoryMapBuilderSV::processIdr(MemoryMapNodeSV *node, Instance *inst)
+void MemoryMapBuilderSV::processIdr(MemoryMapNodeSV *node, Instance &inst)
 {
-    if (!inst || inst->isNull() || !inst->isValid())
+    if (inst.isNull() || !inst.isValid())
         return;
 
     if (!MemoryMapHeuristics::isIdr(inst))
         return;
 
     // Get the top layer
-    Instance top = inst->member("top", BaseType::trLexicalAndPointers);
+    Instance top(inst.member("top", BaseType::trLexicalAndPointers));
 
     // Verify if the instance is valid or if it is still a pointer.
     // in the latter case the pointer could not be dereferenced thus we ignore this
     // instance.
-    if (!MemoryMapHeuristics::validInstance(&top) || top.type()->type() & rtPointer)
+    if (!MemoryMapHeuristics::isValidInstance(top) || top.type()->type() & rtPointer)
         return;
 
     // Get the number of layers
-    Instance layers = inst->member("layers", BaseType::trLexical);
+    Instance layers(inst.member("layers", BaseType::trLexical));
 
     // Handle the node
-    processIdrLayer(node, &top, layers.toUInt32());
+    processIdrLayer(node, top, layers.toUInt32());
 
     // Get the free layer
-    Instance free = inst->member("id_free", BaseType::trLexical);
+    Instance free(inst.member("id_free", BaseType::trLexical));
 
     // Verify if the instance is valid or if it is still a pointer.
     // in the latter case the pointer could not be dereferenced thus we ignore this
     // instance.
-    if (!MemoryMapHeuristics::validInstance(&free) || !(free.type()->type() & rtPointer))
+    if (!MemoryMapHeuristics::isValidInstance(free) || !(free.type()->type() & rtPointer))
         return;
 
     // No special handling of the free pointer required just process it as usually
-    processNode(node, &free);
+    processNode(node, free);
 }
 
-void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *inst)
+void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance &inst)
 {
     MemoryMapNodeSV *nextNode = NULL;
 
-    if (!inst || inst->isNull() || !inst->isValid())
+    if (inst.isNull() || !inst.isValid())
         return;
 
     // Add current node
     if (!existsNode(inst))
         nextNode = dynamic_cast<MemoryMapNodeSV *>(_map->
-                   addChildIfNotExistend((*inst), node, _index, inst->address(), false));
+                   addChildIfNotExistend(inst, node, _index, inst.address(), false));
 
     if (!nextNode) {
         debugerr("Could not cast Node to MemoryMapNodeSV!");
@@ -698,7 +689,7 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *i
     }
 
     // Get the height of the node
-    Instance height = inst->member("height", BaseType::trLexical);
+    Instance height(inst.member("height", BaseType::trLexical));
 
     if (height.isNull() || !height.isValid()) {
         debugerr("Radix Tree Node has no member height!");
@@ -708,7 +699,7 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *i
     quint32 heightInt = height.toInt32();
 
     // Get the slots
-    Instance radixSlots = inst->member("slots", BaseType::trLexical, 0, ksNone);
+    Instance radixSlots(inst.member("slots", BaseType::trLexical, 0, ksNone));
 
     if (radixSlots.isNull() || !radixSlots.isValid()) {
         debugerr("Radix Tree Node has no member slots!");
@@ -717,8 +708,8 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *i
     // Iterate over the array and add all nodes
     const Array* a = dynamic_cast<const Array*>(radixSlots.type());
     quint64 curAddress = 0;
-    Instance curInst = Instance(inst->address(), inst->type(), "",
-                                inst->parentNameComponents(), inst->vmem());
+    Instance curInst(inst.address(), inst.type(), "",
+                     inst.parentNameComponents(), inst.vmem());
 
     if (a && a->length() > 0)
     {
@@ -727,27 +718,30 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *i
         {
             try
             {
-                if(inst->vmem()->memSpecs().arch & MemSpecs::ar_i386)
+                if(inst.vmem()->memSpecs().arch & MemSpecs::ar_i386)
                     curAddress = radixSlots.arrayElem(i).toUInt32();
                 else
                     curAddress = radixSlots.arrayElem(i).toUInt64();
 
-                // Filter invalid pointer
-                if (!MemoryMapHeuristics::validAddress(curAddress, inst->vmem(), false))
-                    continue;
 
-                // Set data
-                curInst.setName(QString("%1.slots[%2]").arg(inst->name()).arg(i));
+                // Set address
                 curInst.setAddress(curAddress);
 
+                // Filter invalid pointer
+                if (!MemoryMapHeuristics::hasValidAddress(curInst, false))
+                    continue;
+
+                // Set new name
+                curInst.setName(inst.name() + QString("slots[%0]").arg(i));
+
                 if (heightInt > 1)
-                    processRadixTreeNode(nextNode, &curInst);
+                    processRadixTreeNode(nextNode, curInst);
                 else if (heightInt == 1)
-                    unknownPointer.insert(inst->address() +
+                    unknownPointer.insert(inst.address() +
                                           (i * curInst.sizeofPointer()), curAddress);
 
             }
-            catch (GenericException& e)
+            catch (GenericException&)
             {
                 // Do nothing
             }
@@ -755,21 +749,21 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance *i
     }
 }
 
-void MemoryMapBuilderSV::processRadixTree(MemoryMapNodeSV *node, Instance *inst)
+void MemoryMapBuilderSV::processRadixTree(MemoryMapNodeSV *node, Instance &inst)
 {
-    if (!inst || inst->isNull() || !inst->isValid())
+    if (inst.isNull() || !inst.isValid())
         return;
 
     if (!MemoryMapHeuristics::isRadixTreeRoot(inst))
         return;
 
     // Get the rnode
-    Instance rnode = inst->member("rnode", BaseType::trLexicalAndPointers);
+    Instance rnode(inst.member("rnode", BaseType::trLexicalAndPointers));
 
     // Verify if the instance is valid or if it is still a pointer.
     // in the latter case the pointer could not be dereferenced thus we ignore this
     // instance.
-    if (!MemoryMapHeuristics::validInstance(&rnode) || rnode.type()->type() & rtPointer)
+    if (!MemoryMapHeuristics::isValidInstance(rnode) || rnode.type()->type() & rtPointer)
         return;
 
     // Fix the pointer if necessary
@@ -796,28 +790,25 @@ void MemoryMapBuilderSV::processRadixTree(MemoryMapNodeSV *node, Instance *inst)
         else
         {
             // Add it to the list of unknown pointer
-            unknownPointer.insert(inst->address(), rnode.address());
+            unknownPointer.insert(inst.address(), rnode.address());
         }
 
         return;
     }
 
     // Handle the node
-    processRadixTreeNode(node, &rnode);
+    processRadixTreeNode(node, rnode);
 }
 
-void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
+void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance inst,
                                      const ReferencingType *ref)
 {
-    Instance i;
-
     // Create an instance from the node if necessary
-    if(!inst)
+    if (!inst.isValid())
     {
         // We need the fullName for debugging. Could be removed later on
         // to improve performance.
-        i = node->toInstance();
-        inst = &i;
+        inst = node->toInstance();
     }
 
     // Handle instance with multiple candidates
@@ -828,17 +819,17 @@ void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
     }
 
     // Is this a pointer?
-    if (inst->type()->type() & rtPointer)
+    if (inst.type()->type() & rtPointer)
     {
         processPointer(node, inst);
     }
     // If this is an array, add all elements
-    else if (inst->type()->type() & rtArray)
+    else if (inst.type()->type() & rtArray)
     {
         processArray(node, inst);
     }
     // Is this a struct or union?
-    else if (inst->memberCount() > 0)
+    else if (inst.memberCount() > 0)
     {
         // Sepcial cases
         // Is this a (h)list_head?
@@ -853,14 +844,14 @@ void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
         else if(MemoryMapHeuristics::isIdr(inst))
             processIdr(node, inst);
         // Struct or Union
-        else if(inst->type()->type() & rtStruct)
+        else if(inst.type()->type() & rtStruct)
             processStruct(node, inst);
-        else if(inst->type()->type() & rtUnion)
+        else if(inst.type()->type() & rtUnion)
             processUnion(node, inst);
     }
     else
     {
-        //debugmsg("" << inst->name() << " is Nothing!\n");
+        //debugmsg("" << inst.name() << " is Nothing!\n");
     }
 
 }
@@ -868,7 +859,7 @@ void MemoryMapBuilderSV::processNode(MemoryMapNodeSV *node, Instance *inst,
 /*
 void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
 {
-    if (!inst->memberCount())
+    if (!inst.memberCount())
         return;
 
     // Possible pointer types: Pointer and integers of pointer size
@@ -881,13 +872,13 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
     bool listHead = MemoryMapHeuristics::isListHead(inst);
 
     // Add all struct members to the stack that haven't been visited
-    for (int i = 0; i < inst->memberCount(); ++i) {
+    for (int i = 0; i < inst.memberCount(); ++i) {
         // We only consider the next member for list_heads
         if(listHead && i > 0)
             break;
 
         // Get declared type of this member
-        const BaseType* mBaseType = inst->memberType(i, BaseType::trLexical, true);
+        const BaseType* mBaseType = inst.memberType(i, BaseType::trLexical, true);
         if (!mBaseType)
             continue;
 
@@ -895,43 +886,43 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
         // Ignore Unions for now
         // if (mBaseType->type() & StructOrUnion) {
         if (mBaseType->type() & rtStruct) {
-            Instance mi = inst->member(i, BaseType::trLexical, -1, true);
+            Instance mi = inst.member(i, BaseType::trLexical, -1, true);
             // Adjust instance name to reflect full path
-            if (node->name() != inst->name())
-                mi.setName(inst->name() + "." + mi.name());
+            if (node->name() != inst.name())
+                mi.setName(inst.name() + "." + mi.name());
 
-            _map->addChildIfNotExistend(mi, node, _index, inst->memberAddress(i));
+            _map->addChildIfNotExistend(mi, node, _index, inst.memberAddress(i));
 
             // addMembers(&mi, node);
             continue;
         }
 
         // Skip members which cannot hold pointers
-        const int candidateCnt = inst->memberCandidatesCount(i);
+        const int candidateCnt = inst.memberCandidatesCount(i);
         if (!candidateCnt && !(mBaseType->type() & ptrTypes))
             continue;
 
         // Skip self and invalid pointers
         if(mBaseType->type() & rtPointer) {
-             Instance m = inst->member(i, BaseType::trLexical, -1, true);
+             Instance m = inst.member(i, BaseType::trLexical, -1, true);
 
-             if((quint64)m.toPointer() == (inst->address() + inst->memberAddress(i, true)) ||
-                 (quint64)m.toPointer() == inst->address() ||
+             if((quint64)m.toPointer() == (inst.address() + inst.memberAddress(i, true)) ||
+                 (quint64)m.toPointer() == inst.address() ||
                  !MemoryMapHeuristics::validPointerAddress(&m))
                  continue;
         }
         // Only one candidate and no unions.
         if (candidateCnt <= 1 && !(node->type()->type() & rtUnion)) {
             try {
-                Instance m = inst->member(i, BaseType::trLexical, -1, true);
+                Instance m = inst.member(i, BaseType::trLexical, -1, true);
                 // Only add pointer members with valid address
                 if (m.type() && m.type()->type() == rtPointer &&
                     _map->addressIsWellFormed(m))
                 {
                     int cnt = 1;
 
-                    if(candidateCnt == 1 && inst->memberCandidateCompatible(i, 0))
-                        m = inst->member(i, BaseType::trLexicalAndPointers, -1);
+                    if(candidateCnt == 1 && inst.memberCandidateCompatible(i, 0))
+                        m = inst.member(i, BaseType::trLexicalAndPointers, -1);
                     else
                         m = m.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
 
@@ -941,9 +932,9 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
                     }
                     else if (cnt && !m.isNull()) {
                         // Adjust instance name to reflect full path
-                        if (node->name() != inst->name())
-                            m.setName(inst->name() + "." + m.name());
-                        _map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i));
+                        if (node->name() != inst.name())
+                            m.setName(inst.name() + "." + m.name());
+                        _map->addChildIfNotExistend(m, node, _index, inst.memberAddress(i));
                     }
                 }
             }
@@ -966,7 +957,7 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
             // the candidates are incorrect due to weird hacks within the
             // kernel
             try {
-                Instance m = inst->member(i, BaseType::trLexical, -1, true);
+                Instance m = inst.member(i, BaseType::trLexical, -1, true);
                 // Only add pointer members with valid address
                 if (m.type() && m.type()->type() == rtPointer &&
                     _map->addressIsWellFormed(m))
@@ -975,11 +966,11 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
                     m = m.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
                     if (cnt || (m.type()->type() & StructOrUnion)) {
                         // Adjust instance name to reflect full path
-                        if (node->name() != inst->name())
-                            m.setName(inst->name() + "." + m.name());
+                        if (node->name() != inst.name())
+                            m.setName(inst.name() + "." + m.name());
 
                        // Member has condidates
-                       lastNode = dynamic_cast<MemoryMapNodeSV*>(_map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i), true));
+                       lastNode = dynamic_cast<MemoryMapNodeSV*>(_map->addChildIfNotExistend(m, node, _index, inst.memberAddress(i), true));
                     }
                 }
             }
@@ -992,13 +983,13 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
                 penalize = 0.0;
 
                 // Check for compatibility
-                if(!inst->memberCandidateCompatible(i, j)) {
+                if(!inst.memberCandidateCompatible(i, j)) {
                     //debugmsg("cont");
                     continue;
                 }
 
                 try {
-                    const BaseType* type = inst->memberCandidateType(i, j);
+                    const BaseType* type = inst.memberCandidateType(i, j);
                     type = type ? type->dereferencedBaseType(BaseType::trLexical) : 0;
 
                     // Skip invalid and void* candidates
@@ -1008,7 +999,7 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
                         continue;
 
                     // Try this candidate
-                    Instance m = inst->memberCandidate(i, j);
+                    Instance m = inst.memberCandidate(i, j);
 
                     // Check compatability using heuristics
                     //if(MemoryMapHeuristics::compatibleCandidate(inst, cand)) {
@@ -1022,10 +1013,10 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
                             m = m.dereference(BaseType::trLexicalPointersArrays, -1, &cnt);
                         if (cnt || (m.type()->type() & StructOrUnion)) {
                             // Adjust instance name to reflect full path
-                            if (node->name() != inst->name())
-                                m.setName(inst->name() + "." + m.name());
+                            if (node->name() != inst.name())
+                                m.setName(inst.name() + "." + m.name());
 
-                            lastNode = dynamic_cast<MemoryMapNodeSV*>(_map->addChildIfNotExistend(m, node, _index, inst->memberAddress(i), true));
+                            lastNode = dynamic_cast<MemoryMapNodeSV*>(_map->addChildIfNotExistend(m, node, _index, inst.memberAddress(i), true));
 
                             if(lastNode != NULL)
                             {
@@ -1049,14 +1040,14 @@ void MemoryMapBuilderSV::addMembers(const Instance *inst, MemoryMapNodeSV* node)
             if(lastNode)
                 lastNode->completeCandidates();
             //else
-                ///debugmsg(inst->fullName() << " (" << inst->memberCandidatesCount(i) << ")");
+                ///debugmsg(inst.fullName() << " (" << inst.memberCandidatesCount(i) << ")");
         }
 #endif
     }
 }
 */
 
-float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) const
+float MemoryMapBuilderSV::calculateNodeProbability(const Instance &inst, float) const
 {
     float p = 1.0;
 
@@ -1073,18 +1064,18 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) 
     static const float degInvalidMagic = 0.99;
 
     // Is the instance valid?
-    if (!inst || !MemoryMapHeuristics::validInstance(inst)) {
+    if (!MemoryMapHeuristics::isValidInstance(inst)) {
         // Instance is invalid, so do not check futher
         return (p * (1 - degInvalidInstance));
     }
 
     // Find the BaseType of this instance, dereference any lexical type(s)
-    const BaseType* instType = inst->type() ?
-            inst->type()->dereferencedBaseType(BaseType::trLexical) : 0;
+    const BaseType* instType = inst.type() ?
+            inst.type()->dereferencedBaseType(BaseType::trLexical) : 0;
 
     // Function Pointer ?
     if (MemoryMapHeuristics::isFunctionPointer(inst)) {
-        if (!MemoryMapHeuristics::validFunctionPointer(inst))
+        if (!MemoryMapHeuristics::isValidFunctionPointer(inst))
             // Invalid function pointer that has no default value
             return (p * (1 - degInvalidPointer));
 
@@ -1093,7 +1084,7 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) 
     // Pointer ?
     else if (instType && instType->type() & rtPointer) {
         // Verify. Default values are fine.
-        if (!MemoryMapHeuristics::validPointer(inst))
+        if (!MemoryMapHeuristics::isValidPointer(inst))
             // Invalid pointer that has no default value
             return (p * (1 - degInvalidPointer));
 
@@ -1104,7 +1095,7 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) 
         const Structured* s = dynamic_cast<const Structured*>(instType);
 
         // Check magic
-        if (!inst->isValidConcerningMagicNumbers())
+        if (!inst.isValidConcerningMagicNumbers())
             p *= (1 - degInvalidMagic);
 
         // Check all members
@@ -1117,24 +1108,24 @@ float MemoryMapBuilderSV::calculateNodeProbability(const Instance *inst, float) 
             Instance mi;
 
             try {
-                mi = m->toInstance(inst->address(), _map->_vmem, inst);
+                mi = m->toInstance(inst.address(), _map->_vmem, &inst);
             }
-            catch(GenericException& ge)
+            catch(GenericException&)
             {
                 // Address invalid
 //                mi = Instance();
             }
 
             // List Heads
-            if (MemoryMapHeuristics::isListHead(&mi))
+            if (MemoryMapHeuristics::isListHead(mi))
             {
                 // Valid list_head? (Allow default values)
-                if (!MemoryMapHeuristics::validListHead(&mi))
+                if (!MemoryMapHeuristics::isValidListHead(mi))
                     p *= (1 - degInvalidListHead);
             }
             else {
                 // Consider all other member types recursively
-                p *= calculateNodeProbability(&mi);
+                p *= calculateNodeProbability(mi);
             }
         }
     }

@@ -162,7 +162,7 @@ void MemoryMapBuilderCS::processPointer(MemoryMapNode *node)
     // Add dereferenced type to the stack, if not already visited
     int cnt = 0;
     inst = inst.dereference(BaseType::trLexicalAndPointers, 1, &cnt);
-    if (cnt && MemoryMapHeuristics::addressIsWellFormed(inst))
+    if (cnt && MemoryMapHeuristics::hasValidAddress(inst, false))
         _map->addChildIfNotExistend(inst, node, _index, node->address());
 }
 
@@ -179,7 +179,7 @@ void MemoryMapBuilderCS::processArray(MemoryMapNode *node)
     for (int i = 0; i < len; ++i) {
         try {
             Instance e = inst.arrayElem(i);
-            if (MemoryMapHeuristics::addressIsWellFormed(e))
+            if (MemoryMapHeuristics::hasValidAddress(e, false))
                 _map->addChildIfNotExistend(e, node, _index,
                                             node->address() + (i * e.size()));
         }
@@ -223,7 +223,7 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
     for (int i = 0; i < inst.memberCount(); ++i) {
 
         try {
-            // Get member instance
+            // Get plain member instance as-is
             Instance mi = inst.member(i, BaseType::trLexical, 0, ksNone);
 
             // Consider the members of nested structs recurisvely
@@ -240,15 +240,13 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
 
             // Only add pointer members with valid address
             if (mi.type() && (mi.type()->type() != rtPointer ||
-                              MemoryMapHeuristics::addressIsWellFormed(mi)))
+                              MemoryMapHeuristics::hasValidAddress(mi, false)))
             {
-//                int cnt;
                 // Dereference member instance
                 mi = inst.member(i, BaseType::trLexicalAndPointers, 1, _map->knowSrc());
-                if (mi.isNull() || !mi.isValid() || !mi.isAccessible())
-                    continue;
 
-                if (mi.type()->type() & (StructOrUnion|rtPointer|rtArray|rtFuncPointer))
+                if (mi.type()->type() & (StructOrUnion|rtPointer|rtArray|rtFuncPointer) &&
+                    MemoryMapHeuristics::isValidInstance(mi))
                 {
                     // Adjust instance name to reflect full path
                     if (node->name() != inst.name())
@@ -265,7 +263,7 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
 }
 
 
-float MemoryMapBuilderCS::calculateNodeProbability(const Instance* inst,
+float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
         float parentProbability) const
 {
     // Degradation of 0.1% per parent-child relation.
@@ -303,23 +301,23 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance* inst,
         _map->_shared->degPerGenerationCnt++;
 
 //    // Check userland address
-//    if (inst->address() < _map->_vmem->memSpecs().pageOffset) {
+//    if (inst.address() < _map->_vmem->memSpecs().pageOffset) {
 //        prob *= 1.0 - degForUserlandAddr;
 //        _map->_shared->degForUserlandAddrCnt++;
 //    }
 //    // Check validity
-//    if (! _map->_vmem->safeSeek((qint64) inst->address()) ) {
+//    if (! _map->_vmem->safeSeek((qint64) inst.address()) ) {
 //        prob *= 1.0 - degForInvalidAddr;
 //        _map->_shared->degForInvalidAddrCnt++;
 //    }
 //    // Check alignment
-//    else if (inst->address() & 0x3ULL) {
+//    else if (inst.address() & 0x3ULL) {
 //        prob *= 1.0 - degForUnalignedAddr;
 //        _map->_shared->degForUnalignedAddrCnt++;
 //    }
 
     // Is the instance valid?
-    if (!inst || !MemoryMapHeuristics::validInstance(inst)) {
+    if (!MemoryMapHeuristics::isValidInstance(inst)) {
         // Instance is invalid, so do not check futher
         return (prob * (1.0 - degInvalidInstance));
     }
@@ -327,11 +325,11 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance* inst,
 
     // Find the BaseType of this instance, dereference any lexical type(s)
     const BaseType* instType =
-            inst->type()->dereferencedBaseType(BaseType::trLexical);
+            inst.type()->dereferencedBaseType(BaseType::trLexical);
 
     // Function Pointer ?
     if (MemoryMapHeuristics::isFunctionPointer(inst)) {
-        if (!MemoryMapHeuristics::validFunctionPointer(inst))
+        if (!MemoryMapHeuristics::isValidFunctionPointer(inst))
             // Invalid function pointer that has no default value
             return (prob * (1.0 - degForInvalidAddr));
 
@@ -340,7 +338,7 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance* inst,
     // Pointer ?
     else if (instType && instType->type() & rtPointer) {
         // Verify. Default values are fine.
-        if (!MemoryMapHeuristics::validPointer(inst))
+        if (!MemoryMapHeuristics::isValidPointer(inst))
             // Invalid pointer that has no default value
             return (prob * (1.0 - degForInvalidAddr));
 
@@ -351,30 +349,23 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance* inst,
 
         const Structured* structured =
                 dynamic_cast<const Structured*>(instType);
-//        quint32 nonAlignedChildAddrCnt = 0;
-        quint32 invalidChildAddrCnt = 0, testedChildren = 0;
+        int invalidChildAddrCnt = 0;
+        int testedChildren = structured->members().size();
         // Check address of all descendant pointers
         for (int i = 0; i < structured->members().size(); ++i) {
-            Instance mi(inst->member(i, BaseType::trLexical, 0, _map->knowSrc()));
+            Instance mi(inst.member(i, BaseType::trLexical, 0, _map->knowSrc()));
 
-            if (!mi.isValid()) {
-                testedChildren++;
+            if (!mi.isValid())
                 invalidChildAddrCnt++;
-            }
             else if (mi.type()->type() & rtPointer) {
-                testedChildren++;
-                try {
-                    quint64 m_addr = (quint64)mi.toPointer();
-                    // Use a safeSeek() instead of doing a mi.dereference()
-                    // to avoid costly throwing of exceptions
-                    if (!_map->_vmem->safeSeek(m_addr))
-                        invalidChildAddrCnt++;
-                }
-                catch (GenericException&) {
-                    // Address was invalid
+                if (!MemoryMapHeuristics::isValidUserLandPointer(mi))
                     invalidChildAddrCnt++;
-                }
             }
+            else if (MemoryMapHeuristics::isFunctionPointer(mi) &&
+                     !MemoryMapHeuristics::isValidFunctionPointer(mi))
+                invalidChildAddrCnt++;
+            else
+                --testedChildren;
         }
 
         if (invalidChildAddrCnt) {

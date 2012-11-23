@@ -1288,10 +1288,11 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
 
                     //debugString.append(QString("Found String: \"%1\"\n").arg(buf));
                 }
-            }else 
+            }
+            else
                 memberValid = true;
-            if (!memberValid)
-            {
+
+            if (!memberValid) {
                 isValid = false;
                 //debugmsg(debugString);
             }

@@ -6,6 +6,7 @@ class MemoryMapVerifier;
 #include "memorymap.h"
 #include "memorymapnodesv.h"
 #include "slubobjects.h"
+#include <QVarLengthArray>
 
 #include <log.h>
 
@@ -151,6 +152,7 @@ public:
      * Collect and print statistics about the current memory map.
      */
     void statistics();
+
 private:
     /**
      * Internal helper function for the statistics function.
@@ -160,7 +162,12 @@ private:
     /**
      * Collects statistics about a single node
      */
-    void statisticsCountNode(MemoryMapNode *node);
+    void statisticsCountNodeSV(MemoryMapNodeSV *node);
+
+    /**
+     * Collects statistics about a single node
+     */
+    void statisticsCountNodeCS(MemoryMapNode *node);
 
     MemoryMap *_map;
     QList<MemoryMapNodeWatcher *> _watchNodes;
@@ -171,22 +178,23 @@ private:
     bool _slubDataAvailable;
     SlubObjects _slub;
 
-    quint64 _validObjects;
-    quint64 _invalidObjects;
-    quint64 _maybeValidObjects;
+    quint32 _validObjects;
+    quint32 _invalidObjects;
+    quint32 _maybeValidObjects;
+    quint32 _maybeValidSlubObjects;
     
-    quint64 _seemValidObjects;
+    quint32 _seemValidObjects;
 
-    quint64 _magicNumberValid;
-    quint64 _magicNumberValid_withConst;
-    quint64 _magicNumberValid_notSlub;
-    quint64 _magicNumberInvalid;
+    quint32 _magicNumberValid;
+    quint32 _magicNumberValid_withConst;
+    quint32 _magicNumberValid_notSlub;
+    quint32 _magicNumberInvalid;
 
-    quint64 _slubValidDistribution[10];
-    quint64 _slubInvalidDistribution[10];
+    QVarLengthArray<quint32, 10> _slubValidDistribution;
+    QVarLengthArray<quint32, 10> _slubInvalidDistribution;
 
-    quint64 _magicnumberValidDistribution[10];
-    quint64 _magicnumberInvalidDistribution[10];
+    QVarLengthArray<quint32, 10> _magicnumberValidDistribution;
+    QVarLengthArray<quint32, 10> _magicnumberInvalidDistribution;
 
 
     float _minValidProbability;
