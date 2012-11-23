@@ -149,9 +149,17 @@ public:
     ObjectValidity objectValid(const Instance* inst) const;
 
     /**
-     * Returns the number of objects contained within the slubs
+     * Returns the number of objects all contained within the slubs.
+     * \sa numberOfObjectsWithType()
      */
-    quint64 numberOfObjects() const;
+    int numberOfObjects() const;
+
+    /**
+     * Returns the number of objects contained within the slubs for which we
+     * have a BaseType.
+     * \sa numberOfObjects()
+     */
+    int numberOfObjectsWithType() const;
 
 private:
     ObjectValidity isInstanceEmbeddedHelper(const BaseType *it, const StructuredMember *mem,
