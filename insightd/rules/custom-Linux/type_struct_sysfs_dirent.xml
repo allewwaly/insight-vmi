@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<!--
+		Reference: http://lxr.linux.no/#linux+v2.6.32.58/fs/sysfs/sysfs.h#L42
+		-->
+		<rule priority="101">
+			<name>sysfs_dirent union</name>
+			<description>Resolve sysfs entry type in union</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>sysfs_dirent</typename>
+				<members>
+					<member></member>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="inline">
+				var dirent = arguments[0];
+				var members = arguments[1];
+				var flags = dirent.s_flags.toUInt32();
+				var elem = dirent.Member(members[0]).Member(members[1]);
+
+				// Types as defined in &lt;fs/sysfs/sysfs.h&gt;
+				var sysfs_types = [
+					{ flag: 0x1, member: "s_dir" },
+					{ flag: 0x2, member: "s_symlink" },
+					{ flag: 0x4, member: "s_attr" },
+					{ flag: 0x8, member: "s_bin_attr" }
+				];
+
+				for (var i in sysfs_types) {
+					var type = sysfs_types[i];
+					// Compare flag and name
+					if (flags &amp; type.flag) {
+						if (elem.Name() == type.member)
+							return elem;
+						else
+							break;
+					}
+				}
+				return new Instance();
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>

@@ -12,9 +12,12 @@
 		<scriptinclude>../scripts</scriptinclude>
 	</scriptincludes>
 
+	<include>no_union_members.xml</include>
 	<include>per_cpu_types.xml</include>
 	<include>type_struct_page.xml</include>
 	<include>type_struct_radix_tree_root.xml</include>
+	<include>type_struct_sysfs_dirent.xml</include>
+	<include>type_struct_task_struct.xml</include>
 	<include>var_modules_struct_list_head.xml</include>
 
 </typeknowledge>

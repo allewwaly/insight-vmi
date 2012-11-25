@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<rule priority="102">
+			<name>task_struct.sibling/children</name>
+			<description>Last entry in the sibling list points to the parent's children list</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>task_struct</typename>
+				<members>
+					<member>sibling</member>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="inline">
+				var task = arguments[0];
+				var members = arguments[1];
+				var parent = task.parent;
+				var sibling = task.Member(members[0]).Member(members[1]);
+				
+				// Change sibling to a task_struct
+				sibling.ChangeType(task.TypeId());
+
+				// Check if the sibling points to the parent's children member
+				var c_address = parent.MemberAddress("children");
+				if (c_address == sibling.Address())
+					sibling.AddToAddress(-sibling.MemberOffset("children"));
+				else
+					sibling.AddToAddress(-sibling.MemberOffset(members[0]));
+				return sibling;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
