@@ -46,7 +46,7 @@ void MemoryMapBuilderCS::run()
     // Now work through the whole stack
     QMutexLocker queueLock(&shared->queueLock);
     while ( !_interrupted && !shared->queue.isEmpty() &&
-            shared->processed < 1000 &&
+//            shared->processed < 1000 &&
             (!shared->lastNode ||
              shared->lastNode->probability() >= shared->minProbability) )
     {
