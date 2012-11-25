@@ -30,6 +30,10 @@ bool MemoryMapHeuristics::isDefaultValue(quint64 value, const MemSpecs& specs)
 bool MemoryMapHeuristics::isValidAddress(quint64 address, const MemSpecs& specs,
                                          bool defaultValid)
 {
+    // Is the adress 0 or -1?
+    if (isDefaultValue(address, specs))
+        return defaultValid;
+
     // Make sure the address is within the virtual address space
     if (specs.arch & MemSpecs::ar_i386) {
         // Address must point into one of the address space mappings
@@ -50,10 +54,6 @@ bool MemoryMapHeuristics::isValidAddress(quint64 address, const MemSpecs& specs,
                (address >= specs.startKernelMap && address <= specs.modulesEnd)))
             return false;
     }
-
-    // Is the adress 0 or -1?
-    if (isDefaultValue(address, specs))
-        return defaultValid;
 
     return true;
 }
@@ -235,10 +235,10 @@ bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct,
 
     // Can we rely on the rules enginge?
     if (Instance::ruleEngine() && Instance::ruleEngine()->count() > 0) {
-        bool ambiguous;
-        nextDeref = i.member(0, 0, 0, ksNoAltTypes, &ambiguous);
+        int result;
+        nextDeref = i.member(0, 0, 0, ksNoAltTypes, &result);
         // If the rules are ambiguous, fall back to default
-        if (ambiguous)
+        if (result & TypeRuleEngine::mrAmbiguous)
             nextDeref = next.dereference(BaseType::trLexicalAndPointers);
     }
     else {

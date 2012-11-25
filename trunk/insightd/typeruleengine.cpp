@@ -168,6 +168,19 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs, int f
         try {
             rule->action()->check(ruleFile(rule), rule, factory);
         }
+        catch (TypeRuleException& e) {
+            QString s = QString("raised a %0:\n").arg(e.className());
+            if (e.xmlLine > 0) {
+                s += QString("At line %0").arg(e.xmlLine);
+                if (e.xmlColumn > 0) {
+                    s += QString(" column %0").arg(e.xmlColumn);
+                }
+                s += ": ";
+            }
+            s += e.message;
+            errRule(rule, i, s);
+            continue;
+        }
         catch (GenericException& e) {
             errRule(rule, i, QString("raised a %1 at %2:%3: %4")
                     .arg(e.className())
@@ -247,10 +260,11 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     // We can stop as soon as all possibly ORed values are included.
     for (; it != e && it.key() == inst->type()->id(); ++it) {
         const TypeRule* rule = it.value().rule;
+        int index = it.value().index;
         ++rulesConsidered;
 
         // If the result is already clear, check only for higher priority rules
-        if (ret == (mrMatch|mrMultiMatch|mrDefer) && rule->priority() <= prio) {
+        if (ret == (mrMatch|mrAmbiguous|mrDefer) && rule->priority() <= prio) {
             // Output information
             if (_verbose)
                 ruleMatchInfo(it.value(), inst, members, 0, false, true);
@@ -276,7 +290,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                 // However, we don't need to evaluate anymore non-high-prio
                 // rules if both mrMatch and mrMultiMatch are already set
                 else if (filter->members().size() == members.size() &&
-                         (ret != (mrMatch|mrMultiMatch) || rule->priority() > prio))
+                         (ret != (mrMatch|mrAmbiguous) || rule->priority() > prio))
                 {
                     match = true;
                     for (int i = 0; match && i < members.size(); ++i)
@@ -298,14 +312,14 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                                 prio = rule->priority();
                                 usedRule = it.value().index;
                                 **newInst = instRet;
-                                ret &= ~mrMultiMatch;
+                                ret &= ~mrAmbiguous;
                             }
                             // Compare this instance to the previous one
                             else if (instRet.address() != (*newInst)->address() ||
                                      (instRet.typeHash() != (*newInst)->typeHash()))
                             {
                                 // Ambiguous rules
-                                ret |= mrMultiMatch;
+                                ret |= mrAmbiguous;
                                 usedRule = -1;
                             }
                         }
@@ -314,7 +328,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                             if (match) {
                                 ret |= mrMatch;
                                 prio = rule->priority();
-                                usedRule = it.value().index;
+                                usedRule = index;
                             }
                             if (!(*newInst) && instRet.isValid()) {
                                 *newInst = new Instance(instRet);
@@ -335,7 +349,11 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
         }
     }
 
-    if (_verbose && rulesConsidered > 0) {
+    if ( rulesConsidered > 0 &&
+         ((_verbose >= veAllRules) ||
+          (_verbose >= veMatchingRules && (ret & mrMatch)) ||
+          (_verbose >= veDeferringRules && ret)) )
+    {
         shell->out() << "==> Result: ";
         if (usedRule >= 0)
             shell->out() << "applied rule " << shell->color(ctBold)
@@ -347,7 +365,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
         }
         if (ret & mrDefer)
             shell->out() << shell->color(ctDeferred) << "deferred ";
-        if (ret & mrMultiMatch)
+        if (ret & mrAmbiguous)
             shell->out() << shell->color(ctMissed) << "ambiguous ";
         if (!ret)
             shell->out() << shell->color(ctMissed) << "missed ";

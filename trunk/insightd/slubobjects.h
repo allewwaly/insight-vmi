@@ -4,6 +4,7 @@
 #include <QString>
 #include <QHash>
 #include <QMap>
+#include <QMultiHash>
 
 #include "structuredmember.h"
 
@@ -99,6 +100,8 @@ public:
         ovEmbedded,      ///< Instance is embedded within a larger object in the slabs
         ovEmbeddedUnion, ///< Instance may be embedded within a larger object in the slabs
         ovMaybeValid,    ///< Instance lies within reserved slab memory for which no type information is available
+        ovValidCastType, ///< Instance matches an object in the slab when using the SlubObjects::_typeCasts exception list
+        ovEmbeddedCastType, ///< Instance is embeddes in another object in the slab when using the SlubObjects::_typeCasts exception list
         ovValid          ///< Instance was either found in the slabs or in a global variable
     };
 
@@ -177,6 +180,7 @@ private:
     AddressMap _objects;
     NameIndexHash _indices;
     CacheList _caches;
+    QMultiHash<QString, QString> _typeCasts; ///< lists types which are considered to be cast from key to value
 };
 
 

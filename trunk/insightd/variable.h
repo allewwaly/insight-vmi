@@ -92,14 +92,14 @@ public:
      * @param resolveTypes which types to automatically resolve, see
      * BaseType::TypeResolution
      * @param src knowledge sources to use for resolving the member
-     * @param ambiguous bool that is set \c true if multiple rules or
-     * candidates matched the member
+     * @param result provides the result of the knowledge source evaluation,
+     * see TypeRuleEngine::MatchResult
      * @return an Instace object for this member
      * \sa KnowledgeSources
      */
     Instance toInstance(VirtualMemory* vmem, int resolveTypes =
             BaseType::trLexical, KnowledgeSources src = ksAll,
-                        bool *ambiguous = 0) const;
+                        int *result = 0) const;
 
     /**
      * Retrieves an Instance for the alternative referencing type no. \a index

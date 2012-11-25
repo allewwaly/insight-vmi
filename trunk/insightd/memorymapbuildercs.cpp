@@ -16,6 +16,7 @@
 #include "array.h"
 #include "structured.h"
 #include "structuredmember.h"
+#include "typeruleengine.h"
 #include <debug.h>
 
 
@@ -45,6 +46,7 @@ void MemoryMapBuilderCS::run()
     // Now work through the whole stack
     QMutexLocker queueLock(&shared->queueLock);
     while ( !_interrupted && !shared->queue.isEmpty() &&
+            shared->processed < 1000 &&
             (!shared->lastNode ||
              shared->lastNode->probability() >= shared->minProbability) )
     {
@@ -127,20 +129,33 @@ void MemoryMapBuilderCS::run()
 
 void MemoryMapBuilderCS::processNode(MemoryMapNode *node)
 {
+    // Ignore user-land objects
+    if (node->address() < _map->_vmem->memSpecs().pageOffset)
+        return;
+
     // Create an instance from the node
-    Instance inst = node->toInstance(false);
+    Instance inst(node->toInstance(false));
+    processInstance(inst, node);
+}
+
+
+void MemoryMapBuilderCS::processInstance(const Instance &inst, MemoryMapNode *node)
+{
+    // Ignore user-land objects
+    if (inst.address() < _map->_vmem->memSpecs().pageOffset)
+        return;
 
     // Ignore instances which we cannot access
-    if (!inst.isAccessible())
+    if (!inst.isValid() || !inst.isAccessible())
         return;
 
     try {
-        if (node->type()->type() & rtPointer)
-            processPointer(node);
-        else if (node->type()->type() & rtArray)
-            processArray(node);
-        else if (node->type()->type() & StructOrUnion)
-            processStructured(node);
+        if (inst.type()->type() & rtPointer)
+            processPointer(inst, node);
+        else if (inst.type()->type() & rtArray)
+            processArray(inst, node);
+        else if (inst.type()->type() & StructOrUnion)
+            processStructured(inst, node);
     }
     catch (GenericException&) {
         // Do nothing
@@ -148,12 +163,9 @@ void MemoryMapBuilderCS::processNode(MemoryMapNode *node)
 }
 
 
-void MemoryMapBuilderCS::processPointer(MemoryMapNode *node)
+void MemoryMapBuilderCS::processPointer(const Instance& inst, MemoryMapNode *node)
 {
-    assert(node->type()->type() == rtPointer);
-
-    // Create an instance from the node
-    Instance inst = node->toInstance(false);
+    assert(inst.type()->type() == rtPointer);
 
     quint64 addr = (quint64) inst.toPointer();
     _map->_shared->pointersToLock.lock();
@@ -161,48 +173,43 @@ void MemoryMapBuilderCS::processPointer(MemoryMapNode *node)
     _map->_shared->pointersToLock.unlock();
     // Add dereferenced type to the stack, if not already visited
     int cnt = 0;
-    inst = inst.dereference(BaseType::trLexicalAndPointers, 1, &cnt);
-    if (cnt && MemoryMapHeuristics::hasValidAddress(inst, false))
-        _map->addChildIfNotExistend(inst, node, _index, node->address());
+    Instance deref(inst.dereference(BaseType::trLexicalAllPointers, 1, &cnt));
+
+    if (cnt && MemoryMapHeuristics::hasValidAddress(inst, false)) {
+        _map->addChildIfNotExistend(deref, node, _index, node->address());
+    }
 }
 
 
-void MemoryMapBuilderCS::processArray(MemoryMapNode *node)
-{
-    assert(node->type()->type() == rtArray);
 
-    // Create an instance from the node
-    Instance inst = node->toInstance(false);
+void MemoryMapBuilderCS::processArray(const Instance& inst, MemoryMapNode *node)
+{
+    assert(inst.type()->type() == rtArray);
 
     int len = inst.arrayLength();
-    // Add all elements to the stack that haven't been visited
+    // Add all elements that haven't been visited to the stack
     for (int i = 0; i < len; ++i) {
-        try {
-            Instance e = inst.arrayElem(i);
-            if (MemoryMapHeuristics::hasValidAddress(e, false))
-                _map->addChildIfNotExistend(e, node, _index,
-                                            node->address() + (i * e.size()));
+        Instance e(inst.arrayElem(i).dereference(BaseType::trLexical));
+        // Pass the "nested" flag to structs/unions in this array
+        if (e.type()->type() & StructOrUnion) {
+            processStructured(e, node, true);
         }
-        catch (GenericException& e) {
-            // Do nothing
+        else {
+            processInstance(e, node);
         }
     }
 }
 
 
-void MemoryMapBuilderCS::processStructured(MemoryMapNode *node)
+void MemoryMapBuilderCS::processStructured(const Instance& inst,
+                                           MemoryMapNode *node, bool isNested)
 {
-    assert(node->type()->type() & StructOrUnion);
+    assert(inst.type()->type() & StructOrUnion);
 
-    // Ignore user-land structs
-    if (node->address() < _map->_vmem->memSpecs().pageOffset)
+    // Ignore non-nested structs/unions that are not aligned at a four-byte
+    // boundary
+    if (!isNested && (inst.address() & 0x3ULL))
         return;
-    // Ignore structs/unions that are not aligned at a four-byte boundary
-    if (node->address() & 0x3ULL)
-        return;
-
-    // Create an instance from the node
-    Instance inst = node->toInstance(false);
 
     addMembers(inst, node);
 }
@@ -210,50 +217,32 @@ void MemoryMapBuilderCS::processStructured(MemoryMapNode *node)
 
 void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
 {
-    if (!inst.memberCount())
-        return;
-
-    // Possible pointer types: Pointer and integers of pointer size
-    const int ptrTypes = rtPointer | rtFuncPointer |
-            ((_map->vmem()->memSpecs().sizeofPointer == 4) ?
-                 (rtInt32 | rtUInt32) :
-                 (rtInt64 | rtUInt64));
+    const int cnt = inst.memberCount();
 
     // Add all struct members to the stack that haven't been visited
-    for (int i = 0; i < inst.memberCount(); ++i) {
-
+    for (int i = 0; i < cnt; ++i) {
         try {
+            int result;
             // Get plain member instance as-is
-            Instance mi = inst.member(i, BaseType::trLexical, 0, ksNone);
-
-            // Consider the members of nested structs recurisvely
-            if (mi.type()->type() & StructOrUnion) {
-                // Adjust instance name to reflect full path
-                if (node->name() != inst.name())
-                    mi.setName(inst.name() + "." + mi.name());
-                addMembers(mi, node);
-                continue;
-            }
-            // Skip members which cannot hold pointers
-            if ( !(mi.type()->type() & ptrTypes) )
+            Instance mi = inst.member(i, BaseType::trLexical, 0,
+                                      _map->knowSrc(), &result);
+            if (!mi.isValid() || mi.isNull())
                 continue;
 
-            // Only add pointer members with valid address
-            if (mi.type() && (mi.type()->type() != rtPointer ||
-                              MemoryMapHeuristics::hasValidAddress(mi, false)))
+            // Did the rules engine provide a new non-ambiguous instance?
+            if ( (result & TypeRuleEngine::mrMatch) &&
+                 !(result & TypeRuleEngine::mrAmbiguous) )
             {
-                // Dereference member instance
-                mi = inst.member(i, BaseType::trLexicalAndPointers, 1, _map->knowSrc());
-
-                if (mi.type()->type() & (StructOrUnion|rtPointer|rtArray|rtFuncPointer) &&
-                    MemoryMapHeuristics::isValidInstance(mi))
-                {
-                    // Adjust instance name to reflect full path
-                    if (node->name() != inst.name())
-                        mi.setName(inst.name() + "." + mi.name());
-                    _map->addChildIfNotExistend(mi, node, _index,
-                                                inst.memberAddress(i, 0, 0, ksNone));
-                }
+                // Add a new child node for this instance
+                _map->addChildIfNotExistend(mi, node, _index,
+                                            inst.memberAddress(i, 0, 0, ksNone));
+            }
+            // Pass the "nested" flag to nested structs/unions
+            else if (mi.type()->type() & StructOrUnion) {
+                processStructured(mi, node, true);
+            }
+            else {
+                processInstance(mi, node);
             }
         }
         catch (GenericException&) {

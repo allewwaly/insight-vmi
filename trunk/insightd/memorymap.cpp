@@ -342,7 +342,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
                     << ", pmemMap: " << _pmemMap.nodeCount()
                     << ", queue: " << queue_size << " " << indicator
                     << ", prob: " << (node ? node->probability() : 1.0)
-                    << ", min_prob: " << _shared->queue.smallest()->probability()
+                    << ", min_prob: " << (queue_size ? _shared->queue.smallest()->probability() : 0)
                     << endl;
             prev_queue_size = queue_size;
         }
@@ -759,41 +759,75 @@ bool MemoryMap::dumpInit(const QString &fileName, const quint32 level) const
 
 MemoryMapNode* MemoryMap::existsNode(const Instance& inst)
 {
-  // Increase the reading counter
-  _shared->vmemReadingLock.lock();
-  _shared->vmemReading++;
-  _shared->vmemReadingLock.unlock();
+    if (!inst.type())
+        return 0;
 
-  MemMapSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
+    if (inst.type()->type() & BaseType::trLexical)
+        debugerr("The given instance has a lexical type!");
 
-  for (MemMapSet::iterator it = nodes.begin(); it != nodes.end(); ++it) {
-      const MemoryMapNode* otherNode = *it;
-      // Is the the same object already contained?
-      bool ok1 = false, ok2 = false;
-      if (otherNode && otherNode->address() == inst.address() &&
-         otherNode->type() && inst.type() &&
-          otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
-          ok1 && ok2)
+    // Increase the reading counter
+    _shared->vmemReadingLock.lock();
+    _shared->vmemReading++;
+    _shared->vmemReadingLock.unlock();
+
+    MemMapSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
+
+    // Decrease the reading counter again
+    _shared->vmemReadingLock.lock();
+    _shared->vmemReading--;
+    _shared->vmemReadingLock.unlock();
+    // Wake up any sleeping thread
+    _shared->vmemReadingDone.wakeAll();
+
+    const MemoryMapNode* otherNode = 0;
+    bool found = false;
+
+    for (MemMapSet::const_iterator it = nodes.begin(), e = nodes.end();
+         !found && it != e; ++it)
+    {
+        otherNode = *it;
+        if (!otherNode || !otherNode->type())
+            continue;
+
+        // Is the the same object already contained?
+        if (otherNode->address() == inst.address() &&
+            (*otherNode->type() == *inst.type()))
         {
-          // Decrease the reading counter again
-          _shared->vmemReadingLock.lock();
-          _shared->vmemReading--;
-          _shared->vmemReadingLock.unlock();
-          // Wake up any sleeping thread
-          _shared->vmemReadingDone.wakeAll();
-          
-          return const_cast<MemoryMapNode*>(otherNode);
+            found = true;
+            break;
         }
-  }
 
-  // Decrease the reading counter again
-  _shared->vmemReadingLock.lock();
-  _shared->vmemReading--;
-  _shared->vmemReadingLock.unlock();
-  // Wake up any sleeping thread
-  _shared->vmemReadingDone.wakeAll();
+        // Does one node embed the instance?
+        Instance other(otherNode->toInstance(false));
+        // Search recursively for embedding structs/unions
+        while (other.memberCount() > 0 && other.address() <= inst.address()) {
+            // Get member at the offset
+            quint64 offset = inst.address() - other.address();
+            other = other.memberByOffset(offset, false).dereference(BaseType::trLexical);
+            // Compare the member
+            if (other.type() && other.address() == inst.address()) {
+                // Do the types match directly?
+                if (*other.type() == *inst.type()) {
+                    found = true;
+                    break;
+                }
+                // Test if the current element is a pointer to the type of the
+                // given instance. If yes, assume a list-like structure that
+                // is terminated at the current node.
+                else if (other.type()->type() == rtPointer) {
+                    int cnt;
+                    do {
+                        other = other.dereference(rtPointer, 1, &cnt);
+                        if (*other.type() == *inst.type())
+                            found = true;
+                    } while (!found && cnt && other.type()->type() == rtPointer);
+                    break;
+                }
+            }
+        }
+    }
 
-  return NULL;
+    return found ? const_cast<MemoryMapNode*>(otherNode) : 0;
 }
 
 
@@ -841,8 +875,10 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
 {
     MemoryMapNode *child = existsNode(inst);
     // Return child if it already exists in virtual memory.
-    if (child)
+    if (child) {
+        child->incFoundInPtrChains();
         return child;
+    }
 
     static const int interestingTypes =
             BaseType::trLexical |
@@ -853,7 +889,8 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
             rtUnion;
 
     // Dereference, if required
-    const Instance i = (inst.type()->type() & BaseType::trLexical) ?
+    const Instance i =
+            (inst.type() && (inst.type()->type() & BaseType::trLexical)) ?
             inst.dereference(BaseType::trLexical) : inst;
 
     if (!i.isNull() && i.type() && (i.type()->type() & interestingTypes))

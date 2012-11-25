@@ -198,6 +198,12 @@ public:
     QStringList parentNameComponents() const;
 
     /**
+     * Sets the component of all parent structs.
+     * @param names list of names
+     */
+    void setParentNameComponents(const QStringList& names);
+
+    /**
      * Use this function to retrieve the full name of this instance as it was
      * found following the names and members of structs in dotted notation,
      * for example, \c init_task.children.next.
@@ -397,14 +403,14 @@ public:
      * dereferenced
      * @param src selects which sources of knowledge to use when accessing
      *  members
-     * @param ambiguous bool that is set \c true if multiple rules or
-     * candidates matched the member
+     * @param result provides the result of the knowledge source evaluation,
+     * see TypeRuleEngine::MatchResult
      * @return Instance object of the specified member
      * \sa BaseType::TypeResolution KnowledgeSources
      */
     Instance member(int index, int resolveTypes = 0,
                     int maxPtrDeref = -1, KnowledgeSources src = ksAll,
-                    bool *ambiguous = 0) const;
+                    int *result = 0) const;
 
     /**
      * Retrieves a member (i.e., struct components) of this Instance, if it
@@ -422,14 +428,14 @@ public:
      * dereferenced
      * @param src selects which sources of knowledge to use when accessing
      *  members
-     * @param ambiguous bool that is set \c true if multiple rules or
-     * candidates matched the member
+     * @param result provides the result of the knowledge source evaluation,
+     * see TypeRuleEngine::MatchResult
      * @return Instance object of the specified member
      * \sa BaseType::TypeResolution, KnowledgeSources
      */
     Instance member(const QString& name, int resolveTypes = 0,
                     int maxPtrDeref = -1, KnowledgeSources src = ksAll,
-                    bool *ambiguous = 0) const;
+                    int *result = 0) const;
 
     /**
      * Obtain the member of this instance that has the given offset provided that
@@ -461,14 +467,14 @@ public:
      * dereferenced
      * @param src selects which sources of knowledge to use when accessing
      *  members
-     * @param ambiguous bool that is set \c true if multiple rules or
-     * candidates matched the member
+     * @param result provides the result of the knowledge source evaluation,
+     * see TypeRuleEngine::MatchResult
      * @return pointer to the type of member \a index, or 0 if this is no struct
      * or union or \a index is out of bounds
      */
     const BaseType* memberType(int index, int resolveTypes = 0,
                                int maxPtrDeref = -1, KnowledgeSources src = ksAll,
-                               bool *ambiguous = 0) const;
+                               int *result = 0) const;
 
     /**
      * Calculates the virtual address of a member, if this is a struct or union.
@@ -479,13 +485,13 @@ public:
      * dereferenced
      * @param src selects which sources of knowledge to use when accessing
      *  members
-     * @param ambiguous bool that is set \c true if multiple rules or
-     * candidates matched the member
+     * @param result provides the result of the knowledge source evaluation,
+     * see TypeRuleEngine::MatchResult
      * @return the virtual address of member \a index, or 0 if this is no struct
      * or union
      */
     quint64 memberAddress(int index, int resolveTypes = 0, int maxPtrDeref = -1,
-                          KnowledgeSources src = ksAll, bool *ambiguous = 0) const;
+                          KnowledgeSources src = ksAll, int *result = 0) const;
 
     /**
      * Calculates the virtual address of a member, if this is a struct or union.
@@ -496,14 +502,14 @@ public:
      * dereferenced
      * @param src selects which sources of knowledge to use when accessing
      *  members
-     * @param ambiguous bool that is set \c true if multiple rules or
-     * candidates matched the member
+     * @param result provides the result of the knowledge source evaluation,
+     * see TypeRuleEngine::MatchResult
      * @return the virtual address of member \a index, or 0 if this is no struct
      * or union
      */
     quint64 memberAddress(const QString& name, int resolveTypes = 0,
                           int maxPtrDeref = -1, KnowledgeSources src = ksAll,
-                          bool *ambiguous = 0) const;
+                          int* result = 0) const;
 
     /**
      * Returns the offset of member \a name within a struct, if this is a struct
@@ -539,13 +545,13 @@ public:
      * dereferenced
      * @param src selects which sources of knowledge to use when accessing
      *  members
-     * @param ambiguous bool that is set \c true if multiple rules or
-     * candidates matched the member
+     * @param result provides the result of the knowledge source evaluation,
+     * see TypeRuleEngine::MatchResult
      * @return the ID of the type, if that member exists, \c 0 otherwise.
      */
     int typeIdOfMember(const QString& name, int resolveTypes = 0,
                        int maxPtrDeref = -1, KnowledgeSources src = ksAll,
-                       bool *ambiguous = 0) const;
+                       int *result = 0) const;
 
     /**
      * Returns the number of candidate types for a particular member.
@@ -854,7 +860,7 @@ private:
 
     Instance member(const ConstMemberList& members, int resolveTypes,
                     int maxPtrDeref, KnowledgeSources src = ksAll,
-                    bool *ambiguous = 0) const;
+                    int *result = 0) const;
 
     Instance *typeRuleMatchRek(ConstMemberList &members, int *match) const;
 

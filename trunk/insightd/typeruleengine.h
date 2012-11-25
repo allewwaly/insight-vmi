@@ -64,8 +64,8 @@ public:
     /// Result of matching an Instance against the rule set
     enum MatchResult {
         mrNoMatch         = 0,         ///< no rule matched
-        mrMatch           = (1 << 0),  ///< one rule matched and was evaluated
-        mrMultiMatch      = (1 << 1),  ///< one rule matched and was evaluated
+        mrMatch           = (1 << 0),  ///< one or more rules matched
+        mrAmbiguous       = (1 << 1),  ///< several rules matched and delivered different results
         mrDefer           = (1 << 2),  ///< one rule may match with further members given
         mrMatchAndDefer = mrMatch|mrDefer ///< one rule matches, further rules might match with more members
     };

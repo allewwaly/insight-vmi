@@ -14,6 +14,7 @@
 #include "instance.h"
 #include "basetype.h"
 #include "memorymapbuilder.h"
+#include "slubobjects.h"
 
 // forward declarations
 class QFile;
@@ -248,6 +249,15 @@ public:
      */
     void setupDiff(MemoryDump* other);
 
+    const SlubObjects& slubs() const;
+
+    bool loadSlubFile(const QString& fileName);
+
+    SlubObjects::ObjectValidity validate(const Instance* inst) const;
+
+    SlubObjects::ObjectValidity validate(const QString& queryString,
+                                         KnowledgeSources src = ksAll) const;
+
 private:
     /**
      * Retrieves the next Instance object following the given symbol,
@@ -273,6 +283,7 @@ private:
     VirtualMemory* _vmem;
     MemoryMap* _map;
     int _index;
+    SlubObjects _slubs;
 };
 
 /// An array of MemoryDump files
@@ -314,6 +325,12 @@ inline MemoryMap* MemoryDump::map()
 inline VirtualMemory* MemoryDump::vmem()
 {
     return _vmem;
+}
+
+
+inline const SlubObjects &MemoryDump::slubs() const
+{
+    return _slubs;
 }
 
 #endif /* MEMORYDUMP_H_ */

@@ -161,6 +161,10 @@ public:
 
     bool seemsValid() const;
 
+    int foundInPtrChains() const;
+
+    void incFoundInPtrChains();
+
 protected:
 	/**
 	 * Re-calculates the probability of this node being "sane" and used by the
@@ -189,6 +193,7 @@ protected:
     float _probability;      ///< probability of "correctness" of this node
     Instance* _origInst;
     bool _seemsValid;
+    int _foundInPtrChains;    ///< how often this node was found through other chains of pointers
 };
 
 
@@ -288,6 +293,18 @@ inline float MemoryMapNode::probability() const
 inline bool MemoryMapNode::seemsValid() const
 {
     return _seemsValid;
+}
+
+
+inline int MemoryMapNode::foundInPtrChains() const
+{
+    return _foundInPtrChains;
+}
+
+
+inline void MemoryMapNode::incFoundInPtrChains()
+{
+    ++_foundInPtrChains;
 }
 
 

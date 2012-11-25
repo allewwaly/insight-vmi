@@ -85,6 +85,9 @@ public:
         trAnyNonNull   = trLexicalPointersArrays,   ///< resolve all types, but no null pointers
         trAnyButTypedef = rtPointer|rtArray|rtConst|rtVolatile|rtFunction, ///< resolve all referencing types except rtTypedef
         trNullPointers = 0x80000000,                ///< resolve rtPointer even with null address
+        trVoidPointers = 0x40000000,                ///< resolve rtPointer even without a type (void*)
+        trAllPointers = rtPointer|trNullPointers|trVoidPointers, ///< resolve all pointers even without a type (void*) or with a null address
+        trLexicalAllPointers = trLexical|trAllPointers, ///< resolve all lexical types and pointers even without a type (void*) or with a null address
         trAny          = trNullPointers|trAnyNonNull ///< resolve all types, incl. null pointers
     };
 

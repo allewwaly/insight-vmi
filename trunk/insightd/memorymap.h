@@ -316,9 +316,9 @@ private:
      * if that instance is in conflict to already existing nodes and a pointer to
      * the existing node, if it already existed in the virtual memory mapping
 	 */
-    MemoryMapNode * addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,  
-                                          int threadIndex, quint64 addrInParent,
-                                          bool addToQueue = true, bool hasCandidates = false);
+	MemoryMapNode* addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,
+										 int threadIndex, quint64 addrInParent,
+										 bool addToQueue = true, bool hasCandidates = false);
 
     /**
      * Check if at least one builder is still runnning.
