@@ -1945,6 +1945,9 @@ int Shell::cmdMemory(QStringList args)
     else if (QString("query").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryQuery(args);
     }
+    else if (QString("verify").startsWith(action) && (action.size() >= 1)) {
+        return cmdMemoryVerify(args);
+    }
     else if (QString("dump").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryDump(args);
     }
@@ -2186,6 +2189,82 @@ int Shell::cmdMemoryQuery(QStringList args)
 		return ecOk;
     }
     return 1;
+}
+
+
+int Shell::cmdMemoryVerify(QStringList args)
+{
+    // Get the memory dump index to use
+    int index = parseMemDumpIndex(args);
+    // Perform the query
+    if (index >= 0) {
+
+        if (!args.isEmpty() && (args[0] == "-l" || args[0] == "--load")) {
+            args.pop_front();
+            _memDumps[index]->loadSlubFile(args.isEmpty() ? QString() : args[0]);
+            return ecOk;
+        }
+        else {
+            if (_memDumps[index]->slubs().numberOfObjects() <= 0) {
+                _out << "No slub file loaded for memory dump " << index << "."
+                     << endl;
+                return ecFileNotLoaded;
+            }
+            Instance inst = _memDumps[index]->queryInstance(args.join(" "));
+            if (!inst.isValid()) {
+                _out << "The query did not retrieve a valid instance." << endl;
+                return ecOk;
+            }
+            if (inst.isNull()) {
+                _out << "The resulting instance is null." << endl;
+                return ecOk;
+            }
+
+            SlubObjects::ObjectValidity v = _memDumps[index]->validate(&inst);
+            _out << "Instance of type " << _color.prettyNameInColor(inst.type(), 0)
+                 << color(ctReset) << " @ " << color(ctAddress) << "0x" << hex
+                 << inst.address() << dec << color(ctReset) << " is "
+                 << color(ctBold);
+
+            switch(v) {
+            // Instance is invalid, no further information avaliable
+            case SlubObjects::ovInvalid:
+                _out << "invalid"; break;
+            // Instance not found, but base type actually not present in any slab
+            case SlubObjects::ovNoSlabType:
+                _out << "no slub type"; break;
+                // Instance not found, even though base type is managed in slabs
+            case SlubObjects::ovNotFound:
+                _out << "not found"; break;
+            // Instance type or address conflicts with object in the slabs
+            case SlubObjects::ovConflict:
+                _out << "in conflict"; break;
+            // Instance is embedded within a larger object in the slabs
+            case SlubObjects::ovEmbedded:
+                _out << "embedded in a struct"; break;
+            // Instance may be embedded within a larger object in the slabs
+            case SlubObjects::ovEmbeddedUnion:
+                _out << "embedded in a union"; break;
+            // Instance is embeddes in another object in the slab when using the SlubObjects::_typeCasts exception list
+            case SlubObjects::ovEmbeddedCastType:
+                _out << "embedded in a valid cast type"; break;
+            // Instance lies within reserved slab memory for which no type information is available
+            case SlubObjects::ovMaybeValid:
+                _out << "maybe valid"; break;
+            // Instance was either found in the slabs or in a global variable
+            case SlubObjects::ovValid:
+                _out << "valid"; break;
+            // Instance matches an object in the slab when using the SlubObjects::_typeCasts exception list
+            case SlubObjects::ovValidCastType:
+                _out << "a valid cast type"; break;
+            }
+
+            _out << color(ctReset) << "." << endl;
+
+            return ecOk;
+        }
+    }
+    return ecInvalidIndex;
 }
 
 
