@@ -9,6 +9,7 @@
 #include "shell.h"
 #include "colorpalette.h"
 #include "shellutil.h"
+#include "memorymapheuristics.h"
 
 #include <math.h>
 
@@ -250,11 +251,13 @@ bool MemoryMapVerifier::performChecks(MemoryMapNode *n)
 
     switch(v) {
         case SlubObjects::ovValid:
+        case SlubObjects::ovValidCastType:
             // Thats fine
             break;
         case SlubObjects::ovEmbedded:
             /* Fall through */
         case SlubObjects::ovEmbeddedUnion:
+        case SlubObjects::ovEmbeddedCastType:
             _log.debug(QString("SLUB ! Node '%1' with address 0x%2 and type %3 is embedded!")
                      .arg(lastNode->fullName())
                      .arg(lastNode->address(), 0, 16)
@@ -371,6 +374,8 @@ void MemoryMapVerifier::statisticsCountNodeSV(MemoryMapNodeSV *node)
 
     switch(v) {
     case SlubObjects::ovValid:
+    case SlubObjects::ovValidCastType:
+        _objectsFoundInSlub++;
         _validObjects++;
         if (_minValidProbability > node->getCandidateProbability())
             _minValidProbability = node->getCandidateProbability();
@@ -381,6 +386,7 @@ void MemoryMapVerifier::statisticsCountNodeSV(MemoryMapNodeSV *node)
     case SlubObjects::ovEmbedded:
         /* Fall through */
     case SlubObjects::ovEmbeddedUnion:
+    case SlubObjects::ovEmbeddedCastType:
         _validObjects++;
         if (_minValidProbability > node->getCandidateProbability())
             _minValidProbability = node->getCandidateProbability();
@@ -447,7 +453,13 @@ void MemoryMapVerifier::statisticsCountNodeSV(MemoryMapNodeSV *node)
 
 void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
 {
-    Instance i = node->toInstance();
+    Instance i = node->toInstance(true);
+
+    // First we check if this node is embedded in another node within our map
+
+
+
+
     SlubObjects::ObjectValidity v = _slub.objectValid(&i);
     bool valid = false;
 
@@ -457,8 +469,13 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
 
     switch(v) {
     case SlubObjects::ovValid:
+    case SlubObjects::ovValidCastType:
+        _objectsFoundInSlub++;
+        // no break, fall through
+
     case SlubObjects::ovEmbedded:
     case SlubObjects::ovEmbeddedUnion:
+    case SlubObjects::ovEmbeddedCastType:
         valid = true;
         _validObjects++;
         if (_minValidProbability > node->probability())
@@ -472,8 +489,9 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         // no break, fall through
 
     case SlubObjects::ovNoSlabType:
-        _maybeValidObjects++;
-        valid = true;
+        valid = MemoryMapHeuristics::isValidInstance(i);
+        if (valid)
+            _maybeValidObjects++;
         break;
 
     case SlubObjects::ovConflict: {
@@ -531,8 +549,10 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
                  << " is invalid according to magic!");
     }
 
-    if ((valid || node->seemsValid()) && node->probability() < 0.1)
+    if (valid && node->probability() < 0.1)
         debugmsg(QString("Valid object with prob < 0.1: %1").arg(i.fullName()));
+//    if (node->seemsValid() && node->probability() < 0.1)
+//        debugmsg(QString("Seems valid object with prob < 0.1: %1").arg(i.fullName()));
     else if (!valid && node->probability() > 0.9) {
         switch (v) {
         case SlubObjects::ovConflict: reason = "conflict"; break;
@@ -585,6 +605,7 @@ void MemoryMapVerifier::statistics()
     _invalidObjects = 0;
     _maybeValidObjects = 0;
     _maybeValidSlubObjects = 0;
+    _objectsFoundInSlub = 0;
 
     _seemValidObjects = 0;
     
@@ -694,14 +715,14 @@ void MemoryMapVerifier::statistics()
                  << "\t| Coverage of all slub objects:"
                  << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << shell->color(ctBold)
                  << qSetFieldWidth(8) << right
-                 << ((float)(_validObjects + _maybeValidSlubObjects)) * 100 / _slub.numberOfObjects()
+                 << ((float)(_objectsFoundInSlub + _maybeValidSlubObjects)) * 100 / _slub.numberOfObjects()
                  << qSetFieldWidth(0) << left << shell->color(ctReset)
                  << "%\n"
                  << qSetFieldWidth(50)
                  << "\t| Coverage of slub objects with type:"
                  << qSetRealNumberPrecision(4) << qSetFieldWidth(0) << shell->color(ctBold)
                  << qSetFieldWidth(8) << right
-                 << ((float)_validObjects) * 100 / _slub.numberOfObjectsWithType()
+                 << ((float)_objectsFoundInSlub) * 100 / _slub.numberOfObjectsWithType()
                  << qSetFieldWidth(0) << left << shell->color(ctReset)
                  << "%\n"
                  << qSetFieldWidth(0)

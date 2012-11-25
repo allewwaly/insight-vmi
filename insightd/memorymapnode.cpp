@@ -18,7 +18,8 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
         quint64 address, const BaseType* type, int id, MemoryMapNode* parent)
 	: _belongsTo(belongsTo), _parent(parent),
 	  _name(MemoryMap::insertName(name)), _address(address), _type(type),
-	  _id(id), _probability(1.0), _origInst(0), _seemsValid(false)
+	  _id(id), _probability(1.0), _origInst(0), _seemsValid(false),
+	  _foundInPtrChains(0)
 {
     if (_belongsTo && (_belongsTo->vmem()->memSpecs().arch & MemSpecs::ar_i386))
         if (_address >= (1ULL << 32))
@@ -34,7 +35,7 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
     : _belongsTo(belongsTo), _parent(parent),
       _name(getNameFromInstance(parent, inst)), _address(inst.address()),
       _type(inst.type()), _id(inst.id()), _probability(1.0),
-      _origInst(0), _seemsValid(false)
+      _origInst(0), _seemsValid(false), _foundInPtrChains(0)
 {
     if (_belongsTo && _address > _belongsTo->vmem()->memSpecs().vaddrSpaceEnd())
             genericError(QString("Address 0x%1 exceeds 32 bit address space")
@@ -55,29 +56,22 @@ MemoryMapNode::~MemoryMapNode()
 }
 
 
-const QString & MemoryMapNode::getNameFromInstance(MemoryMapNode* parent, const Instance &inst)
+const QString& MemoryMapNode::getNameFromInstance(MemoryMapNode* parent,
+                                                   const Instance &inst)
 {
-    // Consider to the full name of the instance to get the correct name for the node
-    const QString instFullName = inst.fullName();
-
-    if (!parent)
-        // The node has no parent => take the full name
-        return MemoryMap::insertName(instFullName);
-    else {
-        // Take the part of the name that is not covered by the parents
-        const QString parentFullName = parent->fullName();
-        int position = instFullName.indexOf(parentFullName);
-
-        if (!position &&
-                instFullName.size() > parentFullName.size()) {
-            // The name of the parent chain is contained within the fullName as expected
-            // Take the missing parts
-            return MemoryMap::insertName(instFullName.right(instFullName.size() -
-                                                           parentFullName.size() - 1));
+    QStringList names(inst.fullNameComponents());
+    // The first parent name(s) came from the parent MemoryMapNode
+    if (parent) {
+        if (!parent->name().isEmpty()) {
+            while (!names.isEmpty() && parent->name() != names.first() &&
+                   !parent->name().endsWith("." + names.first()))
+                names.pop_front();
         }
+        if (!names.isEmpty())
+            names.pop_front();
     }
 
-    return MemoryMap::insertName(inst.name());
+    return MemoryMap::insertName(names.join("."));
 }
 
 
@@ -102,12 +96,8 @@ QString MemoryMapNode::fullName() const
 QStringList MemoryMapNode::fullNameComponents() const
 {
 	QStringList ret = parentNameComponents();
-    // If this is the child of an array or pointer, then suppress the father's
-	// name
-    if (_parent && _parent->type() &&
-            (_parent->type()->type() & (rtArray|rtPointer)))
-        ret.removeLast();
-	ret += name();
+	if (!_name.isEmpty())
+		ret += _name;
 	return ret;
 }
 
@@ -131,14 +121,25 @@ MemoryMapNode* MemoryMapNode::addChild(const Instance& inst)
 Instance MemoryMapNode::toInstance(bool includeParentNameComponents) const
 {
     // Return the stored instance, if it exists
-    if (_origInst)
-        return *_origInst;
+    if (_origInst) {
+        Instance inst(*_origInst);
+        // The parent names may be incomplete, so reconstruct them
+        if (includeParentNameComponents)
+            inst.setParentNameComponents(parentNameComponents());
+    }
 
-    Instance inst(_address, _type, _name,
-            includeParentNameComponents ? parentNameComponents() : QStringList(),
-            _belongsTo->vmem(), _id);
-    inst.setOrigin(Instance::orMemMapNode);
-    return inst;
+    if (includeParentNameComponents) {
+        Instance inst(_address, _type, _name, parentNameComponents(),
+                      _belongsTo->vmem(), _id);
+        inst.setOrigin(Instance::orMemMapNode);
+        return inst;
+    }
+    else {
+        Instance inst(_address, _type, _name, QStringList(), _belongsTo->vmem(),
+                      _id);
+        inst.setOrigin(Instance::orMemMapNode);
+        return inst;
+    }
 }
 
 

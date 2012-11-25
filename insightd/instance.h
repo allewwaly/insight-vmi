@@ -116,7 +116,7 @@ inline void Instance::setType(const BaseType* type)
 
 inline QString Instance::typeName() const
 {
-    return _d->type ? _d->type->prettyName() : QString();
+    return _d->type ? _d->type->prettyName() : QString("void");
 }
 
 

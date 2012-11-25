@@ -103,6 +103,12 @@ QStringList Instance::parentNameComponents() const
 }
 
 
+void Instance::setParentNameComponents(const QStringList &names)
+{
+    _d->parentNames = names;
+}
+
+
 QString Instance::fullName() const
 {
     QStringList comp = fullNameComponents();
@@ -481,12 +487,12 @@ Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCoun
 
 
 Instance Instance::member(const ConstMemberList &members, int resolveTypes,
-						  int maxPtrDeref, KnowledgeSources src, bool *ambiguous) const
+						  int maxPtrDeref, KnowledgeSources src, int *result) const
 {
 	const StructuredMember* m = members.last();
 	int match = 0;
-	if (ambiguous)
-		*ambiguous = false;
+	if (result)
+		*result = TypeRuleEngine::mrNoMatch;
 
 	Instance ret;
 
@@ -495,18 +501,18 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 		ConstMemberList mlist(members);
 		Instance *newInst = typeRuleMatchRek(mlist, &match);
 
-		if (ambiguous)
-			*ambiguous = (match & TypeRuleEngine::mrMultiMatch);
+		if (result)
+			*result = match;
 
 		if (match & TypeRuleEngine::mrMatch) {
 			// Auto-delete object later
 			QScopedPointer<Instance> newInstPtr(newInst);
 			// Was the match ambiguous?
-			if ( !(match & TypeRuleEngine::mrMultiMatch) ) {
+			if ( !(match & TypeRuleEngine::mrAmbiguous) ) {
 				if (!newInst)
 					return Instance(Instance::orRuleEngine);
 				else
-					ret = *newInst;
+					ret = newInst->dereference(resolveTypes, maxPtrDeref);
 			}
 		}
 	}
@@ -514,7 +520,7 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 	// If no match or multiple matches through the rule engine, try to resolve
 	// it ourself
 	if ( !(match & TypeRuleEngine::mrMatch) ||
-		 (match & TypeRuleEngine::mrMultiMatch) )
+		 (match & TypeRuleEngine::mrAmbiguous) )
 	{
 		// In case the member is nested in an anonymous struct/union,
 		// we have to add that inter-offset here because m->toInstance()
@@ -526,7 +532,7 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 				(_d->address + m->offset() + extraOffset < (1ULL << 32));
 
 		// Should we use candidate types?
-		if ((src & ksNoAltTypes) || (match & TypeRuleEngine::mrMultiMatch)) {
+		if ((src & ksNoAltTypes) || (match & TypeRuleEngine::mrAmbiguous)) {
 			// Make sure the address does not exceed 32-bit bounds
 			if (addrInBounds)
 				ret = m->toInstance(_d->address + extraOffset, _d->vmem, this,
@@ -565,17 +571,18 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 	}
 
 	// Do we need to store this instance for further rule evaluation?
-	if (match & TypeRuleEngine::mrDefer) {
+	// The ExpressionAction might have returned "this" or one of our own parents
+	// back to us, so make sure there isn't already a parent set
+	if ((match & TypeRuleEngine::mrDefer) && !ret._d->parent.data()) {
 		// Start with first member
-		assert(ret._d->parent.data() == 0);
 		ret._d->parent = _d;
-		ret._d->fromParent = members.first();
+		ret._d->fromParent = members.last();
 
 		// If we have more members, we need to build a chain of parents
-		for (int i = 1; i < members.size(); ++i) {
+		for (int i = 0; i + 1 < members.size(); ++i) {
 			// Create instance of previous parent and access its member
 			Instance parent(ret._d->parent);
-			Instance child(parent.member(members.mid(i), BaseType::trLexical, 0, ksNone));
+			Instance child(parent.member(members.mid(i, 1), BaseType::trLexical, 0, ksNone));
 			// Child becomes new parent of ret
 			assert(child._d->parent.data() == 0);
 			child._d->parent = ret._d->parent;
@@ -583,6 +590,9 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 			ret._d->parent = child._d;
 		}
 	}
+
+	if (result)
+		*result = match;
 
 	return ret;
 }
@@ -606,7 +616,7 @@ Instance* Instance::typeRuleMatchRek(ConstMemberList &members, int* match) const
 	if ( !((*match) & TypeRuleEngine::mrMatch) ) {
 		if (memberPrepended)
 			members.pop_front();
-		*match = _ruleEngine->match(this, members, &newInst);
+		*match |= _ruleEngine->match(this, members, &newInst);
 	}
 
 	return newInst;
@@ -614,13 +624,13 @@ Instance* Instance::typeRuleMatchRek(ConstMemberList &members, int* match) const
 
 
 Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
-						  KnowledgeSources src, bool *ambiguous) const
+						  KnowledgeSources src, int *result) const
 {
 	const Structured* s = dynamic_cast<const Structured*>(_d->type);
 	if (s && index >= 0 && index < s->members().size()) {
 		const StructuredMember* m = s->members().at(index);
 		return member(ConstMemberList() << m, resolveTypes, maxPtrDeref, src,
-					  ambiguous);
+					  result);
 	}
 	return Instance();
 }
@@ -628,7 +638,7 @@ Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
 
 Instance Instance::member(const QString& name, int resolveTypes,
 						  int maxPtrDeref, KnowledgeSources src,
-						  bool *ambiguous) const
+						  int *result) const
 {
 	const Structured* s;
 	if ( !(s = dynamic_cast<const Structured*>(_d->type)) )
@@ -636,7 +646,7 @@ Instance Instance::member(const QString& name, int resolveTypes,
 
 	ConstMemberList list(s->memberChain(name));
 	if (!list.isEmpty())
-		return member(list, resolveTypes, maxPtrDeref, src, ambiguous);
+		return member(list, resolveTypes, maxPtrDeref, src, result);
 	return Instance();
 }
 
@@ -660,26 +670,26 @@ Instance Instance::memberByOffset(size_t off, bool exactMatch) const
 
 const BaseType* Instance::memberType(int index, int resolveTypes,
 									 int maxPtrDeref, KnowledgeSources src,
-									 bool *ambiguous) const
+									 int *result) const
 {
-	Instance m(member(index, resolveTypes, maxPtrDeref, src, ambiguous));
+	Instance m(member(index, resolveTypes, maxPtrDeref, src, result));
 	return m.type();
 }
 
 
 quint64 Instance::memberAddress(int index, int resolveTypes, int maxPtrDeref,
-								KnowledgeSources src, bool *ambiguous) const
+								KnowledgeSources src, int *result) const
 {
-	Instance m(member(index, resolveTypes, maxPtrDeref, src, ambiguous));
+	Instance m(member(index, resolveTypes, maxPtrDeref, src, result));
 	return m.address();
 }
 
 
 quint64 Instance::memberAddress(const QString &name, int resolveTypes,
 								int maxPtrDeref, KnowledgeSources src,
-								bool *ambiguous) const
+								int *result) const
 {
-	Instance m(member(name, resolveTypes, maxPtrDeref, src, ambiguous));
+	Instance m(member(name, resolveTypes, maxPtrDeref, src, result));
 	return m.address();
 }
 
@@ -712,9 +722,9 @@ int Instance::indexOfMember(const QString& name) const
 
 int Instance::typeIdOfMember(const QString& name, int resolveTypes,
 							 int maxPtrDeref, KnowledgeSources src,
-							 bool *ambiguous) const
+							 int *result) const
 {
-	Instance m(member(name, resolveTypes, maxPtrDeref, src, ambiguous));
+	Instance m(member(name, resolveTypes, maxPtrDeref, src, result));
 	return m.type()	? m.type()->id() : 0;
 }
 

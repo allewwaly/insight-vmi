@@ -55,12 +55,12 @@ QString Variable::toString(QIODevice* mem) const
 
 
 Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes,
-							  KnowledgeSources src, bool *ambiguous) const
+							  KnowledgeSources src, int *result) const
 {
 	Instance ret;
 	int match = 0;
-	if (ambiguous)
-		*ambiguous = false;
+	if (result)
+		*result = TypeRuleEngine::mrNoMatch;
 
 	// If allowed, and available, try the rule engine first
 	if (_ruleEngine && !(src & ksNoRulesEngine)) {
@@ -70,14 +70,14 @@ Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes,
 		Instance *newInst = 0;
 		match = _ruleEngine->match(&ret, emtpyMemberList, &newInst);
 
-		if (ambiguous)
-			*ambiguous = (match & TypeRuleEngine::mrMultiMatch);
+		if (result)
+			*result = match;
 
 		if (match & TypeRuleEngine::mrMatch) {
 			// Auto-delete object later
 			QScopedPointer<Instance> newInstPtr(newInst);
 			// Was the match ambiguous?
-			if ( !(match & TypeRuleEngine::mrMultiMatch) ) {
+			if ( !(match & TypeRuleEngine::mrAmbiguous) ) {
 				if (!newInst)
 					return Instance(Instance::orRuleEngine);
 				else
@@ -89,16 +89,14 @@ Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes,
 	// If no match or multiple matches through the rule engine, try to resolve
 	// it ourself
 	if ( !(match & TypeRuleEngine::mrMatch) ||
-		 (match & TypeRuleEngine::mrMultiMatch) )
+		 (match & TypeRuleEngine::mrAmbiguous) )
 	{
 		// If variable has exactly one alternative type and the user did
 		// not explicitly request the original type, we return the
 		// alternative type
-		if ((src & ksNoAltTypes) || (match & TypeRuleEngine::mrMultiMatch) ||
+		if ((src & ksNoAltTypes) || (match & TypeRuleEngine::mrAmbiguous) ||
 			altRefTypeCount() != 1)
 		{
-			if (ambiguous)
-				*ambiguous = !(src & ksNoAltTypes) && (altRefTypeCount() > 1);
 			ret = createRefInstance(_offset, vmem, _name, _id, resolveTypes);
 			ret.setOrigin(Instance::orVariable);
 		}
@@ -111,6 +109,9 @@ Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes,
 	// resulting from Instance::dereference().
 	if (match & TypeRuleEngine::mrDefer)
 		ret.setParent(ret, 0);
+
+	if (result)
+		*result = match;
 
 	return ret;
 }

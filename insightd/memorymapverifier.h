@@ -182,6 +182,7 @@ private:
     quint32 _invalidObjects;
     quint32 _maybeValidObjects;
     quint32 _maybeValidSlubObjects;
+    quint32 _objectsFoundInSlub;
     
     quint32 _seemValidObjects;
 

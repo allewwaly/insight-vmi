@@ -404,10 +404,10 @@ void MemoryMapBuilderSV::processListHead(MemoryMapNodeSV *node, Instance &inst)
 
         // Can we rely on the rules enginge?
         if (_map->useRuleEngine()) {
-            bool ambiguous;
-            nextDeref = inst.member(0, 0, 0, _map->knowSrc(), &ambiguous);
+            int result;
+            nextDeref = inst.member(0, 0, 0, _map->knowSrc(), &result);
             // If the rules are ambiguous, fall back to default
-            if (ambiguous)
+            if (result & TypeRuleEngine::mrAmbiguous)
                 nextDeref = next.dereference(BaseType::trLexicalAndPointers);
         }
         else {
@@ -542,12 +542,12 @@ void MemoryMapBuilderSV::processStruct(MemoryMapNodeSV *node, Instance &inst)
         // Notice that the performance could be improved if we do not try to create
         // an instance for each member, but just for interesting members like structs,
         // poiters, etc.
-        bool ambiguous = false;
-        Instance mi = inst.member(i, 0, 0, _map->knowSrc(), &ambiguous);
+        int result = false;
+        Instance mi = inst.member(i, 0, 0, _map->knowSrc(), &result);
 
         // If the rules engine has retrieved a new type, we can't handle it as
         // an embedded type
-        if (mi.type() && !ambiguous &&
+        if (mi.type() && !(result & TypeRuleEngine::mrAmbiguous) &&
             mi.type() != inst.memberType(i, 0, 0, ksNone))
         {
             if (!mi.isNull() && !existsNode(mi))
