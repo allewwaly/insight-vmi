@@ -338,6 +338,7 @@ private:
     int cmdMemoryList(QStringList args);
     int cmdMemorySpecs(QStringList args);
     int cmdMemoryQuery(QStringList args);
+    int cmdMemoryVerify(QStringList args);
     int cmdMemoryDump(QStringList args);
     int cmdMemoryRevmap(QStringList args);
     int cmdMemoryRevmapBuild(int index, QStringList args);

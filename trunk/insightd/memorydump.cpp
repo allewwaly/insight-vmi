@@ -33,7 +33,8 @@ MemoryDump::MemoryDump(const MemSpecs& specs, QIODevice* mem,
       _factory(factory),
       _vmem(new VirtualMemory(specs, mem, index)),
       _map(new MemoryMap(_factory, _vmem)),
-      _index(index)
+      _index(index),
+      _slubs(factory, _vmem)
 {
     init();
 }
@@ -46,7 +47,8 @@ MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
       _factory(factory),
       _vmem(new VirtualMemory(_specs, _file, index)),
       _map(new MemoryMap(_factory, _vmem)),
-      _index(index)
+      _index(index),
+      _slubs(factory, _vmem)
 {
     _fileName = fileName;
     // Check existence
@@ -648,3 +650,23 @@ void MemoryDump::setupDiff(MemoryDump* other)
     _map->diffWith(other->map());
 }
 
+
+bool MemoryDump::loadSlubFile(const QString &fileName)
+{
+    _slubs.parsePreproc(fileName);
+    return true;
+}
+
+
+SlubObjects::ObjectValidity MemoryDump::validate(const Instance *inst) const
+{
+    return _slubs.objectValid(inst);
+}
+
+
+SlubObjects::ObjectValidity MemoryDump::validate(const QString &queryString,
+                                                 KnowledgeSources src) const
+{
+    Instance inst(queryInstance(queryString, src));
+    return validate(&inst);
+}
