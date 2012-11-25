@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+File created on Sat Nov 17 12:35:29 2012
+Type: struct sysfs_dirent
+Type ID: 0x11a0e5b
+-->
+<typeknowledge version="1">
+	<rules>
+		<rule priority="50">
+			<name>no union members</name>
+			<description>Returns an invalid instance for all union members</description>
+			<filter>
+				<datatype>union</datatype>
+				<members>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="inline">
+				return new Instance();
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
