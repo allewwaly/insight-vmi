@@ -278,9 +278,9 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
             it != _factory->vars().constEnd(); ++it)
     {
         const Variable* v = *it;
-        // For testing now only start with this one variable
-         if (v->name() != "init_task")
-            continue;
+//        // For testing now only start with this one variable
+//         if (v->name() != "init_task")
+//            continue;
 
         // For now ignore all symbols that have been defined in modules
         if (v->symbolSource() == ssModule)
