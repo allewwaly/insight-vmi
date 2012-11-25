@@ -26,8 +26,10 @@ http://lxr.linux.no/#linux+v2.6.32.58/include/asm-generic/percpu.h#L54
 */
 function per_cpu_var(inst)
 {
-	if (!inst.IsValid() || inst.IsNull())
+	if (!inst.IsValid() || inst.IsNull() ||
+		(inst.Type() == "Pointer" && inst.toPointer() == 0))
 		return false;
+
 	var offsets = new Instance("__per_cpu_offset");
 	// Is this an SMP system?
 	if (offsets.IsValid()) {
