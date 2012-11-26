@@ -287,13 +287,13 @@ void SlubObjects::resolveObjSize()
             return;
         }
 
+        int offset = start.memberOffset("list");
+
         do {
             // Read name and size from memory
             name = inst.member("name", BaseType::trLexical).toString();
             name = name.remove('"');
-//            debugmsg("name = " << name);
-            int size =
-                    inst.member("objsize", BaseType::trLexical).toInt32();
+            int size = inst.member("objsize", BaseType::trLexical).toInt32();
 
             // Find the cache in our list and set the size
             if (_indices.contains(name)) {
@@ -301,14 +301,12 @@ void SlubObjects::resolveObjSize()
                 _caches[index].objSize = size;
             }
 
-            // Proceed to next cache
-            inst = inst.member("list").member("next");
-            // If the type magic was not automatically resolved, fix it manually
-            if (!inst.isValid() || inst.typeHash() != start.typeHash()) {
-                inst.setType(start.type());
-                if (!inst.isNull())
-                    inst.addToAddress(-start.memberOffset("list"));
-            }
+            // Proceed to next cache, resolve pointer magic manually
+            inst = inst.member("list", BaseType::trLexicalAllPointers, -1, ksNone)
+                       .member("next", BaseType::trLexicalAllPointers, -1, ksNone);
+            inst.setType(start.type());
+            if (!inst.isNull())
+                inst.addToAddress(-offset);
         } while (start.address() != inst.address() && !inst.isNull());
     }
     catch (GenericException& e) {
