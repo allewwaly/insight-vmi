@@ -274,6 +274,17 @@ qint64 VirtualMemory::size() const
 }
 
 
+qint64 VirtualMemory::readAtomic(qint64 pos, char *data, qint64 maxlen)
+{
+    if (_threadSafe) {
+        QMutexLocker lock(&_virtMemMutex);
+        return seek(pos) ? read(data, maxlen) : -1;
+    }
+    else
+        return seek(pos) ? read(data, maxlen) : -1;
+}
+
+
 void VirtualMemory::setUserLand(qint64 pgd)
 {
 	_userlandMutex.lock();

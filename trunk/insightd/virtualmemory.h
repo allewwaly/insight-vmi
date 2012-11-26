@@ -68,6 +68,18 @@ public:
     virtual qint64 size() const;
 
     /**
+     * Reads up to \a maxSize bytes starting from offset \a pos and stores the
+     * data in buffer \a data. If thread-safety is enabled (see
+     * setThreadSafety()), then the whole operation is performed atomically.
+     * @param pos offset to read data from
+     * @param data buffer to write the data to
+     * @param maxlen number of bytes to read
+     * @return number of bytes actually read, or -1 in case of errors
+     * \sa setThreadSafety(), isThreadSafe()
+     */
+    qint64 readAtomic(qint64 pos, char * data, qint64 maxlen);
+
+    /**
      * Configures this instance to work on the user-land part of the memory only.
      * Reset with setKernelSpace
      *
@@ -193,6 +205,7 @@ public:
      * the given virtual address
      */
     quint64 getFlags(quint64 vaddr);
+
 protected:
     // Pure virtual functions of QIODevice
     virtual qint64 readData (char* data, qint64 maxSize);
@@ -327,6 +340,7 @@ private:
     int _memDumpIndex;
     bool _threadSafe;
     QMutex _physMemMutex;
+    QMutex _virtMemMutex;
 
     bool _userland; // <! switch to change change from kernelspace reading to userland reading.
     quint64 _userPGD;
