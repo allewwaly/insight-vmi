@@ -17,6 +17,8 @@
 class Structured;
 class VirtualMemory;
 
+typedef QList<qint64> IntList;
+
 
 class StructuredMember: public Symbol, public ReferencingType, public SourceRef
 {
@@ -140,25 +142,25 @@ public:
         return (_seenInEvaluateMagicNumber) ? !(_hasConstIntValue || _hasConstStringValue) : false;
     }
     
-    inline bool hasConstantIntValue() const
+    inline bool hasConstantIntValues() const
     {
         return _hasConstIntValue;
     }
-    inline bool hasConstantStringValue() const
+    inline bool hasConstantStringValues() const
     {
         return _hasConstStringValue;
     }
-    inline bool hasStringValue() const
+    inline bool hasStringValues() const
     {
         return _hasStringValue;
     }
-    inline  const QList<qint64>& constantIntValue() const
+    inline  const IntList& constantIntValues() const
     {
-        return _constIntValue;
+        return _constIntValues;
     }
-    inline const QList<QString>& constantStringValue() const
+    inline const QStringList& constantStringValue() const
     {
-        return _constStringValue;
+        return _constStringValues;
     }
 
 protected:
@@ -177,8 +179,8 @@ private:
 	Structured* _belongsTo;  ///< Struct or Union this member belongs to
     
     bool _seenInEvaluateMagicNumber;
-    QList<qint64> _constIntValue;
-    QList<QString> _constStringValue;
+    IntList _constIntValues;
+    QStringList _constStringValues;
     bool _hasConstIntValue;
     bool _hasConstStringValue;
     bool _hasStringValue;

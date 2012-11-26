@@ -95,8 +95,8 @@ void StructuredMember::readFrom(KernelSymbolStream& in)
         in >> _hasConstIntValue;
         in >> _hasConstStringValue;
         in >> _hasStringValue;
-        in >> _constIntValue;
-        in >> _constStringValue;
+        in >> _constIntValues;
+        in >> _constStringValues;
     }
 
     if (in.kSymVersion() >= kSym::VERSION_16) {
@@ -117,8 +117,8 @@ void StructuredMember::writeTo(KernelSymbolStream& out) const
     out << _hasConstIntValue;
     out << _hasConstStringValue;
     out << _hasStringValue;
-    out << _constIntValue;
-    out << _constStringValue;
+    out << _constIntValues;
+    out << _constStringValues;
 
     // Since KSYM VERSION 16:
     out << _bitSize << _bitOffset;
@@ -144,10 +144,10 @@ bool StructuredMember::evaluateMagicNumberFoundNotConstant()
 {
     bool seen = _seenInEvaluateMagicNumber;
     _hasConstIntValue = false;
-    _constIntValue.clear();
+    _constIntValues.clear();
     _hasStringValue = false;
     _hasConstStringValue = false;
-    _constStringValue.clear();
+    _constStringValues.clear();
     _seenInEvaluateMagicNumber = true;
     return seen;
 }
@@ -162,14 +162,14 @@ bool StructuredMember::evaluateMagicNumberFoundInt(qint64 constant)
         {
             this->evaluateMagicNumberFoundNotConstant();
         }
-        else if (_hasConstIntValue && !_constIntValue.contains(constant))
+        else if (_hasConstIntValue && !_constIntValues.contains(constant))
         {
-            _constIntValue.append(constant);
+            _constIntValues.append(constant);
         }
     }
     else
     {
-        _constIntValue.append(constant);
+        _constIntValues.append(constant);
         _hasConstIntValue = true;
         // What is this member's index?
         int i = 0;
@@ -194,15 +194,15 @@ bool StructuredMember::evaluateMagicNumberFoundString(const QString &constant)
         {
             this->evaluateMagicNumberFoundNotConstant();
         }
-        else if (_hasConstStringValue && !_constStringValue.contains(constant))
+        else if (_hasConstStringValue && !_constStringValues.contains(constant))
         {
-            _constStringValue.append(constant);
+            _constStringValues.append(constant);
         }
         
     }
     else
     {
-        _constStringValue.append(constant);
+        _constStringValues.append(constant);
         _hasConstStringValue = true; 
         // What is this member's index?
         int i = 0;
