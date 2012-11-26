@@ -44,7 +44,7 @@ QString Variable::prettyName(const QString &varName) const
 }
 
 
-QString Variable::toString(QIODevice* mem) const
+QString Variable::toString(VirtualMemory* mem) const
 {
     const BaseType* t = refType();
     if (t)

@@ -794,18 +794,18 @@ public slots:
      */
     QString toString() const;
 
-    /**
-     * Returns a toString() representation of this instance using the page
-     * global directory (that is, page table) specified as \a pgd for
-     * virtual-to-physical address translation. This allows to read an instance
-     * that is located in user-land address space.
-     *
-     * @param pgd the page global directory of the process this instance belongs
-     * to, most likely the content of the \c CR3 register, as a hex-encoded string
-     * @return the same as toString() but tries to access user-land memory,
-     * if possible, using the page table specified as \a pgd
-     */
-    QString toStringUserLand(const QString &pgd) const;
+//    /**
+//     * Returns a toString() representation of this instance using the page
+//     * global directory (that is, page table) specified as \a pgd for
+//     * virtual-to-physical address translation. This allows to read an instance
+//     * that is located in user-land address space.
+//     *
+//     * @param pgd the page global directory of the process this instance belongs
+//     * to, most likely the content of the \c CR3 register, as a hex-encoded string
+//     * @return the same as toString() but tries to access user-land memory,
+//     * if possible, using the page table specified as \a pgd
+//     */
+//    QString toStringUserLand(const QString &pgd) const;
 
 private:
     inline Instance* thisInstance() const;

@@ -169,7 +169,8 @@ QString FuncPointer::prettyName(QString name, const RefBaseType* from) const
 }
 
 
-QString FuncPointer::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
+QString FuncPointer::toString(VirtualMemory* mem, size_t offset,
+                              const ColorPalette* col) const
 {
     QString s("0x%1");
     if (_size == 4)

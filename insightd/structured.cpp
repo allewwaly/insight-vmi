@@ -285,7 +285,8 @@ void Structured::writeTo(KernelSymbolStream& out) const
 }
 
 
-QString Structured::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
+QString Structured::toString(VirtualMemory* mem, size_t offset,
+                             const ColorPalette* col) const
 {
 //    static RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
 

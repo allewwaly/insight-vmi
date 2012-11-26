@@ -230,6 +230,12 @@ inline quint64 Instance::toULong() const
 }
 
 
+inline quint64 Instance::toUIntBitField() const
+{
+    return (quint64) toIntBitField();
+}
+
+
 inline float Instance::toFloat() const
 {
     return isNull() ? 0 : _d->type->toFloat(_d->vmem, _d->address);
@@ -248,32 +254,33 @@ inline void* Instance::toPointer() const
 }
 
 
-inline QString Instance::derefUserLand(const QString &pgd) const
-{
-	//TODO
-	//diekmann
-	QString ret;
-	if (isNull()) {
-    	ret = "NULL";
-    }
-    else {
-    	bool ok;
+//inline QString Instance::derefUserLand(const QString &pgd) const
+//{
+//	//TODO
+//	//diekmann
+//	QString ret;
+//	if (isNull()) {
+//    	ret = "NULL";
+//    }
+//    else {
+//    	bool ok;
 
-    	qint64 pgd_d = pgd.toULongLong(&ok, 16);
-        if (!ok)
-            virtualMemoryError("(PDG invalid)");
+//    	qint64 pgd_d = pgd.toULongLong(&ok, 16);
+//        if (!ok)
+//            virtualMemoryError("(PDG invalid)");
 
-        _d->vmem->setUserLand(pgd_d);
-        try {
-            ret = _d->type->toString(_d->vmem, _d->address);
-        } catch(...) {
-            _d->vmem->setKernelSpace();
-    		throw;
-    	}
-        _d->vmem->setKernelSpace();
-    }
-    return ret;
-}
+//        _d->vmem->setUserLand(pgd_d);
+//        try {
+//            ret = _d->type->toString(_d->vmem, _d->address);
+//        } catch(...) {
+//            _d->vmem->setKernelSpace();
+//    		throw;
+//    	}
+//        _d->vmem->setKernelSpace();
+//    }
+//    return ret;
+//}
+
 
 inline VirtualMemory* Instance::vmem() const
 {

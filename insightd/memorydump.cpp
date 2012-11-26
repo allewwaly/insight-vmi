@@ -544,10 +544,6 @@ QString MemoryDump::query(const QString& queryString,
             if (instance.isNull())
                 ret = QString(col.color(ctAddress)) + "NULL" + QString(col.color(ctReset));
             else {
-                // Can we access the instance's memory? If not, an exception is
-                // thrown.
-                _vmem->seek(instance.address());
-
                 ret = instance.toString(&col);
             }
         }
@@ -580,27 +576,23 @@ QString MemoryDump::query(const QString& queryString,
 QString MemoryDump::dump(const QString& type, quint64 address,
                          const ColorPalette& col) const
 {
-    if (!_vmem->seek(address))
-        queryError(QString("Cannot seek address 0x%1")
-                   .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
-
     if (type == "char") {
         char c;
-        if (_vmem->read(&c, sizeof(char)) != sizeof(char))
+        if (_vmem->readAtomic(address, &c, sizeof(char)) != sizeof(char))
             queryError(QString("Cannot read memory from address 0x%1")
                        .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
         return QString("%1 (0x%2)").arg(c).arg(c, (sizeof(c) << 1), 16, QChar('0'));
     }
     if (type == "int") {
         qint32 i;
-        if (_vmem->read((char*)&i, sizeof(qint32)) != sizeof(qint32))
+        if (_vmem->readAtomic(address, (char*)&i, sizeof(qint32)) != sizeof(qint32))
             queryError(QString("Cannot read memory from address 0x%1")
                        .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
         return QString("%1 (0x%2)").arg(i).arg((quint32)i, (sizeof(i) << 1), 16, QChar('0'));
     }
     if (type == "long") {
         qint64 l;
-        if (_vmem->read((char*)&l, sizeof(qint64)) != sizeof(qint64))
+        if (_vmem->readAtomic(address, (char*)&l, sizeof(qint64)) != sizeof(qint64))
             queryError(QString("Cannot read memory from address 0x%1")
                        .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
         return QString("%1 (0x%2)").arg(l).arg((quint64)l, (sizeof(l) << 1), 16, QChar('0'));

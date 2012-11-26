@@ -78,7 +78,8 @@ QString Array::prettyName(const QString &varName) const
 }
 
 
-QString Array::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
+QString Array::toString(VirtualMemory* mem, size_t offset,
+                        const ColorPalette* col) const
 {
     QString result;
 

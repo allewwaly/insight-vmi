@@ -46,7 +46,7 @@ struct pageTableEntries {
  * This class provides read access to a virtual address space and performs
  * the virtual to physical address translation.
  */
-class VirtualMemory: public QIODevice
+class VirtualMemory: protected QIODevice
 {
 public:
     enum PageTableFlags {
@@ -64,7 +64,6 @@ public:
     virtual bool open (OpenMode mode);
     virtual qint64 pos() const;
     virtual bool reset();
-    virtual bool seek (qint64 pos);
     virtual qint64 size() const;
 
     /**
@@ -79,30 +78,30 @@ public:
      */
     qint64 readAtomic(qint64 pos, char * data, qint64 maxlen);
 
-    /**
-     * Configures this instance to work on the user-land part of the memory only.
-     * Reset with setKernelSpace
-     *
-     * Note: to prevent logical error, VirtualMemory either works on
-     * user-land or kernel space, it is up to the programmer to
-     * switch manually.
-     *
-     * setUserLand() locks this instance for the calling Thread. After calling
-     * setUserLand(), the caller MUST IN ANY CASE call setKernelSpace()
-     * to unlock this VirtualMemory for other Threads. A not executed
-     * setKernelSpace() is the first place to search for, if you look for
-     * deadlocks.
-     *
-     * @param pgd the Page-Global-Directory of the current user process, most likely
-     * the cr3 register content. This value cannot be provided by InSight.
-     */
-    void setUserLand(qint64 pgd);
+//    /**
+//     * Configures this instance to work on the user-land part of the memory only.
+//     * Reset with setKernelSpace
+//     *
+//     * Note: to prevent logical error, VirtualMemory either works on
+//     * user-land or kernel space, it is up to the programmer to
+//     * switch manually.
+//     *
+//     * setUserLand() locks this instance for the calling Thread. After calling
+//     * setUserLand(), the caller MUST IN ANY CASE call setKernelSpace()
+//     * to unlock this VirtualMemory for other Threads. A not executed
+//     * setKernelSpace() is the first place to search for, if you look for
+//     * deadlocks.
+//     *
+//     * @param pgd the Page-Global-Directory of the current user process, most likely
+//     * the cr3 register content. This value cannot be provided by InSight.
+//     */
+//    void setUserLand(qint64 pgd);
 
-    /**
-     * Configures this instance to work on the kernel memory space only.
-     * This is the default behavior.
-     */
-    void setKernelSpace();
+//    /**
+//     * Configures this instance to work on the kernel memory space only.
+//     * This is the default behavior.
+//     */
+//    void setKernelSpace();
 
     /**
      * Seeks to the virtual memory position \a pos without throwing an exception
@@ -207,6 +206,9 @@ public:
     quint64 getFlags(quint64 vaddr);
 
 protected:
+    // Re-implementations of QIODevice
+    virtual bool seek (qint64 pos);
+
     // Pure virtual functions of QIODevice
     virtual qint64 readData (char* data, qint64 maxSize);
     virtual qint64 writeData (const char* data, qint64 maxSize);
@@ -346,7 +348,7 @@ private:
     quint64 _userPGD;
 
     // when someone stes this to userland, we block untill it is set back to kernelMode
-    QMutex _userlandMutex;
+//    QMutex _userlandMutex;
 };
 
 

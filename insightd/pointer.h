@@ -41,7 +41,8 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const;
+    virtual QString toString(VirtualMemory* mem, size_t offset,
+                             const ColorPalette* col = 0) const;
 
     /**
      * Create a hash of that type based on BaseType::hash() and refType()
@@ -61,7 +62,8 @@ protected:
      * @param errMsg any error messages are returned here
      * @return the read string
      */
-    QString readString(QIODevice* mem, size_t offset, const int len, QString* errMsg) const;
+    QString readString(VirtualMemory* mem, size_t offset, const int len,
+                       QString* errMsg) const;
 };
 
 #endif /* POINTER_H_ */

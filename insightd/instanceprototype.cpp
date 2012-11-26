@@ -737,15 +737,15 @@ void InstancePrototype::injectScriptError(const QString& msg) const
 }
 
 
-QString InstancePrototype::toStringUserLand(const QString &pgd) const
-{
-    try {
-        Instance* inst;
-        return ((inst = thisInstance())) ? inst->derefUserLand(pgd) : QString();
-    }
-    catch (GenericException& e) {
-        injectScriptError(e);
-    }
-    return QString();
-}
+//QString InstancePrototype::toStringUserLand(const QString &pgd) const
+//{
+//    try {
+//        Instance* inst;
+//        return ((inst = thisInstance())) ? inst->derefUserLand(pgd) : QString();
+//    }
+//    catch (GenericException& e) {
+//        injectScriptError(e);
+//    }
+//    return QString();
+//}
 

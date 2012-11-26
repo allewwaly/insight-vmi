@@ -92,10 +92,10 @@ class IntegerBitField
 public:
     quint64 toIntBitField(const Instance* inst) const;
 
-    quint64 toIntBitField(QIODevice* mem, size_t offset,
+    quint64 toIntBitField(VirtualMemory* mem, size_t offset,
                           const StructuredMember* m) const;
 
-    virtual quint64 toIntBitField(QIODevice* mem, size_t offset,
+    virtual quint64 toIntBitField(VirtualMemory* mem, size_t offset,
                                   qint8 bitSize, qint8 bitOffset) const = 0;
 };
 
@@ -131,7 +131,7 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset,
+    virtual QString toString(VirtualMemory* mem, size_t offset,
                              const ColorPalette* col = 0) const
     {
         T n = BaseType::value<T>(mem, offset);
@@ -156,7 +156,7 @@ public:
         }
     }
 
-    virtual quint64 toIntBitField(QIODevice* mem, size_t offset,
+    virtual quint64 toIntBitField(VirtualMemory* mem, size_t offset,
                                   qint8 bitSize, qint8 bitOffset) const
     {
         // This won't work on big-endian architectures
@@ -213,7 +213,7 @@ public:
      * @param offset the offset at which to read the value from memory
      * @return a string representation of this type
      */
-    virtual QString toString(QIODevice* mem, size_t offset,
+    virtual QString toString(VirtualMemory* mem, size_t offset,
                              const ColorPalette* col = 0) const
     {
         QString s = QString::number(BaseType::value<T>(mem, offset));

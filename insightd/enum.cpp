@@ -52,7 +52,8 @@ uint Enum::hash(bool* isValid) const
 }
 
 
-QString Enum::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
+QString Enum::toString(VirtualMemory* mem, size_t offset,
+					   const ColorPalette* col) const
 {
 	qint32 key = value<qint32>(mem, offset);
 	if (_enumValues.contains(key)) {
