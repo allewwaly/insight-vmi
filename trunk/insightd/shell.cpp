@@ -2358,17 +2358,20 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
     if (!args.isEmpty()) {
         bool ok;
         prob = args[0].toFloat(&ok);
-        if (ok) {
+        if (ok)
             args.pop_front();
-        }
-        // Assume it's the slub object file, check for existence
-        else if (!QDir::current().exists(args[0])) {
-            errMsg(QString("The specified slub file \"%1\" does not exist.")
-                        .arg(args[0]));
-            return 1;
-        }
         else
-            slubFile = args[0];
+            prob = 0;
+        // Assume it's the slub object file, check for existence
+        if (!args.isEmpty()) {
+            if (!QDir::current().exists(args[0])) {
+                errMsg(QString("The specified slub file \"%1\" does not exist.")
+                       .arg(args[0]));
+                return 1;
+            }
+            else
+                slubFile = args[0];
+        }
     }
 
     _memDumps[index]->setupRevMap(type, prob, slubFile);
