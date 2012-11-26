@@ -90,8 +90,7 @@ protected:
 class IntegerBitField
 {
 public:
-    quint64 toIntBitField(QIODevice* mem, size_t offset,
-                          const Instance* inst) const;
+    quint64 toIntBitField(const Instance* inst) const;
 
     quint64 toIntBitField(QIODevice* mem, size_t offset,
                           const StructuredMember* m) const;
