@@ -178,9 +178,7 @@ quint64 MemoryMapNode::endAddress() const
 void MemoryMapNode::setSeemsValid(bool valid)
 {
     const Instance i(toInstance());
-    if (_seemsValid != valid &&
-       !MemoryMapHeuristics::isListHead(i))
-    {
+    if (_seemsValid != valid) {
         _seemsValid = valid;
         if (_parent)
             _parent->setSeemsValid(valid);
