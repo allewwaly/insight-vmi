@@ -9,9 +9,9 @@
 #include "structuredmember.h"
 #include "instance_def.h"
 
-quint64 IntegerBitField::toIntBitField(QIODevice *mem, size_t offset, const Instance *inst) const
+quint64 IntegerBitField::toIntBitField(const Instance *inst) const
 {
-    return toIntBitField(mem, offset, inst->bitSize(), inst->bitOffset());
+    return toIntBitField(inst->vmem(), inst->address(), inst->bitSize(), inst->bitOffset());
 }
 
 
