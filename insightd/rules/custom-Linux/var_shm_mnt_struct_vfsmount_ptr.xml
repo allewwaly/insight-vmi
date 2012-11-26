@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<!--
+			The source parser usually creates a rule that casts the shm_mnt
+			variable to a struct file, like this:
+			(struct vfsmount *) => (struct file *)
+
+			This type cast seems to be invalid, so this rule overrides the
+			automatically generated rule with a higher priority an returns the
+			correct (original) type.
+		-->
+		<rule priority="100">
+			<name>original shm_mnt</name>
+			<description>Overrides any automatic rule and returns the original variable</description>
+			<filter>
+				<variablename>shm_mnt</variablename>
+				<datatype>pointer</datatype>
+			</filter>
+			<action type="expression">
+				<sourcetype>struct vfsmount *src</sourcetype>
+				<targettype>struct vfsmount *</targettype>
+				<expression>src</expression>
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
