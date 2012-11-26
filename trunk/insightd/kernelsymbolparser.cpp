@@ -266,8 +266,15 @@ void KernelSymbolParser::WorkerThread::parseParam(const ParamSymbolType param,
         break;
     }
     case psBitOffset: {
-        parseInt(i, value, &ok);
-        _info->setBitOffset(i);
+        // In very rare cases, we find two 32-bit integers given as the bit
+        // offset, i.e. "fffffffc 0xffffffff". This makes no sense at all and
+        // also is not explained in the DWARF standard. If this is an unsigned
+        // 64-bit number, it is too large. A signed (negative) number makes no
+        // sense. Thus, we ignore it.
+        if (!value.contains(' ')) {
+            parseInt(i, value, &ok);
+            _info->setBitOffset(i);
+        }
         break;
     }
     case psBitSize: {
@@ -279,13 +286,11 @@ void KernelSymbolParser::WorkerThread::parseParam(const ParamSymbolType param,
         // TODO: Find a better solution
         // The byte size can have the value 0xffffffff.
         // How do we handle this?
-        if (value != "0xffffffff")
-        {
+        if (value != "0xffffffff") {
             parseInt(i, value, &ok);
             _info->setByteSize(i);
         }
-        else
-        {
+        else {
             _info->setByteSize(-1);
         }
         break;
