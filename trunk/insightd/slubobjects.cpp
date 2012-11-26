@@ -15,10 +15,11 @@
 SlubObjects::SlubObjects(const SymFactory* factory, VirtualMemory *vmem)
     : _factory(factory), _vmem(vmem)
 {
+    // First is slub type, second is type in memory map
     _typeCasts.insertMulti("struct raw6_sock", "struct unix_sock");
     _typeCasts.insertMulti("struct raw_sock", "struct unix_sock");
     _typeCasts.insertMulti("struct in6_addr", "struct unix_address");
-
+    _typeCasts.insertMulti("struct anon_vma", "struct address_space");
 }
 
 
