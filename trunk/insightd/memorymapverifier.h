@@ -178,11 +178,17 @@ private:
     bool _slubDataAvailable;
     SlubObjects _slub;
 
-    quint32 _validObjects;
-    quint32 _invalidObjects;
+    quint32 _totalObjects;
+    quint32 _totalValid;
+    quint32 _heuristicsValid;
+    quint32 _slubValid;
+    quint32 _slubNotFound;
+    quint32 _slubConflict;
+    quint32 _slubInvalid;
     quint32 _maybeValidObjects;
-    quint32 _maybeValidSlubObjects;
+    quint32 _slubMaybeValid;
     quint32 _objectsFoundInSlub;
+    QHash<quint64, MemoryMapNode*> _slubObjectNodes;
     
     quint32 _seemValidObjects;
 
@@ -190,6 +196,8 @@ private:
     quint32 _magicNumberValid_withConst;
     quint32 _magicNumberValid_notSlub;
     quint32 _magicNumberInvalid;
+
+    QVarLengthArray<quint32, 10> _totalDistribution;
 
     QVarLengthArray<quint32, 10> _slubValidDistribution;
     QVarLengthArray<quint32, 10> _slubInvalidDistribution;
