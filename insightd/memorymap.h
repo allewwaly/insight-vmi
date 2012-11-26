@@ -320,6 +320,8 @@ private:
 										 int threadIndex, quint64 addrInParent,
 										 bool addToQueue = true, bool hasCandidates = false);
 
+	bool shouldEnqueue(const Instance& inst, MemoryMapNode* node) const;
+
     /**
      * Check if at least one builder is still runnning.
      * @returns true if there is an active MemoryMapBuilder, false otherwise.

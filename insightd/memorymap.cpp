@@ -21,6 +21,17 @@
 #include <expressionevalexception.h>
 
 
+static const int enqueueTypes =
+        rtArray |
+        rtPointer |
+        rtStruct |
+        rtUnion;
+
+static const int interestingTypes =
+        enqueueTypes |
+        BaseType::trLexical |
+        rtFuncPointer;
+
 // static variable
 StringSet MemoryMap::_names;
 
@@ -189,7 +200,9 @@ void MemoryMap::addInstance(const Instance& inst)
     _roots.append(node);
     _vmemMap.insert(node);
     _vmemAddresses.insert(node->address());
-    _shared->queue.insert(node->probability(), node);
+
+    if (shouldEnqueue(inst, node))
+        _shared->queue.insert(node->probability(), node);
 }
 
 
@@ -880,18 +893,10 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
         return child;
     }
 
-    static const int interestingTypes =
-            BaseType::trLexical |
-            rtArray |
-            rtFuncPointer |
-            rtPointer |
-            rtStruct |
-            rtUnion;
-
     // Dereference, if required
-    const Instance i =
-            (inst.type() && (inst.type()->type() & BaseType::trLexical)) ?
-            inst.dereference(BaseType::trLexical) : inst;
+    const Instance i(
+                inst.type() && (inst.type()->type() & BaseType::trLexical) ?
+                    inst.dereference(BaseType::trLexical) : inst);
 
     if (!i.isNull() && i.type() && (i.type()->type() & interestingTypes))
     {
@@ -963,7 +968,7 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
             _shared->vmemWritingLock.unlock();
 
             // Insert the new node into the queue
-            if (addToQueue && i.isAccessible()) {
+            if (addToQueue && shouldEnqueue(i, child)) {
                 _shared->queueLock.lock();
                 _shared->queue.insert(child->probability(), child);
                 _shared->queueLock.unlock();
@@ -983,6 +988,21 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
     }
 
     return child;
+}
+
+
+bool MemoryMap::shouldEnqueue(const Instance &inst, MemoryMapNode *node) const
+{
+//    // For debugging, only build map to a limited depth
+//    int depth = 0;
+//    for (MemoryMapNode* n = node; n; n = n->parent())
+//        ++depth;
+//    if (depth > 10)
+//        return false;
+
+    return (inst.type()->type() & enqueueTypes) &&
+            node->probability() > _shared->minProbability &&
+            inst.isAccessible();
 }
 
 
