@@ -41,7 +41,7 @@ public:
      * @param mem the memory device to read the data from
      */
     template<class T>
-    inline T value(QIODevice* mem) const
+    inline T value(VirtualMemory* mem) const
     {
         // We put the implementation in the header to allow the compiler to
         // inline the code
@@ -55,7 +55,7 @@ public:
      * @return the value of this type as a variant
      */
     template<class T>
-    inline QVariant toVariant(QIODevice* mem) const
+    inline QVariant toVariant(VirtualMemory* mem) const
     {
         // We put the implementation in the header to allow the compiler to
         // inline the code
@@ -73,7 +73,7 @@ public:
      * @param mem the memory device to read the data from
      * @return a string representation of this variable
      */
-    QString toString(QIODevice* mem) const;
+    QString toString(VirtualMemory* mem) const;
 
     /**
      * @return the offset of this variable in memory

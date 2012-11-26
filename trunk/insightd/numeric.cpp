@@ -15,7 +15,8 @@ quint64 IntegerBitField::toIntBitField(const Instance *inst) const
 }
 
 
-quint64 IntegerBitField::toIntBitField(QIODevice *mem, size_t offset, const StructuredMember *m) const
+quint64 IntegerBitField::toIntBitField(VirtualMemory* mem, size_t offset,
+                                       const StructuredMember *m) const
 {
     return toIntBitField(mem, offset, m->bitSize(), m->bitOffset());
 }

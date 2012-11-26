@@ -66,7 +66,7 @@ QString Pointer::prettyName(const QString &varName) const
 }
 
 
-QString Pointer::toString(QIODevice* mem, size_t offset, const ColorPalette* col) const
+QString Pointer::toString(VirtualMemory* mem, size_t offset, const ColorPalette* col) const
 {
     quint64 p = (quint64) toPointer(mem, offset);
 
@@ -128,7 +128,8 @@ uint Pointer::hash(bool* isValid) const
 }
 
 
-QString Pointer::readString(QIODevice* mem, size_t offset, const int len, QString* errMsg) const
+QString Pointer::readString(VirtualMemory* mem, size_t offset, const int len,
+                            QString* errMsg) const
 {
     // Setup a buffer, at most 1024 bytes long
     char buf[len + 1];
@@ -136,8 +137,7 @@ QString Pointer::readString(QIODevice* mem, size_t offset, const int len, QStrin
     // We expect exceptions here
     try {
         // Read the data such that the result is always null-terminated
-        seek(mem, offset);
-        read(mem, buf, len);
+        readAtomic(mem, offset, buf, len);
         // Limit to ASCII characters
         for (int i = 0; i < len; i++) {
             if (buf[i] == 0)
@@ -148,11 +148,11 @@ QString Pointer::readString(QIODevice* mem, size_t offset, const int len, QStrin
         return QString(buf);
     }
     catch (VirtualMemoryException& e) {
-        if(errMsg)
+        if (errMsg)
             *errMsg = e.message;
     }
     catch (MemAccessException& e) {
-        if(errMsg)
+        if (errMsg)
             *errMsg = e.message;
     }
 

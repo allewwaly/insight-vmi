@@ -127,7 +127,8 @@ VirtualMemory::VirtualMemory(const MemSpecs& specs, QIODevice* physMem,
 #endif
       _physMem(physMem), _physMemSize(-1), _specs(specs), _pos(-1),
       _memDumpIndex(memDumpIndex), _threadSafe(false),
-      _userland(false), _userPGD(0), _userlandMutex(QMutex::Recursive)
+      _userland(false), _userPGD(0)
+//    , _userlandMutex(QMutex::Recursive)
 {
     // Make sure the architecture is set
     if ( !(_specs.arch & (MemSpecs::ar_i386|MemSpecs::ar_x86_64)) )
@@ -196,7 +197,7 @@ bool VirtualMemory::seek(qint64 pos)
 	qint64 physAddr;
 
 	//prevent any seek while we might be in userLand mode
-	QMutexLocker locker(&_userlandMutex);
+//	QMutexLocker locker(&_userlandMutex);
 
 //	if(!_userland){
 		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
@@ -205,7 +206,7 @@ bool VirtualMemory::seek(qint64 pos)
 //		physAddr = (qint64)virtualToPhysical((quint64) pos, &pageSize);
 //	}
 
-	locker.unlock();
+//	locker.unlock();
 
 
 	if (physAddr < 0)
@@ -239,12 +240,12 @@ bool VirtualMemory::safeSeek(qint64 pos)
 
         int pageSize;
 
-        QMutexLocker locker(&_userlandMutex);
+//        QMutexLocker locker(&_userlandMutex);
 
         qint64 physAddr =
                 (qint64)virtualToPhysical((quint64) pos, &pageSize, false);
 
-        locker.unlock();
+//        locker.unlock();
 
         if (! (physAddr != (qint64)PADDR_ERROR) && (physAddr >= 0) )
             return false;
@@ -285,19 +286,19 @@ qint64 VirtualMemory::readAtomic(qint64 pos, char *data, qint64 maxlen)
 }
 
 
-void VirtualMemory::setUserLand(qint64 pgd)
-{
-	_userlandMutex.lock();
-	_userland = true;
-	_userPGD = pgd;
-}
+//void VirtualMemory::setUserLand(qint64 pgd)
+//{
+//	_userlandMutex.lock();
+//	_userland = true;
+//	_userPGD = pgd;
+//}
 
-void VirtualMemory::setKernelSpace()
-{
-	_userland = false;
-	_userPGD = 0;
-	_userlandMutex.unlock();
-}
+//void VirtualMemory::setKernelSpace()
+//{
+//	_userland = false;
+//	_userPGD = 0;
+//	_userlandMutex.unlock();
+//}
 
 
 qint64 VirtualMemory::readData(char* data, qint64 maxSize)

@@ -178,7 +178,7 @@ void BaseType::writeTo(KernelSymbolStream &out) const
 }
 
 
-void *BaseType::toPointer(QIODevice *mem, size_t offset) const
+void *BaseType::toPointer(VirtualMemory* mem, size_t offset) const
 
 {
     int ptrsize;
