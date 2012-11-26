@@ -2205,11 +2205,6 @@ int Shell::cmdMemoryVerify(QStringList args)
             return ecOk;
         }
         else {
-            if (_memDumps[index]->slubs().numberOfObjects() <= 0) {
-                _out << "No slub file loaded for memory dump " << index << "."
-                     << endl;
-                return ecFileNotLoaded;
-            }
             Instance inst = _memDumps[index]->queryInstance(args.join(" "));
             if (!inst.isValid()) {
                 _out << "The query did not retrieve a valid instance." << endl;
@@ -2220,46 +2215,70 @@ int Shell::cmdMemoryVerify(QStringList args)
                 return ecOk;
             }
 
-            SlubObjects::ObjectValidity v = _memDumps[index]->validate(&inst);
             _out << "Instance of type " << _color.prettyNameInColor(inst.type(), 0)
                  << color(ctReset) << " @ " << color(ctAddress) << "0x" << hex
-                 << inst.address() << dec << color(ctReset) << " is "
-                 << color(ctBold);
+                 << inst.address() << dec << color(ctReset) << ":" << endl;
 
-            switch(v) {
-            // Instance is invalid, no further information avaliable
-            case SlubObjects::ovInvalid:
-                _out << "invalid"; break;
-            // Instance not found, but base type actually not present in any slab
-            case SlubObjects::ovNoSlabType:
-                _out << "no slub type"; break;
-                // Instance not found, even though base type is managed in slabs
-            case SlubObjects::ovNotFound:
-                _out << "not found"; break;
-            // Instance type or address conflicts with object in the slabs
-            case SlubObjects::ovConflict:
-                _out << "in conflict"; break;
-            // Instance is embedded within a larger object in the slabs
-            case SlubObjects::ovEmbedded:
-                _out << "embedded in a struct"; break;
-            // Instance may be embedded within a larger object in the slabs
-            case SlubObjects::ovEmbeddedUnion:
-                _out << "embedded in a union"; break;
-            // Instance is embeddes in another object in the slab when using the SlubObjects::_typeCasts exception list
-            case SlubObjects::ovEmbeddedCastType:
-                _out << "embedded in a valid cast type"; break;
-            // Instance lies within reserved slab memory for which no type information is available
-            case SlubObjects::ovMaybeValid:
-                _out << "maybe valid"; break;
-            // Instance was either found in the slabs or in a global variable
-            case SlubObjects::ovValid:
-                _out << "valid"; break;
-            // Instance matches an object in the slab when using the SlubObjects::_typeCasts exception list
-            case SlubObjects::ovValidCastType:
-                _out << "a valid cast type"; break;
+            // Verify against SLUB objects
+            _out << "SLUB caches:   ";
+            if (_memDumps[index]->slubs().numberOfObjects() <= 0) {
+                _out << "No slub file loaded for memory dump " << index << "."
+                     << endl;
+            }
+            else {
+                SlubObjects::ObjectValidity v = _memDumps[index]->validate(&inst);
+                _out << "instance is " << color(ctBold);
+
+                switch(v) {
+                // Instance is invalid, no further information avaliable
+                case SlubObjects::ovInvalid:
+                    _out << "invalid"; break;
+                    // Instance not found, but base type actually not present in any slab
+                case SlubObjects::ovNoSlabType:
+                    _out << "no slub type"; break;
+                    // Instance not found, even though base type is managed in slabs
+                case SlubObjects::ovNotFound:
+                    _out << "not found"; break;
+                    // Instance type or address conflicts with object in the slabs
+                case SlubObjects::ovConflict:
+                    _out << "in conflict"; break;
+                    // Instance is embedded within a larger object in the slabs
+                case SlubObjects::ovEmbedded:
+                    _out << "embedded in a struct"; break;
+                    // Instance may be embedded within a larger object in the slabs
+                case SlubObjects::ovEmbeddedUnion:
+                    _out << "embedded in a union"; break;
+                    // Instance is embeddes in another object in the slab when using the SlubObjects::_typeCasts exception list
+                case SlubObjects::ovEmbeddedCastType:
+                    _out << "embedded in a valid cast type"; break;
+                    // Instance lies within reserved slab memory for which no type information is available
+                case SlubObjects::ovMaybeValid:
+                    _out << "maybe valid"; break;
+                    // Instance was either found in the slabs or in a global variable
+                case SlubObjects::ovValid:
+                    _out << "valid"; break;
+                    // Instance matches an object in the slab when using the SlubObjects::_typeCasts exception list
+                case SlubObjects::ovValidCastType:
+                    _out << "a valid cast type"; break;
+                }
+
+                _out << color(ctReset) << "." << endl;
             }
 
-            _out << color(ctReset) << "." << endl;
+            // Verify against magic numbers
+            bool hasConst, valid = inst.isValidConcerningMagicNumbers(&hasConst);
+            _out << "Magic numbers: instance ";
+            if (hasConst) {
+                _out << "is " << color(ctBold);
+                if (valid)
+                    _out << "valid";
+                else
+                    _out << "invalid";
+                _out << color(ctReset) << "." << endl;
+            }
+            else
+                _out << "has no magic constants." << endl;
+
 
             return ecOk;
         }
