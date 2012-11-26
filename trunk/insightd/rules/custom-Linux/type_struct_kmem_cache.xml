@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+
+	For each struct kmem_cache object, only an amount of memory equal to the
+	the value of variable "kmem_size" is allocated. That is, the last member
+	"cpu_slab" of that struct is an array for only "nr_cpus" many CPUs (which
+	is detected at boot time).
+
+	References:
+	http://lxr.linux.no/#linux+v2.6.32.58/mm/slub.c#L175
+	http://lxr.linux.no/#linux+v2.6.32.58/mm/slub.c#L2763
+	http://lxr.linux.no/#linux+v2.6.32.58/mm/slub.c#L3264
+-->
+<typeknowledge version="1">
+	<rules>
+		<!--
+			For now we just return the first element of this member.
+		-->
+		<rule priority="101">
+			<name>kmem_cache.cpu_slab[0]</name>
+			<description>Returns only the first array field for the "cpu_slab" member</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>kmem_cache</typename>
+				<members>
+					<member>cpu_slab</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var cache = arguments[0];
+				var slab = cache.Member(arguments[1][0]);
+				return slab.ArrayElem(0);
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>

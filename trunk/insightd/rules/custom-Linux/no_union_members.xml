@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-File created on Sat Nov 17 12:35:29 2012
-Type: struct sysfs_dirent
-Type ID: 0x11a0e5b
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+	Forbit access to union members, unless there is another rule with a higher 
+	priorty.
 -->
 <typeknowledge version="1">
 	<rules>
