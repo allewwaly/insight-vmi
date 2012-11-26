@@ -582,7 +582,8 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
 //        debugmsg(QString("Seems valid object with prob < 0.1: %1").arg(i.fullName()));
     else if (!valid && node->probability() > 0.9) {
         switch (v) {
-        case SlubObjects::ovConflict: reason = "conflict"; break;
+        // A conflict has its dedicated error message
+        case SlubObjects::ovConflict: return; //reason = "conflict"; break;
         case SlubObjects::ovInvalid:  reason = "invalid"; break;
         case SlubObjects::ovNotFound: reason = "not found"; break;
         default: break;
