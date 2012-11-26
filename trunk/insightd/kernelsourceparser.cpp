@@ -207,11 +207,11 @@ void KernelSourceParser::parse()
         assert(i.value() >= 0 && i.value() < str->members().size());
         const StructuredMember* m = str->members().at(i.value());
 
-        if (m->hasConstantIntValue())
+        if (m->hasConstantIntValues())
         {
             counter++;
             s.clear();
-            QList<qint64> constInt = m->constantIntValue();
+            QList<qint64> constInt = m->constantIntValues();
             for (int j = 0; j < constInt.size(); ++j) {
                 if (j > 0)
                     s += ", ";
@@ -223,7 +223,7 @@ void KernelSourceParser::parse()
                      .arg(m->name())
                      .arg(s));
         }
-        else if (m->hasConstantStringValue())
+        else if (m->hasConstantStringValues())
         {
             counter++;
             s.clear();
