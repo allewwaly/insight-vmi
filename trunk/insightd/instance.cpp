@@ -1080,224 +1080,179 @@ bool Instance::compareInstanceType(const Instance& inst) const
 
 bool Instance::isValidConcerningMagicNumbers(bool * constants) const
 {
-    if(constants) *constants = false;
+    if(constants)
+        *constants = false;
+
     //Check if type is structured
     if (!_d->type || !(_d->type->type() & StructOrUnion))
         return true;
 
     bool isValid = true;
+
     try {
+        const MemberList& members = dynamic_cast<const Structured*>(_d->type)->members();
 
-        MemberList members = dynamic_cast<const Structured*>(_d->type)->members();
-
-        MemberList::iterator memberIterator;
-        for (memberIterator = members.begin(); 
-                memberIterator != members.end(); ++memberIterator)
+        MemberList::const_iterator it, e;
+        for (it = members.begin(), e = members.end(); isValid && it != e; ++it)
         {
-            QString debugString;
+            const StructuredMember* m = *it;
+//            QString debugString;
 
-            if ((_d->vmem->memSpecs().arch & MemSpecs::ar_i386) &&
-                (_d->address + (*memberIterator)->offset() >= (1ULL << 32)))
+            // Skip members without constants
+            if (!m->hasConstantIntValues() && !m->hasStringValues())
+                continue;
+
+            if (constants)
+                *constants = true;
+
+            Instance m_inst(m->toInstance(_d->address, _d->vmem, this, BaseType::trLexical));
+            if (m_inst.isNull() || !m_inst.isAccessible())
                 return false;
 
-            Instance memberInstance = 
-                (*memberIterator)->toInstance(_d->address, _d->vmem, this);
             bool memberValid = false;
-            if((*memberIterator)->hasConstantIntValue())
-            {
-                if(memberInstance.name() == "refcount"){
+            if (m->hasConstantIntValues()) {
+                // CS: What is this for???
+                if (m_inst.name() == "refcount") {
                     memberValid = true;
                     continue;
                 }
-                if(constants) *constants = true;
+
+                // Get constant value
                 qint64 constInt = 0;
-                constInt = memberInstance.toString().toLong();
-                const BaseType* bt;
-                if (memberInstance.bitSize() >= 0 &&
-                        (bt = memberInstance.type()->dereferencedBaseType(BaseType::trLexical)) &&
-                        (bt->type() & IntegerTypes))
-                {
-                    const IntegerBitField* ibf = dynamic_cast<const IntegerBitField*>(bt);
-                    constInt = ibf->toIntBitField(memberInstance._d->vmem, memberInstance._d->address, memberInstance._d->bitSize, memberInstance._d->bitOffset);
+//                constInt = m_inst.toString().toLong();
+                if (m_inst.bitSize() >= 0) {
+                    constInt = m_inst.toIntBitField();
                 }
-                else{
-                    switch (memberInstance.type()->type()) {
-                        case rtBool8:
-                        case rtInt8:
-                        case rtUInt8:
-                            constInt = memberInstance.toUInt8();
-                            break;
-
-                        case rtBool16:
-                        case rtInt16:
-                        case rtUInt16:
-                            constInt = memberInstance.toUInt16();
-                            break;
-
-                        case rtBool32:
-                        case rtInt32:
-                        case rtUInt32:
-                            constInt = memberInstance.toUInt32();
-                            break;
-
-                        case rtBool64:
-                        case rtInt64:
-                        case rtUInt64:
-                            constInt = memberInstance.toUInt64();
-                            break;
-
-                        case rtEnum:
-                            switch (memberInstance.size()) {
-                                case 8: 
-                                    constInt = memberInstance.toUInt64();
-                                    break;
-                                case 4: 
-                                    constInt = memberInstance.toUInt32();
-                                    break;
-                                case 2: 
-                                    constInt = memberInstance.toUInt16();
-                                    break;
-                                default: 
-                                    constInt = memberInstance.toUInt8();
-                                    break;
-                            }
-
-                        default:
-                            break;
+                else if (m_inst.type()->type() & IntegerTypes) {
+                    switch (m_inst.size()) {
+                    case 8:
+                        constInt = m_inst.toInt64();
+                        break;
+                    default: // make integer the default
+                        constInt = m_inst.toInt32();
+                        break;
+                    case 2:
+                        constInt = m_inst.toInt16();
+                        break;
+                    case 1:
+                        constInt = m_inst.toInt8();
+                        break;
                     }
                 }
-                debugString.append(QString("%1 -> %2 : %3 (%4)\n%5\n")
-                        .arg(this->fullName())
-                        .arg(memberInstance.name())
-                        .arg(constInt)
-                        .arg(memberInstance.typeName())
-                        .arg(memberInstance.fullName())
-                        );
-                if (constInt == 0 || 
-                        ((*memberIterator)->constantIntValue().size() == 1 &&
-                        (*memberIterator)->constantIntValue().first() == 0))
+
+//                debugString.append(QString("%1 -> %2 : %3 (%4)\n%5\n")
+//                                   .arg(this->fullName())
+//                                   .arg(m_inst.name())
+//                                   .arg(constInt)
+//                                   .arg(m_inst.typeName())
+//                                   .arg(m_inst.fullName())
+//                                   );
+
+                // Consider a value of zero always to be valid
+                if (constInt == 0 ||
+                    (m->constantIntValues().size() == 1 &&
+                     m->constantIntValues().first() == 0))
                 {
                     memberValid = true;
                     continue;
                 }
-                debugString.append(QString("Number of candidates: %1\n").
-                        arg((*memberIterator)->constantIntValue().size()));
-                QList<qint64> constantList = (*memberIterator)->constantIntValue();
-                QList<qint64>::iterator constant;
-                for (constant = constantList.begin();
-                        constant != constantList.end();
-                        ++constant)
+//                debugString.append(QString("Number of candidates: %1\n").
+//                                   arg(m->constantIntValue().size()));
+
+                m->constantIntValues();
+                IntList::const_iterator it = m->constantIntValues().begin(),
+                        e = m->constantIntValues().end();
+                for (; it != e; ++it)
                 {
-                    if(constInt == (*constant)) memberValid = true;
-                    debugString.append(QString("Possible Value: %1\n").arg(*constant));
+                    if (constInt == (*it)) {
+                        memberValid = true;
+//                        debugString.append(QString("Possible Value: %1\n").arg(*constant));
+                        break;
+                    }
                 }
             }
-            //        else if ((*memberIterator)->hasConstantStringValue())
-            //        {
-            //            if(constants) *constants = true;
-            //            debugString.append(QString("Found String: \"%1\"\n").arg(memberInstance.toString()));
-            //            QList<QString> constantList = (*memberIterator)->constantStringValue();
-            //            QList<QString>::iterator constant;
-            //            for (constant = constantList.begin();
-            //                    constant != constantList.end();
-            //                    ++constant)
-            //            {
-            //                if(memberInstance.toString() == (*constant)) memberValid = true;
-            //                debugString.append(QString("Possible Value: %1\n").arg(*constant));
-            //            }
-            //            //TODO StringConstants do not seem to be a good indicator.
-            //            //Maybe enough if we see any string
-            //        }
-            else if ((*memberIterator)->hasStringValue())
-            {
-                if(constants) *constants = true;
+//            else if (m->hasConstantStringValue())
+//            {
+//                if(constants) *constants = true;
+//                debugString.append(QString("Found String: \"%1\"\n").arg(m_inst.toString()));
+//                QList<QString> constantList = m->constantStringValue();
+//                QList<QString>::iterator constant;
+//                for (constant = constantList.begin();
+//                     constant != constantList.end();
+//                     ++constant)
+//                {
+//                    if(m_inst.toString() == (*constant)) memberValid = true;
+//                    debugString.append(QString("Possible Value: %1\n").arg(*constant));
+//                }
+//                //TODO StringConstants do not seem to be a good indicator.
+//                //Maybe enough if we see any string
+//            }
+            else if (m->hasStringValues()) {
                 //TODO check if type is String (Contains only ASCII Characters)
                 //Do not use toString Method, as is gives non-ascii charackers as dot.
-                if(memberInstance.isNull()){
-                    //There should be a string (at least a pointer to an address that contains 0x0)
+                const int len = 255;
+                // Setup a buffer, at most 'len' bytes long
+                // Read the data such that the result is always null-terminated
+                char buf[len + 1];
+                memset(buf, 0, len + 1);
+                // We expect exceptions here
+                try {
+                    qint64 address = 0;
+
+                    //Get correct address of string
+                    if (m_inst.type()->type() == rtArray) {
+                        address = m_inst.address();
+                    }
+                    else if (m_inst.type()->type() == rtPointer) {
+                        // A null-pointer for a string value is just fine
+                        if ( !(address = (qint64) m_inst.toPointer()) )
+                            continue;
+                    }
+                    else if (m_inst.type()->type() & StructOrUnion) {
+//                        Instance member = (dynamic_cast<const Structured*>
+//                                           (m_inst.type()->dereferencedBaseType(BaseType::trLexical)))->
+//                                memberAtOffset(0, true)->
+//                                toInstance(m_inst.address(), _d->vmem, &m_inst);
+                        Instance member(m_inst.member(0, BaseType::trLexical, 0, ksNone));
+                        if (!member.isNull() && member.type()->type() == rtArray) {
+                            address = m_inst.address();
+                        }
+                        else if (!member.isNull() &&  member.type()->type() == rtPointer) {
+                            // A null-pointer for a string value is just fine
+                            if ( !(address = (qint64) m_inst.toPointer()) )
+                                continue;
+
+                        }
+                    }
+
+                    if (address && m_inst.vmem()->safeSeek(address) &&
+                        m_inst.vmem()->readAtomic(address, buf, len) == len)
+                    {
+                        // Limit to ASCII characters
+                        for (int i = 0; i < len; i++) {
+                            if (buf[i] == 0){
+                                memberValid = true;
+                                break;
+                            }
+                            // buf[i] >= 128 || buf[i] < 32 || last character not 0
+                            else if ( (buf[i] & 0x80) || !(buf[i] & 0x60) || i == len ){
+                                memberValid = false;
+                                break;
+                            }
+                        }
+                    }
+                    else {
+                        memberValid = false;
+                    }
+                }
+                catch (VirtualMemoryException&) {
                     memberValid = false;
                 }
-                else {
-                    const int len = 255;
-                    // Setup a buffer, at most 'len' bytes long
-                    // Read the data such that the result is always null-terminated
-                    char buf[len + 1];
-                    memset(buf, 0, len + 1);
-                    // We expect exceptions here
-                    try {
-                        qint64 ret;
-                        qint64 address = 0;
-                        
-                        //Get correct address of string
-                        if (memberInstance._d->type->type() == rtArray){
-                            address = memberInstance._d->address;
-                        }else if(memberInstance._d->type->type() == rtPointer){
-                            // We have to consider the size of the pointer
-                            if (memberInstance._d->type->size() == 4) {
-                                address = memberInstance.toUInt32();
-                            }
-                            else if (memberInstance._d->type->size() == 8) {
-                                address = memberInstance.toUInt64();
-                            }
-                            else {
-                                throw BaseTypeException(
-                                        "Illegal conversion of a non-pointer type to a pointer",
-                                        __FILE__,
-                                        __LINE__);
-                            }
-                        }else if (memberInstance._d->type->type() == rtStruct){
-                            Instance member = (dynamic_cast<const Structured*>
-                                        (memberInstance._d->type->dereferencedBaseType(BaseType::trLexical)))->
-                                                memberAtOffset(0, true)->
-                                                toInstance(memberInstance._d->address, _d->vmem, &memberInstance);
-                            if (!member.isNull() && member._d->type->type() == rtArray){
-                                address = memberInstance._d->address;
-                            }
-                            else if(!member.isNull() &&  member._d->type->type() == rtPointer){
-                                // We have to consider the size of the pointer
-                                if (member._d->type->size() == 4) {
-                                    address = member.toUInt32();
-                                }
-                                else if (member._d->type->size() == 8) {
-                                    address = member.toUInt64();
-                                }
-                                else {
-                                    throw BaseTypeException(
-                                            "Illegal conversion of a non-pointer type to a pointer",
-                                            __FILE__,
-                                            __LINE__);
-                                }
-                            }
-                        }
-
-                        //TODO This must not be threaded
-                        if (!address || !memberInstance._d->vmem->seek(address) ||
-                            (ret = memberInstance._d->vmem->read(buf, len)) != len ) {
-                            memberValid = false;
-                        }
-                        else {
-                        // Limit to ASCII characters
-                            for (int i = 0; i < len; i++) {
-                                if (buf[i] == 0){
-                                    memberValid = true;
-                                    break;
-                                }
-                                else if ( (buf[i] & 0x80) || !(buf[i] & 0x60) || i == len ){ // buf[i] >= 128 || buf[i] < 32 || last character not 0
-                                    memberValid = false;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    catch (VirtualMemoryException& e) {
-                        memberValid = false;
-                    }
-                    catch (MemAccessException& e) {
-                        memberValid = false;
-                    }
-
-                    //debugString.append(QString("Found String: \"%1\"\n").arg(buf));
+                catch (MemAccessException&) {
+                    memberValid = false;
                 }
+
+                //debugString.append(QString("Found String: \"%1\"\n").arg(buf));
             }
             else
                 memberValid = true;
@@ -1308,9 +1263,10 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
             }
         }
     }
-    catch(VirtualMemoryException& ge) {
+    catch (VirtualMemoryException&) {
         return false;
     }
+
     return isValid;
 }
 
@@ -1325,6 +1281,19 @@ void Instance::setParent(const Instance &parent, const StructuredMember *fromPar
 {
     _d->parent = parent._d;
     _d->fromParent = fromParent;
+}
+
+
+qint64 Instance::toIntBitField() const
+{
+    if (isNull() || !_d->type || !_d->type->type() & IntegerTypes)
+        return 0;
+
+    const IntegerBitField* ibf = dynamic_cast<const IntegerBitField*>(
+                _d->type->dereferencedBaseType(BaseType::trLexical));
+    if (ibf)
+        return ibf->toIntBitField(this);
+    return 0;
 }
 
 

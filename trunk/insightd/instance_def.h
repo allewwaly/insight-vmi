@@ -693,6 +693,22 @@ public:
     quint64 toULong() const;
 
     /**
+     * If this is instance represents a structured bit field, then this function
+     * returns the corresponding integer value as signed integer.
+     * @return integer bit field value
+     * \sa toUIntBitField(), bitSize(), bitOffset()
+     */
+    qint64 toIntBitField() const;
+
+    /**
+     * If this is instance represents a structured bit field, then this function
+     * returns the corresponding integer value as unsigned integer.
+     * @return unsigned integer bit field value
+     * \sa toIntBitField(), bitSize(), bitOffset()
+     */
+    quint64 toUIntBitField() const;
+
+    /**
      * Explicit representation of this instance as float.
      * @return the value of this type as a float
      */
@@ -745,18 +761,18 @@ public:
      */
     QString toString(const ColorPalette *col = 0) const;
 
-    /**
-     * Returns a toString() representation of this instance using the page
-     * global directory (i. e., page table) specified as \a pgd for
-     * virtual-to-physical address translation. This allows to read an instance
-     * that is located in user-land address space.
-     *
-     * @param pgd the page global directory of the process this instance belongs
-     * to, most likely the content of the \c CR3 register, as a hex-encoded string
-     * @return the same as toString() but tries to access user-land memory,
-     * if possible, using the page table specified as \a pgd
-     */
-    QString derefUserLand(const QString &pgd) const;
+//    /**
+//     * Returns a toString() representation of this instance using the page
+//     * global directory (i. e., page table) specified as \a pgd for
+//     * virtual-to-physical address translation. This allows to read an instance
+//     * that is located in user-land address space.
+//     *
+//     * @param pgd the page global directory of the process this instance belongs
+//     * to, most likely the content of the \c CR3 register, as a hex-encoded string
+//     * @return the same as toString() but tries to access user-land memory,
+//     * if possible, using the page table specified as \a pgd
+//     */
+//    QString derefUserLand(const QString &pgd) const;
 
     /**
      * @return the storage size of a pointer for the guest platform,
