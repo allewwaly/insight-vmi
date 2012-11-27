@@ -62,13 +62,21 @@ const QString& MemoryMapNode::getNameFromInstance(MemoryMapNode* parent,
     QStringList names(inst.fullNameComponents());
     // The first parent name(s) came from the parent MemoryMapNode
     if (parent) {
-        if (!parent->name().isEmpty()) {
-            while (!names.isEmpty() && parent->name() != names.first() &&
-                   !parent->name().endsWith("." + names.first()))
+        // For array names, strip the parent's part from the name and keep it
+        if (!names.isEmpty() && names[0].startsWith(parent->name() + "[")) {
+            names[0] = names[0].right(names[0].size() - parent->name().size());
+        }
+        // For other names, we have to get rid of at least the first part
+        else {
+            if (!parent->name().isEmpty()) {
+                // Pop all other name components until we find the parent's name
+                while (!names.isEmpty() && parent->name() != names.first() &&
+                       !parent->name().endsWith("." + names.first()))
+                    names.pop_front();
+            }
+            if (!names.isEmpty())
                 names.pop_front();
         }
-        if (!names.isEmpty())
-            names.pop_front();
     }
 
     return MemoryMap::insertName(names.join("."));
@@ -89,7 +97,7 @@ QStringList MemoryMapNode::parentNameComponents() const
 
 QString MemoryMapNode::fullName() const
 {
-	return fullNameComponents().join(".");
+    return fullNameComponents().join(".").replace(".[", ".");
 }
 
 
