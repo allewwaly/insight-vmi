@@ -294,9 +294,11 @@ private:
      * @return existing Node if an instance already exists at the address of \a inst
      * and the hash of both types are equal, null otherwise
      */
-    MemoryMapNode* existsNode(const Instance& origInst, const InstanceList &candidates) const;
+    MemoryMapNode* existsNode(const Instance& origInst,
+                              const InstanceList &candidates) const;
 
-    MemMapList findAllNodes(const Instance& origInst, const InstanceList &candidates) const;
+    MemMapList findAllNodes(const Instance& origInst,
+                            const InstanceList &candidates) const;
 
    /**
     * Check is existance of \a inst is plausible with current virtual memory mapping.
