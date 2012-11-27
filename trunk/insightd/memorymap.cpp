@@ -770,8 +770,8 @@ bool MemoryMap::dumpInit(const QString &fileName, const quint32 level) const
 }
 
 
-MemMapList MemoryMap::findAllNodesInRange(const Instance& origInst,
-                                          const InstanceList &candidates) const
+MemMapList MemoryMap::findAllNodes(const Instance& origInst,
+                                   const InstanceList &candidates) const
 {
     // Increase the reading counter
     _shared->vmemReadingLock.lock();
