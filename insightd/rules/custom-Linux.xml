@@ -17,6 +17,8 @@
 	<include>per_cpu_types.xml</include>
 
 	<!-- Type-specific rules -->
+	<include>type_struct_ctl_table.xml</include>
+	<include>type_struct_idr_layer.xml</include>
 	<include>type_struct_kmem_cache.xml</include>
 	<include>type_struct_page.xml</include>
 	<include>type_struct_radix_tree_root.xml</include>

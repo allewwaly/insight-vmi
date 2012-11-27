@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<!--
+			Reference: http://lxr.linux.no/#linux+v2.6.32.58/fs/sysfs/sysfs.h#L42
+		-->
+		<rule priority="101">
+			<name>ctl_table.extra?</name>
+			<description>Override any auto-generated rules to the extra pointers</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>ctl_table</typename>
+				<members>
+					<member match="wildcard">extra?</member>
+				</members>
+			</filter>
+			<action type="expression">
+				<sourcetype>struct ctl_table *src</sourcetype>
+				<targettype>void *</targettype>
+				<expression>src</expression>
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>

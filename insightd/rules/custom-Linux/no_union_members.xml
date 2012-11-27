@@ -19,5 +19,38 @@
 				return new Instance();
 			</action>
 		</rule>
+		
+		<rule priority="51">
+			<name>no nested union members</name>
+			<description>Returns an invalid instance for all nested union members</description>
+			<filter>
+				<datatype>struct,union</datatype>
+				<members>
+					<member datatype="union"></member>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="inline">
+				return new Instance();
+			</action>
+		</rule>
+
+		<!--
+		<rule priority="52">
+			<name>no lvl2 nested union members</name>
+			<description>Returns an invalid instance for all lvl2 nested union members</description>
+			<filter>
+				<datatype>struct,union</datatype>
+				<members>
+					<member></member>
+					<member datatype="union"></member>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="inline">
+				return new Instance();
+			</action>
+		</rule>
+		-->
 	</rules>
 </typeknowledge>
