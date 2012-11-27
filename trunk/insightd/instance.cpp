@@ -50,37 +50,23 @@ Instance::Instance()
 
 
 Instance::Instance(Instance::Origin orig)
-	: _d(new InstanceData)
+	: _d(new InstanceData(orig))
 {
-	_d->origin = orig;
 }
 
 
 Instance::Instance(size_t address, const BaseType* type, VirtualMemory* vmem,
-		int id)
-	: _d(new InstanceData)
+		int id, Origin orig)
+	: _d(new InstanceData(id, address, type, vmem, orig))
 {
-    _d->id = id;
-    _d->address = address;
-    _d->type = type;
-    _d->vmem = vmem;
-    if (_d->vmem && (_d->vmem->memSpecs().arch & MemSpecs::ar_i386))
-        _d->address &= 0xFFFFFFFFUL;
 }
 
 
 Instance::Instance(size_t address, const BaseType* type, const QString& name,
-        const QStringList& parentNames, VirtualMemory* vmem, int id)
-    : _d(new InstanceData)
+                   const QStringList& parentNames, VirtualMemory* vmem, int id,
+                   Origin orig)
+    : _d(new InstanceData(id, address, type, vmem, name, parentNames, orig))
 {
-    _d->id = id;
-    _d->address = address;
-    _d->type = type;
-    _d->name = name;
-    _d->parentNames = parentNames;
-    _d->vmem = vmem;
-    if (_d->vmem && (_d->vmem->memSpecs().arch & MemSpecs::ar_i386))
-        _d->address &= 0xFFFFFFFFUL;
 }
 
 
@@ -1105,7 +1091,7 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
             if (constants)
                 *constants = true;
 
-            Instance m_inst(m->toInstance(_d->address, _d->vmem, this, BaseType::trLexical));
+            Instance m_inst(member(ConstMemberList() << m, BaseType::trLexical, 0, ksNone));
             if (m_inst.isNull() || !m_inst.isAccessible())
                 return false;
 
@@ -1209,20 +1195,8 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
                             continue;
                     }
                     else if (m_inst.type()->type() & StructOrUnion) {
-//                        Instance member = (dynamic_cast<const Structured*>
-//                                           (m_inst.type()->dereferencedBaseType(BaseType::trLexical)))->
-//                                memberAtOffset(0, true)->
-//                                toInstance(m_inst.address(), _d->vmem, &m_inst);
-                        Instance member(m_inst.member(0, BaseType::trLexical, 0, ksNone));
-                        if (!member.isNull() && member.type()->type() == rtArray) {
-                            address = m_inst.address();
-                        }
-                        else if (!member.isNull() &&  member.type()->type() == rtPointer) {
-                            // A null-pointer for a string value is just fine
-                            if ( !(address = (qint64) m_inst.toPointer()) )
-                                continue;
-
-                        }
+                        debugerr("We should never come here! This is a parser bug");
+                        continue;
                     }
 
                     if (address && m_inst.vmem()->safeSeek(address) &&

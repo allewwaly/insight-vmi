@@ -79,7 +79,7 @@ public:
      * @param id the ID of the variable this instance represents, if any
      */
     Instance(size_t address, const BaseType* type, VirtualMemory* vmem,
-    		int id = -1);
+            int id = -1, Origin orig = orUnknown);
 
     /**
      * Constructor
@@ -91,7 +91,8 @@ public:
      * @param id the ID of the variable this instance represents, if any
      */
     Instance(size_t address, const BaseType* type, const QString& name,
-            const QStringList& parentNames, VirtualMemory* vmem, int id = -1);
+            const QStringList& parentNames, VirtualMemory* vmem, int id = -1,
+             Origin orig = orUnknown);
 
     /**
      * @return the ID of this instance, if it is a variable instance, -1
