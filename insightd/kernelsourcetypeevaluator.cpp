@@ -688,6 +688,9 @@ void KernelSourceTypeEvaluator::evaluateMagicNumbers(const ASTNode *node)
         }
 #endif /* DEBUGMAGICNUMBERS */
 
+        if (!node || !member)
+            return;
+
         localNode = node;
         bool findAssignment = true;
         while (findAssignment && localNode->parent)
