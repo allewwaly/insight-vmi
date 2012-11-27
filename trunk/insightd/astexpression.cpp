@@ -276,7 +276,7 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
     }
 
     const BaseType* bt = _baseType;
-    QString prettyType = QString("(%1)").arg(bt->prettyName());
+    QString prettyTrans;
     int i = 0, cnt = 0;
 
     // Skip the suffixes starting from our _baseType until we find the matching
@@ -298,7 +298,7 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
             // type as the context type normally is not a pointer type anyway
             if (i > 0 && cnt != 1)
                 exprEvalError(QString("Type \"%1\" (0x%2) is not a pointer.")
-                              .arg(prettyType)
+                              .arg(bt->prettyName())
                               .arg((uint)bt->id(), 0, 16));
             break;
 
@@ -307,34 +307,36 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
             if (!s)
                 exprEvalError(QString("Type \"%1\" (0x%2) is not a structured "
                                       "type")
-                              .arg(prettyType)
+                              .arg(bt->prettyName())
                               .arg((uint)bt->id(), 0, 16));
             const StructuredMember* m = s->member(_transformations[i].member);
             if (!m)
                 exprEvalError(QString("Type \"%1\" has no member \"%2\"")
-                              .arg(prettyType)
+                              .arg(bt->prettyName())
                               .arg(_transformations[i].member));
             bt = m->refType();
-            prettyType += "." + _transformations[i].member;
+            prettyTrans += "." + _transformations[i].member;
             break;
         }
 
         default:
-            exprEvalError(QString("Unhandled symbol transformation for \"%1\" "
+            exprEvalError(QString("Unhandled symbol transformation for \"(%0)%1\" "
                                   ": %2")
-                          .arg(prettyType)
+                          .arg(bt->prettyName())
+                          .arg(prettyTrans)
                           .arg(_transformations[i].typeString()));
         }
     }
 
     if (!bt || bt->hash() != instHash) {
         exprEvalError(QString("Type hash of instance \"%1\" (0x%2) is different "
-                              "from type \"%3\" (0x%4) of expression \"%5\"")
+                              "from type \"%3\" (0x%4) of expression \"(%5)%6\"")
                       .arg(inst->type()->prettyName())
                       .arg((uint)inst->type()->id(), 0, 16)
                       .arg(bt ? bt->prettyName() : QString("(null)"))
                       .arg((uint)(bt ? bt->id() : 0), 0, 16)
-                      .arg(prettyType));
+                      .arg(bt->prettyName())
+                      .arg(prettyTrans));
     }
 
     // Apply remaining suffixes
@@ -359,13 +361,13 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
             derefCnt = 0;
             tmp = tmp.member(_transformations[j].member,
                              BaseType::trLexical, 0, ksNone);
-            prettyType += "." + _transformations[j].member;
+            prettyTrans += "." + _transformations[j].member;
             break;
 
         case ttArray:
             derefCnt = 0;
             tmp = tmp.arrayElem(_transformations[j].arrayIndex);
-            prettyType += QString("[%1]").arg(_transformations[j].arrayIndex);
+            prettyTrans += QString("[%1]").arg(_transformations[j].arrayIndex);
             break;
 
         case ttAddress:
@@ -374,9 +376,10 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
             break;
 
         default:
-            exprEvalError(QString("Unhandled symbol transformation for \"%1\" "
+            exprEvalError(QString("Unhandled symbol transformation for \"(%0%)%1\" "
                                   ": %2")
-                          .arg(prettyType)
+                          .arg(bt->prettyName())
+                          .arg(prettyTrans)
                           .arg(_transformations[j].typeString()));
         }
     }
