@@ -887,10 +887,12 @@ const ASTSymbol* ASTTypeEvaluator::embeddingFuncSymbol(const ASTNode *node)
     QString name = antlrTokenToStr(dd->u.direct_declarator.identifier);
 
     const ASTSymbol* sym = node->scope->find(name, ASTScope::ssSymbols);
-    assert(sym && sym->type() == stFunctionDef);
+    assert(sym != 0);
 
-    if (sym)
+    if (sym) {
+        assert(sym->type() == stFunctionDef);
         _symbolOfNode.insert(node, sym);
+    }
     return sym;
 }
 
