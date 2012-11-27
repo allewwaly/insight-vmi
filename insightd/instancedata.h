@@ -28,14 +28,43 @@ typedef QSet<QString> StringSet;
 class InstanceData: public QSharedData
 {
 public:
-    inline InstanceData()
+    inline InstanceData(quint8 origin = 0)
         : id(-1),
           address(0),
           bitSize(-1),
           bitOffset(-1),
-          origin(0),
+          origin(origin),
           type(0),
           vmem(0),
+          parent(0),
+          fromParent(0)
+    {}
+
+    inline InstanceData(int id, size_t address, const BaseType* type,
+                        VirtualMemory* vmem, quint8 origin)
+        : id(id),
+          address(address),
+          bitSize(-1),
+          bitOffset(-1),
+          origin(origin),
+          type(type),
+          vmem(vmem),
+          parent(0),
+          fromParent(0)
+    {}
+
+    inline InstanceData(int id, size_t address, const BaseType* type,
+                        VirtualMemory* vmem, const QString& name,
+                        const QStringList& parentNames, quint8 origin)
+        : id(id),
+          address(address),
+          bitSize(-1),
+          bitOffset(-1),
+          origin(origin),
+          type(type),
+          vmem(vmem),
+          name(name),
+          parentNames(parentNames),
           parent(0),
           fromParent(0)
     {}
