@@ -201,8 +201,8 @@ inline Instance ReferencingType::createRefInstance(size_t address,
     // We need to keep track of the address
     size_t addr = address;
 #ifdef DEBUG
-    if ((vmem->memSpecs().arch & MemSpecs::ar_i386) && (addr >= (1ULL << 32)))
-        genericError(QString("Address 0x%1 exceeds 32 bit address space")
+    if (addr > (quint64)vmem->size())
+        genericError(QString("Address 0x%1 exceeds address space")
                 .arg(addr, 0, 16));
 #endif
 
