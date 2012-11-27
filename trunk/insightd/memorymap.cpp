@@ -783,7 +783,8 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& inst)
     _shared->vmemReading++;
     _shared->vmemReadingLock.unlock();
 
-    MemMapSet nodes = _vmemMap.objectsInRange(inst.address(), inst.endAddress());
+    MemMapList nodes = _vmemMap.objectsInRangeFast(inst.address(),
+                                                   inst.endAddress());
 
     // Decrease the reading counter again
     _shared->vmemReadingLock.lock();
@@ -795,7 +796,7 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& inst)
     const MemoryMapNode* otherNode = 0;
     bool found = false;
 
-    for (MemMapSet::const_iterator it = nodes.begin(), e = nodes.end();
+    for (MemMapList::const_iterator it = nodes.begin(), e = nodes.end();
          !found && it != e; ++it)
     {
         otherNode = *it;

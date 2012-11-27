@@ -172,6 +172,8 @@ public:
     typedef MemoryRangeTreeNode<value_type, value_accessor, property_type> Node;
     /// This type is returned by certain functions of this class
     typedef QSet<value_type> ItemSet;
+    /// This type is returned by certain functions of this class
+    typedef QList<value_type> ItemList;
 
     // Forward declaration
     class const_iterator;
@@ -342,12 +344,26 @@ public:
     /**
      * Finds all objects in memory that occupy space between
      * \a addrStart and \a addrEnd. Objects that only partly fall into that
-     * range are included.     *
+     * range are included. Each item appears only once in the set, however this
+     * function is significantly slower than objectsInRangeFast().
      * @param addrStart the memory start address
      * @param addrEnd the memory end address (including)
      * @return a set of MemoryMapNode objects
+     * \sa objectsInRangeFast()
      */
     ItemSet objectsInRange(quint64 addrStart, quint64 addrEnd) const;
+
+    /**
+     * Finds all objects in memory that occupy space between
+     * \a addrStart and \a addrEnd. Objects that only partly fall into that
+     * range are included. The list may include each item several times. If
+     * you need a unique list, try objectsInRange() instead.
+     * @param addrStart the memory start address
+     * @param addrEnd the memory end address (including)
+     * @return a set of MemoryMapNode objects
+     * \sa objectsInRange()
+     */
+    ItemList objectsInRangeFast(quint64 addrStart, quint64 addrEnd) const;
 
     /**
      * Returns the properties of a given memory address.
@@ -735,7 +751,8 @@ MemoryRangeTree<value_type, value_accessor, property_type>::objectsAt(quint64 ad
 
 template<class value_type, class value_accessor, class property_type>
 typename MemoryRangeTree<value_type, value_accessor, property_type>::ItemSet
-MemoryRangeTree<value_type, value_accessor, property_type>::objectsInRange(quint64 addrStart, quint64 addrEnd) const
+MemoryRangeTree<value_type, value_accessor, property_type>::objectsInRange(
+        quint64 addrStart, quint64 addrEnd) const
 {
     sanitizeInterval(addrStart, addrEnd);
     // Make sure the tree isn't empty and the address is in range
@@ -758,6 +775,39 @@ MemoryRangeTree<value_type, value_accessor, property_type>::objectsInRange(quint
     while (n && addrEnd >= n->addrStart) {
         for (it = n->items.constBegin(), e = n->items.constEnd(); it != e; ++it)
             result.insert(*it);
+
+        n = n->next;
+    }
+    return result;
+}
+
+
+template<class value_type, class value_accessor, class property_type>
+typename MemoryRangeTree<value_type, value_accessor, property_type>::ItemList
+MemoryRangeTree<value_type, value_accessor, property_type>::objectsInRangeFast(
+        quint64 addrStart, quint64 addrEnd) const
+{
+    sanitizeInterval(addrStart, addrEnd);
+    // Make sure the tree isn't empty and the address is in range
+    if (!_root || addrStart > _addrSpaceEnd)
+        return ItemList();
+
+    const Node* n = _root;
+    // Find the leaf containing the start address
+    while (!n->isLeaf()) {
+        if (addrStart <= n->splitAddr())
+            n = n->lChild;
+        else
+            n = n->rChild;
+    }
+
+    // Add all mappings that are in the requested range
+    ItemList result;
+    typename ItemSet::const_iterator it, e;
+    while (n && addrEnd >= n->addrStart) {
+        result.reserve(result.size() + n->items.size());
+        for (it = n->items.constBegin(), e = n->items.constEnd(); it != e; ++it)
+            result.append(*it);
 
         n = n->next;
     }
