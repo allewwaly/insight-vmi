@@ -46,7 +46,7 @@ void MemoryMapBuilderCS::run()
     // Now work through the whole stack
     QMutexLocker queueLock(&shared->queueLock);
     while ( !_interrupted && !shared->queue.isEmpty() &&
-            shared->processed < 20000 &&
+            shared->processed < 30000 &&
             (!shared->lastNode ||
              shared->lastNode->probability() >= shared->minProbability) )
     {
@@ -224,8 +224,8 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
         try {
             int result;
             // Get member and see if any rules apply
-            Instance mi = inst.member(i, BaseType::trLexical, 0,
-                                          _map->knowSrc(), &result);
+            Instance mi(inst.member(i, BaseType::trLexical, 0,
+                                    _map->knowSrc(), &result));
             if (!mi.isValid() || mi.isNull())
                 continue;
 

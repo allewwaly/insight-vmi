@@ -780,42 +780,42 @@ MemMapList MemoryMap::findAllNodes(const Instance& origInst,
 
     // Find all nodes in the affected memory ranges
     MemMapList nodes;
-    quint64 startAddr = origInst.address(),
-            endAddr = startAddr ? origInst.endAddress() : 0;
+    quint64 addrStart = origInst.address(),
+            addrEnd = addrStart ? origInst.endAddress() : 0;
 
     for (int i = 0; i < candidates.size(); ++i) {
         quint64 c_start = candidates[i].address();
         quint64 c_end   = candidates[i].endAddress();
         // If the interval is invalid, initialize it
-        if (!startAddr && !endAddr) {
-            if ( (startAddr = c_start) )
-                endAddr = c_end;
+        if (!addrStart && !addrEnd) {
+            if ( (addrStart = c_start) )
+                addrEnd = c_end;
             else
                 continue;
         }
 
         // If the memory regions overlap, we enlarge the interval
         bool overlap = false;
-        if (c_start < startAddr) {
-            if (startAddr <= c_end) {
+        if (c_start < addrStart) {
+            if (addrStart <= c_end) {
                 overlap = true;
-                startAddr = qMin(c_start, startAddr);
+                addrStart = qMin(c_start, addrStart);
             }
         }
-        else if (c_start <= endAddr) {
+        else if (c_start <= addrEnd) {
             overlap = true;
-            endAddr = qMax(c_end, endAddr);
+            addrEnd = qMax(c_end, addrEnd);
         }
         // If we have a valid interval, append all nodes and reset it to zero
-        if (!overlap && (startAddr || endAddr)) {
-            nodes += _vmemMap.objectsInRangeFast(startAddr, endAddr);
-            startAddr = endAddr = 0;
+        if (!overlap && (addrStart || addrEnd)) {
+            nodes += _vmemMap.objectsInRangeFast(addrStart, addrEnd);
+            addrStart = addrEnd = 0;
         }
     }
 
     // Request nodes from the final interval
-    if (startAddr || endAddr)
-        nodes += _vmemMap.objectsInRangeFast(startAddr, endAddr);
+    if (addrStart || addrEnd)
+        nodes += _vmemMap.objectsInRangeFast(addrStart, addrEnd);
 
    // Decrease the reading counter again
     _shared->vmemReadingLock.lock();
@@ -837,66 +837,89 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& origInst,
     if (origInst.type()->type() & BaseType::trLexical)
         debugerr("The given instance has a lexical type!");
 
-    MemMapList nodes(findAllNodesInRange(origInst, candidates));
+    MemMapList nodes(findAllNodes(origInst, candidates));
 
     // Did we find any node?
     if (nodes.isEmpty())
         return 0;
 
-    InstanceList insts(candidates);
-    insts.append(origInst);
-
-    const MemoryMapNode* otherNode = 0;
-    bool found = false;
-
+    // Create instances from all nodes
+    InstanceList nodeInsts;
+    nodeInsts.reserve(nodes.size());
     for (MemMapList::const_iterator it = nodes.begin(), e = nodes.end();
-         !found && it != e; ++it)
+         it != e; ++it)
     {
-        otherNode = *it;
-        if (!otherNode || !otherNode->type())
-            continue;
+        const MemoryMapNode *n = *it;
+        nodeInsts.append(n->toInstance(false));
+    }
 
-        // Is the the same object already contained?
-        if (otherNode->address() == origInst.address() &&
-            (*otherNode->type() == *origInst.type()))
-        {
-            found = true;
-            break;
+    bool found = false, done = false;
+    int i = 0, j = 0;
+    Instance inst;
+
+    // Compare all given instances against all nodes found
+    while (!found && !done) {
+        // Try all candidates from the list first, finally the original instance
+        if (i < candidates.size())
+            inst = candidates[i++];
+        else {
+            inst = origInst;
+            done = true;
         }
 
-        // Does one node embed the instance?
-        Instance other(otherNode->toInstance(false));
-        // Search recursively for embedding structs/unions
-        while (other.address() <= origInst.address() &&
-               other.type()->type() & StructOrUnion)
-        {
-            // Get member at the offset
-            quint64 offset = origInst.address() - other.address();
-            other = other.memberByOffset(offset, false).dereference(BaseType::trLexical);
-            // Compare the member
-            if (other.type() && other.address() == origInst.address()) {
-                // Do the types match directly?
-                if (*other.type() == *origInst.type()) {
-                    found = true;
-                    break;
-                }
-                // Test if the current element is a pointer to the type of the
-                // given instance. If yes, assume a list-like structure that
-                // is terminated at the current node.
-                else if (other.type()->type() == rtPointer) {
-                    int cnt;
-                    do {
-                        other = other.dereference(rtPointer, 1, &cnt);
-                        if (*other.type() == *origInst.type())
-                            found = true;
-                    } while (!found && cnt && other.type()->type() == rtPointer);
-                    break;
+        // Make sure the instance is valid
+        if (!inst.isValid() || inst.isNull())
+            continue;
+
+        // Compare the current instance with all nodes found
+        for (j = 0; !found && j < nodeInsts.size(); ++j)  {
+            // Does one node embed the instance?
+            Instance other(nodeInsts[j]);
+
+            // Is the the same object already contained?
+            if (other.address() == inst.address() &&
+                (*other.type() == *inst.type()))
+            {
+                found = true;
+                break;
+            }
+
+            // Search recursively for embedding structs/unions
+            while (other.address() <= inst.address() &&
+                   other.type() && other.type()->type() & StructOrUnion)
+            {
+                // Get member at the offset
+                quint64 offset = inst.address() - other.address();
+                other = other.memberByOffset(offset, false).dereference(BaseType::trLexical);
+                // Compare the member
+                if (other.type() && other.address() == inst.address()) {
+                    // Do the types match directly?
+                    if (*other.type() == *inst.type()) {
+                        found = true;
+                        break;
+                    }
+                    // Test if the current element is a pointer to the type of the
+                    // given instance. If yes, assume a list-like structure that
+                    // is terminated at the current node.
+                    else if (other.type()->type() == rtPointer) {
+                        int cnt;
+                        do {
+                            other = other.dereference(rtPointer, 1, &cnt);
+                            if (*other.type() == *inst.type())
+                                found = true;
+                        } while (!found && cnt && other.type()->type() == rtPointer);
+                        break;
+                    }
                 }
             }
+
+            // Exit loop if node was found
+            if (found)
+                break;
         }
     }
 
-    return found ? const_cast<MemoryMapNode*>(otherNode) : 0;
+    return found ? const_cast<MemoryMapNode*>(nodes[j]) : 0;
 }
 
 
@@ -951,13 +974,17 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(
         return child;
     }
 
-    // Dereference, if required
-    const Instance i(
-                origInst.type() && (origInst.type()->type() & BaseType::trLexical) ?
-                    origInst.dereference(BaseType::trLexical) : origInst);
+    // Only proceed if we don't have more than one instance to process
+    if (candidates.size() > 1 || (!origInst.isValid() && candidates.isEmpty()))
+        return 0;
 
-    if (!i.isNull() && i.type() && (i.type()->type() & interestingTypes))
-    {
+    // Dereference, if required
+    Instance i(candidates.isEmpty() ? origInst : candidates.first());
+
+    if (i.type() && (i.type()->type() & BaseType::trLexical))
+        i = i.dereference(BaseType::trLexical);
+
+    if (!i.isNull() && i.type() && (i.type()->type() & interestingTypes)) {
         // Is any other thread currently searching for the same address?
         _shared->currAddressesLock.lock();
         _shared->currAddresses[threadIndex] = 0;
