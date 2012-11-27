@@ -264,17 +264,6 @@ bool VirtualMemory::safeSeek(qint64 pos)
 }
 
 
-qint64 VirtualMemory::size() const
-{
-    if (_specs.arch & MemSpecs::ar_i386)
-        return VADDR_SPACE_X86;
-    else if (_specs.arch & MemSpecs::ar_x86_64)
-        return VADDR_SPACE_X86_64;
-    // Fallback
-    return 0;
-}
-
-
 qint64 VirtualMemory::readAtomic(qint64 pos, char *data, qint64 maxlen)
 {
     if (_threadSafe) {
