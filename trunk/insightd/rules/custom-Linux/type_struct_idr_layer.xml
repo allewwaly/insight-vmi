@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<!--
+			The idr_layer is organized similar to a radix tree: the usage of the
+			"ary" array depends on the "layer" value. Ignore this for now.
+		-->
+		<rule priority="101">
+			<name>idr_layer.ary</name>
+			<description>Forbit access to the "ary" member.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>idr_layer</typename>
+				<members>
+					<member>ary</member>
+				</members>
+			</filter>
+			<action type="inline">
+				return new Instance();
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
