@@ -450,9 +450,9 @@ Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCoun
         int dcnt = 0;
         // Save original value
         Instance::Origin orig_o = origin();
-        Instance ret = _d->type->toInstance(_d->address, _d->vmem, _d->name,
-                                           _d->parentNames, resolveTypes,
-                                           maxPtrDeref, &dcnt);
+        Instance ret(_d->type->toInstance(_d->address, _d->vmem, _d->name,
+                                          _d->parentNames, resolveTypes,
+                                          maxPtrDeref, &dcnt));
         // Restore origin and parent
         ret.setOrigin(orig_o);
         if (hasParent()) {
