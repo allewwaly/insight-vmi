@@ -20,6 +20,7 @@ SlubObjects::SlubObjects(const SymFactory* factory, VirtualMemory *vmem)
     _typeCasts.insertMulti("struct raw_sock", "struct unix_sock");
     _typeCasts.insertMulti("struct in6_addr", "struct unix_address");
     _typeCasts.insertMulti("struct anon_vma", "struct address_space");
+    _typeCasts.insertMulti("long unsigned int fds_bits[1]", "long unsigned int fds_bits[32]");
 }
 
 
@@ -103,6 +104,9 @@ SlubObjects::ObjectValidity SlubObjects::isInstanceEmbeddedHelper(const BaseType
     quint64 currentOffset = offset;
     bool validA, validB;
     QString itPrettyName = it->prettyName();
+    QString itFirstMemPretty;
+    if (sInst && sInst->name().isEmpty() && !sInst->members().isEmpty())
+        itFirstMemPretty = sInst->members().at(0)->prettyName();
 
     // Consider all nested structs and unions and try to find a match.
     while (it && m) {
@@ -117,7 +121,8 @@ SlubObjects::ObjectValidity SlubObjects::isInstanceEmbeddedHelper(const BaseType
                 return ovEmbedded;
             // Cast type match?
             else if (_typeCasts.contains(m->prettyName(), itPrettyName) ||
-                     _typeCasts.contains(mt->prettyName(), itPrettyName))
+                     _typeCasts.contains(mt->prettyName(), itPrettyName) ||
+                     _typeCasts.contains(m->prettyName(), itFirstMemPretty))
                 return ovEmbeddedCastType;
             // Dereference one array level
             else if (mt->type() == rtArray) {
