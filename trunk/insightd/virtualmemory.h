@@ -389,4 +389,14 @@ inline bool VirtualMemory::setThreadSafety(bool safe)
     return old;
 }
 
+inline qint64 VirtualMemory::size() const
+{
+    if (_specs.arch & MemSpecs::ar_i386)
+        return VADDR_SPACE_X86;
+    else if (_specs.arch & MemSpecs::ar_x86_64)
+        return VADDR_SPACE_X86_64;
+    // Fallback
+    return 0;
+}
+
 #endif /* VIRTUALMEMORY_H_ */
