@@ -210,9 +210,9 @@ const StructuredMember *Structured::memberAtOffset(size_t offset, bool exactMatc
         if (_members[i]->offset() == offset && _members[i]->refType()->size() > 0)
             return _members[i];
 
-    if(exactMatch)
+    if (exactMatch || _members.isEmpty())
         return 0;
-    else if(i == 0)
+    else if (i == 0)
         return _members[i];
     else
         return _members[i - 1];
