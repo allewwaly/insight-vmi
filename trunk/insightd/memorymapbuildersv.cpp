@@ -345,8 +345,8 @@ void MemoryMapBuilderSV::processList(MemoryMapNodeSV *node,
             !existsNode(listMember))
         {
           currentNode = dynamic_cast<MemoryMapNodeSV *>(
-                      _map->addChildIfNotExistend(listMember, currentNode,
-                                                  _index,
+                      _map->addChildIfNotExistend(listMember, InstanceList(),
+                                                  currentNode, _index,
                                                   (currentNode->address() + memOffset)));
         }
 
@@ -488,7 +488,7 @@ void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance &inst)
             Instance i(inst.dereference(BaseType::trLexicalAndPointers, -1, &cnt));
 
             if (cnt && !existsNode(i))
-                _map->addChildIfNotExistend(i, node, _index, inst.address());
+                _map->addChildIfNotExistend(i, InstanceList(), node, _index, inst.address());
         }
         catch (GenericException&)
         {
@@ -551,7 +551,7 @@ void MemoryMapBuilderSV::processStruct(MemoryMapNodeSV *node, Instance &inst)
             mi.type() != inst.memberType(i, 0, 0, ksNone))
         {
             if (!mi.isNull() && !existsNode(mi))
-                _map->addChildIfNotExistend(mi, node, _index, inst.address());
+                _map->addChildIfNotExistend(mi, InstanceList(), node, _index, inst.address());
 
             return;
         }
@@ -587,7 +587,7 @@ void MemoryMapBuilderSV::processIdrLayer(MemoryMapNodeSV *node, Instance &inst, 
 
     if (!existsNode(inst))
         nextNode = dynamic_cast<MemoryMapNodeSV *>(_map->
-                   addChildIfNotExistend(inst, node, _index, inst.address(), false));
+                   addChildIfNotExistend(inst, InstanceList(), node, _index, inst.address(), false));
 
     if (!nextNode) {
         debugerr("Could not cast node to MemoryMapNodeSV!");
@@ -681,7 +681,7 @@ void MemoryMapBuilderSV::processRadixTreeNode(MemoryMapNodeSV *node, Instance &i
     // Add current node
     if (!existsNode(inst))
         nextNode = dynamic_cast<MemoryMapNodeSV *>(_map->
-                   addChildIfNotExistend(inst, node, _index, inst.address(), false));
+                   addChildIfNotExistend(inst, InstanceList(), node, _index, inst.address(), false));
 
     if (!nextNode) {
         debugerr("Could not cast Node to MemoryMapNodeSV!");

@@ -770,28 +770,81 @@ bool MemoryMap::dumpInit(const QString &fileName, const quint32 level) const
 }
 
 
-MemoryMapNode* MemoryMap::existsNode(const Instance& inst)
+MemMapList MemoryMap::findAllNodesInRange(const Instance& origInst,
+                                          const InstanceList &candidates) const
 {
-    if (!inst.type())
-        return 0;
-
-    if (inst.type()->type() & BaseType::trLexical)
-        debugerr("The given instance has a lexical type!");
-
     // Increase the reading counter
     _shared->vmemReadingLock.lock();
     _shared->vmemReading++;
     _shared->vmemReadingLock.unlock();
 
-    MemMapList nodes = _vmemMap.objectsInRangeFast(inst.address(),
-                                                   inst.endAddress());
+    // Find all nodes in the affected memory ranges
+    MemMapList nodes;
+    quint64 startAddr = origInst.address(),
+            endAddr = startAddr ? origInst.endAddress() : 0;
 
-    // Decrease the reading counter again
+    for (int i = 0; i < candidates.size(); ++i) {
+        quint64 c_start = candidates[i].address();
+        quint64 c_end   = candidates[i].endAddress();
+        // If the interval is invalid, initialize it
+        if (!startAddr && !endAddr) {
+            if ( (startAddr = c_start) )
+                endAddr = c_end;
+            else
+                continue;
+        }
+
+        // If the memory regions overlap, we enlarge the interval
+        bool overlap = false;
+        if (c_start < startAddr) {
+            if (startAddr <= c_end) {
+                overlap = true;
+                startAddr = qMin(c_start, startAddr);
+            }
+        }
+        else if (c_start <= endAddr) {
+            overlap = true;
+            endAddr = qMax(c_end, endAddr);
+        }
+        // If we have a valid interval, append all nodes and reset it to zero
+        if (!overlap && (startAddr || endAddr)) {
+            nodes += _vmemMap.objectsInRangeFast(startAddr, endAddr);
+            startAddr = endAddr = 0;
+        }
+    }
+
+    // Request nodes from the final interval
+    if (startAddr || endAddr)
+        nodes += _vmemMap.objectsInRangeFast(startAddr, endAddr);
+
+   // Decrease the reading counter again
     _shared->vmemReadingLock.lock();
     _shared->vmemReading--;
     _shared->vmemReadingLock.unlock();
     // Wake up any sleeping thread
     _shared->vmemReadingDone.wakeAll();
+
+    return nodes;
+}
+
+
+MemoryMapNode* MemoryMap::existsNode(const Instance& origInst,
+                                     const InstanceList &candidates) const
+{
+    if (!origInst.type())
+        return 0;
+
+    if (origInst.type()->type() & BaseType::trLexical)
+        debugerr("The given instance has a lexical type!");
+
+    MemMapList nodes(findAllNodesInRange(origInst, candidates));
+
+    // Did we find any node?
+    if (nodes.isEmpty())
+        return 0;
+
+    InstanceList insts(candidates);
+    insts.append(origInst);
 
     const MemoryMapNode* otherNode = 0;
     bool found = false;
@@ -804,8 +857,8 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& inst)
             continue;
 
         // Is the the same object already contained?
-        if (otherNode->address() == inst.address() &&
-            (*otherNode->type() == *inst.type()))
+        if (otherNode->address() == origInst.address() &&
+            (*otherNode->type() == *origInst.type()))
         {
             found = true;
             break;
@@ -814,14 +867,16 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& inst)
         // Does one node embed the instance?
         Instance other(otherNode->toInstance(false));
         // Search recursively for embedding structs/unions
-        while (other.memberCount() > 0 && other.address() <= inst.address()) {
+        while (other.address() <= origInst.address() &&
+               other.type()->type() & StructOrUnion)
+        {
             // Get member at the offset
-            quint64 offset = inst.address() - other.address();
+            quint64 offset = origInst.address() - other.address();
             other = other.memberByOffset(offset, false).dereference(BaseType::trLexical);
             // Compare the member
-            if (other.type() && other.address() == inst.address()) {
+            if (other.type() && other.address() == origInst.address()) {
                 // Do the types match directly?
-                if (*other.type() == *inst.type()) {
+                if (*other.type() == *origInst.type()) {
                     found = true;
                     break;
                 }
@@ -832,7 +887,7 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& inst)
                     int cnt;
                     do {
                         other = other.dereference(rtPointer, 1, &cnt);
-                        if (*other.type() == *inst.type())
+                        if (*other.type() == *origInst.type())
                             found = true;
                     } while (!found && cnt && other.type()->type() == rtPointer);
                     break;
@@ -845,49 +900,51 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& inst)
 }
 
 
-bool MemoryMap::objectIsSane(const Instance& inst,
-        const MemoryMapNode* parent)
+bool MemoryMap::objectIsSane(const Instance& origInst,
+                             const InstanceList &candidates,
+                             const MemoryMapNode* parent) const
 {
     // We consider a difference in probability of 10% or more to be significant
     //    static const float prob_significance_delta = 0.1;
 
     // Don't add null pointers
-    if (inst.isNull() || !parent)
+    if (origInst.isNull() || !parent)
         return false;
 
     if (_vmemMap.isEmpty())
         return true;
 
-    //do not analyze rtFuncPointers
-    //TODO how to cope with rtFuncPointer types?
-    if(inst.type()->type() & FunctionTypes)
-        return false;
+//    //do not analyze rtFuncPointers
+//    //TODO how to cope with rtFuncPointer types?
+//    if(inst.type()->type() & FunctionTypes)
+//        return false;
    
     //do not analyze instances with no size
     //TODO how to cope with those? eg: struct lock_class_key
-    if(!inst.size())
+    if (!origInst.size())
         return false;
 
-    if(!inst.isValidConcerningMagicNumbers())
-        return false;
+//    if(!inst.isValidConcerningMagicNumbers())
+//        return false;
 
     bool isSane = true;
 
 #if MEMORY_MAP_PROCESS_NODES_WITH_ALT == 0
     // Check if the list contains an object within the same memory region with a
     // significantly higher probability
-    isSane = ! existsNode(inst);
+    isSane = ! existsNode(origInst, candidates);
 
 #endif
     return isSane;
 }
 
 
-MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
+MemoryMapNode * MemoryMap::addChildIfNotExistend(
+        const Instance& origInst, const InstanceList &candidates,
         MemoryMapNode* parent, int threadIndex, quint64 addrInParent,
-        bool addToQueue, bool hasCandidates)
+        bool addToQueue)
 {
-    MemoryMapNode *child = existsNode(inst);
+    MemoryMapNode *child = existsNode(origInst, candidates);
     // Return child if it already exists in virtual memory.
     if (child) {
         child->incFoundInPtrChains();
@@ -896,8 +953,8 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
 
     // Dereference, if required
     const Instance i(
-                inst.type() && (inst.type()->type() & BaseType::trLexical) ?
-                    inst.dereference(BaseType::trLexical) : inst);
+                origInst.type() && (origInst.type()->type() & BaseType::trLexical) ?
+                    origInst.dereference(BaseType::trLexical) : origInst);
 
     if (!i.isNull() && i.type() && (i.type()->type() & interestingTypes))
     {
@@ -927,14 +984,14 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(const Instance& inst,
         _shared->currAddressesLock.unlock();
 
         // Check if object conflicts previously given objects
-        if (objectIsSane(i, parent)) {
+        if (objectIsSane(i, candidates, parent)) {
 
             _shared->mapNodeLock.lock();
             try {
                 MemoryMapNodeSV* parent_sv = _buildType == btSibi ?
                             dynamic_cast<MemoryMapNodeSV*>(parent) : 0;
                 if (parent_sv)
-                    child = parent_sv->addChild(i, addrInParent, hasCandidates);
+                    child = parent_sv->addChild(i, addrInParent);
                 else
                     child = parent->addChild(i);
             }

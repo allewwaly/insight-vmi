@@ -46,7 +46,7 @@ void MemoryMapBuilderCS::run()
     // Now work through the whole stack
     QMutexLocker queueLock(&shared->queueLock);
     while ( !_interrupted && !shared->queue.isEmpty() &&
-//            shared->processed < 1000 &&
+            shared->processed < 20000 &&
             (!shared->lastNode ||
              shared->lastNode->probability() >= shared->minProbability) )
     {
@@ -176,7 +176,7 @@ void MemoryMapBuilderCS::processPointer(const Instance& inst, MemoryMapNode *nod
     Instance deref(inst.dereference(BaseType::trLexicalAllPointers, 1, &cnt));
 
     if (cnt && MemoryMapHeuristics::hasValidAddress(inst, false)) {
-        _map->addChildIfNotExistend(deref, node, _index, node->address());
+        _map->addChildIfNotExistend(deref, InstanceList(), node, _index, node->address());
     }
 }
 
@@ -223,9 +223,9 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
     for (int i = 0; i < cnt; ++i) {
         try {
             int result;
-            // Get plain member instance as-is
+            // Get member and see if any rules apply
             Instance mi = inst.member(i, BaseType::trLexical, 0,
-                                      _map->knowSrc(), &result);
+                                          _map->knowSrc(), &result);
             if (!mi.isValid() || mi.isNull())
                 continue;
 
@@ -233,8 +233,10 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
             if ( (result & TypeRuleEngine::mrMatch) &&
                  !(result & TypeRuleEngine::mrAmbiguous) )
             {
+                // Get the original member as well
+                Instance miOrig(inst.member(i, BaseType::trLexical, 0, ksNone));
                 // Add a new child node for this instance
-                _map->addChildIfNotExistend(mi, node, _index,
+                _map->addChildIfNotExistend(miOrig, InstanceList() << mi, node, _index,
                                             inst.memberAddress(i, 0, 0, ksNone));
             }
             // Pass the "nested" flag to nested structs/unions
