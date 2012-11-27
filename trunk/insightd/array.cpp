@@ -100,7 +100,7 @@ QString Array::toString(VirtualMemory* mem, size_t offset,
     else {
         if (_length >= 0) {
             QString s;
-            if (t->type() & StructOrUnion) {
+            if (refTypeDeep(BaseType::trLexical)->type() & StructOrUnion) {
                 int w = ShellUtil::getFieldWidth(_length, 10);
                 QString indent = QChar('\n') + QString(w + 5, QChar(' '));
                 // Output all array members
