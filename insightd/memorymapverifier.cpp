@@ -568,9 +568,9 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         _magicnumberInvalidDistribution[probIndex]++;
         reason = "magicnum";
 
-        debugmsg("Instance " << i.name() << " @ 0x" << std::hex << i.address()
-                 << std::dec << " with type " << i.type()->prettyName()
-                 << " is invalid according to magic!");
+//        debugmsg("Instance " << i.name() << " @ 0x" << std::hex << i.address()
+//                 << std::dec << " with type " << i.type()->prettyName()
+//                 << " is invalid according to magic!");
     }
 
     if (valid)
@@ -774,18 +774,22 @@ void MemoryMapVerifier::statistics()
                  << shell->color(ctMissed) << qSetFieldWidth(w_f) << right
                  << ((float)_slubConflict) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
                  << shell->color(ctReset)
-                 << "% of " << _totalObjects << ")" << endl
-                 << qSetFieldWidth(w_hdr)
-                 << "\t| No. of otherwise invalid slub objects:"
-                 << right << qSetFieldWidth(0) << shell->color(ctMissed) << qSetFieldWidth(w_i)
-                 << _slubInvalid
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
-                 << " ("
-                 << shell->color(ctMissed) << qSetFieldWidth(w_f) << right
-                 << ((float)_slubInvalid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                 << shell->color(ctReset)
-                 << "% of " << _totalObjects << ")" << endl
-                 << qSetFieldWidth(w_hdr)
+                 << "% of " << _totalObjects << ")" << endl;
+
+    if (_slubInvalid > 0) {
+        shell->out() << qSetFieldWidth(w_hdr)
+                     << "\t| No. of otherwise invalid slub objects:"
+                     << right << qSetFieldWidth(0) << shell->color(ctMissed) << qSetFieldWidth(w_i)
+                     << _slubInvalid
+                     << qSetFieldWidth(0) << left << shell->color(ctReset)
+                     << " ("
+                     << shell->color(ctMissed) << qSetFieldWidth(w_f) << right
+                     << ((float)_slubInvalid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
+                     << shell->color(ctReset)
+                     << "% of " << _totalObjects << ")" << endl;
+    }
+
+    shell->out() << qSetFieldWidth(w_hdr)
                  << "\t| No. of non-slub objects:"
                  << right << qSetFieldWidth(0) << qSetFieldWidth(w_i)
                  << nonSlubObj

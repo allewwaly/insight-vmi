@@ -288,37 +288,45 @@ private:
      * mapping. If an instance at the same address already exists, the
      * BaseType::hash() of the instance's type is compared. Only if address and
      * hash match, the instance is considered to be already existent.
-     * @param inst the Instance object to check for existence
+     * @param origInst the Instance object to check for existence
+     * @param candidates a list of candidates, one of which might be valid
+     *  instead of \a origInst
      * @return existing Node if an instance already exists at the address of \a inst
      * and the hash of both types are equal, null otherwise
      */
-  MemoryMapNode* existsNode(const Instance& inst);
+    MemoryMapNode* existsNode(const Instance& origInst, const InstanceList &candidates) const;
 
-  /**
+    MemMapList findAllNodes(const Instance& origInst, const InstanceList &candidates) const;
+
+   /**
     * Check is existance of \a inst is plausible with current virtual memory mapping.
-    * @param inst the Instance object to check for existence
+    * @param origInst the Instance object to check for existence
+    * @param candidates a list of candidates, one of which might be valid
     * @param parent the parent node of \a inst
     * @return true if object inst is plausible, false otherwise
     */
-	bool objectIsSane(const Instance& inst, const MemoryMapNode* parent);
+    bool objectIsSane(const Instance& origInst, const InstanceList &candidates,
+                      const MemoryMapNode* parent) const;
 
 	/**
 	 * Adds a new node for Instance \a inst as child of \a node, if \a inst is
 	 * not already contained in the virtual memory mapping. If a new node is
 	 * added, it is also appended to the queue \a queue for further processing.
-	 * @param inst the instance to create a new node from
+	 * @param origInst the unmodified instance to create a new node from
+	 * @param candidates a list of candidates (i.e., modified instances), one of
+	 * which might be valid in instead of \a origInst
 	 * @param parent the parent node of the new node to be created
      * @param addrInParent the address of the member within the parent
      * @param addToQueue should the new node be added to the queue
-     * @param hasCandidates specifies if the node has candidates that will be
-     * added next
      * @return \c A pointer to the new node if the node could be added, \c NULL
      * if that instance is in conflict to already existing nodes and a pointer to
      * the existing node, if it already existed in the virtual memory mapping
 	 */
-	MemoryMapNode* addChildIfNotExistend(const Instance& inst, MemoryMapNode* parent,
+	MemoryMapNode* addChildIfNotExistend(const Instance& origInst,
+										 const InstanceList& candidates,
+										 MemoryMapNode* parent,
 										 int threadIndex, quint64 addrInParent,
-										 bool addToQueue = true, bool hasCandidates = false);
+										 bool addToQueue = true);
 
 	bool shouldEnqueue(const Instance& inst, MemoryMapNode* node) const;
 
