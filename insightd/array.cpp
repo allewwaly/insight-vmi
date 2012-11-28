@@ -87,7 +87,7 @@ QString Array::toString(VirtualMemory* mem, size_t offset,
     assert(t != 0);
 
     // Is this possibly a string?
-    if (t && t->type() == rtInt8) {
+    if (t && t->type() & (rtInt8|rtUInt8)) {
         QString s = readString(mem, offset, _length > 0 ? _length : 256, &result);
 
         if (result.isEmpty()) {
