@@ -292,7 +292,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     {
         const Variable* v = *it;
 //        // For testing now only start with this one variable
-         if (v->name() != "sysfs_root")
+         if (v->name() != "dentry_hashtable")
             continue;
 
         // For now ignore all symbols that have been defined in modules
