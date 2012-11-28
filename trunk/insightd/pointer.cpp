@@ -87,10 +87,10 @@ QString Pointer::toString(VirtualMemory* mem, size_t offset, const ColorPalette*
             0;
     // Is this possibly a string (type "char*" or "const char*")?
     if (t &&
-        (t->type() == rtInt8 ||
+        (t->type() & (rtInt8|rtUInt8) ||
          (t->type() == rtConst &&
           refRefType &&
-          refRefType->type() == rtInt8)))
+          refRefType->type() & (rtInt8|rtUInt8))))
     {
         QString s = readString(mem, p, 255, &errMsg);
         if (errMsg.isEmpty()) {

@@ -218,11 +218,11 @@ inline Instance ReferencingType::createRefInstance(size_t address,
     if ( (p = dynamic_cast<const Pointer*>(this)) ) {
         // If this is a type "char*" or "const char*", treat it as a string
         if ((rbtRef = p->refType()) &&
-            ((rbtRef->type() == rtInt8) ||
+            ((rbtRef->type() & (rtInt8|rtUInt8)) ||
              (rbtRef->type() == rtConst &&
               (rbtRbt = dynamic_cast<const RefBaseType*>(rbtRef)) &&
               (rbtRbtRef = rbtRbt->refType()) &&
-              rbtRbtRef->type() == rtInt8)))
+              rbtRbtRef->type() & (rtInt8|rtUInt8))))
             // Stop here, so that toString() later on will print this as string
             return Instance(address, p, name, parentNames, vmem, id);
         // Only dereference pointers, not arrays
