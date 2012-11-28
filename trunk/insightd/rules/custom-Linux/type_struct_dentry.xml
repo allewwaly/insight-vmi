@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<!--
+		Reference: http://lxr.linux.no/#linux+v2.6.32.58/include/linux/dcache.h#L89
+		-->
+		<rule priority="102">
+			<name>dentry.d_u.d_child</name>
+			<description>
+				Make nested members of union "d_u" accessible
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>dentry</typename>
+				<members>
+					<member>d_u</member>
+					<member match="any"></member>
+				</members>
+			</filter>
+			<action type="inline">
+				// Allow access to "d_child", but not to "d_rcu"
+				if (arguments[1][1] == 0)
+					return false;          // false: fall back to default
+				else
+					return new Instance(); // invalid: don't use
+			</action>
+		</rule>
+
+		<rule priority="103">
+			<name>dentry.d_u.d_child.next</name>
+			<description>
+				Even though "d_u" is a union, the member "d_child.next" can be
+				accessed safely.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>dentry</typename>
+				<members>
+					<member>d_u</member>
+					<member>d_child</member>
+					<member>next</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var dentry = arguments[0];
+				var members = arguments[1];
+				var next = dentry.Member(members[0]).Member(members[1]).Member(members[2]);
+				next.ChangeType(dentry.TypeId());
+				next.AddToAddress(-dentry.MemberOffset(members[0]));
+				return next;
+			</action>
+		</rule>
+
+		<rule priority="111">
+			<name>dentry_hashtable.first</name>
+			<description>
+				Variable "dentry_hashtable" holds "struct dentry" objects
+			</description>
+			<filter>
+				<variablename>dentry_hashtable</variablename>
+				<datatype>struct</datatype>
+				<typename>hlist_head</typename>
+				<members>
+					<member>first</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var inst = arguments[0];
+				var members = arguments[1];
+				inst = inst.Member(members[0]);
+				inst.ChangeType("dentry");
+				inst.AddToAddress(-inst.MemberOffset("d_hash"));
+				return inst;
+			</action>
+		</rule>
+
+		<rule priority="103">
+			<name>dentry.d_hash.next</name>
+			<description>
+				Process hlist_node entry
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>dentry</typename>
+				<members>
+					<member>d_hash</member>
+					<member>next</member>
+				</members>
+			</filter>
+			<action type="function" file="generic_lists.js">hlist_node_next</action>
+		</rule>
+
+	</rules>
+</typeknowledge>

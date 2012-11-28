@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<rule priority="1">
+			<name>list_head generic</name>
+			<description>
+				Generic rule for list_head members embedded in other structs
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<members>
+					<member datatype="struct" typename="list_head" match="any" />
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="function" file="generic_lists.js">list_head_member</action>
+		</rule>
+	</rules>
+</typeknowledge>
