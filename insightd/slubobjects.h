@@ -38,15 +38,17 @@ typedef QList<SlubCache> CacheList;
  */
 struct SlubObject
 {
-    SlubObject() : isNull(true), address(0), size(0), baseType(0) {}
-    SlubObject(quint64 address, const SlubCache& slub)
+    SlubObject() : isNull(true), address(0), size(0), baseType(0),
+        cacheIndex(-1) {}
+    SlubObject(quint64 address, const SlubCache& slub, int cacheIndex)
         : isNull(false), address(address), size(slub.objSize),
-          slubName(slub.name), baseType(slub.baseType) {}
+          slubName(slub.name), baseType(slub.baseType), cacheIndex(cacheIndex) {}
     bool isNull;
     quint64 address;
     int size;
     QString slubName;
     const Structured* baseType;
+    int cacheIndex;
 };
 
 /**
@@ -102,7 +104,8 @@ public:
         ovMaybeValid,    ///< Instance lies within reserved slab memory for which no type information is available
         ovValidCastType, ///< Instance matches an object in the slab when using the SlubObjects::_typeCasts exception list
         ovEmbeddedCastType, ///< Instance is embeddes in another object in the slab when using the SlubObjects::_typeCasts exception list
-        ovValid          ///< Instance was either found in the slabs or in a global variable
+        ovValidGlobal,   ///< Instance is a slub type and was found in a global variable
+        ovValid          ///< Instance was found in the slabs
     };
 
     SlubObjects(const SymFactory* factory, VirtualMemory* vmem);
@@ -163,6 +166,10 @@ public:
      * \sa numberOfObjects()
      */
     int numberOfObjectsWithType() const;
+
+    QStringList cacheNames() const { return _indices.keys(); }
+
+    int indexOfCache(const QString& name) const { return _indices.value(name); }
 
 private:
     ObjectValidity isInstanceEmbeddedHelper(const BaseType *it, const StructuredMember *mem,

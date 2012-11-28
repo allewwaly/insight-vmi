@@ -2260,6 +2260,8 @@ int Shell::cmdMemoryVerify(QStringList args)
                     // Instance matches an object in the slab when using the SlubObjects::_typeCasts exception list
                 case SlubObjects::ovValidCastType:
                     _out << "a valid cast type"; break;
+                case SlubObjects::ovValidGlobal:
+                    _out << "a valid global variable"; break;
                 }
 
                 _out << color(ctReset) << "." << endl;

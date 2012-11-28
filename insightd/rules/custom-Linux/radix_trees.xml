@@ -30,5 +30,23 @@
 				return rnode;
 			</action>
 		</rule>
+		
+		<rule priority="101">
+			<name>radix_tree_node.slots</name>
+			<description>
+				The usage of the "slots" array of a radix tree node depends on
+				its height, given in member "height". Ignore it for now.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>radix_tree_node</typename>
+				<members>
+					<member>slots</member>
+				</members>
+			</filter>
+			<action type="inline">
+				return false;
+			</action>
+		</rule>
 	</rules>
 </typeknowledge>

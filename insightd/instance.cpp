@@ -486,13 +486,13 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 	if (_ruleEngine && !(src & ksNoRulesEngine)) {
 		ConstMemberList mlist(members);
 		Instance *newInst = typeRuleMatchRek(mlist, &match);
+		// Auto-delete object later
+		QScopedPointer<Instance> newInstPtr(newInst);
 
 		if (result)
 			*result = match;
 
 		if (match & TypeRuleEngine::mrMatch) {
-			// Auto-delete object later
-			QScopedPointer<Instance> newInstPtr(newInst);
 			// Was the match ambiguous?
 			if ( !(match & TypeRuleEngine::mrAmbiguous) ) {
 				if (!newInst)
@@ -506,7 +506,7 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 	// If no match or multiple matches through the rule engine, try to resolve
 	// it ourself
 	if ( !(match & TypeRuleEngine::mrMatch) ||
-		 (match & TypeRuleEngine::mrAmbiguous) )
+		 (match & (TypeRuleEngine::mrAmbiguous|TypeRuleEngine::mrDefaultHandler)) )
 	{
 		// In case the member is nested in an anonymous struct/union,
 		// we have to add that inter-offset here because m->toInstance()
@@ -602,7 +602,11 @@ Instance* Instance::typeRuleMatchRek(ConstMemberList &members, int* match) const
 	if ( !((*match) & TypeRuleEngine::mrMatch) ) {
 		if (memberPrepended)
 			members.pop_front();
-		*match |= _ruleEngine->match(this, members, &newInst);
+		if (newInst)
+			delete newInst;
+		int ret = _ruleEngine->match(this, members, &newInst);
+		// Carry over the defer flag
+		*match = ret | (*match & TypeRuleEngine::mrDefer);
 	}
 
 	return newInst;

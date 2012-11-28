@@ -307,8 +307,7 @@ private:
     * @param parent the parent node of \a inst
     * @return true if object inst is plausible, false otherwise
     */
-    bool objectIsSane(const Instance& origInst, const InstanceList &candidates,
-                      const MemoryMapNode* parent) const;
+    bool objectIsSane(const Instance& inst) const;
 
 	/**
 	 * Adds a new node for Instance \a inst as child of \a node, if \a inst is
@@ -458,6 +457,7 @@ inline float MemoryMap::calculateNodeProbability(const Instance &inst,
 {
     if (_threads && _threads[0])
         return _threads[0]->calculateNodeProbability(inst, parentProbability);
+
     return 1.0;
 }
 

@@ -46,7 +46,7 @@ void MemoryMapBuilderCS::run()
     // Now work through the whole stack
     QMutexLocker queueLock(&shared->queueLock);
     while ( !_interrupted && !shared->queue.isEmpty() &&
-            shared->processed < 30000 &&
+//            shared->processed < 1000 &&
             (!shared->lastNode ||
              shared->lastNode->probability() >= shared->minProbability) )
     {
@@ -235,9 +235,13 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
             {
                 // Get the original member as well
                 Instance miOrig(inst.member(i, BaseType::trLexical, 0, ksNone));
-                // Add a new child node for this instance
-                _map->addChildIfNotExistend(miOrig, InstanceList() << mi, node, _index,
-                                            inst.memberAddress(i, 0, 0, ksNone));
+
+//                if (miOrig.type()->type() & (StructOrUnion|rtArray))
+//                    processInstance(mi, node);
+//                else
+                    // Add a new child node for this instance
+                    _map->addChildIfNotExistend(miOrig, InstanceList() << mi, node, _index,
+                                                inst.memberAddress(i, 0, 0, ksNone));
             }
             // Pass the "nested" flag to nested structs/unions
             else if (mi.type()->type() & StructOrUnion) {
@@ -257,12 +261,15 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
 float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
         float parentProbability) const
 {
+
+//    if (inst.type()->name() == "sysfs_dirent")
+//        debugmsg("Calculating prob. of " << inst.typeName());
+
     // Degradation of 0.1% per parent-child relation.
     static const float degPerGeneration = 0.001;
 
-//    // Degradation of 20% for address of this node not being aligned at 4 byte
-//    // boundary
-//    static const float degForUnalignedAddr = 0.2;
+    // Degradation of 20% for objects not matching the magic numbers
+    static const float degForInvalidMagicNumbers = 0.2;
 
     // Degradation of 5% for address begin in userland
 //    static const float degForUserlandAddr = 0.05;
@@ -338,6 +345,9 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
     // If this a union or struct, we have to consider the pointer members
     else if ( instType && (instType->type() & StructOrUnion) ) {
 
+        if (!inst.isValidConcerningMagicNumbers())
+            prob *= (1.0 - degForInvalidMagicNumbers);
+
         const Structured* structured =
                 dynamic_cast<const Structured*>(instType);
         int invalidChildAddrCnt = 0;
@@ -355,6 +365,9 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
             else if (MemoryMapHeuristics::isFunctionPointer(mi) &&
                      !MemoryMapHeuristics::isValidFunctionPointer(mi))
                 invalidChildAddrCnt++;
+            else if (MemoryMapHeuristics::isListHead(mi) &&
+                     !MemoryMapHeuristics::isValidListHead(mi, true))
+                return (prob * (1.0 - degInvalidInstance));
             else
                 --testedChildren;
         }

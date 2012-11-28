@@ -69,15 +69,16 @@ Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes,
 
 		Instance *newInst = 0;
 		match = _ruleEngine->match(&ret, emtpyMemberList, &newInst);
+		// Auto-delete object later
+		QScopedPointer<Instance> newInstPtr(newInst);
 
 		if (result)
 			*result = match;
 
 		if (match & TypeRuleEngine::mrMatch) {
-			// Auto-delete object later
-			QScopedPointer<Instance> newInstPtr(newInst);
 			// Was the match ambiguous?
-			if ( !(match & TypeRuleEngine::mrAmbiguous) ) {
+			if ( !(match & (TypeRuleEngine::mrAmbiguous|TypeRuleEngine::mrDefaultHandler)) )
+			{
 				if (!newInst)
 					return Instance(Instance::orRuleEngine);
 				else

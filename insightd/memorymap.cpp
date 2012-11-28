@@ -292,8 +292,8 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     {
         const Variable* v = *it;
 //        // For testing now only start with this one variable
-//         if (v->name() != "init_task")
-//            continue;
+         if (v->name() != "sysfs_root")
+            continue;
 
         // For now ignore all symbols that have been defined in modules
         if (v->symbolSource() == ssModule)
@@ -348,11 +348,11 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 //                    << ", queue = " << queue_size << " " << indicator
 //                    << ", probability = " << (node ? node->probability() : 1.0));
             shell->out()
-                    << "\rProcessed " << _shared->processed << " instances"
-                    << ", vmemAddr: " << _vmemAddresses.size()
+                    << "\rProcessed: " << _shared->processed
+                    << ", addr: " << _vmemAddresses.size()
                     << ", objects: " << _vmemMap.size()
-                    << ", vmemMap: " << _vmemMap.nodeCount()
-                    << ", pmemMap: " << _pmemMap.nodeCount()
+                    << ", vmem: " << _vmemMap.nodeCount()
+                    << ", pmem: " << _pmemMap.nodeCount()
                     << ", queue: " << queue_size << " " << indicator
                     << ", prob: " << (node ? node->probability() : 1.0)
                     << ", min_prob: " << (queue_size ? _shared->queue.smallest()->probability() : 0)
@@ -923,15 +923,13 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& origInst,
 }
 
 
-bool MemoryMap::objectIsSane(const Instance& origInst,
-                             const InstanceList &candidates,
-                             const MemoryMapNode* parent) const
+bool MemoryMap::objectIsSane(const Instance& inst) const
 {
     // We consider a difference in probability of 10% or more to be significant
     //    static const float prob_significance_delta = 0.1;
 
     // Don't add null pointers
-    if (origInst.isNull() || !parent)
+    if (inst.isNull())
         return false;
 
     if (_vmemMap.isEmpty())
@@ -944,21 +942,22 @@ bool MemoryMap::objectIsSane(const Instance& origInst,
    
     //do not analyze instances with no size
     //TODO how to cope with those? eg: struct lock_class_key
-    if (!origInst.size())
+    if (!inst.size())
         return false;
 
-//    if(!inst.isValidConcerningMagicNumbers())
+//    if (!inst.isValidConcerningMagicNumbers())
 //        return false;
 
-    bool isSane = true;
+//    bool isSane = true;
 
-#if MEMORY_MAP_PROCESS_NODES_WITH_ALT == 0
-    // Check if the list contains an object within the same memory region with a
-    // significantly higher probability
-    isSane = ! existsNode(origInst, candidates);
+//#if MEMORY_MAP_PROCESS_NODES_WITH_ALT == 0
+//    // Check if the list contains an object within the same memory region with a
+//    // significantly higher probability
+//    isSane = ! existsNode(origInst, candidates);
 
-#endif
-    return isSane;
+//#endif
+
+    return true;
 }
 
 
@@ -1011,7 +1010,7 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(
         _shared->currAddressesLock.unlock();
 
         // Check if object conflicts previously given objects
-        if (objectIsSane(i, candidates, parent)) {
+        if (objectIsSane(i) && parent) {
 
             _shared->mapNodeLock.lock();
             try {
@@ -1085,9 +1084,14 @@ bool MemoryMap::shouldEnqueue(const Instance &inst, MemoryMapNode *node) const
 //    if (depth > 10)
 //        return false;
 
-    return (inst.type()->type() & enqueueTypes) &&
+    bool ret = (inst.type()->type() & enqueueTypes) &&
             node->probability() > _shared->minProbability &&
             inst.isAccessible();
+
+    if (inst.type()->dereferencedBaseType(BaseType::trLexicalPointersArrays)->name() == "sysfs_dirent" && !ret)
+        debugmsg("Not enqueuing: " << node->fullName() << "." << inst.name());
+
+    return ret;
 }
 
 

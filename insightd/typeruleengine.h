@@ -67,7 +67,8 @@ public:
         mrMatch           = (1 << 0),  ///< one or more rules matched
         mrAmbiguous       = (1 << 1),  ///< several rules matched and delivered different results
         mrDefer           = (1 << 2),  ///< one rule may match with further members given
-        mrMatchAndDefer = mrMatch|mrDefer ///< one rule matches, further rules might match with more members
+        mrDefaultHandler  = (1 << 3)  ///< the matched rule requested to use the default handler
+//        mrMatchAndDefer = mrMatch|mrDefer ///< one rule matches, further rules might match with more members
     };
 
     /// How verbose should we be during rule evaluation?
@@ -205,11 +206,12 @@ public:
      * @param inst instance to match
      * @param members accessed members, originating from the structure pointed
      *  to by \a inst
+     * @param priority returns the priority of the matched rule, if any
      * @return bitwise combination of MatchResult values
      * \a MatchResult
      */
     int match(const Instance* inst, const ConstMemberList &members,
-              Instance **newInst) const;
+              Instance **newInst, int *priority = 0) const;
 
     /**
      * Returns a list of all rules that match instance \a inst.
@@ -265,7 +267,7 @@ private:
     void errRule(const TypeRule *rule, int index, const QString& msg) const;
     void ruleMsg(const TypeRule* rule, int index, const QString &severity,
                  const QString &msg, ColorType light,  ColorType normal) const;
-    void ruleMatchInfo(const ActiveRule& arule, const Instance *inst,
+    bool ruleMatchInfo(const ActiveRule& arule, const Instance *inst,
                        const ConstMemberList &members, int matched,
                        bool evaluated, bool skipped) const;
     const OsFilter* insertOsFilter(const OsFilter* osf);

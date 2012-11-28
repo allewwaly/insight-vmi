@@ -15,13 +15,14 @@
 	<!-- Generic rules -->
 	<include>no_union_members.xml</include>
 	<include>per_cpu_types.xml</include>
+	<include>radix_trees.xml</include>
+	<include>excludes.xml</include>
 
 	<!-- Type-specific rules -->
 	<include>type_struct_ctl_table.xml</include>
 	<include>type_struct_idr_layer.xml</include>
 	<include>type_struct_kmem_cache.xml</include>
 	<include>type_struct_page.xml</include>
-	<include>type_struct_radix_tree_root.xml</include>
 	<include>type_struct_sysfs_dirent.xml</include>
 	<include>type_struct_task_struct.xml</include>
 
