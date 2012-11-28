@@ -136,14 +136,30 @@ Instance MemoryMapNode::toInstance(bool includeParentNameComponents) const
             inst.setParentNameComponents(parentNameComponents());
     }
 
+    // Find a proper name
+    QString name(_name);
+    if (name.isEmpty()) {
+        // When the parent was a pointer, use its name
+        for (MemoryMapNode* n = _parent; n; n = n->parent()) {
+            if (n->type() && n->type()->type() & (rtPointer|rtArray)) {
+                if (!n->name().isEmpty()) {
+                    name = n->name();
+                    break;
+                }
+            }
+            else
+                break;
+        }
+    }
+
     if (includeParentNameComponents) {
-        Instance inst(_address, _type, _name, parentNameComponents(),
+        Instance inst(_address, _type, name, parentNameComponents(),
                       _belongsTo->vmem(), _id);
         inst.setOrigin(Instance::orMemMapNode);
         return inst;
     }
     else {
-        Instance inst(_address, _type, _name, QStringList(), _belongsTo->vmem(),
+        Instance inst(_address, _type, name, QStringList(), _belongsTo->vmem(),
                       _id);
         inst.setOrigin(Instance::orMemMapNode);
         return inst;
