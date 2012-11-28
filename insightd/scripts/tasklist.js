@@ -96,7 +96,7 @@ function printList(p)
 
 var init = new Instance("init_task");
 
-if (init.tasks.MemberCandidatesCount("next") < 1)
-	throw new Error("\"" + init.Name() + "\" does not have any candidate types for member \"tasks.next\"");
+//if (init.tasks.MemberCandidatesCount("next") < 1)
+//	throw new Error("\"" + init.Name() + "\" does not have any candidate types for member \"tasks.next\"");
 
 printList(init);

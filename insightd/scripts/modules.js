@@ -5,7 +5,7 @@
 
 include("lib_string.js");
 
-function printModuleList()
+function printModuleListCand()
 {
     var head = new Instance("modules");
 
@@ -41,4 +41,42 @@ function printModuleList()
 	}
 }
 
-printModuleList();
+function printModuleListRules()
+{
+    var head = new Instance("modules");
+
+    var w_mod = 20;
+    println(lalign("Module [Args]", w_mod) + " Used by");
+
+    // Iterate over all modules
+    var m = head.next;
+    while (m &&
+           m.Address() != head.Address() &&
+           m.MemberAddress("list") != head.Address())
+    {
+        // Build list of modules which use the current module
+        var usedList = "";
+        var u = m.modules_which_use_me.next;
+        while (u.TypeId() == m.TypeId() &&
+               u.MemberAddress("list", true) != m.modules_which_use_me.Address())
+        {
+            if (usedList.length > 0)
+            usedList = usedList + ", ";
+            usedList = usedList + u.module_which_uses.name.toString();
+            u = u.list.next;
+        }
+
+        var name = m.name.toString();
+        if (m.args.toString().length > 0)
+        name += " [" + m.args.toString() + "]";
+
+        if (usedList.length > 0)
+        println(lalign(name, w_mod) + " " + usedList);
+        else
+        println(name);
+
+        m = m.list.next;
+    }
+}
+
+printModuleListRules();
