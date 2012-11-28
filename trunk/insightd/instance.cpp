@@ -492,22 +492,18 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 		if (result)
 			*result = match;
 
-		if (match & TypeRuleEngine::mrMatch) {
-			// Was the match ambiguous?
-			if ( !(match & TypeRuleEngine::mrAmbiguous) ) {
-				if (!newInst)
-					return Instance(Instance::orRuleEngine);
-				else
-					ret = newInst->dereference(resolveTypes, maxPtrDeref);
-			}
+		// Did we have a match? Was the it ambiguous or rejected?
+		if (TypeRuleEngine::useMatchedInst(match)) {
+			if (!newInst)
+				return Instance(Instance::orRuleEngine);
+			else
+				ret = newInst->dereference(resolveTypes, maxPtrDeref);
 		}
 	}
 
 	// If no match or multiple matches through the rule engine, try to resolve
 	// it ourself
-	if ( !(match & TypeRuleEngine::mrMatch) ||
-		 (match & (TypeRuleEngine::mrAmbiguous|TypeRuleEngine::mrDefaultHandler)) )
-	{
+	if (!TypeRuleEngine::useMatchedInst(match)) {
 		// In case the member is nested in an anonymous struct/union,
 		// we have to add that inter-offset here because m->toInstance()
 		// only adds the member's offset within its direct parent.

@@ -75,15 +75,12 @@ Instance Variable::toInstance(VirtualMemory* vmem, int resolveTypes,
 		if (result)
 			*result = match;
 
-		if (match & TypeRuleEngine::mrMatch) {
-			// Was the match ambiguous?
-			if ( !(match & (TypeRuleEngine::mrAmbiguous|TypeRuleEngine::mrDefaultHandler)) )
-			{
-				if (!newInst)
-					return Instance(Instance::orRuleEngine);
-				else
-					ret = *newInst;
-			}
+		// Did we have a match? Was the it ambiguous or rejected?
+		if (TypeRuleEngine::useMatchedInst(match)) {
+			if (!newInst)
+				return Instance(Instance::orRuleEngine);
+			else
+				ret = *newInst;
 		}
 	}
 

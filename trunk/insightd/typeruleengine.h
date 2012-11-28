@@ -254,6 +254,18 @@ public:
     inline void setVerbose(VerboseEvaluation v) { _verbose = v; }
 
     /**
+     * Checks the match result returned by a call to match(). If this function
+     * returns \c true, then the instance returned by match() can be used,
+     * otherwise a different knowledge source should be tried (or the default
+     * instance returned).
+     * @param match match result as returned by match()
+     */
+    inline static bool useMatchedInst(int match)
+    {
+        return (match & mrMatch) && !(match & (mrAmbiguous|mrDefaultHandler));
+    }
+
+    /**
      * \copydoc LongOperation::operationProgress()
      */
     void operationProgress();
