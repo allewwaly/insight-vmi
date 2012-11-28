@@ -229,10 +229,8 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
             if (!mi.isValid() || mi.isNull())
                 continue;
 
-            // Did the rules engine provide a new non-ambiguous instance?
-            if ( (result & TypeRuleEngine::mrMatch) &&
-                 !(result & TypeRuleEngine::mrAmbiguous) )
-            {
+            // Did the rules engine decide which instance to use?
+            if (TypeRuleEngine::useMatchedInst(result)) {
                 // Get the original member as well
                 Instance miOrig(inst.member(i, BaseType::trLexical, 0, ksNone));
 
