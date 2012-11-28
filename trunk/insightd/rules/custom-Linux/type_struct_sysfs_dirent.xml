@@ -8,7 +8,7 @@
 		Reference: http://lxr.linux.no/#linux+v2.6.32.58/fs/sysfs/sysfs.h#L42
 		-->
 		<rule priority="101">
-			<name>sysfs_dirent union</name>
+			<name>sysfs_dirent.{s_dir,s_symlink,s_attr,s_bin_attr}</name>
 			<description>Resolve sysfs entry type in union</description>
 			<filter>
 				<datatype>struct</datatype>
@@ -25,24 +25,36 @@
 				var elem = dirent.Member(members[0]).Member(members[1]);
 
 				// Types as defined in &lt;fs/sysfs/sysfs.h&gt;
-				var sysfs_types = [
-					{ flag: 0x1, member: "s_dir" },
-					{ flag: 0x2, member: "s_symlink" },
-					{ flag: 0x4, member: "s_attr" },
-					{ flag: 0x8, member: "s_bin_attr" }
-				];
+				var sysfs_types = new Object({
+					s_dir:      0x1,
+					s_attr:     0x2,
+					s_bin_attr: 0x4,
+					s_symlink:  0x8
+				});
 
-				for (var i in sysfs_types) {
-					var type = sysfs_types[i];
-					// Compare flag and name
-					if (flags &amp; type.flag) {
-						if (elem.Name() == type.member)
-							return elem;
-						else
-							break;
-					}
-				}
-				return new Instance();
+				// If flag is set corresponding to name, the instance is valid
+				if (flags &amp; sysfs_types[elem.Name()])
+					return false;
+				else
+					return new Instance();
+			</action>
+		</rule>
+		
+		<rule priority="101">
+			<name>sysfs_dirent.s_sibling</name>
+			<description>
+				Override any generated rule for member "s_sibling" and use the 
+				defined type.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>sysfs_dirent</typename>
+				<members>
+					<member>s_sibling</member>
+				</members>
+			</filter>
+			<action type="inline">
+				return false;
 			</action>
 		</rule>
 	</rules>

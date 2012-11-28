@@ -283,6 +283,10 @@ Instance MemoryDump::getNextInstance(const QString& component,
 //			 .arg(re.cap(4))
 //			 .arg(re.cap(5)));
 
+	// A candidate index of 0 means to ignore the alternative types
+	if (candidateIndex == 0)
+		src = static_cast<KnowledgeSources>(src|ksNoAltTypes);
+
 	// If the given instance is Null, we interpret this as the first component
 	// in the query string and will therefore try to resolve the variable.
 	if (!instance.isValid()) {
@@ -300,11 +304,7 @@ Instance MemoryDump::getNextInstance(const QString& component,
 			result = v->altRefTypeInstance(_vmem, candidateIndex - 1);
 		}
 		else {
-			KnowledgeSources tmpSrc = src;
-			// A candidate index of 0 means to ignore the alternative types
-			if (candidateIndex == 0)
-				tmpSrc = static_cast<KnowledgeSources>(tmpSrc|ksNoAltTypes);
-			result = v->toInstance(_vmem, BaseType::trLexical, tmpSrc);
+			result = v->toInstance(_vmem, BaseType::trLexical, src);
 		}
 	}
 	else {
@@ -336,7 +336,7 @@ Instance MemoryDump::getNextInstance(const QString& component,
             result = result.memberCandidate(symbol, candidateIndex - 1);
         }
         else {
-            result = result.member(symbol, BaseType::trLexical, src);
+            result = result.member(symbol, BaseType::trLexical, 0, src);
         }
 	}
 

@@ -244,14 +244,17 @@ QString TypeRuleEngine::ruleFile(const TypeRule *rule) const
 
 
 int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
-                          Instance** newInst) const
+                          Instance** newInst, int *priority) const
 {
+    if (priority)
+        *priority = 0;
+
     if (!inst || !inst->type())
         return mrNoMatch;
 
-    int ret = mrNoMatch, prio = 0, usedRule = -1;
+    int ret = mrNoMatch, prio = 0, usedRule = -1, tmp_ret = 0;
     *newInst = 0;
-    int rulesConsidered = 0;
+    int ruleInfosPrinted = 0;
 
     ActiveRuleHash::const_iterator it = _rulesPerType.find(inst->type()->id()),
             e = _rulesPerType.end();
@@ -261,18 +264,19 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     for (; it != e && it.key() == inst->type()->id(); ++it) {
         const TypeRule* rule = it.value().rule;
         int index = it.value().index;
-        ++rulesConsidered;
 
         // If the result is already clear, check only for higher priority rules
         if (ret == (mrMatch|mrAmbiguous|mrDefer) && rule->priority() <= prio) {
             // Output information
             if (_verbose)
-                ruleMatchInfo(it.value(), inst, members, 0, false, true);
+                if (ruleMatchInfo(it.value(), inst, members, 0, false, true))
+                    ++ruleInfosPrinted;
             continue;
         }
 
         const InstanceFilter* filter = rule->filter();
-        bool defered = false, match = false, evaluated = false, skipped = true;
+        bool match = false, evaluated = false, skipped = true;
+        tmp_ret = 0;
 
         // Ignore rules with a lower priority than the previously matched one
         if (filter && (!(ret & mrMatch) || rule->priority() >= prio)) {
@@ -283,14 +287,14 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                 // Are all required fields accessed?
                 // Not all fields given ==> defer
                 if (filter->members().size() > members.size()) {
-                    ret |= mrDefer;
-                    defered = true;
+                    ret |= tmp_ret |= mrDefer;
                 }
                 // Required no. of fields given ==> match
                 // However, we don't need to evaluate anymore non-high-prio
-                // rules if both mrMatch and mrMultiMatch are already set
+                // rules if both mrMatch and mrAmbiguous are already set
                 else if (filter->members().size() == members.size() &&
-                         (ret != (mrMatch|mrAmbiguous) || rule->priority() > prio))
+                         (!((ret & mrMatch) && (ret & mrAmbiguous)) ||
+                          rule->priority() > prio))
                 {
                     match = true;
                     for (int i = 0; match && i < members.size(); ++i)
@@ -299,70 +303,71 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
 
                     if (match) {
                         // Evaluate the rule
+                        bool alreadyMatched = (ret & mrMatch);
                         evaluated = true;
                         Instance instRet(evaluateRule(it.value(), inst, members,
                                                       &match));
                         instRet.setOrigin(Instance::orRuleEngine);
+                        ret |= tmp_ret |= mrMatch;
 
+                        // If this rule has a higher priority, it overrides
+                        // the previous
+                        if (rule->priority() > prio) {
+                            tmp_ret &= ret &= ~(mrAmbiguous|mrDefaultHandler);
+                            alreadyMatched = false;
+                        }
                         // Did another rule match previously?
-                        if ( (*newInst) && (ret & mrMatch) ) {
-                            // If this rule has a higher priority, it overrides
-                            // the previous
-                            if (rule->priority() > prio) {
-                                prio = rule->priority();
-                                usedRule = it.value().index;
-                                **newInst = instRet;
-                                ret &= ~mrAmbiguous;
-                            }
+                        else if ( (*newInst) && alreadyMatched ) {
                             // Compare this instance to the previous one
-                            else if (instRet.address() != (*newInst)->address() ||
-                                     (instRet.typeHash() != (*newInst)->typeHash()))
+                            if (instRet.address() != (*newInst)->address() ||
+                                (instRet.typeHash() != (*newInst)->typeHash()))
                             {
                                 // Ambiguous rules
-                                ret |= mrAmbiguous;
+                                ret |= tmp_ret |= mrAmbiguous;
                                 usedRule = -1;
                             }
                         }
-                        // No, this is the first match
-                        else {
+
+                        // Is this the first match for the current priority?
+                        if (!alreadyMatched) {
+                            prio = rule->priority();
+                            usedRule = index;
+                            if (priority)
+                                *priority = prio;
+                            // The rule returned an instance (valid or invalid)
                             if (match) {
-                                ret |= mrMatch;
-                                prio = rule->priority();
-                                usedRule = index;
+                                // Save given instance, if valid
+                                if ( (*newInst) )
+                                    **newInst = instRet;
+                                else if (instRet.isValid())
+                                    *newInst = new Instance(instRet);
                             }
-                            if (!(*newInst) && instRet.isValid()) {
-                                *newInst = new Instance(instRet);
-                            }
+                            // The rule asked to fall back to the default handler
+                            else
+                                ret |= tmp_ret |= mrDefaultHandler;
                         }
                     }
                 }
             }
-//            else if (members.isEmpty())
-//                ret |= mrMatch;
         }
         // Output information
         if (_verbose) {
-            int m = match ? mrMatch : mrNoMatch;
-            if (defered)
-                m |= mrDefer;
-            ruleMatchInfo(it.value(), inst, members, m, evaluated, skipped);
+            if (ruleMatchInfo(it.value(), inst, members, tmp_ret, evaluated, skipped))
+                ++ruleInfosPrinted;
         }
     }
 
-    if ( rulesConsidered > 0 &&
-         ((_verbose >= veAllRules) ||
-          (_verbose >= veMatchingRules && (ret & mrMatch)) ||
-          (_verbose >= veDeferringRules && ret)) )
-    {
+    if (ruleInfosPrinted > 0) {
         shell->out() << "==> Result: ";
         if (usedRule >= 0)
             shell->out() << "applied rule " << shell->color(ctBold)
                          << (usedRule + 1) << shell->color(ctReset) << " ";
 
-        if (ret & mrMatch) {
+        if (ret & mrMatch)
             shell->out() << "prio. " << prio << " "
                          << shell->color(ctMatched) << "matched ";
-        }
+        if (ret & mrDefaultHandler)
+            shell->out() << shell->color(ctEvaluated) << "ret.orig. ";
         if (ret & mrDefer)
             shell->out() << shell->color(ctDeferred) << "deferred ";
         if (ret & mrAmbiguous)
@@ -371,6 +376,12 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
             shell->out() << shell->color(ctMissed) << "missed ";
 
         shell->out() << shell->color(ctReset) << endl;
+    }
+
+    // Don't return invalid instances
+    if ((*newInst) && (!(*newInst)->isValid() || (ret & mrDefaultHandler))) {
+        delete *newInst;
+        *newInst = 0;
     }
 
     return ret;
@@ -492,7 +503,7 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
 }
 
 
-void TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
+bool TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
                                    const Instance *inst,
                                    const ConstMemberList &members,
                                    int matched, bool evaluated, bool skipped) const
@@ -546,7 +557,10 @@ void TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
         }
 
         shell->out() << shell->color(ctReset) << endl;
+        return true;
     }
+
+    return false;
 }
 
 

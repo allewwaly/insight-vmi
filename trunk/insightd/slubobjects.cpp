@@ -46,7 +46,7 @@ SlubObject SlubObjects::objectAt(quint64 address) const
     if (it.key() <= address &&
         ((_caches[i].objSize <= 0 && it.key() == address) ||
          (address < it.key() + _caches[i].objSize)))
-        return SlubObject(it.key(), _caches[i]);
+        return SlubObject(it.key(), _caches[i], i);
     else
         return SlubObject();
 }
@@ -58,6 +58,7 @@ SlubObjects::ObjectValidity SlubObjects::objectValid(const Instance *inst) const
         return ovInvalid;
 
     SlubObject obj(objectAt(inst->address()));
+
     // Did we find an object at that address?
     if (obj.isNull) {
         bool isSlubType = false;
@@ -72,7 +73,7 @@ SlubObjects::ObjectValidity SlubObjects::objectValid(const Instance *inst) const
         VariableList vars = _factory->varsUsingId(inst->type()->id());
         for (int i = 0; i < vars.size(); ++i)
             if (vars[i]->offset() == inst->address())
-                return ovValid;
+                return ovValidGlobal;
         return ovNotFound;
     }
     // If we don't know the slab object's type, we assume it's valid
@@ -262,7 +263,6 @@ void SlubObjects::parsePreproc(const QString &fileName)
             s += " -> " + _caches[index].baseType->prettyName();
         debugmsg(s);
     }
-
 }
 
 
@@ -344,6 +344,8 @@ void SlubObjects::resolveBaseType()
             name = "ext3_inode_info";
         else if (name == "filp")
             name = "file";
+        else if (name == "fs_cache")
+            name = "fs_struct";
         else if (name == "ip6_dst_cache")
             name = "rt6_info";
         else if (name == "ip_fib_hash")

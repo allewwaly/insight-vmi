@@ -153,6 +153,8 @@ public:
      */
     void statistics();
 
+    void slubCoverageStats();
+
 private:
     /**
      * Internal helper function for the statistics function.
@@ -189,6 +191,7 @@ private:
     quint32 _slubMaybeValid;
     quint32 _objectsFoundInSlub;
     QHash<quint64, MemoryMapNode*> _slubObjectNodes;
+    QVector<int> _slubObjFoundPerCache;
     
     quint32 _seemValidObjects;
 

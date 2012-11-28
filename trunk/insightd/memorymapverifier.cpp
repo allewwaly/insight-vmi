@@ -252,6 +252,7 @@ bool MemoryMapVerifier::performChecks(MemoryMapNode *n)
     switch(v) {
         case SlubObjects::ovValid:
         case SlubObjects::ovValidCastType:
+        case SlubObjects::ovValidGlobal:
             // Thats fine
             break;
         case SlubObjects::ovEmbedded:
@@ -377,6 +378,7 @@ void MemoryMapVerifier::statisticsCountNodeSV(MemoryMapNodeSV *node)
     switch(v) {
     case SlubObjects::ovValid:
     case SlubObjects::ovValidCastType:
+    case SlubObjects::ovValidGlobal:
         _objectsFoundInSlub++;
         _slubValid++;
         if (_minValidProbability > node->getCandidateProbability())
@@ -486,9 +488,16 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         else {
             _objectsFoundInSlub++;
             _slubObjectNodes.insert(node->address(), node);
+            // If the object was found in a global variable, do not count it
+            SlubObject obj = _slub.objectAt(i.address());
+            assert(obj.isNull == false);
+            if (!obj.isNull >= 0) {
+                _slubObjFoundPerCache[obj.cacheIndex]++;
+            }
         }
         // no break, fall through
 
+    case SlubObjects::ovValidGlobal:
     case SlubObjects::ovEmbedded:
     case SlubObjects::ovEmbeddedUnion:
     case SlubObjects::ovEmbeddedCastType:
@@ -505,27 +514,29 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         _maybeValidObjects++;
         break;
 
-    case SlubObjects::ovConflict: {
+    case SlubObjects::ovConflict:
         // Print detailed debug output
         valid = -1;
         _slubConflict++;
-        SlubObject obj = _slub.objectAt(i.address());
-        int w = ShellUtil::getFieldWidth(
-                    qMax(obj.baseType->id(), i.type()->id()), 16);
-        debugmsg(QString("Conflicting type with prob. %0 detected!\n"
-                         "In slubs    @ 0x%1: 0x%2 %3\n"
-                         "In mem. map @ 0x%4: 0x%5 %6\n"
-                         "Full name:   %7")
-                 .arg(node->probability())
-                 .arg(obj.address, 0, 16)
-                 .arg((uint) obj.baseType->id(), -w, 16)
-                 .arg(obj.baseType->prettyName())
-                 .arg(i.address(), 0, 16)
-                 .arg((uint) i.type()->id(), -w, 16)
-                 .arg(i.typeName())
-                 .arg(i.fullName()));
+        // Only give a warning for objects with good probability
+        if (node->probability() > 0.5) {
+            SlubObject obj = _slub.objectAt(i.address());
+            int w = ShellUtil::getFieldWidth(
+                        qMax(obj.baseType->id(), i.type()->id()), 16);
+            debugmsg(QString("Conflicting type with prob. %0 detected!\n"
+                             "In slubs    @ 0x%1: 0x%2 %3\n"
+                             "In mem. map @ 0x%4: 0x%5 %6\n"
+                             "Full name:   %7")
+                     .arg(node->probability())
+                     .arg(obj.address, 0, 16)
+                     .arg((uint) obj.baseType->id(), -w, 16)
+                     .arg(obj.baseType->prettyName())
+                     .arg(i.address(), 0, 16)
+                     .arg((uint) i.type()->id(), -w, 16)
+                     .arg(i.typeName())
+                     .arg(i.fullName()));
+        }
         break;
-    }
 
     case SlubObjects::ovInvalid:
         valid = -1;
@@ -656,6 +667,7 @@ void MemoryMapVerifier::statistics()
     _slubMaybeValid = 0;
     _objectsFoundInSlub = 0;
     _slubObjectNodes.clear();
+    _slubObjFoundPerCache.fill(0, _slub.caches().size());
 
     _seemValidObjects = 0;
     
@@ -948,6 +960,48 @@ void MemoryMapVerifier::statistics()
                      << _magicnumberInvalidDistribution[i] << shell->color(ctReset);
     }
     shell->out() << endl;
+    shell->out() << "\t`-----------------------------------------------------------------" << endl;
+
+    shell->out() << endl;
+    slubCoverageStats();
+}
+
+
+void MemoryMapVerifier::slubCoverageStats()
+{
+    // Sort the caches by name
+    QStringList names(_slub.cacheNames());
+    names.sort();
+
+    // Find the coverage of slub objects per slub
+    shell->out() << "Slub Coverage details:" << endl;
+
+    for (int i = 0; i < names.size(); ++i) {
+        int cacheIdx = _slub.indexOfCache(names[i]);
+        const SlubCache& cache = _slub.caches().at(cacheIdx);
+        if (!cache.baseType || !cache.objects.size())
+            continue;
+
+        float percent = _slubObjFoundPerCache[cacheIdx] * 100.0 / (float) cache.objects.size();
+
+        shell->out() << "\t| " << qSetFieldWidth(30) << cache.name
+                     << qSetFieldWidth(0)
+                     << shell->prettyNameInColor(cache.baseType, 30, 30)
+                     << shell->color(ctReset)
+                     << ": " << qSetFieldWidth(4) << right
+                     << _slubObjFoundPerCache[cacheIdx] << " of " << cache.objects.size()
+                     << qSetFieldWidth(0) << " (";
+
+        if (percent < 30)
+            shell->out() << shell->color(ctMissed);
+        else if (percent < 80)
+            shell->out() << shell->color(ctDeferred);
+        else
+            shell->out() << shell->color(ctMatched);
+
+        shell->out() << qSetFieldWidth(6) << percent <<  qSetFieldWidth(0)
+                     << shell->color(ctReset) << "%)" << left << endl;
+    }
     shell->out() << "\t`-----------------------------------------------------------------" << endl;
 }
 
