@@ -483,6 +483,40 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
             ret = arule.rule->action()->evaluate(inst, members, _eng, &m);
             if (matched)
                 *matched = m;
+
+            // Check for pointers that point back into or overlap with "inst"
+            if (inst->overlaps(ret) && !members.isEmpty()) {
+                // This is most likely an empty list-like structure, so return the
+                // member where the address points to
+                const BaseType* rt;
+                quint64 realAddr = inst->address();
+                ret = *inst;
+                Instance tmp;
+                // Find out where the pointer points to natively (before rules)
+                for (int i = 0; i < members.size(); ++i) {
+                    tmp = ret.member(members[i]->index(), 0, 0, ksNone);
+                    if (tmp.isValid())
+                        ret = tmp.dereference(BaseType::trLexical);
+                    else
+                        break;
+                }
+                // Is the last member a pointer or numeric type?
+                if (ret.type()->type() & (rtPointer|rtInt32|rtInt64|rtUInt32|rtUInt64))
+                    realAddr = (quint64)ret.toPointer();
+
+                // Now find the member of inst where the real address points to
+                ret = *inst;
+                int i = 0;
+                // Resolve the members as long as they are structs/unions
+                while (i < members.size() &&
+                       ret.address() + members[i]->offset() >= realAddr &&
+                       (rt = members[i]->refTypeDeep(BaseType::trLexical)) &&
+                       (rt->type() & StructOrUnion))
+                {
+                    ret = ret.member(members[i]->index(), 0, 0, ksNone);
+                    ++i;
+                }
+            }
         }
         catch (VirtualMemoryException& /*e*/) {
             // ignored

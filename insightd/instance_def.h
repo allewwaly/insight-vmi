@@ -628,6 +628,46 @@ public:
     const BaseType* memberCandidateType(int mbrIndex, int cndtIndex) const;
 
     /**
+     * Returns \c true if this instance is part of a list of instances, i.e.,
+     * if a call to listNext() retrieves a valid instance. Otherwise \c false
+     * is returned. To retrieve the entire list, call toList() on the list's
+     * head instance.
+     *
+     * Example usage:
+     * \code
+     * Instance inst = ...;
+     * // use inst
+     * ...
+     * while (inst.isList()) {
+     *     inst = inst.listNext();
+     *     // use inst
+     *    ...
+     * }
+     * \endcode
+     *
+     * @return \c true if this is a list, \c false otherwise
+     * \sa toList(), listNext(), fromList()
+     */
+    bool isList() const;
+
+    /**
+     * If this instance is an element of a list, this function returns the next
+     * instance in the list, otherwise an invalid instance is returned.
+     * @return next element in list, if it exists, an invalid instance otherwise
+     * \sa isList(), toList(), fromList()
+     */
+    Instance listNext() const;
+
+    /**
+     * Returns the list of instances (including this instance). If this instance
+     * does not represent a list, this instance will be the only element in the
+     * list.
+     * @return list of instances
+     * \sa isList(), fromList(), listNext()
+     */
+    InstanceList toList() const;
+
+    /**
      * Explicit representation of this instance as qint8.
      * @return the value of this type as a qint8
      */
@@ -804,7 +844,7 @@ public:
      * @return \c true if instances do not conflict with each other
      */
     bool compareInstance(const Instance& inst,
-        bool &embedded, bool &overlap, bool &thisParent) const;
+        bool &embedded, bool &overlaps, bool &thisParent) const;
   
     /**
      * Function to compare two Instances, where one is a rtUnion.
@@ -857,6 +897,30 @@ public:
     void setParent(const Instance& parent, const StructuredMember* fromParent);
 
     /**
+     * Returns \c true if the memory area filled by this instance overlaps with
+     * the memory area of \a other, otherwise returns \c false. No check about
+     * the values of the members is performed.
+     * @param other other instance
+     */
+    bool overlaps(const Instance& other) const;
+
+    /*
+    enum EmbedResult
+    {
+        erNoOverlap,
+        erOverlap,
+        erCover,
+        erEqual,
+        erThisEmbedsOther,
+        erOtherEmbedsThis
+    };
+
+    EmbedResult embeds(const Instance &other) const;
+    EmbedResult embedsHelper(const BaseType *it, const StructuredMember *mem,
+                             quint64 offset) const;
+    */
+
+    /**
      * Returns the global rule engine used by all instances.
      */
     inline static const TypeRuleEngine* ruleEngine() { return _ruleEngine; }
@@ -870,10 +934,22 @@ public:
         _ruleEngine = engine;
     }
 
+    /**
+     * Creates a single instance from a list of instances. Call isList() on that
+     * instance to check if the instance represents a list, and toList() to
+     * retrieve the list of instances.
+     * @param list list of instances
+     * @return a single instance that can be converted back to the list
+     * \sa isList(), toList(), listNext()
+     */
+    static Instance fromList(const InstanceList& list);
+
 private:
     typedef QSet<quint64> VisitedSet;
 
     inline Instance(QSharedDataPointer<InstanceData> data) : _d(data) {}
+
+    void setListNext(const Instance& inst);
 
     Instance member(const ConstMemberList& members, int resolveTypes,
                     int maxPtrDeref, KnowledgeSources src = ksAll,

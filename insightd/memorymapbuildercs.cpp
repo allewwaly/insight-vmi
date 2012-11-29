@@ -139,7 +139,8 @@ void MemoryMapBuilderCS::processNode(MemoryMapNode *node)
 }
 
 
-void MemoryMapBuilderCS::processInstance(const Instance &inst, MemoryMapNode *node)
+void MemoryMapBuilderCS::processInstance(const Instance &inst, MemoryMapNode *node,
+                                         bool isNested)
 {
     // Ignore user-land objects
     if (inst.address() < _map->_vmem->memSpecs().pageOffset)
@@ -155,7 +156,7 @@ void MemoryMapBuilderCS::processInstance(const Instance &inst, MemoryMapNode *no
         else if (inst.type()->type() & rtArray)
             processArray(inst, node);
         else if (inst.type()->type() & StructOrUnion)
-            processStructured(inst, node);
+            processStructured(inst, node, isNested);
     }
     catch (GenericException&) {
         // Do nothing
@@ -190,13 +191,8 @@ void MemoryMapBuilderCS::processArray(const Instance& inst, MemoryMapNode *node)
     // Add all elements that haven't been visited to the stack
     for (int i = 0; i < len; ++i) {
         Instance e(inst.arrayElem(i).dereference(BaseType::trLexical));
-        // Pass the "nested" flag to structs/unions in this array
-        if (e.type()->type() & StructOrUnion) {
-            processStructured(e, node, true);
-        }
-        else {
-            processInstance(e, node);
-        }
+        // Pass the "nested" flag to all elements of this array
+        processInstance(e, node, true);
     }
 }
 
@@ -226,27 +222,35 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
             // Get member and see if any rules apply
             Instance mi(inst.member(i, BaseType::trLexical, 0,
                                     _map->knowSrc(), &result));
-            if (!mi.isValid() || mi.isNull())
+            if (!mi.isValid() || mi.isNull() /* || inst.embeds(mi)*/)
                 continue;
+
 
             // Did the rules engine decide which instance to use?
             if (TypeRuleEngine::useMatchedInst(result)) {
                 // Get the original member as well
-                Instance miOrig(inst.member(i, BaseType::trLexical, 0, ksNone));
+                Instance miOrig(inst.member(i, BaseType::trLexicalAndPointers,
+                                            1, ksNone));
 
-//                if (miOrig.type()->type() & (StructOrUnion|rtArray))
-//                    processInstance(mi, node);
-//                else
-                    // Add a new child node for this instance
-                    _map->addChildIfNotExistend(miOrig, InstanceList() << mi, node, _index,
-                                                inst.memberAddress(i, 0, 0, ksNone));
+                // Does the node already exist? This happens if "inst" was
+                // previously added to the map and we now consider its children,
+                // as is the case for struct/union variables.
+                if (!_map->existsNode(miOrig, InstanceList() << mi)) {
+                    // If the returned instance overlaps the given one, we consider
+                    // it to be a part of this node, not a child
+                    if (inst.overlaps(mi)) {
+                        processInstance(mi, node);
+                    }
+                    // Otherwise add a new child node for this instance
+                    else {
+                        _map->addChild(miOrig, InstanceList() << mi, node,
+                                       _index, inst.memberAddress(i, 0, 0, ksNone));
+                    }
+                }
             }
             // Pass the "nested" flag to nested structs/unions
-            else if (mi.type()->type() & StructOrUnion) {
-                processStructured(mi, node, true);
-            }
             else {
-                processInstance(mi, node);
+                processInstance(mi, node, true);
             }
         }
         catch (GenericException&) {
@@ -264,7 +268,8 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
 //        debugmsg("Calculating prob. of " << inst.typeName());
 
     // Degradation of 0.1% per parent-child relation.
-    static const float degPerGeneration = 0.001;
+//    static const float degPerGeneration = 0.001;
+    static const float degPerGeneration = 0.0;
 
     // Degradation of 20% for objects not matching the magic numbers
     static const float degForInvalidMagicNumbers = 0.2;

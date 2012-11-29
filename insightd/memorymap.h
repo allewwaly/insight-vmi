@@ -329,6 +329,11 @@ private:
 										 int threadIndex, quint64 addrInParent,
 										 bool addToQueue = true);
 
+	MemoryMapNode* addChild(const Instance& origInst,
+							const InstanceList& candidates,
+							MemoryMapNode* parent, int threadIndex,
+							quint64 addrInParent, bool addToQueue = true);
+
 	bool shouldEnqueue(const Instance& inst, MemoryMapNode* node) const;
 
     /**

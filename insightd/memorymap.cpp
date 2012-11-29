@@ -292,8 +292,8 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     {
         const Variable* v = *it;
 //        // For testing now only start with this one variable
-         if (v->name() != "dentry_hashtable")
-            continue;
+//         if (v->name() != "dentry_hashtable")
+//            continue;
 
         // For now ignore all symbols that have been defined in modules
         if (v->symbolSource() == ssModule)
@@ -341,12 +341,8 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 
             timer.restart();
             MemoryMapNode* node = _shared->lastNode;
-//            debugmsg("Processed " << _shared->processed << " instances"
-//                    << ", vmemAddr = " << _vmemAddresses.size()
-//                    << ", vmemMap = " << _vmemMap.objectCount()
-//                    << ", pmemMap = " << _pmemMap.size()
-//                    << ", queue = " << queue_size << " " << indicator
-//                    << ", probability = " << (node ? node->probability() : 1.0));
+            const BaseType* nodeType = node ? node->type() : 0;
+
             shell->out()
                     << "\rProcessed: " << _shared->processed
                     << ", addr: " << _vmemAddresses.size()
@@ -355,8 +351,11 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
                     << ", pmem: " << _pmemMap.nodeCount()
                     << ", queue: " << queue_size << " " << indicator
                     << ", prob: " << (node ? node->probability() : 1.0)
-                    << ", min_prob: " << (queue_size ? _shared->queue.smallest()->probability() : 0)
-                    << endl;
+                    << ", min_prob: " << (queue_size ? _shared->queue.smallest()->probability() : 0);
+            if (nodeType)
+                shell->out() << ", " << nodeType->prettyName();
+            shell->out() << endl;
+
             prev_queue_size = queue_size;
         }
 
@@ -973,6 +972,16 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(
         return child;
     }
 
+    return addChild(origInst, candidates, parent, threadIndex, addrInParent, addToQueue);
+}
+
+
+MemoryMapNode *MemoryMap::addChild(
+        const Instance &origInst, const InstanceList &candidates,
+        MemoryMapNode *parent, int threadIndex, quint64 addrInParent,
+        bool addToQueue)
+{
+    MemoryMapNode *child = 0;
     // Only proceed if we don't have more than one instance to process
     if (candidates.size() > 1 || (!origInst.isValid() && candidates.isEmpty()))
         return 0;
@@ -1087,9 +1096,6 @@ bool MemoryMap::shouldEnqueue(const Instance &inst, MemoryMapNode *node) const
     bool ret = (inst.type()->type() & enqueueTypes) &&
             node->probability() > _shared->minProbability &&
             inst.isAccessible();
-
-    if (inst.type()->dereferencedBaseType(BaseType::trLexicalPointersArrays)->name() == "sysfs_dirent" && !ret)
-        debugmsg("Not enqueuing: " << node->fullName() << "." << inst.name());
 
     return ret;
 }

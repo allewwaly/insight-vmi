@@ -36,6 +36,7 @@ public:
           origin(origin),
           type(0),
           vmem(0),
+          listNext(0),
           parent(0),
           fromParent(0)
     {}
@@ -49,6 +50,7 @@ public:
           origin(origin),
           type(type),
           vmem(vmem),
+          listNext(0),
           parent(0),
           fromParent(0)
     {}
@@ -65,6 +67,7 @@ public:
           vmem(vmem),
           name(name),
           parentNames(parentNames),
+          listNext(0),
           parent(0),
           fromParent(0)
     {}
@@ -80,6 +83,7 @@ public:
     VirtualMemory* vmem;
     QString name;
     QStringList parentNames;
+    QSharedDataPointer<InstanceData> listNext;
     QSharedDataPointer<InstanceData> parent;
     const StructuredMember* fromParent;
 };
