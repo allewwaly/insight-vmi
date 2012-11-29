@@ -45,7 +45,26 @@
 				</members>
 			</filter>
 			<action type="inline">
-				return false;
+				var node = arguments[0];
+				var height = node.height.toUInt32();
+				if (height &gt; 1) {
+					var slots = node.Member(arguments[1][0]);
+					var len = slots.ArrayLength();
+					var ret = new Array();
+					for (var i = 0; i &lt; len; ++i) {
+						var e = slots.ArrayElem(i);
+						// Dereference once
+						if (e.IsAccessible())
+							e.SetAddress(e.toPointer());
+						else
+							e.SetAddress(0);
+						e.ChangeType(node.TypeId());
+						ret.push(e);
+					}
+					return ret;
+				}
+				else
+					return false;
 			</action>
 		</rule>
 	</rules>
