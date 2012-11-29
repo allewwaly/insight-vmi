@@ -38,7 +38,8 @@ protected:
     virtual void run();
 
     void processNode(MemoryMapNode* node);
-    void processInstance(const Instance &inst, MemoryMapNode* node);
+    void processInstance(const Instance &inst, MemoryMapNode* node,
+                         bool isNested = false);
     void processPointer(const Instance &inst, MemoryMapNode* node);
     void processArray(const Instance& inst, MemoryMapNode* node);
     void processStructured(const Instance &inst, MemoryMapNode* node,

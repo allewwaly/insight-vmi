@@ -162,6 +162,18 @@ inline int Instance::sizeofLong() const
 }
 
 
+inline bool Instance::isList() const
+{
+    return _d->listNext.data() != 0;
+}
+
+
+inline Instance Instance::listNext() const
+{
+    return Instance(_d->listNext);
+}
+
+
 inline qint8 Instance::toInt8() const
 {
     return isNull() ? 0 : _d->type->toInt8(_d->vmem, _d->address);

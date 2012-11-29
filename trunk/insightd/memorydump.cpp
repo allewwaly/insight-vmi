@@ -403,14 +403,25 @@ Instance MemoryDump::getNextInstance(const QString& component,
 			quint32 arrayIndex = matches[i].toUInt(&okay, 10);
 
 			if (okay) {
-				// Is this a pointer or an array type?
-				Instance tmp = result.arrayElem(arrayIndex);
-				if (!tmp.isNull())
-					result = tmp.dereference(BaseType::trLexical);
-				// Manually update the address
+				// Is the result already an instance list?
+				if (result.isList()) {
+					InstanceList list(result.toList());
+					if (arrayIndex < (quint32)list.size())
+						result = list[arrayIndex];
+					else
+						queryError(QString("Given array index %1 is out of bounds.")
+								   .arg(arrayIndex));
+				}
 				else {
-					result.addToAddress(arrayIndex * result.type()->size());
-					result.setName(QString("%1[%2]").arg(result.name()).arg(arrayIndex));
+					// Is this a pointer or an array type?
+					Instance tmp = result.arrayElem(arrayIndex);
+					if (!tmp.isNull())
+						result = tmp.dereference(BaseType::trLexical);
+					// Manually update the address
+					else {
+						result.addToAddress(arrayIndex * result.type()->size());
+						result.setName(QString("%1[%2]").arg(result.name()).arg(arrayIndex));
+					}
 				}
 			}
 			else {
