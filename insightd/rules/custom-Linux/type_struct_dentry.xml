@@ -29,7 +29,7 @@
 			</action>
 		</rule>
 
-		<rule priority="103">
+<!--		<rule priority="103">
 			<name>dentry.d_u.d_child.next</name>
 			<description>
 				Even though "d_u" is a union, the member "d_child.next" can be
@@ -52,7 +52,7 @@
 				next.AddToAddress(-dentry.MemberOffset(members[0]));
 				return next;
 			</action>
-		</rule>
+		</rule>-->
 
 		<rule priority="111">
 			<name>dentry_hashtable.first</name>
@@ -91,6 +91,22 @@
 				</members>
 			</filter>
 			<action type="function" file="generic_lists.js">hlist_node_next</action>
+		</rule>
+
+		<rule priority="103">
+			<name>dentry.d_lru.next</name>
+			<description>
+				Dentry objects are arranged in an LRU list using d_lru
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>dentry</typename>
+				<members>
+					<member>d_lru</member>
+					<member match="any"></member>
+				</members>
+			</filter>
+			<action type="function" file="generic_lists.js">list_head_member</action>
 		</rule>
 
 	</rules>
