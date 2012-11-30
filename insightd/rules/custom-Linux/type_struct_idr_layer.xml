@@ -6,11 +6,12 @@
 	<rules>
 		<!--
 			The idr_layer is organized similar to a radix tree: the usage of the
-			"ary" array depends on the "layer" value. Ignore this for now.
+			"ary" array depends on the "layer" value. With a value > 1, it is
+			still a node, otherwise it becomes a leaf.
 		-->
 		<rule priority="101">
 			<name>idr_layer.ary</name>
-			<description>Forbit access to the "ary" member.</description>
+			<description>Forbit access to the "ary" member in leaf nodes.</description>
 			<filter>
 				<datatype>struct</datatype>
 				<typename>idr_layer</typename>
@@ -19,7 +20,12 @@
 				</members>
 			</filter>
 			<action type="inline">
-				return new Instance();
+				var inst = arguments[0];
+				var layer = inst.layer.toInt32();
+				if (layer > 1)
+					return false;
+				else
+					return new Instance();
 			</action>
 		</rule>
 	</rules>
