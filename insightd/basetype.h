@@ -12,6 +12,7 @@
 #include "sourceref.h"
 #include "typeinfo.h"
 #include "instance_def.h"
+#include "embedresult.h"
 
 class ColorPalette;
 
@@ -397,6 +398,18 @@ public:
         return !operator==(other);
     }
 
+    /**
+     * Checks how two objects that possibly share some memory relate to one
+     * another.
+     * @param first the type of the first object
+     * @param firstAddr the virtual memory address of the first object
+     * @param second the type of the second object
+     * @param secondAddr the virtual memory address of the second object
+     * @return see ObjectRelation
+     */
+    static ObjectRelation embeds(const BaseType* first, quint64 firstAddr,
+                                 const BaseType* second, quint64 secondAddr);
+
 protected:
     quint32 _size;             ///< size of this type in byte
     mutable uint _hash;        ///< cashes the hash of this type
@@ -423,6 +436,10 @@ protected:
                     __LINE__);
         }
     }
+
+    static ObjectRelation embedsHelper(const BaseType *first,
+                                    const BaseType *second,
+                                    quint64 offset);
 };
 
 

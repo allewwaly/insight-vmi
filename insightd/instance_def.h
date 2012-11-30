@@ -16,6 +16,7 @@
 #include "instancedata.h"
 #include "expressionresult.h"
 #include "memberlist.h"
+#include "embedresult.h"
 
 class BaseType;
 class VirtualMemory;
@@ -897,28 +898,23 @@ public:
     void setParent(const Instance& parent, const StructuredMember* fromParent);
 
     /**
-     * Returns \c true if the memory area filled by this instance overlaps with
+     * Returns \c true if the memory area occupied by this instance overlaps with
      * the memory area of \a other, otherwise returns \c false. No check about
-     * the values of the members is performed.
+     * the values of the members is performed. If you need a semantic overlap
+     * check, see embeds().
      * @param other other instance
      */
     bool overlaps(const Instance& other) const;
 
-    /*
-    enum EmbedResult
-    {
-        erNoOverlap,
-        erOverlap,
-        erCover,
-        erEqual,
-        erThisEmbedsOther,
-        erOtherEmbedsThis
-    };
-
-    EmbedResult embeds(const Instance &other) const;
-    EmbedResult embedsHelper(const BaseType *it, const StructuredMember *mem,
-                             quint64 offset) const;
-    */
+    /**
+     * Checks how this instance relates to another instance in memory and if
+     * both possibly share the same memory.
+     * @param other other instance
+     * @return see ObjectRelation, where this is the first object and \a other
+     * is the second object
+     * \sa overlaps()
+     */
+    ObjectRelation embeds(const Instance &other) const;
 
     /**
      * Returns the global rule engine used by all instances.
