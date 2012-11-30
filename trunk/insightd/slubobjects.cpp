@@ -89,7 +89,47 @@ SlubObjects::ObjectValidity SlubObjects::objectValid(const Instance *inst) const
                                      inst->type()->prettyName()))
             return ovValidCastType;
     }
-    // Check if inst is embedded within obj
+
+    // Check if inst is embedded within obj, try the more elaborated method
+    // from BaseType first
+    ObjectRelation orel = BaseType::embeds(obj.baseType, obj.address,
+                                           inst->type(), inst->address());
+
+    switch (orel) {
+    case orOverlap:
+    case orCover:
+        return ovConflict;
+
+    case orEqual:
+        return ovValid;
+
+    case orFirstEmbedsSecond:
+        return ovEmbedded;
+
+    // Should never happen!
+    case orNoOverlap:
+        debugerr(QString("SLUB object \"%0\" at 0x%1 does not overlap with "
+                         "instance \"%2\" at 0x%3")
+                 .arg(obj.baseType->prettyName())
+                 .arg(obj.address, 0, 16)
+                 .arg(inst->typeName())
+                 .arg(inst->address(), 0, 16));
+        return ovNotFound;
+
+    // Should never happen!
+    case orSecondEmbedsFirst:
+        debugerr(QString("SLUB object \"%0\" at 0x%1 is embedded by instance "
+                         "\"%2\" at 0x%3")
+                 .arg(obj.baseType->prettyName())
+                 .arg(obj.address, 0, 16)
+                 .arg(inst->typeName())
+                 .arg(inst->address(), 0, 16));
+        return ovEmbedded;
+    }
+
+
+    // If we have no match, we still need to call this implementation, because
+    // it also checks for the allowed type casts defined in the constructor
     return isInstanceEmbedded(inst, obj);
 }
 
