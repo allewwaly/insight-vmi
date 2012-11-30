@@ -67,10 +67,7 @@ public:
         mrMatch           = (1 << 0),  ///< one or more rules matched
         mrAmbiguous       = (1 << 1),  ///< several rules matched and delivered different results
         mrDefer           = (1 << 2),  ///< one rule may match with further members given
-        mrDefaultHandler  = (1 << 3),  ///< the matched rule requested to use the default handler
-//        mrRetIsList       = (1 << 4),  ///< the resulting instance is a list
-        mrRetIsSelfPtr    = (1 << 5)   ///< the resulting instance points into or is a nested member of the given instance
-//        mrMatchAndDefer = mrMatch|mrDefer ///< one rule matches, further rules might match with more members
+        mrDefaultHandler  = (1 << 3)   ///< the matched rule requested to use the default handler
     };
 
     /// How verbose should we be during rule evaluation?
