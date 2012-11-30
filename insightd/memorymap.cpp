@@ -842,74 +842,50 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& origInst,
     if (nodes.isEmpty())
         return 0;
 
-    // Create instances from all nodes
-    InstanceList nodeInsts;
-    nodeInsts.reserve(nodes.size());
-    for (MemMapList::const_iterator it = nodes.begin(), e = nodes.end();
-         it != e; ++it)
-    {
-        const MemoryMapNode *n = *it;
-        nodeInsts.append(n->toInstance(false));
-    }
-
     bool found = false, done = false;
-    int i = 0, j = 0;
-    Instance inst;
+    int i = 0;
+    const MemoryMapNode *n = 0;
+    const BaseType* instType;
+    quint64 instAddr;
 
     // Compare all given instances against all nodes found
     while (!found && !done) {
         // Try all candidates from the list first, finally the original instance
-        if (i < candidates.size())
-            inst = candidates[i++];
+        if (i < candidates.size()) {
+            instType = candidates[i].type();
+            instAddr = candidates[i].address();
+            ++i;
+        }
         else {
-            inst = origInst;
+            instType = origInst.type();
+            instAddr = origInst.address();
             done = true;
         }
 
-        // Make sure the instance is valid
-        if (!inst.isValid() || inst.isNull())
-            continue;
-
         // Compare the current instance with all nodes found
-        for (j = 0; !found && j < nodeInsts.size(); ++j)  {
+        for (MemMapList::const_iterator it = nodes.begin(), e = nodes.end();
+             !found && it != e; ++it)
+        {
+            n = *it;
             // Does one node embed the instance?
-            Instance other(nodeInsts[j]);
-
-            // Is the the same object already contained?
-            if (other.address() == inst.address() &&
-                (*other.type() == *inst.type()))
-            {
+            ObjectRelation orel = BaseType::embeds(n->type(), n->address(),
+                                                   instType, instAddr);
+            switch (orel) {
+            // Conflict, ignored
+            case orOverlap:
+            case orCover:
+                break;
+            // Not found, continue
+            case orNoOverlap:
+                break;
+            // We found the node
+            case orEqual:
+            case orFirstEmbedsSecond:
                 found = true;
                 break;
-            }
-
-            // Search recursively for embedding structs/unions
-            while (other.address() <= inst.address() &&
-                   other.type() && other.type()->type() & StructOrUnion)
-            {
-                // Get member at the offset
-                quint64 offset = inst.address() - other.address();
-                other = other.memberByOffset(offset, false).dereference(BaseType::trLexical);
-                // Compare the member
-                if (other.type() && other.address() == inst.address()) {
-                    // Do the types match directly?
-                    if (*other.type() == *inst.type()) {
-                        found = true;
-                        break;
-                    }
-                    // Test if the current element is a pointer to the type of the
-                    // given instance. If yes, assume a list-like structure that
-                    // is terminated at the current node.
-                    else if (other.type()->type() == rtPointer) {
-                        int cnt;
-                        do {
-                            other = other.dereference(rtPointer, 1, &cnt);
-                            if (*other.type() == *inst.type())
-                                found = true;
-                        } while (!found && cnt && other.type()->type() == rtPointer);
-                        break;
-                    }
-                }
+            // New instance embeds node, currently ignored
+            case orSecondEmbedsFirst:
+                break;
             }
 
             // Exit loop if node was found
@@ -918,7 +894,7 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& origInst,
         }
     }
 
-    return found ? const_cast<MemoryMapNode*>(nodes[j]) : 0;
+    return found ? const_cast<MemoryMapNode*>(n) : 0;
 }
 
 
