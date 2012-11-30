@@ -156,6 +156,134 @@ bool BaseType::operator==(const BaseType& other) const
 }
 
 
+ObjectRelation BaseType::embeds(const BaseType *first, quint64 firstAddr,
+                                const BaseType *second, quint64 secondAddr)
+{
+    if (!first || !second || !first->size() || !second->size())
+        return orNoOverlap;
+
+    ObjectRelation ret = orOverlap;
+    quint64 firstEndAddr = firstAddr + first->size() - 1,
+            secondEndAddr = secondAddr + second->size() - 1;
+
+    // Does one object embed the other entirely or just overlaps?
+    if (secondAddr < firstAddr) {
+        if (secondEndAddr < firstAddr)
+            return orNoOverlap;
+        else if (secondEndAddr < firstEndAddr)
+            return orOverlap;
+        else
+            ret = orSecondEmbedsFirst;
+    }
+    else if (secondAddr == firstAddr) {
+        if (secondEndAddr < firstEndAddr)
+            ret = orFirstEmbedsSecond;
+        else if (secondEndAddr == firstEndAddr)
+            return (*first == *second) ? orEqual : orCover;
+        else
+            ret = orSecondEmbedsFirst;
+    }
+    else {
+        if (secondEndAddr <= firstEndAddr)
+            ret = orFirstEmbedsSecond;
+        else
+            return orNoOverlap;
+    }
+
+    // If this object is embedded by other, call function with switched args
+    if (ret == orSecondEmbedsFirst) {
+        ret = embeds(second, secondAddr, first, firstAddr);
+        if (ret == orFirstEmbedsSecond)
+            return orSecondEmbedsFirst;
+        else
+            return ret;
+    }
+
+    // Check if this instance really embeds other
+    first = first->dereferencedBaseType(BaseType::trLexical);
+    second = second->dereferencedBaseType(BaseType::trLexical);
+
+    return embedsHelper(first, second, secondAddr - firstAddr);
+
+}
+
+
+ObjectRelation BaseType::embedsHelper(const BaseType *first,
+                                             const BaseType *second,
+                                             quint64 offset)
+{
+    if (!first || !second)
+        return orOverlap;
+
+    const Structured *myStruct = 0,
+            *otherStruct = dynamic_cast<const Structured *>(second);
+
+    // Consider all nested arrays, structs, unions and try to find a match.
+    while (first) {
+        // Did we find an exact match?
+        if (offset == 0 && (*first == *second))
+            return orFirstEmbedsSecond;
+
+        // Array type?
+        if (first->type() == rtArray) {
+            first = first->dereferencedBaseType(BaseType::trLexicalAndArrays, 1);
+            offset %= first->size(); // offset into type of myType
+        }
+        // Struct or union?
+        else if (first->type() & StructOrUnion) {
+            const StructuredMember *m;
+            myStruct = dynamic_cast<const Structured*>(first);
+
+            // Is this a struct?
+            if (myStruct->type() == rtStruct) {
+
+                // Are both types that we consider structs?
+                if (otherStruct && offset == 0) {
+                    // Yep. Check if one of the structs is simply a "smaller"
+                    // version of the other as in the case of "raw_prio_tree_node"
+                    // and "prio_tree_node". For this purpose we compare the
+                    // hash of the smaller struct with the hash of the beginning
+                    // of the larger struct. Require at least two members!
+                    int minSize = qMin(otherStruct->members().size(),
+                                       myStruct->members().size());
+                    bool validA, validB;
+                    if (otherStruct->hashMembers(0, minSize, &validA) ==
+                        myStruct->hashMembers(0, minSize, &validB) &&
+                        minSize >= 2 && validA && validB)
+                    {
+                        return orFirstEmbedsSecond;
+                    }
+                }
+
+                // Find member at current offset
+                m = myStruct->memberAtOffset(offset, false);
+                assert(m != 0);
+                assert(offset >= m->offset());
+                offset -= m->offset();
+                first = m->refTypeDeep(BaseType::trLexical);
+            }
+            // For a union, we have to consider all members!
+            else {
+                ObjectRelation ret;
+                for (int i = 0; i < myStruct->members().size(); ++i) {
+                    m = myStruct->members().at(i);
+                    ret = embedsHelper(m->refTypeDeep(BaseType::trLexical),
+                                       second, offset);
+                    if (ret == orFirstEmbedsSecond)
+                        return ret;
+                }
+                break;
+            }
+        }
+        // No more possible resolutions => overlap
+        else
+            break;
+    }
+
+    return orOverlap;
+}
+
+
 void BaseType::readFrom(KernelSymbolStream &in)
 {
     // Read inherited values

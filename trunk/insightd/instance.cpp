@@ -879,176 +879,13 @@ ExpressionResult Instance::toExpressionResult(bool addrOp) const
 	}
 }
 
+
+ObjectRelation Instance::embeds(const Instance &other) const
+{
+    return BaseType::embeds(type(), address(), other.type(), other.address());
+}
+
 /*
-Instance::EmbedResult Instance::embedsHelper(const BaseType *it,
-                                                                  const StructuredMember *mem,
-                                                                  quint64 offset) const
-{
-    EmbedResult ret = ovEmbedded;
-    const Structured *s = NULL;
-    const Structured *sInst = dynamic_cast<const Structured *>(it);
-    const StructuredMember *m = mem;
-    quint64 currentOffset = offset;
-    bool validA, validB;
-    QString itPrettyName = it->prettyName();
-    QString itFirstMemPretty;
-    if (sInst && sInst->name().isEmpty() && !sInst->members().isEmpty())
-        itFirstMemPretty = sInst->members().at(0)->prettyName();
-
-    // Consider all nested structs and unions and try to find a match.
-    while (it && m) {
-        assert(currentOffset >= m->offset());
-        currentOffset -= m->offset();
-
-        // Find final base type and compare them
-        const BaseType *mt = m->refTypeDeep(BaseType::trLexical);
-        while (mt) {
-            // Exact type match?
-            if (*it == *mt)
-                return ovEmbedded;
-            // Cast type match?
-            else if (_typeCasts.contains(m->prettyName(), itPrettyName) ||
-                     _typeCasts.contains(mt->prettyName(), itPrettyName) ||
-                     _typeCasts.contains(m->prettyName(), itFirstMemPretty))
-                return ovEmbeddedCastType;
-            // Dereference one array level
-            else if (mt->type() == rtArray) {
-                mt = mt->dereferencedBaseType(BaseType::trLexicalAndArrays, 1);
-                currentOffset %= mt->size(); // offset into type of mt
-            }
-            // We're done here
-            else
-                break;
-        }
-
-        // Are both types that we consider structs?
-        s = dynamic_cast<const Structured *>(mt);
-
-        if (s != NULL && sInst != NULL) {
-            // Yep. Check if one of the structs is simply a "smaller" version
-            // of the other as in the case of "raw_prio_tree_node" and "prio_tree_node".
-            // For this purpose we compare the hash of the smaller struct with the hash of the
-            // beginning of the larger struct.
-            int minSize = qMin(sInst->members().size(), s->members().size());
-            if (sInst->hashMembers(0, minSize, &validA) ==
-                s->hashMembers(0, minSize, &validB) &&
-                minSize > 0 && validA && validB)
-            {
-                return ovEmbedded;
-            }
-        }
-
-        // Consider nested structs and unions
-        if (s && s->type() & rtUnion) {
-            // In case of unions we explore every possible path
-            for (int i = 0; i < s->members().size() ; ++i) {
-                ret = embedsHelper(it, s->members().at(i), currentOffset);
-
-                // We found a match in a union.
-                if (ret != ovConflict)
-                    return ovEmbeddedUnion;
-            }
-
-            // We could not find a match.
-            return ovConflict;
-        }
-        else {
-            // In case of a struct we try to find the next member
-            m = s ? s->memberAtOffset(currentOffset, false) : NULL;
-        }
-    }
-
-    return ovConflict;
-}
-
-
-Instance::EmbedResult Instance::embeds(const Instance &other) const
-{
-    if (!overlaps(other))
-        return erNoOverlap;
-
-    EmbedResult ret = erOverlap;
-
-    quint64 myAddr = address(), myEndAddr = endAddress(),
-            otherAddr = other.address(), otherEndAddr = other.endAddress();
-
-    // Does one instance embed the other entirely or just overlaps?
-    if (myAddr < otherAddr) {
-        if (myEndAddr < otherEndAddr)
-            return erOverlap;
-        else {
-            // Todo...
-            ret = erThisEmbedsOther;
-        }
-    }
-    else if (myAddr == otherAddr) {
-        if (myEndAddr < otherEndAddr) {
-            // Todo...
-            ret = other.embeds(*this);
-        }
-        else if (myEndAddr == otherEndAddr) {
-            return (*type() == *other.type()) ? erEqual : erOverlap;
-        }
-        else {
-            // Todo...
-            ret = erThisEmbedsOther;
-        }
-    }
-    else {
-        if (myEndAddr < otherEndAddr) {
-            // Todo...
-            ret = other.embeds(*this);
-        }
-    }
-
-
-
-
-
-//            return erOverlap;
-//        else if (endAddress() == other.endAddress())
-//            return (*type() == *other.type()) ? erEqual : erOverlap;
-//        else {
-//            // erThisEmbedsOther
-//        }
-//    }
-//    else if (other.address() < address()) {
-//        if (other.endAddress() < endAddress())
-//            return erOverlap;
-//        else {
-//            ret = other.embeds(*this);
-//            // Invert the this-other result, if required
-//            if (ret == erThisEmbedsOther)
-//                ret = erOtherEmbedsThis;
-//        }
-//    }
-
-//    EmbedResult ret = erOverlap;
-    const BaseType *it = other.type()->dereferencedBaseType(BaseType::trLexicalAndArrays);
-    const StructuredMember *m = 0;
-
-    // Find base type at the expected offset
-    quint64 offset = other.address() - obj.address;
-
-    // If the first element is a union we have to consider all paths
-    if (obj.baseType->type() & rtUnion) {
-        for (int i = 0; i < obj.baseType->members().size(); ++i) {
-            m = obj.baseType->members().at(i);
-
-            if ((ret = embedsHelper(it, m, offset)) != ovConflict)
-                return ret;
-        }
-
-        return ret;
-    }
-
-    // Othwise we try to find the member.
-    m = obj.baseType->memberAtOffset(offset, false);
-
-    return embedsHelper(it, m, offset);
-}
-*/
-
 bool Instance::compareInstance(const Instance& inst, 
     bool &embedded, bool &overlap, bool &thisParent) const
 {
@@ -1243,7 +1080,7 @@ bool Instance::compareInstanceType(const Instance& inst) const
 
   return false;
 }
-
+*/
 
 bool Instance::isValidConcerningMagicNumbers(bool * constants) const
 {
