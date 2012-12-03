@@ -54,13 +54,38 @@
 			</action>
 		</rule>-->
 
+		<rule priority="110">
+			<name>dentry_hashtable</name>
+			<description>
+				Variable "dentry_hashtable" points to an array of hlist_head objects.
+			</description>
+			<filter>
+				<variablename>dentry_hashtable</variablename>
+				<datatype>pointer</datatype>
+			</filter>
+			<action type="inline">
+				var table = arguments[0];
+				var ret = new Array();
+				// Hash table has size (1 &lt;&lt; d_hash_shift)
+				var hash_shift = new Instance("d_hash_shift");
+				var len = 1 &lt;&lt; hash_shift.toUInt32();
+				for (var i = 0; i &lt; len; ++i) {
+					var e = table.ArrayElem(i);
+					ret.push(e);
+<!--					if (e.toPointer() != 0)
+						println(e.Name(), "= 0x" + e.toPointer());-->
+				}
+				return ret;
+			</action>
+		</rule>
+
 		<rule priority="111">
-			<name>dentry_hashtable.first</name>
+			<name>dentry_hashtable[i].first</name>
 			<description>
 				Variable "dentry_hashtable" holds "struct dentry" objects
 			</description>
 			<filter>
-				<variablename>dentry_hashtable</variablename>
+				<variablename match="wildcard">dentry_hashtable\[*\]</variablename>
 				<datatype>struct</datatype>
 				<typename>hlist_head</typename>
 				<members>
@@ -68,11 +93,13 @@
 				</members>
 			</filter>
 			<action type="inline">
-				var inst = arguments[0];
+				var head = arguments[0];
 				var members = arguments[1];
-				inst = inst.Member(members[0]);
+<!-- 				println("Called for", head.Name()); -->
+				var inst = head.Member(members[0]);
 				inst.ChangeType("dentry");
-				inst.AddToAddress(-inst.MemberOffset("d_hash"));
+				if (!inst.IsNull())
+					inst.AddToAddress(-inst.MemberOffset("d_hash"));
 				return inst;
 			</action>
 		</rule>
