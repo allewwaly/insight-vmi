@@ -423,8 +423,8 @@ protected:
      * @param maxSize the number of bytes to read
      * \throws MemAccessException in case reading fails
      */
-    inline void readAtomic(VirtualMemory* mem, size_t offset, char* data,
-                           qint64 maxSize) const
+    inline static void readAtomic(VirtualMemory* mem, size_t offset, char* data,
+                                  qint64 maxSize)
     {
         // Make sure we read the right amount of bytes
         if ( mem->readAtomic(offset, data, maxSize) != maxSize) {
