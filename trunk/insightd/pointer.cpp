@@ -92,7 +92,7 @@ QString Pointer::toString(VirtualMemory* mem, size_t offset, const ColorPalette*
           refRefType &&
           refRefType->type() & (rtInt8|rtUInt8))))
     {
-        QString s = readString(mem, p, 255, &errMsg);
+        QString s(readString(mem, p, 255, &errMsg));
         if (errMsg.isEmpty()) {
             s = QString("\"%1\"").arg(s);
             if (col)
@@ -128,24 +128,24 @@ uint Pointer::hash(bool* isValid) const
 }
 
 
-QString Pointer::readString(VirtualMemory* mem, size_t offset, const int len,
-                            QString* errMsg) const
+QByteArray Pointer::readString(VirtualMemory* mem, size_t offset, const int len,
+                               QString* errMsg, bool replaceNonAscii)
 {
-    // Setup a buffer, at most 1024 bytes long
+    // Setup the buffer
     char buf[len + 1];
     memset(buf, 0, len + 1);
     // We expect exceptions here
     try {
         // Read the data such that the result is always null-terminated
         readAtomic(mem, offset, buf, len);
-        // Limit to ASCII characters
-        for (int i = 0; i < len; i++) {
+        // Limit to ASCII characters, if requested
+        for (int i = 0; i < len && replaceNonAscii; i++) {
             if (buf[i] == 0)
                 break;
             else if ( (buf[i] & 0x80) || !(buf[i] & 0x60) ) // buf[i] >= 128 || buf[i] < 32
                 buf[i] = '.';
         }
-        return QString(buf);
+        return QByteArray(buf, len);
     }
     catch (VirtualMemoryException& e) {
         if (errMsg)
@@ -156,6 +156,6 @@ QString Pointer::readString(VirtualMemory* mem, size_t offset, const int len,
             *errMsg = e.message;
     }
 
-    return QString();
+    return QByteArray();
 }
 

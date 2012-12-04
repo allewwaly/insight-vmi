@@ -9,6 +9,7 @@
 #define POINTER_H_
 
 #include "refbasetype.h"
+#include <QByteArray>
 
 class Pointer: public RefBaseType
 {
@@ -52,7 +53,6 @@ public:
      */
     virtual uint hash(bool* isValid = 0) const;
 
-protected:
     /**
      * Reads a zero-terminated string of max. length \a len from \a mem at
      * address \a offset.
@@ -62,8 +62,8 @@ protected:
      * @param errMsg any error messages are returned here
      * @return the read string
      */
-    QString readString(VirtualMemory* mem, size_t offset, const int len,
-                       QString* errMsg) const;
+    static QByteArray readString(VirtualMemory* mem, size_t offset, const int len,
+                                 QString* errMsg, bool replaceNonAscii = true);
 };
 
 #endif /* POINTER_H_ */
