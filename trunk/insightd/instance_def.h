@@ -751,6 +751,22 @@ public:
     quint64 toUIntBitField() const;
 
     /**
+     * If this instance represents an integer type or a structured bit field,
+     * this function returns the corresponding value as a signed integer.
+     * @return numeric value of this instance
+     * \sa toUnsignedNumber()
+     */
+    qint64 toNumber() const;
+
+    /**
+     * If this instance represents an integer type or a structured bit field,
+     * this function returns the corresponding value as an unsigned integer.
+     * @return numeric value of this instance
+     * \sa toNumber()
+     */
+    quint64 toUnsignedNumber() const;
+
+    /**
      * Explicit representation of this instance as float.
      * @return the value of this type as a float
      */

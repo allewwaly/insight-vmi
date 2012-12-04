@@ -248,6 +248,40 @@ inline quint64 Instance::toUIntBitField() const
 }
 
 
+inline qint64 Instance::toNumber() const
+{
+    if (isNull() && !(_d->type->type() & IntegerTypes))
+        return 0;
+
+    if (bitSize() >= 0)
+        return toIntBitField();
+
+    switch (size()) {
+    case 8:  return toInt64();
+    default: return toInt32(); // make integer the default
+    case 2:  return toInt16();
+    case 1:  return toInt8();
+    }
+}
+
+
+inline quint64 Instance::toUnsignedNumber() const
+{
+    if (isNull() && !(_d->type->type() & IntegerTypes))
+        return 0;
+
+    if (bitSize() >= 0)
+        return toIntBitField();
+
+    switch (size()) {
+    case 8:  return toUInt64();
+    default: return toUInt32(); // make integer the default
+    case 2:  return toUInt16();
+    case 1:  return toUInt8();
+    }
+}
+
+
 inline float Instance::toFloat() const
 {
     return isNull() ? 0 : _d->type->toFloat(_d->vmem, _d->address);
