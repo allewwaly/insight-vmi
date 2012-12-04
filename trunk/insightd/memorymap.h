@@ -25,6 +25,7 @@
 #include "memorymapverifier.h"
 #include "memorymapbuildercs.h"
 #include "memorymapbuildersv.h"
+#include "longoperation.h"
 #include <debug.h>
 
 class SymFactory;
@@ -110,7 +111,7 @@ struct BuilderSharedState
  * fast answers to queries like "which struct resides at virtual/physical
  * address X".
  */
-class MemoryMap
+class MemoryMap: protected LongOperation
 {
     friend class MemoryMapBuilderCS;
     friend class MemoryMapBuilderSV;
@@ -279,6 +280,9 @@ public:
      */
     bool probabilityPropagation() const;
 
+protected:
+    virtual void operationProgress();
+
 private:
     /// Holds the static list of kernel object names. \sa insertName()
 	static StringSet _names;
@@ -371,6 +375,7 @@ private:
     QVector<quint64> _perCpuOffset;
     MemoryMapBuilderType _buildType;
     bool _probPropagation;
+    int _prevQueueSize;
 
 #if MEMORY_MAP_VERIFICATION == 1
     MemoryMapVerifier _verifier; ///< provides debug checks for the creation of the memory map
