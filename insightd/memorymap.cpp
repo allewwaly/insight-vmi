@@ -176,7 +176,14 @@ void MemoryMap::addVariableWithCandidates(const Variable *var)
 
 void MemoryMap::addVariableWithRules(const Variable *var)
 {
-    addInstance(var->toInstance(_vmem, BaseType::trLexical, _knowSrc));
+    Instance inst(var->toInstance(_vmem, BaseType::trLexical, _knowSrc));
+    while (true) {
+        addInstance(inst);
+        if (inst.isList())
+            inst = inst.listNext();
+        else
+            break;
+    }
 }
 
 
