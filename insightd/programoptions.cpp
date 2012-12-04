@@ -21,7 +21,13 @@
 
 ProgramOptions programOptions;
 
-const int OPTION_COUNT = 10;
+#ifdef NO_ANSI_COLORS
+#define ANSI_COLOR_CNT 0
+#else
+#define ANSI_COLOR_CNT 1
+#endif
+
+const int OPTION_COUNT = 9 + ANSI_COLOR_CNT;
 
 const struct Option options[OPTION_COUNT] = {
     {
@@ -69,6 +75,7 @@ const struct Option options[OPTION_COUNT] = {
         ntMemFileName,
         0 // conflicting options
     },
+#ifndef NO_ANSI_COLORS
     {
         "-c",
         "--color",
@@ -79,6 +86,7 @@ const struct Option options[OPTION_COUNT] = {
         ntColorMode,
         0 // conflicting options
     },
+#endif /* NO_ANSI_COLORS */
     {
         "-r",
         "--rules",
