@@ -55,6 +55,8 @@ typedef QHash<int, ActiveRule> ActiveRuleHash;
 /// Hash of OsFilter objects
 typedef QHash<uint, const OsFilter*> OsFilterHash;
 
+class TypeRuleEngineContext;
+
 /**
  * This class manages a set of rules that have to be applied to certain types.
  */
@@ -210,7 +212,8 @@ public:
      * \a MatchResult
      */
     int match(const Instance* inst, const ConstMemberList &members,
-              Instance **newInst, int *priority = 0) const;
+              Instance **newInst, TypeRuleEngineContext* ctx = 0,
+              int *priority = 0) const;
 
     /**
      * Returns a list of all rules that match instance \a inst.
@@ -269,9 +272,26 @@ public:
      */
     void operationProgress();
 
+    /**
+     * Every thread needs its own context to evaluate rules. This function
+     * creates a context for one thread.
+     * @return context object.
+     * \sa deleteContext()
+     */
+    static TypeRuleEngineContext* createContext();
+
+    /**
+     * Deletes the context object that was previously created with
+     * createContext().
+     * @param ctx context object to delete
+     * \sa createContext()
+     */
+    static void deleteContext(TypeRuleEngineContext *ctx);
+
 private:
     Instance evaluateRule(const ActiveRule &arule, const Instance* inst,
-                          const ConstMemberList &members, bool *matched) const;
+                          const ConstMemberList &members, bool *matched,
+                          TypeRuleEngineContext* ctx) const;
 
 //    void warnEvalError(const ScriptEngine* eng, const QString& fileName) const;
     void warnRule(const TypeRule *rule, int index, const QString& msg) const;
@@ -290,7 +310,7 @@ private:
     OsFilterHash _osFilters;
     QStringList _ruleFiles;
     QVector<int> _hits;
-    ScriptEngine *_eng;
+    TypeRuleEngineContext *_ctx;
     int _rulesChecked;
     int _rulesToCheck;
     VerboseEvaluation _verbose;

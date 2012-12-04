@@ -17,9 +17,16 @@ const char* arguments = "arguments";
 const char* inlinefunc = "__inline_func__";
 }
 
+class TypeRuleEngineContext
+{
+public:
+    TypeRuleEngineContext() : eng(ksNone) {}
+    ScriptEngine eng;
+};
+
 
 TypeRuleEngine::TypeRuleEngine()
-    : _eng(new ScriptEngine (ksNone)), _verbose(veOff)
+    : _ctx(new TypeRuleEngineContext()), _verbose(veOff)
 {
 }
 
@@ -27,7 +34,7 @@ TypeRuleEngine::TypeRuleEngine()
 TypeRuleEngine::~TypeRuleEngine()
 {
     clear();
-    delete _eng;
+    delete _ctx;
 }
 
 
@@ -244,7 +251,8 @@ QString TypeRuleEngine::ruleFile(const TypeRule *rule) const
 
 
 int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
-                          Instance** newInst, int *priority) const
+                          Instance** newInst, TypeRuleEngineContext *ctx,
+                          int *priority) const
 {
     if (priority)
         *priority = 0;
@@ -306,7 +314,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                         bool alreadyMatched = (ret & mrMatch);
                         evaluated = true;
                         Instance instRet(evaluateRule(it.value(), inst, members,
-                                                      &match));
+                                                      &match, ctx ? ctx : _ctx));
                         instRet.setOrigin(Instance::orRuleEngine);
                         ret |= tmp_ret |= mrMatch;
 
@@ -474,13 +482,14 @@ ActiveRuleList TypeRuleEngine::rulesMatching(const BaseType *type,
 Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
                                       const Instance *inst,
                                       const ConstMemberList &members,
-                                      bool* matched) const
+                                      bool* matched, TypeRuleEngineContext *ctx) const
 {
     bool m = false;
     Instance ret;
     if (arule.rule->action()) {
         try {
-            ret = arule.rule->action()->evaluate(inst, members, _eng, &m);
+            ret = arule.rule->action()->evaluate(inst, members,
+                                                 ctx ? &ctx->eng : &_ctx->eng, &m);
             if (matched)
                 *matched = m;
 
@@ -670,4 +679,17 @@ void TypeRuleEngine::operationProgress()
             .arg(elapsedTime())
             .arg(_activeRules.size());
     shellOut(s, false);
+}
+
+
+TypeRuleEngineContext *TypeRuleEngine::createContext()
+{
+    return new TypeRuleEngineContext();
+}
+
+
+void TypeRuleEngine::deleteContext(TypeRuleEngineContext *ctx)
+{
+    if (ctx)
+        delete ctx;
 }
