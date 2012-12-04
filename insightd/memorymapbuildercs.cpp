@@ -293,7 +293,7 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
 //    static const float degPerGeneration = 0.0;
 
     // Degradation of 20% for objects not matching the magic numbers
-    static const float degForInvalidMagicNumbers = 0.2;
+    static const float degForInvalidMagicNumbers = 0.3;
 
     // Degradation of 5% for address begin in userland
 //    static const float degForUserlandAddr = 0.05;
@@ -305,9 +305,9 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
 //    // node has
 //    static const float degForNonAlignedChildAddr = 0.3;
 
-    // Max. degradation of 50% for invalid pointer childen the type of this node
+    // Max. degradation of 80% for invalid pointer childen the type of this node
     // has
-    static const float degForInvalidChildAddr = 0.5;
+    static const float degForInvalidChildAddr = 0.8;
 
     // Invalid Instance degradation - 99%
     static const float degInvalidInstance = 0.99;
@@ -367,40 +367,95 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
         return prob;
     }
     // If this a union or struct, we have to consider the pointer members
+    // TODO: For unions, largest take prob. of all children
     else if ( instType && (instType->type() & StructOrUnion) ) {
 
         if (!inst.isValidConcerningMagicNumbers())
             prob *= (1.0 - degForInvalidMagicNumbers);
 
-        const Structured* structured =
-                dynamic_cast<const Structured*>(instType);
-        int invalidChildAddrCnt = 0;
-        int testedChildren = structured->members().size();
-        // Check address of all descendant pointers
-        for (int i = 0; i < structured->members().size(); ++i) {
-            Instance mi(inst.member(i, BaseType::trLexical, 0, _map->knowSrc()));
+        int testedChildren = 0;
+        int invalidChildren = countInvalidChildren(
+                    inst.dereference(BaseType::trLexical), &testedChildren);
 
-            if (!mi.isValid())
-                invalidChildAddrCnt++;
-            else if (mi.type()->type() & rtPointer) {
-                if (!MemoryMapHeuristics::isValidUserLandPointer(mi))
-                    invalidChildAddrCnt++;
-            }
-            else if (MemoryMapHeuristics::isFunctionPointer(mi) &&
-                     !MemoryMapHeuristics::isValidFunctionPointer(mi))
-                invalidChildAddrCnt++;
-            else if (MemoryMapHeuristics::isListHead(mi) &&
-                     !MemoryMapHeuristics::isValidListHead(mi, true))
-                return (prob * (1.0 - degInvalidInstance));
-            else
-                --testedChildren;
+        // A count < 0 results from an invalid list_head
+        if (invalidChildren < 0) {
+            return (prob * (1.0 - degInvalidInstance));
         }
-
-        if (invalidChildAddrCnt) {
-            float invalidPct = invalidChildAddrCnt / (float) testedChildren;
+        else if (invalidChildren > 0) {
+            float invalidPct = invalidChildren / (float) testedChildren;
             prob *= invalidPct * (1.0 - degForInvalidChildAddr) + (1.0 - invalidPct);
             _map->_shared->degForInvalidChildAddrCnt++;
         }
     }
     return prob;
+}
+
+
+int MemoryMapBuilderCS::countInvalidChildren(const Instance &inst, int *total) const
+{
+    int invalidChildren = 0;
+    int invalidListHeads = 0;
+    int testedChildren = 0;
+    bool isUnion = (inst.type()->type() == rtUnion);
+    const int cnt = inst.memberCount();
+
+    // Check address of all descendant pointers
+    for (int i = 0; i < cnt; ++i) {
+        Instance mi(inst.member(i, BaseType::trLexical, 0, ksNone));
+
+        if (!mi.isValid()) {
+            ++invalidChildren;
+            ++testedChildren;
+        }
+        else if (mi.type()->type() & rtPointer) {
+            if (!MemoryMapHeuristics::isValidUserLandPointer(mi))
+                invalidChildren++;
+            ++testedChildren;
+        }
+        else if (MemoryMapHeuristics::isFunctionPointer(mi)) {
+            if (!MemoryMapHeuristics::isValidFunctionPointer(mi))
+                invalidChildren++;
+            ++testedChildren;
+        }
+        else if (MemoryMapHeuristics::isListHead(mi)) {
+            if (!MemoryMapHeuristics::isValidListHead(mi, true))
+                return -1; // return immediately for invali list_heads
+            ++testedChildren;
+        }
+        // Test embedded structs/unions recursively
+        else if (mi.type()->type() & StructOrUnion) {
+            int tot = 0;
+            int ret = countInvalidChildren(mi, &tot);
+            // Pass invalid list_heads through for structs, count them for unions
+            if (ret < 0) {
+                if (isUnion) {
+                    ++invalidListHeads;
+                    ++invalidChildren;
+                }
+                else
+                    return ret;
+            }
+            else {
+                testedChildren += tot;
+                invalidChildren += ret;
+            }
+        }
+    }
+
+    if (isUnion) {
+        // A union counts for only one child
+        *total = 1;
+        // If all children had invalid list_heads, pass -1 through, otherwise
+        // we assume a least one member was ok.
+        if (invalidChildren < cnt)
+            return 0;
+        else if (invalidListHeads == invalidChildren)
+            return -1;
+        else
+            return 1;
+    }
+    else {
+        *total = testedChildren;
+        return invalidChildren;
+    }
 }

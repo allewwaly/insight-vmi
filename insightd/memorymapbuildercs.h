@@ -49,6 +49,7 @@ protected:
 
 private:
     void addMembers(const Instance &inst, MemoryMapNode* node);
+    int countInvalidChildren(const Instance &inst, int *total) const;
 };
 
 #endif /* MEMORYMAPBUILDERCS_H_ */
