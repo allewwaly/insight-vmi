@@ -4,6 +4,9 @@
 #
 #-------------------------------------------------
 
+# Global configuration file
+include(../config.pri)
+
 QT       -= gui webkit
 
 TARGET = debug

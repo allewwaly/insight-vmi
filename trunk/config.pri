@@ -18,6 +18,11 @@ CONFIG += mem_map_vis
 # Build with readline support? Default yes for Unix, no for Windows
 unix:CONFIG += with_readline
 
+# Should we enabled ANSI colors for terminal output? Ignored for Windows.
+CONFIG += with_colors
+
+#---------------------------[ End of configuration ]----------------------------
+
 # Directory where libraries are created
 BUILD_DIR =
 win32 {
@@ -43,4 +48,9 @@ win32 {
     # Avoid compiler warnings from MinGW
     QMAKE_LFLAGS_DEBUG += --enable-auto-import
     QMAKE_LFLAGS_RELEASE += --enable-auto-import
+}
+
+# If building without colorized output, define the corresponding flag
+!CONFIG(with_colors) {
+    DEFINES += NO_ANSI_COLORS
 }

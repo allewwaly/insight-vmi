@@ -105,7 +105,10 @@ void ColorPalette::setAllowColor(bool value)
 
 const char *ColorPalette::color(ColorType ct) const
 {
-
+#ifdef NO_ANSI_COLORS
+    Q_UNUSED(ct);
+    return "";
+#else
     static const char* colors_dark[COLOR_TYPE_SIZE] = {
         C_RST,   // ctReset
         C_BLD,   // ctBold
@@ -189,6 +192,7 @@ const char *ColorPalette::color(ColorType ct) const
     }
 
     return empty;
+#endif /* NO_ANSI_COLORS */
 }
 
 

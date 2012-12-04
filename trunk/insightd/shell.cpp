@@ -139,6 +139,7 @@ Shell::Shell(bool listenOnSocket)
                 "commands. For more detailed information about a command, try "
                 "\"help <command>\"."));
 
+#ifndef NO_ANSI_COLORS
     _commands.insert("color",
                      Command(
                          &Shell::cmdColor,
@@ -148,6 +149,7 @@ Shell::Shell(bool listenOnSocket)
                          "  color dark      Palette for a terminal with dark background\n"
                          "  color light     Palette for a terminal with light background\n"
                          "  color off       Turn off color output"));
+#endif /* NO_ANSI_COLORS */
 
     _commands.insert("list",
             Command(

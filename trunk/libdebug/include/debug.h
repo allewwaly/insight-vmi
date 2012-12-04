@@ -68,7 +68,7 @@ extern const char* userMailingList;
 #undef DEBUG_MERGE_TYPES_AFTER_PARSING
 //#define DEBUG_MERGE_TYPES_AFTER_PARSING 1
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(DEBUG_NO_COLORS) && !defined(NO_ANSI_COLORS)
 #define DEBUG_COLOR_DIM "\033[" "0" ";" "90" "m"
 #define DEBUG_COLOR_ERR "\033[" "0" ";" "91" "m"
 #define DEBUG_COLOR_RST "\033[" "0" "m"
