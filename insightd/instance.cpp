@@ -1091,119 +1091,78 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
     if (!_d->type || !(_d->type->type() & StructOrUnion))
         return true;
 
-    bool isValid = true;
+    bool isUnion = _d->type->type() == rtUnion;
+    Instance m_inst;
 
-    try {
-        const MemberList& members = dynamic_cast<const Structured*>(_d->type)->members();
+    const MemberList& members = dynamic_cast<const Structured*>(_d->type)->members();
+    int validMemberCnt = 0;
 
-        MemberList::const_iterator it, e;
-        for (it = members.begin(), e = members.end(); isValid && it != e; ++it)
-        {
-            const StructuredMember* m = *it;
-//            QString debugString;
+    MemberList::const_iterator it, e;
+    for (it = members.begin(), e = members.end(); it != e; ++it) {
+        const StructuredMember* m = *it;
+        const BaseType* mt = m->refTypeDeep(BaseType::trLexical);
+        bool memberValid = false;
 
-            // Skip members without constants
-            if (!m->hasConstantIntValues() && !m->hasStringValues())
-                continue;
+        try {
+            // Call recursively for structs/unions
+            if (mt && mt->type() & StructOrUnion) {
+                m_inst = member(ConstMemberList() << m,
+                                BaseType::trLexical,  0, ksNone);
+                memberValid = m_inst.isValidConcerningMagicNumbers(constants);
+            }
+            // CS: What is "refcount" for???
+            else if (m->hasConstantIntValues() && m->name() != "refcount") {
+                if (constants)
+                    *constants = true;
 
-            if (constants)
-                *constants = true;
-
-            Instance m_inst(member(ConstMemberList() << m, BaseType::trLexical, 0, ksNone));
-            if (m_inst.isNull() || !m_inst.isAccessible())
-                return false;
-
-            bool memberValid = false;
-            if (m->hasConstantIntValues()) {
-                // CS: What is this for???
-                if (m_inst.name() == "refcount") {
-                    memberValid = true;
-                    continue;
-                }
+                m_inst = member(ConstMemberList() << m,
+                                BaseType::trLexical,  0, ksNone);
 
                 // Get constant value
-                qint64 constInt = 0;
-//                constInt = m_inst.toString().toLong();
-                if (m_inst.bitSize() >= 0) {
-                    constInt = m_inst.toIntBitField();
-                }
-                else if (m_inst.type()->type() & IntegerTypes) {
-                    switch (m_inst.size()) {
-                    case 8:
-                        constInt = m_inst.toInt64();
-                        break;
-                    default: // make integer the default
-                        constInt = m_inst.toInt32();
-                        break;
-                    case 2:
-                        constInt = m_inst.toInt16();
-                        break;
-                    case 1:
-                        constInt = m_inst.toInt8();
-                        break;
-                    }
-                }
-
-//                debugString.append(QString("%1 -> %2 : %3 (%4)\n%5\n")
-//                                   .arg(this->fullName())
-//                                   .arg(m_inst.name())
-//                                   .arg(constInt)
-//                                   .arg(m_inst.typeName())
-//                                   .arg(m_inst.fullName())
-//                                   );
+                qint64 constInt = m_inst.toNumber();
 
                 // Consider a value of zero always to be valid
                 if (constInt == 0 ||
                     (m->constantIntValues().size() == 1 &&
-                     m->constantIntValues().first() == 0))
+                     m->constantIntValues().first() == 0) ||
+                    m->constantIntValues().contains(constInt))
                 {
                     memberValid = true;
-                    continue;
-                }
-//                debugString.append(QString("Number of candidates: %1\n").
-//                                   arg(m->constantIntValue().size()));
-
-                m->constantIntValues();
-                IntList::const_iterator it = m->constantIntValues().begin(),
-                        e = m->constantIntValues().end();
-                for (; it != e; ++it)
-                {
-                    if (constInt == (*it)) {
-                        memberValid = true;
-//                        debugString.append(QString("Possible Value: %1\n").arg(*constant));
-                        break;
-                    }
                 }
             }
-//            else if (m->hasConstantStringValue())
-//            {
-//                if(constants) *constants = true;
-//                debugString.append(QString("Found String: \"%1\"\n").arg(m_inst.toString()));
-//                QList<QString> constantList = m->constantStringValue();
-//                QList<QString>::iterator constant;
-//                for (constant = constantList.begin();
-//                     constant != constantList.end();
-//                     ++constant)
-//                {
-//                    if(m_inst.toString() == (*constant)) memberValid = true;
-//                    debugString.append(QString("Possible Value: %1\n").arg(*constant));
-//                }
-//                //TODO StringConstants do not seem to be a good indicator.
-//                //Maybe enough if we see any string
-//            }
+            /*
+            else if (m->hasConstantStringValue())
+            {
+                if(constants) *constants = true;
+                debugString.append(QString("Found String: \"%1\"\n").arg(m_inst.toString()));
+                QList<QString> constantList = m->constantStringValue();
+                QList<QString>::iterator constant;
+                for (constant = constantList.begin();
+                     constant != constantList.end();
+                     ++constant)
+                {
+                    if(m_inst.toString() == (*constant)) memberValid = true;
+                    debugString.append(QString("Possible Value: %1\n").arg(*constant));
+                }
+                //TODO StringConstants do not seem to be a good indicator.
+                //Maybe enough if we see any string
+            }
+            */
             else if (m->hasStringValues()) {
-                //TODO check if type is String (Contains only ASCII Characters)
-                //Do not use toString Method, as is gives non-ascii charackers as dot.
-                const int len = 255;
-                // Setup a buffer, at most 'len' bytes long
-                // Read the data such that the result is always null-terminated
-                char buf[len + 1];
-                memset(buf, 0, len + 1);
-                // We expect exceptions here
-                try {
-                    qint64 address = 0;
+                if (constants)
+                    *constants = true;
 
-                    //Get correct address of string
+                m_inst = member(ConstMemberList() << m,
+                                BaseType::trLexical,  0, ksNone);
+
+                assert(m_inst.isValid());
+
+                // Check if string is valid (contains only ASCII Characters)
+                // Do not use toString(), as is replaces non-ASCII characters.
+
+                // Get correct address of string
+                qint64 address = 0;
+                if (m_inst.type()) {
                     if (m_inst.type()->type() == rtArray) {
                         address = m_inst.address();
                     }
@@ -1212,54 +1171,47 @@ bool Instance::isValidConcerningMagicNumbers(bool * constants) const
                         if ( !(address = (qint64) m_inst.toPointer()) )
                             continue;
                     }
-                    else if (m_inst.type()->type() & StructOrUnion) {
-                        debugerr("We should never come here! This is a parser bug");
-                        continue;
-                    }
+                }
 
-                    if (address && m_inst.vmem()->safeSeek(address) &&
-                        m_inst.vmem()->readAtomic(address, buf, len) == len)
-                    {
+                if (address && m_inst.vmem()->safeSeek(address)) {
+                    QString err;
+                    QByteArray buf = Pointer::readString(m_inst.vmem(), address,
+                                                         255, &err, false);
+                    // Did any errors occur?
+                    if (err.isEmpty()) {
                         // Limit to ASCII characters
-                        for (int i = 0; i < len; i++) {
-                            if (buf[i] == 0){
+                        for (int i = 0; i < buf.size(); i++) {
+                            if (buf.at(i) == 0) {
                                 memberValid = true;
                                 break;
                             }
-                            // buf[i] >= 128 || buf[i] < 32 || last character not 0
-                            else if ( (buf[i] & 0x80) || !(buf[i] & 0x60) || i == len ){
-                                memberValid = false;
+                            // buf[i] >= 128 || buf[i] < 32
+                            else if ( (buf[i] & 0x80) || !(buf[i] & 0x60) )
                                 break;
-                            }
                         }
                     }
-                    else {
-                        memberValid = false;
-                    }
                 }
-                catch (VirtualMemoryException&) {
-                    memberValid = false;
-                }
-                catch (MemAccessException&) {
-                    memberValid = false;
-                }
-
-                //debugString.append(QString("Found String: \"%1\"\n").arg(buf));
             }
+            // Member is valid by default
             else
                 memberValid = true;
-
-            if (!memberValid) {
-                isValid = false;
-                //debugmsg(debugString);
-            }
         }
-    }
-    catch (VirtualMemoryException&) {
-        return false;
+        catch (VirtualMemoryException&) {
+            memberValid = false;
+        }
+
+        if (memberValid) {
+            ++validMemberCnt;
+            // For unions, one valid member is sufficient
+            if (isUnion)
+                return true;
+        }
+        // For structs, all members must be valid
+        else if (!isUnion)
+            return false;
     }
 
-    return isValid;
+    return true;
 }
 
 
