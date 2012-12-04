@@ -186,6 +186,8 @@ ObjectRelation BaseType::embeds(const BaseType *first, quint64 firstAddr,
     else {
         if (secondEndAddr <= firstEndAddr)
             ret = orFirstEmbedsSecond;
+        else if (secondAddr <= firstEndAddr)
+            return orOverlap;
         else
             return orNoOverlap;
     }
