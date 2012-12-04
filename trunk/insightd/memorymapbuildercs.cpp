@@ -33,10 +33,6 @@ MemoryMapBuilderCS::~MemoryMapBuilderCS()
 
 void MemoryMapBuilderCS::run()
 {
-    static bool statisticsShown;
-    static QMutex builderMutex;
-
-    statisticsShown = false;
     _interrupted = false;
     // Holds the data that is shared among all threads
     BuilderSharedState* shared = _map->_shared;
@@ -115,15 +111,6 @@ void MemoryMapBuilderCS::run()
         // Lock the mutex again before we jump to the loop condition checking
         queueLock.relock();
     }
-
-#if MEMORY_MAP_VERIFICATION == 1
-    builderMutex.lock();
-    if (!statisticsShown) {
-        statisticsShown = true;
-        _map->verifier().statistics();
-    }
-    builderMutex.unlock();
-#endif
 }
 
 

@@ -340,14 +340,6 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     {
         checkOperationProgress();
 
-//#ifdef DEBUG
-//        // emergency stop
-//        if (_shared->processed >= 5000) {
-//            debugmsg(">>> Breaking revmap generation <<<");
-//            break;
-//        }
-//#endif
-
         // Sleep for 100ms
         usleep(100*1000);
 
@@ -382,6 +374,9 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     _vmem->setThreadSafety(wasThreadSafe);
 
     operationStopped();
+
+    // Show statistics
+    _verifier.statistics();
 
     debugmsg("Processed " << std::dec << _shared->processed << " instances in "
              << elapsedTime() << " minutes.");
