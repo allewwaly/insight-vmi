@@ -48,7 +48,8 @@ const QString& MemoryMap::insertName(const QString& name)
 //------------------------------------------------------------------------------
 
 MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
-    : _threads(0), _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
+    : LongOperation(1000),
+      _threads(0), _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
       _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
       _isBuilding(false), _shared(new BuilderSharedState()),
       _useRuleEngine(false), _knowSrc(ksAll), _buildType(btChrschn),
@@ -89,6 +90,7 @@ void MemoryMap::clearRevmap()
     _pmemMap.clear();
     _vmemMap.clear();
     _vmemAddresses.clear();
+    _prevQueueSize = 0;
 
 #ifdef DEBUG
     _shared->degPerGenerationCnt = 0;
@@ -177,12 +179,15 @@ void MemoryMap::addVariableWithCandidates(const Variable *var)
 void MemoryMap::addVariableWithRules(const Variable *var)
 {
     Instance inst(var->toInstance(_vmem, BaseType::trLexical, _knowSrc));
-    while (true) {
+    while (!interrupted()) {
         addInstance(inst);
-        if (inst.isList())
+        if (inst.isList()) {
             inst = inst.listNext();
+            checkOperationProgress();
+        }
         else
             break;
+
     }
 }
 
@@ -224,6 +229,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     clearRevmap();
     _shared->reset();
     _shared->minProbability = minProbability;
+    operationStarted();
 
     if (type == btSibi) {
         _verifier.resetWatchNodes();
@@ -232,12 +238,6 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     else {
         _probPropagation = false;
     }
-
-    QTime timer, totalTimer;
-    timer.start();
-    totalTimer.start();
-    qint64 prev_queue_size = 0;
-
 
     if (!_factory || !_vmem) {
         debugerr("Factory or VirtualMemory is NULL! Aborting!");
@@ -275,7 +275,9 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 //            qMin(qMax(programOptions.threadCount(), 1), MAX_BUILDER_THREADS);
     _shared->threadCount = 1;
 
-//    debugmsg("Building reverse map with " << _shared->threadCount << " threads.");
+    if (_shared->threadCount > 1)
+        debugmsg("Building reverse map with " << _shared->threadCount
+                 << " threads.");
 
     // Create the builder threads
     _threads = new MemoryMapBuilder*[_shared->threadCount];
@@ -295,7 +297,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 
     // Go through the global vars and add their instances to the queue
     for (VariableList::const_iterator it = _factory->vars().constBegin();
-            it != _factory->vars().constEnd(); ++it)
+            !interrupted() && it != _factory->vars().constEnd(); ++it)
     {
         const Variable* v = *it;
 //        // For testing now only start with this one variable
@@ -320,6 +322,8 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
             debugerr("Caught exception for variable " << v->name()
                     << " at " << e.file << ":" << e.line << ": " << e.message);
         }
+
+        checkOperationProgress();
     }
 
     // PARALLEL PART OF BUILDING PROCESS
@@ -327,44 +331,14 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     for (int i = 0; i < _shared->threadCount; ++i)
         _threads[i]->start();
 
-    bool firstLoop = true;
-
     // Let the builders do the work, but regularly output some statistics
-    while (!shell->interrupted() &&
+    while (!interrupted() &&
            //!_shared->queue.isEmpty() &&
            (!_shared->lastNode ||
             _shared->lastNode->probability() >= _shared->minProbability) &&
            builderRunning())
     {
-
-        if (firstLoop || timer.elapsed() > 1000) {
-            firstLoop = false;
-            QChar indicator = '=';
-            qint64 queue_size = _shared->queue.size();
-            if (prev_queue_size < queue_size)
-                indicator = '+';
-            else if (prev_queue_size > queue_size)
-                indicator = '-';
-
-            timer.restart();
-            MemoryMapNode* node = _shared->lastNode;
-            const BaseType* nodeType = node ? node->type() : 0;
-
-            shell->out()
-                    << "\rProcessed: " << _shared->processed
-                    << ", addr: " << _vmemAddresses.size()
-                    << ", objects: " << _vmemMap.size()
-                    << ", vmem: " << _vmemMap.nodeCount()
-                    << ", pmem: " << _pmemMap.nodeCount()
-                    << ", queue: " << queue_size << " " << indicator
-                    << ", prob: " << (node ? node->probability() : 1.0)
-                    << ", min_prob: " << (queue_size ? _shared->queue.smallest()->probability() : 0);
-            if (nodeType)
-                shell->out() << ", " << nodeType->prettyName();
-            shell->out() << endl;
-
-            prev_queue_size = queue_size;
-        }
+        checkOperationProgress();
 
 //#ifdef DEBUG
 //        // emergency stop
@@ -407,220 +381,65 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     // Restore previous value
     _vmem->setThreadSafety(wasThreadSafe);
 
-//#define SHOW_STATISTICS 1
+    operationStopped();
 
-#ifdef SHOW_STATISTICS
-    float proc_per_sec = _shared->processed * 1000.0 / totalTimer.elapsed();
+    debugmsg("Processed " << std::dec << _shared->processed << " instances in "
+             << elapsedTime() << " minutes.");
+}
 
-    // Gather some statistics about the memory map
-//#define STATS_AVAILABLE 1
-//    int nonAligned = 0;
-//    QMap<int, PointerNodeMap::key_type> keyCnt;
-//    for (ULongSet::iterator it = _vmemAddresses.begin();
-//            it != _vmemAddresses.end(); ++it)
-//    {
-//        ULongSet::key_type addr = *it;
-//        if (addr % 4)
-//            ++nonAligned;
-//        int cnt = _vmemMap.count(addr);
-//        keyCnt.insertMulti(cnt, addr);
-//        while (keyCnt.size() > 100)
-//            keyCnt.erase(keyCnt.begin());
-//    }
 
-    debugmsg("Processed " << _shared->processed << " instances");
-    debugmsg(_vmemMap.size() << " nodes at "
-            << _vmemAddresses.size() << " virtual addresses"
-#ifdef STATS_AVAILABLE
-            << " (" << nonAligned
-            << " not aligned)"
-#endif
-            );
-//    debugmsg(_pmemMap.size() << " nodes at " << _pmemMap.uniqueKeys().size()
-//            << " physical addresses");
-    debugmsg(_pointersTo.size() << " pointers to "
-            << _pointersTo.uniqueKeys().size() << " addresses");
-    debugmsg("stack.size() = " << _shared->queue.size());
-    debugmsg("maxObjSize = " << _shared->maxObjSize);
-    debugmsg("Build speed: " << (int)proc_per_sec << " inst./s");
+void MemoryMap::operationProgress()
+{
+    MemoryMapNode* node = _shared->lastNode;
+    const BaseType* nodeType = node ? node->type() : 0;
+    int queueSize = _shared->queue.size();
 
-    // calculate average type size
-    qint64 totalTypeSize = 0;
-    qint64 totalTypeCnt = 0;
-    QList<IntNodeHash::key_type> tkeys = _typeInstances.uniqueKeys();
-    for (int i = 0; i < tkeys.size(); ++i) {
-        int cnt = _typeInstances.count(tkeys[i]);
-        totalTypeSize += cnt * _typeInstances.value(tkeys[i])->size();
-        totalTypeCnt += cnt;
+
+    QChar indicator = '=';
+    if (_prevQueueSize < queueSize)
+        indicator = '+';
+    else if (_prevQueueSize > queueSize)
+        indicator = '-';
+    float prob = node ? node->probability() : 1.0;
+
+    int depth = 0;
+    for (MemoryMapNode* n = node; n; n = n->parent())
+        ++depth;
+
+    shell->out()
+            << right
+            << qSetFieldWidth(5) << elapsedTime() << qSetFieldWidth(0)
+            << " Proc: " << shell->color(ctBold)
+            << qSetFieldWidth(6) << _shared->processed << qSetFieldWidth(0)
+            << shell->color(ctReset)
+            << ", addr: " << qSetFieldWidth(6) << _vmemAddresses.size() << qSetFieldWidth(0)
+            << ", objs: " << qSetFieldWidth(6) << _vmemMap.size() << qSetFieldWidth(0)
+            << ", vmem: " << qSetFieldWidth(6) << _vmemMap.nodeCount() << qSetFieldWidth(0)
+            << ", pmem: " << qSetFieldWidth(6) << _pmemMap.nodeCount() << qSetFieldWidth(0)
+            << ", q: " << qSetFieldWidth(5) << queueSize << qSetFieldWidth(0) << " " << indicator
+            << ", d: " << qSetFieldWidth(2) << depth << qSetFieldWidth(0)
+            << ", p: " << qSetRealNumberPrecision(5) << fixed;
+
+    if (prob < 0.4)
+        shell->out() << shell->color(ctMissed);
+    else if (prob < 0.7)
+        shell->out() << shell->color(ctDeferred);
+    else
+        shell->out() << shell->color(ctMatched);
+    shell->out() << prob << shell->color(ctReset);
+//            << ", min_prob: " << (queueSize ? _shared->queue.smallest()->probability() : 0);
+
+    if (nodeType) {
+        shell->out() << ", " << shell->prettyNameInColor(nodeType) << " ";
+        if (node->parent())
+            shell->out() << shell->color(ctMember);
+        else
+            shell->out() << shell->color(ctVariable);
+        shell->out() << node->name() << shell->color(ctReset);
     }
+    shell->out() << left << endl;
 
-    debugmsg("Total of " << tkeys.size() << " types found, average size: "
-            << QString::number(totalTypeSize / (double) totalTypeCnt, 'f', 1)
-            << " byte");
-
-    debugmsg("degForInvalidAddrCnt         = " << degForInvalidAddrCnt);
-    debugmsg("degForInvalidChildAddrCnt    = " << degForInvalidChildAddrCnt);
-    debugmsg("degForNonAlignedChildAddrCnt = " << degForNonAlignedChildAddrCnt);
-    debugmsg("degForUnalignedAddrCnt       = " << degForUnalignedAddrCnt);
-    debugmsg("degForUserlandAddrCnt        = " << degForUserlandAddrCnt);
-    debugmsg("degPerGenerationCnt          = " << degPerGenerationCnt);
-
-//#if defined(DEBUG) && defined(ENABLE_DOT_CODE)
-//    QString dotfile = "vmemTree.dot";
-//    _vmemMap.outputDotFile(dotfile);
-//    debugmsg("Wrote vmemTree to " << dotfile << ".");
-//#endif
-
-#if defined(DEBUG) && 0
-    debugmsg("Checking consistency of vmemTree");
-    // See if we can find all objects
-    assert(_vmemQMap.size() == _vmemMap.objectCount());
-
-    MemoryRangeTree::iterator it, begin = _vmemMap.begin(),
-            end = _vmemMap.end();
-    MemoryRangeTree::const_iterator ci, cbegin;
-    QSet<const MemoryMapNode*> set;
-    int count, prevCount = 0, testNo = 0;
-
-    //--------------------------------------------------------------------------
-    debugmsg("Consistency check no " << ++testNo); // 1
-    count = 0;
-    set.clear();
-    for (it = _vmemMap.begin(); it != _vmemMap.end(); ++it) {
-        const MemoryMapNode* node = *it;
-        assert(_vmemQMap.contains(node->address()));
-        set.insert(node);
-        ++count;
-    }
-    if (testNo > 1 && prevCount != count)
-        debugmsg("prevCount = " << prevCount << " != " << count << " = count");
-    prevCount = count;
-    if (count < _vmemMap.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemMap.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
-            nci != _vmemQMap.constEnd(); ++nci)
-        if (!set.contains(nci.value()))
-            debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
-
-    //--------------------------------------------------------------------------
-    debugmsg("Consistency check no " << ++testNo); // 2
-    count = 0;
-    set.clear();
-    for (ci = _vmemMap.begin(); ci != _vmemMap.end(); ++ci) {
-        const MemoryMapNode* node = *ci;
-        assert(_vmemQMap.contains(node->address()));
-        set.insert(node);
-        ++count;
-    }
-    if (testNo > 1 && prevCount != count)
-        debugmsg("prevCount = " << prevCount << " != " << count << " = count");
-    prevCount = count;
-    if (count < _vmemMap.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemMap.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
-            nci != _vmemQMap.constEnd(); ++nci)
-        if (!set.contains(nci.value()))
-            debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
-
-    //--------------------------------------------------------------------------
-    debugmsg("Consistency check no " << ++testNo); // 3
-    count = 0;
-    set.clear();
-    for (ci = _vmemMap.constBegin(); ci != _vmemMap.constEnd(); ++ci) {
-        const MemoryMapNode* node = *ci;
-        assert(_vmemQMap.contains(node->address()));
-        set.insert(node);
-        ++count;
-    }
-    if (testNo > 1 && prevCount != count)
-        debugmsg("prevCount = " << prevCount << " != " << count << " = count");
-    prevCount = count;
-    if (count < _vmemMap.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemMap.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
-            nci != _vmemQMap.constEnd(); ++nci)
-        if (!set.contains(nci.value()))
-            debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
-
-    //--------------------------------------------------------------------------
-    debugmsg("Consistency check no " << ++testNo); // 4
-    count = 0;
-    set.clear();
-    it = _vmemMap.end();
-    do {
-        --it;
-        const MemoryMapNode* node = *it;
-        assert(_vmemQMap.contains(node->address()));
-        set.insert(node);
-        ++count;
-    } while (it != begin);
-    if (testNo > 1 && prevCount != count)
-        debugmsg("prevCount = " << prevCount << " != " << count << " = count");
-    prevCount = count;
-    if (count < _vmemMap.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemMap.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
-            nci != _vmemQMap.constEnd(); ++nci)
-        if (!set.contains(nci.value()))
-            debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
-
-    //--------------------------------------------------------------------------
-    debugmsg("Consistency check no " << ++testNo); // 5
-    count = 0;
-    set.clear();
-    ci = _vmemMap.end();
-    cbegin = _vmemMap.begin();
-    do {
-        --ci;
-        const MemoryMapNode* node = *ci;
-        assert(_vmemQMap.contains(node->address()));
-        set.insert(node);
-        ++count;
-    } while (ci != begin);
-    if (testNo > 1 && prevCount != count)
-        debugmsg("prevCount = " << prevCount << " != " << count << " = count");
-    prevCount = count;
-    if (count < _vmemMap.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemMap.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
-            nci != _vmemQMap.constEnd(); ++nci)
-        if (!set.contains(nci.value()))
-            debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
-
-    //--------------------------------------------------------------------------
-    debugmsg("Consistency check no " << ++testNo); // 6
-    count = 0;
-    set.clear();
-    ci = _vmemMap.constEnd();
-    cbegin = _vmemMap.constBegin();
-    do {
-        --ci;
-        const MemoryMapNode* node = *ci;
-        assert(_vmemQMap.contains(node->address()));
-        set.insert(node);
-        ++count;
-    } while (ci != cbegin);
-    if (testNo > 1 && prevCount != count)
-        debugmsg("prevCount = " << prevCount << " != " << count << " = count");
-    prevCount = count;
-    if (count < _vmemMap.objectCount())
-        debugmsg("count = " << count << " >= " << _vmemMap.objectCount() << "= _vmemTree.objectCount()");
-    assert(set.size() == _vmemMap.objectCount());
-    for (PointerNodeMap::const_iterator nci = _vmemQMap.constBegin();
-            nci != _vmemQMap.constEnd(); ++nci)
-        if (!set.contains(nci.value()))
-            debugmsg("Assertion failed: set.contains(nci.value()) for nci.value() = " << nci.value());
-
-    debugmsg("Consistency check done");
-#endif
-
-#endif // SHOW_STATISTICS
-    debugmsg("Processed " << std::dec << _shared->processed << " instances");
+    _prevQueueSize = queueSize;
 }
 
 
