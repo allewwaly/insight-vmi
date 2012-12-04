@@ -168,6 +168,11 @@ void MemoryMapBuilderCS::processPointer(const Instance& inst, MemoryMapNode *nod
     assert(inst.type()->type() == rtPointer);
 
     quint64 addr = (quint64) inst.toPointer();
+
+    // Ignore pointers that point back into the node
+    if (addr >= node->address() && addr <= node->endAddress())
+        return;
+
     _map->_shared->pointersToLock.lock();
     _map->_pointersTo.insert(addr, node);
     _map->_shared->pointersToLock.unlock();
@@ -223,7 +228,6 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
                                     _map->knowSrc(), &result));
             if (!mi.isValid() || mi.isNull())
                 continue;
-
 
             // Did the rules engine decide which instance to use?
             if (TypeRuleEngine::useMatchedInst(result)) {
