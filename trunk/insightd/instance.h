@@ -250,7 +250,7 @@ inline quint64 Instance::toUIntBitField() const
 
 inline qint64 Instance::toNumber() const
 {
-    if (isNull() && !(_d->type->type() & IntegerTypes))
+    if (isNull() || !_d->type || !(_d->type->type() & IntegerTypes))
         return 0;
 
     if (bitSize() >= 0)
