@@ -710,10 +710,11 @@ void MemoryMapVerifier::statistics()
     const int w_f = 5;
     const int w_hdr = 50;
 
-    shell->out() << endl << "Map Statistics:" << endl;
+    // Reset all manipulators to default
+    shell->out() << qSetFieldWidth(0) << left
+                 << qSetRealNumberPrecision(2) << fixed;
 
-    // Use precision of 2 for all real numbers
-    shell->out() << qSetRealNumberPrecision(2) << fixed;
+    shell->out() << endl << "Map Statistics:" << endl;
 
     // General information
     shell->out() << "\tGeneral:" << endl
@@ -964,6 +965,9 @@ void MemoryMapVerifier::statistics()
 
     shell->out() << endl;
     slubCoverageStats();
+
+    // Reset manipulators to default
+    shell->out() << qSetFieldWidth(0) << left;
 }
 
 
