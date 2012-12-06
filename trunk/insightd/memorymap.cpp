@@ -17,6 +17,7 @@
 #include "varsetter.h"
 #include "memorymapbuilder.h"
 #include "memorymapheuristics.h"
+#include "function.h"
 #include <debug.h>
 #include <expressionevalexception.h>
 
@@ -296,8 +297,8 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     bool wasThreadSafe = _vmem->setThreadSafety(_shared->threadCount > 1);
 
     // Go through the global vars and add their instances to the queue
-    for (VariableList::const_iterator it = _factory->vars().constBegin();
-            !interrupted() && it != _factory->vars().constEnd(); ++it)
+    for (VariableList::const_iterator it = _factory->vars().begin(),
+         e = _factory->vars().end(); !interrupted() && it != e; ++it)
     {
         const Variable* v = *it;
 //        // For testing now only start with this one variable
@@ -325,6 +326,33 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 
         checkOperationProgress();
     }
+
+    // Add all functions to the map, but no to the queue
+    for (BaseTypeList::const_iterator it = _factory->types().begin(),
+         e = _factory->types().end(); it != e; ++it)
+    {
+        const BaseType* t = *it;
+        // Skip non-kernel and non-function types
+        if (!t->symbolSource() == ssKernel || t->type() != rtFunction || !t->size())
+            continue;
+
+        const Function* f = dynamic_cast<const Function*>(t);
+        MemoryMapNode* node = 0;
+
+        switch(_buildType) {
+        case btChrschn:
+            node = new MemoryMapNode(this, f->name(), f->pcLow(), t, t->id());
+            break;
+        case btSibi:
+            node = new MemoryMapNodeSV(this, f->name(), f->pcLow(), t, t->id(), 0, 0, false);
+            break;
+        }
+
+        _roots.append(node);
+        _vmemMap.insert(node);
+        _vmemAddresses.insert(node->address());
+    }
+
 
     // PARALLEL PART OF BUILDING PROCESS
 
