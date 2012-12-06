@@ -203,6 +203,7 @@ void MemoryMap::addInstance(const Instance& inst)
 
     switch(_buildType) {
     case btChrschn:
+    case btSlubCache:
         node = new MemoryMapNode(this, inst);
         break;
     case btSibi:
@@ -288,6 +289,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
             _threads[i] = new MemoryMapBuilderSV(this, i);
             break;
         case btChrschn:
+        case btSlubCache:
             _threads[i] = new MemoryMapBuilderCS(this, i);
             break;
         }
@@ -340,6 +342,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
         MemoryMapNode* node = 0;
 
         switch(_buildType) {
+        case btSlubCache:
         case btChrschn:
             node = new MemoryMapNode(this, f->name(), f->pcLow(), t, t->id());
             break;
@@ -353,11 +356,30 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
         _vmemAddresses.insert(node->address());
     }
 
+    if (type == btSlubCache) {
+        // Add all slub objects to the map
+        for (AddressMap::const_iterator it = _verifier.slub().objects().begin(),
+             e = _verifier.slub().objects().end(); it != e; ++it)
+        {
+            const SlubCache& cache = _verifier.slub().caches().at(it.value());
+            MemoryMapNode* node;
+            if (cache.baseType)
+                node = new MemoryMapNode(this, cache.name, it.key(),
+                                         cache.baseType, 0);
+            else
+                node = new MemoryMapNode(this, cache.name, it.key(),
+                                         cache.objSize, 0);
+            _roots.append(node);
+            _vmemMap.insert(node);
+            _vmemAddresses.insert(node->address());
+        }
+    }
+    else {
+        // PARALLEL PART OF BUILDING PROCESS
 
-    // PARALLEL PART OF BUILDING PROCESS
-
-    for (int i = 0; i < _shared->threadCount; ++i)
-        _threads[i]->start();
+        for (int i = 0; i < _shared->threadCount; ++i)
+            _threads[i]->start();
+    }
 
     // Let the builders do the work, but regularly output some statistics
     while (!interrupted() &&
@@ -693,7 +715,7 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& origInst,
 
     bool found = false, done = false;
     int i = 0;
-    const MemoryMapNode *n = 0;
+    const MemoryMapNode *n = 0, *funcNode = 0;
     const BaseType* instType;
     quint64 instAddr;
 
@@ -740,10 +762,21 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& origInst,
             // Exit loop if node was found
             if (found)
                 break;
+            // Exit loop if object overlaps with a function
+            if (n->type() && n->type()->type() == rtFunction)
+                funcNode = n;
         }
     }
 
-    return found ? const_cast<MemoryMapNode*>(n) : 0;
+    if (found)
+        return const_cast<MemoryMapNode*>(n);
+    else if (funcNode)
+        return const_cast<MemoryMapNode*>(funcNode);
+//    else if (!nodes.isEmpty())
+//        return const_cast<MemoryMapNode*>(nodes.first());
+    else
+        return 0;
+//    return found ? const_cast<MemoryMapNode*>(n) : 0;
 }
 
 

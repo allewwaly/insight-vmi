@@ -626,6 +626,7 @@ void MemoryMapVerifier::statisticsHelper(MemoryMapNode *node)
 {
     // Call builder-specific function
     switch (_map->buildType()) {
+    case btSlubCache:
     case btChrschn:
         statisticsCountNodeCS(node);
         break;

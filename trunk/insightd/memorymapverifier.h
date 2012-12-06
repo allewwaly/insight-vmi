@@ -155,6 +155,8 @@ public:
 
     void slubCoverageStats();
 
+    inline const SlubObjects& slub() const { return _slub; }
+
 private:
     /**
      * Internal helper function for the statistics function.
