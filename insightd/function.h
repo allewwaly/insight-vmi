@@ -38,6 +38,17 @@ public:
 	 */
 	virtual RealType type() const;
 
+    /**
+     * Returns the size of this type in bytes
+     */
+    virtual inline uint size() const
+    {
+        if (_pcLow && _pcHigh)
+            return _pcHigh - _pcLow;
+        else
+            return 0;
+    }
+
 	/**
 	 * @return the low program counter
 	 */
