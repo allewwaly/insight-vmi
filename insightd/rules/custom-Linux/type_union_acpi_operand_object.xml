@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<rule priority="101">
+			<name>acpi_operand_object.*</name>
+			<description>
+				Allow access to union members of acpi_operand_object if valid.
+			</description>
+			<filter>
+				<datatype>union</datatype>
+				<typename>acpi_operand_object</typename>
+				<members>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="inline">
+				var obj = arguments[0];
+				var type = obj.common.type.toUInt8();
+				var member = obj.MemberName(arguments[1][0]);
+
+				// Types as defined in &lt;include/acpi/actypes.h&gt;
+				var acpi_obj_types = new Object({
+					integer:        0x01, // ACPI_TYPE_INTEGER
+					string:         0x02, // ACPI_TYPE_STRING
+					buffer:         0x03, // ACPI_TYPE_BUFFER
+					package:        0x04, // ACPI_TYPE_PACKAGE
+					//0x05, // ACPI_TYPE_FIELD_UNIT
+					device:         0x06, // ACPI_TYPE_DEVICE 
+					event:          0x07, // ACPI_TYPE_EVENT
+					method:         0x08, // ACPI_TYPE_METHOD
+					mutex:          0x09, // ACPI_TYPE_MUTEX
+					region:         0x0A, // ACPI_TYPE_REGION
+					power_resource: 0x0B, // ACPI_TYPE_POWER
+					processor:      0x0C, // ACPI_TYPE_PROCESSOR
+					thermal_zone:   0x0D, // ACPI_TYPE_THERMAL
+					buffer_field:   0x0E, // ACPI_TYPE_BUFFER_FIELD
+					//0x0F, // ACPI_TYPE_DDB_HANDLE
+					//0x10, // ACPI_TYPE_DEBUG_OBJECT
+					field:          0x11, // ACPI_TYPE_REGION_FIELD
+					bank_field:     0x12, // ACPI_TYPE_BANK_FIELD
+					index_field:    0x13, // ACPI_TYPE_INDEX_FIELD
+					reference:      0x14, // ACPI_TYPE_LOCAL_REFERENCE
+					//0x15, // ACPI_TYPE_LOCAL_ALIAS
+					//0x16, // ACPI_TYPE_LOCAL_METHOD_ALIAS
+					notify:         0x17, // ACPI_TYPE_LOCAL_NOTIFY
+					address_space:  0x18  // ACPI_TYPE_LOCAL_ADDRESS_HANDLER
+					//0x19, // ACPI_TYPE_LOCAL_RESOURCE
+					//0x1A, // ACPI_TYPE_LOCAL_RESOURCE_FIELD
+					//0x1B, // ACPI_TYPE_LOCAL_SCOPE
+					//0x1C, // ACPI_TYPE_LOCAL_EXTRA
+					//0x1D, // ACPI_TYPE_LOCAL_DATA
+				});
+
+				// If we know the type, allow access only to that member
+				if (type &gt; 0 &amp;&amp; type &lt;= 0x18 &amp;&amp;
+					type != 0x05 &amp;&amp; type != 0x0f &amp;&amp;
+					type != 0x10 &amp;&amp; type != 0x15 &amp;&amp;
+					type != 0x16)
+				{
+					if (type == acpi_obj_types[member])
+						return false;
+					else
+						return new Instance();
+				}
+				// Otherwise allow acces only to "common"
+				else if (member == "common")
+					return false;
+				else
+					return new Instance();
+			</action>
+		</rule>
+
+	</rules>
+</typeknowledge>
