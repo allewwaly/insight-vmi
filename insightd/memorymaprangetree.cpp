@@ -20,10 +20,12 @@ void MemMapProperties::update(const MemoryMapNode* mmnode)
 {
     if (!mmnode)
         return;
-    if (mmnode->probability() < minProbability)
-        minProbability = mmnode->probability();
-    if (mmnode->probability() > maxProbability)
-        maxProbability = mmnode->probability();
+    if (!mmnode->type() || mmnode->type()->type() != rtFunction) {
+        if (mmnode->probability() < minProbability)
+            minProbability = mmnode->probability();
+        if (mmnode->probability() > maxProbability)
+            maxProbability = mmnode->probability();
+    }
     ++objectCount;
     if (mmnode->type())
         baseTypes |= mmnode->type()->type();
