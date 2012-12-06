@@ -393,6 +393,9 @@ bool MemoryMapHeuristics::isValidInstance(const Instance &i)
     if ((i.type()->type() & StructOrUnion) && (i.address() & 0x3UL))
         return false;
 
+    if (!i.isAccessible())
+        return false;
+
     /// todo: We could also test the heuristics at this point
 
     return true;
