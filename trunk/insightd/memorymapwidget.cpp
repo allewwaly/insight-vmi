@@ -458,7 +458,8 @@ bool MemoryMapWidget::event(QEvent *event)
                     cur.movePosition(QTextCursor::NextCell);
 
                     cur.setCharFormat(cellTypeCharFmt);
-                    cur.insertText(node->type()->prettyName());
+                    cur.insertText(node->type() ? node->type()->prettyName()
+                                                : QString());
                     cur.movePosition(QTextCursor::NextCell);
 
                     cur.setCharFormat(cellNameCharFmt);
