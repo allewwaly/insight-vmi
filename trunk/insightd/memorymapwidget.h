@@ -34,6 +34,7 @@ public:
     quint64 visibleAddrSpaceStart() const;
     quint64 visibleAddrSpaceEnd() const;
     quint64 visibleAddrSpaceLength() const;
+    inline quint64 bytesPerCell() const { return _bytesPerCell; }
 
     const MemoryMapRangeTree* map() const;
     void setMap(const MemoryMapRangeTree* map, const MemSpecs &specs);
@@ -62,7 +63,7 @@ private:
     const MemoryDiffTree* _diff;
     bool _visMapValid;
     quint64 _address;
-    quint64 _bytesPerPixel;
+    quint64 _bytesPerCell;
     qint64 _cols;
     qint64 _rows;
     int _maxIntensity;

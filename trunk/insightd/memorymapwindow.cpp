@@ -10,7 +10,7 @@
 
 MemoryMapWindow* memMapWindow = 0;
 
-const char* LBL_MOVE_CURSOR_POS = "Position: 0x%1";
+const char* LBL_MOVE_CURSOR_POS = "%0 %1 per cell, position: 0x%2";
 const char* LBL_BUILDING = "Processing map";
 
 
@@ -19,7 +19,7 @@ MemoryMapWindow::MemoryMapWindow(QWidget *parent)
 {
 	ui.setupUi(this);
 
-	setWindowTitle(tr("InSight - Differences View"));
+	setWindowTitle(tr("InSight - Memory Map View"));
 
 	// Setup main window area
 	_memMapWidget = new MemoryMapWidget(0, this);
@@ -81,7 +81,21 @@ MemoryMapWindow::~MemoryMapWindow()
 void MemoryMapWindow::virtualAddressChanged(quint64 address)
 {
     int width = _memMapWidget->totalAddrSpaceEnd() >= (1ULL << 32) ? 16 : 8;
+
+    float bpc = _memMapWidget->bytesPerCell();
+    QString unit = "byte";
+    if (bpc > 10000) {
+        bpc /= 1024;
+        unit = "kB";
+    }
+    if (bpc > 10000) {
+        bpc /= 1024;
+        unit = "MB";
+    }
+
     QString s = QString(LBL_MOVE_CURSOR_POS)
+                    .arg(bpc, 0, 'f', 2)
+                    .arg(unit)
                     .arg(address, width, 16, QChar('0'));
 //    _sbCursorPosition->setText(s);
     statusBar()->showMessage(s);
