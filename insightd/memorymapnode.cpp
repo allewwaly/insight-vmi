@@ -19,7 +19,7 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
 	: _belongsTo(belongsTo), _parent(parent),
 	  _name(MemoryMap::insertName(name)), _address(address), _type(type),
 	  _id(id), _probability(1.0), _origInst(0), _seemsValid(false),
-	  _foundInPtrChains(0)
+	  _foundInPtrChains(0), _size(-1)
 {
     if (_belongsTo && (_belongsTo->vmem()->memSpecs().arch & MemSpecs::ar_i386))
         if (_address >= (1ULL << 32))
@@ -30,12 +30,28 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
 }
 
 
+MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
+							 quint64 address, int size, MemoryMapNode* parent)
+	: _belongsTo(belongsTo), _parent(parent),
+	  _name(MemoryMap::insertName(name)), _address(address), _type(0),
+	  _id(-1), _probability(1.0), _origInst(0), _seemsValid(false),
+	  _foundInPtrChains(0), _size(size)
+{
+    if (_belongsTo && (_belongsTo->vmem()->memSpecs().arch & MemSpecs::ar_i386))
+        if (_address >= (1ULL << 32))
+            genericError(QString("Address 0x%1 exceeds 32 bit address space")
+                         .arg(_address, 0, 16));
+    if (_belongsTo->buildType() == btChrschn)
+        updateProbability();
+}
+
+
 MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
         MemoryMapNode* parent)
     : _belongsTo(belongsTo), _parent(parent),
       _name(getNameFromInstance(parent, inst)), _address(inst.address()),
       _type(inst.type()), _id(inst.id()), _probability(1.0),
-      _origInst(0), _seemsValid(false), _foundInPtrChains(0)
+      _origInst(0), _seemsValid(false), _foundInPtrChains(0), _size(-1)
 {
     if (_belongsTo && _address > _belongsTo->vmem()->memSpecs().vaddrSpaceEnd())
             genericError(QString("Address 0x%1 exceeds 32 bit address space")

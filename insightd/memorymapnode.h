@@ -51,6 +51,17 @@ public:
     MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
             MemoryMapNode* parent = 0);
 
+	/**
+	 * Creates a new node based on free chosen parameters.
+	 * @param belongsTo the MemoryMap this node belongs to
+	 * @param name the name of this node, typically the name of the component
+	 * of the parent struct or pointer or the name of a global variable
+	 * @param address the virtual address of this node
+	 * @param size the size of this node
+	 * @param parent the parent node of this node, defaults to null
+	 */
+	MemoryMapNode(MemoryMap* belongsTo, const QString& name,
+				  quint64 address, int size, MemoryMapNode* parent = 0);
     /**
      * The destructor recursively deletes all child nodes of this node.
      */
@@ -194,6 +205,7 @@ protected:
     Instance* _origInst;
     bool _seemsValid;
     int _foundInPtrChains;    ///< how often this node was found through other chains of pointers
+    int _size;
 };
 
 
@@ -274,6 +286,8 @@ inline const QString& MemoryMapNode::name() const
 
 inline quint32 MemoryMapNode::size() const
 {
+    if (_size > 0)
+        return _size;
     return _type ? _type->size() : 0;
 }
 

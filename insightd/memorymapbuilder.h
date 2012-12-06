@@ -44,7 +44,8 @@ protected:
 
 enum MemoryMapBuilderType {
     btSibi,
-    btChrschn
+    btChrschn,
+    btSlubCache
 };
 
 

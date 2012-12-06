@@ -2370,6 +2370,8 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
         type = btSibi;
     else if (QString("chrschn").startsWith(args[0]))
         type = btChrschn;
+    else if (QString("slub").startsWith(args[0]))
+        type = btSlubCache;
     else {
         _err << "Valid builder types are: sibi, chrschn" << endl;
         return 2;
