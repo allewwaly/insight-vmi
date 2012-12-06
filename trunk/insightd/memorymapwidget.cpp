@@ -26,8 +26,10 @@
 #include <debug.h>
 
 static const int margin = 3;
-static const int cellSize = 8;
+static const int cellSize = 9;
 static const unsigned char PROB_MAX = 16;
+
+static const QColor funcColor(0, 128, 255);
 
 static const QColor probColor[PROB_MAX+1] = {
         QColor(255,   0, 0),  //  0
@@ -129,7 +131,7 @@ void MemoryMapWidget::resizeEvent(QResizeEvent* /*e*/)
     _cols = drawWidth() / cellSize;
     _rows = drawHeight() / cellSize;
 
-    _bytesPerPixel = ceil(visibleAddrSpaceLength() / (double)(_cols * _rows));
+    _bytesPerCell = ceil(visibleAddrSpaceLength() / (double)(_cols * _rows));
 }
 
 
@@ -142,7 +144,7 @@ void MemoryMapWidget::mouseMoveEvent(QMouseEvent *e)
 
     int c = x / cellSize, r = y / cellSize;
 
-    quint64 addr = (r * _cols + c) * _bytesPerPixel + visibleAddrSpaceStart();
+    quint64 addr = (r * _cols + c) * _bytesPerCell + visibleAddrSpaceStart();
 
     if (_address != addr && addr < visibleAddrSpaceEnd()) {
         _address = addr;
@@ -162,11 +164,12 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
 
     VarSetter<bool> painting(&_isPainting, true, false);
 
-    QColor unusedColor(255, 255, 255);
-    QColor usedColor(0, 0, 0);
-    QColor gridColor(240, 240, 240);
-    QColor bgColor(255, 255, 255);
-    QColor diffColor(0, 0, 255);
+    static const QColor unusedColor(255, 255, 255);
+//    static const QColor usedColor(0, 0, 0);
+    static const QColor gridColor(240, 240, 240);
+    static const QColor bgColor(255, 255, 255);
+    static const QColor userLandBgColor(220, 220, 220);
+    static const QColor diffColor(0, 0, 255);
 
     QPainter painter(this);
     if (_antialiasing)
@@ -178,6 +181,19 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
     painter.setPen(Qt::NoPen);
     painter.setBrush(bgColor);
     painter.drawRect(0, 0, _cols * cellSize, _rows * cellSize);
+
+    // Draw user-land background
+    if (!_showOnlyKernelSpace) {
+        qint64 userLandCells = _specs.pageOffset / _bytesPerCell;
+        qint64 userLandRows = userLandCells / _cols;
+        painter.setBrush(userLandBgColor);
+        painter.drawRect(0, 0, _cols * cellSize, userLandRows * cellSize);
+        if (userLandCells % _cols != 0) {
+            quint64 bytesMissing = _specs.pageOffset - (userLandRows * _cols * _bytesPerCell);
+            painter.drawRect(0, userLandRows * cellSize,
+                             (bytesMissing / (float)_bytesPerCell) * cellSize, cellSize);
+        }
+    }
 
     // Draw grid lines if we have at least 3 pixel per byte
     if (cellSize > 1 && gridColor != unusedColor) {
@@ -192,7 +208,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
     painter.setBrush(Qt::NoBrush);
     painter.setPen(Qt::NoPen);
     int lastColor = -1;
-    bool diffWasEmpty = true, propsWasEmpty = true;
+    bool diffWasEmpty = true, propsWasEmpty = true, probsHadFunctions = false;
     bool sameAddrSpaceSize =
             !_map || !_diff || _map->addrSpaceEnd() == _diff->addrSpaceEnd();
 
@@ -210,7 +226,7 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
 
         cell.index = i;
         cell.addrStart = cell.addrEnd + 1;
-        cell.addrEnd += _bytesPerPixel;
+        cell.addrEnd += _bytesPerCell;
         // Beware of overflows
         if (cell.addrEnd < cell.addrStart ||
                 cell.addrEnd > totalAddrSpaceEnd())
@@ -254,6 +270,8 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
 
         cell.minProb = (unsigned char)(PROB_MAX * props.minProbability);
         cell.maxProb = (unsigned char)(PROB_MAX * props.maxProbability);
+        bool hasFunction = props.baseTypes & rtFunction;
+        bool hasObjects = props.baseTypes & ~rtFunction;
 
         // Draw  cell
         quint64 r = cell.index / _cols;
@@ -269,7 +287,9 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
         }
         else {
             // Do we need to change the brush?
-            if (propsWasEmpty != props.isEmpty() || cell.maxProb != lastColor) {
+            if (propsWasEmpty != props.isEmpty() || cell.maxProb != lastColor ||
+                probsHadFunctions)
+            {
                 if (props.isEmpty())
                     painter.setBrush(Qt::NoBrush);
                 else {
@@ -286,14 +306,52 @@ void MemoryMapWidget::paintEvent(QPaintEvent * e)
                     painter.setPen(diffColor);
                 diffWasEmpty = diffProps.isEmpty();
             }
+
             // Finally draw the cell
-            if (diffProps.isEmpty())
-                painter.drawRect(c * cellSize, r * cellSize,
-                        cellSize - 1, cellSize - 1);
-            else
-                painter.drawRect(c * cellSize - 1, r * cellSize - 1,
-                        cellSize, cellSize);
+            if (hasFunction && !hasObjects) {
+                lastColor = 255;
+                painter.setBrush(funcColor);
+                if (diffProps.isEmpty())
+                    painter.drawRect(c * cellSize, r * cellSize,
+                            cellSize - 1, cellSize - 1);
+                else
+                    painter.drawRect(c * cellSize - 1, r * cellSize - 1,
+                            cellSize, cellSize);
+            }
+            else if (hasObjects) {
+                if (diffProps.isEmpty())
+                    painter.drawRect(c * cellSize, r * cellSize,
+                            cellSize - 1, cellSize - 1);
+                else
+                    painter.drawRect(c * cellSize - 1, r * cellSize - 1,
+                            cellSize, cellSize);
+
+                if (hasFunction) {
+                    lastColor = 255;
+                    painter.setBrush(funcColor);
+                    painter.setPen(gridColor);
+                    if (diffProps.isEmpty()) {
+                        QPoint points[3] = {
+                            QPoint(c * cellSize, r * cellSize),
+                            QPoint(c * cellSize, r * cellSize + (cellSize - 1)),
+                            QPoint(c * cellSize + (cellSize - 1), r * cellSize + (cellSize - 1)),
+                        };
+                        painter.drawConvexPolygon(points, 3);
+                    }
+                    else {
+                        QPoint points[3] = {
+                            QPoint(c * cellSize - 1, r * cellSize - 1),
+                            QPoint(c * cellSize - 1, (r * cellSize - 1) + (cellSize - 1)),
+                            QPoint((c * cellSize - 1) + cellSize, (r * cellSize - 1) + cellSize),
+                        };
+                        painter.drawConvexPolygon(points, 3);
+                    }
+                    painter.setPen(Qt::NoPen);
+                }
+            }
         }
+
+        probsHadFunctions = hasFunction;
     }
 }
 
@@ -311,8 +369,8 @@ bool MemoryMapWidget::event(QEvent *event)
         }
         else {
             int c = x / cellSize, r = y / cellSize;
-            quint64 addrStart = (r * _cols + c) * _bytesPerPixel + visibleAddrSpaceStart();
-            quint64 addrEnd = addrStart + _bytesPerPixel - 1;
+            quint64 addrStart = (r * _cols + c) * _bytesPerCell + visibleAddrSpaceStart();
+            quint64 addrEnd = addrStart + _bytesPerCell - 1;
             // Limit addrEnd to acutal end of address space. There are two cases:
             // 32-bit: addrEnd is beyond totalAddrSpaceEnd()
             // 64-bit: addrEnd is close to zero, because an overflow occured
