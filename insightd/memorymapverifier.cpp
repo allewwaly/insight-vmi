@@ -601,12 +601,16 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     // Final decision: Is this a valid object?
     if (valid > 0) {
         _totalValid++;
+        _totalValidDistribution[probIndex]++;
 
         if (valid > 0 && node->probability() < 0.1)
             debugmsg(QString("Valid object with prob < 0.1: %1").arg(i.fullName()));
     }
     // Final decision: Is the object invalid?
     else if (valid < 0) {
+        _totalInvalid++;
+        _totalInvalidDistribution[probIndex]++;
+
         if (node->probability() > 0.9) {
             switch (v) {
             // A conflict has its dedicated error message
@@ -659,6 +663,7 @@ void MemoryMapVerifier::statistics()
     // Reset stats
     _totalObjects = 0;
     _totalValid = 0;
+    _totalInvalid = 0;
     _heuristicsValid = 0;
     _slubValid = 0;
     _slubNotFound = 0;
@@ -682,6 +687,8 @@ void MemoryMapVerifier::statistics()
 
     const int dist_cnt = 10;
     _totalDistribution.resize(dist_cnt);
+    _totalValidDistribution.resize(dist_cnt);
+    _totalInvalidDistribution.resize(dist_cnt);
     _slubValidDistribution.resize(dist_cnt);
     _slubInvalidDistribution.resize(dist_cnt);
     _magicnumberValidDistribution.resize(dist_cnt);
@@ -690,6 +697,8 @@ void MemoryMapVerifier::statistics()
 
     for(int i = 0 ; i < dist_cnt; i++){
         _totalDistribution[i] = 0;
+        _totalValidDistribution[i] = 0;
+        _totalInvalidDistribution[i] = 0;
         _slubValidDistribution[i] = 0;
         _slubInvalidDistribution[i] = 0;
         _magicnumberValidDistribution[i] = 0;
@@ -736,6 +745,16 @@ void MemoryMapVerifier::statistics()
                  << shell->color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
+                 << "\t| Total no. of invalid objects w/ all validrs.:"
+                 << qSetFieldWidth(0) << shell->color(ctMissed) << right << qSetFieldWidth(w_i)
+                 << _totalInvalid
+                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << " ("
+                 << shell->color(ctMissed) << qSetFieldWidth(w_f) << right
+                 << ((float)_totalInvalid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
+                 << shell->color(ctReset)
+                 << "% of " << _totalObjects << ")" << endl
+                 << qSetFieldWidth(w_hdr)
                  << "\t| Total no. of valid objects w/ heuristics:"
                  << right << qSetFieldWidth(0) << shell->color(ctMatched) << qSetFieldWidth(w_i)
                  << _heuristicsValid
@@ -745,11 +764,25 @@ void MemoryMapVerifier::statistics()
                  << ((float)_heuristicsValid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
                  << shell->color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
-                 << "\t| Distribution: ";
+                 << "\t| Distribution:  ";
     for (int i = 0; i < _totalDistribution.size(); ++i) {
         if (i > 0)
             shell->out() << " - ";
         shell->out() << _totalDistribution[i];
+    }
+    shell->out() << endl
+                 << "\t| Valid dist.:   ";
+    for (int i = 0; i < _totalValidDistribution.size(); ++i) {
+        if (i > 0)
+            shell->out() << " - ";
+        shell->out() << shell->color(ctMatched) << _totalValidDistribution[i] << shell->color(ctReset);
+    }
+    shell->out() << endl
+                 << "\t| Invalid dist.: ";
+    for (int i = 0; i < _totalInvalidDistribution.size(); ++i) {
+        if (i > 0)
+            shell->out() << " - ";
+        shell->out() << shell->color(ctMissed) << _totalInvalidDistribution[i] << shell->color(ctReset);
     }
     shell->out() << endl
                  << qSetFieldWidth(w_hdr)
