@@ -9,7 +9,7 @@
 			<description>This rule does nothing.</description>
 			<filter>
 				<datatype>struct</datatype>
-				<typename>does_not_exist</typename>
+				<typename>rt6_info</typename>
 			</filter>
 			<action type="inline">
 				return false;
