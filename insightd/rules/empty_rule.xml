@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<rule priority="1">
+			<name>empty</name>
+			<description>This rule does nothing.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>does_not_exist</typename>
+			</filter>
+			<action type="inline">
+				return false;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
