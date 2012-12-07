@@ -184,6 +184,7 @@ private:
 
     quint32 _totalObjects;
     quint32 _totalValid;
+    quint32 _totalInvalid;
     quint32 _heuristicsValid;
     quint32 _slubValid;
     quint32 _slubNotFound;
@@ -203,6 +204,8 @@ private:
     quint32 _magicNumberInvalid;
 
     QVarLengthArray<quint32, 10> _totalDistribution;
+    QVarLengthArray<quint32, 10> _totalValidDistribution;
+    QVarLengthArray<quint32, 10> _totalInvalidDistribution;
 
     QVarLengthArray<quint32, 10> _slubValidDistribution;
     QVarLengthArray<quint32, 10> _slubInvalidDistribution;
