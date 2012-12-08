@@ -13,7 +13,7 @@
 	</scriptincludes>
 
 	<!-- Generic rules -->
-	<include>no_union_members.xml</include>
+<!-- 	<include>no_union_members.xml</include> -->
 	<include>per_cpu_types.xml</include>
 	<include>radix_trees.xml</include>
 
