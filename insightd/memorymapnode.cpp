@@ -150,6 +150,7 @@ Instance MemoryMapNode::toInstance(bool includeParentNameComponents) const
         // The parent names may be incomplete, so reconstruct them
         if (includeParentNameComponents)
             inst.setParentNameComponents(parentNameComponents());
+        return inst;
     }
 
     // Find a proper name
