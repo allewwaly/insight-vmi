@@ -13,6 +13,8 @@
 
 #include <math.h>
 
+//#define MEMMAP_DEBUG 1
+
 
 /*
  * ===================================> MemoryMapNodeWatcher
@@ -476,6 +478,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     switch(v) {
     case SlubObjects::ovValid:
     case SlubObjects::ovValidCastType:
+#ifdef MEMMAP_DEBUG
         if (_slubObjectNodes.contains(node->address())) {
             debugerr(QString("We found another slub object at address 0x%0:\n"
                              "  In set: %1  ->  %2\n"
@@ -486,9 +489,13 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
                      .arg(node->type()->prettyName())
                      .arg(node->fullName()));
         }
-        else {
-            _objectsFoundInSlub++;
+        else
+#endif
+        {
+#ifdef MEMMAP_DEBUG
             _slubObjectNodes.insert(node->address(), node);
+#endif
+            _objectsFoundInSlub++;
             // If the object was found in a global variable, do not count it
             SlubObject obj = _slub.objectAt(i.address());
             assert(obj.isNull == false);
@@ -527,6 +534,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         // Print detailed debug output
         valid = -1;
         _slubConflict++;
+#ifdef MEMMAP_DEBUG
         // Only give a warning for objects with good probability
         if (node->probability() > 0.5) {
             SlubObject obj = _slub.objectAt(i.address());
@@ -545,6 +553,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
                      .arg(i.typeName())
                      .arg(i.fullName()));
         }
+#endif
         break;
 
     case SlubObjects::ovInvalid:
@@ -595,12 +604,14 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     else {
         if (!valid)
             valid = -1;
+#ifdef MEMMAP_DEBUG
         else if (valid > 0) {
             debugmsg("Instance @ 0x" << std::hex << i.address()
                      << std::dec << " with type " << i.type()->prettyName()
                      << " is invalid according to magic but valid according"
                      << " to slubs: " << i.fullName() );
         }
+#endif
 
         _magicNumberInvalid++;
         _magicnumberInvalidDistribution[probIndex]++;
@@ -613,8 +624,10 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         _totalValidDistribution[probIndex]++;
         _typeCountValid[node->type()]++;
 
+#ifdef MEMMAP_DEBUG
         if (valid > 0 && node->probability() < 0.1)
             debugmsg(QString("Valid object with prob < 0.1: %1").arg(i.fullName()));
+#endif
     }
     // Final decision: Is the object invalid?
     else if (valid < 0) {
@@ -622,6 +635,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         _totalInvalidDistribution[probIndex]++;
         _typeCountInvalid[node->type()]++;
 
+#ifdef MEMMAP_DEBUG
         if (node->probability() > 0.9) {
             switch (v) {
             // A conflict has its dedicated error message
@@ -633,6 +647,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
             debugmsg("Invalid (" << reason << ") object with prob > 0.9: "
                      << i.fullName());
         }
+#endif
     }
     else {
         _typeCountUnknown[node->type()]++;
