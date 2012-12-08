@@ -458,6 +458,7 @@ void MemoryMapVerifier::statisticsCountNodeSV(MemoryMapNodeSV *node)
 void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
 {
     ++_totalObjects;
+    _typeCountAll[node->type()]++;
     Instance i = node->toInstance(true);
 
     SlubObjects::ObjectValidity v = _slub.objectValid(&i);
@@ -511,7 +512,15 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         // no break, fall through
 
     case SlubObjects::ovNoSlabType:
-        _maybeValidObjects++;
+        // If this node represents a global variable, it is always valid
+        if (i.id() > 0) {
+            valid = 1;
+            _slubValid++;
+            node->setSeemsValid();
+        }
+        else {
+            _maybeValidObjects++;
+        }
         break;
 
     case SlubObjects::ovConflict:
@@ -569,12 +578,12 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         if (hasConst){
             if (valid == 0)
                 valid = 1;
-            else if (valid < 0) {
-                debugmsg("Instance @ 0x" << std::hex << i.address()
-                         << std::dec << " with type " << i.type()->prettyName()
-                         << " is valid according to magic but invalid according"
-                         << " to slubs: " << i.fullName() );
-            }
+//            else if (valid < 0) {
+//                debugmsg("Instance @ 0x" << std::hex << i.address()
+//                         << std::dec << " with type " << i.type()->prettyName()
+//                         << " is valid according to magic but invalid according"
+//                         << " to slubs: " << i.fullName() );
+//            }
 
             _magicNumberValid_withConst++;
             node->setSeemsValid();
@@ -602,6 +611,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     if (valid > 0) {
         _totalValid++;
         _totalValidDistribution[probIndex]++;
+        _typeCountValid[node->type()]++;
 
         if (valid > 0 && node->probability() < 0.1)
             debugmsg(QString("Valid object with prob < 0.1: %1").arg(i.fullName()));
@@ -610,6 +620,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     else if (valid < 0) {
         _totalInvalid++;
         _totalInvalidDistribution[probIndex]++;
+        _typeCountInvalid[node->type()]++;
 
         if (node->probability() > 0.9) {
             switch (v) {
@@ -622,6 +633,9 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
             debugmsg("Invalid (" << reason << ") object with prob > 0.9: "
                      << i.fullName());
         }
+    }
+    else {
+        _typeCountUnknown[node->type()]++;
     }
 }
 
@@ -674,6 +688,10 @@ void MemoryMapVerifier::statistics()
     _objectsFoundInSlub = 0;
     _slubObjectNodes.clear();
     _slubObjFoundPerCache.fill(0, _slub.caches().size());
+    _typeCountValid.clear();
+    _typeCountInvalid.clear();
+    _typeCountUnknown.clear();
+    _typeCountAll.clear();
 
     _seemValidObjects = 0;
     
@@ -1000,6 +1018,9 @@ void MemoryMapVerifier::statistics()
     shell->out() << endl;
     slubCoverageStats();
 
+    shell->out() << endl;
+    typeCountStats();
+
     // Reset manipulators to default
     shell->out() << qSetFieldWidth(0) << left;
 }
@@ -1041,6 +1062,88 @@ void MemoryMapVerifier::slubCoverageStats()
                      << shell->color(ctReset) << "%)" << left << endl;
     }
     shell->out() << "\t`-----------------------------------------------------------------" << endl;
+}
+
+
+void MemoryMapVerifier::typeCountStats()
+{
+    shell->out() << "Object Type details:" << endl;
+    shell->out() << "\tAll types:" << endl;
+    typeCountStatsHelper(_typeCountAll);
+    shell->out() << "\t|" << endl;
+    shell->out() << "\tValid types:" << endl;
+    typeCountStatsHelper(_typeCountValid);
+    shell->out() << "\t|" << endl;
+    shell->out() << "\tInvalid types:" << endl;
+    typeCountStatsHelper(_typeCountInvalid);
+    shell->out() << "\t|" << endl;
+    shell->out() << "\tTypes with unknown validity:" << endl;
+    typeCountStatsHelper(_typeCountUnknown);
+    shell->out() << "\t`-----------------------------------------------------------------" << endl;
+}
+
+
+inline void insertSorted(int count, const BaseType* type,
+                  QLinkedList<QPair<int, const BaseType*> >& list)
+{
+    QLinkedList<QPair<int, const BaseType*> >::iterator it = list.begin(),
+            e = list.end();
+
+    // Where to insert the item?
+    while (it != e && count < it->first)
+        ++it;
+    list.insert(it, QPair<int, const BaseType*>(count, type));
+}
+
+
+void MemoryMapVerifier::typeCountStatsHelper(QHash<const BaseType *, int> hash) const
+{
+    const int topX = 20;
+    quint64 size = 0, count = 0;
+
+    QLinkedList<QPair<int, const BaseType*> > topList;
+
+    for (QHash<const BaseType *, int>::const_iterator it = hash.begin(),
+         e = hash.end(); it != e; ++it)
+    {
+        const BaseType* t = it.key();
+        if (!t || t->type() == rtFunction)
+            continue;
+
+        // Count size for average type size
+        size += t->size() * it.value();
+        count += it.value();
+
+        // Put object in top list
+        if (topList.size() < topX)
+            insertSorted(it.value(), t, topList);
+        else if (topList.last().first < it.value()) {
+            insertSorted(it.value(), t, topList);
+            topList.removeLast();
+        }
+    }
+
+    float avgSize = size / (double) count;
+
+    // Print top-X list
+    QLinkedList<QPair<int, const BaseType*> >::iterator it = topList.begin(),
+            e = topList.end();
+    int index = 0;
+    shell->out() << "\t| Average object size: " << avgSize << " byte" << endl;
+    shell->out() << "\t| Distinct types:      " << hash.size() << endl;
+    for (; it != e; ++it) {
+        shell->out() << "\t| " << qSetFieldWidth(2) << right << ++index
+                     << qSetFieldWidth(0) << ". "
+                     << shell->prettyNameInColor(it->second, 40, 40)
+                     << shell->color(ctReset)
+                     << qSetFieldWidth(8) << right << it->first
+                     << qSetFieldWidth(0) << " ("
+                     << qSetFieldWidth(5) << it->first / (float) count * 100.0
+                     << qSetFieldWidth(0) << "%), "
+                     << qSetFieldWidth(5) << it->second->size()
+                     << qSetFieldWidth(0) << " byte"
+                     << left << endl;
+    }
 }
 
 /*

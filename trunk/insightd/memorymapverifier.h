@@ -154,6 +154,7 @@ public:
     void statistics();
 
     void slubCoverageStats();
+    void typeCountStats();
 
     inline const SlubObjects& slub() const { return _slub; }
 
@@ -172,6 +173,8 @@ private:
      * Collects statistics about a single node
      */
     void statisticsCountNodeCS(MemoryMapNode *node);
+
+    void typeCountStatsHelper(QHash<const BaseType*, int> hash) const;
 
     MemoryMap *_map;
     QList<MemoryMapNodeWatcher *> _watchNodes;
@@ -195,6 +198,10 @@ private:
     quint32 _objectsFoundInSlub;
     QHash<quint64, MemoryMapNode*> _slubObjectNodes;
     QVector<int> _slubObjFoundPerCache;
+    QHash<const BaseType*, int> _typeCountValid;
+    QHash<const BaseType*, int> _typeCountInvalid;
+    QHash<const BaseType*, int> _typeCountUnknown;
+    QHash<const BaseType*, int> _typeCountAll;
     
     quint32 _seemValidObjects;
 
