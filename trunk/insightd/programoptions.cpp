@@ -282,6 +282,7 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
                 std::cerr << "The color mode must be one of: "
                              CM_LIGHT ", " CM_DARK  ", " CM_NONE << std::endl;
             }
+            nextToken = ntOption;
             break;
 
         case ntRulesFile: {
