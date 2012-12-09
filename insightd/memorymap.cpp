@@ -424,7 +424,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     _vmem->setThreadSafety(wasThreadSafe);
 
     debugmsg("Processed " << std::dec << _shared->processed << " instances in "
-             << elapsedTime() << " minutes, statistic is generated.");
+             << elapsedTime() << " minutes, statistic is being generated...");
 
     operationStopped();
 
@@ -672,7 +672,8 @@ MemMapList MemoryMap::findAllNodes(const Instance& origInst,
         if (c_start < addrStart) {
             if (addrStart <= c_end) {
                 overlap = true;
-                addrStart = qMin(c_start, addrStart);
+                addrStart = c_start;
+                addrEnd = qMax(addrEnd, c_end);
             }
         }
         else if (c_start <= addrEnd) {
@@ -682,7 +683,8 @@ MemMapList MemoryMap::findAllNodes(const Instance& origInst,
         // If we have a valid interval, append all nodes and reset it to zero
         if (!overlap && (addrStart || addrEnd)) {
             nodes += _vmemMap.objectsInRangeFast(addrStart, addrEnd);
-            addrStart = addrEnd = 0;
+            addrStart = c_start;
+            addrEnd = c_end;
         }
     }
 
