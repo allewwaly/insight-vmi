@@ -118,15 +118,17 @@ SlubObjects::ObjectValidity SlubObjects::objectValid(const Instance *inst) const
 
     // Should never happen!
     case orSecondEmbedsFirst:
-        debugerr(QString("SLUB object \"%0\" at 0x%1 is embedded by instance "
-                         "\"%2\" at 0x%3")
-                 .arg(obj.baseType->prettyName())
-                 .arg(obj.address, 0, 16)
-                 .arg(inst->typeName())
-                 .arg(inst->address(), 0, 16));
+        // Can happen for acpi_* structs and unions
+        if (!inst->typeName().startsWith("acpi_")) {
+            debugerr(QString("SLUB object \"%0\" at 0x%1 is embedded by instance "
+                             "\"%2\" at 0x%3")
+                     .arg(obj.baseType->prettyName())
+                     .arg(obj.address, 0, 16)
+                     .arg(inst->typeName())
+                     .arg(inst->address(), 0, 16));
+        }
         return ovEmbedded;
     }
-
 
     // If we have no match, we still need to call this implementation, because
     // it also checks for the allowed type casts defined in the constructor
