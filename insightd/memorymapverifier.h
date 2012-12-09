@@ -189,6 +189,7 @@ private:
     quint32 _totalValid;
     quint32 _totalInvalid;
     quint32 _heuristicsValid;
+    quint32 _globalVarValid;
     quint32 _slubValid;
     quint32 _slubNotFound;
     quint32 _slubConflict;
