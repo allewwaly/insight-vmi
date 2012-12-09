@@ -293,9 +293,15 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                 filter->matchInst(inst))
             {
                 // Are all required fields accessed?
-                // Not all fields given ==> defer
                 if (filter->members().size() > members.size()) {
-                    ret |= tmp_ret |= mrDefer;
+                    // Check if the fields given so far match the required fields
+                    match = true;
+                    for (int i = 0; match && i < members.size(); ++i)
+                        if (!filter->members().at(i).match(members[i]))
+                            match = false;
+                    // Match but not all fields given yet ==> defer
+                    if (match)
+                        ret |= tmp_ret |= mrDefer;
                 }
                 // Required no. of fields given ==> match
                 // However, we don't need to evaluate anymore non-high-prio
