@@ -473,8 +473,6 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     if (probIndex >= _slubValidDistribution.size())
         probIndex = _slubValidDistribution.size() - 1;
 
-    _totalDistribution[probIndex]++;
-
     switch(v) {
     case SlubObjects::ovValid:
     case SlubObjects::ovValidCastType:
@@ -505,7 +503,6 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         }
         // no break, fall through
 
-    case SlubObjects::ovValidGlobal:
     case SlubObjects::ovEmbedded:
     case SlubObjects::ovEmbeddedUnion:
     case SlubObjects::ovEmbeddedCastType:
@@ -514,6 +511,12 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         node->setSeemsValid();
         break;
 
+    case SlubObjects::ovValidGlobal:
+        _globalVarValid++;
+        valid = 1;
+        node->setSeemsValid();
+        return;
+
     case SlubObjects::ovMaybeValid:
         _slubMaybeValid++;
         // no break, fall through
@@ -521,9 +524,10 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     case SlubObjects::ovNoSlabType:
         // If this node represents a global variable, it is always valid
         if (i.id() > 0) {
+            _globalVarValid++;
             valid = 1;
-            _slubValid++;
             node->setSeemsValid();
+            return;
         }
         else {
             _maybeValidObjects++;
@@ -618,6 +622,8 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         reason = "magicnum";
     }
 
+    _totalDistribution[probIndex]++;
+
     // Final decision: Is this a valid object?
     if (valid > 0) {
         _totalValid++;
@@ -695,6 +701,7 @@ void MemoryMapVerifier::statistics()
     _totalInvalid = 0;
     _heuristicsValid = 0;
     _slubValid = 0;
+    _globalVarValid = 0;
     _slubNotFound = 0;
     _slubConflict = 0;
     _slubInvalid = 0;
@@ -744,10 +751,12 @@ void MemoryMapVerifier::statistics()
     for(int i = 0; i < rootNodes.size(); ++i)
         statisticsHelper(rootNodes[i]);
 
-    assert(_totalObjects == _magicNumberInvalid + _magicNumberValid);
+    assert(_totalObjects == _magicNumberInvalid + _magicNumberValid + _globalVarValid);
 
     quint32 nonSlubObj = _totalObjects -
             (_slubValid + _slubMaybeValid + _slubNotFound + _slubConflict + _slubInvalid);
+    quint32 unknownValidityObj = _totalObjects -
+            (_totalValid + _totalInvalid + _globalVarValid);
 
     const int w_i = 8;
     const int w_f = 5;
@@ -768,7 +777,17 @@ void MemoryMapVerifier::statistics()
                  << _totalObjects
                  << qSetFieldWidth(0) << left << shell->color(ctReset) << endl
                  << qSetFieldWidth(w_hdr)
-                 << "\t| Total no. of valid objects w/ all validators:"
+                 << "\t| No. of global variables:"
+                 << qSetFieldWidth(0) << shell->color(ctMatched) << right << qSetFieldWidth(w_i)
+                 << _globalVarValid
+                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << " ("
+                 << shell->color(ctMatched) << qSetFieldWidth(w_f) << right
+                 << ((float)_globalVarValid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
+                 << shell->color(ctReset)
+                 << "% of " << _totalObjects << ")" << endl
+                 << qSetFieldWidth(w_hdr)
+                 << "\t| No. of valid objects (non-globals):"
                  << qSetFieldWidth(0) << shell->color(ctMatched) << right << qSetFieldWidth(w_i)
                  << _totalValid
                  << qSetFieldWidth(0) << left << shell->color(ctReset)
@@ -778,7 +797,7 @@ void MemoryMapVerifier::statistics()
                  << shell->color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
-                 << "\t| Total no. of invalid objects w/ all validrs.:"
+                 << "\t| No. of invalid objects (non-globals):"
                  << qSetFieldWidth(0) << shell->color(ctMissed) << right << qSetFieldWidth(w_i)
                  << _totalInvalid
                  << qSetFieldWidth(0) << left << shell->color(ctReset)
@@ -788,7 +807,18 @@ void MemoryMapVerifier::statistics()
                  << shell->color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
-                 << "\t| Total no. of valid objects w/ heuristics:"
+                 << "\t| No. of non-globals w/ unknown validity"
+                 << qSetFieldWidth(0) << shell->color(ctDeferred) << right << qSetFieldWidth(w_i)
+                 << unknownValidityObj
+                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << " ("
+                 << shell->color(ctDeferred) << qSetFieldWidth(w_f) << right
+                 << ((float)unknownValidityObj) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
+                 << shell->color(ctReset)
+                 << "% of " << _totalObjects << ")" << endl
+                 << "\t|" << endl
+                 << qSetFieldWidth(w_hdr)
+                 << "\t| No. of valid objects w/ heuristics:"
                  << right << qSetFieldWidth(0) << shell->color(ctMatched) << qSetFieldWidth(w_i)
                  << _heuristicsValid
                  << qSetFieldWidth(0) << left << shell->color(ctReset)
@@ -797,7 +827,9 @@ void MemoryMapVerifier::statistics()
                  << ((float)_heuristicsValid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
                  << shell->color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
-                 << "\t| Distribution:  ";
+                 << "\t|" << endl
+                 << "\t| Distribution of non-globals:" << endl
+                 << "\t| Total:         ";
     for (int i = 0; i < _totalDistribution.size(); ++i) {
         if (i > 0)
             shell->out() << " - ";
