@@ -1144,6 +1144,7 @@ void MemoryMapVerifier::typeCountStatsHelper(QHash<const BaseType *, int> hash) 
     QLinkedList<QPair<int, const BaseType*> >::iterator it = topList.begin(),
             e = topList.end();
     int index = 0;
+    quint64 shownCount = 0;
     shell->out() << "\t| Average object size: " << avgSize << " byte" << endl;
     shell->out() << "\t| Distinct types:      " << hash.size() << endl;
     for (; it != e; ++it) {
@@ -1158,7 +1159,15 @@ void MemoryMapVerifier::typeCountStatsHelper(QHash<const BaseType *, int> hash) 
                      << qSetFieldWidth(5) << it->second->size()
                      << qSetFieldWidth(0) << " byte"
                      << left << endl;
+        shownCount += it->first;
     }
+
+    shell->out() << "\t| Total shown:                                "
+                 << qSetFieldWidth(8) << right << shownCount
+                 << qSetFieldWidth(0) << " ("
+                 << qSetFieldWidth(5) << shownCount / (float) count * 100.0
+                 << qSetFieldWidth(0) << "%)"
+                 << left << endl;
 }
 
 /*
