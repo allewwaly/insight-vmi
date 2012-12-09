@@ -423,6 +423,9 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     // Restore previous value
     _vmem->setThreadSafety(wasThreadSafe);
 
+    debugmsg("Processed " << std::dec << _shared->processed << " instances in "
+             << elapsedTime() << " minutes, statistic is generated.");
+
     operationStopped();
 
     // Show statistics
