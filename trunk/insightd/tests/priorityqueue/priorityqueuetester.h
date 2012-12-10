@@ -21,6 +21,7 @@ public:
 
 private slots:
     void runTests();
+    void randomTests();
 };
 
 #endif /* PRIORITYQUEUETESTER_H_ */
