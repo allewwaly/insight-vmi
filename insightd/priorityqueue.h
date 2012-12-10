@@ -8,7 +8,7 @@
 #ifndef PRIORITYQUEUE_H_
 #define PRIORITYQUEUE_H_
 
-#include <QMultiMap>
+#include <QLinkedList>
 
 /**
  * This container class stores items associated with a priority in an ordered
@@ -30,27 +30,33 @@ template<class Key, class T>
 class PriorityQueue
 {
 public:
-    typedef QMultiMap<Key, T> map_type;
+    /// Queue item class
+    class Item {
+    public:
+        Item() : _key(Key()), _value(T()) {}
+        Item(const Key& key, const T& value) : _key(key), _value(value) {}
+        inline const Key& key() const { return _key; }
+        inline const T& value() const { return _value; }
+        inline T& value() { return _value; }
+    private:
+        Key _key;
+        T _value;
+    };
+
+    typedef QLinkedList<Item> list_type;
 
     /// Iterator type for this container
-    typedef typename map_type::iterator iterator;
+    typedef typename list_type::iterator iterator;
 
     /// Iterator type for this container, const version
-    typedef typename map_type::const_iterator const_iterator;
+    typedef typename list_type::const_iterator const_iterator;
 
 public:
 
     /**
      * Constructor
      */
-    PriorityQueue() : _count(0)
-    {
-    }
-
-    /**
-     * Destructor
-     */
-    virtual ~PriorityQueue()
+    PriorityQueue() : _cur(_list.end())
     {
     }
 
@@ -59,8 +65,7 @@ public:
      */
     inline void clear()
     {
-        _map.clear();
-        _count = 0;
+        _list.clear();
     }
 
     /**
@@ -70,7 +75,7 @@ public:
      */
     inline T& smallest()
     {
-        return _map.begin().value();
+        return _list.first().value();
     }
 
     /**
@@ -80,7 +85,7 @@ public:
      */
     inline const T& smallest() const
     {
-        return _map.constBegin().value();
+        return _list.first().value();
     }
 
     /**
@@ -90,7 +95,7 @@ public:
      */
     inline Key smallestKey() const
     {
-        return _map.constBegin().key();
+        return _list.first().key();
     }
 
     /**
@@ -99,9 +104,7 @@ public:
      */
     inline T& largest()
     {
-        typename map_type::iterator it = _map.end();
-        while (--it == _map.end());
-        return it.value();
+        return _list.last().value();
     }
 
     /**
@@ -110,9 +113,7 @@ public:
      */
     inline const T& largest() const
     {
-        typename map_type::const_iterator it = _map.constEnd();
-        while (--it == _map.constEnd());
-        return it.value();
+        return _list.last().value();
     }
 
     /**
@@ -122,9 +123,7 @@ public:
      */
     inline Key largestKey() const
     {
-        typename map_type::const_iterator it = _map.constEnd();
-        while (--it == _map.constEnd());
-        return it.key();
+        return _list.last().key();
     }
 
     /**
@@ -132,10 +131,36 @@ public:
      * @param key the sorting key
      * @param value the value to insert
      */
-    inline void insert(Key key, T value)
+    inline void insert(const Key& key, const T& value)
     {
-        _map.insertMulti(key, value);
-        ++_count;
+        // Insert sorted with the smallest key at the beginning and the largest
+        // key at the end
+        if (_list.isEmpty())
+            _list.append(Item(key, value));
+        else if (_list.last().key() < key)
+            _list.append(Item(key, value));
+        else if (_list.first().key() >= key)
+            _list.prepend(Item(key, value));
+        else {
+            // Use _cur iterator or start from beginning, depending which
+            // distance is smaller
+            if (_cur == _list.end() ||
+                qAbs(key - _cur->key()) > qAbs(key - _list.first().key()))
+                _cur = _list.begin();
+            // Which direction to go?
+            if (key < _cur->key()) {
+                do {
+                    --_cur;
+                } while (key < _cur->key() && _cur != _list.begin());
+                // Value is inserted BEFORE _cur, so we need to go back one step
+                _cur = _list.insert(++_cur, Item(key, value));
+            }
+            else {
+                while (_cur != _list.end() && key > _cur->key())
+                    ++_cur;
+                _cur = _list.insert(_cur, Item(key, value));
+            }
+        }
     }
 
     /**
@@ -147,10 +172,8 @@ public:
      */
     inline T takeSmallest()
     {
-        typename map_type::iterator it = _map.begin();
-        T item = it.value();
-        _map.erase(it);
-        --_count;
+        T item = _list.first().value();
+        _list.pop_front();
         return item;
     }
 
@@ -163,11 +186,8 @@ public:
      */
     T takeLargest()
     {
-        typename map_type::iterator it = _map.end();
-        while (--it == _map.end());
-        T item = it.value();
-        _map.erase(it);
-        --_count;
+        T item = _list.last().value();
+        _list.pop_back();
         return item;
     }
 
@@ -178,8 +198,7 @@ public:
      */
     inline int count() const
     {
-//        return _map.size();
-        return _count;
+        return _list.size();
     }
 
     /**
@@ -189,8 +208,7 @@ public:
      */
     inline int size() const
     {
-//        return _map.size();
-        return _count;
+        return _list.size();
     }
 
     /**
@@ -198,7 +216,7 @@ public:
      */
     inline bool isEmpty() const
     {
-        return _map.isEmpty();
+        return _list.isEmpty();
     }
 
     /**
@@ -208,7 +226,7 @@ public:
      */
     inline iterator begin()
     {
-        return _map.begin();
+        return _list.begin();
     }
 
     /**
@@ -218,7 +236,7 @@ public:
      */
     inline iterator end()
     {
-        return _map.end();
+        return _list.end();
     }
 
     /**
@@ -227,7 +245,7 @@ public:
      */
     inline const_iterator begin() const
     {
-        return _map.begin();
+        return _list.begin();
     }
 
     /**
@@ -236,7 +254,7 @@ public:
      */
     inline const_iterator end() const
     {
-        return _map.end();
+        return _list.end();
     }
 
     /**
@@ -246,7 +264,7 @@ public:
      */
     inline const_iterator constBegin() const
     {
-        return _map.constBegin();
+        return _list.constBegin();
     }
 
     /**
@@ -256,12 +274,13 @@ public:
      */
     inline const_iterator constEnd() const
     {
-        return _map.constEnd();
+        return _list.constEnd();
     }
 
 private:
-    map_type _map;
-    int _count;
+    list_type _list;
+    iterator _cur;
 };
+
 
 #endif /* PRIORITYQUEUE_H_ */
