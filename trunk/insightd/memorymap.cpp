@@ -835,7 +835,8 @@ MemoryMapNode * MemoryMap::addChildIfNotExistend(
         return child;
     }
 
-    return addChild(origInst, candidates, parent, threadIndex, addrInParent, addToQueue);
+    return addChild(origInst, candidates, parent, threadIndex, addrInParent,
+                    addToQueue);
 }
 
 
@@ -849,9 +850,49 @@ MemoryMapNode *MemoryMap::addChild(
     if (candidates.size() > 1 || (!origInst.isValid() && candidates.isEmpty()))
         return 0;
 
-    // Dereference, if required
-    Instance i(candidates.isEmpty() ? origInst : candidates.first());
+    Instance i(origInst);
 
+    // Do we have a candidate?
+    if (!candidates.isEmpty()) {
+        float o_prob, c_prob;
+        Instance cand(candidates.first());
+        // Does one instance embed the other?
+        ObjectRelation orel = BaseType::embeds(
+                cand.type(), cand.address(),
+                origInst.type(), origInst.address());
+
+        switch(orel) {
+        case orEqual:
+        case orSecondEmbedsFirst:
+            // Use the original type
+            break;
+
+        case orFirstEmbedsSecond:
+            // Use the candidate type
+            i = cand;
+            break;
+
+        case orCover:
+        case orOverlap:
+        case orNoOverlap:
+            // Calculate probability for both
+            o_prob = calculateNodeProbability(origInst, 1.0);
+            c_prob = calculateNodeProbability(cand, 1.0);
+            // If probs are significantly different (> 0.1), and add the one
+            // with higher prob., otherwise add both
+            if (qAbs(c_prob - o_prob) > 0.1) {
+                if (c_prob > o_prob)
+                    i = cand;
+            }
+            else {
+                addChild(cand, InstanceList(), parent, threadIndex,
+                         addrInParent, addToQueue);
+            }
+            break;
+        }
+    }
+
+    // Dereference, if required
     if (i.type() && (i.type()->type() & BaseType::trLexical))
         i = i.dereference(BaseType::trLexical);
 

@@ -266,7 +266,7 @@ public:
     const SymFactory * symfactory() const;
 
     float calculateNodeProbability(const Instance &inst,
-                                   float parentProbability = 0) const;
+                                   float parentProbability = 1.0) const;
 
     bool useRuleEngine() const;
 
