@@ -476,7 +476,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     switch(v) {
     case SlubObjects::ovValid:
     case SlubObjects::ovValidCastType:
-#ifdef MEMMAP_DEBUG
+//#ifdef MEMMAP_DEBUG
         if (_slubObjectNodes.contains(node->address())) {
             debugerr(QString("We found another slub object at address 0x%0:\n"
                              "  In set: %1  ->  %2\n"
@@ -488,11 +488,11 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
                      .arg(node->fullName()));
         }
         else
-#endif
+//#endif
         {
-#ifdef MEMMAP_DEBUG
+//#ifdef MEMMAP_DEBUG
             _slubObjectNodes.insert(node->address(), node);
-#endif
+//#endif
             _objectsFoundInSlub++;
             // If the object was found in a global variable, do not count it
             SlubObject obj = _slub.objectAt(i.address());
