@@ -185,3 +185,39 @@ void PriorityQueueTester::runTests()
     QVERIFY(queue.isEmpty());
     QCOMPARE(queue.count(), 0);
 }
+
+
+void PriorityQueueTester::randomTests()
+{
+    uint seed = QDateTime::currentDateTime().toTime_t();
+    qsrand(seed);
+    std::cout << "Using seed value " << seed << "." << std::endl;
+
+    for (int i = 0; i < 1000; ++i) {
+        PriorityQueue<int, QString> queue;
+        for (int j = 0; j < 1000; ++j)
+            queue.insert(qrand(), QString::number(i * 1000 + j));
+
+        int last = -1, j = 0;
+        while (!queue.isEmpty()) {
+            QVERIFY(queue.smallestKey() >= last);
+            last = queue.smallestKey();
+            queue.takeSmallest();
+            ++j;
+        }
+    }
+
+    for (int i = 0; i < 1000; ++i) {
+        PriorityQueue<int, QString> queue;
+        for (int j = 0; j < 1000; ++j)
+            queue.insert(qrand(), QString::number(i * 1000 + j));
+
+        int last = 0x7fffffff;
+        while (!queue.isEmpty()) {
+            QVERIFY(queue.largestKey() <= last);
+            last = queue.largestKey();
+            queue.takeLargest();
+        }
+    }
+
+}
