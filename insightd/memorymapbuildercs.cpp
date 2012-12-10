@@ -150,6 +150,7 @@ void MemoryMapBuilderCS::processInstance(const Instance &inst, MemoryMapNode *no
     }
 }
 
+
 void MemoryMapBuilderCS::processPointer(const Instance& inst, MemoryMapNode *node)
 {
     assert(inst.type()->type() == rtPointer);
@@ -271,7 +272,6 @@ void MemoryMapBuilderCS::processInstanceFromRule(const Instance &parent,
 }
 
 
-
 float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
         float parentProbability) const
 {
@@ -334,7 +334,6 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
         // Instance is invalid, so do not check futher
         return (prob * (1.0 - degInvalidInstance));
     }
-
 
     // Find the BaseType of this instance, dereference any lexical type(s)
     const BaseType* instType =
