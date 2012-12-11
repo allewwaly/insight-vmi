@@ -203,12 +203,16 @@ const StructuredMember* Structured::member(const QString& memberName,
 
 const StructuredMember *Structured::memberAtOffset(size_t offset, bool exactMatch) const
 {
-    int i;
+    int i, size;
 
-    for (i = 0; i < _members.size() && _members[i]->offset() <= offset; ++i)
+    for (i = 0, size = _members.size(); i < size; ++i) {
+        const StructuredMember* m = _members[i];
+        if (m->offset() <= offset)
+            break;
         // Ignore members that have a size of 0
-        if (_members[i]->offset() == offset && _members[i]->refType()->size() > 0)
-            return _members[i];
+        if (m->offset() == offset && m->refType()->size() > 0)
+            return m;
+    }
 
     if (exactMatch || _members.isEmpty())
         return 0;
