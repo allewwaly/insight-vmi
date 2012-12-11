@@ -205,7 +205,7 @@ const StructuredMember *Structured::memberAtOffset(size_t offset, bool exactMatc
 {
     int i, size;
 
-    if (offset > _size)
+    if (offset >= _size)
         return 0;
 
     for (i = 0, size = _members.size(); i < size; ++i) {

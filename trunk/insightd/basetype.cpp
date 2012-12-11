@@ -269,6 +269,9 @@ ObjectRelation BaseType::embedsHelper(const BaseType *first,
                 ObjectRelation ret;
                 for (int i = 0; i < myStruct->members().size(); ++i) {
                     m = myStruct->members().at(i);
+                    // Make sure the offset is within bounds of the type
+                    if (offset >= m->refType()->size())
+                        continue;
                     ret = embedsHelper(m->refTypeDeep(BaseType::trLexical),
                                        second, offset);
                     if (ret == orFirstEmbedsSecond)
