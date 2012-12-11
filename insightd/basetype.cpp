@@ -235,7 +235,6 @@ ObjectRelation BaseType::embedsHelper(const BaseType *first,
         else if (first->type() & StructOrUnion) {
             const StructuredMember *m;
             myStruct = dynamic_cast<const Structured*>(first);
-
             // Is this a struct?
             if (myStruct->type() == rtStruct) {
 
@@ -257,9 +256,12 @@ ObjectRelation BaseType::embedsHelper(const BaseType *first,
                     }
                 }
 
-                // Find member at current offset
-                m = myStruct->memberAtOffset(offset, false);
-                assert(m != 0);
+                // Find member at current offset. Due to memory alignment, it
+                // can happen that the offset is still larger than the struct,
+                // in which case m == NULL.
+                if ( !(m = myStruct->memberAtOffset(offset, false)) )
+                    return orOverlap;
+
                 assert(offset >= m->offset());
                 offset -= m->offset();
                 first = m->refTypeDeep(BaseType::trLexical);
