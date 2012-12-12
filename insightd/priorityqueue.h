@@ -149,11 +149,12 @@ public:
                 _cur = _list.begin();
             // Which direction to go?
             if (key < _cur->key()) {
-                do {
+                while (key < _cur->key() && _cur != _list.begin())
                     --_cur;
-                } while (key < _cur->key() && _cur != _list.begin());
-                // Value is inserted BEFORE _cur, so we need to go back one step
-                _cur = _list.insert(++_cur, Item(key, value));
+                // Value is inserted BEFORE _cur, so we may need to go back one step
+                if (key >= _cur->key())
+                    ++_cur;
+                _cur = _list.insert(_cur, Item(key, value));
             }
             else {
                 while (_cur != _list.end() && key > _cur->key())
