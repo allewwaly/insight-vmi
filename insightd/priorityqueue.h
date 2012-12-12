@@ -66,6 +66,7 @@ public:
     inline void clear()
     {
         _list.clear();
+        _cur = _list.end();
     }
 
     /**
@@ -173,9 +174,9 @@ public:
      */
     inline T takeSmallest()
     {
-        T item = _list.first().value();
-        _list.pop_front();
-        return item;
+        if (_list.begin() == _cur)
+            ++_cur;
+        return _list.takeFirst().value();
     }
 
     /**
@@ -187,9 +188,9 @@ public:
      */
     T takeLargest()
     {
-        T item = _list.last().value();
-        _list.pop_back();
-        return item;
+        if (--_list.end() == _cur)
+            --_cur;
+        return _list.takeLast().value();
     }
 
     /**
