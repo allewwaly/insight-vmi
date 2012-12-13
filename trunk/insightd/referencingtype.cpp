@@ -80,10 +80,10 @@ inline base_t* ReferencingType::refTypeDeepTempl(ref_t *ref, int resolveTypes)
     if (!ref->_refTypeDeep || resolveTypes != ref->_deepResolvedTypes) {
         ref->_deepResolvedTypes = resolveTypes;
         base_t* t = ref->refType();
-        if ( t && (t->type() & resolveTypes) ) {
-            ref_base_t* rbt = dynamic_cast<ref_base_t*>(t);
-            while (rbt && (rbt->type() & resolveTypes)) {
-                rbt = dynamic_cast<ref_base_t*>(t = rbt->refType());
+        if ( t && (t->type() & resolveTypes & RefBaseTypes) ) {
+            ref_base_t* rbt = static_cast<ref_base_t*>(t);
+            while (rbt && (rbt->type() & resolveTypes & RefBaseTypes)) {
+                rbt = static_cast<ref_base_t*>(t = rbt->refType());
             }
         }
         ref->_refTypeDeep = const_cast<BaseType*>(t);
@@ -220,7 +220,7 @@ inline Instance ReferencingType::createRefInstance(size_t address,
         if ((rbtRef = p->refType()) &&
             ((rbtRef->type() & (rtInt8|rtUInt8)) ||
              (rbtRef->type() == rtConst &&
-              (rbtRbt = dynamic_cast<const RefBaseType*>(rbtRef)) &&
+              (rbtRbt = static_cast<const RefBaseType*>(rbtRef)) &&
               (rbtRbtRef = rbtRbt->refType()) &&
               rbtRbtRef->type() & (rtInt8|rtUInt8))))
             // Stop here, so that toString() later on will print this as string
@@ -259,9 +259,9 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 
     const RefBaseType* rbt = 0;
 
-    while ( !done && b && (b->type() & resolveTypes) &&
-            (rbt = dynamic_cast<const RefBaseType*>(b)) )
+    while ( !done && b && (b->type() & resolveTypes & RefBaseTypes) )
     {
+        rbt = static_cast<const RefBaseType*>(b);
         // If this is an unresolved type, don't resolve it anymore
         if ( !(rbtRef = rbt->refType()) &&
              !(resolveTypes & BaseType::trVoidPointers) )
@@ -273,7 +273,7 @@ inline Instance ReferencingType::createRefInstance(size_t address,
 			if (rbtRef &&
 				(rbtRef->type() == rtInt8 ||
 				 (rbtRef->type() == rtConst &&
-				  (rbtRbt = dynamic_cast<const RefBaseType*>(rbtRef)) &&
+				  (rbtRbt = static_cast<const RefBaseType*>(rbtRef)) &&
 				  (rbtRbtRef = rbtRbt->refType()) &&
 				  rbtRbtRef->type() == rtInt8)))
 				// Stop here, so that toString() later on will print this as string

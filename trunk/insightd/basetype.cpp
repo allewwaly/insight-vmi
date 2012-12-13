@@ -40,7 +40,8 @@ BaseType* BaseType::dereferencedBaseType(int resolveTypes, int maxPtrDeref,
         return this;
 
     BaseType* prev = this;
-    RefBaseType* curr = dynamic_cast<RefBaseType*>(prev);
+    RefBaseType* curr = (type() & RefBaseTypes) ?
+                static_cast<RefBaseType*>(this) : 0;
     while (curr && curr->refType() && (curr->type() & resolveTypes) ) {
         if (curr->type() & (rtPointer|rtArray)) {
             // Count down pointer dereferences
@@ -54,7 +55,7 @@ BaseType* BaseType::dereferencedBaseType(int resolveTypes, int maxPtrDeref,
                 *depth += 1;
         }
         prev = curr->refType();
-        curr = dynamic_cast<RefBaseType*>(prev);
+        curr = (prev->type() & RefBaseTypes) ? static_cast<RefBaseType*>(prev) : 0;
     }
     return prev;
 }
@@ -218,7 +219,8 @@ ObjectRelation BaseType::embedsHelper(const BaseType *first,
         return orOverlap;
 
     const Structured *myStruct = 0,
-            *otherStruct = dynamic_cast<const Structured *>(second);
+            *otherStruct = (second->type() & StructOrUnion) ?
+                static_cast<const Structured *>(second) : 0;
 
     // Consider all nested arrays, structs, unions and try to find a match.
     while (first) {
@@ -234,7 +236,7 @@ ObjectRelation BaseType::embedsHelper(const BaseType *first,
         // Struct or union?
         else if (first->type() & StructOrUnion) {
             const StructuredMember *m;
-            myStruct = dynamic_cast<const Structured*>(first);
+            myStruct = static_cast<const Structured*>(first);
             // Is this a struct?
             if (myStruct->type() == rtStruct) {
 

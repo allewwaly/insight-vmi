@@ -612,7 +612,9 @@ Instance* Instance::typeRuleMatchRek(ConstMemberList &members, int* match) const
 Instance Instance::member(int index, int resolveTypes, int maxPtrDeref,
 						  KnowledgeSources src, int *result) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
+	if (!_d->type || !(_d->type->type() & StructOrUnion))
+		return Instance();
+	const Structured* s = static_cast<const Structured*>(_d->type);
 	if (s && index >= 0 && index < s->members().size()) {
 		const StructuredMember* m = s->members().at(index);
 		return member(ConstMemberList() << m, resolveTypes, maxPtrDeref, src,
@@ -626,10 +628,9 @@ Instance Instance::member(const QString& name, int resolveTypes,
 						  int maxPtrDeref, KnowledgeSources src,
 						  int *result) const
 {
-	const Structured* s;
-	if ( !(s = dynamic_cast<const Structured*>(_d->type)) )
+	if (!_d->type || !(_d->type->type() & StructOrUnion))
 		return Instance();
-
+	const Structured* s = static_cast<const Structured*>(_d->type);
 	ConstMemberList list(s->memberChain(name));
 	if (!list.isEmpty())
 		return member(list, resolveTypes, maxPtrDeref, src, result);
@@ -640,11 +641,10 @@ Instance Instance::member(const QString& name, int resolveTypes,
 Instance Instance::memberByOffset(size_t off, bool exactMatch) const
 {
     // Is this an struct?
-    const Structured* s = dynamic_cast<const Structured*>(_d->type);
-
-    if (!s)
+    if (!_d->type || !(_d->type->type() & StructOrUnion))
         return Instance();
 
+    const Structured* s = static_cast<const Structured*>(_d->type);
     const StructuredMember *m = s->memberAtOffset(off, exactMatch);
 
     if (!m)
@@ -685,7 +685,7 @@ int Instance::memberOffset(const QString& name) const
     if (!_d->type || !(_d->type->type() & StructOrUnion))
         return false;
 
-    const Structured* s = dynamic_cast<const Structured*>(_d->type);
+    const Structured* s = static_cast<const Structured*>(_d->type);
     return s->memberOffset(name);
 }
 
@@ -695,13 +695,15 @@ bool Instance::memberExists(const QString& name) const
     if (!_d->type || !(_d->type->type() & StructOrUnion))
         return false;
 
-    return dynamic_cast<const Structured*>(_d->type)->memberExists(name, true);
+    return static_cast<const Structured*>(_d->type)->memberExists(name, true);
 }
 
 
 int Instance::indexOfMember(const QString& name) const
 {
-	const Structured* s = dynamic_cast<const Structured*>(_d->type);
+	if (!_d->type || !(_d->type->type() & StructOrUnion))
+		return -1;
+	const Structured* s = static_cast<const Structured*>(_d->type);
 	return s ? s->memberNames().indexOf(name) : -1;
 }
 
