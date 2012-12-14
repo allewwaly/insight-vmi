@@ -2297,16 +2297,23 @@ int Shell::cmdMemoryDump(QStringList args)
     int index = parseMemDumpIndex(args);
     // Perform the dump
     if (index >= 0) {
-        QRegExp re("^\\s*([^@]+)\\s*@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
+        QRegExp re("^\\s*([_a-zA-Z0-9]+)\\s*(?:([0-9]+)\\s*)?@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
 
         if (!re.exactMatch(args.join(" "))) {
-            errMsg("Usage: memory dump [index] <char|int|long|type-name|type-id>(.<member>)* @ <address>");
+            errMsg("Usage: memory dump [index] <raw|char|int|long|type-name|type-id>(.<member>)* [length] @ <address>");
             return 1;
         }
 
-        bool ok;
-        quint64 addr = re.cap(2).toULong(&ok, 16);
-        _out << _memDumps[index]->dump(re.cap(1).trimmed(), addr, _color) << endl;
+        bool ok = true;
+        int length = re.cap(2).isEmpty() ? -1 : re.cap(2).toULong(&ok);
+        if (!ok)
+            errMsg("Invalid length given: " + re.cap(2));
+
+        quint64 addr = re.cap(3).toULongLong(&ok, 16);
+        if (!ok)
+            errMsg("Invalid address: " + re.cap(3));
+
+        _out << _memDumps[index]->dump(re.cap(1).trimmed(), addr, length, _color) << endl;
         return ecOk;
     }
 
