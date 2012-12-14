@@ -208,7 +208,7 @@ public:
      * @return a string representation of the memory region at \a address as
      * type \a type
      */
-    QString dump(const QString& type, quint64 address, const ColorPalette &col) const;
+    QString dump(const QString& type, quint64 address, int length, const ColorPalette &col) const;
 
     /**
      * @return the memory specification this MemDump object uses

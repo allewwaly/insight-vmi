@@ -584,7 +584,7 @@ QString MemoryDump::query(const QString& queryString,
 }
 
 
-QString MemoryDump::dump(const QString& type, quint64 address,
+QString MemoryDump::dump(const QString& type, quint64 address, int length,
                          const ColorPalette& col) const
 {
     if (type == "char") {
@@ -607,6 +607,66 @@ QString MemoryDump::dump(const QString& type, quint64 address,
             queryError(QString("Cannot read memory from address 0x%1")
                        .arg(address, (_specs.sizeofPointer << 1), 16, QChar('0')));
         return QString("%1 (0x%2)").arg(l).arg((quint64)l, (sizeof(l) << 1), 16, QChar('0'));
+    }
+    if (type == "raw" || type == "hex") {
+        QString ret;
+        const int buflen = 256, linelen = 16;
+        char buf[buflen];
+        char bufstr[linelen + 1] = {0};
+
+        // Make sure we got a valid length
+        if (length < 0)
+            queryError(QString("No valid length given for dumping raw memory"));
+
+        int totalBytesRead = 0, col = 0;
+        while (length > 0) {
+            int bytesRead = _vmem->readAtomic(address, buf, qMin(buflen, length));
+            length -= bytesRead;
+
+            int i = 0;
+            while (i < bytesRead) {
+                // New line every 16 bytes begins with address
+                if (totalBytesRead % 16 == 0) {
+                    if (totalBytesRead > 0) {
+                        ret += QString("  |%0|\n").arg(bufstr, -linelen);
+                        memset(bufstr, 0, linelen + 2);
+                        col = 0;
+                    }
+                    ret += QString("%1 ").arg(address, _specs.sizeofPointer << 1, 16, QChar('0'));
+                }
+
+                // Wider column after 8 bytes
+                if (totalBytesRead % 8 == 0)
+                    ret += ' ';
+                // Write the character as hex string
+                if ((unsigned char)buf[i] < 16)
+                    ret += '0';
+                ret += QString::number((unsigned char)buf[i], 16) + ' ';
+                // Add character to string buffer, if it's an ASCII char
+                if ( ((unsigned char)buf[i] >= 32) && ((unsigned char)buf[i] < 127) )
+                    bufstr[col] = buf[i];
+                else
+                    bufstr[col] = '.';
+
+                ++col;
+                ++totalBytesRead;
+                ++address;
+                ++i;
+            }
+        }
+
+        // Finish it up
+        if (col > 0) {
+            while (col < linelen) {
+                ret += "   ";
+                if (col % 8 == 0)
+                    ret += ' ';
+                ++col;
+            }
+            ret += QString("  |%0|").arg(bufstr, -linelen);
+        }
+
+        return ret;
     }
 
 	QStringList components = type.split('.', QString::SkipEmptyParts);
