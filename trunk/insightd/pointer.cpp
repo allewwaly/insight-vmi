@@ -142,7 +142,7 @@ QByteArray Pointer::readString(VirtualMemory* mem, size_t offset, const int len,
         for (int i = 0; i < len && replaceNonAscii; i++) {
             if (buf[i] == 0)
                 break;
-            else if ( (buf[i] & 0x80) || !(buf[i] & 0x60) ) // buf[i] >= 128 || buf[i] < 32
+            else if ( ((unsigned char)buf[i] < 32) || ((unsigned char)buf[i] >= 127) )
                 buf[i] = '.';
         }
         return QByteArray(buf, len);
