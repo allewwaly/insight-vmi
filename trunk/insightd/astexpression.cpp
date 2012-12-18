@@ -674,15 +674,20 @@ ASTConstExpressionList ASTBinaryExpression::expandAlternatives(ASTConstExpressio
         return selflist;
     // For all alternatives of this, left and right, create new objects
     for (int s = 0; s < selflist.size(); ++s) {
-        for (int l = 0; l < llist.size(); ++l) {
-            for (int r = 0; r < rlist.size(); ++r) {
-                ASTBinaryExpression* self =
-                        dynamic_cast<ASTBinaryExpression*>(
-                            selflist[s]->copy(list, false));
-                self->_left = const_cast<ASTExpression*>(llist[l]);
-                self->_right = const_cast<ASTExpression*>(rlist[r]);
-                ret += self;
+        if (dynamic_cast<const ASTBinaryExpression*>(selflist[s])) {
+            for (int l = 0; l < llist.size(); ++l) {
+                for (int r = 0; r < rlist.size(); ++r) {
+                    ASTBinaryExpression* self =
+                            dynamic_cast<ASTBinaryExpression*>(
+                                selflist[s]->copy(list, false));
+                    self->_left = const_cast<ASTExpression*>(llist[l]);
+                    self->_right = const_cast<ASTExpression*>(rlist[r]);
+                    ret += self;
+                }
             }
+        }
+        else {
+            ret += selflist[s]->expandAlternatives(list);
         }
     }
     return ret;
@@ -939,12 +944,17 @@ ASTConstExpressionList ASTUnaryExpression::expandAlternatives(ASTConstExpression
         return selflist;
     // For all alternatives of this, left and right, create new objects
     for (int s = 0; s < selflist.size(); ++s) {
-        for (int c = 0; c < clist.size(); ++c) {
+        if (dynamic_cast<const ASTUnaryExpression*>(selflist[s])) {
+            for (int c = 0; c < clist.size(); ++c) {
                 ASTUnaryExpression* self =
                         dynamic_cast<ASTUnaryExpression*>(
-                                          selflist[s]->copy(list, false));
+                            selflist[s]->copy(list, false));
                 self->_child = const_cast<ASTExpression*>(clist[c]);
                 ret += self;
+            }
+        }
+        else {
+            ret += selflist[s]->expandAlternatives(list);
         }
     }
     return ret;
