@@ -33,7 +33,8 @@ const char* path_sep        = ":";
 
 ScriptEngine::ScriptEngine(int knowledgeSources)
 	: _engine(0), _instClass(0), _symClass(0), _memClass(0),
-	  _lastEvalFailed(false), _initialized(false), _knowSrc(knowledgeSources)
+	  _lastEvalFailed(false), _initialized(false), _knowSrc(knowledgeSources),
+	  _memDumpIndex(-1)
 {
 }
 
@@ -186,17 +187,18 @@ void ScriptEngine::checkEvalErrors(const QScriptValue &result)
 
 
 QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
-									const QStringList& includePaths)
+									const QStringList& includePaths,
+									int memDumpIndex)
 {
 	QStringList argv(program.fileName());
 	QStringList inc(QFileInfo(program.fileName()).absoluteFilePath());
 	inc += includePaths;
-	return evaluate(program, argv, inc);
+	return evaluate(program, argv, inc, memDumpIndex);
 }
 
 
 QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
-		const QStringList& argv, const QStringList& includePaths)
+		const QStringList& argv, const QStringList& includePaths, int memDumpIndex)
 {
 	initScriptEngine();
 
@@ -208,6 +210,7 @@ QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
 
 	prepareEvaluation(argv, includePaths);
 
+	VarSetter<int> setter(&_memDumpIndex, memDumpIndex, -1);
 	QScriptValue ret(_engine->evaluate(program));
 	checkEvalErrors(ret);;
 
@@ -216,25 +219,27 @@ QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
 
 
 QScriptValue ScriptEngine::evaluate(const QString &code,
-		const QStringList &argv, const QStringList &includePaths)
+		const QStringList &argv, const QStringList &includePaths, int memDumpIndex)
 {
 	if (argv.isEmpty())
-		return evaluate(QScriptProgram(code), argv, includePaths);
+		return evaluate(QScriptProgram(code), argv, includePaths, memDumpIndex);
 	else
-		return evaluate(QScriptProgram(code, argv.first()), argv, includePaths);
+		return evaluate(QScriptProgram(code, argv.first()), argv, includePaths,
+						memDumpIndex);
 }
 
 
 QScriptValue ScriptEngine::evaluateFunction(const QString &func,
 		const QScriptValueList &funcArgs, const QScriptProgram &program,
-		const QStringList& includePaths)
+		const QStringList& includePaths, int memDumpIndex)
 {
-	QScriptValue ret(evaluate(program, includePaths));
+	QScriptValue ret(evaluate(program, includePaths, memDumpIndex));
 
 	if (_lastEvalFailed)
 		return ret;
 	// Obtain the function object
 	QScriptValue f(_engine->currentContext()->activationObject().property(func));
+	VarSetter<int> setter(&_memDumpIndex, memDumpIndex, -1);
 	ret = f.call(QScriptValue(), funcArgs);
 	checkEvalErrors(ret);
 
@@ -247,7 +252,7 @@ ScriptEngine::FuncExistsResult ScriptEngine::functionExists(const QString& func,
 {
 	QStringList argv(program.fileName());
 	QStringList includePaths(QFileInfo(program.fileName()).absoluteFilePath());
-	QScriptValue ret(evaluate(program, argv, includePaths));
+	QScriptValue ret(evaluate(program, argv, includePaths, 0));
 
 	if (_lastEvalFailed)
 		return feRuntimeError;
@@ -316,20 +321,24 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
         return QScriptValue();
     }
 
+    int index = this_eng->_memDumpIndex;
+
     // Default memDump index is the first one
-    int index = 0;
-    while (index < shell->memDumps().size() && !shell->memDumps()[index])
-        index++;
-    if (index >= shell->memDumps().size() || !shell->memDumps()[index]) {
-        ctx->throwError("No memory dumps loaded");
-        return QScriptValue();
+    if (index < 0) {
+        index = 0;
+        while (index < shell->memDumps().size() && !shell->memDumps()[index])
+            index++;
+        if (index >= shell->memDumps().size() || !shell->memDumps()[index]) {
+            ctx->throwError("No memory dumps loaded");
+            return QScriptValue();
+        }
     }
 
     // Second argument is optional and defines the memDump index
     if (ctx->argumentCount() == 2) {
         index = ctx->argument(1).isNumber() ? ctx->argument(1).toInt32() : -1;
         if (index < 0 || index >= shell->memDumps().size() ||
-        		!shell->memDumps()[index])
+            !shell->memDumps().at(index))
         {
             ctx->throwError(QString("Invalid memory dump index: %1")
                                 .arg(ctx->argument(1).toString()));
@@ -340,8 +349,8 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
     // Get the instance
     try {
 		Instance instance = queryStr.isNull() ?
-				shell->memDumps()[index]->queryInstance(queryId) :
-				shell->memDumps()[index]->queryInstance(queryStr);
+				shell->memDumps().at(index)->queryInstance(queryId) :
+				shell->memDumps().at(index)->queryInstance(queryStr);
 
 		if (!instance.isValid())
 			return QScriptValue();

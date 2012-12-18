@@ -105,9 +105,11 @@ public:
      * the name of the script file, determined with QScriptProgram::fileName().
      * The include path is set to the directory containing the script file.
      * @param program script code to be evaluated
+     * @param memDumpIndex index of the memory dump to use, default value -1 uses the first
      * @return the result of the script evaluation
      */
-    QScriptValue evaluate(const QScriptProgram& program, const QStringList &includePaths);
+    QScriptValue evaluate(const QScriptProgram& program, const QStringList &includePaths,
+                          int memDumpIndex = -1);
 
     /**
      * Evaluates the script in \a program and returns the result of the
@@ -119,10 +121,11 @@ public:
      * @param argv a list of parameters that is available as global array
      *  \c ARGV within the script
      * @param includePaths list of paths to look for script file includes
+     * @param memDumpIndex index of the memory dump to use, default value -1 uses the first
      * @return the result of the script evaluation
      */
     QScriptValue evaluate(const QScriptProgram& program, const QStringList& argv,
-                          const QStringList& includePaths);
+                          const QStringList& includePaths, int memDumpIndex = -1);
 
     /**
      * This is an overloaded convenience function that encapsulates \a code in a
@@ -131,10 +134,11 @@ public:
      * @param argv a list of parameters that is available as global array
      *  \c ARGV within the script
      * @param includePaths list of paths to look for script file includes
+     * @param memDumpIndex index of the memory dump to use, default value -1 uses the first
      * @return the result of the script evaluation
      */
     QScriptValue evaluate(const QString& code, const QStringList& argv,
-            const QStringList &includePaths);
+            const QStringList &includePaths, int memDumpIndex = -1);
 
     /**
      * Evaluates the function with name \a func which must be defined in
@@ -145,10 +149,12 @@ public:
      * @param program program that defines the function
      * @param argv see evaluate()
      * @param includePaths see evaluate()
+     * @param memDumpIndex index of the memory dump to use, default value -1 uses the first
      * @return see evaluate()
      */
     QScriptValue evaluateFunction(const QString& func,
-            const QScriptValueList& funcArgs, const QScriptProgram &program, const QStringList &includePaths);
+            const QScriptValueList& funcArgs, const QScriptProgram &program,
+                                  const QStringList &includePaths, int memDumpIndex = -1);
 
     /**
      * Checks if the function named \a func is defined within the scope of
@@ -234,6 +240,7 @@ private:
 	bool _initialized;
 	bool _contextPushed;
 	int _knowSrc;
+	int _memDumpIndex;
 
 	void prepareEvaluation(const QStringList &argv, const QStringList &includePaths);
 
