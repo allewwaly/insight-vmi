@@ -3032,7 +3032,7 @@ int Shell::cmdScript(QStringList args)
         args.pop_front();
     }
 
-    QString fileName = args[0];
+    QString fileName = args.isEmpty() ? QString() : args[0];
     QFile file(fileName);
     QStringList includePaths(QDir::cleanPath(QFileInfo(file).absolutePath()));
 
