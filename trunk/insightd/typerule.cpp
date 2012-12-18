@@ -163,7 +163,7 @@ Instance ScriptAction::evaluate(const Instance *inst,
     QScriptValueList args;
     args << instVal << indexlist;
     QScriptValue ret(eng->evaluateFunction(funcToCall(), args, *_program,
-                                            _includePaths));
+                                           _includePaths, inst->memDumpIndex()));
 
     if (eng->lastEvaluationFailed())
         warnEvalError(eng, _program->fileName());

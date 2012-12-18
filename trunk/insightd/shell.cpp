@@ -3026,8 +3026,14 @@ int Shell::cmdScript(QStringList args)
         return 1;
     }
 
+    // Get the memory dump index to use
+    int index = parseMemDumpIndex(args);
+    // Make sure the index is valid
+    if (index < 0)
+        return ecNoMemoryDumpsLoaded;
+
     bool timing = false;
-    if (args.first() == "-v") {
+    if (!args.isEmpty() && args.first() == "-v") {
         timing = true;
         args.pop_front();
     }
@@ -3068,7 +3074,7 @@ int Shell::cmdScript(QStringList args)
 	QTime timer;
 	if (timing)
 		timer.start();
-	QScriptValue result = _engine->evaluate(scriptCode, args, includePaths);
+	QScriptValue result = _engine->evaluate(scriptCode, args, includePaths, index);
 
 	if (_engine->hasUncaughtException()) {
 		_err << color(ctError) << "Exception occured on ";
