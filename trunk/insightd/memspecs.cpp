@@ -143,7 +143,8 @@ KernelMemSpecList MemSpecs::supportedMemSpecs()
             str::maxErrNo,
             str::maxErrNo,
             "int",
-            "%d"));
+            "%d",
+            QString("defined(%1)").arg(str::maxErrNo)));
 
     // Linux kernel version information
     // See <init/version.c>
