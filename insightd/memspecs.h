@@ -105,7 +105,7 @@ struct MemSpecs
         ar_i386         = (1 << 0), ///< architecture is i386 with extended paging
         ar_x86_64       = (1 << 1), ///< architecture is AMD64
         ar_pae_enabled  = (1 << 2), ///< flag that indicates if PAE is enabled in i386 mode
-        ar_i386_pae     = ar_i386 & ar_pae_enabled ///< architecture is i386 with PAE enabled
+        ar_i386_pae     = ar_i386 | ar_pae_enabled ///< architecture is i386 with PAE enabled
     };
 
     /**
