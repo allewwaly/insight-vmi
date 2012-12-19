@@ -475,6 +475,9 @@ Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCoun
 Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 						  int maxPtrDeref, KnowledgeSources src, int *result) const
 {
+	if (!_d->vmem)
+		return Instance();
+
 	const StructuredMember* m = members.last();
 	int match = 0;
 	if (result)
@@ -806,7 +809,7 @@ InstanceList Instance::toList() const
 Instance Instance::memberCandidate(const StructuredMember* m,
 								   int cndtIndex) const
 {
-	if (!m || cndtIndex < 0 || cndtIndex >= m->altRefTypeCount())
+	if (!_d->vmem || !m || cndtIndex < 0 || cndtIndex >= m->altRefTypeCount())
 		return Instance();
 	// Otherwise use the alternative type
 	const AltRefType& alt = m->altRefType(cndtIndex);
@@ -1280,7 +1283,7 @@ qint64 Instance::toIntBitField() const
 QString Instance::toString(const ColorPalette* col) const
 {
     static const QString nullStr("NULL");
-    if (isNull()) {
+    if (isNull() || !_d->vmem) {
         if (col)
             return QString(col->color(ctAddress)) + nullStr + QString(col->color(ctReset));
         else
