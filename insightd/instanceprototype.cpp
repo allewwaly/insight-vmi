@@ -328,7 +328,10 @@ Instance InstancePrototype::Member(const QString& name, bool declaredType) const
 {
 	Instance* inst;
 	return ((inst = thisInstance()))
-			? inst->member(name, BaseType::trLexicalAndPointers, -1,
+			? inst->member(name,
+						   declaredType ? BaseType::trLexical
+										: BaseType::trLexicalAndPointers,
+						   -1,
 						 declaredType ? ksNone : _knowSrc)
 			: Instance();
 }
@@ -338,7 +341,10 @@ Instance InstancePrototype::Member(int index, bool declaredType) const
 {
     Instance* inst;
     return ((inst = thisInstance()))
-            ? inst->member(index, BaseType::trLexicalAndPointers, -1,
+            ? inst->member(index,
+                           declaredType ? BaseType::trLexical
+                                        : BaseType::trLexicalAndPointers,
+                           -1,
                            declaredType ? ksNone : _knowSrc)
             : Instance();
 }
