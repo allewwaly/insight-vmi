@@ -374,6 +374,19 @@ public slots:
     quint32 Size() const;
 
     /**
+     * If this instance represents a pointer, a dereferenced instance is
+     * returned, otherwise this instance is returned as-is. For multi-level
+     * pointers, the number of derefenciations can be limited with
+     * \a maxPtrDeref. The default value of -1 dereferences all pointer levels.
+     * @param maxPtrDeref max. number of pointer dereferenciations, use -1 for
+     * infinity
+     * @return a dereferenced version of this instance
+     * \sa Type()
+     */
+    Instance Dereference(int maxPtrDeref = -1) const;
+
+
+    /**
      * Checks if a member with the given name \a name exists in this instance.
      * @param name the name of the member to find
      * @return \c true if that member exists, \c false otherwise
@@ -430,8 +443,11 @@ public slots:
      * valid or not.
      *
      * @param name the name of the member to find
-     * @param declaredType selects if the candidate type (if it exists) or the
-     * declared types should be used, defaults to \c false
+     * @param declaredType if set to \c false (the default), all enabled
+     *  knowledge sources will be considered to resolve this member and all
+     *  pointer types will be dereferenced;
+     *  if set to \c true, the originally declared type for this member will be
+     *  returned and only lexical types will be dereferenced (but no pointers)
      * @return a new Instance object if the member was found, or an empty
      * object otherwise
      * \sa MemberExists(), MemberNames(), IsValid()

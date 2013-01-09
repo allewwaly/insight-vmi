@@ -287,7 +287,16 @@ QString InstancePrototype::Type() const
 quint32 InstancePrototype::Size() const
 {
 	Instance* inst;
-    return ((inst = thisInstance())) ? inst->size() : 0;
+	return ((inst = thisInstance())) ? inst->size() : 0;
+}
+
+
+Instance InstancePrototype::Dereference(int maxPtrDeref) const
+{
+	Instance* inst = thisInstance();
+	if (!inst)
+		return Instance();
+	return inst->dereference(BaseType::trLexicalAllPointers, maxPtrDeref);
 }
 
 
