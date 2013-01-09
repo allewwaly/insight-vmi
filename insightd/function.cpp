@@ -60,6 +60,21 @@ QString Function::toString(QIODevice* /*mem*/, size_t /*offset*/, const ColorPal
 }
 
 
+Instance Function::toInstance(size_t address, VirtualMemory *vmem,
+							  const QString &name, const QStringList &parentNames,
+							  int resolveTypes, int maxPtrDeref, int *derefCount) const
+{
+    Q_UNUSED(address);
+    Q_UNUSED(name);
+    Q_UNUSED(parentNames);
+    Q_UNUSED(resolveTypes);
+    Q_UNUSED(maxPtrDeref);
+    Q_UNUSED(derefCount);
+    Instance inst(_pcLow, this, _name, QStringList(), vmem, _id, Instance::orBaseType);
+    return inst;
+}
+
+
 void Function::readFrom(KernelSymbolStream& in)
 {
     FuncPointer::readFrom(in);
