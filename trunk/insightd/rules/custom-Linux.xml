@@ -25,6 +25,7 @@
 	<include>type_struct_page.xml</include>
 	<include>type_struct_sysfs_dirent.xml</include>
 	<include>type_struct_task_struct.xml</include>
+	<include>type_struct_vm_area_struct.xml</include>
 	<include>type_union_acpi_operand_object.xml</include>
 
 	<!-- Variable-specific rules -->
