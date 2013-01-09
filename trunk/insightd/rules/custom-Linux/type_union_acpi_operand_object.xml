@@ -73,5 +73,31 @@
 			</action>
 		</rule>
 
+		<rule priority="101">
+			<name>acpi_object_package.elements</name>
+			<description>
+				Member "elements" is a dynamic array of size "count".
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>acpi_object_package</typename>
+				<members>
+					<member>elements</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var obj = arguments[0];
+				var count = obj.count;
+				var elements = obj.Member(arguments[1][0], true);
+				var ret = new Array();
+
+				for (var i = 0; i &lt; count; ++i) {
+					var e = elements.ArrayElem(i).Dereference();
+					if (!e.IsNull())
+						ret.push(e);
+				}
+				return ret;
+			</action>
+		</rule>
 	</rules>
 </typeknowledge>
