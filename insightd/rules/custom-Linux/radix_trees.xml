@@ -22,11 +22,10 @@
 				var RADIX_TREE_INDIRECT_PTR = 1;
 				var root = arguments[0];
 				var rnode = root.rnode;
-				if (!rnode.IsNull()) {
-					var addr_low = rnode.AddressLow();
-					if (addr_low &amp; RADIX_TREE_INDIRECT_PTR)
-						rnode.SetAddressLow(addr_low &amp; ~RADIX_TREE_INDIRECT_PTR);
-				}
+				// Do we need to unset the INDIRECT_PTR flag?
+				var addr_low = rnode.AddressLow();
+				if (addr_low &amp; RADIX_TREE_INDIRECT_PTR)
+					rnode.SetAddressLow(addr_low &amp; ~RADIX_TREE_INDIRECT_PTR);
 				return rnode;
 			</action>
 		</rule>
@@ -45,21 +44,24 @@
 				</members>
 			</filter>
 			<action type="inline">
+				var RADIX_TREE_INDIRECT_PTR = 1;
 				var node = arguments[0];
 				var height = node.height.toUInt32();
-				if (height &gt; 1) {
+				if (height &gt; 0) {
 					var slots = node.Member(arguments[1][0]);
 					var len = slots.ArrayLength();
 					var ret = new Array();
 					for (var i = 0; i &lt; len; ++i) {
 						var e = slots.ArrayElem(i);
 						// Dereference once
-						if (e.IsAccessible())
+						if (e.IsAccessible()) {
 							e.SetAddress(e.toPointer());
-						else
-							e.SetAddress(0);
-						e.ChangeType(node.TypeId());
-						ret.push(e);
+							// Make sure the address is no indirect pointer
+							if (e.AddressLow() &amp; RADIX_TREE_INDIRECT_PTR)
+								continue;
+							e.ChangeType(node.TypeId());
+							ret.push(e);
+						}
 					}
 					return ret;
 				}

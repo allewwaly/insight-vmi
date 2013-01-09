@@ -72,13 +72,13 @@
 				for (var i = 0; i &lt; len; ++i) {
 					var e = table.ArrayElem(i);
 					ret.push(e);
-<!--					if (e.toPointer() != 0)
-						println(e.Name(), "= 0x" + e.toPointer());-->
+//					if (e.toPointer() != 0)
+//						println(e.Name(), "= 0x" + e.toPointer());
 				}
 				return ret;
 			</action>
 		</rule>
-
+		
 		<rule priority="111">
 			<name>dentry_hashtable[i].first</name>
 			<description>
@@ -95,7 +95,6 @@
 			<action type="inline">
 				var head = arguments[0];
 				var members = arguments[1];
-<!-- 				println("Called for", head.Name()); -->
 				var inst = head.Member(members[0]);
 				inst.ChangeType("dentry");
 				if (!inst.IsNull())
