@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1.0" os="linux" >
+
+	<rules>
+		<rule priority="101">
+			<name>vm_area_struct.vm_rb.rb_left</name>
+			<description>vm_rb.rb_left points to a "vm_area_struct"</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>vm_area_struct</typename>
+				<members>
+					<member>vm_rb</member>
+					<member match="regex">rb_(left|right)</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var vms = arguments[0];
+				var members = arguments[1];
+				var node = vms.Member(members[0]).Member(members[1]);
+				
+				// Change node's type to vm_area_struct and fix offset
+				node.ChangeType(vms.TypeId());
+				node.AddToAddress(-vms.MemberOffset(members[0]));
+				return node;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
