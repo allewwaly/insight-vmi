@@ -86,6 +86,14 @@ public:
     virtual QString toString(QIODevice* mem, size_t offset, const ColorPalette* col = 0) const;
 
     /**
+     * @copydoc BaseType::toInstance()
+     */
+    virtual Instance toInstance(size_t address, VirtualMemory* vmem,
+            const QString& name, const QStringList& parentNames,
+            int resolveTypes = trLexical, int maxPtrDeref = -1,
+            int* derefCount = 0) const;
+
+    /**
      * Reads a serialized version of this object from \a in.
      * \sa writeTo()
      * @param in the data stream to read the data from, must be ready to read
