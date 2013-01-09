@@ -212,18 +212,17 @@ public slots:
      * Treats this Instance as an array and returns a new instance
      * at index \a index. The behavior depends on the Type():
      *
-     *  * For pointers of type <tt>T*</tt>, the pointer is dereferenced and
+     * \li For pointers of type <tt>T*</tt>, the pointer is dereferenced and
      *    \a index * <tt>sizeof(T)</tt> is added to the resulting address. The
      *    resulting type is <tt>T</tt>. If the pointer cannot be dereferenced,
      *    either because it is of type <tt>void*</tt> or the address is not
      *    accessible, an empty Instance is returned.
-     *  * For arrays of type <tt>T[]</tt>, \a index * <tt>sizeof(T)</tt> is
+     * \li For arrays of type <tt>T[]</tt>, \a index * <tt>sizeof(T)</tt> is
      *    added to the current address. The resulting type is <tt>T</tt>.
-     *  * For any other type <tt>T</tt>, only \a index * <tt>sizeof(T)</tt> is
+     * \li For any other type <tt>T</tt>, only \a index * <tt>sizeof(T)</tt> is
      *    added to the current address. The type <tt>T</tt> remains unchanged.
      *
-     * \warning For Array types, the ArrayLength() parameter is never checked
-     * against \a index!
+     * \warning The ArrayLength() parameter is never checked against \a index!
      *
      * @param index array index to access
      * @return a new Instance as described above
@@ -411,8 +410,11 @@ public slots:
      * You can check for the number of members with MemberCount().
      *
      * @param index the index of the member
-     * @param declaredType selects if the candidate type (if it exists) or the
-     * declared types should be used, defaults to \c false
+     * @param declaredType if set to \c false (the default), all enabled
+     *  knowledge sources will be considered to resolve this member and all
+     *  pointer types will be dereferenced;
+     *  if set to \c true, the originally declared type for this member will be
+     *  returned and only lexical types will be dereferenced (but no pointers)
      * @return a new Instance object if the member exists, or an empty
      * object otherwise
      * \sa MemberCount()
@@ -439,8 +441,11 @@ public slots:
     /**
      * Retrieves the type ID of the member \a name.
      * @param name the name of the member
-     * @param declaredType selects if the candidate type (if it exists) or the
-     * declared types should be used, defaults to \c false
+     * @param declaredType if set to \c false (the default), all enabled
+     *  knowledge sources will be considered to resolve this member and all
+     *  pointer types will be dereferenced;
+     *  if set to \c true, the originally declared type for this member will be
+     *  returned and only lexical types will be dereferenced (but no pointers)
      * @return the ID of the type, if that member exists, \c 0 otherwise.
      */
     int TypeIdOfMember(const QString& name, bool declaredType = false) const;
