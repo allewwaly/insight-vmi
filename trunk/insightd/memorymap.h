@@ -280,6 +280,8 @@ public:
      */
     bool probabilityPropagation() const;
 
+    InstanceList typeInstances(int id) const;
+
 protected:
     virtual void operationProgress();
 
@@ -369,7 +371,7 @@ private:
     MemoryDiffTree _pmemDiff;    ///< differences between this and another map
     ULongSet _vmemAddresses;     ///< holds all virtual addresses
     bool _isBuilding;            ///< indicates if the memory map is currently being built
-    BuilderSharedState* _shared; ///< all variables that are shared amount the builder threads
+    BuilderSharedState* _shared; ///< all variables that are shared among the builder threads
     bool _useRuleEngine;
     KnowledgeSources _knowSrc;
     QVector<quint64> _perCpuOffset;
@@ -492,5 +494,6 @@ inline bool MemoryMap::probabilityPropagation() const
 {
     return _probPropagation;
 }
+
 
 #endif /* MEMORYMAP_H_ */

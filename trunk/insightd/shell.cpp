@@ -192,16 +192,18 @@ Shell::Shell(bool listenOnSocket)
 				"                              Notice, that a type name or a type id\n"
 				"                              can be followed by a query string in case\n"
 				"                              a member of a struct should be dumped.\n"
+				"  memory revmap [index] build\n"
+				"                              Build a reverse mapping for dump <index>\n"
+				"  memory revmap [index] list <type>\n"
+				"                              List all instances of given type in the \n"
+				"                              reverse mapping for dump <index>\n"
 #ifdef CONFIG_WITH_X_SUPPORT
-                "  memory revmap [index] build|visualize\n"
-                "                              Build or visualize a reverse mapping for \n"
-                "                              dump <index>\n"
+                "  memory revmap [index] visualize\n"
+                "                              Visualize the reverse mapping for dump <index>\n"
                 "  memory diff [index1] build <index2>|visualize\n"
                 "                              Compare or visualize a memory dump with\n"
                 "                              dump <index2>"
 #else
-                 "  memory revmap [index] build"
-                 "                              Build a reverse mapping for dump <index>\n"
                  "  memory diff [index1] build <index2>\n"
                  "                              Compare a memory dump with dump <index2>"
 #endif /* CONFIG_WITH_X_SUPPORT */
@@ -986,16 +988,9 @@ int Shell::cmdColor(QStringList args)
 
 void Shell::hline(int width)
 {
-	const int bufLen = 256;
-	char buf[bufLen] = { 0 };
-	// Make sure we don't overrun the buffer
-	if (width + 2 > bufLen)
-		width = bufLen - 2;
-	// Construct and terminate the string
-	memset(buf, '-', width);
-	buf[width + 2] = 0;
-
-    _out << buf << endl;
+	for (int i = 0; i < width; ++i)
+		_out << '-';
+	_out << endl;
 }
 
 
@@ -1679,6 +1674,41 @@ Shell::varsUsingType(const BaseType* usedType, int maxCount) const
 }
 
 
+BaseTypeList Shell::typeIdOrName(QString s) const
+{
+    BaseTypeList types;
+
+    if (s.startsWith("0x"))
+        s = s.right(s.size() - 2);
+    bool ok = false;
+    int id = (int)s.toUInt(&ok, 16);
+
+    // Did we parse an ID?
+    if (ok) {
+        if (_sym.factory().typesById().contains(id))
+            types.append(_sym.factory().findBaseTypeById(id));
+    }
+    // No ID given, so try to find the type by name
+    else
+        types = _sym.factory().typesByName().values(s);
+
+    return types;
+}
+
+
+bool Shell::isRevmapReady(int index) const
+{
+    if (!_memDumps[index]->map() || _memDumps[index]->map()->vmemMap().isEmpty())
+    {
+        _err << "The memory mapping has not yet been build for memory dump "
+                << index << ". Try \"help memory\" to learn how to build it."
+                << endl;
+        return false;
+    }
+    return true;
+}
+
+
 inline bool cmpVarIdLessThan(const Variable* v1, const Variable* v2)
 {
     return ((uint)v1->id()) < ((uint)v2->id());
@@ -2334,6 +2364,10 @@ int Shell::cmdMemoryRevmap(QStringList args)
             args.pop_front();
             return cmdMemoryRevmapBuild(index, args);
         }
+        else if (QString("list").startsWith(args[0])) {
+            args.pop_front();
+            return cmdMemoryRevmapList(index, args);
+        }
         else if (QString("dump").startsWith(args[0])) {
             args.pop_front();
             return cmdMemoryRevmapDump(index, args);
@@ -2425,12 +2459,98 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
 }
 
 
+bool cmdAddrLessThan(const Instance& i1, const Instance& i2)
+{
+    return i1.address() < i2.address();
+}
+
+
+int Shell::cmdMemoryRevmapList(int index, QStringList args)
+{
+    if (args.size() != 1)
+        return cmdHelp(QStringList("memory"));
+
+    if (!isRevmapReady(index))
+        return ecOk;
+
+    InstanceList instances;
+    BaseTypeList types = typeIdOrName(args.front());
+    if (types.isEmpty()) {
+        _out << "No type by that name or ID found." << endl;
+        return ecOk;
+    }
+
+    for (int i = 0; i < types.size(); ++i)
+        instances += _memDumps[index]->map()->typeInstances(types[i]->id());
+
+    if (instances.isEmpty()) {
+        _out << "No instances of that type within the memory map." << endl;
+        return ecOk;
+    }
+
+    // Sort list by address
+    qSort(instances.begin(), instances.end(), cmdAddrLessThan);
+
+    const int w_sep = 2;
+    const int w_addr = 2 + (_memDumps[index]->memSpecs().sizeofPointer << 1);
+    const int w_total = ShellUtil::termSize().width();
+    const int w_name = w_total - w_addr - 1*w_sep;
+
+    // Print header
+    _out << color(ctBold)
+         << qSetFieldWidth(w_addr) << "Address"
+         << qSetFieldWidth(w_sep) << " "
+         << qSetFieldWidth(w_name) << "Full name"
+         << qSetFieldWidth(0) << color(ctReset) << endl;
+    hline(w_total);
+
+    for (int i = 0; i < instances.size(); ++i) {
+        const Instance& inst = instances[i];
+        QStringList comp = inst.fullNameComponents();
+        int w = w_name;
+
+        _out << color(ctAddress)
+             << QString("0x%0").arg(inst.address(), w_addr - 2, 16, QChar('0'))
+             << qSetFieldWidth(w_sep) << " "
+             << qSetFieldWidth(0);
+
+        for (int j = 0; j < comp.size() && w > 0; ++j) {
+            if (j)
+                _out << '.' << color(ctMember);
+            else
+                _out << color(ctVariable);
+            if (comp[j].size() <= w) {
+                _out << comp[j];
+                w -= comp[j].size();
+            }
+            else {
+                _out << ShellUtil::abbrvStrRight(comp[j], w);
+                w = 0;
+            }
+            _out << color(ctReset);
+        }
+
+        _out << endl;
+    }
+
+    // Print footer
+    hline(w_total);
+    _out << "Total no. of instances: " << color(ctBold) << instances.size()
+         << color(ctReset) << endl;
+
+    return ecOk;
+}
+
+
 int Shell::cmdMemoryRevmapDump(int index, QStringList args)
 {
     if (args.size() != 1) {
         cmdHelp(QStringList("memory"));
         return ecInvalidArguments;
     }
+
+    if (!isRevmapReady(index))
+        return ecOk;
 
     const QString& fileName = args.front();
     // Check file for existence
@@ -2492,13 +2612,8 @@ int Shell::cmdMemoryRevmapDumpInit(int index, QStringList args)
 
 int Shell::cmdMemoryRevmapVisualize(int index, QString type)
 {
-    if (!_memDumps[index]->map() || _memDumps[index]->map()->vmemMap().isEmpty())
-    {
-        _err << "The memory mapping has not yet been build for memory dump "
-                << index << ". Try \"help memory\" to learn how to build it."
-                << endl;
-        return 1;
-    }
+    if (!isRevmapReady(index))
+        return ecOk;
 
     int ret = 0;
     /*if (QString("physical").startsWith(type) || QString("pmem").startsWith(type))
@@ -2579,6 +2694,9 @@ int Shell::cmdMemoryDiffBuild(int index1, int index2)
 
 int Shell::cmdMemoryDiffVisualize(int index)
 {
+    if (!isRevmapReady(index))
+        return ecOk;
+
     if (!_memDumps[index]->map() || _memDumps[index]->map()->pmemDiff().isEmpty())
     {
         _err << "The memory dump has not yet been compared to another dump "
