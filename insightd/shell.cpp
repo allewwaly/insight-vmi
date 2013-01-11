@@ -2494,9 +2494,9 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
     const int w_sep = 2;
     const int w_addr = 2 + (_memDumps[index]->memSpecs().sizeofPointer << 1);
     const int w_prob = 4;
-    const int w_valid = 3;
+    const int w_slub = 3;
     const int w_total = 3 * ShellUtil::termSize().width();
-    const int w_name = w_total - w_addr - w_prob - w_valid - 3*w_sep;
+    const int w_name = w_total - w_addr - w_prob - w_slub - 3*w_sep;
 
     // Print header
     _out << color(ctBold)
@@ -2504,7 +2504,7 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
          << qSetFieldWidth(w_sep) << " "
          << qSetFieldWidth(w_prob) << "Prob"
          << qSetFieldWidth(w_sep) << " "
-         << qSetFieldWidth(w_valid) << "Vld"
+         << qSetFieldWidth(w_slub) << "Slb"
          << qSetFieldWidth(w_sep) << " "
          << qSetFieldWidth(0) << "Full name"
          << qSetFieldWidth(0) << color(ctReset) << endl;
@@ -2535,7 +2535,7 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
         _out << qSetFieldWidth(w_sep) << " "
              << qSetFieldWidth(0)
              << color(node->seemsValid() ? ctMatched : ctMissed)
-             << qSetFieldWidth(w_valid) << (node->seemsValid() ? "yes" : "no")
+             << qSetFieldWidth(w_slub) << (node->seemsValid() ? "yes" : "no")
              << qSetFieldWidth(w_sep) << " "
              << qSetFieldWidth(0);
 
