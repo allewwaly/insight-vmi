@@ -317,6 +317,8 @@ private:
 
     QList<QPair<const Variable*, QStringList> >
     varsUsingType(const BaseType *usedType, int maxCount) const;
+    BaseTypeList typeIdOrName(QString s) const;
+    bool isRevmapReady(int index) const;
 //---------------------------------
 //    int cmdDiffVectors(QStringList args);
     int cmdExit(QStringList args);
@@ -342,6 +344,7 @@ private:
     int cmdMemoryDump(QStringList args);
     int cmdMemoryRevmap(QStringList args);
     int cmdMemoryRevmapBuild(int index, QStringList args);
+    int cmdMemoryRevmapList(int index, QStringList args);
 #ifdef CONFIG_WITH_X_SUPPORT
     int cmdMemoryRevmapVisualize(int index, QString type = "v");
 #endif

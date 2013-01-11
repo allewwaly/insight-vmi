@@ -1101,4 +1101,19 @@ void MemoryMap::diffWith(MemoryMap* other)
 }
 
 
+InstanceList MemoryMap::typeInstances(int id) const
+{
+    InstanceList ret;
 
+    // Get list of equivalent types
+    QList<int> typeIds = _factory->equivalentTypes(id);
+    // Find instances for all equivalent types
+    IntNodeHash::const_iterator it, e = _typeInstances.constEnd();
+    for (int i = 0; i < typeIds.size(); ++i) {
+        int typeId = typeIds[i];
+        for (it = _typeInstances.find(typeId); it != e && it.key() == typeId; ++it)
+            ret.append(it.value()->toInstance(true));
+    }
+
+    return ret;
+}
