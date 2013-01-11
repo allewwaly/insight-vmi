@@ -280,7 +280,7 @@ public:
      */
     bool probabilityPropagation() const;
 
-    InstanceList typeInstances(int id) const;
+    ConstNodeList nodesOfType(int id) const;
 
 protected:
     virtual void operationProgress();
