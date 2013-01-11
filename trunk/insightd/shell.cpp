@@ -2459,9 +2459,9 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
 }
 
 
-bool cmdAddrLessThan(const Instance& i1, const Instance& i2)
+bool cmdAddrLessThan(const MemoryMapNode* n1, const MemoryMapNode* n2)
 {
-    return i1.address() < i2.address();
+    return n1->address() < n2->address();
 }
 
 
@@ -2473,7 +2473,7 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
     if (!isRevmapReady(index))
         return ecOk;
 
-    InstanceList instances;
+    ConstNodeList nodes;
     BaseTypeList types = typeIdOrName(args.front());
     if (types.isEmpty()) {
         _out << "No type by that name or ID found." << endl;
@@ -2481,50 +2481,85 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
     }
 
     for (int i = 0; i < types.size(); ++i)
-        instances += _memDumps[index]->map()->typeInstances(types[i]->id());
+        nodes += _memDumps[index]->map()->nodesOfType(types[i]->id());
 
-    if (instances.isEmpty()) {
+    if (nodes.isEmpty()) {
         _out << "No instances of that type within the memory map." << endl;
         return ecOk;
     }
 
     // Sort list by address
-    qSort(instances.begin(), instances.end(), cmdAddrLessThan);
+    qSort(nodes.begin(), nodes.end(), cmdAddrLessThan);
 
     const int w_sep = 2;
     const int w_addr = 2 + (_memDumps[index]->memSpecs().sizeofPointer << 1);
-    const int w_total = ShellUtil::termSize().width();
-    const int w_name = w_total - w_addr - 1*w_sep;
+    const int w_prob = 4;
+    const int w_valid = 3;
+    const int w_total = 3 * ShellUtil::termSize().width();
+    const int w_name = w_total - w_addr - w_prob - w_valid - 3*w_sep;
 
     // Print header
     _out << color(ctBold)
          << qSetFieldWidth(w_addr) << "Address"
          << qSetFieldWidth(w_sep) << " "
-         << qSetFieldWidth(w_name) << "Full name"
+         << qSetFieldWidth(w_prob) << "Prob"
+         << qSetFieldWidth(w_sep) << " "
+         << qSetFieldWidth(w_valid) << "Vld"
+         << qSetFieldWidth(w_sep) << " "
+         << qSetFieldWidth(0) << "Full name"
          << qSetFieldWidth(0) << color(ctReset) << endl;
-    hline(w_total);
+    hline(ShellUtil::termSize().width());
 
-    for (int i = 0; i < instances.size(); ++i) {
-        const Instance& inst = instances[i];
-        QStringList comp = inst.fullNameComponents();
+    _out << qSetRealNumberPrecision(2) << fixed;
+
+    for (int i = 0; i < nodes.size(); ++i) {
+        const MemoryMapNode* node = nodes[i];
+        QStringList comp = node->fullNameComponents();
         int w = w_name;
 
         _out << color(ctAddress)
-             << QString("0x%0").arg(inst.address(), w_addr - 2, 16, QChar('0'))
+             << QString("0x%0").arg(node->address(), w_addr - 2, 16, QChar('0'))
              << qSetFieldWidth(w_sep) << " "
              << qSetFieldWidth(0);
 
+        // Colorized probability
+        if (node->probability() < 0.3)
+            _out << shell->color(ctMissed);
+        else if (node->probability() < 0.8)
+            _out << shell->color(ctDeferred);
+        else
+            _out << shell->color(ctMatched);
+        _out << qSetFieldWidth(w_prob) << node->probability();
+
+        // Colorized validity
+        _out << qSetFieldWidth(w_sep) << " "
+             << qSetFieldWidth(0)
+             << color(node->seemsValid() ? ctMatched : ctMissed)
+             << qSetFieldWidth(w_valid) << (node->seemsValid() ? "yes" : "no")
+             << qSetFieldWidth(w_sep) << " "
+             << qSetFieldWidth(0);
+
+        // Colorized name
         for (int j = 0; j < comp.size() && w > 0; ++j) {
-            if (j)
+            QString s = comp[j];
+            while (s.startsWith('.'))
+                s.remove(0, 1);
+            while (s.endsWith('.'))
+                s.remove(s.length()-1, 1);
+
+            if (j) {
                 _out << '.' << color(ctMember);
+                w -= 1;
+            }
             else
                 _out << color(ctVariable);
-            if (comp[j].size() <= w) {
-                _out << comp[j];
-                w -= comp[j].size();
+
+            if (s.size() <= w) {
+                _out << s;
+                w -= s.size();
             }
             else {
-                _out << ShellUtil::abbrvStrRight(comp[j], w);
+                _out << ShellUtil::abbrvStrRight(s, w);
                 w = 0;
             }
             _out << color(ctReset);
@@ -2534,8 +2569,8 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
     }
 
     // Print footer
-    hline(w_total);
-    _out << "Total no. of instances: " << color(ctBold) << instances.size()
+    hline(ShellUtil::termSize().width());
+    _out << "Total no. of instances: " << color(ctBold) << nodes.size()
          << color(ctReset) << endl;
 
     return ecOk;
