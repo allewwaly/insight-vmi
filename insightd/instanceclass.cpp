@@ -13,6 +13,7 @@
 #include "instanceprototype.h"
 #include "basetype.h"
 #include <debug.h>
+#include <QScriptValueIterator>
 
 namespace js
 {
@@ -295,9 +296,48 @@ QScriptValue InstanceClass::instToScriptValue(QScriptEngine* eng, const Instance
 {
     QScriptValue ctor = eng->globalObject().property(js::instance);
     InstanceClass *cls = qscriptvalue_cast<InstanceClass*>(ctor.data());
-    if (!cls)
+    if (!cls) {
+        debugerr("Could not find instance constructor function object");
         return eng->newVariant(qVariantFromValue(inst));
-    return cls->newInstance(inst);
+    }
+    QScriptValue instVal(cls->newInstance(inst));
+    bool ok;
+    // Add all custom properties as properties of the script object
+    for (StringHash::const_iterator it = inst.properties().begin(),
+         e = inst.properties().end(); it != e; ++it)
+    {
+        int i = it.value().toInt(&ok);
+        if (ok)
+            instVal.setProperty(it.key(), QScriptValue(eng, i));
+        else {
+            double d = it.value().toDouble(&ok);
+            if (ok)
+                instVal.setProperty(it.key(), QScriptValue(eng, d));
+            else
+                instVal.setProperty(it.key(), it.value());
+        }
+    }
+
+    return instVal;
+}
+
+
+void InstanceClass::instFromScriptValue(const QScriptValue &obj, Instance &inst)
+
+{
+    inst = qvariant_cast<Instance>(obj.data().toVariant());
+    QScriptValueIterator it(obj);
+    StringHash props;
+    while (it.hasNext()) {
+         it.next();
+         // Properties with the undeletable flag are members of the correspondig
+         // struct/union, so skip those. User-set properties don't have this
+         // flag set.
+         if (!(it.flags() & QScriptValue::Undeletable)) {
+            props.insert(it.name(), it.value().toString());
+         }
+     }
+    inst.setProperties(props);
 }
 
 

@@ -59,18 +59,14 @@ public:
     KnowledgeSources knowledgeSources() const;
     void setKnowledgeSources(KnowledgeSources src);
 
+    static QScriptValue instToScriptValue(QScriptEngine* eng, const Instance& inst);
+    static void instFromScriptValue(const QScriptValue& obj, Instance& inst);
+
 private:
     static QScriptValue getSetUseCandidates(QScriptContext *ctx, QScriptEngine *eng);
     static QScriptValue getSetUseRules(QScriptContext *ctx, QScriptEngine *eng);
 
     static QScriptValue construct(QScriptContext* ctx, QScriptEngine* eng);
-
-    static QScriptValue instToScriptValue(QScriptEngine* eng, const Instance& inst);
-    inline static void instFromScriptValue(const QScriptValue& obj, Instance& inst)
-    {
-        inst = qvariant_cast<Instance>(obj.data().toVariant());
-    }
-
 
     static QScriptValue membersToScriptValue(QScriptEngine* eng, const InstanceList& inst);
     static void membersFromScriptValue(const QScriptValue& obj, InstanceList& inst);

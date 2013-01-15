@@ -12,6 +12,7 @@
 #include <QSet>
 #include <QSharedData>
 #include <QSharedPointer>
+#include <QMap>
 
 
 // forward declarations
@@ -20,6 +21,7 @@ class VirtualMemory;
 class StructuredMember;
 
 typedef QSet<QString> StringSet;
+typedef QHash<QString, QString> StringHash;
 
 /**
  * This class holds the data of an Instance object.
@@ -86,6 +88,7 @@ public:
     QSharedDataPointer<InstanceData> listNext;
     QSharedDataPointer<InstanceData> parent;
     const StructuredMember* fromParent;
+    StringHash properties;
 };
 
 #endif /* INSTANCEDATA_H_ */

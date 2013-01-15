@@ -14,6 +14,7 @@
 #include "symfactory.h"
 #include "memspecs.h"
 #include "shell.h"
+#include "instanceclass.h"
 #include <abstractsyntaxtree.h>
 #include <astbuilder.h>
 #include <astscopemanager.h>
@@ -148,13 +149,13 @@ Instance ScriptAction::evaluate(const Instance *inst,
     if (matched)
         *matched = true;
 
-    if (!_program)
+    if (!_program || !inst)
         return Instance();
 
     eng->initScriptEngine();
 
     // Instance passed to the rule as 1. argument
-    QScriptValue instVal = eng->toScriptValue(inst);
+    QScriptValue instVal = InstanceClass::instToScriptValue(eng->engine(), *inst);
     // List of accessed member indices passed to the rule as 2. argument
     QScriptValue indexlist = eng->engine()->newArray(members.size());
     for (int i = 0; i < members.size(); ++i)
@@ -176,8 +177,11 @@ Instance ScriptAction::evaluate(const Instance *inst,
         qScriptValueToSequence(ret, list);
         return Instance::fromList(list);
     }
-    else
-        return qscriptvalue_cast<Instance>(ret);
+    else {
+        Instance instRet;
+        InstanceClass::instFromScriptValue(ret, instRet);
+        return instRet;
+    }
 
     return Instance();
 }
