@@ -56,7 +56,7 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
     if (_belongsTo && _address > _belongsTo->vmem()->memSpecs().vaddrSpaceEnd())
             genericError(QString("Address 0x%1 exceeds 32 bit address space")
                     .arg(_address, 0, 16));
-    if (inst.hasParent())
+    if (inst.hasParent() || !inst.properties().isEmpty())
         _origInst = new Instance(inst);
     if (_belongsTo->buildType() == btChrschn)
         updateProbability();

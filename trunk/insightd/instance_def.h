@@ -629,6 +629,19 @@ public:
     const BaseType* memberCandidateType(int mbrIndex, int cndtIndex) const;
 
     /**
+     * @return a string-indexed hash of properties that were set for this
+     * instance within the scripting engine
+     */
+    const StringHash& properties() const { return _d->properties; }
+
+    /**
+     * Sets a string-indexed hash of properties that will be available as
+     * additional proerties within the scripting engine.
+     * @param properties hash of properties
+     */
+    void setProperties(const StringHash& properties) { _d->properties = properties; }
+
+    /**
      * Returns \c true if this instance is part of a list of instances, i.e.,
      * if a call to listNext() retrieves a valid instance. Otherwise \c false
      * is returned. To retrieve the entire list, call toList() on the list's
