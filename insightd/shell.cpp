@@ -2135,6 +2135,7 @@ QString Shell::prettyNameInColor(const BaseType *t, int minLen, int maxLen) cons
     return _color.prettyNameInColor(t, minLen, maxLen);
 }
 
+
 QString Shell::prettyNameInColor(const QString &name, ColorType nameType,
                                  const BaseType *t, int minLen, int maxLen) const
 {
@@ -3444,58 +3445,7 @@ int Shell::cmdShow(QStringList args)
 
 void Shell::printMatchingRules(const ActiveRuleList &rules, int indent)
 {
-	if (rules.isEmpty())
-		return;
-
-	const int w_idx = ShellUtil::getFieldWidth(rules.last().index + 1);
-
-	for (int i = 0; i < rules.size(); ++i) {
-		const TypeRuleAction* action = rules[i].rule->action();
-		if (!action)
-			continue;
-
-		_out << qSetFieldWidth(indent) << right
-			 << QString("Rule %0: ").arg(rules[i].index + 1, w_idx)
-			 << qSetFieldWidth(0);
-
-		switch (action->actionType())
-		{
-		case TypeRuleAction::atExpression: {
-			const ExpressionAction* ea =
-					dynamic_cast<const ExpressionAction*>(action);
-			const BaseType* t = ea->targetType();
-			if (t)
-				_out << color(ctTypeId)
-					 << QString("0x%2 ").arg((uint)t->id(), -8, 16)
-					 << prettyNameInColor(t) << color(ctReset);
-			else
-				_out << ea->targetTypeStr();
-
-			_out << ": " << ea->expression()->toString(true);
-			break;
-		}
-
-		case TypeRuleAction::atFunction: {
-			const FuncCallScriptAction* sa =
-					dynamic_cast<const FuncCallScriptAction*>(action);
-			_out << "Execute function " << color(ctBold)
-				 << sa->function() << "()" << color(ctReset) << " in file "
-				 << color(ctBold) << ShellUtil::shortFileName(sa->scriptFile())
-				 << color(ctReset);
-			break;
-		}
-
-		case TypeRuleAction::atInlineCode: {
-			_out << "Execute inline script code";
-			break;
-		}
-
-		case TypeRuleAction::atNone:
-			break;
-		}
-
-		_out << endl;
-	}
+	_out << TypeRuleEngine::matchingRulesToStr(rules, indent, &_color);
 }
 
 

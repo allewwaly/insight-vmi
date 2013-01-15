@@ -10,6 +10,8 @@
 #include <debug.h>
 #include "shell.h"
 #include "shellutil.h"
+#include "typeruleengine.h"
+#include "typerule.h"
 
 namespace str
 {
@@ -295,8 +297,13 @@ void Structured::writeTo(KernelSymbolStream& out) const
 QString Structured::toString(VirtualMemory* mem, size_t offset,
                              const ColorPalette* col) const
 {
-//    static RealTypeRevMap tRevMap = BaseType::getRealTypeRevMap();
+    return toString(mem,offset, 0, col);
+}
 
+
+QString Structured::toString(VirtualMemory *mem, size_t offset,
+                             const Instance *inst, const ColorPalette *col) const
+{
     QString s, name;
     int index_len = 0, offset_len = 1, name_len = 1, type_len = 1;
     quint32 i = _size;
@@ -435,7 +442,11 @@ QString Structured::toString(VirtualMemory* mem, size_t offset,
                      -type_len)
                 .arg(valueStr);
 
-        if (m->altRefTypeCount() > 0) {
+        // Print candidate types. If we have more than 3 candidates, just print
+        // a summary, otherwise the full list
+        if (m->altRefTypeCount() > 3)
+            s += QString("\n\t(%0 candidate types)").arg(m->altRefTypeCount());
+        else if (m->altRefTypeCount() > 0) {
             for (int j = 0; j < m->altRefTypeCount(); ++j) {
                 const BaseType* t = m->altRefBaseType(j);
                 s += QString("\n\t<%1>%2 0x%3 %4 : %5")
@@ -446,6 +457,24 @@ QString Structured::toString(VirtualMemory* mem, size_t offset,
                                  : t->prettyName())
                         .arg(m->altRefType(j).expr()->toString(true));
             }
+        }
+
+        // Print matching rules.
+        ActiveRuleList rules;
+        if (inst)
+            rules = shell->symbols().ruleEngine().rulesMatching(inst, ConstMemberList() << m);
+        else
+            rules = shell->symbols().ruleEngine().rulesMatching(this, ConstMemberList() << m);
+
+        // If we have more than 3 rules, just print a summary, otherwise the
+        // full list
+        if (rules.size() > 3)
+            s += QString("\n\t(%0 matching rules)").arg(rules.size());
+        else if (rules.size() > 0) {
+            QString tmp = TypeRuleEngine::matchingRulesToStr(rules, 0, col).trimmed();
+            tmp.replace('\n', "\n\t");
+            if (!tmp.isEmpty())
+                s += "\n\t" + tmp;
         }
     }
 

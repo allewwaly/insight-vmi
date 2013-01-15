@@ -901,9 +901,18 @@ public:
      * \note Most instances do \b not have the parent available, in which case
      * this function returns an invalid Instance. Be sure to check hasParent()
      * before or isValid() afterwards!
-     * \sa hasParent(), isvalid()
+     * \sa fromParent(), hasParent(), isValid()
      */
     Instance parent() const;
+
+    /**
+     * If this instance has its parent available, this method returns the
+     * StructuredMember which lead from parent() to this instance.
+     * @return member that was followed the parent to this instance, if
+     * available, \c null otherwise
+     * \sa hasParent(), parent()
+     */
+    inline const StructuredMember* fromParent() const { return _d->fromParent; }
 
     /**
      * Sets the parent for this instance. This is normally done

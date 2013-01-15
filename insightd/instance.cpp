@@ -1304,7 +1304,12 @@ QString Instance::toString(const ColorPalette* col) const
             return s;
     }
 
-    return _d->type->toString(_d->vmem, _d->address, col);
+    if (_d->type->type() & StructOrUnion) {
+        const Structured* s = static_cast<const Structured*>(_d->type);
+        return s->toString(_d->vmem, _d->address, this, col);
+    }
+    else
+        return _d->type->toString(_d->vmem, _d->address, col);
 }
 
 

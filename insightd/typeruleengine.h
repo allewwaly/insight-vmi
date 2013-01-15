@@ -288,6 +288,15 @@ public:
      */
     static void deleteContext(TypeRuleEngineContext *ctx);
 
+    /**
+     * Pretty-prints the given list of active rules,
+     * @param rules
+     * @param indent
+     * @return
+     */
+    static QString matchingRulesToStr(const ActiveRuleList &rules, int indent,
+                                      const ColorPalette *col = 0);
+
 private:
     Instance evaluateRule(const ActiveRule &arule, const Instance* inst,
                           const ConstMemberList &members, bool *matched,

@@ -10,6 +10,7 @@
 #include "refbasetype.h"
 #include "variable.h"
 #include <debug.h>
+#include <QTextStream>
 
 namespace js
 {
@@ -455,7 +456,23 @@ inline const BaseType* get_inst_type(const Instance* inst)
 ActiveRuleList TypeRuleEngine::rulesMatching(const Instance *inst,
                                              const ConstMemberList &members) const
 {
-    return rulesMatchingTempl(inst, members, _rulesPerType, &get_inst_type);
+    ActiveRuleList list =
+            rulesMatchingTempl(inst, members, _rulesPerType, &get_inst_type);
+
+    if (inst->hasParent() && inst->fromParent()) {
+        Instance parent(inst->parent());
+        ConstMemberList mlist(members);
+        mlist.prepend(inst->fromParent());
+        // Find matching rules in parent instance. The rule set with highest
+        // priority wins.
+        ActiveRuleList pList = rulesMatching(&parent, mlist);
+        if ( !pList.isEmpty() &&
+             (list.isEmpty() ||
+              list.first().rule->priority() <= pList.first().rule->priority()) )
+            return pList;
+    }
+
+    return list;
 }
 
 
@@ -698,4 +715,85 @@ void TypeRuleEngine::deleteContext(TypeRuleEngineContext *ctx)
 {
     if (ctx)
         delete ctx;
+}
+
+
+QString TypeRuleEngine::matchingRulesToStr(const ActiveRuleList &rules,
+										   int indent, const ColorPalette *col)
+{
+	if (rules.isEmpty())
+		return QString();
+
+	uint max_id = 0;
+	for (int i = 0; i < rules.size(); ++i) {
+		const TypeRuleAction* action = rules[i].rule->action();
+		if (action && action->actionType() == TypeRuleAction::atExpression) {
+			const ExpressionAction* ea =
+					dynamic_cast<const ExpressionAction*>(action);
+			if (max_id < (uint) ea->targetType()->id())
+				max_id = ea->targetType()->id();
+		}
+	}
+
+	const int w_idx = ShellUtil::getFieldWidth(rules.last().index + 1, 10);
+	const int w_id = ShellUtil::getFieldWidth(max_id);
+
+	QString s;
+	QTextStream out(&s);
+
+	for (int i = 0; i < rules.size(); ++i) {
+		const TypeRuleAction* action = rules[i].rule->action();
+		if (!action)
+			continue;
+
+		out << qSetFieldWidth(indent) << right
+			<< QString("Rule %0: ").arg(rules[i].index + 1, w_idx)
+			<< qSetFieldWidth(0);
+
+		switch (action->actionType())
+		{
+		case TypeRuleAction::atExpression: {
+			const ExpressionAction* ea =
+					dynamic_cast<const ExpressionAction*>(action);
+			const BaseType* t = ea->targetType();
+			if (t) {
+				if (col)
+					out << col->color(ctTypeId)
+						<< QString("0x%2 ").arg((uint)t->id(), -w_id, 16)
+						<< col->prettyNameInColor(t, 0) << col->color(ctReset);
+				else
+					out << QString("0x%2 ").arg((uint)t->id(), -w_id, 16)
+						<< t->prettyName();
+			}
+			else
+				out << ea->targetTypeStr();
+
+			out << ": " << ea->expression()->toString(true);
+			break;
+		}
+
+		case TypeRuleAction::atFunction: {
+			const FuncCallScriptAction* sa =
+					dynamic_cast<const FuncCallScriptAction*>(action);
+			out << "Execute function "
+				<< ShellUtil::colorize(sa->function() + "()", ctBold, col)
+				<< " in file "
+				<< ShellUtil::colorize(
+					   ShellUtil::shortFileName(sa->scriptFile()), ctBold, col);
+			break;
+		}
+
+		case TypeRuleAction::atInlineCode: {
+			out << "Execute inline script code";
+			break;
+		}
+
+		case TypeRuleAction::atNone:
+			break;
+		}
+
+		out << endl;
+	}
+
+	return s;
 }
