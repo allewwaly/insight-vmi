@@ -197,8 +197,6 @@ public:
             const QScriptValue::PropertyFlags &flags =
                 QScriptValue::ReadOnly|QScriptValue::Undeletable);
 
-    QScriptValue newArray(uint length = 0);
-
     /**
      * Creates a QScriptValue from Instance \a inst.
      * @param inst Instance
