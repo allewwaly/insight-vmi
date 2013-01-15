@@ -170,10 +170,26 @@ public:
     /**
      * @param mem the memory device to read the data from
      * @param offset the offset at which to read the value from memory
+     * @param col color palette to colorize the string
      * @return a string representation of this type
      */
      virtual QString toString(VirtualMemory* mem, size_t offset,
                               const ColorPalette* col = 0) const;
+
+     /**
+      * Non-virtual function that also accepts the instance of the current
+      * struct/union instance passed as parameter \a inst. This provides a
+      * richer context and allows us to correctly display the matching rules
+      * below each member.
+      * @param mem the memory device to read the data from
+      * @param offset the offset at which to read the value from memory
+      * @param inst the instance of this struct, if any (may be \c null)
+      * @param col color palette to colorize the string
+      * @return a string representation of this type
+      */
+     QString toString(VirtualMemory* mem, size_t offset, const Instance *inst,
+                      const ColorPalette* col = 0) const;
+
 protected:
 	MemberList _members;
 	QStringList _memberNames;
