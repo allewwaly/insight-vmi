@@ -84,7 +84,7 @@ public:
     /**
      * Constructor
      */
-    TypeRuleEngine();
+    TypeRuleEngine(const SymFactory *factory);
 
     /**
      * Destructor
@@ -278,7 +278,7 @@ public:
      * @return context object.
      * \sa deleteContext()
      */
-    static TypeRuleEngineContext* createContext();
+    static TypeRuleEngineContext* createContext(const SymFactory *factory);
 
     /**
      * Deletes the context object that was previously created with

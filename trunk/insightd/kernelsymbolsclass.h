@@ -18,6 +18,7 @@
 class InstanceClass;
 class BaseType;
 class VirtualMemory;
+class SymFactory;
 
 /**
  * This class provides access to the kernel symbols from within the QtScript
@@ -44,9 +45,11 @@ public:
 	/**
 	 * Constructor
 	 * @param instClass the InstanceClass wrapper of the ScriptEngine
+	 * @param factory the factory of the kernel symbols
 	 * @param parent parent object
 	 */
-	KernelSymbolsClass(InstanceClass* instClass, QObject* parent = 0);
+	KernelSymbolsClass(InstanceClass* instClass, const SymFactory* factory,
+					   QObject* parent = 0);
 
 	/**
 	 * Destructor
@@ -132,8 +135,30 @@ public slots:
 	 */
 	Instance getType(int id, int index = -1) const;
 
+	/**
+	 * Returns the value of enumerator \a name. If that enumerator does not
+	 * exist or is ambiguous, -1 is returned. However, it is safer to check
+	 * if that enumerator exists with enumExists() first rather than comparing
+	 * the return value with < 0 (unless you can assure that the enumeration
+	 * values will always be >= 0).
+	 * @param name the name of the enumerator
+	 * @return the constant value, if \a name exists and is not ambiguous,
+	 * -1 otherwise
+	 * \sa enumExists()
+	 */
+	int enumValue(const QString& name) const;
+
+	/**
+	 * Checks if the enumerator \a name is known.
+	 * @param name name of the enumerator
+	 * @return \c true if \a name exists, \c false otherwise
+	 * \sa enumValue()
+	 */
+	bool enumExists(const QString& name) const;
+
 private:
 	InstanceClass* _instClass;
+	const SymFactory* _factory;
 
 	template <class T>
 	QScriptValue listGeneric(QString filter, int index,	const QList<T*>& list,

@@ -341,7 +341,7 @@ void Shell::prepare()
     _out.setDevice(&_stdout);
     _err.setDevice(&_stderr);
 
-    _engine = new ScriptEngine();
+    _engine = new ScriptEngine(&_sym.factory());
 
     if (programOptions.activeOptions() & opColorDarkBg)
         _color.setColorMode(cmDarkBg);
@@ -3548,14 +3548,14 @@ int Shell::cmdShowBaseType(const BaseType* t, const QString &name,
 	const Enum* e = dynamic_cast<const Enum*>(t);
 	if (!fp && e) {
 		_out << color(ctColHead) << "  Enumerators:    "
-			 << color(ctReset) << e->enumValues().size() << endl;
+			 << color(ctReset) << e->enumerators().size() << endl;
 
-        QList<Enum::EnumHash::key_type> keys = e->enumValues().uniqueKeys();
+        QList<Enum::EnumHash::key_type> keys = e->enumerators().uniqueKeys();
         qSort(keys);
 
         for (int i = 0; i < keys.size(); i++) {
-            for (Enum::EnumHash::const_iterator it = e->enumValues().find(keys[i]);
-                 it != e->enumValues().end() && it.key() == keys[i]; ++it) {
+            for (Enum::EnumHash::const_iterator it = e->enumerators().find(keys[i]);
+                 it != e->enumerators().end() && it.key() == keys[i]; ++it) {
                 _out << "    "
                      << qSetFieldWidth(30) << left << it.value()
                      << qSetFieldWidth(0) << " = " << it.key()

@@ -243,7 +243,7 @@ bool FuncCallScriptAction::check(const QString &xmlFile, const TypeRule *rule,
                                .arg(result.errorMessage()));
     }
     // Check if the function exists
-    ScriptEngine eng;
+    ScriptEngine eng(0);
     ScriptEngine::FuncExistsResult ret =
             eng.functionExists(_function, *_program);
     if (ret == ScriptEngine::feRuntimeError) {

@@ -33,7 +33,7 @@
 
 //------------------------------------------------------------------------------
 KernelSymbols::KernelSymbols()
-	: _factory(_memSpecs)
+	: _factory(_memSpecs), _ruleEngine(&_factory)
 {
 }
 

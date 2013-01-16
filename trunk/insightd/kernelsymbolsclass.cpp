@@ -11,11 +11,12 @@
 #include "instanceclass.h"
 #include "shell.h"
 #include "variable.h"
+#include "enum.h"
 #include <QScriptEngine>
 #include <QRegExp>
 
-KernelSymbolsClass::KernelSymbolsClass(InstanceClass* instClass, QObject* parent)
-	: QObject(parent), _instClass(instClass)
+KernelSymbolsClass::KernelSymbolsClass(InstanceClass* instClass, const SymFactory *factory, QObject* parent)
+	: QObject(parent), _instClass(instClass), _factory(factory)
 {
 	assert(instClass != 0);
 }
@@ -83,9 +84,12 @@ inline Instance typeToInst(const BaseType* t, VirtualMemory* vmem)
 
 QScriptValue KernelSymbolsClass::listTypes(QString filter, int index)
 {
+	if (!_factory)
+		return engine()->newArray();
+
 	return listGeneric<BaseType>(filter, index,
-			shell->symbols().factory().types(),
-			shell->symbols().factory().typesByName(),
+			_factory->types(),
+			_factory->typesByName(),
 			typeToInst);
 }
 
@@ -102,22 +106,31 @@ inline Instance varToInst(const Variable* v, VirtualMemory* vmem)
 
 QScriptValue KernelSymbolsClass::listVariables(QString filter, int index)
 {
+	if (!_factory)
+		return engine()->newArray();
+
 	return listGeneric<Variable>(filter, index,
-			shell->symbols().factory().vars(),
-			shell->symbols().factory().varsByName(),
+			_factory->vars(),
+			_factory->varsByName(),
 			varToInst);
 }
 
 
 QStringList KernelSymbolsClass::typeNames() const
 {
-    return shell->symbols().factory().typesByName().uniqueKeys();
+	if (!_factory)
+		return QStringList();
+
+	return _factory->typesByName().uniqueKeys();
 }
 
 
 QList<int> KernelSymbolsClass::typeIds() const
 {
-    QList<int> ret = shell->symbols().factory().typesById().keys();
+	if (!_factory)
+		return QList<int>();
+
+    QList<int> ret = _factory->typesById().keys();
     qSort(ret);
     return ret;
 }
@@ -125,13 +138,19 @@ QList<int> KernelSymbolsClass::typeIds() const
 
 QStringList KernelSymbolsClass::variableNames() const
 {
-    return shell->symbols().factory().varsByName().uniqueKeys();
+	if (!_factory)
+		return QStringList();
+
+	return _factory->varsByName().uniqueKeys();
 }
 
 
 QList<int> KernelSymbolsClass::variableIds() const
 {
-    QList<int> ret = shell->symbols().factory().varsById().keys();
+	if (!_factory)
+		return QList<int>();
+
+    QList<int> ret = _factory->varsById().keys();
     qSort(ret);
     return ret;
 }
@@ -139,8 +158,10 @@ QList<int> KernelSymbolsClass::variableIds() const
 
 Instance KernelSymbolsClass::getType(int id, int index) const
 {
+	if (!_factory)
+		return Instance();
 
-    BaseType* t = shell->symbols().factory().findBaseTypeById(id);
+    BaseType* t = _factory->findBaseTypeById(id);
     if (!t) {
         context()->throwError(
                     QString("Invalid type ID: 0x%1").arg((uint)id, 0, 16));
@@ -150,6 +171,35 @@ Instance KernelSymbolsClass::getType(int id, int index) const
         VirtualMemory* vmem = vmemFromIndex(index);
         return Instance(0, t, vmem);
     }
+}
+
+
+int KernelSymbolsClass::enumValue(const QString &name) const
+{
+    if (!_factory)
+        return -1;
+
+    QList<IntEnumPair> enums = _factory->enumsByName().values(name);
+    if (enums.size() != 1)
+        return -1;
+
+    try {
+        const Enum* e = enums[0].second;
+        return e->enumValue(name);
+    }
+    catch (BaseTypeException&) {
+        return -1;
+    }
+    return -1;
+}
+
+
+bool KernelSymbolsClass::enumExists(const QString &name) const
+{
+	if (!_factory)
+		return false;
+
+	return _factory->enumsByName().contains(name);
 }
 
 

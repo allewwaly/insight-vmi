@@ -21,13 +21,13 @@ const char* inlinefunc = "__inline_func__";
 class TypeRuleEngineContext
 {
 public:
-    TypeRuleEngineContext() : eng(ksNone) {}
+    TypeRuleEngineContext(const SymFactory* factory) : eng(factory, ksNone) {}
     ScriptEngine eng;
 };
 
 
-TypeRuleEngine::TypeRuleEngine()
-    : _ctx(new TypeRuleEngineContext()), _verbose(veOff)
+TypeRuleEngine::TypeRuleEngine(const SymFactory* factory)
+    : _ctx(new TypeRuleEngineContext(factory)), _verbose(veOff)
 {
 }
 
@@ -705,9 +705,9 @@ void TypeRuleEngine::operationProgress()
 }
 
 
-TypeRuleEngineContext *TypeRuleEngine::createContext()
+TypeRuleEngineContext *TypeRuleEngine::createContext(const SymFactory* factory)
 {
-    return new TypeRuleEngineContext();
+    return new TypeRuleEngineContext(factory);
 }
 
 
