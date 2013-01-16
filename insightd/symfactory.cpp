@@ -642,8 +642,8 @@ void SymFactory::updateTypeRelations(const int new_id, const QString& new_name,
         }
         // Add enumeration values into name-indexed hash
         else if ( (en = dynamic_cast<Enum*>(target)) ) {
-            for (Enum::EnumHash::const_iterator it = en->enumValues().begin();
-                 it != en->enumValues().end(); ++it)
+            for (Enum::EnumHash::const_iterator it = en->enumerators().begin();
+                 it != en->enumerators().end(); ++it)
             {
                 _enumsByName.insertMulti(it.value(), IntEnumPair(it.key(), en));
             }

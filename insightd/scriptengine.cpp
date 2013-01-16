@@ -31,10 +31,10 @@ const char* path_sep        = ":";
 }
 
 
-ScriptEngine::ScriptEngine(int knowledgeSources)
+ScriptEngine::ScriptEngine(const SymFactory *factory, int knowledgeSources)
 	: _engine(0), _instClass(0), _symClass(0), _memClass(0),
 	  _lastEvalFailed(false), _initialized(false), _knowSrc(knowledgeSources),
-	  _memDumpIndex(-1)
+	  _memDumpIndex(-1), _factory(factory)
 {
 }
 
@@ -134,7 +134,7 @@ void ScriptEngine::initScriptEngine()
     		_instClass->constructor(),
     		roFlags);
 
-    _symClass = new KernelSymbolsClass(_instClass);
+    _symClass = new KernelSymbolsClass(_instClass, _factory);
     _engine->globalObject().setProperty(js::symbols,
     		_engine->newQObject(_symClass,
     				QScriptEngine::QtOwnership,
