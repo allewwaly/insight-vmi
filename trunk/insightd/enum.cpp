@@ -17,7 +17,7 @@ Enum::Enum(SymFactory* factory)
 
 
 Enum::Enum(SymFactory* factory, const TypeInfo& info)
-    : BaseType(factory, info), _enumValues(info.enumValues())
+    : BaseType(factory, info), _enumerators(info.enumValues())
 {
 }
 
@@ -32,13 +32,13 @@ uint Enum::hash(bool* isValid) const
 {
     if (!_hashValid) {
         _hash = BaseType::hash(0);
-        qsrand(_hash ^ _enumValues.size());
+        qsrand(_hash ^ _enumerators.size());
         _hash ^= qHash(qrand());
         // To place the enum values at different bit positions
         uint rot = 0;
         // Extend the hash to all enumeration values
-        EnumHash::const_iterator it = _enumValues.constBegin();
-        while (it != _enumValues.constEnd()) {
+        EnumHash::const_iterator it = _enumerators.constBegin();
+        while (it != _enumerators.constEnd()) {
             _hash ^= rotl32(it.key(), rot);
             rot = (rot + 3) % 32;
             _hash ^= rotl32(qHash(it.value()), rot);
@@ -56,15 +56,15 @@ QString Enum::toString(VirtualMemory* mem, size_t offset,
 					   const ColorPalette* col) const
 {
 	qint32 key = value<qint32>(mem, offset);
-	if (_enumValues.contains(key)) {
+	if (_enumerators.contains(key)) {
 		if (col)
 			return QString("%1%2%3 (%1%4%3)")
 					.arg(col->color(ctType))
-					.arg(_enumValues.value(key))
+					.arg(_enumerators.value(key))
 					.arg(col->color(ctReset))
 					.arg(key);
 		else
-			return QString("%1 (%2)").arg(_enumValues.value(key)).arg(key);
+			return QString("%1 (%2)").arg(_enumerators.value(key)).arg(key);
 	}
 	else
 		return QString("(Out of enum range: %1)").arg(key);
@@ -75,6 +75,7 @@ void Enum::readFrom(KernelSymbolStream& in)
 {
     BaseType::readFrom(in);
 
+    _enumerators.clear();
     _enumValues.clear();
     qint32 enumCnt;
     EnumHash::key_type key;
@@ -83,7 +84,8 @@ void Enum::readFrom(KernelSymbolStream& in)
     in >> enumCnt;
     for (int i = 0; i < enumCnt; i++) {
         in >> key >> value;
-        _enumValues.insertMulti(key, value);
+        _enumerators.insertMulti(key, value);
+        _enumValues.insert(value, key);
     }
 }
 
@@ -91,10 +93,34 @@ void Enum::readFrom(KernelSymbolStream& in)
 void Enum::writeTo(KernelSymbolStream& out) const
 {
     BaseType::writeTo(out);
-    out << (qint32) _enumValues.size();
-    for (EnumHash::const_iterator it = _enumValues.constBegin();
-        it != _enumValues.constEnd(); ++it)
+    out << (qint32) _enumerators.size();
+    for (EnumHash::const_iterator it = _enumerators.constBegin();
+        it != _enumerators.constEnd(); ++it)
     {
         out << it.key() << it.value();
     }
+}
+
+
+int Enum::enumValue(const QString &enumerator) const
+{
+    EnumValueHash::const_iterator it = _enumValues.constFind(enumerator);
+    if (it == _enumValues.constEnd())
+        baseTypeError(QString("Enumerator '%0' does not exist in %1 (0x%2)")
+                      .arg(enumerator)
+                      .arg(prettyName())
+                      .arg((uint)id(), 0, 16));
+    return it.value();
+}
+
+
+inline void Enum::setEnumerators(const EnumHash& values)
+{
+    _enumerators = values;
+    // Update inverse hash
+    _enumValues.clear();
+    for (EnumHash::const_iterator it = _enumerators.begin(),
+         e = _enumerators.end(); it != e; ++it)
+        _enumValues.insert(it.value(), it.key());
+    _hashValid  = false;
 }
