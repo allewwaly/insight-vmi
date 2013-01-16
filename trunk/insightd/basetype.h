@@ -16,6 +16,8 @@
 
 class ColorPalette;
 
+#define baseTypeError(x) do { throw BaseTypeException((x), __FILE__, __LINE__); } while (0)
+
 /**
   Basic exception class for all type-related exceptions
  */
