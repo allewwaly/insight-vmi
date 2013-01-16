@@ -257,12 +257,23 @@ void MemoryMapBuilderCS::processInstanceFromRule(const Instance &parent,
     case orNoOverlap:
     // We found the embedding node for an embedded node
     case orSecondEmbedsFirst: {
-        // Get the unchanged, dereferenced member as well
-        Instance mOrig(parent.member(mbrIdx, BaseType::trLexicalAndPointers,
-                                    1, ksNone));
-        _map->addChildIfNotExistend(
-                    mOrig, InstanceList() << member, node,
-                    _index, parent.memberAddress(mbrIdx, 0, 0, ksNone));
+        // Get the unchanged member as well
+        Instance mOrig(parent.member(mbrIdx, BaseType::trLexical, 0, ksNone));
+        // Dereference exactly once
+        int derefCount = 0;
+        mOrig = mOrig.dereference(BaseType::trLexicalAndPointers, 1, &derefCount);
+        // In case the instance was NOT dereferenced, we can ignore it because
+        // it is embedded within parent
+        if (!derefCount) {
+            _map->addChildIfNotExistend(
+                        member, InstanceList(), node,
+                        _index, parent.memberAddress(mbrIdx, 0, 0, ksNone));
+        }
+        else {
+            _map->addChildIfNotExistend(
+                        mOrig, InstanceList() << member, node,
+                        _index, parent.memberAddress(mbrIdx, 0, 0, ksNone));
+        }
         break;
     }
     }
