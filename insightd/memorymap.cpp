@@ -862,13 +862,15 @@ MemoryMapNode *MemoryMap::addChild(
                 origInst.type(), origInst.address());
 
         switch(orel) {
-        case orEqual:
         case orSecondEmbedsFirst:
             // Use the original type
             break;
 
+        // Use the candidate type
         case orFirstEmbedsSecond:
-            // Use the candidate type
+        // Use the candidate type (it might hold properties from the
+        // JavaScript rule evaluation
+        case orEqual:
             i = cand;
             break;
 
