@@ -33,5 +33,28 @@
 				return sibling;
 			</action>
 		</rule>
+		
+		<rule priority="102">
+			<name>task_struct.tasks.prev</name>
+			<description>Last entry in the sibling list points to the parent's children list</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>task_struct</typename>
+				<members>
+					<member>tasks</member>
+					<member>prev</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var task = arguments[0];
+				var members = arguments[1];
+				var prev = task.Member(members[0]).Member(members[1]);
+				
+				// Change prev to a task_struct
+				prev.ChangeType(task.TypeId());
+				prev.AddToAddress(-prev.MemberOffset(members[0]));
+				return prev;
+			</action>
+		</rule>
 	</rules>
 </typeknowledge>

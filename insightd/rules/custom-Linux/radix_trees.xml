@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-	File created by Christian Schneider <chrschn@sec.in.tum.de>
+	Copyright (C) 2013 by Christian Schneider <chrschn@sec.in.tum.de>
 -->
 <typeknowledge version="1">
 	<rules>
 		<rule priority="101">
 			<name>radix_tree_root.rnode</name>
 			<description>
-				Based on the last bit of the pointer that points to the next
-				node in a radix tree, the pointer may either be directly
-				dereferenceable or not.
+				Generic rule to handle radix_tree_root objects.
 			</description>
 			<filter>
 				<datatype>struct</datatype>
@@ -18,23 +16,14 @@
 					<member>rnode</member>
 				</members>
 			</filter>
-			<action type="inline">
-				var RADIX_TREE_INDIRECT_PTR = 1;
-				var root = arguments[0];
-				var rnode = root.rnode;
-				// Do we need to unset the INDIRECT_PTR flag?
-				var addr_low = rnode.AddressLow();
-				if (addr_low &amp; RADIX_TREE_INDIRECT_PTR)
-					rnode.SetAddressLow(addr_low &amp; ~RADIX_TREE_INDIRECT_PTR);
-				return rnode;
-			</action>
+			<action type="function" file="radix_tree.js">radix_tree_node_from_root</action>
 		</rule>
 		
 		<rule priority="101">
 			<name>radix_tree_node.slots</name>
 			<description>
 				The usage of the "slots" array of a radix tree node depends on
-				its height, given in member "height". Ignore it for now.
+				its height, given in member "height".
 			</description>
 			<filter>
 				<datatype>struct</datatype>
@@ -43,31 +32,7 @@
 					<member>slots</member>
 				</members>
 			</filter>
-			<action type="inline">
-				var RADIX_TREE_INDIRECT_PTR = 1;
-				var node = arguments[0];
-				var height = node.height.toUInt32();
-				if (height &gt; 0) {
-					var slots = node.Member(arguments[1][0]);
-					var len = slots.ArrayLength();
-					var ret = new Array();
-					for (var i = 0; i &lt; len; ++i) {
-						var e = slots.ArrayElem(i);
-						// Dereference once
-						if (e.IsAccessible()) {
-							e.SetAddress(e.toPointer());
-							// Make sure the address is no indirect pointer
-							if (e.AddressLow() &amp; RADIX_TREE_INDIRECT_PTR)
-								continue;
-							e.ChangeType(node.TypeId());
-							ret.push(e);
-						}
-					}
-					return ret;
-				}
-				else
-					return false;
-			</action>
+			<action type="function" file="radix_tree.js">radix_tree_node_slots</action>
 		</rule>
 	</rules>
 </typeknowledge>
