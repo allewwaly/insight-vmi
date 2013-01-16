@@ -25,14 +25,45 @@
 			<action type="inline">
 				var mapping = arguments[0].mapping;
 				if (!mapping.IsNull()) {
-					var PAGE_MAPPING_ANON = 1;
-					var PAGE_MAPPING_FLAGS = 3;
+					const PAGE_MAPPING_ANON = 1;
+					const PAGE_MAPPING_FLAGS = 3;
 					var addr = mapping.AddressLow();
 					if (addr &amp; PAGE_MAPPING_ANON)
 						mapping.ChangeType("anon_vma");
 					mapping.SetAddressLow(addr &amp; ~PAGE_MAPPING_FLAGS);
 				}
 				return mapping;
+			</action>
+		</rule>
+
+		<rule priority="100">
+			<name>page.private</name>
+			<description>
+				Test if page->private points to a "buffer_head" object.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>page</typename>
+				<members>
+					<member></member>
+					<member></member>
+					<member>private</member>
+				</members>
+			</filter>
+			<action type="inline">
+				const PG_private = 1 &lt;&lt; Symbols.enumValue("PG_private");
+				var page = arguments[0];
+				var bh = page.private;
+				// Check if "private" contains valid, non-null data
+				if ((page.flags &amp; PG_private) &amp;&amp; (bh != 0)) {
+					// Convert to a "struct buffer_head" object
+					bh.SetAddress(bh.toULong(16));
+					bh.ChangeType("buffer_head");
+					// Test if the buffer_head object is valid by checking the pointer back
+					if (bh.b_page.Address() == page.Address())
+						return bh;
+				}
+				return false;
 			</action>
 		</rule>
 	</rules>
