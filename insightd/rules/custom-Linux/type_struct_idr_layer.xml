@@ -8,10 +8,65 @@
 			The idr_layer is organized similar to a radix tree: the usage of the
 			"ary" array depends on the "layer" value. With a value > 1, it is
 			still a node, otherwise it becomes a leaf.
+			
+			We process the free list seperately, since it contains references to 
+			other idr nodes.
+			
+			We currently do not know which node a leaf references. This is why we
+			currently only process the tree, but not the leaf nodes.
+		-->
+		
+		<!-- 
+		
+			Process the free list.
+			
+			Currently implemented by returning an array, since we cannot yet keep
+			the state of certain variables for further querries. Thus we will process 
+			the whole list in one interation and return all its members in an array.
+			
+			To avoid processing the free list of invalid struct idrs we check the
+			id_free_cnt variable for two conditions. First, id_free_cnt must be 
+			greater than 0. Second, id_free_cnt must be smaller than 2 * MAX_LEVEL.
+			
+			For the definition of IDR_FREE_MAX see:
+			http://lxr.linux.no/#linux+v2.6.38.8/include/linux/idr.h#L49
+			
 		-->
 		<rule priority="101">
+			<name>idr.id_free</name>
+			<description>Process the free list of a struct idr.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>idr</typename>
+				<members>
+					<member>id_free</member>
+				</members>
+			</filter>
+			<action type="inline">					
+				var node = arguments[0];
+				var id_free_cnt = node.id_free_cnt.toInt32();
+				
+				// The length of a free list must be below IDR_FREE_MAX
+				// For details see XML comment above this rule
+				if (id_free_cnt &gt; 0 &amp;&amp; id_free_cnt &lt; 101) {
+					// Get element
+					var ret = node.Member(arguments[1][0]);
+					
+					// Add the length to the Instance
+					ret.id_free_cnt = id_free_cnt - 1;
+					
+					return ret;
+				}
+				else
+					// Do not follow
+					return new Instance();
+			</action>
+		</rule>
+		
+		<!-- Process the Elements -->
+		<rule priority="101">
 			<name>idr_layer.ary</name>
-			<description>Forbit access to the "ary" member in leaf nodes.</description>
+			<description>Resolve members of the free list, but forbid access to normal "ary" members in leaf nodes.</description>
 			<filter>
 				<datatype>struct</datatype>
 				<typename>idr_layer</typename>
@@ -19,13 +74,59 @@
 					<member>ary</member>
 				</members>
 			</filter>
-			<action type="inline">
-				var inst = arguments[0];
-				var layer = inst.layer.toInt32();
-				if (layer > 1)
-					return false;
+			<action type="inline">	
+				var node = arguments[0];
+				
+				if (typeof node.id_free_cnt === "undefined")
+				{
+					// This idr_layer node is not part of the free list
+					// thus it depends on the layer variable
+					
+					var layer = node.layer.toInt32();
+					if (layer &gt; 0) {
+						var ary = node.Member(arguments[1][0]);
+						var len = ary.ArrayLength();
+						var ret = new Array();
+						for (var i = 0; i &lt; len; ++i) {
+							var e = ary.ArrayElem(i);
+							
+							// Valid?
+							if (e.IsAccessible()) {
+								e.SetAddress(e.toPointer());
+								e.ChangeType(node.TypeId());
+								ret.push(e);
+							}
+						}
+						return ret;
+					}
+					else
+						// Do not follow any leaves!
+						return new Instance();	
+				}
 				else
+				{
+					// This node is part of the free list
+					// Use id_free_cnt property to process.
+					if(node.id_free_cnt &gt; 0)
+					{
+						var ary = node.Member(arguments[1][0]);
+						var ret = ary.ArrayElem(0);
+						
+						// Valid?
+						if (ret.IsAccessible()) {
+							ret.SetAddress(ret.toPointer());
+							ret.ChangeType(node.TypeId());
+							
+							ret.id_free_cnt = node.id_free_cnt - 1;
+						
+							return ret;
+						}
+					}
+					
 					return new Instance();
+				}
+				
+				
 			</action>
 		</rule>
 	</rules>
