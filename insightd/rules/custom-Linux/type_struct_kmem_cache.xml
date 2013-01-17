@@ -30,7 +30,7 @@
 			<action type="inline">
 				var cache = arguments[0];
 				var slab = cache.Member(arguments[1][0]);
-				return slab.ArrayElem(0);
+				return slab.ArrayElem(0).Dereference();
 			</action>
 		</rule>
 	</rules>
