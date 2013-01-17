@@ -2328,7 +2328,7 @@ int Shell::cmdMemoryDump(QStringList args)
     int index = parseMemDumpIndex(args);
     // Perform the dump
     if (index >= 0) {
-        QRegExp re("^\\s*([_a-zA-Z0-9]+)\\s*(?:([0-9]+)\\s*)?@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
+        QRegExp re("^\\s*([_a-zA-Z][_a-zA-Z0-9]*(?:\\.[_a-zA-Z][_a-zA-Z0-9]*)*)\\s*(?:([0-9]+)\\s*)?@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
 
         if (!re.exactMatch(args.join(" "))) {
             errMsg("Usage: memory dump [index] <raw|char|int|long|type-name|type-id>(.<member>)* [length] @ <address>");
