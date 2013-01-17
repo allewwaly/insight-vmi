@@ -162,6 +162,13 @@ inline int Instance::sizeofLong() const
 }
 
 
+inline void Instance::setProperties(const StringHash& properties)
+{
+    _d->properties = properties;
+    _d->checkForProperties = !properties.isEmpty();
+}
+
+
 inline bool Instance::isList() const
 {
     return _d->listNext.data() != 0;

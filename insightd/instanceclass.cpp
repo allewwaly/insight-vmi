@@ -136,8 +136,10 @@ QScriptClass::QueryFlags InstanceClass::queryProperty(const QScriptValue& object
         *id = CALL_BY_NAME;
         return flags;
     }
-    else
+    else {
+        inst->setCheckForProperties(true);
         *id = MEMBER_NOT_FOUND;
+    }
 
     // Return zero to indicate we don't handle this property ourself
     return 0;
@@ -325,21 +327,23 @@ QScriptValue InstanceClass::instToScriptValue(QScriptEngine* eng, const Instance
 
 
 void InstanceClass::instFromScriptValue(const QScriptValue &obj, Instance &inst)
-
 {
     inst = qvariant_cast<Instance>(obj.data().toVariant());
-    QScriptValueIterator it(obj);
-    StringHash props;
-    while (it.hasNext()) {
-         it.next();
-         // Properties with the undeletable flag are members of the correspondig
-         // struct/union, so skip those. User-set properties don't have this
-         // flag set.
-         if (!(it.flags() & QScriptValue::Undeletable)) {
-            props.insert(it.name(), it.value().toString());
-         }
-     }
-    inst.setProperties(props);
+    // Do we need to check this object for additional properties?
+    if (inst.checkForProperties() || !inst.properties().isEmpty()) {
+        QScriptValueIterator it(obj);
+        StringHash props;
+        while (it.hasNext()) {
+            it.next();
+            // Properties with the undeletable flag are members of the correspondig
+            // struct/union, so skip those. User-set properties don't have this
+            // flag set.
+            if (!(it.flags() & QScriptValue::Undeletable)) {
+                props.insert(it.name(), it.value().toString());
+            }
+        }
+        inst.setProperties(props);
+    }
 }
 
 

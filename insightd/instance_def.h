@@ -639,7 +639,25 @@ public:
      * additional proerties within the scripting engine.
      * @param properties hash of properties
      */
-    void setProperties(const StringHash& properties) { _d->properties = properties; }
+    void setProperties(const StringHash& properties);
+
+    /**
+     * Flag that indicates whether the QScriptValue wrapping this instance
+     * should be checked for additional properties when converting it back
+     * to an Instance object.
+     * @return \c true if properties should be check, \c false otherwise
+     * \sa setCheckForProperties()
+     */
+    bool checkForProperties() const { return _d->checkForProperties; }
+
+    /**
+     * Set flag that indicates whether the QScriptValue wrapping this instance
+     * should be checked for additional properties when converting it back
+     * to an Instance object.
+     * @param valu
+     * \sa checkForProperties()
+     */
+    void setCheckForProperties(bool value) { _d->checkForProperties = value; }
 
     /**
      * Returns \c true if this instance is part of a list of instances, i.e.,
