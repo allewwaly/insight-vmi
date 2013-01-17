@@ -36,6 +36,7 @@ public:
           bitSize(-1),
           bitOffset(-1),
           origin(origin),
+          checkForProperties(false),
           type(0),
           vmem(0),
           listNext(0),
@@ -50,6 +51,7 @@ public:
           bitSize(-1),
           bitOffset(-1),
           origin(origin),
+          checkForProperties(false),
           type(type),
           vmem(vmem),
           listNext(0),
@@ -65,6 +67,7 @@ public:
           bitSize(-1),
           bitOffset(-1),
           origin(origin),
+          checkForProperties(false),
           type(type),
           vmem(vmem),
           name(name),
@@ -81,6 +84,7 @@ public:
     qint8 bitSize;
     qint8 bitOffset;
     quint8 origin;
+    bool checkForProperties;
     const BaseType* type;
     VirtualMemory* vmem;
     QString name;
