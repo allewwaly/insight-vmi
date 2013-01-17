@@ -1281,9 +1281,24 @@ qint64 Instance::toIntBitField() const
 }
 
 
-QString Instance::toString(const ColorPalette* col) const
+QString Instance::toStringPrivate(const ColorPalette *col, bool firstArrayElem) const
 {
     static const QString nullStr("NULL");
+
+    // If this instance represents an array, then handle it here
+    if (isList() && firstArrayElem) {
+        QString ret("(");
+        // This is the first instance
+        ret += toStringPrivate(col, false);
+        // Now add all following instances
+        Instance inst(_d);
+        while (inst.isList()) {
+            inst = inst.listNext();
+            ret += ", " + inst.toStringPrivate(col, false);
+        }
+        return ret + ")";
+    }
+
     if (isNull() || !_d->vmem) {
         if (col)
             return QString(col->color(ctAddress)) + nullStr + QString(col->color(ctReset));

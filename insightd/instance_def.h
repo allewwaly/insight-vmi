@@ -1000,6 +1000,8 @@ private:
 	bool memberCandidateCompatible(const StructuredMember* m,
 								   int cndtIndex) const;
 
+	QString toStringPrivate(const ColorPalette *col, bool firstArrayElem) const;
+
 	QSharedDataPointer<InstanceData> _d;
 
     static const TypeRuleEngine* _ruleEngine;
