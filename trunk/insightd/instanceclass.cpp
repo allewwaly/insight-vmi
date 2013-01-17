@@ -154,10 +154,12 @@ QScriptValue InstanceClass::property(const QScriptValue& object,
     Instance member;
     if (id == CALL_BY_NAME) {
         QString nameStr = name.toString();
-        member = inst->member(nameStr, BaseType::trAny, 1, _proto->knowledgeSources());
+        member = inst->member(nameStr, BaseType::trLexicalAllPointers, 1,
+                              _proto->knowledgeSources());
     }
     else
-        member = inst->member(id, BaseType::trAny, 1, _proto->knowledgeSources());
+        member = inst->member(id, BaseType::trLexicalAllPointers, 1,
+                              _proto->knowledgeSources());
 
     return newInstance(member);
 }
