@@ -20,10 +20,56 @@
 				<variablename>shm_mnt</variablename>
 				<datatype>pointer</datatype>
 			</filter>
-			<action type="expression">
-				<sourcetype>struct vfsmount *src</sourcetype>
-				<targettype>struct vfsmount *</targettype>
-				<expression>src</expression>
+			<action type="inline">
+				var shm = arguments[0].Dereference();
+				// Record that member "mnt_sb" is of type "struct shmem_sb_info"
+				shm.fsInfoType = "shmem_sb_info";
+				return shm;
+			</action>
+		</rule>
+		
+		<!--
+			The super_block.s_fs_info member of this "struct vfsmount" object is of type
+			"struct shmem_sb_info".
+			
+			Reference: http://lxr.linux.no/#linux+v2.6.32.58/mm/shmem.c#L174
+		-->
+		<rule priority="101">
+			<name>vfsmount.mnt_sb</name>
+			<description>Handle the superblock of of variable "shm_mnt"</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>vfsmount</typename>
+				<members>
+					<member>mnt_sb</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var shm = arguments[0];
+				var sb = shm.Member(arguments[1][0]);
+				// Propagate the property to the child
+				if (shm.fsInfoType !== undefined)
+					sb.fsInfoType = shm.fsInfoType;
+				return sb;
+			</action>
+		</rule>
+		<rule priority="101">
+			<name>super_block.s_fs_info</name>
+			<description>The corresponding superblock is of type "struct shmem_sb_info"</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>super_block</typename>
+				<members>
+					<member>s_fs_info</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var sb = arguments[0];
+				var info = sb.Member(arguments[1][0]);
+				// If the type is known, apply it
+				if (sb.fsInfoType !== undefined)
+					info.ChangeType(sb.fsInfoType);
+				return info;
 			</action>
 		</rule>
 	</rules>
