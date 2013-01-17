@@ -300,6 +300,11 @@ inline void* Instance::toPointer() const
 }
 
 
+inline QString Instance::toString(const ColorPalette* col) const
+{
+    return toStringPrivate(col, true);
+}
+
 //inline QString Instance::derefUserLand(const QString &pgd) const
 //{
 //	//TODO
