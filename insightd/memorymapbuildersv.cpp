@@ -96,7 +96,7 @@ void MemoryMapBuilderSV::run()
         */
 
         // Insert in non-critical (non-exception prone) mappings
-        shared->typeInstancesLock.lock();
+        shared->typeInstancesLock.lockForWrite();
         _map->_typeInstances.insert(node->type()->id(), node);
         if (shared->maxObjSize < node->size())
             shared->maxObjSize = node->size();
@@ -112,7 +112,7 @@ void MemoryMapBuilderSV::run()
                             physAddr,
                             node->size() > 0 ? physAddr + node->size() - 1 : physAddr,
                             node);
-                shared->pmemMapLock.lock();
+                shared->pmemMapLock.lockForWrite();
                 _map->_pmemMap.insert(pNode);
                 shared->pmemMapLock.unlock();
             }
@@ -132,7 +132,7 @@ void MemoryMapBuilderSV::run()
                                 physAddr, physAddr + sizeOnPage - 1, node);
 
                     // Add a memory mapping
-                    shared->pmemMapLock.lock();
+                    shared->pmemMapLock.lockForWrite();
                     _map->_pmemMap.insert(pNode);
                     shared->pmemMapLock.unlock();
                     // Subtract the available space from left-over size
@@ -172,10 +172,7 @@ void MemoryMapBuilderSV::run()
 
 MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance & /*inst*/)
 {
-    // Increase the reading counter
-    _map->_shared->vmemReadingLock.lock();
-    _map->_shared->vmemReading++;
-    _map->_shared->vmemReadingLock.unlock();
+    _map->_shared->vmemMapLock.lockForRead();
 
 /*
     MemMapSet nodes = _map->vmemMapsInRange(inst.address(), inst.endAddress());
@@ -189,13 +186,6 @@ MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance & /*inst*/)
             otherNode->type()->hash(&ok1) == inst.type()->hash(&ok2) &&
             ok1 && ok2)
         {
-            // Decrease the reading counter again
-            _map->_shared->vmemReadingLock.lock();
-            _map->_shared->vmemReading--;
-            _map->_shared->vmemReadingLock.unlock();
-            // Wake up any sleeping thread
-            _map->_shared->vmemReadingDone.wakeAll();
-
             // We encountered an existing node
             otherNode->encountered();
 
@@ -204,12 +194,7 @@ MemoryMapNodeSV* MemoryMapBuilderSV::existsNode(Instance & /*inst*/)
     }
 */
 
-    // Decrease the reading counter again
-    _map->_shared->vmemReadingLock.lock();
-    _map->_shared->vmemReading--;
-    _map->_shared->vmemReadingLock.unlock();
-    // Wake up any sleeping thread
-    _map->_shared->vmemReadingDone.wakeAll();
+    _map->_shared->vmemMapLock.unlock();
 
     return NULL;
 }
@@ -479,7 +464,7 @@ void MemoryMapBuilderSV::processPointer(MemoryMapNodeSV *node, Instance &inst)
                 return;
 
             // Add pointer to the _pointerTo map
-            _map->_shared->pointersToLock.lock();
+            _map->_shared->pointersToLock.lockForWrite();
             _map->_pointersTo.insert(addr, node);
             _map->_shared->pointersToLock.unlock();
 

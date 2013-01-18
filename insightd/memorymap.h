@@ -73,7 +73,7 @@ struct BuilderSharedState
     {
         queue.clear();
         minProbability = 0;
-        processed = threadCount = vmemReading = vmemWriting = 0;
+        processed = threadCount = 0;
         maxObjSize = 0;
         lastNode = 0;
         for (int i = 0; i < MAX_BUILDER_THREADS; ++i)
@@ -81,7 +81,7 @@ struct BuilderSharedState
     }
 
     float minProbability;
-    int threadCount, vmemReading, vmemWriting;
+    int threadCount;
     unsigned int maxObjSize;
     quint64 currAddresses[MAX_BUILDER_THREADS];
     QMutex perThreadLock[MAX_BUILDER_THREADS];
@@ -89,10 +89,9 @@ struct BuilderSharedState
     NodeQueue queue;
     MemoryMapNode* lastNode;
     qint64 processed;
-    QMutex findAndAddChildLock, queueLock, pmemMapLock, currAddressesLock,
-        typeInstancesLock, pointersToLock, vmemReadingLock, vmemWritingLock,
-        mapNodeLock;
-    QWaitCondition vmemReadingDone, vmemWritingDone;
+    QMutex queueLock;
+    QReadWriteLock pmemMapLock, vmemMapLock, currAddressesLock,
+        typeInstancesLock, pointersToLock;
 
 #ifdef DEBUG
 	mutable quint32 degPerGenerationCnt;
@@ -263,7 +262,7 @@ public:
     /**
      * Returns the SymFactory used by this map.
      */
-    const SymFactory * symfactory() const;
+    const SymFactory * factory() const;
 
     float calculateNodeProbability(const Instance &inst,
                                    float parentProbability = 1.0) const;
@@ -356,9 +355,26 @@ private:
      */
     QVector<quint64> perCpuOffsets();
 
+    /**
+     * \warning This function is \b not thread-safe! It must not be called in
+     * multi-treaded contexts!
+     * @param var variable to add
+     */
     void addVariableWithCandidates(const Variable* var);
+
+    /**
+     * \warning This function is \b not thread-safe! It must not be called in
+     * multi-treaded contexts!
+     * @param var variable to add
+     */
     void addVariableWithRules(const Variable* var);
-    void addInstance(const Instance& inst);
+
+    /**
+     * \warning This function is \b not thread-safe! It must not be called in
+     * multi-treaded contexts!
+     * @param inst root instance to add
+     */
+    void addVarInstance(const Instance& inst);
 
     MemoryMapBuilder** _threads;
     const SymFactory* _factory;  ///< holds the SymFactory to operate on
@@ -452,7 +468,7 @@ inline quint64 MemoryMap::paddrSpaceEnd() const
             _vmem->physMem()->size() - 1 : VADDR_SPACE_X86;
 }
 
-inline const SymFactory * MemoryMap::symfactory() const
+inline const SymFactory * MemoryMap::factory() const
 {
     return _factory;
 }

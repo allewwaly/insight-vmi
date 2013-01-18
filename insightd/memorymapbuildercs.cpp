@@ -53,7 +53,7 @@ void MemoryMapBuilderCS::run()
         queueLock.unlock();
 
         // Insert in non-critical (non-exception prone) mappings
-        shared->typeInstancesLock.lock();
+        shared->typeInstancesLock.lockForWrite();
         _map->_typeInstances.insert(node->type()->id(), node);
         if (shared->maxObjSize < node->size())
             shared->maxObjSize = node->size();
@@ -69,7 +69,7 @@ void MemoryMapBuilderCS::run()
                             physAddr,
                             node->size() > 0 ? physAddr + node->size() - 1 : physAddr,
                             node);
-                shared->pmemMapLock.lock();
+                shared->pmemMapLock.lockForWrite();
                 _map->_pmemMap.insert(pNode);
                 shared->pmemMapLock.unlock();
             }
@@ -89,7 +89,7 @@ void MemoryMapBuilderCS::run()
                                 physAddr, physAddr + sizeOnPage - 1, node);
 
                     // Add a memory mapping
-                    shared->pmemMapLock.lock();
+                    shared->pmemMapLock.lockForWrite();
                     _map->_pmemMap.insert(pNode);
                     shared->pmemMapLock.unlock();
                     // Subtract the available space from left-over size
@@ -161,7 +161,7 @@ void MemoryMapBuilderCS::processPointer(const Instance& inst, MemoryMapNode *nod
     if (addr >= node->address() && addr <= node->endAddress())
         return;
 
-    _map->_shared->pointersToLock.lock();
+    _map->_shared->pointersToLock.lockForWrite();
     _map->_pointersTo.insert(addr, node);
     _map->_shared->pointersToLock.unlock();
     // Add dereferenced type to the stack, if not already visited
