@@ -26,6 +26,7 @@
 #include "memorymapbuildercs.h"
 #include "memorymapbuildersv.h"
 #include "longoperation.h"
+#include "programoptions.h"
 #include <debug.h>
 
 class SymFactory;
@@ -56,7 +57,7 @@ typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
 
 
-#define MAX_BUILDER_THREADS 32
+#define MAX_BUILDER_THREADS 8
 
 /**
  * Holds all variables that are shared among the builder threads.
