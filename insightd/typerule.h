@@ -198,10 +198,10 @@ class TypeRuleAction
 public:
     /// Type of action that is performed when the rule filter hits
     enum ActionType {
-        atNone,        ///< no action specified
-        atExpression,  ///< action() represents a C expression
-        atInlineCode,  ///< action() represents a script that is evaluated
-        atFunction     ///< action() is the name of a function in scriptFile() that is invoked
+        atNone       = 0,        ///< no action specified
+        atExpression = (1 << 0), ///< action() represents a C expression
+        atInlineCode = (1 << 1), ///< action() represents a script that is evaluated
+        atFunction   = (1 << 2)  ///< action() is the name of a function in scriptFile() that is invoked
     };
 
     /**

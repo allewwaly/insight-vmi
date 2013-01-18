@@ -128,7 +128,7 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map) :
     _slubFile(),
     _slubDataParsed(false),
     _slubDataAvailable(false),
-    _slub(map->symfactory(), map->vmem()),
+    _slub(map->factory(), map->vmem()),
     _minValidProbability(1.0),
     _maxInvalidProbability(0.0)
 {
@@ -141,7 +141,7 @@ MemoryMapVerifier::MemoryMapVerifier(MemoryMap *map, const char *slubFile) :
     _slubFile(slubFile),
     _slubDataParsed(false),
     _slubDataAvailable(true),
-    _slub(map->symfactory(), map->vmem()),
+    _slub(map->factory(), map->vmem()),
     _minValidProbability(1.0),
     _maxInvalidProbability(0.0)
 {

@@ -18,6 +18,7 @@
 
 
 MemoryMapBuilder::MemoryMapBuilder(MemoryMap* map, int index)
-    : _index(index), _map(map), _interrupted(false)
+    : TypeRuleEngineContextProvider(map->factory()),
+      _index(index), _map(map), _interrupted(false)
 {
 }
