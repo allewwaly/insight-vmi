@@ -10,6 +10,7 @@
 
 #include <QString>
 #include <QList>
+#include <QMutex>
 #include "basetype.h"
 #include "instance.h"
 
@@ -206,6 +207,7 @@ protected:
     bool _seemsValid;
     int _foundInPtrChains;    ///< how often this node was found through other chains of pointers
     int _size;
+    QMutex _nodeLock;
 };
 
 
@@ -318,7 +320,9 @@ inline int MemoryMapNode::foundInPtrChains() const
 
 inline void MemoryMapNode::incFoundInPtrChains()
 {
+    _nodeLock.lock();
     ++_foundInPtrChains;
+    _nodeLock.unlock();
 }
 
 

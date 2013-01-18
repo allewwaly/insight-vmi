@@ -168,11 +168,11 @@ void MemoryMap::addVariableWithCandidates(const Variable *var)
             if (!inst.isNull() && _perCpuOffset[i] != -1ULL)
                 inst.addToAddress(_perCpuOffset[i]);
 
-            addInstance(inst);
+            addVarInstance(inst);
         }
     }
     else {
-        addInstance(var->toInstance(_vmem, BaseType::trLexical, _knowSrc));
+        addVarInstance(var->toInstance(_vmem, BaseType::trLexical, _knowSrc));
     }
 }
 
@@ -181,7 +181,7 @@ void MemoryMap::addVariableWithRules(const Variable *var)
 {
     Instance inst(var->toInstance(_vmem, BaseType::trLexical, _knowSrc));
     while (!interrupted()) {
-        addInstance(inst);
+        addVarInstance(inst);
         if (inst.isList()) {
             inst = inst.listNext();
             checkOperationProgress();
@@ -193,7 +193,7 @@ void MemoryMap::addVariableWithRules(const Variable *var)
 }
 
 
-void MemoryMap::addInstance(const Instance& inst)
+void MemoryMap::addVarInstance(const Instance& inst)
 {
     if (inst.isNull() || !MemoryMapHeuristics::hasValidAddress(inst, false) ||
         !inst.isAccessible())
@@ -214,6 +214,7 @@ void MemoryMap::addInstance(const Instance& inst)
     _roots.append(node);
     _vmemMap.insert(node);
     _vmemAddresses.insert(node->address());
+
 
     if (shouldEnqueue(inst, node))
         _shared->queue.insert(node->probability(), node);
@@ -646,11 +647,6 @@ bool MemoryMap::dumpInit(const QString &fileName, const quint32 level) const
 MemMapList MemoryMap::findAllNodes(const Instance& origInst,
                                    const InstanceList &candidates) const
 {
-    // Increase the reading counter
-    _shared->vmemReadingLock.lock();
-    _shared->vmemReading++;
-    _shared->vmemReadingLock.unlock();
-
     // Find all nodes in the affected memory ranges
     MemMapList nodes;
     quint64 addrStart = origInst.address(),
@@ -682,22 +678,20 @@ MemMapList MemoryMap::findAllNodes(const Instance& origInst,
         }
         // If we have a valid interval, append all nodes and reset it to zero
         if (!overlap && (addrStart || addrEnd)) {
+            _shared->vmemMapLock.lockForRead();
             nodes += _vmemMap.objectsInRangeFast(addrStart, addrEnd);
+            _shared->vmemMapLock.unlock();
             addrStart = c_start;
             addrEnd = c_end;
         }
     }
 
     // Request nodes from the final interval
-    if (addrStart || addrEnd)
+    if (addrStart || addrEnd) {
+        _shared->vmemMapLock.lockForRead();
         nodes += _vmemMap.objectsInRangeFast(addrStart, addrEnd);
-
-   // Decrease the reading counter again
-    _shared->vmemReadingLock.lock();
-    _shared->vmemReading--;
-    _shared->vmemReadingLock.unlock();
-    // Wake up any sleeping thread
-    _shared->vmemReadingDone.wakeAll();
+        _shared->vmemMapLock.unlock();
+    }
 
     return nodes;
 }
@@ -903,7 +897,7 @@ MemoryMapNode *MemoryMap::addChild(
 
     if (!i.isNull() && i.type() && (i.type()->type() & interestingTypes)) {
         // Is any other thread currently searching for the same address?
-        _shared->currAddressesLock.lock();
+        _shared->currAddressesLock.lockForWrite();
         _shared->currAddresses[threadIndex] = 0;
         int idx = 0;
         while (idx < _shared->threadCount) {
@@ -911,10 +905,10 @@ MemoryMapNode *MemoryMap::addChild(
                 // Another thread searches for the same address, so release the
                 // currAddressesLock and wait for it to finish
                 _shared->currAddressesLock.unlock();
-//                _shared->threadDone[idx].wait(&_shared->perThreadLock[idx]);
                 _shared->perThreadLock[idx].lock();
+                // We are blocked until the other thread has finished its node
                 _shared->perThreadLock[idx].unlock();
-                _shared->currAddressesLock.lock();
+                _shared->currAddressesLock.lockForWrite();
                 idx = 0;
             }
             else
@@ -930,7 +924,6 @@ MemoryMapNode *MemoryMap::addChild(
         // Check if object conflicts previously given objects
         if (objectIsSane(i) && parent) {
 
-            _shared->mapNodeLock.lock();
             try {
                 MemoryMapNodeSV* parent_sv = _buildType == btSibi ?
                             dynamic_cast<MemoryMapNodeSV*>(parent) : 0;
@@ -943,31 +936,17 @@ MemoryMapNode *MemoryMap::addChild(
                 // The address of the instance is invalid
 
                 // Release locks and return
+                _shared->currAddressesLock.lockForWrite();
                 _shared->currAddresses[threadIndex] = 0;
-                _shared->mapNodeLock.unlock();
+                _shared->currAddressesLock.unlock();
 
                 return child;
             }
 
-            _shared->mapNodeLock.unlock();
-
-            // Acquire the writing lock
-            _shared->vmemWritingLock.lock();
-
-            // Wait until there is no more reader and we hold the read lock
-            _shared->vmemReadingLock.lock();
-
-            while (_shared->vmemReading > 0) {
-                _shared->vmemReadingDone.wait(&_shared->vmemReadingLock);
-                // Keep the reading lock until we have finished writing
-            }
-
+            _shared->vmemMapLock.lockForWrite();
             _vmemAddresses.insert(child->address());
             _vmemMap.insert(child);
-
-            // Release the reading and the writing lock
-            _shared->vmemReadingLock.unlock();
-            _shared->vmemWritingLock.unlock();
+            _shared->vmemMapLock.unlock();
 
             // Insert the new node into the queue
             if (addToQueue && shouldEnqueue(i, child)) {
@@ -975,15 +954,12 @@ MemoryMapNode *MemoryMap::addChild(
                 _shared->queue.insert(child->probability(), child);
                 _shared->queueLock.unlock();
             }
-
-//            // Sanity check
-//            if ((parent->type()->dereferencedType(BaseType::trLexical) & StructOrUnion) &&
-//                child->type()->dereferencedType(BaseType::trLexical) & StructOrUnion)
-//                debugerr("This should not happen! " << child->fullName());
         }
 
         // Done, release our current address (no need to hold currAddressesLock)
+        _shared->currAddressesLock.lockForWrite();
         _shared->currAddresses[threadIndex] = 0;
+        _shared->currAddressesLock.unlock();
 //        // Wake up a waiting thread (if it exists)
 //        _shared->threadDone[threadIndex].wakeOne();
 
