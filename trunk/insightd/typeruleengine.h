@@ -204,16 +204,22 @@ public:
     /**
      * Matches the given Instance with the given member access pattern agains
      * the rule set.
+     *
+     * \warning This function is \b not thread-safe! For concurrent rule
+     * matching, the individual threads must inherit from class
+     * TypeRuleEngineContextProvider.
+     *
      * @param inst instance to match
      * @param members accessed members, originating from the structure pointed
      *  to by \a inst
+     * @param newInst the resulting instance (if any) is returned in this
+     * parameter, may be \c null
      * @param priority returns the priority of the matched rule, if any
      * @return bitwise combination of MatchResult values
      * \a MatchResult
      */
     int match(const Instance* inst, const ConstMemberList &members,
-              Instance **newInst, TypeRuleEngineContext* ctx = 0,
-              int *priority = 0) const;
+              Instance **newInst, int *priority = 0) const;
 
     /**
      * Returns a list of all rules that match instance \a inst.
@@ -275,8 +281,8 @@ public:
     /**
      * Every thread needs its own context to evaluate rules. This function
      * creates a context for one thread.
-     * @return context object.
-     * \sa deleteContext()
+     * @return unique context object
+     * \sa deleteContext(), TypeRuleEngineContextProvider
      */
     static TypeRuleEngineContext* createContext(const SymFactory *factory);
 
@@ -284,7 +290,7 @@ public:
      * Deletes the context object that was previously created with
      * createContext().
      * @param ctx context object to delete
-     * \sa createContext()
+     * \sa createContext(), TypeRuleEngineContextProvider
      */
     static void deleteContext(TypeRuleEngineContext *ctx);
 

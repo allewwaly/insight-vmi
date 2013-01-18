@@ -9,6 +9,7 @@
 #define MEMORYMAPBUILDER_H_
 
 #include <QThread>
+#include "typeruleenginecontextprovider.h"
 
 // Forward declaration
 class MemoryMap;
@@ -17,7 +18,7 @@ class Instance;
 /**
  * Threading class for building the memory map in parallel
  */
-class MemoryMapBuilder: public QThread
+class MemoryMapBuilder: public QThread, public TypeRuleEngineContextProvider
 {
 public:
     MemoryMapBuilder(MemoryMap* map, int index);

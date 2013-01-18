@@ -9,6 +9,7 @@
 #include "scriptengine.h"
 #include "refbasetype.h"
 #include "variable.h"
+#include "typeruleenginecontextprovider.h"
 #include <debug.h>
 #include <QTextStream>
 
@@ -252,9 +253,9 @@ QString TypeRuleEngine::ruleFile(const TypeRule *rule) const
 
 
 int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
-                          Instance** newInst, TypeRuleEngineContext *ctx,
-                          int *priority) const
+                          Instance** newInst, int *priority) const
 {
+    TypeRuleEngineContext *ctx = 0;
     if (priority)
         *priority = 0;
 
@@ -271,14 +272,15 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     // Rules with variable names might need to match inst->name(), so check all.
     // We can stop as soon as all possibly ORed values are included.
     for (; it != e && it.key() == inst->type()->id(); ++it) {
-        const TypeRule* rule = it.value().rule;
-        int index = it.value().index;
+        const ActiveRule& arule = it.value();
+        const TypeRule* rule = arule.rule;
+        int index = arule.index;
 
         // If the result is already clear, check only for higher priority rules
         if (ret == (mrMatch|mrAmbiguous|mrDefer) && rule->priority() <= prio) {
             // Output information
             if (_verbose)
-                if (ruleMatchInfo(it.value(), inst, members, 0, false, true))
+                if (ruleMatchInfo(arule, inst, members, 0, false, true))
                     ++ruleInfosPrinted;
             continue;
         }
@@ -317,10 +319,21 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                             match = false;
 
                     if (match) {
+                        // For a rule with a ScriptAction, we need a valid context
+                        if (!ctx &&
+                            (rule->action()->actionType() &
+                             (TypeRuleAction::atFunction|TypeRuleAction::atInlineCode)))
+                        {
+                            const TypeRuleEngineContextProvider* ctxp =
+                                    dynamic_cast<const TypeRuleEngineContextProvider*>(
+                                        QThread::currentThread());
+                            ctx = ctxp ? ctxp->typeRuleCtx() : _ctx;
+                        }
+
                         // Evaluate the rule
                         bool alreadyMatched = (ret & mrMatch);
                         evaluated = true;
-                        Instance instRet(evaluateRule(it.value(), inst, members,
+                        Instance instRet(evaluateRule(arule, inst, members,
                                                       &match, ctx ? ctx : _ctx));
                         instRet.setOrigin(Instance::orRuleEngine);
                         ret |= tmp_ret |= mrMatch;
