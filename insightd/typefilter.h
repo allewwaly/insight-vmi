@@ -6,6 +6,7 @@
 #include <QStringList>
 #include <QRegExp>
 #include <QHash>
+#include <QMutex>
 #include <safeflags.h>
 #include "filterexception.h"
 #include "keyvaluestore.h"
@@ -253,6 +254,9 @@ protected:
     bool matchTypeName(const QString& name) const;
 
     Filter::Options _filters;
+
+protected:
+    mutable QMutex _regExLock;
 
 private:
     QString _typeName;

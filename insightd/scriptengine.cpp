@@ -212,7 +212,7 @@ QScriptValue ScriptEngine::evaluate(const QScriptProgram &program,
 
 	VarSetter<int> setter(&_memDumpIndex, memDumpIndex, -1);
 	QScriptValue ret(_engine->evaluate(program));
-	checkEvalErrors(ret);;
+	checkEvalErrors(ret);
 
 	return ret;
 }

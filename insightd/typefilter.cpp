@@ -7,7 +7,7 @@
 #include "instance_def.h"
 #include "shellutil.h"
 #include "symfactory.h"
-
+#include <QMutexLocker>
 
 namespace xml
 {
@@ -384,12 +384,15 @@ bool GenericFilter::matchTypeName(const QString &name) const
     if (filterActive(ftTypeNameLiteral) &&
         _typeName.compare(name, Qt::CaseInsensitive) != 0)
         return false;
-    else if (filterActive(ftTypeNameWildcard) &&
-             !_typeRegEx->exactMatch(name))
-        return false;
-    else if (filterActive(ftTypeNameRegEx) &&
-             _typeRegEx->indexIn(name) < 0)
-        return false;
+    else {
+        QMutexLocker lock(&_regExLock);
+        if (filterActive(ftTypeNameWildcard) &&
+            !_typeRegEx->exactMatch(name))
+            return false;
+        else if (filterActive(ftTypeNameRegEx) &&
+                 _typeRegEx->indexIn(name) < 0)
+            return false;
+    }
 
     return true;
 }
@@ -514,12 +517,15 @@ bool MemberFilter::match(const StructuredMember *member) const
     if (!member)
         return false;
 
-    if (filterActive(Options(ftVarNameWildcard|ftVarNameRegEx)) &&
-        _nameRegEx->indexIn(member->name()) < 0)
-        return false;
-    else if (filterActive(ftVarNameLiteral) &&
+    if (filterActive(ftVarNameLiteral) &&
              QString::compare(_name, member->name(), Qt::CaseInsensitive) != 0)
         return false;
+    else {
+        QMutexLocker lock(&_regExLock);
+        if (filterActive(Options(ftVarNameWildcard|ftVarNameRegEx)) &&
+            _nameRegEx->indexIn(member->name()) < 0)
+            return false;
+    }
 
     return matchType(member->refTypeDeep(BaseType::trLexical));
 }
@@ -737,12 +743,15 @@ bool VariableFilter::matchVarName(const QString &name) const
     if (filterActive(ftVarNameLiteral) &&
         _varName.compare(name, Qt::CaseInsensitive) != 0)
         return false;
-    else if (filterActive(ftVarNameWildcard) &&
-             !_varRegEx->exactMatch(name))
-        return false;
-    else if (filterActive(ftVarNameRegEx) &&
-             _varRegEx->indexIn(name) < 0)
-        return false;
+    else {
+        QMutexLocker lock(&_regExLock);
+        if (filterActive(ftVarNameWildcard) &&
+            !_varRegEx->exactMatch(name))
+            return false;
+        else if (filterActive(ftVarNameRegEx) &&
+                 _varRegEx->indexIn(name) < 0)
+            return false;
+    }
 
     return true;
 }
