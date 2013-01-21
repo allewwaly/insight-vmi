@@ -49,14 +49,22 @@ void ScriptEngine::reset()
 {
 	terminateScript();
 
-	if (_engine)
+	if (_engine) {
 		delete _engine;
-	if (_instClass)
+		_engine = 0;
+	}
+	if (_instClass) {
 		delete _instClass;
-	if (_symClass)
+		_instClass = 0;
+	}
+	if (_symClass) {
 		delete _symClass;
-	if (_memClass)
+		_symClass = 0;
+	}
+	if (_memClass) {
 	    delete _memClass;
+		_memClass = 0;
+	}
 	_lastError.clear();
 	_lastEvalFailed = false;
 	_initialized = false;
