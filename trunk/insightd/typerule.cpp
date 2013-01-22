@@ -146,6 +146,12 @@ Instance ScriptAction::evaluate(const Instance *inst,
                                 const ConstMemberList &members,
                                 ScriptEngine *eng, bool *matched) const
 {
+    // Using the same QScriptProgram by multiple engines concurrently causes
+    // a segmentation fault.
+    // See https://bugreports.qt-project.org/browse/QTBUG-29246
+    QScriptProgram prog(_program->sourceCode(), _program->fileName(),
+                        _program->firstLineNumber());
+
     if (matched)
         *matched = true;
 
@@ -163,11 +169,11 @@ Instance ScriptAction::evaluate(const Instance *inst,
 
     QScriptValueList args;
     args << instVal << indexlist;
-    QScriptValue ret(eng->evaluateFunction(funcToCall(), args, *_program,
+    QScriptValue ret(eng->evaluateFunction(funcToCall(), args, prog,
                                            _includePaths, inst->memDumpIndex()));
 
     if (eng->lastEvaluationFailed())
-        warnEvalError(eng, _program->fileName());
+        warnEvalError(eng, prog.fileName());
     else if (ret.isBool() || ret.isNumber() || ret.isNull()) {
         if (matched)
             *matched = ret.toBool();
