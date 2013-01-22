@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules priority="100">
+		<rule priority="111">
+			<name>inodes_in_use</name>
+			<description>Variable "inodes_in_use" is head of "struct inode" objects.</description>
+			<filter>
+				<variablename>inodes_in_use</variablename>
+				<datatype>struct</datatype>
+				<typename>list_head</typename>
+				<members>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="function" file="inodes.js">inode_i_list</action>
+		</rule>
+
+		<rule priority="111">
+			<name>inodes_unused</name>
+			<description>Variable "inodes_unused" is head of "struct inode" objects.</description>
+			<filter>
+				<variablename>inodes_unused</variablename>
+				<datatype>struct</datatype>
+				<typename>list_head</typename>
+				<members>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="function" file="inodes.js">inode_i_list</action>
+		</rule>
+
+		<rule priority="102">
+			<name>super_block.s_inodes</name>
+			<description>Member "s_inodes" of "struct super_block" links inodes into a list.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>super_block</typename>
+				<members>
+					<member>s_inodes</member>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="function" file="inodes.js">super_block_s_inodes</action>
+		</rule>
+
+		<rule priority="102">
+			<name>inodes.i_list</name>
+			<description>Member "i_list" of "struct inode" links further inodes into a list.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>inode</typename>
+				<members>
+					<member>i_list</member>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="function" file="inodes.js">inode_i_list</action>
+		</rule>
+
+		<rule priority="102">
+			<name>inodes.i_sb_list</name>
+			<description>Member "i_sb_list" of "struct inode" links further inodes into a list.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>inode</typename>
+				<members>
+					<member>i_sb_list</member>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="function" file="inodes.js">inode_i_sb_list</action>
+		</rule>
+
+		<rule priority="101">
+			<name>dentry.d_inode</name>
+			<description>Resolves inode type of member "d_inode" in "struct dentry".</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>dentry</typename>
+				<members>
+					<member>d_inode</member>
+				</members>
+			</filter>
+			<action type="function" file="inodes.js">generic_inode_member</action>
+		</rule>
+
+		<rule priority="101">
+			<name>address_space.host</name>
+			<description>Resolves inode type of member "host" in "struct address_space".</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>address_space</typename>
+				<members>
+					<member>host</member>
+				</members>
+			</filter>
+			<action type="function" file="inodes.js">generic_inode_member</action>
+		</rule>
+
+		<rule priority="101">
+			<name>block_device.bd_inode</name>
+			<description>Resolves inode type of member "bd_inode" in "struct block_device".</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>block_device</typename>
+				<members>
+					<member>bd_inode</member>
+				</members>
+			</filter>
+			<action type="function" file="inodes.js">generic_inode_member</action>
+		</rule>
+
+	</rules>
+</typeknowledge>
