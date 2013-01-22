@@ -16,6 +16,7 @@
 <!-- 	<include>no_union_members.xml</include> -->
 	<include>per_cpu_types.xml</include>
 	<include>radix_trees.xml</include>
+	<include>inodes.xml</include>
 
 	<!-- Type-specific rules -->
 	<include>type_struct_ctl_table.xml</include>
@@ -29,7 +30,6 @@
 	<include>type_union_acpi_operand_object.xml</include>
 
 	<!-- Variable-specific rules -->
-	<include>var_inodes.xml</include>
 	<include>var_modules_struct_list_head.xml</include>
 	<include>var_shm_mnt_struct_vfsmount_ptr.xml</include>
 
