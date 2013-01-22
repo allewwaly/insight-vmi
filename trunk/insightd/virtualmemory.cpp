@@ -187,11 +187,17 @@ bool VirtualMemory::seek(qint64 pos)
     // Call inherited function
 //    QIODevice::seek(pos);
 
+    bool doLock = _threadSafe;
+
     if ( ((quint64) pos) > ((quint64) size()) || !isOpen() )
         return false;
 
-    if (_pos == (quint64) pos)
+    if (doLock) _physMemMutex.lock();
+    if (_pos == (quint64) pos) {
+        if (doLock) _physMemMutex.unlock();
         return true;
+    }
+    if (doLock) _physMemMutex.unlock();
 
 	int pageSize;
 	qint64 physAddr;
@@ -212,7 +218,6 @@ bool VirtualMemory::seek(qint64 pos)
 	if (physAddr < 0)
 	    return false;
 
-	bool doLock = _threadSafe;
 
     if (doLock) _physMemMutex.lock();
 	bool seekOk = _physMem->seek(physAddr);
@@ -235,8 +240,14 @@ bool VirtualMemory::safeSeek(qint64 pos)
         if ( ((quint64) pos) > ((quint64) size()) || !isOpen() )
             return false;
 
-        if (_pos == (quint64) pos)
+        bool doLock = _threadSafe;
+
+        if (doLock) _physMemMutex.lock();
+        if (_pos == (quint64) pos) {
+            if (doLock) _physMemMutex.unlock();
             return true;
+        }
+        if (doLock) _physMemMutex.unlock();
 
         int pageSize;
 
@@ -250,7 +261,6 @@ bool VirtualMemory::safeSeek(qint64 pos)
         if (! (physAddr != (qint64)PADDR_ERROR) && (physAddr >= 0) )
             return false;
 
-        bool doLock = _threadSafe;
 
         if (doLock) _physMemMutex.lock();
         bool seekOk = _physMem->seek(physAddr);
