@@ -274,13 +274,16 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 
 
     // How many threads to create?
-//    _shared->threadCount =
-//            qMin(qMax(programOptions.threadCount(), 1), MAX_BUILDER_THREADS);
-    _shared->threadCount = 1;
+    _shared->threadCount =
+            qMin(qMax(programOptions.threadCount(), 1), MAX_BUILDER_THREADS);
+//    _shared->threadCount = 1;
 
     if (_shared->threadCount > 1)
         debugmsg("Building reverse map with " << _shared->threadCount
                  << " threads.");
+
+    // Enable thread safety for VirtualMemory object
+    bool wasThreadSafe = _vmem->setThreadSafety(_shared->threadCount > 1);
 
     // Create the builder threads
     _threads = new MemoryMapBuilder*[_shared->threadCount];
@@ -295,9 +298,6 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
             break;
         }
     }
-
-    // Enable thread safety for VirtualMemory object
-    bool wasThreadSafe = _vmem->setThreadSafety(_shared->threadCount > 1);
 
     // Go through the global vars and add their instances to the queue
     for (VariableList::const_iterator it = _factory->vars().begin(),
@@ -357,6 +357,8 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
         _vmemAddresses.insert(node->address());
     }
 
+    // The btSlubCache type ONLY adds all slub objects to the map and does not
+    // follow any further pointers.
     if (type == btSlubCache) {
         // Add all slub objects to the map
         for (AddressMap::const_iterator it = _verifier.slub().objects().begin(),
@@ -375,12 +377,13 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
             _vmemAddresses.insert(node->address());
         }
     }
+    // Regular mode, process all instances in the queue.
     else {
-        // PARALLEL PART OF BUILDING PROCESS
-
         for (int i = 0; i < _shared->threadCount; ++i)
             _threads[i]->start();
     }
+
+    // PARALLEL PART OF BUILDING PROCESS
 
     // Let the builders do the work, but regularly output some statistics
     while (!interrupted() &&
