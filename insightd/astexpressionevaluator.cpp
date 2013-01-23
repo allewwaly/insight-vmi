@@ -119,7 +119,7 @@ ASTExpression* ASTExpressionEvaluator::exprOfNode(
         return 0;
 
     // Push current root on the recursion tracking stack, gets auto-popped later
-    StackAutoPopper<typeof(_evalNodeStack)> autoPopper(&_evalNodeStack, node);
+    StackAutoPopper<ASTNodeStack> autoPopper(&_evalNodeStack, node);
     Q_UNUSED(autoPopper);
 
     // Check for loops in recursive evaluation
