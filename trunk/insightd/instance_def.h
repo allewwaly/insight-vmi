@@ -67,6 +67,20 @@ public:
     Instance();
 
     /**
+     * Copy constructor
+     * @param other constant reference
+     */
+    Instance(const Instance &other);
+
+#ifdef Q_COMPILER_RVALUE_REFS
+    /**
+     * Move constructor
+     * @param other
+     */
+    Instance (Instance&& other);
+#endif
+
+    /**
      * Constructor which sets the origin
      * @param orig origin of this instance
      */
@@ -94,6 +108,22 @@ public:
     Instance(size_t address, const BaseType* type, const QString& name,
             const QStringList& parentNames, VirtualMemory* vmem, int id = -1,
              Origin orig = orUnknown);
+
+    /**
+     * copy operator
+     * @param other constant reference
+     * @return this
+     */
+    Instance& operator=(const Instance& other);
+
+#ifdef Q_COMPILER_RVALUE_REFS
+    /**
+     * Move operator
+     * @param other rvalue
+     * @return this
+     */
+    Instance& operator=(Instance&& other);
+#endif
 
     /**
      * @return the ID of this instance, if it is a variable instance, -1
@@ -881,7 +911,7 @@ public:
       * Get the VirtualMemory object that is used by this instance
       */
     VirtualMemory* vmem() const;
-    
+
     /**
      * Function to compare two Instances.
      * @param inst instance to compare to
@@ -893,11 +923,11 @@ public:
      */
     bool compareInstance(const Instance& inst,
         bool &embedded, bool &overlaps, bool &thisParent) const;
-  
+
     /**
      * Function to compare two Instances, where one is a rtUnion.
      * Used in compareInstances
-     * @param inst instance to compare to 
+     * @param inst instance to compare to
      * @param thisParent \c true if \a this instance contains \a inst
      *                  (\c false if \a inst contains \a this instance)
      * @return \c true if instances do not conflict with each other
@@ -911,7 +941,7 @@ public:
      * @return \c true if instances types do not conflict with each other
      */
     bool compareInstanceType(const Instance& inst) const ;
-    
+
     /**
      * Function to check consistency by considering const / enum members.
      * This function is only useful for structured types.
@@ -1013,7 +1043,7 @@ private:
             bool includeNestedStructs, QStringList& result,
             VisitedSet& visited) const;
 
-	Instance memberCandidate(const StructuredMember* m, int cndtIndex) const;
+    Instance memberCandidate(const StructuredMember* m, int cndtIndex) const;
 
 	bool memberCandidateCompatible(const StructuredMember* m,
 								   int cndtIndex) const;
@@ -1022,7 +1052,7 @@ private:
 
 	QSharedDataPointer<InstanceData> _d;
 
-    static const TypeRuleEngine* _ruleEngine;
+	static const TypeRuleEngine* _ruleEngine;
 };
 
 Q_DECLARE_METATYPE(Instance*)

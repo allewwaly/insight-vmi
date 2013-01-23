@@ -8,11 +8,43 @@
 #ifndef INSTANCE_H_
 #define INSTANCE_H_
 
+#include <QtAlgorithms>
 #include "instancedata.h"
 #include "basetype.h"
 #include "virtualmemory.h"
 #include "virtualmemoryexception.h"
 #include "instance_def.h"
+
+
+inline Instance::Instance(const Instance& other)
+    : _d(other._d)
+{
+}
+
+
+#ifdef Q_COMPILER_RVALUE_REFS
+inline Instance::Instance(Instance &&other)
+{
+    qSwap(_d, other._d);
+}
+#endif
+
+
+inline Instance& Instance::operator=(const Instance& other)
+{
+    _d = other._d;
+    return *this;
+}
+
+
+#ifdef Q_COMPILER_RVALUE_REFS
+inline Instance& Instance::operator=(Instance&& other)
+{
+    qSwap(_d, other._d);
+    return *this;
+}
+#endif
+
 
 inline int Instance::id() const
 {
