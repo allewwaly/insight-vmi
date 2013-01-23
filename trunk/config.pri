@@ -34,6 +34,9 @@ win32 {
 QMAKE_CFLAGS_RELEASE += -O3
 QMAKE_CXXFLAGS_RELEASE += -O3
 
+# Enable C++11 support for GCC
+contains(QMAKE_CXX, g++): QMAKE_CXXFLAGS += -std=c++0x
+
 # Names of the libs
 INSIGHT_LIB = insight
 CPARSER_LIB = cparser

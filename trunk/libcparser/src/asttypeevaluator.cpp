@@ -308,7 +308,7 @@ ASTType* ASTTypeEvaluator::typeofNode(const ASTNode *node)
         return _types[node];
     }
 
-    StackAutoPopper<typeof(_typeNodeStack)> autoPopper(&_typeNodeStack, node);
+    StackAutoPopper<ASTNodeStack> autoPopper(&_typeNodeStack, node);
 
     // Check for loops in recursive evaluation
     for (int i = 0; i < _typeNodeStack.size() - 1; ++i) {
