@@ -1,3 +1,14 @@
+/* Relation between super_operations objects and the corresponding inode 
+ * specializations
+ */
+const inode_types = {
+	shmem_ops: "shmem_inode_info",
+	proc_sops: "proc_inode",
+	bdev_sops: "bdev_inode",
+	sockfs_ops: "socket_alloc",
+	mqueue_super_ops: "mqueue_inode_info"
+};
+
 /*
 Compares characteristic pointers of the given inode against other well-known
 objects, such as the super_block operations. If the type is known, the inode's
@@ -6,37 +17,22 @@ type is changed to the embedding type.
 function inode_resolve_embedding(inode)
 {
 	// The most reliable distinction is using the related super_operations
-	var sb_op = inode.i_sb.s_op;
-	if (sb_op === undefined || sb_op.IsNull())
+	var i_sb_ops = inode.i_sb.s_op;
+	if (i_sb_ops === undefined || i_sb_ops.IsNull())
 		return inode;
 
-	// Is this a "struct shmem_inode_info"?
-	// See: http://lxr.linux.no/#linux+v2.6.32/include/linux/shmem_fs.h#L36
-	var shm_sb_op = new Instance("shmem_ops");
-	if (sb_op.Address() == shm_sb_op.Address()) {
-		inode.ChangeType("shmem_inode_info");
-		inode.AddToAddress(-inode.MemberOffset("vfs_inode"));
-		return inode;
+	// Compare super_operations address linked by inode to all other known
+	// super_operations types
+	for (var ops_name in inode_types) {
+		var sb_ops = new Instance(ops_name);
+		if (i_sb_ops.Address() == sb_ops.Address()) {
+			inode.ChangeType(inode_types[ops_name]);
+			inode.AddToAddress(-inode.MemberOffset("vfs_inode"));
+			return inode;
+		}
 	}
-	
-	// Is this a "struct proc_inode"?
-	// See: http://lxr.linux.no/#linux+v2.6.32/include/linux/proc_fs.h#L274
-	var proc_sb_op = new Instance("proc_sops");
-	if (sb_op.Address() == proc_sb_op.Address()) {
-		inode.ChangeType("proc_inode");
-		inode.AddToAddress(-inode.MemberOffset("vfs_inode"));
-		return inode;
-	}
-	
-	// Is this a "struct bdev_inode"?
-	var bdev_sb_op = new Instance("bdev_sops");
-	if (sb_op.Address() == bdev_sb_op.Address()) {
-		inode.ChangeType("bdev_inode");
-		inode.AddToAddress(-inode.MemberOffset("vfs_inode"));
-		return inode;
-	}
-	
-	// Otherwise we don't know the type (or it is just a plain inode)
+
+	// We don't know the type (or it is just a plain inode)
 	return inode;
 }
 
