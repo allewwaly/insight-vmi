@@ -147,8 +147,8 @@ Instance ScriptAction::evaluate(const Instance *inst,
                                 ScriptEngine *eng, bool *matched) const
 {
     // Parallel evaluation of threads
-    static QMutex lock(QMutex::Recursive);
-    QMutexLocker l(&lock);
+//    static QMutex lock(QMutex::Recursive);
+//    QMutexLocker l(&lock);
 
     // Using the same QScriptProgram by multiple engines concurrently causes
     // a segmentation fault.
