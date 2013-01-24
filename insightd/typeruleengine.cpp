@@ -22,8 +22,10 @@ const char* inlinefunc = "__inline_func__";
 class TypeRuleEngineContext
 {
 public:
-    TypeRuleEngineContext(const SymFactory* factory) : eng(factory, ksNone) {}
+    TypeRuleEngineContext(const SymFactory* factory)
+        : eng(factory, ksNone), currentRule(0) {}
     ScriptEngine eng;
+    const ActiveRule* currentRule;
 };
 
 
@@ -328,13 +330,18 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                                     dynamic_cast<const TypeRuleEngineContextProvider*>(
                                         QThread::currentThread());
                             ctx = ctxp ? ctxp->typeRuleCtx() : _ctx;
+
                         }
 
                         // Evaluate the rule
                         bool alreadyMatched = (ret & mrMatch);
                         evaluated = true;
+                        if (ctx)
+                            ctx->currentRule = &arule;
                         Instance instRet(evaluateRule(arule, inst, members,
                                                       &match, ctx ? ctx : _ctx));
+                        if (ctx)
+                            ctx->currentRule = 0;
                         instRet.setOrigin(Instance::orRuleEngine);
                         ret |= tmp_ret |= mrMatch;
 
