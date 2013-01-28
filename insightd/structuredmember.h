@@ -27,16 +27,16 @@ class StructuredMember: public Symbol, public ReferencingType, public SourceRef
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    explicit StructuredMember(SymFactory* factory);
+    explicit StructuredMember(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    StructuredMember(SymFactory* factory, const TypeInfo& info);
+    StructuredMember(KernelSymbols* symbols, const TypeInfo& info);
 
     /**
      * Returns the index of this member into its structure's member list.
@@ -187,18 +187,6 @@ private:
     qint8 _bitSize;
     qint8 _bitOffset;
 };
-
-
-inline const SymFactory* StructuredMember::fac() const
-{
-	return _factory;
-}
-
-
-inline SymFactory* StructuredMember::fac()
-{
-    return _factory;
-}
 
 
 inline size_t StructuredMember::offset() const

@@ -3,8 +3,8 @@
 #include "typeruleengine.h"
 
 
-TypeRuleEngineContextProvider::TypeRuleEngineContextProvider(const SymFactory *factory)
-    : _ctx(TypeRuleEngine::createContext(factory))
+TypeRuleEngineContextProvider::TypeRuleEngineContextProvider(KernelSymbols *symbols)
+    : _ctx(TypeRuleEngine::createContext(symbols))
 {
 }
 

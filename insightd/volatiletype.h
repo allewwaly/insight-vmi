@@ -15,16 +15,16 @@ class VolatileType: public RefBaseType
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    VolatileType(SymFactory* factory);
+    VolatileType(KernelSymbols* symbols);
 
     /**
-     * Volatileructor
-     * @param factory the factory that created this symbol
+     * Constructor
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to volatileruct this type from
      */
-    VolatileType(SymFactory* factory, const TypeInfo& info);
+    VolatileType(KernelSymbols* symbols, const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable

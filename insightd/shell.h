@@ -22,7 +22,7 @@
 #include "keyvaluestore.h"
 #include "kernelsymbols.h"
 #include "memorydump.h"
-#include "colorpalette.h"
+#include "console.h"
 
 // Forward declaration
 class QProcess;
@@ -92,23 +92,6 @@ public:
      */
     virtual ~Shell();
 
-    /**
-     * Use this stream to write information on the console.
-     * @return the \c stdout stream of the shell
-     */
-    QTextStream& out();
-
-    /**
-     * Use this stream to write error messages on the console.
-     * @return the \c stderr stream of the shell
-     */
-    QTextStream& err();
-
-    void errMsg(const QString& s, bool newline = true);
-
-    void errMsg(const char* s, bool newline = true);
-
-    void warnMsg(const QString& s, bool newline = true);
 
     /**
      * @return the KernelSymbol object of this Shell object
@@ -128,12 +111,9 @@ public:
     QString readLine(const QString& prompt = QString());
 
     /**
-     * This flag indicates whether we are in an interactive session or not.
-     * If non-interactive, the shell is less verbose (no progress information,
-     * no prompts, no questions).
-     * @return
+     * Requests the shell to interrupt any currently running operation.
      */
-    bool interactive() const;
+    void interrupt();
 
     /**
      * @return the exit code of the last executed command
@@ -152,79 +132,44 @@ public:
     bool shuttingDown() const;
 
     /**
-     * Requests the shell to interrupt any currently running operation.
-     */
-    void interrupt();
-
-    /**
-     * @return \c true if interrupt() has been called during execution of the
-     * running operation, \c false otherwise
-     */
-    bool interrupted() const;
-
-    /**
      * @return \c true if a command is currently evaluated and the operation is
      * still in progress, \c false otherwise
      */
     bool executing() const;
 
-    /**
-     * @return the array of memory dump files
-     */
-    static const MemDumpArray& memDumps();
+//    /**
+//     * Returns the ANSI color code to produce the color for type \a ct.
+//     * @param ct the desired color type
+//     * @return color code to produce that color in an ANSI terminal
+//     */
+//    const char* color(ColorType ct) const;
 
-    /**
-     * Loads a memory file.
-     * @param fileName the file to load
-     * @return in case of success, the index of the loaded file into the
-     * memDumps() array is returned, i.e., a value >= 0, otherwise an error
-     * code < 0
-     */
-    int loadMemDump(const QString& fileName);
+//    /**
+//     * Formats the pretty name of a type including ANSI color codes to produce
+//     * some syntax highlighting.
+//     * @param t the type to pretty-print
+//     * @param minLen the desired minimum length of the output string (excluding
+//     *  color codes); the string will be padded with spaces to match \a minLen
+//     * @param maxLen the desired maximum length of the output string (excluding
+//     *  color codes); the string will be shortend with "..." to be at most
+//     *  \a maxLen characters long.
+//     * @return the pretty name of type \a t, including ANSI color codes, padded
+//     *  or shortend to the given \a minLen and \a maxLen.
+//     */
+//    QString prettyNameInColor(const BaseType* t, int minLen = 0,
+//                              int maxLen = 0) const;
 
-    /**
-     * Unloads a memory file, either based on the file name or an the index into
-     * the memDumps() array.
-     * @param indexOrFileName either the name or the list index of the file to
-     * unload
-     * @param unloadedFile if given, the name of the unloaded file will be
-     * returned here
-     * @return in case of success, the index of the loaded file into the
-     * memDumps() array is returned, i.e., a value >= 0, otherwise an error
-     * code < 0
-     */
-    int unloadMemDump(const QString& indexOrFileName, QString* unloadedFile = 0);
-
-    /**
-     * Returns the ANSI color code to produce the color for type \a ct.
-     * @param ct the desired color type
-     * @return color code to produce that color in an ANSI terminal
-     */
-    const char* color(ColorType ct) const;
-
-    /**
-     * Formats the pretty name of a type including ANSI color codes to produce
-     * some syntax highlighting.
-     * @param t the type to pretty-print
-     * @param minLen the desired minimum length of the output string (excluding
-     *  color codes); the string will be padded with spaces to match \a minLen
-     * @param maxLen the desired maximum length of the output string (excluding
-     *  color codes); the string will be shortend with "..." to be at most
-     *  \a maxLen characters long.
-     * @return the pretty name of type \a t, including ANSI color codes, padded
-     *  or shortend to the given \a minLen and \a maxLen.
-     */
-    QString prettyNameInColor(const BaseType* t, int minLen = 0,
-                              int maxLen = 0) const;
-
-    QString prettyNameInColor(const QString& name, ColorType nameType,
-                              const BaseType* t, int minLen = 0,
-                              int maxLen = 0) const;
+//    QString prettyNameInColor(const QString& name, ColorType nameType,
+//                              const BaseType* t, int minLen = 0,
+//                              int maxLen = 0) const;
 
     /**
      * Saves the command line history to the history file.
      */
     void saveShellHistory();
+
+    static UserResponse yesNoQuestion(const QString& title,
+                                      const QString& question);
 
 protected:
     /**
@@ -256,18 +201,13 @@ private slots:
 
 private:
     static KernelSymbols _sym;
-    static QFile _stdin;
-    static QFile _stdout;
-    static QFile _stderr;
-    static QTextStream _out;
-    static QTextStream _err;
     static QDataStream _bin;
     static QDataStream _ret;
     QHash<QString, Command> _commands;
     static MemDumpArray _memDumps;
     QList<QProcess*> _pipedProcs;
     bool _listenOnSocket;
-    bool _interactive;
+//    bool _interactive;
     bool _executing;
     QLocalSocket* _clSocket;
     QLocalServer* _srvSocket;
@@ -279,11 +219,11 @@ private:
     QSemaphore _sockSem;
     QMutex _sockSemLock;
     bool _finished;
-    bool _interrupted;
+//    bool _interrupted;
     int _lastStatus;
     QMutex _engineLock;
     ScriptEngine* _engine;
-    ColorPalette _color;
+//    ColorPalette _color;
 
 //    void printTimeStamp(const QTime& time);
     int memberNameLenth(const Structured* s, int indent) const;
@@ -402,9 +342,5 @@ private:
 /// Globally accessible shell object
 extern Shell* shell;
 
-inline const MemDumpArray& Shell::memDumps()
-{
-	return _memDumps;
-}
 
 #endif /* SHELL_H_ */

@@ -61,12 +61,6 @@ QTextStream& Shell::err()
 }
 
 
-bool Shell::interactive() const
-{
-    return _interactive;
-}
-
-
 int Shell::lastStatus() const
 {
     return _lastStatus;

@@ -61,13 +61,13 @@ public:
      */
     bool questionYesNo(const QString& question);
 
-    /**
-     * This flag indicates whether we are in an interactive session or not.
-     * If non-interactive, the shell is less verbose (no progress information,
-     * no prompts, no questions).
-     * @return
-     */
-    bool interactive() const;
+//    /**
+//     * This flag indicates whether we are in an interactive session or not.
+//     * If non-interactive, the shell is less verbose (no progress information,
+//     * no prompts, no questions).
+//     * @return
+//     */
+//    bool interactive() const;
 
     /**
      * @return the exit code of the last executed command

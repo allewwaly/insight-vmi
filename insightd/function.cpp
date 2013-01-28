@@ -1,14 +1,14 @@
 #include "function.h"
 #include <bitop.h>
 
-Function::Function(SymFactory* factory)
-	: FuncPointer(factory), _inlined(false), _pcLow(0), _pcHigh(0)
+Function::Function(KernelSymbols *symbols)
+	: FuncPointer(symbols), _inlined(false), _pcLow(0), _pcHigh(0)
 {
 }
 
 
-Function::Function(SymFactory* factory, const TypeInfo& info)
-	: FuncPointer(factory, info), _inlined(info.inlined()),
+Function::Function(KernelSymbols *symbols, const TypeInfo& info)
+	: FuncPointer(symbols, info), _inlined(info.inlined()),
 	  _pcLow(info.pcLow()), _pcHigh(info.pcHigh())
 {
 }

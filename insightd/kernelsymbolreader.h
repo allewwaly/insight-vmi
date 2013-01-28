@@ -13,7 +13,7 @@
 
 // forward declarations
 class QIODevice;
-class SymFactory;
+class KernelSymbols;
 struct MemSpecs;
 
 /**
@@ -26,10 +26,10 @@ public:
     /**
      * Constructor
      * @param from source to read the previsouly saved debugging symbols from
-     * @param factory the SymFactory to use for symbol creation
+     * @param symbols the KernelSymbols to use for symbol creation
      * @param specs the MemSpecs to write the memory specifications to
      */
-    KernelSymbolReader(QIODevice* from, SymFactory* factory, MemSpecs* specs);
+    KernelSymbolReader(QIODevice* from, KernelSymbols* symbols, MemSpecs* specs);
 
     /**
      * Starts the reading process
@@ -62,7 +62,7 @@ private:
     };
 
     QIODevice* _from;
-    SymFactory* _factory;
+    KernelSymbols* _symbols;
     MemSpecs* _specs;
     Phases _phase;
 };

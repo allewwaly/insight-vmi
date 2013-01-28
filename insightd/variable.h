@@ -25,16 +25,16 @@ class Variable: public Symbol, public ReferencingType, public SourceRef
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    explicit Variable(SymFactory* factory);
+    explicit Variable(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    Variable(SymFactory* factory, const TypeInfo& info);
+    Variable(KernelSymbols* symbols, const TypeInfo& info);
 
     /**
      * Generic value function that will return the data as any type
@@ -180,18 +180,6 @@ inline quint64 Variable::offset() const
 inline void Variable::setOffset(quint64 offset)
 {
     _offset = offset;
-}
-
-
-inline const SymFactory* Variable::fac() const
-{
-    return _factory;
-}
-
-
-inline SymFactory* Variable::fac()
-{
-    return _factory;
 }
 
 

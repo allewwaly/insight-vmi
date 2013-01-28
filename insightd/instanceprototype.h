@@ -14,6 +14,7 @@
 #include "instance.h"
 #include "genericexception.h"
 
+class SymFactory;
 
 /**
  * This class is the prototype for script variables of type Instance within the
@@ -121,7 +122,7 @@ public:
      * Constructor
      * @param parent parent object, defaults to 0
      */
-    InstancePrototype(QObject *parent = 0);
+    InstancePrototype(const SymFactory* factory, QObject *parent = 0);
 
     /**
      * Destructor
@@ -838,6 +839,7 @@ private:
     inline void injectScriptError(const GenericException& e) const;
     inline void injectScriptError(const QString& msg) const;
     KnowledgeSources _knowSrc;
+    const SymFactory* _factory;
 };
 
 #endif /* INSTANCEPROTOTYPE_H_ */

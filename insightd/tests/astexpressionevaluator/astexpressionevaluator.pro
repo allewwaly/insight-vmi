@@ -134,6 +134,7 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../typeinfo.cpp \
     ../../typerule.cpp \
     ../../typeruleengine.cpp \
+    ../../typeruleenginecontextprovider.cpp \
     ../../typeruleparser.cpp \
     ../../typerulereader.cpp \
     ../../variable.cpp \

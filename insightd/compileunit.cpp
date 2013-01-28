@@ -7,14 +7,14 @@
 
 #include "compileunit.h"
 
-CompileUnit::CompileUnit(SymFactory* factory)
-    : Symbol(factory)
+CompileUnit::CompileUnit(KernelSymbols *symbols)
+    : Symbol(symbols)
 {
 }
 
 
-CompileUnit::CompileUnit(SymFactory* factory, const TypeInfo& info)
-    : Symbol(factory, info), _dir(info.srcDir())
+CompileUnit::CompileUnit(KernelSymbols *symbols, const TypeInfo& info)
+    : Symbol(symbols, info), _dir(info.srcDir())
 {
 }
 

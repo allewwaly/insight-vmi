@@ -10,14 +10,14 @@
 #include <debug.h>
 #include "colorpalette.h"
 
-Enum::Enum(SymFactory* factory)
-    : BaseType(factory)
+Enum::Enum(KernelSymbols *symbols)
+    : BaseType(symbols)
 {
 }
 
 
-Enum::Enum(SymFactory* factory, const TypeInfo& info)
-    : BaseType(factory, info), _enumerators(info.enumValues())
+Enum::Enum(KernelSymbols *symbols, const TypeInfo& info)
+    : BaseType(symbols, info), _enumerators(info.enumValues())
 {
 }
 

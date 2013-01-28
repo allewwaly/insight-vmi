@@ -12,6 +12,7 @@
 #include "instancedata.h"
 #include "instanceprototype.h"
 #include "basetype.h"
+#include "kernelsymbols.h"
 #include <debug.h>
 #include <QScriptValueIterator>
 
@@ -60,14 +61,14 @@ private:
 
 //------------------------------------------------------------------------------
 
-InstanceClass::InstanceClass(QScriptEngine *eng, KnowledgeSources src)
-    : QScriptClass(eng), _proto(0)
+InstanceClass::InstanceClass(const KernelSymbols *symbols, QScriptEngine *eng, KnowledgeSources src)
+    : QScriptClass(eng), _proto(0), _symbols(symbols)
 {
     qScriptRegisterMetaType<Instance>(eng, instToScriptValue, instFromScriptValue);
     qScriptRegisterMetaType<InstanceList>(eng, membersToScriptValue, membersFromScriptValue);
     qScriptRegisterMetaType<QStringList>(eng, stringListToScriptValue, stringListFromScriptValue);
 
-    _proto = new InstancePrototype();
+    _proto = new InstancePrototype(&symbols->factory());
     _proto->setKnowledgeSources(src);
     _protoScriptVal = eng->newQObject(_proto,
                                QScriptEngine::QtOwnership,

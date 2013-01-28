@@ -1,19 +1,19 @@
 #include "basetype.h"
 #include "refbasetype.h"
-#include "symfactory.h"
+#include "kernelsymbols.h"
 #include <debug.h>
 
 #include <QIODevice>
 
-BaseType::BaseType(SymFactory* factory)
-        : Symbol(factory), _size(0), _hash(0), _hashValid(false)
+BaseType::BaseType(KernelSymbols *symbols)
+        : Symbol(symbols), _size(0), _hash(0), _hashValid(false)
 {
 }
 
 
-BaseType::BaseType(SymFactory* factory, const TypeInfo& info)
-        : Symbol(factory, info), SourceRef(info), _size(info.byteSize()), _hash(0),
-          _hashValid(false)
+BaseType::BaseType(KernelSymbols* symbols, const TypeInfo& info)
+        : Symbol(symbols, info), SourceRef(info), _size(info.byteSize()),
+          _hash(0), _hashValid(false)
 {
 }
 
@@ -320,8 +320,8 @@ void *BaseType::toPointer(VirtualMemory* mem, size_t offset) const
     int ptrsize;
     if (type() == rtPointer)
             ptrsize = _size;
-    else if (_factory)
-        ptrsize = _factory->memSpecs().sizeofPointer;
+    else if (_symbols)
+        ptrsize = _symbols->memSpecs().sizeofPointer;
     else
         ptrsize = 0;
 

@@ -17,6 +17,7 @@
 #include <QMutex>
 
 // forward declaration
+class KernelSymbols;
 class KernelSymbolReader;
 class BaseType;
 class Structured;
@@ -190,7 +191,7 @@ public:
      * @param memSpecs reference to the underlying memory specifications for the
      * symbols
      */
-	SymFactory(const MemSpecs& memSpecs);
+    SymFactory(KernelSymbols *symbols);
 
 	/**
 	 * Destructor
@@ -433,10 +434,7 @@ public:
 	/**
 	 * @return the memory specifications of the symbols
 	 */
-	const MemSpecs& memSpecs() const
-	{
-	    return _memSpecs;
-	}
+	const MemSpecs& memSpecs() const;
 
     /**
      * Returns a list of all type IDs that are equivalent to the type with
@@ -826,6 +824,7 @@ private:
      */
     BaseType* findTypeByHash(const BaseType* t);
 
+    KernelSymbols* _symbols;          ///< The kernel symbols this factory belongs to
     CompileUnitIntHash _sources;      ///< Holds all source files
 	VariableList _vars;               ///< Holds all Variable objects
 	VariableLList _externalVars;      ///< Holds all external Variable declarations
@@ -844,7 +843,6 @@ private:
 	VarMultiHash _usedByVars;         ///< Holds all Variable objects that hold a reference to another type
 	StructMemberMultiHash _usedByStructMembers;///< Holds all StructuredMember objects that hold a reference to another type
 	FuncParamMultiHash _usedByFuncParams;///< Holds all FuncParam objects that hold a reference to another type
-	const MemSpecs& _memSpecs;        ///< Reference to the memory specifications for the symbols
 	ASTExpressionList _expressions;
 	IdRevMapping _idRevMapping;       ///< Maps original to internal IDs
 	QStringList _origSymFiles;        ///< List of executable files the symbols were obtained from

@@ -25,20 +25,20 @@ public:
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    explicit NumericBaseType(SymFactory* factory)
-        : BaseType(factory), _type(realType)
+    explicit NumericBaseType(KernelSymbols* symbols)
+        : BaseType(symbols), _type(realType)
     {
     }
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    NumericBaseType(SymFactory* factory, const TypeInfo& info)
-        : BaseType(factory, info), _type(realType)
+    NumericBaseType(KernelSymbols* symbols, const TypeInfo& info)
+        : BaseType(symbols, info), _type(realType)
     {
     }
 
@@ -109,20 +109,20 @@ class IntegerBaseType: public NumericBaseType<T, realType>, public IntegerBitFie
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    IntegerBaseType(SymFactory* factory)
-        : NumericBaseType<T, realType>(factory)
+    IntegerBaseType(KernelSymbols* symbols)
+        : NumericBaseType<T, realType>(symbols)
     {
     }
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    IntegerBaseType(SymFactory* factory, const TypeInfo& info)
-        : NumericBaseType<T, realType>(factory, info)
+    IntegerBaseType(KernelSymbols* symbols, const TypeInfo& info)
+        : NumericBaseType<T, realType>(symbols, info)
     {
     }
 
@@ -190,21 +190,21 @@ class FloatingBaseType: public NumericBaseType<T, realType>
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    FloatingBaseType(SymFactory* factory)
-        : NumericBaseType<T, realType>(factory)
+    FloatingBaseType(KernelSymbols* symbols)
+        : NumericBaseType<T, realType>(symbols)
     {
     }
 
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    FloatingBaseType(SymFactory* factory, const TypeInfo& info)
-        : NumericBaseType<T, realType>(factory, info)
+    FloatingBaseType(KernelSymbols* symbols, const TypeInfo& info)
+        : NumericBaseType<T, realType>(symbols, info)
     {
     }
 

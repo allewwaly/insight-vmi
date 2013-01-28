@@ -9,6 +9,7 @@
 #include "basetype.h"
 #include "funcpointer.h"
 #include "typeruleengine.h"
+#include "kernelsymbols.h"
 #include <QScopedPointer>
 
 #include <assert.h>
@@ -16,14 +17,15 @@
 const TypeRuleEngine* Variable::_ruleEngine = 0;
 static const ConstMemberList emtpyMemberList;
 
-Variable::Variable(SymFactory* factory)
-	: Symbol(factory), _offset(0)
+Variable::Variable(KernelSymbols *symbols)
+	: Symbol(symbols), _offset(0)
 {
 }
 
 
-Variable::Variable(SymFactory* factory, const TypeInfo& info)
-	: Symbol(factory, info), ReferencingType(info), SourceRef(info), _offset(info.location())
+Variable::Variable(KernelSymbols *symbols, const TypeInfo& info)
+	: Symbol(symbols, info), ReferencingType(info), SourceRef(info),
+	  _offset(info.location())
 {
 }
 
@@ -154,6 +156,17 @@ Instance Variable::altRefTypeInstance(VirtualMemory* vmem, int index) const
 
 	AltRefType alt = altRefType(index);
 	Instance inst = toInstance(vmem, BaseType::trLexical, ksNone);
-	return alt.toInstance(vmem, &inst, _factory, name(), QStringList());
+	return alt.toInstance(vmem, &inst, fac(), name(), QStringList());
 }
 
+
+const SymFactory* Variable::fac() const
+{
+	return _symbols ? &_symbols->factory() : 0;
+}
+
+
+SymFactory* Variable::fac()
+{
+	return _symbols ? &_symbols->factory() : 0;
+}

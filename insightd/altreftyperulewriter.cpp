@@ -12,7 +12,7 @@
 #include "astexpression.h"
 #include "typerule.h"
 #include "typeruleexception.h"
-#include "shell.h"
+#include "console.h"
 #include <debug.h>
 #include <QXmlStreamWriter>
 #include <QDir>

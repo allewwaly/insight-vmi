@@ -10,13 +10,14 @@
 #include <string.h>
 #include "virtualmemoryexception.h"
 #include <debug.h>
-#include "shell.h"
+#include "console.h"
+#include "kernelsymbols.h"
 
-Pointer::Pointer(SymFactory* factory)
-	: RefBaseType(factory)
+Pointer::Pointer(KernelSymbols *symbols)
+	: RefBaseType(symbols)
 {
-	if (factory) {
-		setSize(factory->memSpecs().sizeofPointer);
+	if (symbols) {
+		setSize(symbols->memSpecs().sizeofPointer);
 		// Make sure the host system can handle the pointer size of the guest
 		if (_size > sizeof(void*)) {
 			throw BaseTypeException(
@@ -30,8 +31,8 @@ Pointer::Pointer(SymFactory* factory)
 }
 
 
-Pointer::Pointer(SymFactory* factory, const TypeInfo& info)
-	: RefBaseType(factory, info)
+Pointer::Pointer(KernelSymbols* symbols, const TypeInfo& info)
+	: RefBaseType(symbols, info)
 {
 	// Make sure the host system can handle the pointer size of the guest
 	if (_size > 0 && _size > sizeof(void*)) {

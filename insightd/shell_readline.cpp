@@ -60,21 +60,21 @@ QString Shell::readLine(const QString& prompt)
     QString ret;
     QString p = prompt;
     if (p.isEmpty()) {
-        if (_color.colorMode() == cmOff)
+        if (Console::colors().colorMode() == cmOff)
             p = ">>> ";
         else
             // Wrap color codes in \001...\002 so readline ignores them
             // when calculating the line length
             p = QString("\001%1\002>>>\001%2\002 ")
-                    .arg(color(ctPrompt))
-                    .arg(color(ctReset));
+                    .arg(Console::color(ctPrompt))
+                    .arg(Console::color(ctReset));
     }
 
     // Read input from stdin or from socket?
     if (_listenOnSocket) {
         // Print prompt in interactive mode
-        if (_interactive)
-            _out << p << flush;
+        if (Console::interactive())
+            Console::out() << p << flush;
         // Wait until a complete line is readable
         _sockSem.acquire(1);
         // The socket might already be null if we received a kill signal

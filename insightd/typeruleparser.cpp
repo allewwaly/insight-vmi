@@ -5,7 +5,7 @@
 #include "osfilter.h"
 #include "keyvaluestore.h"
 #include "xmlschema.h"
-#include "shell.h"
+#include "console.h"
 #include "shellutil.h"
 #include <debug.h>
 
@@ -238,7 +238,7 @@ bool TypeRuleParser::startElement(const QString &namespaceURI,
                           .arg(atts.value(xml::version)));
         // Print a warning if version is newer than the current one
         if (ver > xml::currentVer)
-            shell->warnMsg(QString("The rule file \"%1\" has version %2, our "
+            Console::warnMsg(QString("The rule file \"%1\" has version %2, our "
                                    "version is %3.")
                            .arg(ShellUtil::shortFileName(_reader->currFile()))
                            .arg(ver)

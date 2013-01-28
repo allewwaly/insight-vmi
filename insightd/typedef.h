@@ -15,16 +15,16 @@ class Typedef: public RefBaseType
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    Typedef(SymFactory* factory);
+    Typedef(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    Typedef(SymFactory* factory, const TypeInfo& info);
+    Typedef(KernelSymbols* symbols, const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable

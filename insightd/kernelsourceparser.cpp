@@ -16,7 +16,7 @@
 #include <cassert>
 #include <debug.h>
 #include <bugreport.h>
-#include "shell.h"
+#include "console.h"
 #include "compileunit.h"
 #include "filenotfoundexception.h"
 #include "expressionevalexception.h"
@@ -120,7 +120,7 @@ void KernelSourceParser::parse()
 {
     // Make sure the source directoy exists
     if (!_srcDir.exists()) {
-        shell->err() << "Source directory \"" << _srcDir.absolutePath()
+        Console::err() << "Source directory \"" << _srcDir.absolutePath()
                      << "\" does not exist."
                      << endl;
         return;
@@ -142,7 +142,7 @@ void KernelSourceParser::parse()
     _bytesTotal = _bytesRead = 0;
     QString fileName;
     CompileUnitIntHash::const_iterator it = _factory->sources().begin();    
-    while (it != _factory->sources().end() && !shell->interrupted()) {
+    while (it != _factory->sources().end() && !Console::interrupted()) {
         const CompileUnit* unit = it.value();
         // Skip assembly files
         if (!unit->name().endsWith(".S")) {
@@ -248,7 +248,7 @@ void KernelSourceParser::parse()
     if (BugReport::log()) {
         if (BugReport::log()->entries()) {
             BugReport::log()->close();
-            shell->out() << endl
+            Console::out() << endl
                          << BugReport::log()->bugSubmissionHint(BugReport::log()->entries());
         }
         delete BugReport::log();
@@ -263,7 +263,7 @@ void KernelSourceParser::WorkerThread::run()
     QMutexLocker lock(&_parser->_filesMutex);
     _stopExecution = false;
 
-    while (!_stopExecution && !shell->interrupted() &&
+    while (!_stopExecution && !Console::interrupted() &&
            _parser->_filesIndex < _parser->_fileNames.size())
     {
         currentFile = _parser->_fileNames[_parser->_filesIndex++];

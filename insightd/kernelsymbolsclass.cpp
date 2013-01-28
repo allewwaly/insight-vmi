@@ -9,14 +9,15 @@
 #include "kernelsymbols.h"
 #include "instance.h"
 #include "instanceclass.h"
-#include "shell.h"
+#include "console.h"
 #include "variable.h"
 #include "enum.h"
 #include <QScriptEngine>
 #include <QRegExp>
 
-KernelSymbolsClass::KernelSymbolsClass(InstanceClass* instClass, const SymFactory *factory, QObject* parent)
-	: QObject(parent), _instClass(instClass), _factory(factory)
+KernelSymbolsClass::KernelSymbolsClass(const KernelSymbols *symbols,
+									   InstanceClass* instClass, QObject* parent)
+	: QObject(parent), _instClass(instClass), _symbols(symbols)
 {
 	assert(instClass != 0);
 }
@@ -84,12 +85,12 @@ inline Instance typeToInst(const BaseType* t, VirtualMemory* vmem)
 
 QScriptValue KernelSymbolsClass::listTypes(QString filter, int index)
 {
-	if (!_factory)
+	if (!_symbols)
 		return engine()->newArray();
 
 	return listGeneric<BaseType>(filter, index,
-			_factory->types(),
-			_factory->typesByName(),
+			_symbols->factory().types(),
+			_symbols->factory().typesByName(),
 			typeToInst);
 }
 
@@ -106,31 +107,31 @@ inline Instance varToInst(const Variable* v, VirtualMemory* vmem)
 
 QScriptValue KernelSymbolsClass::listVariables(QString filter, int index)
 {
-	if (!_factory)
+	if (!_symbols)
 		return engine()->newArray();
 
 	return listGeneric<Variable>(filter, index,
-			_factory->vars(),
-			_factory->varsByName(),
+			_symbols->factory().vars(),
+			_symbols->factory().varsByName(),
 			varToInst);
 }
 
 
 QStringList KernelSymbolsClass::typeNames() const
 {
-	if (!_factory)
+	if (!_symbols)
 		return QStringList();
 
-	return _factory->typesByName().uniqueKeys();
+	return _symbols->factory().typesByName().uniqueKeys();
 }
 
 
 QList<int> KernelSymbolsClass::typeIds() const
 {
-	if (!_factory)
+	if (!_symbols)
 		return QList<int>();
 
-    QList<int> ret = _factory->typesById().keys();
+    QList<int> ret = _symbols->factory().typesById().keys();
     qSort(ret);
     return ret;
 }
@@ -138,19 +139,19 @@ QList<int> KernelSymbolsClass::typeIds() const
 
 QStringList KernelSymbolsClass::variableNames() const
 {
-	if (!_factory)
+	if (!_symbols)
 		return QStringList();
 
-	return _factory->varsByName().uniqueKeys();
+	return _symbols->factory().varsByName().uniqueKeys();
 }
 
 
 QList<int> KernelSymbolsClass::variableIds() const
 {
-	if (!_factory)
+	if (!_symbols)
 		return QList<int>();
 
-    QList<int> ret = _factory->varsById().keys();
+    QList<int> ret = _symbols->factory().varsById().keys();
     qSort(ret);
     return ret;
 }
@@ -158,10 +159,10 @@ QList<int> KernelSymbolsClass::variableIds() const
 
 Instance KernelSymbolsClass::getType(int id, int index) const
 {
-	if (!_factory)
+	if (!_symbols)
 		return Instance();
 
-    BaseType* t = _factory->findBaseTypeById(id);
+    BaseType* t = _symbols->factory().findBaseTypeById(id);
     if (!t) {
         context()->throwError(
                     QString("Invalid type ID: 0x%1").arg((uint)id, 0, 16));
@@ -176,10 +177,10 @@ Instance KernelSymbolsClass::getType(int id, int index) const
 
 int KernelSymbolsClass::enumValue(const QString &name) const
 {
-    if (!_factory)
+    if (!_symbols)
         return -1;
 
-    QList<IntEnumPair> enums = _factory->enumsByName().values(name);
+    QList<IntEnumPair> enums = _symbols->factory().enumsByName().values(name);
     if (enums.size() != 1)
         return -1;
 
@@ -196,10 +197,10 @@ int KernelSymbolsClass::enumValue(const QString &name) const
 
 bool KernelSymbolsClass::enumExists(const QString &name) const
 {
-	if (!_factory)
+	if (!_symbols)
 		return false;
 
-	return _factory->enumsByName().contains(name);
+	return _symbols->factory().enumsByName().contains(name);
 }
 
 
@@ -211,14 +212,14 @@ VirtualMemory *KernelSymbolsClass::vmemFromIndex(int index) const
     if (index < 0) {
         // Default memDump index is the first one
         index = 0;
-        while (index < shell->memDumps().size() && !shell->memDumps()[index])
+        while (index < _symbols->memDumps().size() && !_symbols->memDumps()[index])
             index++;
 
-		if (index < shell->memDumps().size() && shell->memDumps()[index])
-			vmem = shell->memDumps()[index]->vmem();
+		if (index < _symbols->memDumps().size() && _symbols->memDumps()[index])
+			vmem = _symbols->memDumps()[index]->vmem();
 	}
 	// Check the supplied index
-	else if (index >= shell->memDumps().size() || !shell->memDumps()[index]) {
+	else if (index >= _symbols->memDumps().size() || !_symbols->memDumps()[index]) {
 		context()->throwError(
 				QString("Invalid memory dump index: %1").arg(index));
 	}

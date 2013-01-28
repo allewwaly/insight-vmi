@@ -1922,9 +1922,9 @@ TEST_FUNCTION(builtins)
     CONSTANT_EXPR(__alignof__(struct A));
     CONSTANT_EXPR(__alignof__(struct A*));
     CONSTANT_EXPR(__alignof__(a));
-    CONSTANT_EXPR(__alignof__(typeof(a)));
+    CONSTANT_EXPR2(__alignof__(typeof(a)), __alignof__(decltype(a)));
     CONSTANT_EXPR(__alignof__(&a));
-    CONSTANT_EXPR(__alignof__(typeof(&a)));
+    CONSTANT_EXPR2(__alignof__(typeof(&a)), __alignof__(decltype(&a)));
     CONSTANT_EXPR(__alignof__(a.l));
     CONSTANT_EXPR(__alignof__(a.s));
     CONSTANT_EXPR(__alignof__(a.i));
@@ -2048,9 +2048,9 @@ TEST_FUNCTION(builtins)
     CONSTANT_EXPR(sizeof(struct A));
     CONSTANT_EXPR(sizeof(struct A*));
     CONSTANT_EXPR(sizeof(a));
-    CONSTANT_EXPR(sizeof(typeof(a)));
+    CONSTANT_EXPR2(sizeof(typeof(a)), sizeof(decltype(a)));
     CONSTANT_EXPR(sizeof(&a));
-    CONSTANT_EXPR(sizeof(typeof(&a)));
+    CONSTANT_EXPR2(sizeof(typeof(&a)), sizeof(decltype(&a)));
     CONSTANT_EXPR(sizeof(a.l));
     CONSTANT_EXPR(sizeof(a.s));
     CONSTANT_EXPR(sizeof(a.i));
@@ -2071,7 +2071,7 @@ TEST_FUNCTION(builtins)
 
     CONSTANT_EXPR(sizeof("foo"));
     CONSTANT_EXPR(sizeof("foo" "bar"));
-    CONSTANT_EXPR(sizeof(typeof("foo" "bar")));
+    CONSTANT_EXPR2(sizeof(typeof("foo" "bar")), sizeof(decltype("foo" "bar")));
     CONSTANT_EXPR(sizeof("\n"));
     CONSTANT_EXPR(sizeof("\t"));
     CONSTANT_EXPR(sizeof("\\\"\\\""));

@@ -5,7 +5,7 @@ isEmpty(PREFIX) {
 }
 
 # Should the tests be built?
-#CONFIG += tests
+CONFIG += tests
 
 # Disable type-safe enums in release mode
 CONFIG(release): DEFINES += NO_TYPESAFE_FLAGS

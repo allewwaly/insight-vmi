@@ -8,24 +8,26 @@
 #include "structured.h"
 #include "pointer.h"
 #include <debug.h>
-#include "shell.h"
+#include "console.h"
 #include "shellutil.h"
 #include "typeruleengine.h"
 #include "typerule.h"
+#include "bitop.h"
+#include "kernelsymbols.h"
 
 namespace str
 {
 const char* anonymous = "(anon.)";
 }
 
-Structured::Structured(SymFactory* factory)
-	: BaseType(factory)
+Structured::Structured(KernelSymbols *symbols)
+    : BaseType(symbols)
 {
 }
 
 
-Structured::Structured(SymFactory* factory, const TypeInfo& info)
-    : BaseType(factory, info), _members(info.members())
+Structured::Structured(KernelSymbols *symbols, const TypeInfo& info)
+    : BaseType(symbols, info), _members(info.members())
 {
     for (int i = 0; i < _members.size(); i++) {
         _members[i]->_belongsTo = this;
@@ -258,7 +260,7 @@ void Structured::readFrom(KernelSymbolStream& in)
     in >> memberCnt;
 
     for (qint32 i = 0; i < memberCnt; i++) {
-        StructuredMember* member = new StructuredMember(_factory);
+        StructuredMember* member = new StructuredMember(_symbols);
         if (!member)
             genericError("Out of memory.");
         in >> *member;
@@ -276,12 +278,12 @@ void Structured::writeTo(KernelSymbolStream& out) const
     for (qint32 i = 0; i < _members.size(); i++) {
         refTypeId = 0;
         // Reset ID to original for members with artificial IDs
-        if (_factory &&
-                _factory->replacedMemberTypes().contains(_members[i]->id()))
+        if (_symbols &&
+                _symbols->factory().replacedMemberTypes().contains(_members[i]->id()))
         {
             refTypeId = _members[i]->refTypeId();
             _members[i]->setRefTypeId(
-                        _factory->replacedMemberTypes().value(_members[i]->id()));
+                        _symbols->factory().replacedMemberTypes().value(_members[i]->id()));
         }
 
         // Write out member
@@ -462,9 +464,9 @@ QString Structured::toString(VirtualMemory *mem, size_t offset,
         // Print matching rules.
         ActiveRuleList rules;
         if (inst)
-            rules = shell->symbols().ruleEngine().rulesMatching(inst, ConstMemberList() << m);
+            rules = _symbols->ruleEngine().rulesMatching(inst, ConstMemberList() << m);
         else
-            rules = shell->symbols().ruleEngine().rulesMatching(this, ConstMemberList() << m);
+            rules = _symbols->ruleEngine().rulesMatching(this, ConstMemberList() << m);
 
         // If we have more than 3 rules, just print a summary, otherwise the
         // full list
@@ -483,14 +485,14 @@ QString Structured::toString(VirtualMemory *mem, size_t offset,
 
 
 //------------------------------------------------------------------------------
-Struct::Struct(SymFactory* factory)
-    : Structured(factory)
+Struct::Struct(KernelSymbols *symbols)
+    : Structured(symbols)
 {
 }
 
 
-Struct::Struct(SymFactory* factory, const TypeInfo& info)
-    : Structured(factory, info)
+Struct::Struct(KernelSymbols *symbols, const TypeInfo& info)
+    : Structured(symbols, info)
 {
 }
 
@@ -512,14 +514,14 @@ QString Struct::prettyName(const QString &varName) const
 
 
 //------------------------------------------------------------------------------
-Union::Union(SymFactory* factory)
-    : Structured(factory)
+Union::Union(KernelSymbols *symbols)
+    : Structured(symbols)
 {
 }
 
 
-Union::Union(SymFactory* factory, const TypeInfo& info)
-    : Structured(factory, info)
+Union::Union(KernelSymbols *symbols, const TypeInfo& info)
+    : Structured(symbols, info)
 {
 }
 

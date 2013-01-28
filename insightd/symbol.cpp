@@ -6,21 +6,21 @@
  */
 
 #include "symbol.h"
-#include "symfactory.h"
+#include "kernelsymbols.h"
 
 // instance of sstatic member
 const QString Symbol::emptyString;
 
 
-Symbol::Symbol(SymFactory* factory)
-    : _id(0), _origId(0), _origFileIndex(-1), _factory(factory)
+Symbol::Symbol(KernelSymbols *symbols)
+    : _id(0), _origId(0), _origFileIndex(-1), _symbols(symbols)
 {
 }
 
 
-Symbol::Symbol(SymFactory* factory, const TypeInfo& info)
+Symbol::Symbol(KernelSymbols *symbols, const TypeInfo& info)
     : _id(info.id()), _origId(info.origId()), _origFileIndex(info.fileIndex()),
-      _name(info.name()), _factory(factory)
+      _name(info.name()), _symbols(symbols)
 {
 }
 
@@ -56,16 +56,22 @@ void Symbol::writeTo(KernelSymbolStream& out) const
 
 const QString& Symbol::origFileName() const
 {
-    if (!_factory ||  _origFileIndex < 0 ||
-        _origFileIndex >= _factory->origSymFiles().size())
+    if (!_symbols ||  _origFileIndex < 0 ||
+        _origFileIndex >= _symbols->factory().origSymFiles().size())
         return emptyString;
     else
-        return _factory->origSymFiles().at(_origFileIndex);
+        return _symbols->factory().origSymFiles().at(_origFileIndex);
 }
 
 
 SymbolSource Symbol::symbolSource() const
 {
-    return (_factory && _factory->origSymKernelFileIndex() != _origFileIndex) ?
+    return (_symbols && _symbols->factory().origSymKernelFileIndex() != _origFileIndex) ?
                 ssModule : ssKernel;
+}
+
+
+SymFactory* Symbol::factory() const
+{
+    return _symbols ? &_symbols->factory() : 0;
 }

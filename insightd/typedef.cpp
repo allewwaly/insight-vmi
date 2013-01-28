@@ -8,14 +8,14 @@
 #include "typedef.h"
 #include "funcpointer.h"
 
-Typedef::Typedef(SymFactory* factory)
-    : RefBaseType(factory)
+Typedef::Typedef(KernelSymbols *symbols)
+    : RefBaseType(symbols)
 {
 }
 
 
-Typedef::Typedef(SymFactory* factory, const TypeInfo& info)
-    : RefBaseType(factory, info)
+Typedef::Typedef(KernelSymbols *symbols, const TypeInfo& info)
+    : RefBaseType(symbols, info)
 {
 }
 

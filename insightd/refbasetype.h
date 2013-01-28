@@ -17,16 +17,16 @@ class RefBaseType: public BaseType, public ReferencingType
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    explicit RefBaseType(SymFactory* factory);
+    explicit RefBaseType(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    RefBaseType(SymFactory* factory, const TypeInfo& info);
+    RefBaseType(KernelSymbols* symbols, const TypeInfo& info);
 
     /**
      * Create a hash of that type based on BaseType::hash() and refType()
@@ -108,18 +108,6 @@ inline uint RefBaseType::size() const
     }
     else
         return _size;
-}
-
-
-inline const SymFactory* RefBaseType::fac() const
-{
-    return _factory;
-}
-
-
-inline SymFactory* RefBaseType::fac()
-{
-    return _factory;
 }
 
 #endif /* REFBASETYPE_H_ */

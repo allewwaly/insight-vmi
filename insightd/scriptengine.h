@@ -21,7 +21,7 @@ class Instance;
 class InstanceClass;
 class KernelSymbolsClass;
 class MemoryDumpsClass;
-class SymFactory;
+class KernelSymbols;
 
 /**
  * This class manages and executes the QtScript scripting engine.
@@ -45,7 +45,7 @@ public:
 	 * resolving members?
 	 * \sa KnowledgeSources
 	 */
-	ScriptEngine(const SymFactory* factory, int knowledgeSources = 0);
+	ScriptEngine(KernelSymbols* symbols, int knowledgeSources = 0);
 
 	/**
 	 * Destructor
@@ -240,7 +240,7 @@ private:
 	bool _contextPushed;
 	int _knowSrc;
 	int _memDumpIndex;
-	const SymFactory* _factory;
+	KernelSymbols* _symbols;
 
 	void prepareEvaluation(const QStringList &argv, const QStringList &includePaths);
 

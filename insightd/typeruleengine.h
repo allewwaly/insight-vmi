@@ -55,6 +55,7 @@ typedef QHash<int, ActiveRule> ActiveRuleHash;
 /// Hash of OsFilter objects
 typedef QHash<uint, const OsFilter*> OsFilterHash;
 
+class KernelSymbols;
 class TypeRuleEngineContext;
 
 /**
@@ -84,7 +85,7 @@ public:
     /**
      * Constructor
      */
-    TypeRuleEngine(const SymFactory *factory);
+    TypeRuleEngine(KernelSymbols* symbols);
 
     /**
      * Destructor
@@ -281,10 +282,11 @@ public:
     /**
      * Every thread needs its own context to evaluate rules. This function
      * creates a context for one thread.
+     * @param symbols the kernel symbols to use this engine with
      * @return unique context object
      * \sa deleteContext(), TypeRuleEngineContextProvider
      */
-    static TypeRuleEngineContext* createContext(const SymFactory *factory);
+    static TypeRuleEngineContext* createContext(KernelSymbols *symbols);
 
     /**
      * Deletes the context object that was previously created with

@@ -108,6 +108,7 @@
 #include <debug.h>
 #include "kernelsymbols.h"
 #include "shell.h"
+#include "console.h"
 #include "genericexception.h"
 #include "programoptions.h"
 
@@ -145,7 +146,7 @@ void signal_handler(int sig_num, siginfo_t * info, void * ucontext)
         case SIGINT:
             // Try to terminate a script
             if (shell) {
-                if (shell->interactive()) {
+                if (Console::interactive()) {
                     shell->interrupt();
                 }
                 else {
@@ -410,8 +411,8 @@ int main(int argc, char* argv[])
 
 		if (daemonize)
             log_message(QString("InSight exited with return code %1.").arg(ret));
-		if (shell->interactive())
-		    shell->out() << "Done, exiting." << endl;
+        if (Console::interactive())
+			Console::out() << "Done, exiting." << endl;
 	}
 	catch (GenericException& e) {
 		QString msg = QString("Caught a %0 at %1:%2\nMessage: %3")
@@ -422,7 +423,7 @@ int main(int argc, char* argv[])
 	    if (daemonize)
 	        log_message(msg);
 	    else
-	        shell->err() << msg << endl;
+			Console::err() << msg << endl;
 	    return 1;
 	}
 

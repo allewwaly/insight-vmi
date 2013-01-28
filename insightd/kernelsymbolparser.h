@@ -17,7 +17,7 @@
 #include <QThread>
 
 // forward declarations
-class SymFactory;
+class KernelSymbols;
 
 /**
  * This class parses the kernel debugging symbols from the output of the
@@ -71,17 +71,16 @@ class KernelSymbolParser: public LongOperation
 public:
     /**
      * Constructor
-     * @param factory the SymFactory to use for symbol creation
-     * @param srcPath path to the kernel's source tree
+     * @param symbols the KernelSymbols to use for symbol creation
      */
-    KernelSymbolParser(SymFactory* factory);
+    KernelSymbolParser(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the SymFactory to use for symbol creation
+     * @param symbols the KernelSymbols to use for symbol creation
      * @param srcPath path to the kernel's source tree
      */
-    KernelSymbolParser(const QString& srcPath, SymFactory* factory);
+    KernelSymbolParser(const QString& srcPath, KernelSymbols* symbols);
 
     /**
      * Destructor
@@ -111,7 +110,7 @@ private:
     void cleanUpThreads();
 
     QString _srcPath;
-    SymFactory* _factory;
+    KernelSymbols* _symbols;
     QDir _srcDir;
     QString _currentFile;
     QStringList _fileNames;

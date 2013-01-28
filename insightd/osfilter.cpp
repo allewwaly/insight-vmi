@@ -3,6 +3,7 @@
 #include <bitop.h>
 #include "memspecs.h"
 #include "shellutil.h"
+#include "console.h"
 
 namespace xml
 {
@@ -193,7 +194,7 @@ QString OsFilter::toString(const ColorPalette *col) const
     Q_UNUSED(col);
 #else
     if (_osFamilies) {
-        s += ShellUtil::colorize("OS type:", ctColHead, col) + " ";
+        s += Console::colorize("OS type:", ctColHead, col) + " ";
         bool first = true;
         if (_osFamilies & OsSpecs::ofLinux) {
             commaIfNotFirst(s, first);
@@ -208,7 +209,7 @@ QString OsFilter::toString(const ColorPalette *col) const
         s += "\n";
     }
     if (_architectures) {
-        s += ShellUtil::colorize("Architecture:", ctColHead, col) + " ";
+        s += Console::colorize("Architecture:", ctColHead, col) + " ";
         bool first = true;
         if (_architectures & OsSpecs::arX86) {
             commaIfNotFirst(s, first);
@@ -227,10 +228,10 @@ QString OsFilter::toString(const ColorPalette *col) const
         s += "\n";
     }
     if (!_minVer.isEmpty())
-        s += ShellUtil::colorize("Min. version:", ctColHead, col) + " " +
+        s += Console::colorize("Min. version:", ctColHead, col) + " " +
                 _minVer.join(".") + "\n";
     if (!_maxVer.isEmpty())
-        s += ShellUtil::colorize("Max. version:", ctColHead, col) + " " +
+        s += Console::colorize("Max. version:", ctColHead, col) + " " +
                 _maxVer.join(".") + "\n";
 
 #endif /* QT_TESTLIB_LIB */

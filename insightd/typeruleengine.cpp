@@ -4,7 +4,7 @@
 #include "typerulereader.h"
 #include "osfilter.h"
 #include "symfactory.h"
-#include "shell.h"
+#include "console.h"
 #include "shellutil.h"
 #include "scriptengine.h"
 #include "refbasetype.h"
@@ -12,6 +12,7 @@
 #include "typeruleenginecontextprovider.h"
 #include <debug.h>
 #include <QTextStream>
+#include <QThread>
 
 namespace js
 {
@@ -19,18 +20,19 @@ const char* arguments = "arguments";
 const char* inlinefunc = "__inline_func__";
 }
 
+
 class TypeRuleEngineContext
 {
 public:
-    TypeRuleEngineContext(const SymFactory* factory)
-        : eng(factory, ksNone), currentRule(0) {}
+    TypeRuleEngineContext(KernelSymbols* symbols)
+        : eng(symbols, ksNone), currentRule(0) {}
     ScriptEngine eng;
     const ActiveRule* currentRule;
 };
 
 
-TypeRuleEngine::TypeRuleEngine(const SymFactory* factory)
-    : _ctx(new TypeRuleEngineContext(factory)), _verbose(veOff)
+TypeRuleEngine::TypeRuleEngine(KernelSymbols *symbols)
+    : _ctx(new TypeRuleEngineContext(symbols)), _verbose(veOff)
 {
 }
 
@@ -393,24 +395,24 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     }
 
     if (ruleInfosPrinted > 0) {
-        shell->out() << "==> Result: ";
+        Console::out() << "==> Result: ";
         if (usedRule >= 0)
-            shell->out() << "applied rule " << shell->color(ctBold)
-                         << (usedRule + 1) << shell->color(ctReset) << " ";
+            Console::out() << "applied rule " << Console::color(ctBold)
+                         << (usedRule + 1) << Console::color(ctReset) << " ";
 
         if (ret & mrMatch)
-            shell->out() << "prio. " << prio << " "
-                         << shell->color(ctMatched) << "matched ";
+            Console::out() << "prio. " << prio << " "
+                         << Console::color(ctMatched) << "matched ";
         if (ret & mrDefaultHandler)
-            shell->out() << shell->color(ctEvaluated) << "ret.orig. ";
+            Console::out() << Console::color(ctEvaluated) << "ret.orig. ";
         if (ret & mrDefer)
-            shell->out() << shell->color(ctDeferred) << "deferred ";
+            Console::out() << Console::color(ctDeferred) << "deferred ";
         if (ret & mrAmbiguous)
-            shell->out() << shell->color(ctMissed) << "ambiguous ";
+            Console::out() << Console::color(ctMissed) << "ambiguous ";
         if (!ret)
-            shell->out() << shell->color(ctMissed) << "missed ";
+            Console::out() << Console::color(ctMissed) << "missed ";
 
-        shell->out() << shell->color(ctReset) << endl;
+        Console::out() << Console::color(ctReset) << endl;
     }
 
     // Don't return invalid instances
@@ -601,48 +603,48 @@ bool TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
         (_verbose >= veEvaluatedRules && evaluated))
     {
         int w = ShellUtil::getFieldWidth(_rules.size(), 10);
-        shell->out() << "Rule " << shell->color(ctBold)
+        Console::out() << "Rule " << Console::color(ctBold)
                      << qSetFieldWidth(w) << right << (arule.index + 1)
-                     << qSetFieldWidth(0) << shell->color(ctReset)
+                     << qSetFieldWidth(0) << Console::color(ctReset)
                      << " prio."
                      << qSetFieldWidth(4) << right << arule.rule->priority()
                      << qSetFieldWidth(0) << left << " ";
         if (skipped)
-            shell->out() << shell->color(ctDim) << "skipped";
+            Console::out() << Console::color(ctDim) << "skipped";
         else {
             if (matched & mrMatch) {
-                shell->out() << shell->color(ctMatched) << "matches";
+                Console::out() << Console::color(ctMatched) << "matches";
                 if ((matched & mrDefer))
-                    shell->out() << " and " << shell->color(ctDeferred) << "defers";
+                    Console::out() << " and " << Console::color(ctDeferred) << "defers";
             }
             else if ((matched & mrDefer))
-                shell->out() << shell->color(ctDeferred) << "defers ";
+                Console::out() << Console::color(ctDeferred) << "defers ";
             else
-                shell->out() << shell->color(ctMissed) << "misses ";
+                Console::out() << Console::color(ctMissed) << "misses ";
 
-            shell->out() << shell->color(ctReset) << " instance ";
+            Console::out() << Console::color(ctReset) << " instance ";
             if (inst)
-                shell->out() << shell->color(ctBold)
+                Console::out() << Console::color(ctBold)
                              << ShellUtil::abbrvStrLeft(inst->fullName(), 60)
-                             << shell->color(ctReset);
+                             << Console::color(ctReset);
             for (int i = 0; i < members.size(); ++i) {
                 if (i > 0 || inst)
-                    shell->out() << ".";
-                shell->out() << shell->color(ctMember) << members[i]->name()
-                             << shell->color(ctReset);
+                    Console::out() << ".";
+                Console::out() << Console::color(ctMember) << members[i]->name()
+                             << Console::color(ctReset);
             }
 
             if (matched & mrMatch) {
                 if (evaluated)
-                    shell->out() << " and is " << shell->color(ctEvaluated)
+                    Console::out() << " and is " << Console::color(ctEvaluated)
                                  << "evaluated";
                 else
-                    shell->out() << " but is " << shell->color(ctDeferred)
+                    Console::out() << " but is " << Console::color(ctDeferred)
                                  << "ignored";
             }
         }
 
-        shell->out() << shell->color(ctReset) << endl;
+        Console::out() << Console::color(ctReset) << endl;
         return true;
     }
 
@@ -670,27 +672,27 @@ void TypeRuleEngine::ruleMsg(const TypeRule* rule, int index,
         return;
 
     shellEndl();
-    shell->err() << shell->color(light) << severity << ": "
-                 << shell->color(normal) << "Rule "
-                 << shell->color(ctBold) << (index + 1)
-                 << shell->color(normal) << " ";
+    Console::err() << Console::color(light) << severity << ": "
+                 << Console::color(normal) << "Rule "
+                 << Console::color(ctBold) << (index + 1)
+                 << Console::color(normal) << " ";
 
     if (!rule->name().isEmpty()) {
-        shell->err() << "(" << shell->color(ctBold) << rule->name()
-                     << shell->color(normal) << ") ";
+        Console::err() << "(" << Console::color(ctBold) << rule->name()
+                     << Console::color(normal) << ") ";
     }
     if (rule->srcFileIndex() >= 0) {
         // Use as-short-as-possible file name
         QString file(ShellUtil::shortFileName(ruleFile(rule)));
 
-        shell->err() << "defined in "
-                     << shell->color(ctBold) << file << shell->color(normal)
+        Console::err() << "defined in "
+                     << Console::color(ctBold) << file << Console::color(normal)
                      << " line "
-                     << shell->color(ctBold) << rule->srcLine()
-                     << shell->color(normal) << " ";
+                     << Console::color(ctBold) << rule->srcLine()
+                     << Console::color(normal) << " ";
     }
 
-    shell->err() << msg << shell->color((ctReset)) << endl;
+    Console::err() << msg << Console::color((ctReset)) << endl;
 }
 
 
@@ -725,9 +727,9 @@ void TypeRuleEngine::operationProgress()
 }
 
 
-TypeRuleEngineContext *TypeRuleEngine::createContext(const SymFactory* factory)
+TypeRuleEngineContext *TypeRuleEngine::createContext(KernelSymbols* symbols)
 {
-    return new TypeRuleEngineContext(factory);
+    return new TypeRuleEngineContext(symbols);
 }
 
 
@@ -796,9 +798,9 @@ QString TypeRuleEngine::matchingRulesToStr(const ActiveRuleList &rules,
 			const FuncCallScriptAction* sa =
 					dynamic_cast<const FuncCallScriptAction*>(action);
 			out << "Execute function "
-				<< ShellUtil::colorize(sa->function() + "()", ctBold, col)
+				<< Console::colorize(sa->function() + "()", ctBold, col)
 				<< " in file "
-				<< ShellUtil::colorize(
+				<< Console::colorize(
 					   ShellUtil::shortFileName(sa->scriptFile()), ctBold, col);
 			break;
 		}
