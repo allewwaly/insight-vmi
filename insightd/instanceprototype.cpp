@@ -8,6 +8,7 @@
 #include "instanceprototype.h"
 #include <QScriptEngine>
 #include "basetype.h"
+#include "variable.h"
 #include "shell.h"
 #include <debug.h>
 
@@ -488,6 +489,22 @@ void InstancePrototype::ChangeType(int typeId)
         inst->setType(t);
     else
         injectScriptError(QString("Type ID not found: 0x%1").arg(typeId, 0, 16));
+}
+
+
+QString InstancePrototype::OrigFileName() const
+{
+    Instance* inst = thisInstance();
+    if (!inst || !inst->isValid())
+        return QString();
+    // Is this the instance of a variable?
+    if (inst->id() > 0) {
+        // Try to find the variable
+        const Variable* v = inst->type()->factory()->findVarById(inst->id());
+        if (v)
+            return v->origFileName();
+    }
+    return inst->type()->origFileName();
 }
 
 

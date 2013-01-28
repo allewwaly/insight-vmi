@@ -676,8 +676,8 @@ public slots:
      *
      * @param typeName the name of the type to change to
      */
-    void ChangeType(const QString& typeName);
 
+    void ChangeType(const QString& typeName);
     /**
      * Changes the type of this instance to the type specified by its ID
      * \a typeId. If that type cannot be found, a script exception is injected.
@@ -687,6 +687,11 @@ public slots:
      * @param typeId the name of the type to change to
      */
     void ChangeType(int typeId);
+
+    /**
+     * Returns the name of the kernel or module file this symbol was read from.
+     */
+    QString OrigFileName() const;
 
     /**
      * Explicit representation of this instance as qint8.
