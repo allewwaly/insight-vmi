@@ -215,55 +215,55 @@ inline Instance Instance::listNext() const
 
 inline qint8 Instance::toInt8() const
 {
-    return isNull() ? 0 : _d->type->toInt8(_d->vmem, _d->address);
+    return isNull() || !isValid() ? 0 : _d->type->toInt8(_d->vmem, _d->address);
 }
 
 
 inline quint8 Instance::toUInt8() const
 {
-    return isNull() ? 0 : _d->type->toUInt8(_d->vmem, _d->address);
+    return isNull() || !isValid() ? 0 : _d->type->toUInt8(_d->vmem, _d->address);
 }
 
 
 inline qint16 Instance::toInt16() const
 {
-    return isNull() ? 0 : _d->type->toInt16(_d->vmem, _d->address);
+    return isNull() || !isValid() ? 0 : _d->type->toInt16(_d->vmem, _d->address);
 }
 
 
 inline quint16 Instance::toUInt16() const
 {
-    return isNull() ? 0 : _d->type->toUInt16(_d->vmem, _d->address);
+    return isNull() || !isValid() ? 0 : _d->type->toUInt16(_d->vmem, _d->address);
 }
 
 
 inline qint32 Instance::toInt32() const
 {
-    return isNull() ? 0 : _d->type->toInt32(_d->vmem, _d->address);
+    return isNull() || !isValid() ? 0 : _d->type->toInt32(_d->vmem, _d->address);
 }
 
 
 inline quint32 Instance::toUInt32() const
 {
-    return isNull() ? 0 : _d->type->toUInt32(_d->vmem, _d->address);
+    return isNull() || !isValid() ? 0 : _d->type->toUInt32(_d->vmem, _d->address);
 }
 
 
 inline qint64 Instance::toInt64() const
 {
-    return isNull() ? 0 : _d->type->toInt64(_d->vmem, _d->address);
+    return isNull() || !isValid() ? 0 : _d->type->toInt64(_d->vmem, _d->address);
 }
 
 
 inline quint64 Instance::toUInt64() const
 {
-    return isNull() ? 0 : _d->type->toUInt64(_d->vmem, _d->address);
+    return isNull() || !isValid() ? 0 : _d->type->toUInt64(_d->vmem, _d->address);
 }
 
 
 inline qint64 Instance::toLong() const
 {
-    if (isNull())
+    if (isNull() || !isValid())
         return 0;
     return sizeofLong() == 4 ?
                 (qint64) _d->type->toInt32(_d->vmem, _d->address) :
@@ -273,7 +273,7 @@ inline qint64 Instance::toLong() const
 
 inline quint64 Instance::toULong() const
 {
-    if (isNull())
+    if (isNull() || !isValid())
         return 0;
     return sizeofLong() == 4 ?
                 (qint64) _d->type->toUInt32(_d->vmem, _d->address) :
@@ -289,7 +289,7 @@ inline quint64 Instance::toUIntBitField() const
 
 inline qint64 Instance::toNumber() const
 {
-    if (isNull() || !_d->type || !(_d->type->type() & IntegerTypes))
+    if (isNull() || !isValid() || !(_d->type->type() & IntegerTypes))
         return 0;
 
     if (bitSize() >= 0)
@@ -306,7 +306,7 @@ inline qint64 Instance::toNumber() const
 
 inline quint64 Instance::toUnsignedNumber() const
 {
-    if (isNull() && !(_d->type->type() & IntegerTypes))
+    if (isNull() || !isValid() || !(_d->type->type() & IntegerTypes))
         return 0;
 
     if (bitSize() >= 0)
@@ -323,19 +323,20 @@ inline quint64 Instance::toUnsignedNumber() const
 
 inline float Instance::toFloat() const
 {
-    return isNull() ? 0 : _d->type->toFloat(_d->vmem, _d->address);
+    return isNull() || !isValid() ? 0 : _d->type->toFloat(_d->vmem, _d->address);
 }
 
 
 inline double Instance::toDouble() const
 {
-    return isNull() ? 0 : _d->type->toDouble(_d->vmem, _d->address);
+    return isNull() || !isValid() ? 0 : _d->type->toDouble(_d->vmem, _d->address);
 }
 
 
 inline void* Instance::toPointer() const
 {
-    return isNull() ? (void*)0 : _d->type->toPointer(_d->vmem, _d->address);
+    return isNull() || !isValid() ? (void*)0
+                                  : _d->type->toPointer(_d->vmem, _d->address);
 }
 
 
@@ -382,7 +383,7 @@ inline VirtualMemory* Instance::vmem() const
 template<class T>
 inline QVariant Instance::toVariant() const
 {
-    return isNull() ? QVariant() : _d->type->toVariant<T>(_d->vmem, _d->address);
+    return isNull() || !isValid() ? QVariant() : _d->type->toVariant<T>(_d->vmem, _d->address);
 }
 
 #endif /* INSTANCE_H_ */
