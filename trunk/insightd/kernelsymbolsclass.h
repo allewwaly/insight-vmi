@@ -18,7 +18,7 @@
 class InstanceClass;
 class BaseType;
 class VirtualMemory;
-class SymFactory;
+class KernelSymbols;
 
 /**
  * This class provides access to the kernel symbols from within the QtScript
@@ -44,11 +44,11 @@ class KernelSymbolsClass: public QObject, public QScriptable
 public:
 	/**
 	 * Constructor
-	 * @param instClass the InstanceClass wrapper of the ScriptEngine
 	 * @param factory the factory of the kernel symbols
+	 * @param instClass the InstanceClass wrapper of the ScriptEngine
 	 * @param parent parent object
 	 */
-	KernelSymbolsClass(InstanceClass* instClass, const SymFactory* factory,
+	KernelSymbolsClass(const KernelSymbols* symbols, InstanceClass* instClass,
 					   QObject* parent = 0);
 
 	/**
@@ -158,7 +158,7 @@ public slots:
 
 private:
 	InstanceClass* _instClass;
-	const SymFactory* _factory;
+	const KernelSymbols* _symbols;
 
 	template <class T>
 	QScriptValue listGeneric(QString filter, int index,	const QList<T*>& list,

@@ -13,11 +13,13 @@
 #include "virtualmemory.h"
 #include "virtualmemoryexception.h"
 #include "array.h"
-#include "shell.h"
+#include "console.h"
 #include "varsetter.h"
 #include "memorymapbuilder.h"
 #include "memorymapheuristics.h"
 #include "function.h"
+#include "typeruleengine.h"
+#include "kernelsymbols.h"
 #include <debug.h>
 #include <expressionevalexception.h>
 
@@ -48,9 +50,9 @@ const QString& MemoryMap::insertName(const QString& name)
 
 //------------------------------------------------------------------------------
 
-MemoryMap::MemoryMap(const SymFactory* factory, VirtualMemory* vmem)
+MemoryMap::MemoryMap(KernelSymbols *symbols, VirtualMemory* vmem)
     : LongOperation(1000),
-      _threads(0), _factory(factory), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
+      _threads(0), _symbols(symbols), _vmem(vmem), _vmemMap(vaddrSpaceEnd()),
       _pmemMap(paddrSpaceEnd()), _pmemDiff(paddrSpaceEnd()),
       _isBuilding(false), _shared(new BuilderSharedState()),
       _useRuleEngine(false), _knowSrc(ksAll), _buildType(btChrschn),
@@ -69,6 +71,12 @@ MemoryMap::~MemoryMap()
     delete _shared;
     if (_threads)
         delete _threads;
+}
+
+
+const SymFactory * MemoryMap::factory() const
+{
+    return _symbols ? &_symbols->factory() : 0;
 }
 
 
@@ -127,7 +135,7 @@ QVector<quint64> MemoryMap::perCpuOffsets()
     quint32 nr_cpus = 1;
 
     // Get the number of cpus from the dump if possible
-    Variable *var = _factory->findVarByName("nr_cpu_ids");
+    Variable *var = factory()->findVarByName("nr_cpu_ids");
     if (var != 0)
         nr_cpus = var->value<quint32>(_vmem);
 
@@ -135,7 +143,7 @@ QVector<quint64> MemoryMap::perCpuOffsets()
     QVector<quint64> per_cpu_offset(nr_cpus, 0);
 
     // Get the variable
-    var = _factory->findVarByName("__per_cpu_offset");
+    var = factory()->findVarByName("__per_cpu_offset");
     Instance inst = var ?
                 var->toInstance(_vmem, BaseType::trLexical, ksNone) :
                 Instance();
@@ -242,7 +250,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
         _probPropagation = false;
     }
 
-    if (!_factory || !_vmem) {
+    if (!_symbols || !_vmem) {
         debugerr("Factory or VirtualMemory is NULL! Aborting!");
         return;
     }
@@ -300,8 +308,8 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     }
 
     // Go through the global vars and add their instances to the queue
-    for (VariableList::const_iterator it = _factory->vars().begin(),
-         e = _factory->vars().end(); !interrupted() && it != e; ++it)
+    for (VariableList::const_iterator it = factory()->vars().begin(),
+         e = factory()->vars().end(); !interrupted() && it != e; ++it)
     {
         const Variable* v = *it;
 //        // For testing now only start with this one variable
@@ -331,8 +339,8 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
     }
 
     // Add all functions to the map, but no to the queue
-    for (BaseTypeList::const_iterator it = _factory->types().begin(),
-         e = _factory->types().end(); it != e; ++it)
+    for (BaseTypeList::const_iterator it = factory()->types().begin(),
+         e = factory()->types().end(); it != e; ++it)
     {
         const BaseType* t = *it;
         // Skip non-kernel and non-function types
@@ -406,7 +414,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
         if (!isRunning)
             break;
     }
-    shell->out() << endl;
+    Console::out() << endl;
 
 
     // Interrupt all threads, doesn't harm if they are not running anymore
@@ -458,12 +466,12 @@ void MemoryMap::operationProgress()
     for (MemoryMapNode* n = node; n; n = n->parent())
         ++depth;
 
-    shell->out()
+    Console::out()
             << right
             << qSetFieldWidth(5) << elapsedTime() << qSetFieldWidth(0)
-            << " Proc: " << shell->color(ctBold)
+            << " Proc: " << Console::color(ctBold)
             << qSetFieldWidth(6) << _shared->processed << qSetFieldWidth(0)
-            << shell->color(ctReset)
+            << Console::color(ctReset)
             << ", addr: " << qSetFieldWidth(6) << _vmemAddresses.size() << qSetFieldWidth(0)
             << ", objs: " << qSetFieldWidth(6) << _vmemMap.size() << qSetFieldWidth(0)
             << ", vmem: " << qSetFieldWidth(6) << _vmemMap.nodeCount() << qSetFieldWidth(0)
@@ -473,23 +481,23 @@ void MemoryMap::operationProgress()
             << ", p: " << qSetRealNumberPrecision(5) << fixed;
 
     if (prob < 0.4)
-        shell->out() << shell->color(ctMissed);
+        Console::out() << Console::color(ctMissed);
     else if (prob < 0.7)
-        shell->out() << shell->color(ctDeferred);
+        Console::out() << Console::color(ctDeferred);
     else
-        shell->out() << shell->color(ctMatched);
-    shell->out() << prob << shell->color(ctReset);
+        Console::out() << Console::color(ctMatched);
+    Console::out() << prob << Console::color(ctReset);
 //            << ", min_prob: " << (queueSize ? _shared->queue.smallest()->probability() : 0);
 
     if (nodeType) {
-        shell->out() << ", " << shell->prettyNameInColor(nodeType) << " ";
+        Console::out() << ", " << Console::prettyNameInColor(nodeType) << " ";
         if (node->parent())
-            shell->out() << shell->color(ctMember);
+            Console::out() << Console::color(ctMember);
         else
-            shell->out() << shell->color(ctVariable);
-        shell->out() << node->name() << shell->color(ctReset);
+            Console::out() << Console::color(ctVariable);
+        Console::out() << node->name() << Console::color(ctReset);
     }
-    shell->out() << left << endl;
+    Console::out() << left << endl;
 
     _prevQueueSize = queueSize;
 }
@@ -1031,7 +1039,7 @@ void MemoryMap::diffWith(MemoryMap* other)
         totalSize = qMax(dev->size(), otherDev->size());
 
     // Compare the complete physical address space
-    while (!shell->interrupted() && !dev->atEnd() && !otherDev->atEnd()) {
+    while (!Console::interrupted() && !dev->atEnd() && !otherDev->atEnd()) {
         readSize1 = dev->read(buf1, bufsize);
         readSize2 = otherDev->read(buf2, bufsize);
 
@@ -1069,7 +1077,7 @@ void MemoryMap::diffWith(MemoryMap* other)
 
         done = (int) (addr / (float) totalSize * 100);
         if (prevDone < 0 || (done != prevDone && timer.elapsed() > 500)) {
-            shell->out() << "\rComparing memory dumps: " << done << "%" << flush;
+            Console::out() << "\rComparing memory dumps: " << done << "%" << flush;
             prevDone = done;
             timer.restart();
         }
@@ -1079,7 +1087,7 @@ void MemoryMap::diffWith(MemoryMap* other)
     if (!wasEqual)
         _pmemDiff.insert(Difference(startAddr, length));
 
-    shell->out() << "\rComparing memory dumps finished." << endl;
+    Console::out() << "\rComparing memory dumps finished." << endl;
 
 //    debugmsg("No. of differences: " << _pmemDiff.objectCount());
 }
@@ -1090,7 +1098,7 @@ ConstNodeList MemoryMap::nodesOfType(int id) const
     ConstNodeList ret;
 
     // Get list of equivalent types
-    QList<int> typeIds = _factory->equivalentTypes(id);
+    QList<int> typeIds = factory()->equivalentTypes(id);
     // Find instances for all equivalent types
     IntNodeHash::const_iterator it, e = _typeInstances.constEnd();
     for (int i = 0; i < typeIds.size(); ++i) {

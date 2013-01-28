@@ -8,13 +8,15 @@
 #include "scriptengine.h"
 #include <QScriptEngine>
 #include "instanceclass.h"
+#include "kernelsymbols.h"
 #include "kernelsymbolsclass.h"
 #include "memorydumpsclass.h"
-#include "shell.h"
+#include "console.h"
 #include "symfactory.h"
 #include "variable.h"
 #include "varsetter.h"
 #include "instanceclass.h"
+#include "memorydump.h"
 #include <QDir>
 
 namespace js
@@ -31,10 +33,10 @@ const char* path_sep        = ":";
 }
 
 
-ScriptEngine::ScriptEngine(const SymFactory *factory, int knowledgeSources)
+ScriptEngine::ScriptEngine(KernelSymbols *symbols, int knowledgeSources)
 	: _engine(0), _instClass(0), _symClass(0), _memClass(0),
 	  _lastEvalFailed(false), _initialized(false), _knowSrc(knowledgeSources),
-	  _memDumpIndex(-1), _factory(factory)
+	  _memDumpIndex(-1), _symbols(symbols)
 {
 }
 
@@ -137,19 +139,19 @@ void ScriptEngine::initScriptEngine()
     		_engine->newFunction(scriptInclude, 1),
     		roFlags|QScriptValue::KeepExistingFlags);
 
-    _instClass = new InstanceClass(_engine, (KnowledgeSources)_knowSrc);
+    _instClass = new InstanceClass(_symbols, _engine, (KnowledgeSources)_knowSrc);
     _engine->globalObject().setProperty(js::instance,
     		_instClass->constructor(),
     		roFlags);
 
-    _symClass = new KernelSymbolsClass(_instClass, _factory);
+    _symClass = new KernelSymbolsClass(_symbols, _instClass);
     _engine->globalObject().setProperty(js::symbols,
     		_engine->newQObject(_symClass,
     				QScriptEngine::QtOwnership,
     				QScriptEngine::ExcludeSuperClassContents),
     		roFlags);
 
-    _memClass = new MemoryDumpsClass();
+    _memClass = new MemoryDumpsClass(_symbols);
     _engine->globalObject().setProperty(js::memory,
             _engine->newQObject(_memClass,
                     QScriptEngine::QtOwnership,
@@ -330,13 +332,14 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
     }
 
     int index = this_eng->_memDumpIndex;
+    const MemDumpArray& memDumps = this_eng->_symbols->memDumps();
 
     // Default memDump index is the first one
     if (index < 0) {
         index = 0;
-        while (index < shell->memDumps().size() && !shell->memDumps()[index])
+        while (index < memDumps.size() && !memDumps[index])
             index++;
-        if (index >= shell->memDumps().size() || !shell->memDumps()[index]) {
+        if (index >= memDumps.size() || !memDumps[index]) {
             ctx->throwError("No memory dumps loaded");
             return QScriptValue();
         }
@@ -345,8 +348,8 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
     // Second argument is optional and defines the memDump index
     if (ctx->argumentCount() == 2) {
         index = ctx->argument(1).isNumber() ? ctx->argument(1).toInt32() : -1;
-        if (index < 0 || index >= shell->memDumps().size() ||
-            !shell->memDumps().at(index))
+        if (index < 0 || index >= memDumps.size() ||
+            !memDumps[index])
         {
             ctx->throwError(QString("Invalid memory dump index: %1")
                                 .arg(ctx->argument(1).toString()));
@@ -357,8 +360,8 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
     // Get the instance
     try {
 		Instance instance = queryStr.isNull() ?
-				shell->memDumps().at(index)->queryInstance(queryId) :
-				shell->memDumps().at(index)->queryInstance(queryStr);
+				memDumps[index]->queryInstance(queryId) :
+				memDumps[index]->queryInstance(queryStr);
 
 		if (!instance.isValid())
 			return QScriptValue();
@@ -376,10 +379,10 @@ QScriptValue ScriptEngine::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
 {
     for (int i = 0; i < ctx->argumentCount(); ++i) {
         if (i > 0)
-            shell->out() << " ";
-        shell->out() << ctx->argument(i).toString();
+            Console::out() << " ";
+        Console::out() << ctx->argument(i).toString();
     }
-    shell->out() << flush;
+    Console::out() << flush;
 
     return eng->undefinedValue();
 }
@@ -388,7 +391,7 @@ QScriptValue ScriptEngine::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
 QScriptValue ScriptEngine::scriptPrintLn(QScriptContext* ctx, QScriptEngine* eng)
 {
     QScriptValue ret = scriptPrint(ctx, eng);
-    shell->out() << endl;
+    Console::out() << endl;
 
     return ret;
 }

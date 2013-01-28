@@ -88,9 +88,7 @@ SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/refbasetype.cpp \
     $$ROOT_DIR/insightd/referencingtype.cpp \
     $$ROOT_DIR/insightd/scriptengine.cpp \
-    $$ROOT_DIR/insightd/shell.cpp \
     $$ROOT_DIR/insightd/shellutil.cpp \
-    $$ROOT_DIR/insightd/shell_readline.cpp \
     $$ROOT_DIR/insightd/slubobjects.cpp \
     $$ROOT_DIR/insightd/sourceref.cpp \
     $$ROOT_DIR/insightd/structured.cpp \
@@ -102,6 +100,7 @@ SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/typeinfo.cpp \
     $$ROOT_DIR/insightd/typerule.cpp \
     $$ROOT_DIR/insightd/typeruleengine.cpp \
+    $$ROOT_DIR/insightd/typeruleenginecontextprovider.cpp \
     $$ROOT_DIR/insightd/typeruleparser.cpp \
     $$ROOT_DIR/insightd/typerulereader.cpp \
     $$ROOT_DIR/insightd/variable.cpp \
@@ -160,7 +159,6 @@ HEADERS += \
     $$ROOT_DIR/insightd/refbasetype.h \
     $$ROOT_DIR/insightd/referencingtype.h \
     $$ROOT_DIR/insightd/scriptengine.h \
-    $$ROOT_DIR/insightd/shell.h \
     $$ROOT_DIR/insightd/shellutil.h \
     $$ROOT_DIR/insightd/sourceref.h \
     $$ROOT_DIR/insightd/structured.h \
@@ -172,6 +170,7 @@ HEADERS += \
     $$ROOT_DIR/insightd/typeinfo.h \
     $$ROOT_DIR/insightd/typerule.h \
     $$ROOT_DIR/insightd/typeruleengine.h \
+    $$ROOT_DIR/insightd/typeruleenginecontextprovider.h \
     $$ROOT_DIR/insightd/typeruleparser.h \
     $$ROOT_DIR/insightd/typerulereader.h \
     $$ROOT_DIR/insightd/variable.h \

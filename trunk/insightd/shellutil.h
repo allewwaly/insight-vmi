@@ -13,8 +13,22 @@
 class ShellUtil
 {
 public:
+    /**
+     * Shortens the given file name by using its relative or absolute path,
+     * depending on which is shorter
+     * @param fileName absolute file name to shorten
+     * @return shortest possible file name
+     */
     static QString shortFileName(const QString &fileName);
 
+    /**
+     * Abbreviates string \a s to be at most \a width characters wide. If \a s
+     * is longer, its right side will be trimmed and filled with an elipsis.
+     * @param s string to shorten
+     * @param width max. allowed width
+     * @return \a s, possibly shortened
+     * \sa abbrvStrLeft()
+     */
     inline static QString abbrvStrRight(const QString& s, int width)
     {
         if (s.size() > width) {
@@ -34,6 +48,14 @@ public:
     }
 
 
+    /**
+     * Abbreviates string \a s to be at most \a width characters wide. If \a s
+     * is longer, its left side will be trimmed and filled with an elipsis.
+     * @param s string to shorten
+     * @param width max. allowed width
+     * @return \a s, possibly shortened
+     * \sa abbrvStrRight()
+     */
     inline static QString abbrvStrLeft(const QString& s, int width)
     {
         if (s.size() > width) {
@@ -52,6 +74,13 @@ public:
             return s;
     }
 
+    /**
+     * Pretty-prints the value of \a time.elapsed().
+     * @param time elapsed time value
+     * @param showMS set to \c true to show the milli seconds, otherwise set
+     *  to \c false
+     * @return formated time
+     */
     static QString elapsedTimeStamp(const QTime& time, bool showMS = false);
 
     /**
@@ -60,24 +89,19 @@ public:
      */
     static QSize termSize();
 
+    /**
+     * Returns the required width of the string representing number \a maxVal
+     * in base \a base.
+     * @param maxVal value to represent as string
+     * @param base the base to represent the string as
+     * @return required string width
+     */
     static int getFieldWidth(quint32 maxVal, int base = 16);
 
-    inline static QString colorize(const QString& s, ColorType c,
-                                   const ColorPalette *col)
-    {
-        // Avoid unnecessary dependencies for test builds
-#ifndef QT_TESTLIB_LIB
-        if (col)
-            return col->color(c) + s + col->color(ctReset);
-        else
-#else
-        Q_UNUSED(c);
-        Q_UNUSED(col);
-#endif /* TESTLIB */
-            return s;
-    }
-
 private:
+    /**
+     * Private constructor
+     */
     ShellUtil() {}
 };
 

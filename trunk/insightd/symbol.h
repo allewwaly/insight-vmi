@@ -13,6 +13,7 @@
 
 // forward declaration
 class SymFactory;
+class KernelSymbols;
 
 /// Where was this symbol original obtained from?
 enum SymbolSource {
@@ -30,16 +31,16 @@ class Symbol
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    explicit Symbol(SymFactory* factory);
+    explicit Symbol(KernelSymbols* symbols);
 
 	/**
 	 * Constructor
-	 * @param factory the factory that created this symbol
-     * @param info the type information to construct this type from
+	 * @param symbols the kernel symbols this symbol belongs to
+	 * @param info the type information to construct this type from
 	 */
-	Symbol(SymFactory* factory, const TypeInfo& info);
+	Symbol(KernelSymbols* symbols, const TypeInfo& info);
 
 	/**
 	 * Destructor
@@ -134,18 +135,23 @@ public:
      */
     SymFactory* factory() const;
 
+    /**
+     * Returns the kernel symbols this symbol belongs to.
+     */
+    KernelSymbols* symbols() const;
+
 protected:
     /**
-     * Sets the factory for this symbol.
-     * @param factory the factory to set
+     * Sets the symbols the kernel symbols this symbol belongs to.
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    void setFactory(SymFactory* factory);
+    void setSymbols(KernelSymbols* symbols);
 
     int _id;              ///< local ID of this type, assigned by SymFactory
     int _origId;          ///< original ID of this type, given by objdump
     int _origFileIndex;   ///< ID of this type, given by objdump
     QString _name;        ///< name of this type, e.g. "int"
-    SymFactory* _factory; ///< the factory that created this symbol
+    KernelSymbols* _symbols; ///< the factory that created this symbol
     static const QString emptyString;
 };
 
@@ -197,15 +203,16 @@ inline void Symbol::setOrigFileIndex(int index)
     _origFileIndex = index;
 }
 
-inline SymFactory* Symbol::factory() const
+
+inline KernelSymbols *Symbol::symbols() const
 {
-    return _factory;
+    return _symbols;
 }
 
 
-inline void Symbol::setFactory(SymFactory* factory)
+inline void Symbol::setSymbols(KernelSymbols *symbols)
 {
-    _factory = factory;
+    _symbols = symbols;
 }
 
 

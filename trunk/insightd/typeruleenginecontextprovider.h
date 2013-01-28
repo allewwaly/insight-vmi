@@ -3,7 +3,7 @@
 
 // Forward declaration
 class TypeRuleEngineContext;
-class SymFactory;
+class KernelSymbols;
 
 /**
  * Base class for multi-threaded usage of the TypeRuleEngine.
@@ -19,9 +19,9 @@ class TypeRuleEngineContextProvider
 public:
     /**
      * Constructor
-     * @param factory the symbol factory used by the TypeRuleEngine
+     * @param symbols the KernelSymbols used by the TypeRuleEngine
      */
-    TypeRuleEngineContextProvider(const SymFactory* factory);
+    TypeRuleEngineContextProvider(KernelSymbols* symbols);
 
     /**
      * Destructor

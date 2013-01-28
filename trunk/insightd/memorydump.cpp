@@ -10,11 +10,12 @@
 #include <QFile>
 #include <QStringList>
 #include <QRegExp>
-#include "symfactory.h"
+#include "kernelsymbols.h"
 #include "variable.h"
-#include "shell.h"
+#include "console.h"
 #include "typeruleengine.h"
 #include "memorymap.h"
+#include "shellutil.h"
 
 
 #define queryError(msg) do { throw QueryException((msg), __FILE__, __LINE__); } while (0)
@@ -26,29 +27,29 @@
 	} while (0)
 
 
-MemoryDump::MemoryDump(const MemSpecs& specs, QIODevice* mem,
-                       SymFactory* factory, int index)
-    : _specs(specs),
+MemoryDump::MemoryDump(QIODevice* mem,
+                       KernelSymbols* symbols, int index)
+    : _specs(symbols ? symbols->memSpecs() : MemSpecs()),
       _file(0),
-      _factory(factory),
-      _vmem(new VirtualMemory(specs, mem, index)),
-      _map(new MemoryMap(_factory, _vmem)),
+      _factory(symbols ? &symbols->factory() : 0),
+      _vmem(new VirtualMemory(_specs, mem, index)),
+      _map(new MemoryMap(symbols, _vmem)),
       _index(index),
-      _slubs(factory, _vmem)
+      _slubs(_factory, _vmem)
 {
     init();
 }
 
 
-MemoryDump::MemoryDump(const MemSpecs& specs, const QString& fileName,
-        const SymFactory* factory, int index)
-    : _specs(specs),
+MemoryDump::MemoryDump(const QString& fileName,
+        KernelSymbols* symbols, int index)
+    : _specs(symbols ? symbols->memSpecs() : MemSpecs()),
       _file(new QFile(fileName)),
-      _factory(factory),
+      _factory(symbols ? &symbols->factory() : 0),
       _vmem(new VirtualMemory(_specs, _file, index)),
-      _map(new MemoryMap(_factory, _vmem)),
+      _map(new MemoryMap(symbols, _vmem)),
       _index(index),
-      _slubs(factory, _vmem)
+      _slubs(_factory, _vmem)
 {
     _fileName = fileName;
     // Check existence
@@ -165,15 +166,15 @@ void MemoryDump::init()
                                           BaseType::trLexical).toString());
 
             if (!_specs.version.equals(ver)) {
-                shell->err()
-                        << shell->color(ctWarningLight) << "WARNING:"
-                        << shell->color(ctWarning) << " The memory in "
-                        << shell->color(ctWarningLight) << _fileName
-                        << shell->color(ctWarning) << " belongs to a different "
-                           "kernel version than the loaded symbols!" << endl
-                        << "  Kernel symbols: " << _specs.version.toString() << endl
-                        << "  Memory file:    " << ver.toString()
-                        << shell->color(ctReset) << endl;
+                Console::errMsg("WARNING",
+                                QString("The memory in '%0' belongs to a "
+                                        "different kernel version than the "
+                                        "loaded symbols!\n"
+                                        "  Kernel symbols: %1\n"
+                                        "  Memory file:    %2")
+                                .arg(ShellUtil::shortFileName(_fileName))
+                                .arg(_specs.version.toString())
+                                .arg(ver.toString()));
             }
         }
         catch (QueryException& e) {

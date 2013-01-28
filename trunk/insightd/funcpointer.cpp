@@ -10,14 +10,14 @@
 #include "colorpalette.h"
 #include <bitop.h>
 
-FuncPointer::FuncPointer(SymFactory* factory)
-    : RefBaseType(factory)
+FuncPointer::FuncPointer(KernelSymbols *symbols)
+    : RefBaseType(symbols)
 {
 }
 
 
-FuncPointer::FuncPointer(SymFactory* factory, const TypeInfo& info)
-	: RefBaseType(factory, info), _params(info.params())
+FuncPointer::FuncPointer(KernelSymbols *symbols, const TypeInfo& info)
+	: RefBaseType(symbols, info), _params(info.params())
 {
 	for (int i = 0; i < _params.size(); ++i)
 		_params[i]->_belongsTo = this;
@@ -224,7 +224,7 @@ void FuncPointer::readFrom(KernelSymbolStream& in)
     in >> paramCnt;
 
     for (qint32 i = 0; i < paramCnt; i++) {
-        FuncParam* param = new FuncParam(_factory);
+        FuncParam* param = new FuncParam(_symbols);
         if (!param)
             genericError("Out of memory.");
         in >> *param;

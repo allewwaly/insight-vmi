@@ -865,7 +865,7 @@ ExpressionResult ASTUnaryExpression::result(const Instance *inst) const
     case etUnaryStar: {
         if (!inst || !inst->type() || !inst->type()->factory())
             exprEvalError("Star operator requires a valid instance with a valid type.");
-        Pointer p(inst->type()->factory());
+        Pointer p(inst->type()->symbols());
         if (inst->vmem()->memSpecs().sizeofPointer == 4)
             res.result.ui64 = (quint64)p.toPointer(inst->vmem(), res.result.ui32);
         else

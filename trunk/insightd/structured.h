@@ -29,16 +29,16 @@ class Structured: public BaseType
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    explicit Structured(SymFactory* factory);
+    explicit Structured(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    Structured(SymFactory* factory, const TypeInfo& info);
+    Structured(KernelSymbols* symbols, const TypeInfo& info);
 
     /**
      * Destructor
@@ -225,16 +225,16 @@ class Struct: public Structured
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    Struct(SymFactory* factory);
+    Struct(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    Struct(SymFactory* factory, const TypeInfo& info);
+    Struct(KernelSymbols* symbols, const TypeInfo& info);
 
     /**
      * @return the real type, i. e., \c rtStruct
@@ -256,16 +256,16 @@ class Union: public Structured
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    Union(SymFactory* factory);
+    Union(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    Union(SymFactory* factory, const TypeInfo& info);
+    Union(KernelSymbols* symbols, const TypeInfo& info);
 
     /**
      * @return the real type, i. e., \c rtUnion

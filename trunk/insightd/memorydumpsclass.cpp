@@ -7,10 +7,11 @@
 
 #include "memorydumpsclass.h"
 #include <QScriptEngine>
-#include "shell.h"
+#include "console.h"
+#include "kernelsymbols.h"
 
-MemoryDumpsClass::MemoryDumpsClass(QObject* parent)
-    : QObject(parent)
+MemoryDumpsClass::MemoryDumpsClass(KernelSymbols *symbols, QObject* parent)
+    : QObject(parent), _symbols(symbols)
 {
 }
 
@@ -25,9 +26,9 @@ QScriptValue MemoryDumpsClass::list() const
     // Create resulting array
     QScriptValue ret = engine()->newArray();
 
-    for (int i = 0; i < shell->memDumps().size(); ++i) {
-        if (shell->memDumps()[i])
-            ret.setProperty(i, shell->memDumps()[i]->fileName());
+    for (int i = 0; i < _symbols->memDumps().size(); ++i) {
+        if (_symbols->memDumps()[i])
+            ret.setProperty(i, _symbols->memDumps()[i]->fileName());
     }
 
     return ret;
@@ -36,11 +37,11 @@ QScriptValue MemoryDumpsClass::list() const
 
 int MemoryDumpsClass::load(const QString& fileName) const
 {
-    return shell->loadMemDump(fileName);
+    return _symbols->loadMemDump(fileName);
 }
 
 
 int MemoryDumpsClass::unload(const QString& indexOrfileName) const
 {
-    return shell->unloadMemDump(indexOrfileName);
+    return _symbols->unloadMemDump(indexOrfileName);
 }

@@ -96,16 +96,16 @@ public:
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    explicit BaseType(SymFactory* factory);
+    explicit BaseType(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    explicit BaseType(SymFactory* factory, const TypeInfo& info);
+    explicit BaseType(KernelSymbols* symbols, const TypeInfo& info);
 
     /**
      * Destructor

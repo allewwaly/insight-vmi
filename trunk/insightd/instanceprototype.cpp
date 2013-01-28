@@ -8,14 +8,16 @@
 #include "instanceprototype.h"
 #include <QScriptEngine>
 #include "basetype.h"
+#include "console.h"
+#include "structured.h"
+#include "symfactory.h"
 #include "variable.h"
-#include "shell.h"
 #include <debug.h>
 
 #define INT32MASK 0xFFFFFFFFULL
 
-InstancePrototype::InstancePrototype(QObject *parent)
-    : QObject(parent)
+InstancePrototype::InstancePrototype(const SymFactory *factory, QObject *parent)
+    : QObject(parent), _factory(factory)
 {
 }
 
@@ -471,7 +473,7 @@ void InstancePrototype::ChangeType(const QString& typeName)
     Instance* inst = thisInstance();
     if (!inst)
         return;
-    const BaseType* t = shell->symbols().factory().findBaseTypeByName(typeName);
+    const BaseType* t = _factory->findBaseTypeByName(typeName);
     if (t)
         inst->setType(t);
     else
@@ -484,7 +486,7 @@ void InstancePrototype::ChangeType(int typeId)
     Instance* inst = thisInstance();
     if (!inst)
         return;
-    const BaseType* t = shell->symbols().factory().findBaseTypeById(typeId);
+    const BaseType* t = _factory->findBaseTypeById(typeId);
     if (t)
         inst->setType(t);
     else

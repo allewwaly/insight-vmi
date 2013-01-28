@@ -10,11 +10,11 @@
 #include "virtualmemory.h"
 #include "pointer.h"
 #include "funcpointer.h"
-#include "symfactory.h"
+#include "kernelsymbols.h"
 #include <debug.h>
 
-StructuredMember::StructuredMember(SymFactory* factory)
-	: Symbol(factory), _offset(0), _belongsTo(0), 
+StructuredMember::StructuredMember(KernelSymbols *symbols)
+    : Symbol(symbols), _offset(0), _belongsTo(0),
       _seenInEvaluateMagicNumber(false), 
       _hasConstIntValue(false), _hasConstStringValue(false),
       _hasStringValue(false), _bitSize(-1), _bitOffset(-1)
@@ -22,8 +22,8 @@ StructuredMember::StructuredMember(SymFactory* factory)
 }
 
 
-StructuredMember::StructuredMember(SymFactory* factory, const TypeInfo& info)
-	: Symbol(factory, info), ReferencingType(info), SourceRef(info),
+StructuredMember::StructuredMember(KernelSymbols *symbols, const TypeInfo& info)
+	: Symbol(symbols, info), ReferencingType(info), SourceRef(info),
 	  _offset(info.dataMemberLocation()), _belongsTo(0),
       _seenInEvaluateMagicNumber(false),
       _hasConstIntValue(false), _hasConstStringValue(false),
@@ -177,7 +177,7 @@ bool StructuredMember::evaluateMagicNumberFoundInt(qint64 constant)
                 (i < _belongsTo->members().size()) )
             ++i;
         // Add struct's ID and member index
-        _factory->seenMagicNumbers.insertMulti(_belongsTo->id(), i);
+        _symbols->factory().seenMagicNumbers.insertMulti(_belongsTo->id(), i);
     }
     _seenInEvaluateMagicNumber = true;
     return seen;
@@ -210,8 +210,22 @@ bool StructuredMember::evaluateMagicNumberFoundString(const QString &constant)
                 (i < _belongsTo->members().size()) )
             ++i;
         // Add struct's ID and member index
-        _factory->seenMagicNumbers.insertMulti(_belongsTo->id(), i);
+        _symbols->factory().seenMagicNumbers.insertMulti(_belongsTo->id(), i);
     }
     _seenInEvaluateMagicNumber = true;
     return seen;
 }
+
+
+const SymFactory* StructuredMember::fac() const
+{
+    return _symbols ? &_symbols->factory() : 0;
+}
+
+
+SymFactory* StructuredMember::fac()
+{
+    return _symbols ? &_symbols->factory() : 0;
+}
+
+

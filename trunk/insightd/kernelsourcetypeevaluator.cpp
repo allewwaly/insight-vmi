@@ -13,7 +13,7 @@
 #include <astscopemanager.h>
 #include <astsourceprinter.h>
 #include <abstractsyntaxtree.h>
-#include "shell.h"
+#include "console.h"
 #include "astexpressionevaluator.h"
 #include "expressionevalexception.h"
 #include "typeevaluatorexception.h"
@@ -120,7 +120,7 @@ void KernelSourceTypeEvaluator::primaryExpressionTypeChange(
 
 bool KernelSourceTypeEvaluator::interrupted() const
 {
-    return shell->interrupted();
+    return Console::interrupted();
 }
 
 

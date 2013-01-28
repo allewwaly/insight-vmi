@@ -12,6 +12,8 @@
 #include <QScriptable>
 #include <QScriptValue>
 
+class KernelSymbols;
+
 /**
  * This class allows management of memory files within the scripting engine.
  *
@@ -27,7 +29,7 @@ public:
      * Constructor
      * @param parent parent QObject
      */
-    MemoryDumpsClass(QObject* parent = 0);
+    MemoryDumpsClass(KernelSymbols* symbols, QObject* parent = 0);
 
     /**
      * Destructor
@@ -96,6 +98,8 @@ public slots:
      * \sa list(), load()
      */
     int unload(const QString& indexOrfileName) const;
+private:
+    KernelSymbols* _symbols;
 };
 
 #endif /* MEMORYDUMPSCLASS_H_ */

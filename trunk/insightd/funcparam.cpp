@@ -4,16 +4,17 @@
 #include "refbasetype.h"
 #include "virtualmemory.h"
 #include "pointer.h"
+#include "kernelsymbols.h"
 #include <debug.h>
 
-FuncParam::FuncParam(SymFactory* factory)
-	: Symbol(factory), _belongsTo(0)
+FuncParam::FuncParam(KernelSymbols *symbols)
+	: Symbol(symbols), _belongsTo(0)
 {
 }
 
 
-FuncParam::FuncParam(SymFactory* factory, const TypeInfo& info)
-	: Symbol(factory, info), ReferencingType(info), SourceRef(info),
+FuncParam::FuncParam(KernelSymbols *symbols, const TypeInfo& info)
+	: Symbol(symbols, info), ReferencingType(info), SourceRef(info),
 	  _belongsTo(0)
 {
 }
@@ -87,3 +88,14 @@ KernelSymbolStream& operator<<(KernelSymbolStream& out, const FuncParam& param)
     return out;
 }
 
+
+const SymFactory* FuncParam::fac() const
+{
+    return _symbols ? &_symbols->factory() : 0;
+}
+
+
+SymFactory* FuncParam::fac()
+{
+    return _symbols ? &_symbols->factory() : 0;
+}

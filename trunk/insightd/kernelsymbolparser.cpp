@@ -12,9 +12,9 @@
 #include <QDirIterator>
 
 #include "kernelsymbolparser.h"
-#include "symfactory.h"
+#include "kernelsymbols.h"
 #include "parserexception.h"
-#include "shell.h"
+#include "console.h"
 #include "funcparam.h"
 #include "bugreport.h"
 #include "programoptions.h"
@@ -134,7 +134,7 @@ void KernelSymbolParser::WorkerThread::run()
     facLock.unlock();
     _stopExecution = false;
 
-    while (!_stopExecution && !shell->interrupted() &&
+    while (!_stopExecution && !Console::interrupted() &&
            _parser->_filesIndex < _parser->_fileNames.size())
     {
         _curFileIndex = _parser->_filesIndex++;
@@ -159,9 +159,9 @@ void KernelSymbolParser::WorkerThread::run()
         facLock.relock();
         // Remove externally declared variables, for which we have full
         // declarations
-        _parser->_factory->scanExternalVars(false);
+        _parser->_symbols->factory().scanExternalVars(false);
         // Delete the reverse mappings for the finished file
-        _parser->_factory->clearIdRevMap(_curFileIndex);
+        _parser->_symbols->factory().clearIdRevMap(_curFileIndex);
         facLock.unlock();
 
         filesLock.relock();
@@ -195,14 +195,14 @@ void KernelSymbolParser::WorkerThread::finishLastSymbol()
                         _parentInfo->addEnumValue(_info->name(), _info->constValue().toInt());
                         break;
                     case hsMember:
-                        _parser->_factory->mapToInternalIds(*_info);
+                        _parser->_symbols->factory().mapToInternalIds(*_info);
                         _parentInfo->members().append(
-                                    new StructuredMember(_parser->_factory, *_info));
+                                    new StructuredMember(_parser->_symbols, *_info));
                         break;
                     case hsFormalParameter:
-                        _parser->_factory->mapToInternalIds(*_info);
+                        _parser->_symbols->factory().mapToInternalIds(*_info);
                         _parentInfo->params().append(
-                                    new FuncParam(_parser->_factory, *_info));
+                                    new FuncParam(_parser->_symbols, *_info));
                         break;
                     default:
                         parserError(QString("Unhandled sub-type: %1").arg(_info->symType()));
@@ -223,8 +223,8 @@ void KernelSymbolParser::WorkerThread::finishLastSymbol()
                         _info->setName(QString());
                     // Make this function thread-safe
                     QMutexLocker lock(&_parser->_factoryMutex);
-                    _parser->_factory->mapToInternalIds(*_info);
-                    _parser->_factory->addSymbol(*_info);
+                    _parser->_symbols->factory().mapToInternalIds(*_info);
+                    _parser->_symbols->factory().addSymbol(*_info);
                 }
             }
 
@@ -490,7 +490,7 @@ void KernelSymbolParser::WorkerThread::parse(QIODevice* from)
 
     try {
 
-        while ( !shell->interrupted() &&
+        while ( !Console::interrupted() &&
                 ( !from->atEnd() ||
                   (proc && proc->state() != QProcess::NotRunning) ) )
         {
@@ -596,15 +596,15 @@ void KernelSymbolParser::WorkerThread::parse(QIODevice* from)
 
 /******************************************************************************/
 
-KernelSymbolParser::KernelSymbolParser(SymFactory *factory)
-    : _factory(factory), _filesIndex(0), _durationLastFileFinished(0)
+KernelSymbolParser::KernelSymbolParser(KernelSymbols *symbols)
+    : _symbols(symbols), _filesIndex(0), _durationLastFileFinished(0)
 {
 }
 
 
 KernelSymbolParser::KernelSymbolParser(const QString& srcPath,
-                                       SymFactory* factory)
-    : _srcPath(srcPath), _factory(factory), _srcDir(srcPath), _filesIndex(0),
+                                       KernelSymbols *symbols)
+    : _srcPath(srcPath), _symbols(symbols), _srcDir(srcPath), _filesIndex(0),
       _durationLastFileFinished(0)
 {
 }
@@ -627,7 +627,7 @@ void KernelSymbolParser::parse(bool kernelOnly)
 {
     // Make sure the source directoy exists
     if (!_srcDir.exists()) {
-        shell->err() << "Source directory \"" << _srcDir.absolutePath()
+        Console::err() << "Source directory \"" << _srcDir.absolutePath()
                      << "\" does not exist."
                      << endl;
         return;
@@ -640,7 +640,7 @@ void KernelSymbolParser::parse(bool kernelOnly)
     if (!testproc.waitForFinished() ||
         testproc.error() != QProcess::UnknownError)
     {
-        shell->err() << "Could not execute \"objdump\". Make sure the "
+        Console::err() << "Could not execute \"objdump\". Make sure the "
                         "objdump utility is installed and can be found through "
                         "the PATH variable."
                      << endl;
@@ -676,7 +676,7 @@ void KernelSymbolParser::parse(bool kernelOnly)
     QDirIterator dit(_srcPath, QDir::Files|QDir::NoSymLinks|QDir::NoDotAndDotDot,
                      QDirIterator::Subdirectories);
 
-    while (!kernelOnly && !shell->interrupted() && dit.hasNext()) {
+    while (!kernelOnly && !Console::interrupted() && dit.hasNext()) {
         dit.next();
         // Find all modules outside the lib/modules/ directory
         if (dit.fileInfo().suffix() == "ko" &&
@@ -698,7 +698,7 @@ void KernelSymbolParser::parse(bool kernelOnly)
         }
     }
 
-    _factory->setOrigSymFiles(_fileNames);
+    _symbols->factory().setOrigSymFiles(_fileNames);
 
     shellOut(QString("%1 files found.").arg(_fileNames.size()), true);
 
@@ -734,14 +734,14 @@ void KernelSymbolParser::parse(bool kernelOnly)
 
 
     shellOut("Post-processing symbols... ", false);
-    _factory->symbolsFinished(SymFactory::rtParsing);
+    _symbols->factory().symbolsFinished(SymFactory::rtParsing);
     shellOut("done.", true);
 
     // In case there were errors, show the user some information
     if (BugReport::log()) {
         if (BugReport::log()->entries()) {
             BugReport::log()->close();
-            shell->out() << endl
+            Console::out() << endl
                          << BugReport::log()->bugSubmissionHint(
                                 BugReport::log()->entries());
         }

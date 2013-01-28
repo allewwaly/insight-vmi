@@ -13,16 +13,16 @@ class Function : public FuncPointer
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    explicit Function(SymFactory* factory);
+    explicit Function(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    Function(SymFactory* factory, const TypeInfo& info);
+    Function(KernelSymbols* symbols, const TypeInfo& info);
 
     /**
      * Create a hash of that type based on BaseType::hash(), srcLine() and the

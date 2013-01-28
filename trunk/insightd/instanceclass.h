@@ -26,6 +26,7 @@ extern const char* useCandidates;
 class QScriptContext;
 class QScriptEngine;
 class InstancePrototype;
+class KernelSymbols;
 
 /**
  * This class wraps an Instance object for a QtScript environment.
@@ -33,7 +34,8 @@ class InstancePrototype;
 class InstanceClass : public QScriptClass
 {
 public:
-    InstanceClass(QScriptEngine *eng, KnowledgeSources src);
+    InstanceClass(const KernelSymbols *symbols, QScriptEngine *eng,
+                  KnowledgeSources src);
     ~InstanceClass();
 
     QScriptValue constructor();
@@ -77,6 +79,7 @@ private:
     InstancePrototype* _proto;
     QScriptValue _protoScriptVal;
     QScriptValue _ctor;
+    const KernelSymbols* _symbols;
 };
 
 

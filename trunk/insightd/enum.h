@@ -23,16 +23,16 @@ public:
 
 	/**
 	 * Constructor
-	 * @param factory the factory that created this symbol
+	 * @param symbols the kernel symbols this symbol belongs to
 	 */
-	explicit Enum(SymFactory* factory);
+	explicit Enum(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    Enum(SymFactory* factory, const TypeInfo& info);
+    Enum(KernelSymbols* symbols, const TypeInfo& info);
 
 	/**
 	 @return the actual type of that polimorphic variable

@@ -6,16 +6,17 @@
  */
 
 #include "refbasetype.h"
+#include "kernelsymbols.h"
 #include <debug.h>
 
-RefBaseType::RefBaseType(SymFactory* factory)
-    : BaseType(factory), _hashRefTypeId(0)
+RefBaseType::RefBaseType(KernelSymbols *symbols)
+    : BaseType(symbols), _hashRefTypeId(0)
 {
 }
 
 
-RefBaseType::RefBaseType(SymFactory* factory, const TypeInfo& info)
-    : BaseType(factory, info), ReferencingType(info), _hashRefTypeId(0)
+RefBaseType::RefBaseType(KernelSymbols *symbols, const TypeInfo& info)
+    : BaseType(symbols, info), ReferencingType(info), _hashRefTypeId(0)
 {
 }
 
@@ -76,5 +77,17 @@ void RefBaseType::writeTo(KernelSymbolStream& out) const
 {
     BaseType::writeTo(out);
     ReferencingType::writeTo(out);
+}
+
+
+const SymFactory* RefBaseType::fac() const
+{
+    return _symbols ? &_symbols->factory() : 0;
+}
+
+
+SymFactory* RefBaseType::fac()
+{
+    return _symbols ? &_symbols->factory() : 0;
 }
 

@@ -12,20 +12,20 @@
 #include <QPair>
 #include <QLinkedList>
 #include "kernelsymbolconsts.h"
-#include "symfactory.h"
+#include "kernelsymbols.h"
 #include "refbasetype.h"
 #include "compileunit.h"
 #include "variable.h"
 #include "readerwriterexception.h"
-#include "shell.h"
+#include "console.h"
 #include "memspecs.h"
 #include <debug.h>
 
 //------------------------------------------------------------------------------
 
-KernelSymbolReader::KernelSymbolReader(QIODevice* from, SymFactory* factory,
+KernelSymbolReader::KernelSymbolReader(QIODevice* from, KernelSymbols *symbols,
                                        MemSpecs* specs)
-    : _from(from), _factory(factory), _specs(specs), _phase(phFinished)
+    : _from(from), _symbols(symbols), _specs(specs), _phase(phFinished)
 {
 }
 
@@ -51,24 +51,21 @@ void KernelSymbolReader::read()
         readerWriterError(QString("The given file magic number 0x%1 is invalid.")
                                   .arg(magic, 0, 16));
     if (qt_stream_version > in.version()) {
-        shell->err()
-            << shell->color(ctWarningLight) << "WARNING:"
-            << shell->color(ctWarning)
-            << " This file was created with a newer version of "
-            << "the Qt libraries, your system is running version " << qVersion()
-            << ". We will continue, but the result is undefined!"
-            << shell->color(ctReset) << endl;
+        Console::warnMsg("WARNING",
+                         QString("This file was created with a newer version of "
+                                 "the Qt libraries, your system is running version "
+                                 "%0. We will continue, but the result is undefined!")
+                         .arg(qVersion()));
     }
 
     // Warn for deprecated symbol versions
     if (version < kSym::VERSION_MAX) {
-        shell->err()
-            << shell->color(ctWarningLight) << "WARNING:"
-            << shell->color(ctWarning)
-            << " The kernel symbols were parsed with an older version of "
-            << ProjectInfo::projectName << ". You may want to consider "
-               "re-creating the symbols to benefit from all features."
-            << shell->color(ctReset) << endl;
+        Console::warnMsg("WARNING",
+                         QString("The kernel symbols were parsed with an older "
+                                 "version of %0. You may want to consider "
+                                 "re-creating the symbols to benefit from all "
+                                 "features.")
+                         .arg(ProjectInfo::projectName));
     }
 
     // Try to apply the version in any case
@@ -118,6 +115,7 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
 
     try {
         qint32 size, type, source, target;
+        SymFactory* factory = &_symbols->factory();
 
         // Read memory specifications
         in >> *_specs;
@@ -126,11 +124,11 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
         _phase = phCompileUnits;
         in >> size;
         for (qint32 i = 0; i < size; i++) {
-            CompileUnit* c = new CompileUnit(_factory);
+            CompileUnit* c = new CompileUnit(_symbols);
             if (!c)
                 genericError("Out of memory.");
             in >> *c;
-            _factory->addSymbol(c);
+            factory->addSymbol(c);
             checkOperationProgress();
         }
 
@@ -139,11 +137,11 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
         in >> size;
         for (int i = 0; i < size; i++) {
             in >> type;
-            BaseType* t = _factory->createEmptyType((RealType) type);
+            BaseType* t = factory->createEmptyType((RealType) type);
             if (!t)
                 genericError("Out of memory.");
             in >> *t;
-            _factory->addSymbol(t);
+            factory->addSymbol(t);
 
             if (t->type() & (ReferencingTypes & ~StructOrUnion))
                 _phase = phReferencingTypes;
@@ -164,10 +162,10 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
         const QString empty; // empty string
         for (int i = 0; i < size; i++) {
             in >> source >> target;
-            BaseType* t = _factory->findBaseTypeById(target);
+            BaseType* t = factory->findBaseTypeById(target);
             // Is the type already in the list?
             if (t)
-                _factory->updateTypeRelations(source, empty, t);
+                factory->updateTypeRelations(source, empty, t);
             // If not, we update the type relations later
             else
                 typeRelations.append(IntInt(source, target));
@@ -179,9 +177,9 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
         while (it != typeRelations.end()) {
             source = it->first;
             target = it->second;
-            BaseType* t = _factory->findBaseTypeById(target);
+            BaseType* t = factory->findBaseTypeById(target);
             if (t) {
-                _factory->updateTypeRelations(source, empty, t);
+                factory->updateTypeRelations(source, empty, t);
                 it = typeRelations.erase(it);
             }
             else
@@ -209,11 +207,11 @@ void KernelSymbolReader::readVersion11(KernelSymbolStream& in)
         _phase = phVariables;
         in >> size;
         for (qint32 i = 0; i < size; i++) {
-            Variable* v = new Variable(_factory);
+            Variable* v = new Variable(_symbols);
             if (!v)
                 genericError("Out of memory.");
             in >> *v;
-            _factory->addSymbol(v);
+            factory->addSymbol(v);
             checkOperationProgress();
         }
     }
@@ -356,6 +354,7 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
 
     try {
         qint32 size, type, source, target, id, belongsTo;
+        SymFactory* factory = &_symbols->factory();
 
         // Read memory specifications
         in >> *_specs;
@@ -364,11 +363,11 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         _phase = phCompileUnits;
         in >> size;
         for (qint32 i = 0; i < size && !interrupted(); i++) {
-            CompileUnit* c = new CompileUnit(_factory);
+            CompileUnit* c = new CompileUnit(_symbols);
             if (!c)
                 genericError("Out of memory.");
             in >> *c;
-            _factory->addSymbol(c);
+            factory->addSymbol(c);
             checkOperationProgress();
         }
 
@@ -380,11 +379,11 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         in >> size;
         for (int i = 0; i < size && !interrupted(); i++) {
             in >> type;
-            BaseType* t = _factory->createEmptyType((RealType) type);
+            BaseType* t = factory->createEmptyType((RealType) type);
             if (!t)
                 genericError("Out of memory.");
             in >> *t;
-            _factory->addSymbol(t);
+            factory->addSymbol(t);
 
             if (t->type() & (ReferencingTypes & ~StructOrUnion))
                 _phase = phReferencingTypes;
@@ -408,10 +407,10 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         const QString empty; // empty string
         for (int i = 0; i < size && !interrupted(); i++) {
             in >> source >> target;
-            BaseType* t = _factory->findBaseTypeById(target);
+            BaseType* t = factory->findBaseTypeById(target);
             // Is the type already in the list?
             if (t)
-                _factory->updateTypeRelations(source, empty, t);
+                factory->updateTypeRelations(source, empty, t);
             // If not, we update the type relations later
             else
                 typeRelations.append(IntInt(source, target));
@@ -426,9 +425,9 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         while (it != typeRelations.end() && !interrupted()) {
             source = it->first;
             target = it->second;
-            BaseType* t = _factory->findBaseTypeById(target);
+            BaseType* t = factory->findBaseTypeById(target);
             if (t) {
-                _factory->updateTypeRelations(source, empty, t);
+                factory->updateTypeRelations(source, empty, t);
                 it = typeRelations.erase(it);
             }
             else
@@ -460,11 +459,11 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         _phase = phVariables;
         in >> size;
         for (qint32 i = 0; i < size && !interrupted(); i++) {
-            Variable* v = new Variable(_factory);
+            Variable* v = new Variable(_symbols);
             if (!v)
                 genericError("Out of memory.");
             in >> *v;
-            _factory->addSymbol(v);
+            factory->addSymbol(v);
             checkOperationProgress();
         }
 
@@ -478,11 +477,11 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         for (qint32 i = 0; i < size && !interrupted(); ++i) {
             in >> id;
             if ( !(rbt = dynamic_cast<RefBaseType*>(
-                       _factory->findBaseTypeById(id))) )
+                       factory->findBaseTypeById(id))) )
                 readerWriterError(QString("Type with ID 0x%1 not found or not "
                                           "a referencing type.")
                                   .arg((uint)id, 0, 16));
-            rbt->readAltRefTypesFrom(in, _factory);
+            rbt->readAltRefTypesFrom(in, factory);
             checkOperationProgress();
         }
 
@@ -496,7 +495,7 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         for (qint32 i = 0; i < size && !interrupted(); ++i) {
             in >> id >> belongsTo;
             if ( !(s = dynamic_cast<Structured*>(
-                       _factory->findBaseTypeById(belongsTo))) )
+                       factory->findBaseTypeById(belongsTo))) )
                 readerWriterError(QString("Type with ID 0x%1 not found or not "
                                           "a struct/union type.")
                                   .arg((uint)belongsTo, 0, 16));
@@ -511,7 +510,7 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
                                   .arg((uint)id, 0, 16)
                                   .arg(s->prettyName())
                                   .arg((uint)belongsTo, 0, 16));
-            m->readAltRefTypesFrom(in, _factory);
+            m->readAltRefTypesFrom(in, factory);
             checkOperationProgress();
         }
 
@@ -523,10 +522,10 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         in >> size;
         for (qint32 i = 0; i < size && !interrupted(); ++i) {
             in >> id;
-            if ( !(v = _factory->findVarById(id)) )
+            if ( !(v = factory->findVarById(id)) )
                 readerWriterError(QString("Varible with ID 0x%1 not found.")
                                   .arg((uint)id, 0, 16));
-            v->readAltRefTypesFrom(in, _factory);
+            v->readAltRefTypesFrom(in, factory);
             checkOperationProgress();
         }
 
@@ -537,7 +536,7 @@ void KernelSymbolReader::readVersion12(KernelSymbolStream& in)
         if (in.kSymVersion() >= kSym::VERSION_17) {
             QStringList fileNames;
             in >> fileNames;
-            _factory->setOrigSymFiles(fileNames);
+            factory->setOrigSymFiles(fileNames);
         }
     }
     catch (...) {

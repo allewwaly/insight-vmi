@@ -18,7 +18,7 @@
 
 
 MemoryMapBuilder::MemoryMapBuilder(MemoryMap* map, int index)
-    : TypeRuleEngineContextProvider(map->factory()),
+    : TypeRuleEngineContextProvider(map->symbols()),
       _index(index), _map(map), _interrupted(false)
 {
 }

@@ -23,16 +23,16 @@ class FuncParam: public Symbol, public ReferencingType, public SourceRef
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    explicit FuncParam(SymFactory* factory);
+    explicit FuncParam(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    FuncParam(SymFactory* factory, const TypeInfo& info);
+    FuncParam(KernelSymbols* symbols, const TypeInfo& info);
 
     /**
      * \copydoc Symbol::prettyName()
@@ -85,18 +85,6 @@ protected:
 private:
     FuncPointer* _belongsTo;  ///< function this parameter belongs to
 };
-
-
-inline const SymFactory* FuncParam::fac() const
-{
-    return _factory;
-}
-
-
-inline SymFactory* FuncParam::fac()
-{
-    return _factory;
-}
 
 
 /**

@@ -6,7 +6,7 @@
  */
 
 #include "longoperation.h"
-#include "shell.h"
+#include "console.h"
 #include <debug.h>
 #include <QTextStream>
 
@@ -74,24 +74,24 @@ QString LongOperation::elapsedTimeVerbose() const
 
 bool LongOperation::interrupted() const
 {
-    return shell && shell->interrupted();
+    return Console::interrupted();
 }
 
 
 void LongOperation::shellOut(const QString &s, bool newline) const
 {
 
-    shell->out() << qPrintable(s);
+    Console::out() << qPrintable(s);
     int len = s.size();
     if (_lastLen > len)
-        shell->out() << qPrintable(QString(_lastLen - len, QChar(' ')));
+        Console::out() << qPrintable(QString(_lastLen - len, QChar(' ')));
 
     if (newline) {
-        shell->out() << endl;
+        Console::out() << endl;
         _lastLen = 0;
     }
     else {
-        shell->out() << flush;
+        Console::out() << flush;
         _lastLen = len;
     }
 }
@@ -100,14 +100,14 @@ void LongOperation::shellOut(const QString &s, bool newline) const
 void LongOperation::shellErr(const QString &s) const
 {
     shellEndl();
-    shell->err() << s << endl << flush;
+    Console::err() << s << endl << flush;
 }
 
 
 void LongOperation::shellEndl() const
 {
     if (_lastLen > 0) {
-        shell->out() << endl;
+        Console::out() << endl;
         _lastLen = 0;
     }
 }

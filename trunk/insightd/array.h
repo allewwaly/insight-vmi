@@ -15,17 +15,17 @@ class Array: public Pointer
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    explicit Array(SymFactory* factory);
+    explicit Array(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      * @param boundsIndex index into the \a info.bounds() list for array lengths
      */
-    Array(SymFactory* factory, const TypeInfo& info, int boundsIndex);
+    Array(KernelSymbols* symbols, const TypeInfo& info, int boundsIndex);
 
 	/**
 	 @return the actual type of that polimorphic variable

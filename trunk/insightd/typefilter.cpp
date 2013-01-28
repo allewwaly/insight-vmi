@@ -6,6 +6,7 @@
 #include "structuredmember.h"
 #include "instance_def.h"
 #include "shellutil.h"
+#include "console.h"
 #include "symfactory.h"
 #include <QMutexLocker>
 
@@ -300,37 +301,37 @@ QString GenericFilter::toString(const ColorPalette *col) const
 
     if (filterActive(ftTypeNameAny)) {
         s += QString("%0 %1\n")
-                .arg(ShellUtil::colorize("Type name:", ctColHead, col))
-                .arg(ShellUtil::colorize(QString("(%1)").arg(xml::any), ctType,
+                .arg(Console::colorize("Type name:", ctColHead, col))
+                .arg(Console::colorize(QString("(%1)").arg(xml::any), ctType,
                                          col));
     }
     else if (filterActive(ftTypeNameLiteral)) {
         s += QString("%0 %1\n")
-                .arg(ShellUtil::colorize("Type name:", ctColHead, col))
-                .arg(ShellUtil::colorize(_typeName, ctType, col));
+                .arg(Console::colorize("Type name:", ctColHead, col))
+                .arg(Console::colorize(_typeName, ctType, col));
     }
     else if (filterActive(ftTypeNameRegEx)) {
         s += QString("%0 %2\n")
-                .arg(ShellUtil::colorize("Type name (%1):", ctColHead, col))
+                .arg(Console::colorize("Type name (%1):", ctColHead, col))
                 .arg(xml::regex)
-                .arg(ShellUtil::colorize(_typeName, ctType, col));
+                .arg(Console::colorize(_typeName, ctType, col));
     }
     else if (filterActive(ftTypeNameWildcard)) {
         s += QString("%0 %2\n")
-                .arg(ShellUtil::colorize("Type name (%1):", ctColHead, col))
+                .arg(Console::colorize("Type name (%1):", ctColHead, col))
                 .arg(xml::wildcard)
-                .arg(ShellUtil::colorize(_typeName, ctType, col));
+                .arg(Console::colorize(_typeName, ctType, col));
     }
 
     else if (filterActive(ftTypeId)) {
         QString id = QString("0x%0").arg((uint)_typeId, 0, 16);
         s += QString("%0 %1\n")
-                .arg(ShellUtil::colorize("Type ID:", ctColHead, col))
-                .arg(ShellUtil::colorize(id, ctTypeId, col));
+                .arg(Console::colorize("Type ID:", ctColHead, col))
+                .arg(Console::colorize(id, ctTypeId, col));
     }
 
     if (filterActive(ftRealType)) {
-        s += ShellUtil::colorize("Data type:", ctColHead, col) + " ";
+        s += Console::colorize("Data type:", ctColHead, col) + " ";
         bool first = true;
         for (int i = 1; i <= rtVaList; i <<= 1) {
             if (dataType() & i) {
@@ -338,7 +339,7 @@ QString GenericFilter::toString(const ColorPalette *col) const
                     first = false;
                 else
                     s += ", ";
-                s += ShellUtil::colorize(realTypeToStr((RealType)i), ctRealType,
+                s += Console::colorize(realTypeToStr((RealType)i), ctRealType,
                                          col);
             }
         }
@@ -348,8 +349,8 @@ QString GenericFilter::toString(const ColorPalette *col) const
     }
 
     if (filterActive(ftSize)) {
-        s += ShellUtil::colorize("Type size:", ctColHead, col) + " " +
-             ShellUtil::colorize(QString::number(size()), ctNumber, col);
+        s += Console::colorize("Type size:", ctColHead, col) + " " +
+             Console::colorize(QString::number(size()), ctNumber, col);
     }
 
     return s;
@@ -537,26 +538,26 @@ QString MemberFilter::toString(const ColorPalette *col) const
 
     if (filterActive(ftVarNameAny)) {
         s += QString("%0 %1\n")
-                .arg(ShellUtil::colorize("Name:", ctColHead, col))
-                .arg(ShellUtil::colorize(QString("(%1)").arg(xml::any),
+                .arg(Console::colorize("Name:", ctColHead, col))
+                .arg(Console::colorize(QString("(%1)").arg(xml::any),
                                          ctMember, col));
     }
     else if (filterActive(ftVarNameLiteral)) {
         s += QString("%0 %1\n")
-                .arg(ShellUtil::colorize("Name:", ctColHead, col))
-                .arg(ShellUtil::colorize(_name, ctMember, col));
+                .arg(Console::colorize("Name:", ctColHead, col))
+                .arg(Console::colorize(_name, ctMember, col));
     }
     else if (filterActive(ftVarNameRegEx)) {
         s += QString("%0 %2\n")
-                .arg(ShellUtil::colorize("Name (%1):", ctColHead, col))
+                .arg(Console::colorize("Name (%1):", ctColHead, col))
                 .arg(xml::regex)
-                .arg(ShellUtil::colorize(_name, ctMember, col));
+                .arg(Console::colorize(_name, ctMember, col));
     }
     else if (filterActive(ftVarNameWildcard)) {
         s += QString("%0 %2\n")
-                .arg(ShellUtil::colorize("Name (%1):", ctColHead, col))
+                .arg(Console::colorize("Name (%1):", ctColHead, col))
                 .arg(xml::wildcard)
-                .arg(ShellUtil::colorize(_name, ctMember, col));
+                .arg(Console::colorize(_name, ctMember, col));
     }
 
     return s;
@@ -581,7 +582,7 @@ QString TypeFilter::toString(const ColorPalette *col) const
     if (!_members.isEmpty()) {
         for (int i = 0; i < _members.size(); ++i) {
             QString ms(_members[i].toString(col).trimmed());
-            s += ShellUtil::colorize(QString("Member %1:").arg(i+1), ctColHead, col);
+            s += Console::colorize(QString("Member %1:").arg(i+1), ctColHead, col);
             s += indent + ms.replace(QChar('\n'), indent) + "\n";
         }
     }
@@ -826,26 +827,26 @@ QString VariableFilter::toString(const ColorPalette *col) const
 
     if (filterActive(ftVarNameAny)) {
         s += QString("%0 %1\n")
-                .arg(ShellUtil::colorize("Var. name:", ctColHead, col))
-                .arg(ShellUtil::colorize(QString("(%1)").arg(xml::any),
+                .arg(Console::colorize("Var. name:", ctColHead, col))
+                .arg(Console::colorize(QString("(%1)").arg(xml::any),
                                          ctVariable, col));
     }
     else if (filterActive(ftVarNameLiteral)) {
         s += QString("%0 %1\n")
-                .arg(ShellUtil::colorize("Var. name:", ctColHead, col))
-                .arg(ShellUtil::colorize(_varName, ctVariable, col));
+                .arg(Console::colorize("Var. name:", ctColHead, col))
+                .arg(Console::colorize(_varName, ctVariable, col));
     }
     else if (filterActive(ftVarNameRegEx)) {
         s += QString("%0 %2\n")
-                .arg(ShellUtil::colorize("Var. name (%1):", ctColHead, col))
+                .arg(Console::colorize("Var. name (%1):", ctColHead, col))
                 .arg(xml::regex)
-                .arg(ShellUtil::colorize(_varName, ctVariable, col));
+                .arg(Console::colorize(_varName, ctVariable, col));
     }
     else if (filterActive(ftVarNameWildcard)) {
         s += QString("%0 %2\n")
-                .arg(ShellUtil::colorize("Var. name (%1):", ctColHead, col))
+                .arg(Console::colorize("Var. name (%1):", ctColHead, col))
                 .arg(xml::wildcard)
-                .arg(ShellUtil::colorize(_varName, ctVariable, col));
+                .arg(Console::colorize(_varName, ctVariable, col));
     }
 
     return s;

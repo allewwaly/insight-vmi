@@ -6,7 +6,7 @@
 #include <variable.h>
 #include <basetype.h>
 #include <typefilter.h>
-#include <shell.h>
+//#include <shell.h>
 
 #define safe_delete(x) \
     do { if ((x)) { delete (x); (x) = 0; } } while (0)
@@ -254,7 +254,7 @@ private:
 TypeFilterTest::TypeFilterTest()
     : _factory(0), _specs(0)
 {
-    shell = new Shell(false);
+//    shell = new Shell(false);
 }
 
 

@@ -30,6 +30,7 @@
 #include <debug.h>
 
 class SymFactory;
+class KernelSymbols;
 class VirtualMemory;
 class Variable;
 class MemoryMapVerifier;
@@ -118,10 +119,10 @@ class MemoryMap: protected LongOperation
 public:
 	/**
 	 * Constructor
-	 * @param factory the symbol factory to use
+	 * @param symbols the symbols to use
 	 * @param vmem the virtual memory instance to build a mapping from
 	 */
-	MemoryMap(const SymFactory* factory, VirtualMemory* vmem);
+	MemoryMap(KernelSymbols* symbols, VirtualMemory* vmem);
 
 	/**
 	 * Destructor
@@ -265,6 +266,11 @@ public:
      */
     const SymFactory * factory() const;
 
+    /**
+     * Returns the KernelSymbols used by this map.
+     */
+    KernelSymbols* symbols() const;
+
     float calculateNodeProbability(const Instance &inst,
                                    float parentProbability = 1.0) const;
 
@@ -378,7 +384,7 @@ private:
     void addVarInstance(const Instance& inst);
 
     MemoryMapBuilder** _threads;
-    const SymFactory* _factory;  ///< holds the SymFactory to operate on
+    KernelSymbols* _symbols;     ///< holds the KernelSymbols to operate on
     VirtualMemory* _vmem;        ///< the virtual memory object this map is being built for
 	NodeList _roots;             ///< the nodes of the global kernel variables
     PointerNodeHash _pointersTo; ///< holds all pointers that point to a certain address
@@ -469,11 +475,6 @@ inline quint64 MemoryMap::paddrSpaceEnd() const
             _vmem->physMem()->size() - 1 : VADDR_SPACE_X86;
 }
 
-inline const SymFactory * MemoryMap::factory() const
-{
-    return _factory;
-}
-
 #ifdef MEMORY_MAP_VERIFICATION
 inline MemoryMapVerifier& MemoryMap::verifier()
 {
@@ -510,6 +511,12 @@ inline MemoryMapBuilderType MemoryMap::buildType() const
 inline bool MemoryMap::probabilityPropagation() const
 {
     return _probPropagation;
+}
+
+
+inline KernelSymbols *MemoryMap::symbols() const
+{
+    return _symbols;
 }
 
 

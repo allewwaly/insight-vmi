@@ -16,16 +16,16 @@ class FuncPointer: public RefBaseType
 public:
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      */
-    explicit FuncPointer(SymFactory* factory);
+    explicit FuncPointer(KernelSymbols* symbols);
 
     /**
      * Constructor
-     * @param factory the factory that created this symbol
+     * @param symbols the kernel symbols this symbol belongs to
      * @param info the type information to construct this type from
      */
-    FuncPointer(SymFactory* factory, const TypeInfo& info);
+    FuncPointer(KernelSymbols* symbols, const TypeInfo& info);
 
     /**
      * Destructor

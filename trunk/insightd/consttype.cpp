@@ -7,14 +7,14 @@
 
 #include "consttype.h"
 
-ConstType::ConstType(SymFactory* factory)
-    : RefBaseType(factory)
+ConstType::ConstType(KernelSymbols *symbols)
+    : RefBaseType(symbols)
 {
 }
 
 
-ConstType::ConstType(SymFactory* factory, const TypeInfo& info)
-    : RefBaseType(factory, info)
+ConstType::ConstType(KernelSymbols *symbols, const TypeInfo& info)
+    : RefBaseType(symbols, info)
 {
 }
 

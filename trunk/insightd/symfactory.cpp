@@ -21,12 +21,13 @@
 #include "funcpointer.h"
 #include "compileunit.h"
 #include "variable.h"
-#include "shell.h"
+#include "console.h"
 #include <debug.h>
 #include "function.h"
 #include "kernelsourcetypeevaluator.h"
 #include "astexpressionevaluator.h"
 #include "programoptions.h"
+#include "kernelsymbols.h"
 #include <string.h>
 #include <asttypeevaluator.h>
 #include <astnode.h>
@@ -42,8 +43,8 @@ const char* rx_type_id_typedef = "__0x([0-9a-fA-F]+)__";
 
 //------------------------------------------------------------------------------
 
-SymFactory::SymFactory(const MemSpecs& memSpecs)
-	: _memSpecs(memSpecs)
+SymFactory::SymFactory(KernelSymbols* symbols)
+	: _symbols(symbols)
 {
 	clear();
 }
@@ -133,99 +134,99 @@ BaseType* SymFactory::createEmptyType(RealType type)
 
     switch (type) {
     case rtInt8:
-        t = new Int8(this);
+        t = new Int8(_symbols);
         break;
 
     case rtUInt8:
-        t = new UInt8(this);
+        t = new UInt8(_symbols);
         break;
 
     case rtBool8:
-        t = new Bool8(this);
+        t = new Bool8(_symbols);
         break;
 
     case rtInt16:
-        t = new Int16(this);
+        t = new Int16(_symbols);
         break;
 
     case rtUInt16:
-        t = new UInt16(this);
+        t = new UInt16(_symbols);
         break;
 
     case rtBool16:
-        t = new Bool16(this);
+        t = new Bool16(_symbols);
         break;
 
     case rtInt32:
-        t = new Int32(this);
+        t = new Int32(_symbols);
         break;
 
     case rtUInt32:
-        t = new UInt32(this);
+        t = new UInt32(_symbols);
         break;
 
     case rtBool32:
-        t = new Bool32(this);
+        t = new Bool32(_symbols);
         break;
 
     case rtInt64:
-        t = new Int64(this);
+        t = new Int64(_symbols);
         break;
 
     case rtUInt64:
-        t = new UInt64(this);
+        t = new UInt64(_symbols);
         break;
 
     case rtBool64:
-        t = new Bool64(this);
+        t = new Bool64(_symbols);
         break;
 
     case rtFloat:
-        t = new Float(this);
+        t = new Float(_symbols);
         break;
 
     case rtDouble:
-        t = new Double(this);
+        t = new Double(_symbols);
         break;
 
     case rtPointer:
-        t = new Pointer(this);
+        t = new Pointer(_symbols);
         break;
 
     case rtArray:
-        t = new Array(this);
+        t = new Array(_symbols);
         break;
 
     case rtEnum:
-        t = new Enum(this);
+        t = new Enum(_symbols);
         break;
 
     case rtStruct:
-        t = new Struct(this);
+        t = new Struct(_symbols);
         break;
 
     case rtUnion:
-        t = new Union(this);
+        t = new Union(_symbols);
         break;
 
     case rtConst:
-        t = new ConstType(this);
+        t = new ConstType(_symbols);
         break;
 
     case rtVolatile:
-        t = new VolatileType(this);
+        t = new VolatileType(_symbols);
         break;
 
     case rtTypedef:
-        t = new Typedef(this);
+        t = new Typedef(_symbols);
         break;
 
     case rtFuncPointer:
-        t = new FuncPointer(this);
+        t = new FuncPointer(_symbols);
         break;
 
     case rtFunction:
-        t = new Function(this);
+        t = new Function(_symbols);
         break;
 
     default:
@@ -317,7 +318,7 @@ ASTExpression *SymFactory::createEmptyExpression(ExpressionType type)
 Array* SymFactory::getTypeInstance(const TypeInfo& info, int boundsIndex)
 {
     // Create a new type from the info
-    Array* t = new Array(this, info, boundsIndex);
+    Array* t = new Array(_symbols, info, boundsIndex);
     return getTypeInstance2(t, info);
 }
 
@@ -326,7 +327,7 @@ template<class T>
 T* SymFactory::getTypeInstance(const TypeInfo& info)
 {
     // Create a new type from the info
-    T* t = new T(this, info);
+    T* t = new T(_symbols, info);
     return getTypeInstance2(t, info);
 }
 
@@ -343,7 +344,7 @@ T* SymFactory::getTypeInstance2(T* t, const TypeInfo& info)
         Pointer* p = dynamic_cast<Pointer*>(t);
         assert(p != 0);
         if (p->size() == 0)
-            p->setSize(_memSpecs.sizeofPointer);
+            p->setSize(memSpecs().sizeofPointer);
     }
 
     // Try to find the type based on its hash, but only if hash is valid
@@ -464,7 +465,7 @@ BaseType* SymFactory::getNumericInstance(const TypeInfo& info)
 
 Variable* SymFactory::getVarInstance(const TypeInfo& info)
 {
-	Variable* var = new Variable(this, info);
+	Variable* var = new Variable(_symbols, info);
 	// Do not add external declarations to the global lists
 	if (info.location() <= 0 && info.external()) {		
 		if (varDeclAvailable(var))
@@ -486,7 +487,7 @@ void SymFactory::insert(const TypeInfo& info, BaseType* type)
 
 	// Only add to the list if this is a new type
 	if (isNewType(info, type)) {
-		type->setFactory(this);
+		type->setSymbols(_symbols);
 	    if (type->size() > _maxTypeSize)
 	        _maxTypeSize = type->size();
 	}
@@ -501,7 +502,7 @@ void SymFactory::insert(BaseType* type)
     assert(type != 0);
 
     // Add to the list of types
-    type->setFactory(this);
+    type->setSymbols(_symbols);
     if (type->size() > _maxTypeSize)
         _maxTypeSize = type->size();
 
@@ -746,7 +747,7 @@ bool SymFactory::postponedTypeResolved(ReferencingType* rt,
 void SymFactory::insert(CompileUnit* unit)
 {
 	assert(unit != 0);
-	unit->setFactory(this);
+	unit->setSymbols(_symbols);
 	_sources.insert(unit->id(), unit);
 }
 
@@ -754,7 +755,7 @@ void SymFactory::insert(CompileUnit* unit)
 void SymFactory::insert(Variable* var)
 {
 	assert(var != 0);
-	var->setFactory(this);
+	var->setSymbols(_symbols);
 	_vars.append(var);
 	_varsById.insert(var->id(), var);
 	_varsByName.insertMulti(var->name(), var);
@@ -811,7 +812,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
 	case hsArrayType: {
 		// Create instances for multi-dimensional array
 		for (int i = info.upperBounds().size() - 1; i > 0; --i) {
-			Array *a = new Array(this, info, i);
+			Array *a = new Array(_symbols, info, i);
 			addSymbol(a);
 		}
 		ref = getTypeInstance(info, 0);
@@ -822,7 +823,7 @@ void SymFactory::addSymbol(const TypeInfo& info)
 		break;
 	}
 	case hsCompileUnit: {
-		CompileUnit* c = new CompileUnit(this, info);
+		CompileUnit* c = new CompileUnit(_symbols, info);
 		insert(c);
 		break;
 	}
@@ -1070,39 +1071,39 @@ BaseType* SymFactory::makeDeepTypeCopy(BaseType* source, bool clearAltTypes)
     BaseType* dest;
     switch (source->type()) {
     case rtArray:
-        dest = new Array(this);
+        dest = new Array(_symbols);
         break;
 
     case rtPointer:
-        dest = new Pointer(this);
+        dest = new Pointer(_symbols);
         break;
 
     case rtStruct:
-        dest = new Struct(this);
+        dest = new Struct(_symbols);
         break;
 
     case rtUnion:
-        dest = new Union(this);
+        dest = new Union(_symbols);
         break;
 
     case rtConst:
-        dest = new ConstType(this);
+        dest = new ConstType(_symbols);
         break;
 
     case rtVolatile:
-        dest = new VolatileType(this);
+        dest = new VolatileType(_symbols);
         break;
 
     case rtTypedef:
-        dest = new Typedef(this);
+        dest = new Typedef(_symbols);
         break;
 
     case rtFuncPointer:
-        dest = new FuncPointer(this);
+        dest = new FuncPointer(_symbols);
         break;
 
     case rtFunction:
-        dest = new Function(this);
+        dest = new Function(_symbols);
         break;
 
     default:
@@ -1576,44 +1577,44 @@ void SymFactory::symbolsFinished(RestoreType rt)
     // Sort the types by ID
     qSort(_types.begin(), _types.end(), idLessThan);
 
-    shell->out() << "Statistics:" << endl;
+    Console::out() << "Statistics:" << endl;
 
-    shell->out() << qSetFieldWidth(10) << right;
+    Console::out() << qSetFieldWidth(10) << right;
 
-    shell->out() << "  | No. of types:              " << _types.size() << endl;
-    shell->out() << "  | No. of types by name:      " << _typesByName.size() << endl;
-    shell->out() << "  | No. of types by ID:        " << _typesById.size() << endl;
-    shell->out() << "  | No. of types by hash:      " << _typesByHash.size() << endl;
-//    shell->out() << "  | Types found by hash:       " << _typeFoundByHash << endl;
-//    shell->out() << "  | Postponed types:           " << << _postponedTypes.size() << endl;
-    shell->out() << "  | No. of variables:          " << _vars.size() << endl;
-    shell->out() << "  | No. of variables by ID:    " << _varsById.size() << endl;
-    shell->out() << "  | No. of variables by name:  " << _varsByName.size() << endl;
+    Console::out() << "  | No. of types:              " << _types.size() << endl;
+    Console::out() << "  | No. of types by name:      " << _typesByName.size() << endl;
+    Console::out() << "  | No. of types by ID:        " << _typesById.size() << endl;
+    Console::out() << "  | No. of types by hash:      " << _typesByHash.size() << endl;
+//    Console::out() << "  | Types found by hash:       " << _typeFoundByHash << endl;
+//    Console::out() << "  | Postponed types:           " << << _postponedTypes.size() << endl;
+    Console::out() << "  | No. of variables:          " << _vars.size() << endl;
+    Console::out() << "  | No. of variables by ID:    " << _varsById.size() << endl;
+    Console::out() << "  | No. of variables by name:  " << _varsByName.size() << endl;
 
     if (rt == rtParsing)
-        shell->out() << "  | Empty structs replaced:    " << zeroReplaced << endl;
-    shell->out() << "  | Empty structs remaining:   " << _zeroSizeStructs.size() << endl;
+        Console::out() << "  | Empty structs replaced:    " << zeroReplaced << endl;
+    Console::out() << "  | Empty structs remaining:   " << _zeroSizeStructs.size() << endl;
 
-    shell->out() << qSetFieldWidth(0) << left;
+    Console::out() << qSetFieldWidth(0) << left;
 
 	if (!_postponedTypes.isEmpty()) {
-//		shell->out() << "  | The following types still have unresolved references:" << endl;
+//		Console::out() << "  | The following types still have unresolved references:" << endl;
 		QList<int> keys = _postponedTypes.uniqueKeys();
 //		qSort(keys);
 //		for (int i = 0; i < keys.size(); i++) {
 //			int key = keys[i];
-//			shell->out() << QString("  |   missing id: 0x%1, %2 element(s)\n").arg(key, 0, 16).arg(_postponedTypes.count(key));
+//			Console::out() << QString("  |   missing id: 0x%1, %2 element(s)\n").arg(key, 0, 16).arg(_postponedTypes.count(key));
 //		}
-	    shell->out() << "  | There are " << _postponedTypes.size()
+	    Console::out() << "  | There are " << _postponedTypes.size()
 	            << " referencing types still waiting for " << keys.size()
 	            << " missing types." << endl;
 	}
 
-    shell->out() << "  `-------------------------------------------" << endl;
-//    shell->out() << typesByHashStats();
-//    shell->out() << "-------------------------------------------" << endl;
-//    shell->out() << postponedTypesStats();
-//    shell->out() << "-------------------------------------------" << endl;
+    Console::out() << "  `-------------------------------------------" << endl;
+//    Console::out() << typesByHashStats();
+//    Console::out() << "-------------------------------------------" << endl;
+//    Console::out() << postponedTypesStats();
+//    Console::out() << "-------------------------------------------" << endl;
 
 
     // Some sanity checks on the numbers
@@ -1788,17 +1789,17 @@ void SymFactory::sourceParcingFinished()
         }
     }
 
-    shell->out() << "Statistics:" << endl;
-    shell->out() << qSetFieldWidth(10) << right;
-    shell->out() << "  | Type changes of struct members: " << _uniqeTypesChanged << endl;
-    shell->out() << "  | Type changes of variables:      " << _varTypeChanges << endl;
-    shell->out() << "  | Total type changes:             " << _totalTypesChanged << endl;
-    shell->out() << "  | Types copied:                   " << _typesCopied << endl;
-    shell->out() << "  | Unique types merged:            " << uniqueTypesMerged << endl;
-    shell->out() << "  | Total types merged:             " << totalTypesMerged << endl;
-    shell->out() << "  | Ambigues types:                 " << _ambiguesAltTypes << endl;
-    shell->out() << "  `-------------------------------------------" << endl;
-    shell->out() << qSetFieldWidth(0) << left;
+    Console::out() << "Statistics:" << endl;
+    Console::out() << qSetFieldWidth(10) << right;
+    Console::out() << "  | Type changes of struct members: " << _uniqeTypesChanged << endl;
+    Console::out() << "  | Type changes of variables:      " << _varTypeChanges << endl;
+    Console::out() << "  | Total type changes:             " << _totalTypesChanged << endl;
+    Console::out() << "  | Types copied:                   " << _typesCopied << endl;
+    Console::out() << "  | Unique types merged:            " << uniqueTypesMerged << endl;
+    Console::out() << "  | Total types merged:             " << totalTypesMerged << endl;
+    Console::out() << "  | Ambigues types:                 " << _ambiguesAltTypes << endl;
+    Console::out() << "  `-------------------------------------------" << endl;
+    Console::out() << qSetFieldWidth(0) << left;
 }
 
 
@@ -2299,8 +2300,8 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                 Pointer* ptr = 0;
                 Array* a = 0;
                 switch (preceedingPtrs[j]->type()) {
-                case rtArray: ptr = a = new Array(this); break;
-                case rtPointer: ptr = new Pointer(this); break;
+                case rtArray: ptr = a = new Array(_symbols); break;
+                case rtPointer: ptr = new Pointer(_symbols); break;
                 default: factoryError("Unexpected type: " +
                                       realTypeToStr(preceedingPtrs[j]->type()));
                 }
@@ -2308,7 +2309,7 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
                 // For void pointers, targetBaseType is null
                 if (ptrBaseType)
                     ptr->setRefTypeId(ptrBaseType->id());
-                ptr->setSize(_memSpecs.sizeofPointer);
+                ptr->setSize(memSpecs().sizeofPointer);
                 // For arrays, set their length
                 if (a)
                     a->setLength(preceedingPtrs[j]->arraySize());
@@ -3220,4 +3221,10 @@ void SymFactory::setOrigSymFiles(const QStringList &list)
 {
 	_origSymFiles = list;
 	_origSymKernelFileIndex = _origSymFiles.indexOf("vmlinux");
+}
+
+
+const MemSpecs& SymFactory::memSpecs() const
+{
+	return _symbols->memSpecs();
 }

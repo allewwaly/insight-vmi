@@ -13,6 +13,7 @@
 #include "genericexception.h"
 #include "memspecs.h"
 #include "typeruleengine.h"
+#include "memorydump.h"
 
 // Forward declaration
 class QIODevice;
@@ -129,6 +130,34 @@ public:
      */
     bool symbolsAvailable() const;
 
+    /**
+     * Returns the memory dump files loaded for these symbols.
+     * @return dump files
+     */
+    const MemDumpArray& memDumps() const { return _memDumps; }
+
+    /**
+     * Loads a memory file.
+     * @param fileName the file to load
+     * @return in case of success, the index of the loaded file into the
+     * memDumps() array is returned, i.e., a value >= 0, otherwise an error
+     * code < 0
+     */
+    int loadMemDump(const QString& fileName);
+
+    /**
+     * Unloads a memory file, either based on the file name or an the index into
+     * the memDumps() array.
+     * @param indexOrFileName either the name or the list index of the file to
+     * unload
+     * @param unloadedFile if given, the name of the unloaded file will be
+     * returned here
+     * @return in case of success, the index of the unloaded file into the
+     * memDumps() array is returned, i.e., a value >= 0, otherwise an error
+     * code < 0
+     */
+    int unloadMemDump(const QString& indexOrFileName, QString* unloadedFile = 0);
+
 private:
     void checkRules(int from = 0);
 
@@ -136,6 +165,7 @@ private:
     SymFactory _factory;
     TypeRuleEngine _ruleEngine;
     QString _fileName;
+    MemDumpArray _memDumps;
 };
 
 

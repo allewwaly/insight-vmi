@@ -6,9 +6,10 @@
 #include <QTextStream>
 #include <debug.h>
 #include "ioexception.h"
-#include "shell.h"
+#include "console.h"
 #include "colorpalette.h"
 #include "shellutil.h"
+#include "structured.h"
 #include "memorymapheuristics.h"
 
 #include <math.h>
@@ -763,161 +764,161 @@ void MemoryMapVerifier::statistics()
     const int w_hdr = 50;
 
     // Reset all manipulators to default
-    shell->out() << qSetFieldWidth(0) << left
+    Console::out() << qSetFieldWidth(0) << left
                  << qSetRealNumberPrecision(2) << fixed;
 
-    shell->out() << endl << "Map Statistics:" << endl;
+    Console::out() << endl << "Map Statistics:" << endl;
 
     // General information
-    shell->out() << "\tGeneral:" << endl
+    Console::out() << "\tGeneral:" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| Total no. of objects in map:"
-                 << qSetFieldWidth(0) << shell->color(ctBold)
+                 << qSetFieldWidth(0) << Console::color(ctBold)
                  << right << qSetFieldWidth(w_i)
                  << _totalObjects
-                 << qSetFieldWidth(0) << left << shell->color(ctReset) << endl
+                 << qSetFieldWidth(0) << left << Console::color(ctReset) << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of global variables:"
-                 << qSetFieldWidth(0) << shell->color(ctMatched) << right << qSetFieldWidth(w_i)
+                 << qSetFieldWidth(0) << Console::color(ctMatched) << right << qSetFieldWidth(w_i)
                  << _globalVarValid
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctMatched) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctMatched) << qSetFieldWidth(w_f) << right
                  << ((float)_globalVarValid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                 << shell->color(ctReset)
+                 << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of valid objects (non-globals):"
-                 << qSetFieldWidth(0) << shell->color(ctMatched) << right << qSetFieldWidth(w_i)
+                 << qSetFieldWidth(0) << Console::color(ctMatched) << right << qSetFieldWidth(w_i)
                  << _totalValid
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctMatched) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctMatched) << qSetFieldWidth(w_f) << right
                  << ((float)_totalValid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                 << shell->color(ctReset)
+                 << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of invalid objects (non-globals):"
-                 << qSetFieldWidth(0) << shell->color(ctMissed) << right << qSetFieldWidth(w_i)
+                 << qSetFieldWidth(0) << Console::color(ctMissed) << right << qSetFieldWidth(w_i)
                  << _totalInvalid
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctMissed) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctMissed) << qSetFieldWidth(w_f) << right
                  << ((float)_totalInvalid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                 << shell->color(ctReset)
+                 << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of non-globals w/ unknown validity"
-                 << qSetFieldWidth(0) << shell->color(ctDeferred) << right << qSetFieldWidth(w_i)
+                 << qSetFieldWidth(0) << Console::color(ctDeferred) << right << qSetFieldWidth(w_i)
                  << unknownValidityObj
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctDeferred) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctDeferred) << qSetFieldWidth(w_f) << right
                  << ((float)unknownValidityObj) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                 << shell->color(ctReset)
+                 << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << "\t|" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of valid objects w/ heuristics:"
-                 << right << qSetFieldWidth(0) << shell->color(ctMatched) << qSetFieldWidth(w_i)
+                 << right << qSetFieldWidth(0) << Console::color(ctMatched) << qSetFieldWidth(w_i)
                  << _heuristicsValid
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctMatched) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctMatched) << qSetFieldWidth(w_f) << right
                  << ((float)_heuristicsValid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                 << shell->color(ctReset)
+                 << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << "\t|" << endl
                  << "\t| Distribution of non-globals:" << endl
                  << "\t| Total:         ";
     for (int i = 0; i < _totalDistribution.size(); ++i) {
         if (i > 0)
-            shell->out() << " - ";
-        shell->out() << _totalDistribution[i];
+            Console::out() << " - ";
+        Console::out() << _totalDistribution[i];
     }
-    shell->out() << endl
+    Console::out() << endl
                  << "\t| Valid dist.:   ";
     for (int i = 0; i < _totalValidDistribution.size(); ++i) {
         if (i > 0)
-            shell->out() << " - ";
-        shell->out() << shell->color(ctMatched) << _totalValidDistribution[i] << shell->color(ctReset);
+            Console::out() << " - ";
+        Console::out() << Console::color(ctMatched) << _totalValidDistribution[i] << Console::color(ctReset);
     }
-    shell->out() << endl
+    Console::out() << endl
                  << "\t| Invalid dist.: ";
     for (int i = 0; i < _totalInvalidDistribution.size(); ++i) {
         if (i > 0)
-            shell->out() << " - ";
-        shell->out() << shell->color(ctMissed) << _totalInvalidDistribution[i] << shell->color(ctReset);
+            Console::out() << " - ";
+        Console::out() << Console::color(ctMissed) << _totalInvalidDistribution[i] << Console::color(ctReset);
     }
-    shell->out() << endl
+    Console::out() << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| Estimation of map correctness:"
-                 << qSetFieldWidth(0) << shell->color(ctBold)
-                 << shell->color(ctEvaluated) << qSetFieldWidth(w_i) << right
+                 << qSetFieldWidth(0) << Console::color(ctBold)
+                 << Console::color(ctEvaluated) << qSetFieldWidth(w_i) << right
                  << ((float)_seemValidObjects) * 100.0 / _totalObjects
                  << qSetFieldWidth(0) << left
                  << " - " << ((float)_maybeValidObjects + _slubValid) * 100.0 / _totalObjects
-                 << shell->color(ctReset)
+                 << Console::color(ctReset)
                  << "%" << endl
                  << "\t|" << endl;
 
     // Slubs Validity
-    shell->out() << "\tSlubs:" << endl
+    Console::out() << "\tSlubs:" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of exact matches with slub objects:"
-                 << qSetFieldWidth(0) << shell->color(ctMatched) << right << qSetFieldWidth(w_i)
+                 << qSetFieldWidth(0) << Console::color(ctMatched) << right << qSetFieldWidth(w_i)
                  << _slubValid
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctMatched) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctMatched) << qSetFieldWidth(w_f) << right
                  << ((float)_slubValid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                 << shell->color(ctReset)
+                 << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of objects in generic slub space:"
-                 << right << qSetFieldWidth(0) << shell->color(ctMatched) << qSetFieldWidth(w_i)
+                 << right << qSetFieldWidth(0) << Console::color(ctMatched) << qSetFieldWidth(w_i)
                  << _slubMaybeValid
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctMatched) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctMatched) << qSetFieldWidth(w_f) << right
                  << ((float)_slubMaybeValid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                 << shell->color(ctReset)
+                 << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of objects not found in slubs:"
-                 << right << qSetFieldWidth(0) << shell->color(ctDeferred) << qSetFieldWidth(w_i)
+                 << right << qSetFieldWidth(0) << Console::color(ctDeferred) << qSetFieldWidth(w_i)
                  << _slubNotFound
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctDeferred) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctDeferred) << qSetFieldWidth(w_f) << right
                  << ((float)_slubNotFound) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                 << shell->color(ctReset)
+                 << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of objects contradicting slub objects:"
-                 << right << qSetFieldWidth(0) << shell->color(ctMissed) << qSetFieldWidth(w_i)
+                 << right << qSetFieldWidth(0) << Console::color(ctMissed) << qSetFieldWidth(w_i)
                  << _slubConflict
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctMissed) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctMissed) << qSetFieldWidth(w_f) << right
                  << ((float)_slubConflict) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                 << shell->color(ctReset)
+                 << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl;
 
     if (_slubInvalid > 0) {
-        shell->out() << qSetFieldWidth(w_hdr)
+        Console::out() << qSetFieldWidth(w_hdr)
                      << "\t| No. of otherwise invalid slub objects:"
-                     << right << qSetFieldWidth(0) << shell->color(ctMissed) << qSetFieldWidth(w_i)
+                     << right << qSetFieldWidth(0) << Console::color(ctMissed) << qSetFieldWidth(w_i)
                      << _slubInvalid
-                     << qSetFieldWidth(0) << left << shell->color(ctReset)
+                     << qSetFieldWidth(0) << left << Console::color(ctReset)
                      << " ("
-                     << shell->color(ctMissed) << qSetFieldWidth(w_f) << right
+                     << Console::color(ctMissed) << qSetFieldWidth(w_f) << right
                      << ((float)_slubInvalid) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                     << shell->color(ctReset)
+                     << Console::color(ctReset)
                      << "% of " << _totalObjects << ")" << endl;
     }
 
-    shell->out() << qSetFieldWidth(w_hdr)
+    Console::out() << qSetFieldWidth(w_hdr)
                  << "\t| No. of non-slub objects:"
                  << right << qSetFieldWidth(0) << qSetFieldWidth(w_i)
                  << nonSlubObj
@@ -929,15 +930,15 @@ void MemoryMapVerifier::statistics()
                  << "\t|" << endl;
 
     // Seems valid
-    shell->out() << qSetFieldWidth(w_hdr)
+    Console::out() << qSetFieldWidth(w_hdr)
                  << "\t| No. of seems-valid objects:"
-                 << qSetFieldWidth(0) << shell->color(ctMatched) << right << qSetFieldWidth(w_i)
+                 << qSetFieldWidth(0) << Console::color(ctMatched) << right << qSetFieldWidth(w_i)
                  << _seemValidObjects
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctMatched) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctMatched) << qSetFieldWidth(w_f) << right
                  << ((float)_seemValidObjects) * 100.0 / _totalObjects << qSetFieldWidth(0) << left
-                 << shell->color(ctReset)
+                 << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of objects whose status is unknown:"
@@ -950,126 +951,126 @@ void MemoryMapVerifier::statistics()
                  << "\t|" << endl;
 
     // Slub coverage
-    shell->out() << qSetFieldWidth(w_hdr)
+    Console::out() << qSetFieldWidth(w_hdr)
                  << "\t| Coverage of all slub objects:"
-                 << qSetFieldWidth(0) << shell->color(ctBold)
+                 << qSetFieldWidth(0) << Console::color(ctBold)
                  << qSetFieldWidth(w_i) << right
                  << ((float)(_objectsFoundInSlub + _slubMaybeValid)) * 100.0 / _slub.numberOfObjects()
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << "% of " << _slub.numberOfObjects() << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| Coverage of slub objects with type:"
-                 << qSetFieldWidth(0) << shell->color(ctBold)
+                 << qSetFieldWidth(0) << Console::color(ctBold)
                  << qSetFieldWidth(w_i) << right
                  << ((float)_objectsFoundInSlub) * 100.0 / _slub.numberOfObjectsWithType()
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << "% of " << _slub.numberOfObjectsWithType() << endl
                  << qSetFieldWidth(0)
                  << "\t|" << endl;
 
     // Prob. distribution
-    shell->out() << qSetFieldWidth(w_hdr)
+    Console::out() << qSetFieldWidth(w_hdr)
                  << "\t| Min Valid Probability:"
                  << right << qSetFieldWidth(w_i)
                  << _minValidProbability * 100.0
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << "%" << endl
                  << "\t| Distribution: ";
     for (int i = 0; i < _slubValidDistribution.size(); ++i) {
         if (i > 0)
-            shell->out() << " - ";
-        shell->out() << shell->color(ctMatched)
-                     << _slubValidDistribution[i] << shell->color(ctReset);
+            Console::out() << " - ";
+        Console::out() << Console::color(ctMatched)
+                     << _slubValidDistribution[i] << Console::color(ctReset);
     }
-    shell->out() << endl
+    Console::out() << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| Max Invalid Probability:"
                  << right << qSetFieldWidth(w_i)
                  << _maxInvalidProbability * 100.0
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << "%" << endl
                  << "\t| Distribution: ";
     for (int i = 0; i < _slubInvalidDistribution.size(); ++i) {
         if (i > 0)
-            shell->out() << " - ";
-        shell->out() << shell->color(ctMissed)
-                     <<  _slubInvalidDistribution[i] << shell->color(ctReset);
+            Console::out() << " - ";
+        Console::out() << Console::color(ctMissed)
+                     <<  _slubInvalidDistribution[i] << Console::color(ctReset);
     }
-    shell->out() << endl
+    Console::out() << endl
                  << "\t|" << endl;
 
     // Magic number evaluation
-    shell->out() << "\tMagic Numbers:" << endl
+    Console::out() << "\tMagic Numbers:" << endl
 //                 << qSetFieldWidth(w_hdr)
 //                 << "\t| No. of valid objects:"
-//                 << qSetFieldWidth(0) << shell->color(ctMatched) << right << qSetFieldWidth(w_i)
+//                 << qSetFieldWidth(0) << Console::color(ctMatched) << right << qSetFieldWidth(w_i)
 //                 << _magicNumberValid
-//                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+//                 << qSetFieldWidth(0) << left << Console::color(ctReset)
 //                 << " ("
-//                 << shell->color(ctMatched) << qSetFieldWidth(w_f) << right
+//                 << Console::color(ctMatched) << qSetFieldWidth(w_f) << right
 //                 << ((float)_magicNumberValid) * 100.0 / _totalObjects
-//                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+//                 << qSetFieldWidth(0) << left << Console::color(ctReset)
 //                 << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of valid objects w/ magic numbers:"
-                 << right << qSetFieldWidth(0) << shell->color(ctMatched) << qSetFieldWidth(w_i)
+                 << right << qSetFieldWidth(0) << Console::color(ctMatched) << qSetFieldWidth(w_i)
                  << _magicNumberValid_withConst
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctMatched) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctMatched) << qSetFieldWidth(w_f) << right
                  << ((float)_magicNumberValid_withConst) * 100.0 / _totalObjects
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of invalid objects w/ magic numbers:"
-                 << right << qSetFieldWidth(0) << shell->color(ctMissed) << qSetFieldWidth(w_i)
+                 << right << qSetFieldWidth(0) << Console::color(ctMissed) << qSetFieldWidth(w_i)
                  << _magicNumberInvalid
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctMissed) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctMissed) << qSetFieldWidth(w_f) << right
                  << ((float)_magicNumberInvalid) * 100.0 / _totalObjects
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << qSetFieldWidth(w_hdr)
                  << "\t| No. of valid objects not found in slub:"
-                 << right << qSetFieldWidth(0) << shell->color(ctDeferred) << qSetFieldWidth(w_i)
+                 << right << qSetFieldWidth(0) << Console::color(ctDeferred) << qSetFieldWidth(w_i)
                  << _magicNumberValid_notSlub
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << " ("
-                 << shell->color(ctDeferred) << qSetFieldWidth(w_f) << right
+                 << Console::color(ctDeferred) << qSetFieldWidth(w_f) << right
                  << ((float)_magicNumberValid_notSlub) * 100.0 / _totalObjects
-                 << qSetFieldWidth(0) << left << shell->color(ctReset)
+                 << qSetFieldWidth(0) << left << Console::color(ctReset)
                  << "% of " << _totalObjects << ")" << endl
                  << "\t|" << endl;
 
     // Magic number distribution
-    shell->out() << "\t| Valid Distribution:   ";
+    Console::out() << "\t| Valid Distribution:   ";
     for (int i = 0; i < _magicnumberValidDistribution.size(); ++i) {
         if (i > 0)
-            shell->out() << " - ";
-        shell->out() << shell->color(ctMatched)
-                     << _magicnumberValidDistribution[i] << shell->color(ctReset);
+            Console::out() << " - ";
+        Console::out() << Console::color(ctMatched)
+                     << _magicnumberValidDistribution[i] << Console::color(ctReset);
     }
-    shell->out() << endl;
+    Console::out() << endl;
 
-    shell->out() << "\t| Invalid Distribution: ";
+    Console::out() << "\t| Invalid Distribution: ";
     for (int i = 0; i < _magicnumberInvalidDistribution.size(); ++i) {
         if (i > 0)
-            shell->out() << " - ";
-        shell->out() << shell->color(ctMissed)
-                     << _magicnumberInvalidDistribution[i] << shell->color(ctReset);
+            Console::out() << " - ";
+        Console::out() << Console::color(ctMissed)
+                     << _magicnumberInvalidDistribution[i] << Console::color(ctReset);
     }
-    shell->out() << endl;
-    shell->out() << "\t`-----------------------------------------------------------------" << endl;
+    Console::out() << endl;
+    Console::out() << "\t`-----------------------------------------------------------------" << endl;
 
-    shell->out() << endl;
+    Console::out() << endl;
     slubCoverageStats();
 
-    shell->out() << endl;
+    Console::out() << endl;
     typeCountStats();
 
     // Reset manipulators to default
-    shell->out() << qSetFieldWidth(0) << left;
+    Console::out() << qSetFieldWidth(0) << left;
 }
 
 
@@ -1080,7 +1081,7 @@ void MemoryMapVerifier::slubCoverageStats()
     names.sort();
 
     // Find the coverage of slub objects per slub
-    shell->out() << "Slub Coverage details:" << endl;
+    Console::out() << "Slub Coverage details:" << endl;
 
     for (int i = 0; i < names.size(); ++i) {
         int cacheIdx = _slub.indexOfCache(names[i]);
@@ -1090,43 +1091,43 @@ void MemoryMapVerifier::slubCoverageStats()
 
         float percent = _slubObjFoundPerCache[cacheIdx] * 100.0 / (float) cache.objects.size();
 
-        shell->out() << "\t| " << qSetFieldWidth(30) << cache.name
+        Console::out() << "\t| " << qSetFieldWidth(30) << cache.name
                      << qSetFieldWidth(0)
-                     << shell->prettyNameInColor(cache.baseType, 30, 30)
-                     << shell->color(ctReset)
+                     << Console::prettyNameInColor(cache.baseType, 30, 30)
+                     << Console::color(ctReset)
                      << ": " << qSetFieldWidth(4) << right
                      << _slubObjFoundPerCache[cacheIdx] << " of " << cache.objects.size()
                      << qSetFieldWidth(0) << " (";
 
         if (percent < 30)
-            shell->out() << shell->color(ctMissed);
+            Console::out() << Console::color(ctMissed);
         else if (percent < 80)
-            shell->out() << shell->color(ctDeferred);
+            Console::out() << Console::color(ctDeferred);
         else
-            shell->out() << shell->color(ctMatched);
+            Console::out() << Console::color(ctMatched);
 
-        shell->out() << qSetFieldWidth(6) << percent <<  qSetFieldWidth(0)
-                     << shell->color(ctReset) << "%)" << left << endl;
+        Console::out() << qSetFieldWidth(6) << percent <<  qSetFieldWidth(0)
+                     << Console::color(ctReset) << "%)" << left << endl;
     }
-    shell->out() << "\t`-----------------------------------------------------------------" << endl;
+    Console::out() << "\t`-----------------------------------------------------------------" << endl;
 }
 
 
 void MemoryMapVerifier::typeCountStats()
 {
-    shell->out() << "Object Type details:" << endl;
-    shell->out() << "\tAll types:" << endl;
+    Console::out() << "Object Type details:" << endl;
+    Console::out() << "\tAll types:" << endl;
     typeCountStatsHelper(_typeCountAll);
-    shell->out() << "\t|" << endl;
-    shell->out() << "\tValid types:" << endl;
+    Console::out() << "\t|" << endl;
+    Console::out() << "\tValid types:" << endl;
     typeCountStatsHelper(_typeCountValid);
-    shell->out() << "\t|" << endl;
-    shell->out() << "\tInvalid types:" << endl;
+    Console::out() << "\t|" << endl;
+    Console::out() << "\tInvalid types:" << endl;
     typeCountStatsHelper(_typeCountInvalid);
-    shell->out() << "\t|" << endl;
-    shell->out() << "\tTypes with unknown validity:" << endl;
+    Console::out() << "\t|" << endl;
+    Console::out() << "\tTypes with unknown validity:" << endl;
     typeCountStatsHelper(_typeCountUnknown);
-    shell->out() << "\t`-----------------------------------------------------------------" << endl;
+    Console::out() << "\t`-----------------------------------------------------------------" << endl;
 }
 
 
@@ -1177,13 +1178,13 @@ void MemoryMapVerifier::typeCountStatsHelper(QHash<const BaseType *, int> hash) 
             e = topList.end();
     int index = 0;
     quint64 shownCount = 0;
-    shell->out() << "\t| Average object size: " << avgSize << " byte" << endl;
-    shell->out() << "\t| Distinct types:      " << hash.size() << endl;
+    Console::out() << "\t| Average object size: " << avgSize << " byte" << endl;
+    Console::out() << "\t| Distinct types:      " << hash.size() << endl;
     for (; it != e; ++it) {
-        shell->out() << "\t| " << qSetFieldWidth(2) << right << ++index
+        Console::out() << "\t| " << qSetFieldWidth(2) << right << ++index
                      << qSetFieldWidth(0) << ". "
-                     << shell->prettyNameInColor(it->second, 40, 40)
-                     << shell->color(ctReset)
+                     << Console::prettyNameInColor(it->second, 40, 40)
+                     << Console::color(ctReset)
                      << qSetFieldWidth(8) << right << it->first
                      << qSetFieldWidth(0) << " ("
                      << qSetFieldWidth(5) << it->first / (float) count * 100.0
@@ -1194,7 +1195,7 @@ void MemoryMapVerifier::typeCountStatsHelper(QHash<const BaseType *, int> hash) 
         shownCount += it->first;
     }
 
-    shell->out() << "\t| Total shown:                                "
+    Console::out() << "\t| Total shown:                                "
                  << qSetFieldWidth(8) << right << shownCount
                  << qSetFieldWidth(0) << " ("
                  << qSetFieldWidth(5) << shownCount / (float) count * 100.0

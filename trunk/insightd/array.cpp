@@ -10,31 +10,32 @@
 #include "virtualmemoryexception.h"
 #include <debug.h>
 #include "colorpalette.h"
-#include "symfactory.h"
+#include "kernelsymbols.h"
 #include "shellutil.h"
 
-Array::Array(SymFactory* factory)
-    : Pointer(factory), _length(-1)
+Array::Array(KernelSymbols *symbols)
+    : Pointer(symbols), _length(-1)
 {
 }
 
 
-Array::Array(SymFactory *factory, const TypeInfo &info, int boundsIndex)
-    : Pointer(factory, info),  _length(-1)
+Array::Array(KernelSymbols *symbols, const TypeInfo &info, int boundsIndex)
+    : Pointer(symbols, info),  _length(-1)
 {
     if (boundsIndex >= 0 && boundsIndex < info.upperBounds().size()) {
         _length = info.upperBounds().at(boundsIndex) + 1;
+        SymFactory* fac = &symbols->factory();
         // Create a new ID greater than the original one, depending on the
         // boundsIndex. For the first dimension (boundsIndex == 0), the
         // resulting ID must equal info.id()!
-        setId(factory->mapToInternalArrayId(info.origId(), info.fileIndex(),
+        setId(fac->mapToInternalArrayId(info.origId(), info.fileIndex(),
                                             info.id(), boundsIndex));
         // Only the last dimension of an array refers to info.refTypeId()
         if (boundsIndex + 1 < info.upperBounds().size())
-            setRefTypeId(factory->mapToInternalArrayId(info.origId(),
-                                                       info.fileIndex(),
-                                                       info.id(),
-                                                       boundsIndex + 1));
+            setRefTypeId(fac->mapToInternalArrayId(info.origId(),
+                                                   info.fileIndex(),
+                                                   info.id(),
+                                                   boundsIndex + 1));
     }
 }
 

@@ -21,7 +21,7 @@
 #include "refbasetype.h"
 #include "compileunit.h"
 #include "variable.h"
-#include "shell.h"
+#include "console.h"
 #include "memspecs.h"
 #include <debug.h>
 
@@ -336,7 +336,7 @@ void KernelSymbolWriter::write()
     catch (...) {
         // Exceptional cleanup
         operationStopped();
-        shell->out() << endl;
+        Console::out() << endl;
         throw; // Re-throw exception
     }
 

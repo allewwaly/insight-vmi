@@ -9,13 +9,13 @@
 
 #include <assert.h>
 
-VolatileType::VolatileType(SymFactory* factory)
-	: RefBaseType(factory)
+VolatileType::VolatileType(KernelSymbols *symbols)
+	: RefBaseType(symbols)
 {
 }
 
-VolatileType::VolatileType(SymFactory* factory, const TypeInfo& info)
-	: RefBaseType(factory, info)
+VolatileType::VolatileType(KernelSymbols *symbols, const TypeInfo& info)
+	: RefBaseType(symbols, info)
 {
 }
 

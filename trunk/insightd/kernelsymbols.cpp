@@ -24,16 +24,17 @@
 #include "kernelsymbolwriter.h"
 #include "parserexception.h"
 #include "memspecparser.h"
-#include "shell.h"
+#include "console.h"
 #include <debug.h>
 #include <bugreport.h>
 #include "typerulereader.h"
 #include "osfilter.h"
+#include "errorcodes.h"
 
 
 //------------------------------------------------------------------------------
 KernelSymbols::KernelSymbols()
-	: _factory(_memSpecs), _ruleEngine(&_factory)
+	: _factory(this), _ruleEngine(this)
 {
 }
 
@@ -56,7 +57,7 @@ void KernelSymbols::parseSymbols(const QString& kernelSrc, bool kernelOnly)
     MemSpecParser specParser(kernelSrc, systemMap);
 
 	try {
-        shell->out()
+        Console::out()
             << "Parsing memory specifications..." << flush;
 
 	    // Parse the memory specifications
@@ -70,7 +71,7 @@ void KernelSymbols::parseSymbols(const QString& kernelSrc, bool kernelOnly)
         if (m > 0)
             time = QString("%1 min ").arg(m) + time;
 
-	    shell->out()
+	    Console::out()
 			<< "\rSuccessfully parsed the memory specifications in " << time
 			<< "." << endl;
 
@@ -79,27 +80,34 @@ void KernelSymbols::parseSymbols(const QString& kernelSrc, bool kernelOnly)
 	}
 	catch (MemSpecParserException& e) {
 		// Was the error caused during the memspec build process?
-        if (!specParser.errorOutput().isEmpty() && shell->interactive()) {
+		if (!specParser.errorOutput().isEmpty() && Console::interactive()) {
             // Output the error messages
-            shell->err() << endl << "Caught a " << e.className() << " at "
-                         << e.file << ":" << e.line << ": " << e.message
-                         << endl;
+            Console::out() << endl;
+            Console::errMsg(QString("Caught a %0 at %1:%2: %3")
+                            .arg(e.className())
+                            .arg(e.file)
+                            .arg(e.line)
+                            .arg(e.message));
 
             // Ask the user if he wants to keep the build directory
-            QString reply;
-            do {
-                QString prompt = QString("Keep build directory \"%1\"? [Y/n] ")
-                                    .arg(specParser.buildDir());
-                reply = shell->readLine(prompt).toLower();
-                if (reply.isEmpty())
-                    reply = "y";
-            } while (reply != "y" && reply != "n");
-            specParser.setAutoRemoveBuildDir(reply == "n");
+//            QString reply;
+//            do {
+//                QString prompt = QString("Keep build directory \"%1\"? [Y/n] ")
+//                                    .arg(specParser.buildDir());
+//                reply = shell->readLine(prompt).toLower();
+//                if (reply.isEmpty())
+//                    reply = "y";
+//            } while (reply != "y" && reply != "n");
+
+            QString prompt = QString("Keep build directory \"%1\"?")
+                    .arg(specParser.buildDir());
+            if (Console::yesNoQuestion("Confirmation", prompt))
+                specParser.setAutoRemoveBuildDir(false);
         }
         throw;
     }
 
-    KernelSymbolParser symParser(kernelSrc, &_factory);
+    KernelSymbolParser symParser(kernelSrc, this);
 
 	// Parse the debugging symbols
 	symParser.parse(kernelOnly);
@@ -114,7 +122,7 @@ void KernelSymbols::loadSymbols(QIODevice* from)
     _factory.clear();
     _memSpecs = MemSpecs();
 
-    KernelSymbolReader reader(from, &_factory, &_memSpecs);
+    KernelSymbolReader reader(from, this, &this->_memSpecs);
     try {
         QTime timer;
         timer.start();
@@ -122,7 +130,7 @@ void KernelSymbols::loadSymbols(QIODevice* from)
         reader.read();
 
         // Revert everything if operation was interrupted
-        if (shell->interrupted()) {
+        if (Console::interrupted()) {
             _factory.clear();
             return;
         }
@@ -137,19 +145,19 @@ void KernelSymbols::loadSymbols(QIODevice* from)
         if (m > 0)
             time = QString("%1 min ").arg(m) + time;
 
-        shell->out() << "Reading ";
+        Console::out() << "Reading ";
         if (from->pos() > 0)
-            shell->out() << "of " << from->pos() << " bytes ";
-        shell->out() << "finished in " << time;
+            Console::out() << "of " << from->pos() << " bytes ";
+        Console::out() << "finished in " << time;
         if (from->pos() > 0 && duration > 0)
-            shell->out() << " (" << (int)((from->pos() / (float)duration * 1000)) << " byte/s)";
-        shell->out() << "." << endl;
+            Console::out() << " (" << (int)((from->pos() / (float)duration * 1000)) << " byte/s)";
+        Console::out() << "." << endl;
 
 		// Check rules again
 		checkRules();
 	}
     catch (GenericException& e) {
-        shell->err()
+        Console::err()
             << "Caught a " << e.className() << " at " << e.file << ":"
             << endl
             << "Message: " << e.message << endl;
@@ -191,16 +199,16 @@ void KernelSymbols::saveSymbols(QIODevice* to)
         if (m > 0)
             time = QString("%1 min ").arg(m) + time;
 
-        shell->out() << "Writing ";
+        Console::out() << "Writing ";
         if (to->pos() > 0)
-            shell->out() << "of " << to->pos() << " bytes ";
-        shell->out() << "finished in " << time;
+            Console::out() << "of " << to->pos() << " bytes ";
+        Console::out() << "finished in " << time;
         if (to->pos() > 0 && duration > 0)
-            shell->out() << " (" << (int)((to->pos() / (float)duration * 1000)) << " byte/s)";
-        shell->out() << "." << endl;
+            Console::out() << " (" << (int)((to->pos() / (float)duration * 1000)) << " byte/s)";
+        Console::out() << "." << endl;
     }
     catch (GenericException& e) {
-        shell->err()
+        Console::err()
             << "Caught a " << e.className() << " at " << e.file << ":" << e.line
             << endl
             << "Message: " << e.message << endl;
@@ -255,4 +263,72 @@ void KernelSymbols::checkRules(int from)
         Instance::setRuleEngine(&_ruleEngine);
         Variable::setRuleEngine(&_ruleEngine);
     }
+}
+
+
+int KernelSymbols::loadMemDump(const QString &fileName)
+{
+	// Check if any symbols are loaded yet
+	if (!symbolsAvailable())
+		return ecNoSymbolsLoaded;
+
+    // Check file for existence
+    QFile file(fileName);
+    if (!file.exists())
+        return ecFileNotFound;
+
+    // Find an unused index and check if the file is already loaded
+    int index = -1;
+    for (int i = 0; i < _memDumps.size(); ++i) {
+        if (!_memDumps[i] && index < 0)
+            index = i;
+        if (_memDumps[i] && _memDumps[i]->fileName() == fileName)
+            return i;
+    }
+    // Enlarge array, if necessary
+    if (index < 0) {
+        index = _memDumps.size();
+        _memDumps.resize(_memDumps.size() + 1);
+    }
+
+    // Load memory dump
+    _memDumps[index] =
+            new MemoryDump(fileName, this, index);
+
+    return index;
+}
+
+
+int KernelSymbols::unloadMemDump(const QString &indexOrFileName,
+                                 QString *unloadedFile)
+{
+    // Did the user specify an index or a file name?
+    bool isNumeric = false;
+    int index = indexOrFileName.toInt(&isNumeric);
+    // Initialize error codes according to parameter type
+    int ret = isNumeric ? ecInvalidIndex : ecFileNotFound;
+
+    if (isNumeric) {
+        if (index >= 0 && index < _memDumps.size() && _memDumps[index])
+            ret = index;
+    }
+    else {
+        // Not numeric, must have been a file name
+        for (int i = 0; i < _memDumps.size(); ++i) {
+            if (_memDumps[i] && _memDumps[i]->fileName() == indexOrFileName) {
+                ret = i;
+                break;
+            }
+        }
+    }
+
+    if (ret >= 0) {
+        // Finally, delete the memory dump
+        if (unloadedFile)
+            *unloadedFile = _memDumps[ret]->fileName();
+        delete _memDumps[ret];
+        _memDumps[ret] = 0;
+    }
+
+    return ret;
 }

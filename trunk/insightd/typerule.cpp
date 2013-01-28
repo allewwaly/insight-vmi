@@ -13,7 +13,7 @@
 #include "astexpressionevaluator.h"
 #include "symfactory.h"
 #include "memspecs.h"
-#include "shell.h"
+#include "console.h"
 #include "instanceclass.h"
 #include <abstractsyntaxtree.h>
 #include <astbuilder.h>
@@ -98,33 +98,33 @@ QString TypeRule::toString(const ColorPalette *col) const
 
     if (!_name.isEmpty()) {
         s += QString("%1 %2\n")
-                .arg(ShellUtil::colorize("Name:", ctColHead, col))
+                .arg(Console::colorize("Name:", ctColHead, col))
                 .arg(_name);
     }
     if (!_description.isEmpty()) {
         s += QString("%1 %2\n")
-                .arg(ShellUtil::colorize("Description:", ctColHead, col))
+                .arg(Console::colorize("Description:", ctColHead, col))
                 .arg(_description);
     }
     s += QString("%1 %2\n")
-            .arg(ShellUtil::colorize("Priority:", ctColHead, col))
+            .arg(Console::colorize("Priority:", ctColHead, col))
             .arg(_priority);
     if (_osFilter) {
         QString f(_osFilter->toString(col).trimmed());
         f.replace("\n", indent);
-        s += ShellUtil::colorize("OS filter:", ctColHead, col);
+        s += Console::colorize("OS filter:", ctColHead, col);
         s +=  indent + f + "\n";
     }
     if (_filter) {
         QString f(_filter->toString(col).trimmed());
         f.replace("\n", indent);
-        s += ShellUtil::colorize("Type filter:", ctColHead, col);
+        s += Console::colorize("Type filter:", ctColHead, col);
         s +=  indent + f + "\n";
     }
     if (_action) {
         QString a(_action->toString(col).trimmed());
         a.replace("\n", indent);
-        s += ShellUtil::colorize("Action:", ctColHead, col);
+        s += Console::colorize("Action:", ctColHead, col);
         s += indent + a + "\n";
     }
     return s;
@@ -203,17 +203,17 @@ void ScriptAction::warnEvalError(const ScriptEngine *eng,
     // Print errors as warnings
     if (eng && eng->lastEvaluationFailed()) {
         QString file(ShellUtil::shortFileName(fileName));
-        shell->err() << shell->color(ctWarning) << "At "
-                     << shell->color(ctBold) << file
-                     << shell->color(ctWarning);
+        Console::err() << Console::color(ctWarning) << "At "
+                     << Console::color(ctBold) << file
+                     << Console::color(ctWarning);
         if (eng->hasUncaughtException()) {
-            shell->err() << ":"
-                         << shell->color(ctBold)
+            Console::err() << ":"
+                         << Console::color(ctBold)
                          << eng->uncaughtExceptionLineNumber()
-                         << shell->color(ctWarning);
+                         << Console::color(ctWarning);
         }
-        shell->err() << ": " << eng->lastError()
-                     << shell->color(ctReset) << endl;
+        Console::err() << ": " << eng->lastError()
+                     << Console::color(ctReset) << endl;
     }
 }
 
@@ -289,8 +289,8 @@ QString FuncCallScriptAction::toString(const ColorPalette *col) const
     QString file = ShellUtil::shortFileName(_scriptFile);
 
     return QString("Call %1() in file %2")
-            .arg(ShellUtil::colorize(_function, ctBold, col))
-            .arg(ShellUtil::colorize(file, ctBold, col));
+            .arg(Console::colorize(_function, ctBold, col))
+            .arg(Console::colorize(file, ctBold, col));
 }
 
 
@@ -692,7 +692,7 @@ QString ExpressionAction::toString(const ColorPalette *col) const
 {
     QString s;
 
-    s += ShellUtil::colorize("Source type:", ctColHead, col) + " ";
+    s += Console::colorize("Source type:", ctColHead, col) + " ";
     if (_srcType) {
         QString id = QString("0x%1").arg((uint)_srcType->id(), -8, 16);
         if (col)
@@ -704,7 +704,7 @@ QString ExpressionAction::toString(const ColorPalette *col) const
     else
         s += _srcTypeStr;
 
-    s += "\n" + ShellUtil::colorize("Target type:", ctColHead, col) + " ";
+    s += "\n" + Console::colorize("Target type:", ctColHead, col) + " ";
     if (_targetType) {
         QString id = QString("0x%1").arg((uint)_targetType->id(), -8, 16);
         if (col)
@@ -716,7 +716,7 @@ QString ExpressionAction::toString(const ColorPalette *col) const
     else
         s += _targetTypeStr;
 
-    s += "\n" + ShellUtil::colorize("Expression:", ctColHead, col) + "  ";
+    s += "\n" + Console::colorize("Expression:", ctColHead, col) + "  ";
     s += _expr ? _expr->toString() : _exprStr;
     return s;
 }

@@ -87,27 +87,23 @@ class MemoryDump
 public:
     /**
      * Constructor
-     * @param specs the memory and architecture specifications
      * @param mem the memory image to operate on
-     * @param factory the debugging symbols to use for memory interpretation
+     * @param symbols the kernel symbols to use for memory interpretation
      * @param index the index of this memory dump within the array of dumps
      */
-    MemoryDump(const MemSpecs& specs, QIODevice* mem, SymFactory* factory,
-               int index);
+    MemoryDump(QIODevice* mem, KernelSymbols *symbols, int index);
 
     /**
      * This convenience constructor will create a QIODevice for the given file
      * name and operate on that.
-     * @param specs the memory and architecture specifications
      * @param fileName the name of a memory dump file to operate on
-     * @param factory the debugging symbols to use for memory interpretation
+     * @param symbols the kernel symbols to use for memory interpretation
      * @param index the index of this memory dump within the array of dumps
      *
      * @exception FileNotFoundException the file given by \a fileName could not be found
      * @exception IOException error opening the file given by \a fileName
      */
-    MemoryDump(const MemSpecs& specs, const QString& fileName,
-               const SymFactory* factory, int index);
+    MemoryDump(const QString& fileName, KernelSymbols *symbols, int index);
 
     /**
      * Destructor
