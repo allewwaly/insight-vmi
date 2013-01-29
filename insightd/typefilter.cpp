@@ -157,7 +157,8 @@ bool GenericFilter::parseOption(const QString &key, const QString &value,
             for (int j = 1; j <= rtVaList; j <<= 1) {
                 rt = realTypeToStr((RealType)j);
                 if ( (syntax == psLiteral && rt.compare(s, Qt::CaseInsensitive) == 0) ||
-                     (syntax != psLiteral && rx.indexIn(rt) != -1) )
+                     (syntax == psWildcard && rx.exactMatch(rt)) ||
+                     (syntax == psRegExp && rx.indexIn(rt) != -1) )
                     realType |= j;
             }
         }
@@ -523,7 +524,10 @@ bool MemberFilter::match(const StructuredMember *member) const
         return false;
     else {
         QMutexLocker lock(&_regExLock);
-        if (filterActive(Options(ftVarNameWildcard|ftVarNameRegEx)) &&
+        if (filterActive(ftVarNameWildcard) &&
+            !_nameRegEx->exactMatch(member->name()))
+            return false;
+        else if (filterActive(Options(ftVarNameRegEx)) &&
             _nameRegEx->indexIn(member->name()) < 0)
             return false;
     }
