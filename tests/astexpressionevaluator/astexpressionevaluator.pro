@@ -20,6 +20,7 @@ QT -= gui \
 
 # Disable warnings for this project
 CONFIG -= warn_on
+CONFIG += warn_off
 
 CONFIG += qtestlib debug_and_release
 

@@ -171,15 +171,15 @@ void OsfilterTest::parseMinVersion()
     OsFilter filter;
     QVERIFY(filter.minVersion().isEmpty());
 
-    filter.parseOption("minversion", ver.join("."));
+    filter.parseOption("minosversion", ver.join("."));
     QCOMPARE(filter.minVersion(), ver);
     filter.clear();
 
-    filter.parseOption("minversion", ver.join(","));
+    filter.parseOption("minosversion", ver.join(","));
     QCOMPARE(filter.minVersion(), ver);
     filter.clear();
 
-    filter.parseOption("minversion", ver.join("-"));
+    filter.parseOption("minosversion", ver.join("-"));
     QCOMPARE(filter.minVersion(), ver);
     filter.clear();
 }
@@ -204,15 +204,15 @@ void OsfilterTest::parseMaxVersion()
     OsFilter filter;
     QVERIFY(filter.maxVersion().isEmpty());
 
-    filter.parseOption("maxversion", ver.join("."));
+    filter.parseOption("maxosversion", ver.join("."));
     QCOMPARE(filter.maxVersion(), ver);
     filter.clear();
 
-    filter.parseOption("maxversion", ver.join(","));
+    filter.parseOption("maxosversion", ver.join(","));
     QCOMPARE(filter.maxVersion(), ver);
     filter.clear();
 
-    filter.parseOption("maxversion", ver.join("-"));
+    filter.parseOption("maxosversion", ver.join("-"));
     QCOMPARE(filter.maxVersion(), ver);
     filter.clear();
 }
@@ -300,67 +300,67 @@ void OsfilterTest::matchMinVersion()
     OsFilter f;
     OsSpecs s;
 
-    f.parseOption("minversion", "2.6.31");
+    f.parseOption("minosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("minversion", "2.6.31");
+    f.parseOption("minosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("2.6.32");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("minversion", "2.6.31");
+    f.parseOption("minosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("2.7.31");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("minversion", "2.6.31");
+    f.parseOption("minosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("3.6.31");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("minversion", "2.6.31");
+    f.parseOption("minosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31.1");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("minversion", "2.6.31");
+    f.parseOption("minosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31-a");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("minversion", "2.6.31-a");
+    f.parseOption("minosversion", "2.6.31-a");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31-b");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("minversion", "2.6.31-1");
+    f.parseOption("minosversion", "2.6.31-1");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31-b");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("minversion", "02.06.31");
+    f.parseOption("minosversion", "02.06.31");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("minversion", "02.06.031");
+    f.parseOption("minosversion", "02.06.031");
     QVERIFY(f.match(s));
     s.setVersion("2.6.32");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("minversion", "2.6.31-a");
+    f.parseOption("minosversion", "2.6.31-a");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31-b");
     QVERIFY(f.match(s));
@@ -373,67 +373,67 @@ void OsfilterTest::matchMaxVersion()
     OsFilter f;
     OsSpecs s;
 
-    f.parseOption("maxversion", "2.6.31");
+    f.parseOption("maxosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("2.6.32");
     QVERIFY(!f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("maxversion", "2.6.31");
+    f.parseOption("maxosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("maxversion", "2.6.31");
+    f.parseOption("maxosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("2.7.31");
     QVERIFY(!f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("maxversion", "2.6.31");
+    f.parseOption("maxosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("3.6.31");
     QVERIFY(!f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("maxversion", "2.6.31");
+    f.parseOption("maxosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31.1");
     QVERIFY(!f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("maxversion", "2.6.31");
+    f.parseOption("maxosversion", "2.6.31");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31-a");
     QVERIFY(!f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("maxversion", "2.6.31-a");
+    f.parseOption("maxosversion", "2.6.31-a");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31-b");
     QVERIFY(!f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("maxversion", "2.6.31-1");
+    f.parseOption("maxosversion", "2.6.31-1");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31-b");
     QVERIFY(!f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("maxversion", "02.06.31");
+    f.parseOption("maxosversion", "02.06.31");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31");
     QVERIFY(f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("maxversion", "02.06.031");
+    f.parseOption("maxosversion", "02.06.031");
     QVERIFY(f.match(s));
     s.setVersion("2.6.32");
     QVERIFY(!f.match(s));
     f.clear(); s.clear();
 
-    f.parseOption("maxversion", "2.6.31-a");
+    f.parseOption("maxosversion", "2.6.31-a");
     QVERIFY(f.match(s));
     s.setVersion("2.6.31-b");
     QVERIFY(!f.match(s));
@@ -447,8 +447,8 @@ void OsfilterTest::matchAll()
 
     f.setArchitectures(OsSpecs::arX86|OsSpecs::arX86PAE);
     f.setOsFamilies(OsSpecs::ofLinux);
-    f.parseOption("minversion", "2.6.30");
-    f.parseOption("maxversion", "2.6.40");
+    f.parseOption("minosversion", "2.6.30");
+    f.parseOption("maxosversion", "2.6.40");
 
     s.setVersion("2.6.5");
     QVERIFY(!f.match(s));
