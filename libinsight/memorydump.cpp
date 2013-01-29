@@ -630,7 +630,7 @@ QString MemoryDump::dump(const QString& type, quint64 address, int length,
                 if (totalBytesRead % 16 == 0) {
                     if (totalBytesRead > 0) {
                         ret += QString("  |%0|\n").arg(bufstr, -linelen);
-                        memset(bufstr, 0, linelen + 2);
+                        memset(bufstr, 0, linelen + 1);
                         col = 0;
                     }
                     ret += QString("%1 ").arg(address, _specs.sizeofPointer << 1, 16, QChar('0'));
