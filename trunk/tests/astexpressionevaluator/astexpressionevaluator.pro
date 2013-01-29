@@ -5,7 +5,7 @@ ROOT_DIR = ../..
 include($$ROOT_DIR/config.pri)
 
 TEMPLATE = app
-TARGET = astexpressionevaluatortester
+TARGET = test_astexpressionevaluator
 HEADERS += astexpressionevaluatortester.h
 
 SOURCES += astexpressionevaluatortester.cpp
