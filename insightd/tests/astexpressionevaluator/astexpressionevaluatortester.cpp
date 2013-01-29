@@ -258,6 +258,7 @@ void ASTExpressionEvaluatorTester::initTestCase()
 
     _symbols = new KernelSymbols();
     _symbols->setMemSpecs(specs);
+    _specs = &_symbols->memSpecs();
 
     // Create device from object dump above
     QByteArray ba(objdump);
@@ -273,7 +274,7 @@ void ASTExpressionEvaluatorTester::initTestCase()
 void ASTExpressionEvaluatorTester::cleanupTestCase()
 {
     safe_delete(_symbols);
-    safe_delete(_specs);
+    _specs = 0;
 }
 
 
