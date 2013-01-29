@@ -5,7 +5,7 @@ ROOT_DIR = ../..
 include($$ROOT_DIR/config.pri)
 
 TEMPLATE = app
-TARGET = priorityqueuetester
+TARGET = test_priorityqueue
 HEADERS = priorityqueuetester.h ../../priorityqueue.h
 SOURCES = priorityqueuetester.cpp
 QT += core \

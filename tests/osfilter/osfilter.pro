@@ -14,7 +14,7 @@ QT       += core testlib
 
 QT       -= gui
 
-TARGET = tst_osfiltertest
+TARGET = test_osfilter
 CONFIG   += console debug_and_release
 CONFIG   -= app_bundle
 

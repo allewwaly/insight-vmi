@@ -5,7 +5,7 @@ ROOT_DIR = ../..
 include($$ROOT_DIR/config.pri)
 
 TEMPLATE = app
-TARGET = memoryrangetreetester
+TARGET = test_memoryrangetree
 HEADERS = memoryrangetreetester.h ../../memoryrangetree.h
 SOURCES = memoryrangetreetester.cpp
 QT += core \

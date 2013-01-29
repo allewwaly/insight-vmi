@@ -6,7 +6,7 @@ include($$ROOT_DIR/config.pri)
 
 TEMPLATE = app
 
-TARGET = devicemuxertest
+TARGET = test_devicemuxer
 
 QT += core \
     network \

@@ -5,7 +5,7 @@ ROOT_DIR = ../..
 include($$ROOT_DIR/config.pri)
 
 TEMPLATE = app
-TARGET = asttypeevaluator
+TARGET = test_asttypeevaluator
 QT += core \
     testlib
 QT -= gui webkit

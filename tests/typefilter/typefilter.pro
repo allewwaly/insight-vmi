@@ -14,7 +14,7 @@ QT       += core testlib script xml network
 
 QT       -= gui webkit
 
-TARGET = tst_typefiltertest
+TARGET = test_typefilter
 CONFIG   += console debug_and_release
 CONFIG   -= app_bundle
 
