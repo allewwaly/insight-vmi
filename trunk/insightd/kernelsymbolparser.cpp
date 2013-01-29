@@ -17,7 +17,7 @@
 #include "console.h"
 #include "funcparam.h"
 #include "bugreport.h"
-#include "programoptions.h"
+#include "multithreading.h"
 #include <debug.h>
 
 #define parseInt(i, s, pb) \
@@ -706,7 +706,7 @@ void KernelSymbolParser::parse(bool kernelOnly)
 #if defined(DEBUG_SYM_PARSING)
     const int THREAD_COUNT = 1;
 #else
-    const int THREAD_COUNT = programOptions.threadCount();
+    const int THREAD_COUNT = MultiThreading::maxThreads();
 #endif
 
     for (int i = 0; i < THREAD_COUNT; ++i)

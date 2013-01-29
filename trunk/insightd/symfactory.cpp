@@ -26,7 +26,7 @@
 #include "function.h"
 #include "kernelsourcetypeevaluator.h"
 #include "astexpressionevaluator.h"
-#include "programoptions.h"
+#include "multithreading.h"
 #include "kernelsymbols.h"
 #include <string.h>
 #include <asttypeevaluator.h>
@@ -110,7 +110,7 @@ void SymFactory::clear()
 	_varsByName.clear();
 	_varsById.clear();
 	_idRevMapping.clear();
-	_idRevMapping.reserve(programOptions.threadCount());
+	_idRevMapping.reserve(MultiThreading::maxThreads());
 	_origSymFiles.clear();
 
 	// Reset other vars
@@ -3063,7 +3063,7 @@ int SymFactory::mapToInternalId(int fileIndex, int origSymId)
             i = freeIdx;
         // No, so enlarge the vector
         else {
-            if (i == programOptions.threadCount())
+            if (i == MultiThreading::maxThreads())
                 debugmsg("About to create bucket " << (i+1));
             _idRevMapping.resize(i + 1);
         }

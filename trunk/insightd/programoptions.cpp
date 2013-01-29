@@ -13,6 +13,7 @@
 #include <QCoreApplication>
 #include <debug.h>
 #include <QThread>
+#include "multithreading.h"
 
 // Color modes for console output
 #define CM_DARK  "dark"
@@ -131,7 +132,7 @@ const struct Option options[OPTION_COUNT] = {
 //------------------------------------------------------------------------------
 
 ProgramOptions::ProgramOptions()
-    : _action(acNone), _activeOptions(0), _maxThreads(-1)
+    : _action(acNone), _activeOptions(0)
 {
 }
 
@@ -169,15 +170,6 @@ void ProgramOptions::cmdOptionsUsage()
             << "Detailed information on how to use "
             << ProjectInfo::projectName << " can be found online at:" << std::endl
             << ProjectInfo::homePage << std::endl;
-}
-
-
-int ProgramOptions::threadCount() const
-{
-    if (_maxThreads > 0 && _maxThreads < QThread::idealThreadCount())
-        return _maxThreads;
-    else
-        return QThread::idealThreadCount();
 }
 
 
@@ -316,7 +308,11 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
                           << "\"" << std::endl;
                 return false;
             }
-            _maxThreads = threads;
+            if (threads < 1) {
+                std::cerr << "The number of threads must be 1 or greater." << std::endl;
+                return false;
+            }
+            MultiThreading::setMaxThreads(threads);
         }
         }
     }

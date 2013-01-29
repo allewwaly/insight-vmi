@@ -161,24 +161,6 @@ public:
         _ruleFiles = ruleFiles;
     }
 
-    /**
-     * Returns the maximum number of allowed threads for parallel processing.
-     * @return
-     */
-    inline int maxThreads() const { return _maxThreads; }
-
-    /**
-     * Sets the maximum number of allowed threads for parallel processing.
-     * @param threads max. no. of threads
-     */
-    void setMaxThreads(int threads) { _maxThreads = threads; }
-
-    /**
-     * Returns the no. of threads to be used for parallel processing.
-     * @return
-     */
-    int threadCount() const;
-
 private:
     QString _inFileName;
     QStringList _memFileNames;
@@ -186,7 +168,6 @@ private:
     int _activeOptions;
     QString _rulesAutoDir;
     QStringList _ruleFiles;
-    int _maxThreads;
 };
 
 /// Global options instance

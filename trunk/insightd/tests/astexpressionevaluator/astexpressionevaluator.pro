@@ -50,11 +50,9 @@ HEADERS += astexpressionevaluatortester.h \
     ../../numeric.h \
     ../../parserexception.h \
     ../../pointer.h \
-    ../../programoptions.h \
     ../../refbasetype.h \
     ../../referencingtype.h \
     ../../scriptengine.h \
-    ../../shell.h \
     ../../shellutil.h \
     ../../slubobjects.h \
     ../../sourceref.h \
@@ -114,16 +112,14 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../memorymapverifier.cpp \
     ../../memspecparser.cpp \
     ../../memspecs.cpp \
+    ../../multithreading.cpp \
     ../../numeric.cpp \
     ../../osfilter.cpp \
     ../../pointer.cpp \
-    ../../programoptions.cpp \
     ../../refbasetype.cpp \
     ../../referencingtype.cpp \
     ../../scriptengine.cpp \
-    ../../shell.cpp \
     ../../shellutil.cpp \
-    ../../shell_readline.cpp \
     ../../slubobjects.cpp \
     ../../sourceref.cpp \
     ../../structured.cpp \
