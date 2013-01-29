@@ -1,5 +1,6 @@
 SUBDIRS += \
     asttypeevaluator \
+    astexpressionevaluator \
     osfilter \
     typefilter
 TEMPLATE = subdirs
