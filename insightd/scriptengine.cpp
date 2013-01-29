@@ -359,9 +359,10 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
 
     // Get the instance
     try {
+        KnowledgeSources src = this_eng->_instClass->knowledgeSources();
 		Instance instance = queryStr.isNull() ?
-				memDumps[index]->queryInstance(queryId) :
-				memDumps[index]->queryInstance(queryStr);
+				memDumps[index]->queryInstance(queryId, src) :
+				memDumps[index]->queryInstance(queryStr, src);
 
 		if (!instance.isValid())
 			return QScriptValue();
