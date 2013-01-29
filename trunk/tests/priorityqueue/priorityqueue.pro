@@ -1,5 +1,5 @@
 # Root directory of project
-ROOT_DIR = ../../..
+ROOT_DIR = ../..
 
 # Global configuration file
 include($$ROOT_DIR/config.pri)
@@ -15,6 +15,5 @@ CONFIG += qtestlib debug_and_release
 
 INCLUDEPATH += $$ROOT_DIR/libinsight/include \
     $$ROOT_DIR/libdebug/include
-
 
 LIBS += -L$$ROOT_DIR/libinsight$$BUILD_DIR -l$$INSIGHT_LIB
