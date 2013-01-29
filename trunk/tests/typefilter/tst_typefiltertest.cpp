@@ -976,9 +976,9 @@ void TypeFilterTest::setMembers()
     TEST_SET_MEMBER1(QString(), Filter::psAny, true, true);
 
     TEST_SET_MEMBER2("?", Filter::psWildcard, "l", Filter::psLiteral, false, true);
-    TEST_SET_MEMBER2("??", Filter::psWildcard, "l", Filter::psLiteral, false, false);
+    TEST_SET_MEMBER2("??", Filter::psWildcard, "l", Filter::psLiteral, false, true);
     TEST_SET_MEMBER2("?", Filter::psWildcard, "x?i", Filter::psRegExp, false, true);
-    TEST_SET_MEMBER2("??", Filter::psWildcard, "p?a", Filter::psRegExp, false, false);
+    TEST_SET_MEMBER2("??", Filter::psWildcard, "p?a", Filter::psRegExp, false, true);
     TEST_SET_MEMBER2("^a?$", Filter::psRegExp, "^.*i$", Filter::psRegExp, false, true);
     TEST_SET_MEMBER2("^$", Filter::psRegExp, "nested_*", Filter::psWildcard, false, true);
 
