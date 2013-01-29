@@ -75,7 +75,6 @@ Q_DECLARE_METATYPE(QAbstractSocket::SocketError)
 
 Shell* shell = 0;
 
-MemDumpArray Shell::_memDumps;
 KernelSymbols Shell::_sym;
 //QFile Shell::_stdin;
 //QFile Shell::_stdout;
@@ -1691,7 +1690,7 @@ BaseTypeList Shell::typeIdOrName(QString s) const
 
 bool Shell::isRevmapReady(int index) const
 {
-    if (!_memDumps[index]->map() || _memDumps[index]->map()->vmemMap().isEmpty())
+    if (!_sym.memDumps().at(index)->map() || _sym.memDumps().at(index)->map()->vmemMap().isEmpty())
     {
         Console::err() << "The memory mapping has not yet been build for memory dump "
                 << index << ". Try \"help memory\" to learn how to build it."
@@ -1996,7 +1995,7 @@ int Shell::parseMemDumpIndex(QStringList &args, int skip, bool quiet)
     if (ok) {
         args.pop_front();
         // Check the bounds
-        if (index < 0 || index >= _memDumps.size() || !_memDumps[index]) {
+        if (index < 0 || index >= _sym.memDumps().size() || !_sym.memDumps().at(index)) {
             if (!quiet)
                 Console::errMsg(QString("Memory dump index %1 does not exist.").arg(index));
             return ecInvalidIndex;
@@ -2005,8 +2004,8 @@ int Shell::parseMemDumpIndex(QStringList &args, int skip, bool quiet)
     // Otherwise use the first valid index
     else {
     	index = -1;
-        for (int i = 0; i < _memDumps.size() && index < 0; ++i)
-            if (_memDumps[i] && skip-- <= 0)
+        for (int i = 0; i < _sym.memDumps().size() && index < 0; ++i)
+            if (_sym.memDumps().at(i) && skip-- <= 0)
                 return i;
     }
     // No memory dumps loaded at all?
@@ -2041,7 +2040,7 @@ int Shell::cmdMemoryLoad(QStringList args)
             Console::errMsg(QString("An unknown error occurred (error code %1)")
                    .arg(ret));
         else
-            Console::out() << "Loaded [" << ret << "] " << _memDumps[ret]->fileName()
+            Console::out() << "Loaded [" << ret << "] " << _sym.memDumps().at(ret)->fileName()
                 << endl;
         break;
     }
@@ -2116,9 +2115,9 @@ int Shell::cmdMemoryUnload(QStringList args)
 int Shell::cmdMemoryList(QStringList /*args*/)
 {
     QString out;
-    for (int i = 0; i < _memDumps.size(); ++i) {
-        if (_memDumps[i])
-            out += QString("  [%1] %2\n").arg(i).arg(_memDumps[i]->fileName());
+    for (int i = 0; i < _sym.memDumps().size(); ++i) {
+        if (_sym.memDumps().at(i))
+            out += QString("  [%1] %2\n").arg(i).arg(_sym.memDumps().at(i)->fileName());
     }
 
     if (out.isEmpty())
@@ -2135,7 +2134,7 @@ int Shell::cmdMemorySpecs(QStringList args)
     int index = parseMemDumpIndex(args);
     // Output the specs
     if (index >= 0) {
-        Console::out() << _memDumps[index]->memSpecs().toString() << endl;
+        Console::out() << _sym.memDumps().at(index)->memSpecs().toString() << endl;
         return ecOk;
     }
 
@@ -2149,7 +2148,7 @@ int Shell::cmdMemoryQuery(QStringList args)
     int index = parseMemDumpIndex(args);
     // Perform the query
     if (index >= 0) {
-        Console::out() << _memDumps[index]->query(args.join(" "), Console::colors()) << endl;
+        Console::out() << _sym.memDumps().at(index)->query(args.join(" "), Console::colors()) << endl;
 		return ecOk;
     }
     return 1;
@@ -2165,11 +2164,11 @@ int Shell::cmdMemoryVerify(QStringList args)
 
         if (!args.isEmpty() && (args[0] == "-l" || args[0] == "--load")) {
             args.pop_front();
-            _memDumps[index]->loadSlubFile(args.isEmpty() ? QString() : args[0]);
+            _sym.memDumps().at(index)->loadSlubFile(args.isEmpty() ? QString() : args[0]);
             return ecOk;
         }
         else {
-            Instance inst = _memDumps[index]->queryInstance(args.join(" "));
+            Instance inst = _sym.memDumps().at(index)->queryInstance(args.join(" "));
             if (!inst.isValid()) {
                 Console::out() << "The query did not retrieve a valid instance." << endl;
                 return ecOk;
@@ -2185,12 +2184,12 @@ int Shell::cmdMemoryVerify(QStringList args)
 
             // Verify against SLUB objects
             Console::out() << "SLUB caches:   ";
-            if (_memDumps[index]->slubs().numberOfObjects() <= 0) {
+            if (_sym.memDumps().at(index)->slubs().numberOfObjects() <= 0) {
                 Console::out() << "No slub file loaded for memory dump " << index << "."
                      << endl;
             }
             else {
-                SlubObjects::ObjectValidity v = _memDumps[index]->validate(&inst);
+                SlubObjects::ObjectValidity v = _sym.memDumps().at(index)->validate(&inst);
                 Console::out() << "instance is " << Console::color(ctBold);
 
                 switch(v) {
@@ -2275,7 +2274,7 @@ int Shell::cmdMemoryDump(QStringList args)
         if (!ok)
             Console::errMsg("Invalid address: " + re.cap(3));
 
-        Console::out() << _memDumps[index]->dump(re.cap(1).trimmed(), addr, length, Console::colors()) << endl;
+        Console::out() << _sym.memDumps().at(index)->dump(re.cap(1).trimmed(), addr, length, Console::colors()) << endl;
         return ecOk;
     }
 
@@ -2372,7 +2371,7 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
         }
     }
 
-    _memDumps[index]->setupRevMap(type, prob, slubFile);
+    _sym.memDumps().at(index)->setupRevMap(type, prob, slubFile);
 
     int elapsed = timer.elapsed();
     int min = (elapsed / 1000) / 60;
@@ -2413,7 +2412,7 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
     }
 
     for (int i = 0; i < types.size(); ++i)
-        nodes += _memDumps[index]->map()->nodesOfType(types[i]->id());
+        nodes += _sym.memDumps().at(index)->map()->nodesOfType(types[i]->id());
 
     if (nodes.isEmpty()) {
         Console::out() << "No instances of that type within the memory map." << endl;
@@ -2424,7 +2423,7 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
     qSort(nodes.begin(), nodes.end(), cmdAddrLessThan);
 
     const int w_sep = 2;
-    const int w_addr = 2 + (_memDumps[index]->memSpecs().sizeofPointer << 1);
+    const int w_addr = 2 + (_sym.memDumps().at(index)->memSpecs().sizeofPointer << 1);
     const int w_prob = 4;
     const int w_slub = 3;
     const int w_total = 3 * ShellUtil::termSize().width();
@@ -2532,7 +2531,7 @@ int Shell::cmdMemoryRevmapDump(int index, QStringList args)
         } while (reply != "y");
     }
 
-    _memDumps[index]->map()->dump(fileName);
+    _sym.memDumps().at(index)->map()->dump(fileName);
     return ecOk;
 }
 
@@ -2566,10 +2565,10 @@ int Shell::cmdMemoryRevmapDumpInit(int index, QStringList args)
             return 1;
         }
 
-        _memDumps[index]->map()->dumpInit(fileName, level);
+        _sym.memDumps().at(index)->map()->dumpInit(fileName, level);
     }
     else
-        _memDumps[index]->map()->dumpInit(fileName);
+        _sym.memDumps().at(index)->map()->dumpInit(fileName);
 
     return ecOk;
 }
@@ -2584,11 +2583,11 @@ int Shell::cmdMemoryRevmapVisualize(int index, QString type)
 
     int ret = 0;
     /*if (QString("physical").startsWith(type) || QString("pmem").startsWith(type))
-        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->pmemMap(),
-                                          _memDumps[index]->memSpecs());
+        memMapWindow->mapWidget()->setMap(&_sym.memDumps().at(index)->map()->pmemMap(),
+                                          _sym.memDumps().at(index)->memSpecs());
     else*/ if (QString("virtual").startsWith(type) || QString("vmem").startsWith(type))
-        memMapWindow->mapWidget()->setMap(&_memDumps[index]->map()->vmemMap(),
-                                          _memDumps[index]->memSpecs());
+        memMapWindow->mapWidget()->setMap(&_sym.memDumps().at(index)->map()->vmemMap(),
+                                          _sym.memDumps().at(index)->memSpecs());
     else {
         cmdHelp(QStringList("memory"));
         ret = 1;
@@ -2640,7 +2639,7 @@ int Shell::cmdMemoryDiffBuild(int index1, int index2)
 {
     QTime timer;
     timer.start();
-    _memDumps[index1]->setupDiff(_memDumps[index2]);
+    _sym.memDumps().at(index1)->setupDiff(_sym.memDumps().at(index2));
     int elapsed = timer.elapsed();
     int min = (elapsed / 1000) / 60;
     int sec = (elapsed / 1000) % 60;
@@ -2664,7 +2663,7 @@ int Shell::cmdMemoryDiffVisualize(int index)
     if (!isRevmapReady(index))
         return ecOk;
 
-    if (!_memDumps[index]->map() || _memDumps[index]->map()->pmemDiff().isEmpty())
+    if (!_sym.memDumps().at(index)->map() || _sym.memDumps().at(index)->map()->pmemDiff().isEmpty())
     {
         Console::err() << "The memory dump has not yet been compared to another dump "
              << index << ". Try \"help memory\" to learn how to compare them."
@@ -2672,7 +2671,7 @@ int Shell::cmdMemoryDiffVisualize(int index)
         return 1;
     }
 
-    memMapWindow->mapWidget()->setDiff(&_memDumps[index]->map()->pmemDiff());
+    memMapWindow->mapWidget()->setDiff(&_sym.memDumps().at(index)->map()->pmemDiff());
 
     if (!QMetaObject::invokeMethod(memMapWindow, "show", Qt::QueuedConnection))
         debugerr("Error invoking show() on memMapWindow");
@@ -4084,12 +4083,12 @@ int Shell::cmdBinary(QStringList args)
 int Shell::cmdBinaryMemDumpList(QStringList /*args*/)
 {
     QStringList files;
-    for (int i = 0; i < _memDumps.size(); ++i) {
-        if (_memDumps[i]) {
+    for (int i = 0; i < _sym.memDumps().size(); ++i) {
+        if (_sym.memDumps().at(i)) {
             // Eventually pad the list with null strings
             while (files.size() < i)
                 files.append(QString());
-            files.append(_memDumps[i]->fileName());
+            files.append(_sym.memDumps().at(i)->fileName());
         }
     }
     _bin << files;
@@ -4232,14 +4231,14 @@ int Shell::cmdDiffVectors(QStringList args)
             printTimeStamp(timer);
             Console::out() << "Building reverse map for dump [" << j << "], "
                  << "min. probability " << minProb << endl;
-            _memDumps[j]->setupRevMap(minProb);
+            _sym.memDumps().at(j)->setupRevMap(minProb);
         }
 
         // Compare to previous dump
         if (!Console::interrupted()) {
             printTimeStamp(timer);
             Console::out() << "Comparing dump [" << prevj << "] to [" << j << "]" << endl;
-            _memDumps[j]->setupDiff(_memDumps[prevj]);
+            _sym.memDumps().at(j)->setupDiff(_sym.memDumps().at(prevj));
         }
 
         if (!Console::interrupted()) {
@@ -4250,9 +4249,9 @@ int Shell::cmdDiffVectors(QStringList args)
             changedTypes[i].fill(0, typeIds.size());
 
             // Iterate over all changes
-            const MemoryDiffTree& diff = _memDumps[j]->map()->pmemDiff();
-            const PhysMemoryMapRangeTree& currPMemMap = _memDumps[j]->map()->pmemMap();
-            const MemoryMapRangeTree& prevVMemMap = _memDumps[prevj]->map()->vmemMap();
+            const MemoryDiffTree& diff = _sym.memDumps().at(j)->map()->pmemDiff();
+            const PhysMemoryMapRangeTree& currPMemMap = _sym.memDumps().at(j)->map()->pmemMap();
+            const MemoryMapRangeTree& prevVMemMap = _sym.memDumps().at(prevj)->map()->vmemMap();
             for (MemoryDiffTree::const_iterator it = diff.constBegin();
                     it != diff.constEnd() && !Console::interrupted(); ++it)
             {
@@ -4275,12 +4274,12 @@ int Shell::cmdDiffVectors(QStringList args)
 
                         if (cnode->type()->id() == pnode->type()->id()) {
                             // Read in the data for the current node
-                            _memDumps[j]->vmem()->seek(cnode->address());
-                            int cret = _memDumps[j]->vmem()->read(cbuf, cnode->size());
+                            _sym.memDumps().at(j)->vmem()->seek(cnode->address());
+                            int cret = _sym.memDumps().at(j)->vmem()->read(cbuf, cnode->size());
                             assert((quint32)cret == cnode->size());
                             // Read in the data for the previous node
-                            _memDumps[prevj]->vmem()->seek(pnode->address());
-                            int pret = _memDumps[prevj]->vmem()->read(pbuf, pnode->size());
+                            _sym.memDumps().at(prevj)->vmem()->seek(pnode->address());
+                            int pret = _sym.memDumps().at(prevj)->vmem()->read(pbuf, pnode->size());
                             assert((quint32)pret == pnode->size());
                             // Compare memory
                             if (memcmp(cbuf, pbuf, cnode->size()) != 0) {
@@ -4303,7 +4302,7 @@ int Shell::cmdDiffVectors(QStringList args)
         }
 
         // Free unneeded memory
-        _memDumps[prevj]->map()->clear();
+        _sym.memDumps().at(prevj)->map()->clear();
 
         prevj = j;
     }
@@ -4333,7 +4332,7 @@ int Shell::cmdDiffVectors(QStringList args)
 //        return 2;
 //    }
 
-//    Instance inst = _memDumps[index]->queryInstance(args[0]);
+//    Instance inst = _sym.memDumps().at(index)->queryInstance(args[0]);
 //    // TO DO implement me
 //}
 
