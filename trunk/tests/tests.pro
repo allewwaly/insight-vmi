@@ -1,6 +1,7 @@
 SUBDIRS += \
     asttypeevaluator \
     astexpressionevaluator \
+    devicemuxer \
     memoryrangetree \
     osfilter \
     priorityqueue \
