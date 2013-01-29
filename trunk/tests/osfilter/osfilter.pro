@@ -4,8 +4,11 @@
 #
 #-------------------------------------------------
 
+# Root directory of project
+ROOT_DIR = ../..
+
 # Global configuration file
-include(../../config.pri)
+include($$ROOT_DIR/config.pri)
 
 QT       += core testlib
 
@@ -17,8 +20,7 @@ CONFIG   -= app_bundle
 
 TEMPLATE = app
 
-DEFINES += SRCDIR=\\\"$$PWD/\\\"
-ROOT_DIR = ../..
+#DEFINES += SRCDIR=\\\"$$PWD/\\\"
 
 INCLUDEPATH += $$ROOT_DIR/insightd \
     $$ROOT_DIR/libdebug/include \

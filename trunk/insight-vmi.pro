@@ -8,4 +8,4 @@ CONFIG += debug_and_release \
           ordered
 
 # Build tests, if requested
-CONFIG(tests): SUBDIRS += tests libcparser/tests insightd/tests
+CONFIG(tests): SUBDIRS += tests

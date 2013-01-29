@@ -1,4 +1,6 @@
-SUBDIRS += osfilter \
+SUBDIRS += \
+    asttypeevaluator \
+    osfilter \
     typefilter
 TEMPLATE = subdirs
 CONFIG += debug_and_release

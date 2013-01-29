@@ -4,8 +4,11 @@
 #
 #-------------------------------------------------
 
+# Root directory of project
+ROOT_DIR = ../..
+
 # Global configuration file
-include(../../config.pri)
+include($$ROOT_DIR/config.pri)
 
 QT       += core testlib script xml network
 
@@ -19,9 +22,8 @@ TEMPLATE = app
 
 
 #DEFINES += SRCDIR=\\\"$$PWD/\\\"
-ROOT_DIR = ../..
 
-INCLUDEPATH += $$ROOT_DIR/insightd \
+INCLUDEPATH += \
     $$ROOT_DIR/libdebug/include \
     $$ROOT_DIR/libcparser/include \
     $$ROOT_DIR/libcparser/antlr_generated \
@@ -32,12 +34,6 @@ LIBS += -L$$ROOT_DIR/libcparser$$BUILD_DIR -l$$CPARSER_LIB \
         -L$$ROOT_DIR/libdebug$$BUILD_DIR -l$$DEBUG_LIB \
         -L$$ROOT_DIR/libantlr3c$$BUILD_DIR -l$$ANTLR_LIB \
         -L$$ROOT_DIR/libinsight$$BUILD_DIR -l$$INSIGHT_LIB
-
-# Enable or disable libreadline support
-CONFIG(with_readline) {
-    DEFINES += CONFIG_READLINE
-    LIBS += -lreadline
-}
 
 SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/altreftyperulewriter.cpp \

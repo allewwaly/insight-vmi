@@ -8,7 +8,7 @@
 #ifndef ASTTYPEEVALUATORTEST_H_
 #define ASTTYPEEVALUATORTEST_H_
 
-#include <C.h>
+//#include <C.h>
 #include <QObject>
 #include <QByteArray>
 #include <QTextStream>
