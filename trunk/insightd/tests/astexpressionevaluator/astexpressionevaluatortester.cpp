@@ -9,7 +9,7 @@
 #include "../../astexpressionevaluator.h"
 #include "../../kernelsymbolparser.h"
 #include "../../kernelsourcetypeevaluator.h"
-#include "../../shell.h"
+#include "../../kernelsymbols.h"
 
 #define safe_delete(x) \
     do { if ((x)) { delete (x); (x) = 0; } } while (0)
@@ -237,27 +237,27 @@ protected:
     }
 
 private:
-    SymFactory* _factory;
+//    KernelSymbols* _symbols;
     ASTExpressionEvaluator _expr;
 };
 
 
 ASTExpressionEvaluatorTester::ASTExpressionEvaluatorTester(QObject *parent) :
-    QObject(parent), _specs(0), _factory(0), _eval(0), _tester(0), _ast(0),
+    QObject(parent), _specs(0), _symbols(0), _eval(0), _tester(0), _ast(0),
     _builder(0)
 {
-    shell = new Shell(false);
 }
 
 
 void ASTExpressionEvaluatorTester::initTestCase()
 {
-    _specs = new MemSpecs();
-    _specs->arch = MemSpecs::ar_x86_64;
-    _specs->sizeofPointer = 8;
-    _specs->sizeofLong = 8;
+    MemSpecs specs;
+    specs.arch = MemSpecs::ar_x86_64;
+    specs.sizeofPointer = 8;
+    specs.sizeofLong = 8;
 
-    _factory = new SymFactory(*_specs);
+    _symbols = new KernelSymbols();
+    _symbols->setMemSpecs(specs);
 
     // Create device from object dump above
     QByteArray ba(objdump);
@@ -265,14 +265,14 @@ void ASTExpressionEvaluatorTester::initTestCase()
     buf.open(QIODevice::ReadOnly);
 
     // Parse the object dump
-    KernelSymbolParser parser(_factory);
+    KernelSymbolParser parser(_symbols);
     parser.parse(&buf);
 }
 
 
 void ASTExpressionEvaluatorTester::cleanupTestCase()
 {
-    safe_delete(_factory);
+    safe_delete(_symbols);
     safe_delete(_specs);
 }
 
@@ -281,8 +281,8 @@ void ASTExpressionEvaluatorTester::init()
 {
     _ast = new AbstractSyntaxTree();
     _builder = new ASTBuilder(_ast);
-    _eval = new KernelSourceTypeEvaluator(_ast, _factory);
-    _tester = new ASTExpressionTester(_ast, _factory, _eval);
+    _eval = new KernelSourceTypeEvaluator(_ast, &_symbols->factory());
+    _tester = new ASTExpressionTester(_ast, &_symbols->factory(), _eval);
 }
 
 

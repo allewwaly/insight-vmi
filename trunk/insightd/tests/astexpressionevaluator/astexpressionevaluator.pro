@@ -80,6 +80,7 @@ SOURCES += astexpressionevaluatortester.cpp \
     ../../basetype.cpp \
     ../../colorpalette.cpp \
     ../../compileunit.cpp \
+    ../../console.cpp \
     ../../consttype.cpp \
     ../../enum.cpp \
     ../../expressionresult.cpp \

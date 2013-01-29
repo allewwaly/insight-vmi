@@ -48,6 +48,7 @@ SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/basetype.cpp \
     $$ROOT_DIR/insightd/colorpalette.cpp \
     $$ROOT_DIR/insightd/compileunit.cpp \
+    $$ROOT_DIR/insightd/console.cpp \
     $$ROOT_DIR/insightd/consttype.cpp \
     $$ROOT_DIR/insightd/enum.cpp \
     $$ROOT_DIR/insightd/expressionresult.cpp \

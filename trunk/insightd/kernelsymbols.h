@@ -110,6 +110,12 @@ public:
     const MemSpecs& memSpecs() const;
 
     /**
+     * Sets the memory specifications for the symbols.
+     * @param specs
+     */
+    void setMemSpecs(const MemSpecs& specs);
+
+    /**
      * Returns the rules engine.
      */
     TypeRuleEngine& ruleEngine();
@@ -190,6 +196,12 @@ inline const SymFactory& KernelSymbols::factory() const
 inline const MemSpecs&  KernelSymbols::memSpecs() const
 {
     return _memSpecs;
+}
+
+
+inline void KernelSymbols::setMemSpecs(const MemSpecs &specs)
+{
+    _memSpecs = specs;
 }
 
 

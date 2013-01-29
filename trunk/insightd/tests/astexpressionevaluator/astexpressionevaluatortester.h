@@ -8,7 +8,7 @@
 
 
 class MemSpecs;
-class SymFactory;
+class KernelSymbols;
 class KernelSourceTypeEvaluator;
 class ASTExpressionTester;
 class AbstractSyntaxTree;
@@ -69,7 +69,7 @@ private:
     ExprResultSizes exprSize(T x) const;
 
     MemSpecs* _specs;
-    SymFactory* _factory;
+    KernelSymbols* _symbols;
     KernelSourceTypeEvaluator* _eval;
     ASTExpressionTester* _tester;
     AbstractSyntaxTree* _ast;
