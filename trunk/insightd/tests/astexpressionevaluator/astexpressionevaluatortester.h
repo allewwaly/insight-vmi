@@ -68,7 +68,7 @@ private:
     template <class T>
     ExprResultSizes exprSize(T x) const;
 
-    MemSpecs* _specs;
+    const MemSpecs* _specs;
     KernelSymbols* _symbols;
     KernelSourceTypeEvaluator* _eval;
     ASTExpressionTester* _tester;
