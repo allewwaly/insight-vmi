@@ -20,9 +20,9 @@
 #include <QTextCursor>
 #include <QTextTable>
 #include <math.h>
-#include "memorymaprangetree.h"
-#include "virtualmemory.h"
-#include "varsetter.h"
+#include <insight/memorymaprangetree.h>
+#include <insight/virtualmemory.h>
+#include <insight/varsetter.h>
 #include <debug.h>
 
 static const int margin = 3;

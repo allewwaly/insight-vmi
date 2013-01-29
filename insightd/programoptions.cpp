@@ -13,7 +13,7 @@
 #include <QCoreApplication>
 #include <debug.h>
 #include <QThread>
-#include "multithreading.h"
+#include <insight/multithreading.h>
 
 // Color modes for console output
 #define CM_DARK  "dark"

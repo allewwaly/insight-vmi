@@ -8,7 +8,7 @@
 #ifndef KERNELSOURCEPARSER_H_
 #define KERNELSOURCEPARSER_H_
 
-#include "longoperation.h"
+#include <insight/longoperation.h>
 #include <QString>
 #include <QDir>
 #include <QThread>

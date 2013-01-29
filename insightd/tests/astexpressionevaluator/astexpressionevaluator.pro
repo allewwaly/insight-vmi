@@ -70,74 +70,6 @@ HEADERS += astexpressionevaluatortester.h \
     ../../volatiletype.h
 
 SOURCES += astexpressionevaluatortester.cpp \
-    ../../altreftype.cpp \
-    ../../altreftyperulewriter.cpp \
-    ../../array.cpp \
-    ../../astexpression.cpp \
-    ../../astexpressionevaluator.cpp \
-    ../../basetype.cpp \
-    ../../colorpalette.cpp \
-    ../../compileunit.cpp \
-    ../../console.cpp \
-    ../../consttype.cpp \
-    ../../enum.cpp \
-    ../../expressionresult.cpp \
-    ../../funcparam.cpp \
-    ../../funcpointer.cpp \
-    ../../function.cpp \
-    ../../instanceclass.cpp \
-    ../../instance.cpp \
-    ../../instancedata.cpp \
-    ../../instanceprototype.cpp \
-    ../../kernelsourceparser.cpp \
-    ../../kernelsourcetypeevaluator.cpp \
-    ../../kernelsymbolparser.cpp \
-    ../../kernelsymbolreader.cpp \
-    ../../kernelsymbolsclass.cpp \
-    ../../kernelsymbols.cpp \
-    ../../kernelsymbolstream.cpp \
-    ../../kernelsymbolwriter.cpp \
-    ../../longoperation.cpp \
-    ../../memorydifftree.cpp \
-    ../../memorydump.cpp \
-    ../../memorydumpsclass.cpp \
-    ../../memorymapbuilder.cpp \
-    ../../memorymapbuildercs.cpp \
-    ../../memorymapbuildersv.cpp \
-    ../../memorymap.cpp \
-    ../../memorymapheuristics.cpp \
-    ../../memorymapnode.cpp \
-    ../../memorymapnodesv.cpp \
-    ../../memorymaprangetree.cpp \
-    ../../memorymapverifier.cpp \
-    ../../memspecparser.cpp \
-    ../../memspecs.cpp \
-    ../../multithreading.cpp \
-    ../../numeric.cpp \
-    ../../osfilter.cpp \
-    ../../pointer.cpp \
-    ../../refbasetype.cpp \
-    ../../referencingtype.cpp \
-    ../../scriptengine.cpp \
-    ../../shellutil.cpp \
-    ../../slubobjects.cpp \
-    ../../sourceref.cpp \
-    ../../structured.cpp \
-    ../../structuredmember.cpp \
-    ../../symbol.cpp \
-    ../../symfactory.cpp \
-    ../../typedef.cpp \
-    ../../typefilter.cpp \
-    ../../typeinfo.cpp \
-    ../../typerule.cpp \
-    ../../typeruleengine.cpp \
-    ../../typeruleenginecontextprovider.cpp \
-    ../../typeruleparser.cpp \
-    ../../typerulereader.cpp \
-    ../../variable.cpp \
-    ../../virtualmemory.cpp \
-    ../../volatiletype.cpp \
-    ../../xmlschema.cpp
 
 QT += core \
     script \
@@ -147,24 +79,19 @@ QT += core \
 QT -= gui \
     webkit
 
+# Disable warnings for this project
+CONFIG -= warn_on
+
 CONFIG += qtestlib debug_and_release
+
 INCLUDEPATH += ../../src \
 	../../../libdebug/include \
 	../../../libcparser/include \
 	../../../libcparser/antlr_generated \
-        ../../../libantlr3c/include \
-        ../../../libinsight/include
+    ../../../libantlr3c/include \
+    ../../../libinsight/include
+
 LIBS += -L../../../libcparser$$BUILD_DIR -l$$CPARSER_LIB \
         -L../../../libdebug$$BUILD_DIR -l$$DEBUG_LIB \
         -L../../../libantlr3c$$BUILD_DIR -l$$ANTLR_LIB \
         -L../../../libinsight$$BUILD_DIR -l$$INSIGHT_LIB
-
-QMAKE_CXXFLAGS_DEBUG += -w
-QMAKE_CXXFLAGS_RELEASE += -w
-
-
-# Enable or disable libreadline support
-CONFIG(with_readline) {
-    DEFINES += CONFIG_READLINE
-    LIBS += -lreadline
-}

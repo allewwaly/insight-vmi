@@ -106,9 +106,9 @@
 #include <insight/constdefs.h>
 
 #include <debug.h>
-#include "kernelsymbols.h"
+#include <insight/kernelsymbols.h>
 #include "shell.h"
-#include "console.h"
+#include <insight/console.h>
 #include "genericexception.h"
 #include "programoptions.h"
 

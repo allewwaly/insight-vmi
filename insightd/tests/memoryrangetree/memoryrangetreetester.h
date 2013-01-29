@@ -11,7 +11,7 @@
 #include <QObject>
 #include <QtTest>
 #include <QVector>
-#include "../../memoryrangetree.h"
+#include <insight/memoryrangetree.h>
 
 #define VMEM_END 0xFFFFFFFFULL
 

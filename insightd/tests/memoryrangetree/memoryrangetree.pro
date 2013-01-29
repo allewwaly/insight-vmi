@@ -1,5 +1,8 @@
+# Root directory of project
+ROOT_DIR = ../../..
+
 # Global configuration file
-include(../../../config.pri)
+include($$ROOT_DIR/config.pri)
 
 TEMPLATE = app
 TARGET = memoryrangetreetester
@@ -10,5 +13,8 @@ QT += core \
 QT -= webkit
 CONFIG += qtestlib debug_and_release
 
-INCLUDEPATH +=  ../../../libdebug/include
-LIBS += -L../../../libdebug$$BUILD_DIR -l$$DEBUG_LIB
+
+INCLUDEPATH += $$ROOT_DIR/libinsight/include \
+    $$ROOT_DIR/libdebug/include
+
+LIBS += -L$$ROOT_DIR/libinsight$$BUILD_DIR -l$$INSIGHT_LIB

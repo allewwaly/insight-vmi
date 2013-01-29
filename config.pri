@@ -21,6 +21,10 @@ unix:CONFIG += with_readline
 # Should we enabled ANSI colors for terminal output? Ignored for Windows.
 CONFIG += with_colors
 
+# Enable compiler warnings by default
+CONFIG -= warn_off
+CONFIG += warn_on
+
 #---------------------------[ End of configuration ]----------------------------
 
 # Directory where libraries are created

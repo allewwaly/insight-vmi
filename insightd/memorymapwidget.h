@@ -16,9 +16,9 @@ class QPaintEvent;
 class QMouseEvent;
 class QCloseEvent;
 
-#include "memorymaprangetree.h"
-#include "memorydifftree.h"
-#include "memspecs.h"
+#include <insight/memorymaprangetree.h>
+#include <insight/memorydifftree.h>
+#include <insight/memspecs.h>
 
 
 class MemoryMapWidget: public QWidget
