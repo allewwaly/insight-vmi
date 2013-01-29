@@ -82,10 +82,10 @@ SOURCES += tst_typefiltertest.cpp \
     $$ROOT_DIR/insightd/memorymapverifier.cpp \
     $$ROOT_DIR/insightd/memspecparser.cpp \
     $$ROOT_DIR/insightd/memspecs.cpp \
+    $$ROOT_DIR/insightd/multithreading.cpp \
     $$ROOT_DIR/insightd/numeric.cpp \
     $$ROOT_DIR/insightd/osfilter.cpp \
     $$ROOT_DIR/insightd/pointer.cpp \
-    $$ROOT_DIR/insightd/programoptions.cpp \
     $$ROOT_DIR/insightd/refbasetype.cpp \
     $$ROOT_DIR/insightd/referencingtype.cpp \
     $$ROOT_DIR/insightd/scriptengine.cpp \
@@ -156,7 +156,6 @@ HEADERS += \
     $$ROOT_DIR/insightd/numeric.h \
     $$ROOT_DIR/insightd/osfilter.h \
     $$ROOT_DIR/insightd/pointer.h \
-    $$ROOT_DIR/insightd/programoptions.h \
     $$ROOT_DIR/insightd/refbasetype.h \
     $$ROOT_DIR/insightd/referencingtype.h \
     $$ROOT_DIR/insightd/scriptengine.h \

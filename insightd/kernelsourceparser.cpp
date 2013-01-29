@@ -20,7 +20,7 @@
 #include "compileunit.h"
 #include "filenotfoundexception.h"
 #include "expressionevalexception.h"
-#include "programoptions.h"
+#include "multithreading.h"
 
 #include <QDirIterator>
 
@@ -161,7 +161,7 @@ void KernelSourceParser::parse()
 #if defined(DEBUG_APPLY_USED_AS) || defined(DEBUG_USED_AS) || defined(DEBUG_POINTS_TO)
     const int THREAD_COUNT = 1;
 #else
-    const int THREAD_COUNT = programOptions.threadCount();
+    const int THREAD_COUNT = MultiThreading::maxThreads();
 #endif
 
     for (int i = 0; i < THREAD_COUNT; ++i)

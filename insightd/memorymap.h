@@ -26,7 +26,6 @@
 #include "memorymapbuildercs.h"
 #include "memorymapbuildersv.h"
 #include "longoperation.h"
-#include "programoptions.h"
 #include <debug.h>
 
 class SymFactory;

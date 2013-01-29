@@ -20,6 +20,7 @@
 #include "function.h"
 #include "typeruleengine.h"
 #include "kernelsymbols.h"
+#include "multithreading.h"
 #include <debug.h>
 #include <expressionevalexception.h>
 
@@ -283,7 +284,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 
     // How many threads to create?
     _shared->threadCount =
-            qMin(qMax(programOptions.threadCount(), 1), MAX_BUILDER_THREADS);
+            qMin(qMax(MultiThreading::maxThreads(), 1), MAX_BUILDER_THREADS);
 //    _shared->threadCount = 1;
 
     if (_shared->threadCount > 1)

@@ -116,7 +116,8 @@ SOURCES += altreftype.cpp \
     volatiletype.cpp \
     xmlschema.cpp \
     typeruleenginecontextprovider.cpp \
-    console.cpp
+    console.cpp \
+    multithreading.cpp
 
 
 HEADERS += altreftype.h \
@@ -203,7 +204,8 @@ HEADERS += altreftype.h \
     embedresult.h \
     typeruleenginecontextprovider.h \
     console.h \
-    errorcodes.h
+    errorcodes.h \
+    multithreading.h
 
 # Things to do when the memory map builder and widget is to be built. Enabling
 # this feature requires InSight to run on an X server.
