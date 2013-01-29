@@ -1,5 +1,5 @@
 # Root directory of project
-ROOT_DIR = ../../..
+ROOT_DIR = ../..
 
 # Global configuration file
 include($$ROOT_DIR/config.pri)

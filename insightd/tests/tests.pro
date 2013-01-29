@@ -1,3 +1,3 @@
-SUBDIRS += priorityqueue memoryrangetree
+SUBDIRS += priorityqueue
 TEMPLATE = subdirs
 CONFIG += debug_and_release

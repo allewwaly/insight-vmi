@@ -1,6 +1,7 @@
 SUBDIRS += \
     asttypeevaluator \
     astexpressionevaluator \
+    memoryrangetree \
     osfilter \
     typefilter
 TEMPLATE = subdirs
