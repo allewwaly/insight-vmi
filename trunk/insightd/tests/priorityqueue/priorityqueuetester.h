@@ -10,7 +10,7 @@
 
 #include <QObject>
 #include <QtTest>
-#include "../../priorityqueue.h"
+#include <insight/priorityqueue.h>
 
 class PriorityQueueTester: public QObject
 {

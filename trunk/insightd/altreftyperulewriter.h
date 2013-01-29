@@ -5,10 +5,10 @@
 #include <QDir>
 #include <QFile>
 #include <QXmlStreamWriter>
-#include "memberlist.h"
+#include <insight/memberlist.h>
 #include "genericexception.h"
-#include "altreftype.h"
-#include "longoperation.h"
+#include <insight/altreftype.h>
+#include <insight/longoperation.h>
 
 #define typeRuleWriterError(x) do { throw TypeRuleWriterException((x), __FILE__, __LINE__); } while (0)
 

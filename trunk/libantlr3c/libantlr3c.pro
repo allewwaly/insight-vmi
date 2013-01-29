@@ -33,6 +33,7 @@ SOURCES = src/antlr3baserecognizer.c \
     src/antlr3tokenstream.c \
     src/antlr3treeparser.c \
     src/antlr3ucs2inputstream.c
+
 HEADERS = include/antlr3.h \
     include/antlr3baserecognizer.h \
     include/antlr3basetree.h \
@@ -62,5 +63,6 @@ HEADERS = include/antlr3.h \
     include/antlr3stringstream.h \
     include/antlr3tokenstream.h \
     include/antlr3treeparser.h
+
 INCLUDEPATH += ./include
 

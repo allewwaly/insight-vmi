@@ -4,7 +4,7 @@
 #include <QObject>
 #include <QtTest>
 #include <QByteArray>
-#include "../../astexpression.h"
+#include <insight/astexpression.h>
 
 
 class MemSpecs;

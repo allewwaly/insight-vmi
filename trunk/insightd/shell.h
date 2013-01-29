@@ -19,10 +19,10 @@
 #include <QTime>
 #include <QMutex>
 #include <QSize>
-#include "keyvaluestore.h"
-#include "kernelsymbols.h"
-#include "memorydump.h"
-#include "console.h"
+#include <insight/keyvaluestore.h>
+#include <insight/kernelsymbols.h>
+#include <insight/memorydump.h>
+#include <insight/console.h>
 
 // Forward declaration
 class QProcess;

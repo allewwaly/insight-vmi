@@ -22,6 +22,7 @@ LIBS += \
     -l$$DEBUG_LIB
 INCLUDEPATH += ../libdebug/include \
     ../libinsight/include
+
 QMAKE_CFLAGS_RELEASE += -O3
 QMAKE_CXXFLAGS_RELEASE += -O3
 

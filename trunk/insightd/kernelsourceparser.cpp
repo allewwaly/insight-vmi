@@ -6,21 +6,21 @@
  */
 
 #include "kernelsourceparser.h"
-#include "symfactory.h"
+#include <insight/symfactory.h>
 #include <astbuilder.h>
 #include <abstractsyntaxtree.h>
 #include <astdotgraph.h>
-#include "kernelsourcetypeevaluator.h"
+#include <insight/kernelsourcetypeevaluator.h>
 #include <typeevaluatorexception.h>
 #include <astsourceprinter.h>
 #include <cassert>
 #include <debug.h>
 #include <bugreport.h>
-#include "console.h"
-#include "compileunit.h"
-#include "filenotfoundexception.h"
+#include <insight/console.h>
+#include <insight/compileunit.h>
+#include <insight/filenotfoundexception.h>
 #include "expressionevalexception.h"
-#include "multithreading.h"
+#include <insight/multithreading.h>
 
 #include <QDirIterator>
 

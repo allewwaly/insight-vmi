@@ -1,12 +1,12 @@
 #include <QString>
 #include <QtTest>
-#include <memspecs.h>
-#include <symfactory.h>
-#include <kernelsymbolparser.h>
-#include <variable.h>
-#include <basetype.h>
-#include <typefilter.h>
-#include "kernelsymbols.h"
+#include <insight/memspecs.h>
+#include <insight/symfactory.h>
+#include <insight/kernelsymbolparser.h>
+#include <insight/variable.h>
+#include <insight/basetype.h>
+#include <insight/typefilter.h>
+#include <insight/kernelsymbols.h>
 
 #define safe_delete(x) \
     do { if ((x)) { delete (x); (x) = 0; } } while (0)

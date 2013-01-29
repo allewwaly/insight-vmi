@@ -31,21 +31,23 @@ HEADERS += include/ast_interface.h \
     include/bitop.h \
     include/astnodefinder.h \
     include/typeinfooracle.h
-SOURCES += src/astscopemanager.cpp \
-    src/astsymbol.cpp \
-    src/realtypes.cpp \
+SOURCES += \
+    antlr_generated/CLexer.c \
+    antlr_generated/CParser.c \
     src/abstractsyntaxtree.cpp \
     src/ast_interface.cpp \
     src/astbuilder.cpp \
     src/astdotgraph.cpp \
     src/astnode.cpp \
+    src/astnodefinder.cpp \
+    src/astscopemanager.cpp \
+    src/astsourceprinter.cpp \
     src/asttypeevaluator.cpp \
+    src/astsymbol.cpp \
     src/astwalker.cpp \
     src/genericexception.cpp \
-    antlr_generated/CLexer.c \
-    antlr_generated/CParser.c \
-    src/astsourceprinter.cpp \
-    src/astnodefinder.cpp
+    src/realtypes.cpp
+
 LIBS += -L../libantlr3c$$BUILD_DIR \
     -l$$ANTLR_LIB \
     -L../libdebug$$BUILD_DIR \

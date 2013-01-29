@@ -1,6 +1,6 @@
 #include <QString>
 #include <QtTest>
-#include <osfilter.h>
+#include <insight/osfilter.h>
 
 class OsfilterTest : public QObject
 {

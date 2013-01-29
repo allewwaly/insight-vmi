@@ -4,12 +4,12 @@
 #include <abstractsyntaxtree.h>
 #include <astbuilder.h>
 #include <asttypeevaluator.h>
-#include "../../memspecs.h"
-#include "../../symfactory.h"
-#include "../../astexpressionevaluator.h"
-#include "../../kernelsymbolparser.h"
-#include "../../kernelsourcetypeevaluator.h"
-#include "../../kernelsymbols.h"
+#include <insight/memspecs.h>
+#include <insight/symfactory.h>
+#include <insight/astexpressionevaluator.h>
+#include <insight/kernelsymbolparser.h>
+#include <insight/kernelsourcetypeevaluator.h>
+#include <insight/kernelsymbols.h>
 
 #define safe_delete(x) \
     do { if ((x)) { delete (x); (x) = 0; } } while (0)
