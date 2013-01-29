@@ -6,7 +6,7 @@
 #include <variable.h>
 #include <basetype.h>
 #include <typefilter.h>
-//#include <shell.h>
+#include "kernelsymbols.h"
 
 #define safe_delete(x) \
     do { if ((x)) { delete (x); (x) = 0; } } while (0)
@@ -241,8 +241,7 @@ private Q_SLOTS:
     void setMembers();
 
 private:
-    SymFactory* _factory;
-    MemSpecs* _specs;
+    KernelSymbols* _symbols;
     const Variable* var_a;
     const Variable* var_b;
     const BaseType* type_a;
@@ -252,20 +251,22 @@ private:
 
 
 TypeFilterTest::TypeFilterTest()
-    : _factory(0), _specs(0)
 {
-//    shell = new Shell(false);
 }
 
 
 void TypeFilterTest::initTestCase()
 {
-    _specs = new MemSpecs();
-    _specs->arch = MemSpecs::ar_x86_64;
-    _specs->sizeofPointer = 8;
-    _specs->sizeofLong = 8;
+    MemSpecs specs;
+    specs.arch = MemSpecs::ar_x86_64;
+    specs.sizeofPointer = 8;
+    specs.sizeofLong = 8;
 
-    _factory = new SymFactory(*_specs);
+    _symbols = new KernelSymbols();
+    _symbols->setMemSpecs(specs);
+
+    SymFactory* factory;
+    factory = &_symbols->factory();
 
     // Create device from object dump above
     QByteArray ba(objdump);
@@ -273,21 +274,20 @@ void TypeFilterTest::initTestCase()
     buf.open(QIODevice::ReadOnly);
 
     // Parse the object dump
-    KernelSymbolParser parser(_factory);
+    KernelSymbolParser parser(_symbols);
     parser.parse(&buf);
 
-    var_a = _factory->findVarByName("a");
-    var_b = _factory->findVarByName("b");
+    var_a = factory->findVarByName("a");
+    var_b = factory->findVarByName("b");
     type_a = var_a->refType();
     type_b = var_b->refType();
-    type_int = _factory->findBaseTypeByName("int");
+    type_int = factory->findBaseTypeByName("int");
 }
 
 
 void TypeFilterTest::cleanupTestCase()
 {
-    safe_delete(_factory);
-    safe_delete(_specs);
+    safe_delete(_symbols);
 }
 
 
