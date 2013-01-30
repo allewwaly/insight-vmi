@@ -517,14 +517,14 @@ Instance Instance::member(const ConstMemberList &members, int resolveTypes,
 		bool addrInBounds = (_d->vmem->memSpecs().arch & MemSpecs::ar_x86_64) ||
 				(_d->address + m->offset() + extraOffset < (1ULL << 32));
 
-		// Should we use candidate types?
-		if ((src & ksNoAltTypes) || (match & TypeRuleEngine::mrAmbiguous)) {
+		// Don't use candidates if forbidden or the rule engine actually matched
+		if ((src & ksNoAltTypes) || (match & TypeRuleEngine::mrMatch)) {
 			// Make sure the address does not exceed 32-bit bounds
 			if (addrInBounds)
 				ret = m->toInstance(_d->address + extraOffset, _d->vmem, this,
 									resolveTypes, maxPtrDeref);
 		}
-		// Try the candidate type
+		// Okay, we can try the candidate type
 		else {
 			// See how many candidates are compatible with this instance
 			int cndtIndex = -1;
