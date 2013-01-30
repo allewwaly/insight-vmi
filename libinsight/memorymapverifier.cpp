@@ -479,14 +479,16 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     case SlubObjects::ovValidCastType:
 //#ifdef MEMMAP_DEBUG
         if (_slubObjectNodes.contains(node->address())) {
-            debugerr(QString("We found another slub object at address 0x%0:\n"
-                             "  In set: %1  ->  %2\n"
-                             "  New:    %3  ->  %4")
-                     .arg((quint64)node->address(), 0, 16)
-                     .arg(_slubObjectNodes[node->address()]->type()->prettyName())
-                     .arg(_slubObjectNodes[node->address()]->fullName())
-                     .arg(node->type()->prettyName())
-                     .arg(node->fullName()));
+            if (*node->type() != *_slubObjectNodes[node->address()]->type()) {
+                debugerr(QString("We found another slub object at address 0x%0:\n"
+                                 "  In set: %1  ->  %2\n"
+                                 "  New:    %3  ->  %4")
+                         .arg((quint64)node->address(), 0, 16)
+                         .arg(_slubObjectNodes[node->address()]->type()->prettyName())
+                        .arg(_slubObjectNodes[node->address()]->fullName())
+                        .arg(node->type()->prettyName())
+                        .arg(node->fullName()));
+            }
         }
         else
 //#endif
