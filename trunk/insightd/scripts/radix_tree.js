@@ -17,6 +17,8 @@ http://lxr.linux.no/#linux+v2.6.32.58/include/linux/radix-tree.h#L48
 */
 function radix_tree_node_from_root(root, members)
 {
+	println(root.Name() + ".nodeType =", root.nodeType);
+	
 	// With a height of 0, the tree is empty and the pointer invalid
 	var h = root.height;
 	if (h == 0 || h > RADIX_TREE_MAX_HEIGHT)
@@ -33,11 +35,19 @@ function radix_tree_node_from_root(root, members)
 	if (addr_low & RADIX_TREE_INDIRECT_PTR)
 		node.SetAddressLow(addr_low & ~RADIX_TREE_INDIRECT_PTR);
 	// Is the node consistent?
-	if (node.IsAccessible() && (node.height > RADIX_TREE_MAX_HEIGHT || node.count > node.slots.ArrayLength())) {
+	if (node.IsAccessible() &&
+		(node.height > RADIX_TREE_MAX_HEIGHT || node.count > node.slots.ArrayLength()))
+	{
 		println("Found inconsistent radix_tree_node @ 0x" + node.Address() +
 			", radix_tree_root is", root.FullName(), "@ 0x" + root.Address());
 		return new Instance();
 	}
+	// Pass on the type stored in the leaves, if given
+	if (root.nodeType != undefined) {
+		node.nodeType = root.nodeType;
+		println(node.Name() + ".nodeType =", node.nodeType);
+	}
+	
 	return node;
 }
 
@@ -49,9 +59,15 @@ function radix_tree_node_slots(node, members)
 	// Nodes with a height of 1 are leaves, all others are interior nodes
 	if (node.height > 1)
 		return radix_tree_deref_slots(node, node.TypeId());
-	// The leaves store "struct page" objects
-	else if (node.height == 1)
-		return radix_tree_deref_slots(node, "page");
+	// The leaves store mostly "struct page" objects
+	else if (node.height == 1) {
+		if (node.nodeType != undefined) {
+			println("Creating leaf object", node.nodeType);
+			return radix_tree_deref_slots(node, node.nodeType);
+		}
+		else
+			return radix_tree_deref_slots(node, "page");
+	}
 	// This seems to be an invalid node anyway
 	else
 		return false;
@@ -81,13 +97,22 @@ function radix_tree_deref_slots(node, typeId)
 			if (e.AddressLow() & RADIX_TREE_INDIRECT_PTR)
 				continue;
 			e.ChangeType(typeId);
-            // For a radix_tree_node, a A valid height is not larger than 6, a
-			// valid count can't be larger than len
-			if (typeId == node.TypeId() && (e.height > 6 || e.count > len)) {
-				println("Found inconsistent radix_tree_node in slot", i, 
-						"@ 0x" + e.Address() + ", parent is", node.FullName(), 
-						"@ 0x" + node.Address());
-				continue;
+			// Is this an inner node or a leaf object?
+			if (typeId == node.TypeId()) {
+				// Pass on the type stored in the leaves, if given
+				if (node.nodeType != undefined) {
+					e.nodeType = node.nodeType;
+					println(e.Name() + ".nodeType =", e.nodeType);
+				}
+				
+				// For a radix_tree_node, a valid height is not larger than 6, a
+				// valid count can't be larger than len
+				if (e.height > 6 || e.count > len) {
+					println("Found inconsistent radix_tree_node in slot", i,
+							"@ 0x" + e.Address() + ", parent is", node.FullName(),
+							"@ 0x" + node.Address());
+					continue;
+				}
 			}
 			ret.push(e);
 		}
@@ -99,4 +124,40 @@ function radix_tree_deref_slots(node, typeId)
 				"for", node.FullName(), "@ 0x" + node.Address());
 	}
 	return ret;
+}
+
+/*
+ * Accesses a radix_tree_root member and sets the type stored in the leaf nodes
+ * to the given typeId.
+ */ 
+function radix_root_with_known_type(inst, members, typeId)
+{
+	var root = inst;
+	for (var i in members) {
+		root = root.Member(members[i]);
+		if (!root.IsValid() || root.IsNull())
+			return false;
+	}
+
+	// Set the type that is stored in the leaves of the tree
+	root.nodeType = typeId;
+	println(inst.MemberName(members[0]) + ".nodeType =", root.nodeType);
+
+	return root;
+}
+
+/*
+ * Accesses the radix_tree_root with cfq_io_context objects in it.
+ */ 
+function radix_root_io_context(ctx, members)
+{
+	return radix_root_with_known_type(ctx, members, "cfq_io_context");
+}
+
+/*
+ * Accesses the radix_tree_root with page objects in it.
+ */
+function radix_root_address_space(as, members)
+{
+	return radix_root_with_known_type(as, members, "page");
 }
