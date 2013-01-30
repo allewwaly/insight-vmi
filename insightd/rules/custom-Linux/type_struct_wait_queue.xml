@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	File created by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<rule priority="101">
+			<name>__wait_queue.private</name>
+			<description>The "private" member points to a "task_struct" or to a "poll_wqueues" object.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>__wait_queue</typename>
+				<members>
+					<member>private</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var queue = arguments[0];
+				var priv = queue.Member(arguments[1][0]);
+
+				// Check if this is a task_struct by verifying list_head members
+				priv.ChangeType("task_struct");
+				try {
+					var tasks = priv.tasks;
+					var sibling = priv.sibling;
+					if (tasks.Address() == tasks.next.prev.Address() &amp;&amp;
+					    tasks.Address() == tasks.prev.next.Address() &amp;&amp;
+						sibling.Address() == sibling.next.prev.Address() &amp;&amp;
+						sibling.Address() == sibling.next.prev.Address())
+					{
+						return priv;
+					}
+				}
+				catch (e) {
+					// do nothing
+				}
+				
+				// This is no task_struct, so change to poll_wqueues
+				priv.ChangeType("poll_wqueues");
+				return priv;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
