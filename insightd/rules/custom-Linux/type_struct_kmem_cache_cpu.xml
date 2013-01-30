@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Copyright (C) 2013 by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<rule priority="101">
+			<name>kmem_cache_cpu.freelist</name>
+			<description>The "freelist" points to arbitrary objects.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>kmem_cache_cpu</typename>
+				<members>
+					<member>freelist</member>
+				</members>
+			</filter>
+			<action type="inline">
+				return false;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
