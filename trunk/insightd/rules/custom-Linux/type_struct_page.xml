@@ -5,7 +5,7 @@
 <typeknowledge version="1.0" os="linux" >
 
 	<rules priority="100" >
-		<rule priority="100">
+		<rule priority="103">
 			<name>page.mapping</name>
 			<description>
 				<!-- http://lxr.linux.no/#linux+v3.6.6/include/linux/mm.h#L769 -->
@@ -36,7 +36,7 @@
 			</action>
 		</rule>
 
-		<rule priority="100">
+		<rule priority="103">
 			<name>page.private</name>
 			<description>
 				Test if page->private points to a "buffer_head" object.
@@ -64,6 +64,43 @@
 						return bh;
 				}
 				return false;
+			</action>
+		</rule>
+		
+		<rule priority="102">
+            <name>page.slab</name>
+			<description>
+                Test if page->slab pointer is valid.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>page</typename>
+				<members>
+					<member></member>
+					<member>slab</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var page = arguments[0];
+				var slab = page.slab;
+				slab.ChangeType("kmem_cache");
+
+				// Check if the slab is valid by testing its list_head member
+				try {
+					var list = slab.list;
+					// Test if list is correctly linked
+					if (list.Address() == list.next.prev.Address() &amp;&amp;
+					    list.Address() == list.prev.next.Address())
+					{
+						return slab;
+					}
+				}
+				catch (e) {
+					// do nothing
+				}
+
+				// This union field is invalid
+				return new Instance();
 			</action>
 		</rule>
 	</rules>
