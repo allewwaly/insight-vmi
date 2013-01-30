@@ -178,8 +178,6 @@ SOURCES += \
 LIBS += \
     -L../libdebug$$BUILD_DIR \
     -l$$DEBUG_LIB \
-    -L../libinsight$$BUILD_DIR \
-    -l$$INSIGHT_LIB \
     -L../libcparser$$BUILD_DIR \
     -l$$CPARSER_LIB \
     -L../libantlr3c$$BUILD_DIR \
