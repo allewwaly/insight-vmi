@@ -40,8 +40,8 @@ protected:
     void processNode(MemoryMapNode* node);
     void processInstance(const Instance &inst, MemoryMapNode* node,
                          bool isNested = false);
-    void processInstanceFromRule(const Instance &parent, const Instance& member, int mbrIdx,
-                                 MemoryMapNode* node);
+    void processInstanceFromRule(const Instance &parent, const Instance& member,
+                                 int mbrIdx, MemoryMapNode* node);
     void processPointer(const Instance &inst, MemoryMapNode* node);
     void processArray(const Instance& inst, MemoryMapNode* node);
     void processStructured(const Instance &inst, MemoryMapNode* node,
@@ -50,6 +50,8 @@ protected:
 private:
     void addMembers(const Instance &inst, MemoryMapNode* node);
     int countInvalidChildren(const Instance &inst, int *total) const;
+    int countInvalidChildrenRek(const Instance &inst, int *total,
+                                int *userlandPtrs) const;
 };
 
 #endif /* MEMORYMAPBUILDERCS_H_ */

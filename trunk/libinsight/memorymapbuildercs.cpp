@@ -368,7 +368,7 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
         return prob;
     }
     // If this a union or struct, we have to consider the pointer members
-    // TODO: For unions, largest take prob. of all children
+    // For unions, the largest prob. of all children is taken
     else if ( instType && (instType->type() & StructOrUnion) ) {
 
         if (!inst.isValidConcerningMagicNumbers())
@@ -394,6 +394,23 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
 
 int MemoryMapBuilderCS::countInvalidChildren(const Instance &inst, int *total) const
 {
+    int userlandPtrs = 0, tot = 0;
+    int invalid = countInvalidChildrenRek(inst, &tot, &userlandPtrs);
+
+    if (total)
+        *total = tot;
+
+    // Allow at most 20% user-land pointers of all children
+    if (invalid >= 0 && userlandPtrs > (tot / 5))
+        invalid += userlandPtrs - (tot / 5);
+
+    return invalid;
+}
+
+
+int MemoryMapBuilderCS::countInvalidChildrenRek(const Instance &inst, int *total,
+                                                int *userlandPtrs) const
+{
     int invalidChildren = 0;
     int invalidListHeads = 0;
     int testedChildren = 0;
@@ -409,8 +426,12 @@ int MemoryMapBuilderCS::countInvalidChildren(const Instance &inst, int *total) c
             ++testedChildren;
         }
         else if (mi.type()->type() & rtPointer) {
-            if (!MemoryMapHeuristics::isValidUserLandPointer(mi))
+            bool isUserland = false;
+            if (!MemoryMapHeuristics::isValidUserLandPointer(mi, true, &isUserland))
                 invalidChildren++;
+            // Count the user-land pointers
+            else if (isUserland)
+                ++(*userlandPtrs);
             ++testedChildren;
         }
         else if (MemoryMapHeuristics::isFunctionPointer(mi)) {
@@ -426,7 +447,7 @@ int MemoryMapBuilderCS::countInvalidChildren(const Instance &inst, int *total) c
         // Test embedded structs/unions recursively
         else if (mi.type()->type() & StructOrUnion) {
             int tot = 0;
-            int ret = countInvalidChildren(mi, &tot);
+            int ret = countInvalidChildrenRek(mi, &tot, userlandPtrs);
             // Pass invalid list_heads through for structs, count them for unions
             if (ret < 0) {
                 if (isUnion) {
