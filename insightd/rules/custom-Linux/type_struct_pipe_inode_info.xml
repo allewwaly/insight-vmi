@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Copyright (C) 2013 by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<!--
+			The "bufs" member of struct pipe_inode_info is an array used as a
+			ring buffer. Member "curbuf" gives the index of the current buffer,
+			"nrbufs" is the number of buffers in use.
+			
+			References:
+			http://lxr.free-electrons.com/source/include/linux/pipe_fs_i.h?v=2.6.32#L29
+			http://lxr.free-electrons.com/source/fs/pipe.c?v=2.6.32#L522
+		-->
+		<rule priority="101">
+			<name>pipe_inode_info.bufs</name>
+			<description>The "bufs" member is a ircular array of pipe buffers.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>pipe_inode_info</typename>
+				<members>
+					<member>bufs</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var pipe = arguments[0];
+				var bufs = pipe.Member(arguments[1][0]);
+
+				// Index of current buffer
+				var curbuf = pipe.curbuf;
+				// No. of used buffers
+				var nrbufs = pipe.nrbufs;
+				// No. of buffers is either the array length (for older kernels)
+				// or given in member "buffers" (for newer kernels)
+				var cnt;
+				if (bufs.Type() == "Array")
+					cnt = bufs.ArrayLength();
+				else if (pipe.MemberExists("buffers"))
+					cnt = bufs.buffers;
+				else // Don't know how to handle this
+					return false;
+
+				var ret = new Array();
+
+				// Fill array with buffer elements
+				while (nrbufs &gt; 0) {
+					var buf = bufs.ArrayElem(curbuf);
+					ret[curbuf] = buf;
+					curbuf = (++curbuf) % cnt;
+					--nrbufs;
+				}
+
+				// Fill remaining array with null pointer objects
+				var empty = bufs.ArrayElem(0);
+				empty.SetAddress(0);
+				for (var i = 0; i &lt; cnt; ++i) {
+					if (!ret[i])
+						ret[i] = empty;
+				}
+
+				return ret;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
