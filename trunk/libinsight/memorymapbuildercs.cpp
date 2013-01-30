@@ -441,7 +441,7 @@ int MemoryMapBuilderCS::countInvalidChildrenRek(const Instance &inst, int *total
         }
         else if (MemoryMapHeuristics::isListHead(mi)) {
             if (!MemoryMapHeuristics::isValidListHead(mi, true))
-                return -1; // return immediately for invali list_heads
+                return -1; // return immediately for invalid list_heads
             ++testedChildren;
         }
         // Test embedded structs/unions recursively
