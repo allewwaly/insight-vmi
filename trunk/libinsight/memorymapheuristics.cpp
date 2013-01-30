@@ -96,8 +96,11 @@ bool MemoryMapHeuristics::isValidPointer(const Instance &p, bool defaultValid)
 }
 
 
-bool MemoryMapHeuristics::isValidUserLandPointer(const Instance &p, bool defaultValid)
+bool MemoryMapHeuristics::isValidUserLandPointer(const Instance &p, bool defaultValid, bool *isUserland)
 {
+    if (isUserland)
+        *isUserland = false;
+
     // Is this even a pointer
     if (p.isNull() || !p.isValid() || !(p.type()->type() & rtPointer))
         return false;
@@ -107,8 +110,13 @@ bool MemoryMapHeuristics::isValidUserLandPointer(const Instance &p, bool default
         quint64 targetAdr = (quint64)p.toPointer();
 
         // Is the address valid?
-        return isUserLandAddress(targetAdr, p.vmem()->memSpecs()) ||
-                isValidAddress(targetAdr, p.vmem()->memSpecs(), defaultValid);
+        if (isUserLandAddress(targetAdr, p.vmem()->memSpecs())) {
+            if (isUserland)
+                *isUserland = true;
+            return true;
+        }
+        else
+            return isValidAddress(targetAdr, p.vmem()->memSpecs(), defaultValid);
     }
     catch (VirtualMemoryException&) {
         return false;
@@ -170,7 +178,11 @@ bool MemoryMapHeuristics::isValidFunctionPointer(const Instance &p, bool default
 
 bool MemoryMapHeuristics::isUserLandAddress(quint64 address, const MemSpecs &specs)
 {
-    return (address < specs.pageOffset);
+    // Typical userland addresses start at 0x400000 (64-bit) or 0x8000000 (32-bit)
+    if (specs.arch & MemSpecs::ar_i386)
+        return (address >= 0x400000ul) && (address < specs.pageOffset);
+    else
+        return (address >= 0x8000000ul) && (address < specs.pageOffset);
 }
 
 
