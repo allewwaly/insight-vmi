@@ -2424,7 +2424,7 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
 
     const int w_sep = 2;
     const int w_addr = 2 + (_sym.memDumps().at(index)->memSpecs().sizeofPointer << 1);
-    const int w_prob = 4;
+    const int w_prob = 6;
     const int w_slub = 3;
     const int w_total = 3 * ShellUtil::termSize().width();
     const int w_name = w_total - w_addr - w_prob - w_slub - 3*w_sep;
@@ -2433,7 +2433,7 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
     Console::out() << Console::color(ctBold)
          << qSetFieldWidth(w_addr) << "Address"
          << qSetFieldWidth(w_sep) << " "
-         << qSetFieldWidth(w_prob) << "Prob"
+         << qSetFieldWidth(w_prob) << "Prob."
          << qSetFieldWidth(w_sep) << " "
          << qSetFieldWidth(w_slub) << "Slb"
          << qSetFieldWidth(w_sep) << " "
@@ -2441,7 +2441,7 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
          << qSetFieldWidth(0) << Console::color(ctReset) << endl;
     hline(ShellUtil::termSize().width());
 
-    Console::out() << qSetRealNumberPrecision(2) << fixed;
+    Console::out() << qSetRealNumberPrecision(w_prob - 2) << fixed;
 
     for (int i = 0; i < nodes.size(); ++i) {
         const MemoryMapNode* node = nodes[i];
