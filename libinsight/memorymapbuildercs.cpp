@@ -401,7 +401,7 @@ int MemoryMapBuilderCS::countInvalidChildren(const Instance &inst, int *total) c
         *total = tot;
 
     // Allow at most 20% user-land pointers of all children
-    if (invalid >= 0 && userlandPtrs > (tot / 5))
+    if (tot > 1 && invalid >= 0 && userlandPtrs > (tot / 5))
         invalid += userlandPtrs - (tot / 5);
 
     return invalid;
