@@ -34,5 +34,35 @@
 			</filter>
 			<action type="function" file="radix_tree.js">radix_tree_node_slots</action>
 		</rule>
+
+		<rule priority="101">
+			<name>io_context.radix_root</name>
+			<description>
+				This struct stores "cfq_io_context" objects in its leaves.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>io_context</typename>
+				<members>
+					<member>radix_root</member>
+				</members>
+			</filter>
+			<action type="function" file="radix_tree.js">radix_root_io_context</action>
+		</rule>
+
+		<rule priority="101">
+			<name>address_space.radix_root</name>
+			<description>
+				This struct stores "cfq_io_context" objects in its leaves.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>address_space</typename>
+				<members>
+					<member>page_tree</member>
+				</members>
+			</filter>
+			<action type="function" file="radix_tree.js">radix_root_address_space</action>
+		</rule>
 	</rules>
 </typeknowledge>

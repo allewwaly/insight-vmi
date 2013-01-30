@@ -14,7 +14,7 @@
 
 #include <math.h>
 
-//#define MEMMAP_DEBUG 1
+#define MEMMAP_DEBUG 1
 
 
 /*
