@@ -99,9 +99,12 @@ public:
      * @param defaultValid specifies whether default values such as 0 or -1 should
      * be considered as valid values or as invalid values while verifying the given
      * instance \a i. By default all default values are considered to be valid.
+     * @param isUserland if given, this boolean is set to \c true if \a p points
+     * into user-land, \c false otherwise
      * @return true if the pointer is valid, false otherwise
      */
-    static bool isValidUserLandPointer(const Instance &p, bool defaultValid = true);
+    static bool isValidUserLandPointer(const Instance &p, bool defaultValid = true,
+                                       bool *isUserland = 0);
 
     /**
      * Checks if the given pointer is a function pointer.
