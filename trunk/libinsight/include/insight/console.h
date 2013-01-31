@@ -147,18 +147,15 @@ public:
      * Returns a string wrapped in ANSI color codes according to \a c.
      * @param s string to colorize
      * @param c color type
+     * @param minWidth minimal width of output string, will be padded
      * @return colorized string
      */
-    inline static QString colorize(const QString& s, ColorType c)
+    inline static QString colorize(const QString& s, ColorType c, int minWidth = 0)
     {
-        // Avoid unnecessary dependencies for test builds
-//#ifdef QT_TESTLIB_LIB
-//        Q_UNUSED(c);
-//        Q_UNUSED(col);
-//#else
-        return _colors.color(c) + s + _colors.color(ctReset);
-//#endif /* TESTLIB */
-//        return s;
+        if (minWidth > s.size())
+            return _colors.color(c) + s + _colors.color(ctReset) + QString(minWidth - s.size(), ' ');
+        else
+            return _colors.color(c) + s + _colors.color(ctReset);
     }
 
     /**
@@ -166,20 +163,25 @@ public:
      * @param s string to colorize
      * @param c color type
      * @param col the color palette to use
+     * @param minWidth minimal width of output string, will be padded
      * @return colorized string
      */
     inline static QString colorize(const QString& s, ColorType c,
-                                   const ColorPalette *col)
+                                   const ColorPalette *col, int minWidth = 0)
     {
-        // Avoid unnecessary dependencies for test builds
-//#ifdef QT_TESTLIB_LIB
-//        Q_UNUSED(c);
-//        Q_UNUSED(col);
-//#else
-        if (col)
-            return col->color(c) + s + col->color(ctReset);
-//#endif /* TESTLIB */
-        return s;
+        if (col) {
+            if (minWidth > s.size())
+                return col->color(c) + s + col->color(ctReset) +
+                        QString(minWidth - s.size(), ' ');
+            else
+                return col->color(c) + s + col->color(ctReset);
+        }
+        else {
+            if (minWidth > s.size())
+                return s + QString(minWidth - s.size(), ' ');
+            else
+                return s;
+        }
     }
 
     /**
@@ -189,13 +191,7 @@ public:
      */
     inline static const char* color(ColorType ct)
     {
-        // Avoid unnecessary dependencies for test builds
-//#ifdef QT_TESTLIB_LIB
-//        Q_UNUSED(ct);
-//        return "";
-//#else
         return _colors.color(ct);
-//#endif
     }
 
     /**
