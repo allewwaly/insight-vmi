@@ -540,6 +540,8 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
 
             // Check for pointers that point back into or overlap with "inst"
             if (inst->overlaps(ret) && !members.isEmpty()) {
+                // Save properties to restore them later
+                StringHash props(ret.properties());
                 // This is most likely an empty list-like structure, so return the
                 // member where the address points to
                 const BaseType* rt;
@@ -570,6 +572,8 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
                     ret = ret.member(members[i]->index(), 0, 0, ksNone);
                     ++i;
                 }
+                // Restore properties
+                ret.setProperties(props);
             }
         }
         catch (VirtualMemoryException& /*e*/) {
