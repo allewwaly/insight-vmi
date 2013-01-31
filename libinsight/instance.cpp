@@ -459,7 +459,9 @@ Instance Instance::dereference(int resolveTypes, int maxPtrDeref, int *derefCoun
             ret._d->parent = _d->parent;
             ret._d->fromParent = _d->fromParent;
         }
-        ret.setProperties(properties());
+        // Restore properties
+        if (!properties().isEmpty())
+            ret.setProperties(properties());
         // If only lexical types were dereferenced, preserve the bit-field location
         if (dcnt == 0) {
             ret.setBitSize(_d->bitSize);
