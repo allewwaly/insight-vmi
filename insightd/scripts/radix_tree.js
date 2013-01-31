@@ -17,7 +17,7 @@ http://lxr.linux.no/#linux+v2.6.32.58/include/linux/radix-tree.h#L48
 */
 function radix_tree_node_from_root(root, members)
 {
-	println(root.Name() + ".nodeType =", root.nodeType);
+// 	println(root.Name() + ".nodeType =", root.nodeType);
 	
 	// With a height of 0, the tree is empty and the pointer invalid
 	var h = root.height;
@@ -45,7 +45,7 @@ function radix_tree_node_from_root(root, members)
 	// Pass on the type stored in the leaves, if given
 	if (root.nodeType != undefined) {
 		node.nodeType = root.nodeType;
-		println(node.Name() + ".nodeType =", node.nodeType);
+// 		println(node.Name() + ".nodeType =", node.nodeType);
 	}
 	
 	return node;
@@ -62,11 +62,13 @@ function radix_tree_node_slots(node, members)
 	// The leaves store mostly "struct page" objects
 	else if (node.height == 1) {
 		if (node.nodeType != undefined) {
-			println("Creating leaf object", node.nodeType);
+// 			println("Creating leaf object", node.nodeType);
 			return radix_tree_deref_slots(node, node.nodeType);
 		}
-		else
+		else {
+			println("WARNING: No node type specified for " + node.TypeName() + " '" + node.FullName() + "'."); 
 			return radix_tree_deref_slots(node, "page");
+		}
 	}
 	// This seems to be an invalid node anyway
 	else
@@ -81,40 +83,58 @@ function radix_tree_deref_slots(node, typeId)
 	var slots = node.slots;
 	var ret = new Array();
 	const len = slots.ArrayLength();
+	
+	// Create a null element
+// 	var empty = slots.ArrayElem(0);
+// 	empty.ChangeType(typeId);
+// 	empty.SetAddress(0);
 
 	var cnt = 0;
 	for (var i = 0; i < len; ++i) {
-		var e = slots.ArrayElem(i);
-		// Dereference once
-		if (e.IsAccessible()) {
-			e.SetAddress(e.toPointer());
-			// Count the number of non-null objects
-			if (!e.IsNull())
-				cnt++;
-			else
-				continue;
-			// Make sure the address is no indirect pointer
-			if (e.AddressLow() & RADIX_TREE_INDIRECT_PTR)
-				continue;
-			e.ChangeType(typeId);
-			// Is this an inner node or a leaf object?
-			if (typeId == node.TypeId()) {
-				// Pass on the type stored in the leaves, if given
-				if (node.nodeType != undefined) {
-					e.nodeType = node.nodeType;
-					println(e.Name() + ".nodeType =", e.nodeType);
-				}
-				
-				// For a radix_tree_node, a valid height is not larger than 6, a
-				// valid count can't be larger than len
-				if (e.height > 6 || e.count > len) {
-					println("Found inconsistent radix_tree_node in slot", i,
-							"@ 0x" + e.Address() + ", parent is", node.FullName(),
-							"@ 0x" + node.Address());
+		try {
+			var e = slots.ArrayElem(i);
+			// Dereference once
+			if (e.IsAccessible()) {
+				e.SetAddress(e.toPointer());
+				// Count the number of non-null objects
+				if (!e.IsNull())
+					cnt++;
+				else {
+// 					ret.push(empty);
 					continue;
 				}
+				// Make sure the address is no indirect pointer
+				if (e.AddressLow() & RADIX_TREE_INDIRECT_PTR) {
+// 					ret.push(empty);
+					continue;
+				}
+				e.ChangeType(typeId);
+				// Is this an inner node or a leaf object?
+				if (typeId == node.TypeId()) {
+					// Pass on the type stored in the leaves, if given
+					if (node.nodeType != undefined) {
+						e.nodeType = node.nodeType;
+// 						println(e.Name() + ".nodeType =", e.nodeType);
+					}
+					
+					// For a radix_tree_node, a valid height is not larger than 6, a
+					// valid count can't be larger than len
+					if (e.height > 6 || e.count > len) {
+						println("Found inconsistent radix_tree_node in slot", i,
+								"@ 0x" + e.Address() + ", parent is", node.FullName(),
+								"@ 0x" + node.Address());
+// 						ret.push(empty);
+						continue;
+					}
+				}
+				ret.push(e);
 			}
-			ret.push(e);
+			else {
+// 				ret.push(empty);
+			}
+		}
+		catch (e) {
+			// do nothing
 		}
 	}
 	
@@ -141,7 +161,7 @@ function radix_root_with_known_type(inst, members, typeId)
 
 	// Set the type that is stored in the leaves of the tree
 	root.nodeType = typeId;
-	println(inst.MemberName(members[0]) + ".nodeType =", root.nodeType);
+// 	println(inst.MemberName(members[0]) + ".nodeType =", root.nodeType);
 
 	return root;
 }
