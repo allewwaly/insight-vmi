@@ -237,45 +237,53 @@ void MemoryMapBuilderCS::processInstanceFromRule(const Instance &parent,
                                                  const Instance &member,
                                                  int mbrIdx, MemoryMapNode *node)
 {
-    // How does the returned instance relate to the given one?
-    switch (parent.embeds(member)) {
-    // Conflict, ignored
-    case orOverlap:
-    case orCover:
-    // No conflict, but no need to handle the same instance twice
-    case orEqual:
-        break;
+    if (!member.isNull()) {
+        // How does the returned instance relate to the given one?
+        switch (parent.embeds(member)) {
+        // Conflict, ignored
+        case orOverlap:
+        case orCover:
+            // No conflict, but no need to handle the same instance twice
+        case orEqual:
+            break;
 
-    // Process the original, non-dereferenced member instance
-    case orFirstEmbedsSecond: {
-        // Get the unchanged member and process it instead of "member"
-        Instance mOrig(parent.member(mbrIdx, BaseType::trLexical, 0, ksNone));
-        processInstance(mOrig, node, true);
-        break;
-    }
-    // We followed a pointer
-    case orNoOverlap:
-    // We found the embedding node for an embedded node
-    case orSecondEmbedsFirst: {
-        // Get the unchanged member as well
-        Instance mOrig(parent.member(mbrIdx, BaseType::trLexical, 0, ksNone));
-        // Dereference exactly once
-        int derefCount = 0;
-        mOrig = mOrig.dereference(BaseType::trLexicalAndPointers, 1, &derefCount);
-        // In case the instance was NOT dereferenced, we can ignore it because
-        // it is embedded within parent
-        if (!derefCount) {
-            _map->addChildIfNotExistend(
-                        member, InstanceList(), node,
-                        _index, parent.memberAddress(mbrIdx, 0, 0, ksNone));
+            // Process the original, non-dereferenced member instance
+        case orFirstEmbedsSecond: {
+            // Get the unchanged member and process it instead of "member"
+            Instance mOrig(parent.member(mbrIdx, BaseType::trLexical, 0, ksNone));
+            // Preserve used-defined properties, if any
+            if (!member.properties().isEmpty())
+                mOrig.setProperties(member.properties());
+            processInstance(mOrig, node, true);
+            break;
         }
-        else {
-            _map->addChildIfNotExistend(
-                        mOrig, InstanceList() << member, node,
-                        _index, parent.memberAddress(mbrIdx, 0, 0, ksNone));
+            // We followed a pointer
+        case orNoOverlap:
+            // We found the embedding node for an embedded node
+        case orSecondEmbedsFirst: {
+            // Get the unchanged member as well
+            Instance mOrig(parent.member(mbrIdx, BaseType::trLexical, 0, ksNone));
+            // Dereference exactly once
+            int derefCount = 0;
+            mOrig = mOrig.dereference(BaseType::trLexicalAndPointers, 1, &derefCount);
+            // Preserve used-defined properties, if any
+            if (!member.properties().isEmpty())
+                mOrig.setProperties(member.properties());
+            // In case the instance was NOT dereferenced, we can ignore it because
+            // it is embedded within parent
+            if (!derefCount) {
+                _map->addChildIfNotExistend(
+                            member, InstanceList(), node,
+                            _index, parent.memberAddress(mbrIdx, 0, 0, ksNone));
+            }
+            else {
+                _map->addChildIfNotExistend(
+                            mOrig, InstanceList() << member, node,
+                            _index, parent.memberAddress(mbrIdx, 0, 0, ksNone));
+            }
+            break;
         }
-        break;
-    }
+        }
     }
 
     if (member.isList())
@@ -388,6 +396,12 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
             _map->_shared->degForInvalidChildAddrCnt++;
         }
     }
+
+    if (prob < 0 || prob > 1) {
+        debugerr("Probability for node is " << prob << ", should be between "
+                 "0 and 1.");
+    }
+
     return prob;
 }
 
