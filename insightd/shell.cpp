@@ -2425,9 +2425,9 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
     const int w_sep = 2;
     const int w_addr = 2 + (_sym.memDumps().at(index)->memSpecs().sizeofPointer << 1);
     const int w_prob = 6;
-    const int w_slub = 3;
+    const int w_valid = 9;
     const int w_total = 3 * ShellUtil::termSize().width();
-    const int w_name = w_total - w_addr - w_prob - w_slub - 3*w_sep;
+    const int w_name = w_total - w_addr - w_prob - w_valid - 3*w_sep;
 
     // Print header
     Console::out() << Console::color(ctBold)
@@ -2435,7 +2435,7 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
          << qSetFieldWidth(w_sep) << " "
          << qSetFieldWidth(w_prob) << "Prob."
          << qSetFieldWidth(w_sep) << " "
-         << qSetFieldWidth(w_slub) << "Slb"
+         << qSetFieldWidth(w_valid) << "Validity"
          << qSetFieldWidth(w_sep) << " "
          << qSetFieldWidth(0) << "Full name"
          << qSetFieldWidth(0) << Console::color(ctReset) << endl;
@@ -2443,12 +2443,14 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
 
     Console::out() << qSetRealNumberPrecision(w_prob - 2) << fixed;
 
+    const SlubObjects& slub = _sym.memDumps().at(index)->map()->verifier().slub();
+
     for (int i = 0; i < nodes.size(); ++i) {
         const MemoryMapNode* node = nodes[i];
         QStringList comp = node->fullNameComponents();
         int w = w_name;
 
-        Console::out() << Console::color(ctAddress)
+        Console::out() << qSetFieldWidth(0) << Console::color(ctAddress)
              << QString("0x%0").arg(node->address(), w_addr - 2, 16, QChar('0'))
              << qSetFieldWidth(w_sep) << " "
              << qSetFieldWidth(0);
@@ -2463,12 +2465,57 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
         Console::out() << qSetFieldWidth(w_prob) << node->probability();
 
         // Colorized validity
-        Console::out() << qSetFieldWidth(w_sep) << " "
-             << qSetFieldWidth(0)
-             << Console::color(node->seemsValid() ? ctMatched : ctMissed)
-             << qSetFieldWidth(w_slub) << (node->seemsValid() ? "yes" : "no")
-             << qSetFieldWidth(w_sep) << " "
-             << qSetFieldWidth(0);
+        Console::out() << qSetFieldWidth(w_sep) << " " << qSetFieldWidth(0);
+
+        Instance inst(node->toInstance(false));
+        SlubObjects::ObjectValidity v = slub.objectValid(&inst);
+        switch(v) {
+        // Instance is invalid, no further information avaliable
+        case SlubObjects::ovInvalid:
+            Console::out() << Console::colorize("invalid", ctMissed, w_valid);
+            break;
+            // Instance not found, but base type actually not present in any slab
+        case SlubObjects::ovNoSlabType:
+            Console::out() << Console::colorize("no slub", ctReset, w_valid);
+            break;
+            // Instance not found, even though base type is managed in slabs
+        case SlubObjects::ovNotFound:
+            Console::out() << Console::colorize("not found", ctDeferred, w_valid);
+            break;
+            // Instance type or address conflicts with object in the slabs
+        case SlubObjects::ovConflict:
+            Console::out() << Console::colorize("conflict", ctMissed, w_valid);
+            break;
+            // Instance is embedded within a larger object in the slabs
+        case SlubObjects::ovEmbedded:
+            Console::out() << Console::colorize("emb. (s)", ctMatched, w_valid);
+            break;
+            // Instance may be embedded within a larger object in the slabs
+        case SlubObjects::ovEmbeddedUnion:
+            Console::out() << Console::colorize("emb. (u)", ctMatched, w_valid);
+            break;
+            // Instance is embeddes in another object in the slab when using the SlubObjects::_typeCasts exception list
+        case SlubObjects::ovEmbeddedCastType:
+            Console::out() << Console::colorize("emb. (c)", ctMatched, w_valid);
+            break;
+            // Instance lies within reserved slab memory for which no type information is available
+        case SlubObjects::ovMaybeValid:
+            Console::out() << Console::colorize("maybe v.", ctMatched, w_valid);
+            break;
+            // Instance was either found in the slabs or in a global variable
+        case SlubObjects::ovValid:
+            Console::out() << Console::colorize("valid", ctMatched, w_valid);
+            break;
+            // Instance matches an object in the slab when using the SlubObjects::_typeCasts exception list
+        case SlubObjects::ovValidCastType:
+            Console::out() << Console::colorize("valid (c)", ctMatched, w_valid);
+            break;
+        case SlubObjects::ovValidGlobal:
+            Console::out() << Console::colorize("valid (g)", ctMatched, w_valid);
+            break;
+        }
+
+        Console::out() << qSetFieldWidth(w_sep) << " " << qSetFieldWidth(0);
 
         // Colorized name
         for (int j = 0; j < comp.size() && w > 0; ++j) {
