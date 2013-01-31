@@ -46,18 +46,19 @@
 				// Fill array with buffer elements
 				while (nrbufs &gt; 0) {
 					var buf = bufs.ArrayElem(curbuf);
-					ret[curbuf] = buf;
+<!-- 					ret[curbuf] = buf; -->
+					ret.push(buf);
 					curbuf = (++curbuf) % cnt;
 					--nrbufs;
 				}
 
-				// Fill remaining array with null pointer objects
+<!--				// Fill remaining array with null pointer objects
 				var empty = bufs.ArrayElem(0);
 				empty.SetAddress(0);
 				for (var i = 0; i &lt; cnt; ++i) {
 					if (!ret[i])
 						ret[i] = empty;
-				}
+				}-->
 
 				return ret;
 			</action>
