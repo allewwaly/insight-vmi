@@ -2373,6 +2373,9 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
         }
     }
 
+    // Make sure the rules verbose output is disabled
+    _sym.ruleEngine().setVerbose(TypeRuleEngine::veOff);
+
     _sym.memDumps().at(index)->setupRevMap(type, prob, slubFile);
 
     int elapsed = timer.elapsed();
