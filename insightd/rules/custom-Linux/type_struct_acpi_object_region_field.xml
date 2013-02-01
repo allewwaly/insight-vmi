@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Copyright (C) 2013 by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<rule priority="101">
+			<name>acpi_object_region_field.region_obj</name>
+			<description>Override parsed rule.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>acpi_object_region_field</typename>
+				<members>
+					<member>region_obj</member>
+				</members>
+			</filter>
+			<action type="inline">
+				return false;
+			</action>
+		</rule>
+		
+		<rule priority="102">
+			<name>acpi_operand_object.field.region_obj</name>
+			<description>Override parsed rule.</description>
+			<filter>
+				<datatype>union</datatype>
+				<typename>acpi_operand_object</typename>
+				<members>
+					<member>field</member>
+					<member>region_obj</member>
+				</members>
+			</filter>
+			<action type="inline">
+				return false;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
