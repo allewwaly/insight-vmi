@@ -6,7 +6,8 @@ const inode_types = {
 	proc_sops: "proc_inode",
 	bdev_sops: "bdev_inode",
 	sockfs_ops: "socket_alloc",
-	mqueue_super_ops: "mqueue_inode_info"
+	mqueue_super_ops: "mqueue_inode_info",
+	hugetlbfs_ops: "hugetlbfs_inode_info"
 };
 
 /*
