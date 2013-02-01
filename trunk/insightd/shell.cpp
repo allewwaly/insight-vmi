@@ -208,6 +208,8 @@ Shell::Shell(bool listenOnSocket)
                  "  rules active             List all rules that are currently\n"
                  "                           active\n"
                  "  rules show <index>       Show details of rule <index>\n"
+                 "  rules enable <index>     Enable rule <index>\n"
+                 "  rules disable <index>    Disable rule <index>\n"
                  "  rules verbose [<level>]  Set the verbose level when evaluating\n"
                  "                           rules, may be between 0 (off) and 4 (on)\n"
                  "  rules flush              Removes all rules"));
@@ -2767,6 +2769,10 @@ int Shell::cmdRules(QStringList args)
         return cmdRulesList(args);
     else if (QString("active").startsWith(cmd))
         return cmdRulesActive(args);
+    else if (QString("disable").startsWith(cmd))
+        return cmdRulesDisable(args);
+    else if (QString("enable").startsWith(cmd))
+        return cmdRulesEnable(args);
     else if (QString("flush").startsWith(cmd))
         return cmdRulesFlush(args);
     else if (QString("show").startsWith(cmd))
@@ -2891,6 +2897,48 @@ int Shell::cmdRulesActive(QStringList args)
     return printRulesList(_sym.ruleEngine().activeRules(),
                           "Total active rules: ",
                           getActiveRule, getActiveRuleIndex, true);
+}
+
+
+int Shell::cmdRulesEnable(QStringList args)
+{
+    if (args.isEmpty()) {
+        cmdHelp(QStringList("rules"));
+        return ecInvalidArguments;
+    }
+
+    for (int i = 0; i < args.size(); ++i) {
+        const TypeRule* rule = parseRuleIndex(args[i]);
+        if (rule) {
+            if (_sym.ruleEngine().setActive(rule))
+                Console::out() << "Enabled rule " << args[i] << "." << endl;
+            else
+                Console::out() << "Could not enable " << args[i] << "." << endl;
+        }
+    }
+
+    return ecOk;
+}
+
+
+int Shell::cmdRulesDisable(QStringList args)
+{
+    if (args.isEmpty()) {
+        cmdHelp(QStringList("rules"));
+        return ecInvalidArguments;
+    }
+
+    for (int i = 0; i < args.size(); ++i) {
+        const TypeRule* rule = parseRuleIndex(args[i]);
+        if (rule) {
+            if (_sym.ruleEngine().setInactive(rule))
+                Console::out() << "Disabled rule " << args[i] << "." << endl;
+            else
+                Console::out() << "Rule " << args[i] << " already disabled." << endl;
+        }
+    }
+
+    return ecOk;
 }
 
 

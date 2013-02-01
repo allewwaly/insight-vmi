@@ -137,11 +137,9 @@ public:
 
     /**
      * Checks all rules for correctness and sets the relevant rules active.
-     * @param factory symbol factory to use for checking the rules
-     * @param OS specification to match against the rules
      * @param from index where to start checking the rules from
      */
-    void checkRules(SymFactory *factory, const OsSpecs* specs, int from = 0);
+    void checkRules(int from = 0);
 
     /**
      * Returns all rules that are stored in this engine.
@@ -201,6 +199,24 @@ public:
      * @return absolute file name of rules file
      */
     QString ruleFile(const TypeRule* rule) const;
+
+    /**
+     * Sets the given type rule as "active".
+     * @param rule type rule to activate
+     * @return \c true if the given rule was successfully activated, \c false
+     * otherwise
+     * \sa setInactive()
+     */
+    bool setActive(const TypeRule* rule);
+
+    /**
+     * Sets the given type rule as "inactive".
+     * @param rule type rule to deactivate
+     * @return \c true if the given rule was previously active, \c false
+     * otherwise
+     * \sa setActive()
+     */
+    bool setInactive(const TypeRule* rule);
 
     /**
      * Matches the given Instance with the given member access pattern agains
@@ -321,6 +337,9 @@ private:
     const OsFilter* insertOsFilter(const OsFilter* osf);
     int addAllLexicalTypes(const BaseType* type, ActiveRule& arule);
 
+    bool checkRule(TypeRule *rule, int index, const OsSpecs *specs);
+
+
     TypeRuleList _rules;
     ActiveRuleList _activeRules;
     ActiveRuleHash _rulesPerType;
@@ -331,6 +350,7 @@ private:
     int _rulesChecked;
     int _rulesToCheck;
     VerboseEvaluation _verbose;
+    KernelSymbols* _symbols;
 };
 
 #endif // TYPERULEENGINE_H
