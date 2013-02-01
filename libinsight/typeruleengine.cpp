@@ -3,7 +3,7 @@
 #include <insight/typerule.h>
 #include <insight/typerulereader.h>
 #include <insight/osfilter.h>
-#include <insight/symfactory.h>
+#include <insight/kernelsymbols.h>
 #include <insight/console.h>
 #include <insight/shellutil.h>
 #include <insight/scriptengine.h>
@@ -32,7 +32,8 @@ public:
 
 
 TypeRuleEngine::TypeRuleEngine(KernelSymbols *symbols)
-    : _ctx(new TypeRuleEngineContext(symbols)), _verbose(veOff)
+    : _ctx(new TypeRuleEngineContext(symbols)), _verbose(veOff),
+      _symbols(symbols)
 {
 }
 
@@ -136,7 +137,7 @@ int TypeRuleEngine::addAllLexicalTypes(const BaseType* type, ActiveRule& arule)
 }
 
 
-void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs, int from)
+void TypeRuleEngine::checkRules(int from)
 {
     operationStarted();
     _rulesChecked = 0;
@@ -154,10 +155,11 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs, int f
         _rulesToCheck = _rules.size() - from;
     }
 
-    if (!factory->symbolsAvailable() || _rules.isEmpty())
+    if (!_symbols->factory().symbolsAvailable() || _rules.isEmpty())
         return;
 
     forceOperationProgress();
+    OsSpecs specs(&_symbols->memSpecs());
 
     // Checking the rules from last to first assures that rules in the
     // _activeRules hash are processes first to last. That way, if multiple
@@ -166,83 +168,89 @@ void TypeRuleEngine::checkRules(SymFactory *factory, const OsSpecs* specs, int f
         ++_rulesChecked;
         checkOperationProgress();
 
-        TypeRule* rule = _rules[i];
-
-        // Check for OS filters first
-        if (rule->osFilter() && !rule->osFilter()->match(specs))
-            continue;
-
-        // Make sure a filter is specified
-        if (!rule->filter()) {
-            warnRule(rule, i, "is ignored because it does not specify a filter.");
-            continue;
-        }
-
-        try {
-            rule->action()->check(ruleFile(rule), rule, factory);
-        }
-        catch (TypeRuleException& e) {
-            QString s = QString("raised a %0:\n").arg(e.className());
-            if (e.xmlLine > 0) {
-                s += QString("At line %0").arg(e.xmlLine);
-                if (e.xmlColumn > 0) {
-                    s += QString(" column %0").arg(e.xmlColumn);
-                }
-                s += ": ";
-            }
-            s += e.message;
-            errRule(rule, i, s);
-            continue;
-        }
-        catch (GenericException& e) {
-            errRule(rule, i, QString("raised a %1 at %2:%3: %4")
-                    .arg(e.className())
-                    .arg(e.file)
-                    .arg(e.line)
-                    .arg(e.message));
-//            throw;
-            continue;
-        }
-
-        QScriptProgramPtr prog;
-
-        ActiveRule arule(i, rule, prog);
-
-        // Should we check variables or types?
-        int hits = 0;
-        // If we have a type name or a type ID, we don't have to try all rules
-        if (rule->filter()->filterActive(Filter::ftTypeNameLiteral)) {
-            const QString& name = rule->filter()->typeName();
-            BaseTypeStringHash::const_iterator
-                    it = factory->typesByName().find(name),
-                    e = factory->typesByName().end();
-            while (it != e && it.key() == name) {
-                hits += addAllLexicalTypes(it.value(), arule);
-                ++it;
-            }
-        }
-        else if (rule->filter()->filterActive(Filter::ftTypeId)) {
-            const BaseType* t = factory->findBaseTypeById(rule->filter()->typeId());
-            hits += addAllLexicalTypes(t, arule);
-        }
-        else {
-            foreach (const BaseType* bt, factory->types()) {
-                hits += addAllLexicalTypes(bt, arule);
-            }
-        }
-
-        // Warn if a rule does not match
-        if (hits) {
-            _hits[i] = hits;
-            _activeRules.append(arule);
-        }
-        else
-            warnRule(rule, i, "does not match any type.");
+        checkRule(_rules[i], i, &specs);
     }
 
     operationStopped();
     operationProgress();
     shellEndl();
+}
+
+
+bool TypeRuleEngine::checkRule(TypeRule *rule, int index, const OsSpecs *specs)
+{
+    // Check for OS filters first
+    if (rule->osFilter() && !rule->osFilter()->match(specs))
+        return false;
+
+    // Make sure a filter is specified
+    if (!rule->filter()) {
+        warnRule(rule, index, "is ignored because it does not specify a filter.");
+        return false;
+    }
+
+    SymFactory* factory = &_symbols->factory();
+
+    try {
+        rule->action()->check(ruleFile(rule), rule, factory);
+    }
+    catch (TypeRuleException& e) {
+        QString s = QString("raised a %0:\n").arg(e.className());
+        if (e.xmlLine > 0) {
+            s += QString("At line %0").arg(e.xmlLine);
+            if (e.xmlColumn > 0) {
+                s += QString(" column %0").arg(e.xmlColumn);
+            }
+            s += ": ";
+        }
+        s += e.message;
+        errRule(rule, index, s);
+        return false;
+    }
+    catch (GenericException& e) {
+        errRule(rule, index, QString("raised a %1 at %2:%3: %4")
+                .arg(e.className())
+                .arg(e.file)
+                .arg(e.line)
+                .arg(e.message));
+        return false;
+    }
+
+    QScriptProgramPtr prog;
+    ActiveRule arule(index, rule, prog);
+
+    // Should we check variables or types?
+    int hits = 0;
+    // If we have a type name or a type ID, we don't have to try all rules
+    if (rule->filter()->filterActive(Filter::ftTypeNameLiteral)) {
+        const QString& name = rule->filter()->typeName();
+        BaseTypeStringHash::const_iterator
+                it = factory->typesByName().find(name),
+                e = factory->typesByName().end();
+        while (it != e && it.key() == name) {
+            hits += addAllLexicalTypes(it.value(), arule);
+            ++it;
+        }
+    }
+    else if (rule->filter()->filterActive(Filter::ftTypeId)) {
+        const BaseType* t = factory->findBaseTypeById(rule->filter()->typeId());
+        hits += addAllLexicalTypes(t, arule);
+    }
+    else {
+        foreach (const BaseType* bt, factory->types()) {
+            hits += addAllLexicalTypes(bt, arule);
+        }
+    }
+
+    // Warn if a rule does not match
+    if (hits) {
+        _hits[index] = hits;
+        _activeRules.append(arule);
+    }
+    else
+        warnRule(rule, index, "does not match any type.");
+
+    return hits > 0;
 }
 
 
@@ -253,6 +261,58 @@ QString TypeRuleEngine::ruleFile(const TypeRule *rule) const
         rule->srcFileIndex() < _ruleFiles.size())
         return _ruleFiles[rule->srcFileIndex()];
     return QString();
+}
+
+
+bool TypeRuleEngine::setActive(const TypeRule *rule)
+{
+    // Find the rule in the list
+    for (int i = 0; i < _rules.size(); ++i) {
+        if (_rules[i] == rule) {
+            // Check if the rule is already active
+            if (_hits[i] == 0) {
+                OsSpecs specs(&_symbols->memSpecs());
+                checkRule(const_cast<TypeRule*>(rule), i, &specs);
+            }
+            return _hits[i] > 0;
+        }
+    }
+
+    return false;
+}
+
+
+bool TypeRuleEngine::setInactive(const TypeRule *rule)
+{
+    bool wasActive = false;
+    // Remove this rule from the list of active rules
+    ActiveRuleList::iterator lit = _activeRules.begin(),
+            le = _activeRules.end();
+    while (lit != le) {
+        if (lit->rule == rule) {
+            if (lit->index >= 0 && lit->index < _hits.size())
+                _hits[lit->index] = 0;
+            lit = _activeRules.erase(lit);
+            wasActive = true;
+            break;
+        }
+        else
+            ++lit;
+    }
+
+    if (wasActive) {
+        // Remove this rule from the matching type hash
+        ActiveRuleHash::iterator hit = _rulesPerType.begin(),
+                he = _rulesPerType.end();
+        while (hit != he) {
+            if (hit.value().rule == rule)
+                hit = _rulesPerType.erase(hit);
+            else
+                ++hit;
+        }
+    }
+
+    return wasActive;
 }
 
 

@@ -247,7 +247,7 @@ void KernelSymbols::checkRules(int from)
     Variable::setRuleEngine(0);
 
     OsSpecs specs(&_memSpecs);
-    _ruleEngine.checkRules(&_factory, &specs, from);
+    _ruleEngine.checkRules(from);
 
     // Enable engine only if we have active rules
     if (!_ruleEngine.activeRules().isEmpty()) {
