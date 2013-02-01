@@ -295,51 +295,56 @@ bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct,
 }
 
 
-bool MemoryMapHeuristics::isValidListHead(const Instance &i, bool defaultValid)
+bool MemoryMapHeuristics::isValidListHead(const Instance &listHead, bool defaultValid)
 {
     // Is this even a list_head?
-    if(i.isNull() || (!isListHead(i) && !isHListHead(i)))
+    if (listHead.isNull() || !isListHead(listHead))
         return false;
 
     // Check if a list_head.next.prev pointer points to list_head
     // as it should.
 
-    // Get the next pointer.
-    Instance next(i.member(0, 0, -1, ksNone));
-    quint64 nextPrevAdr = 0;
-
-    // Is the next pointer valid?
-    if (next.isNull())
-        return false;
-
+    // Test the next pointer.
     try {
-        // Get the value of the next and prev pointer
-        quint64 nextAdr = (quint64) next.toPointer();
-        quint64 prevAdr = (quint64) next.type()->toPointer(i.vmem(), next.address() +
-                                                           next.type()->size());
+        Instance next(listHead.member("next", 0, 0, ksNone));
+        Instance prev(listHead.member("prev", 0, 0, ksNone));
+
+        // Get the addresses where next and prev point to
+        quint64 nextAddr = (quint64) next.toPointer();
+        quint64 prevAddr = (quint64) prev.toPointer();
 
         // Check for possible default values.
         // We allow that a pointer can be 0, -1, next == prev, or
         // LIST_POISON1/LIST_POISON2 since this are actually valid values.
-        if (isDefaultValue(nextAdr, i.vmem()->memSpecs()) ||
-            isDefaultValue(prevAdr, i.vmem()->memSpecs()) || nextAdr == prevAdr)
-            return defaultValid;
+        if ( isDefaultValue(nextAddr, listHead.vmem()->memSpecs()) &&
+             isDefaultValue(prevAddr, listHead.vmem()->memSpecs()) )
+        {
+            if (!defaultValid)
+                return false;
+        }
+        else {
+            // No default values, should be valid pointers, so apply them
+            next = next.dereference(BaseType::trLexicalAllPointers, 1);
+            prev = prev.dereference(BaseType::trLexicalAllPointers, 1);
 
-        // Can we obtain the address that the next pointer points to
-        if(!i.vmem()->safeSeek(nextAdr))
-            return false;
+            // Can we access the address?
+            if (!next.isAccessible() || !prev.isAccessible())
+                return false;
 
-        // Get the value of the next.prev pointer
-        nextPrevAdr = (quint64) next.type()->toPointer(i.vmem(), nextAdr +
-                                                               next.type()->size());
+            // The next.prev pointer should point back to the address of the list_head.
+            quint64 nextPrevAddr = (quint64) next.member("prev", 0, 0, ksNone).toPointer();
+            if (listHead.address() != nextPrevAddr)
+                return false;
+
+            // The next.prev pointer should point back to the address of the list_head.
+            quint64 prevNextAddr = (quint64) prev.member("next", 0, 0, ksNone).toPointer();
+            if (listHead.address() != prevNextAddr)
+                return false;
+        }
     }
     catch (VirtualMemoryException&) {
         return false;
     }
-
-    // The next.prev pointer should point back to the address of the list_head.
-    if (i.address() != nextPrevAdr)
-        return false;
 
     return true;
 }
