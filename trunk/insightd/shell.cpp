@@ -44,6 +44,7 @@
 #include <insight/shellutil.h>
 #include "altreftyperulewriter.h"
 #include <insight/memorymap.h>
+#include <insight/memorymapbuildercs.h>
 #include <insight/console.h>
 #include <insight/errorcodes.h>
 
@@ -2162,95 +2163,127 @@ int Shell::cmdMemoryVerify(QStringList args)
     // Get the memory dump index to use
     int index = parseMemDumpIndex(args);
     // Perform the query
-    if (index >= 0) {
+    if (index < 0)
+        return ecInvalidIndex;
 
-        if (!args.isEmpty() && (args[0] == "-l" || args[0] == "--load")) {
-            args.pop_front();
-            _sym.memDumps().at(index)->loadSlubFile(args.isEmpty() ? QString() : args[0]);
-            return ecOk;
+    MemoryDump* mem = _sym.memDumps().at(index);
+
+    if (!args.isEmpty() && (args[0] == "-l" || args[0] == "--load")) {
+        args.pop_front();
+        mem->loadSlubFile(args.isEmpty() ? QString() : args[0]);
+        return ecOk;
+    }
+
+    Instance inst = mem->queryInstance(args.join(" "));
+    if (!inst.isValid()) {
+        Console::out() << "The query did not retrieve a valid instance." << endl;
+        return ecOk;
+    }
+    if (inst.isNull()) {
+        Console::out() << "The resulting instance is null." << endl;
+        return ecOk;
+    }
+
+    Console::out() << "Instance of type "
+                   << Console::colorize(
+                          QString("0x%0").arg((uint)inst.type()->id(), 0, 16),
+                          ctTypeId)
+                   << " " << Console::prettyNameInColor(inst.type(), 0)
+                   << Console::color(ctReset) << " @ " << Console::color(ctAddress) << "0x" << hex
+                   << inst.address() << dec << Console::color(ctReset) << ":" << endl;
+
+    // Verify against SLUB objects
+    Console::out() << "SLUB caches:    ";
+    const SlubObjects* slubs = 0;
+
+    // Which slub objects to use?
+    if (mem->slubs().numberOfObjects())
+        slubs = &mem->slubs();
+    else if (mem->map() && mem->map()->verifier().slub().numberOfObjects())
+        slubs = &mem->map()->verifier().slub();
+
+    if (!slubs) {
+        Console::out() << "No slub file loaded for memory dump "
+                       << index << "." << endl;
+    }
+    else {
+        SlubObjects::ObjectValidity v = slubs->objectValid(&inst);
+        Console::out() << "instance is " << Console::color(ctBold);
+
+        switch(v) {
+        // Instance is invalid, no further information avaliable
+        case SlubObjects::ovInvalid:
+            Console::out() << "invalid"; break;
+            // Instance not found, but base type actually not present in any slab
+        case SlubObjects::ovNoSlabType:
+            Console::out() << "no slub type"; break;
+            // Instance not found, even though base type is managed in slabs
+        case SlubObjects::ovNotFound:
+            Console::out() << "not found"; break;
+            // Instance type or address conflicts with object in the slabs
+        case SlubObjects::ovConflict:
+            Console::out() << "in conflict"; break;
+            // Instance is embedded within a larger object in the slabs
+        case SlubObjects::ovEmbedded:
+            Console::out() << "embedded in a struct"; break;
+            // Instance may be embedded within a larger object in the slabs
+        case SlubObjects::ovEmbeddedUnion:
+            Console::out() << "embedded in a union"; break;
+            // Instance is embeddes in another object in the slab when using the SlubObjects::_typeCasts exception list
+        case SlubObjects::ovEmbeddedCastType:
+            Console::out() << "embedded in a valid cast type"; break;
+            // Instance lies within reserved slab memory for which no type information is available
+        case SlubObjects::ovMaybeValid:
+            Console::out() << "maybe valid"; break;
+            // Instance was either found in the slabs or in a global variable
+        case SlubObjects::ovValid:
+            Console::out() << "valid"; break;
+            // Instance matches an object in the slab when using the SlubObjects::_typeCasts exception list
+        case SlubObjects::ovValidCastType:
+            Console::out() << "a valid cast type"; break;
+        case SlubObjects::ovValidGlobal:
+            Console::out() << "a valid global variable"; break;
         }
-        else {
-            Instance inst = _sym.memDumps().at(index)->queryInstance(args.join(" "));
-            if (!inst.isValid()) {
-                Console::out() << "The query did not retrieve a valid instance." << endl;
-                return ecOk;
-            }
-            if (inst.isNull()) {
-                Console::out() << "The resulting instance is null." << endl;
-                return ecOk;
-            }
 
-            Console::out() << "Instance of type " << Console::prettyNameInColor(inst.type(), 0)
-                 << Console::color(ctReset) << " @ " << Console::color(ctAddress) << "0x" << hex
-                 << inst.address() << dec << Console::color(ctReset) << ":" << endl;
+        Console::out() << Console::color(ctReset) << "." << endl;
 
-            // Verify against SLUB objects
-            Console::out() << "SLUB caches:   ";
-            if (_sym.memDumps().at(index)->slubs().numberOfObjects() <= 0) {
-                Console::out() << "No slub file loaded for memory dump " << index << "."
-                     << endl;
-            }
-            else {
-                SlubObjects::ObjectValidity v = _sym.memDumps().at(index)->validate(&inst);
-                Console::out() << "instance is " << Console::color(ctBold);
-
-                switch(v) {
-                // Instance is invalid, no further information avaliable
-                case SlubObjects::ovInvalid:
-                    Console::out() << "invalid"; break;
-                    // Instance not found, but base type actually not present in any slab
-                case SlubObjects::ovNoSlabType:
-                    Console::out() << "no slub type"; break;
-                    // Instance not found, even though base type is managed in slabs
-                case SlubObjects::ovNotFound:
-                    Console::out() << "not found"; break;
-                    // Instance type or address conflicts with object in the slabs
-                case SlubObjects::ovConflict:
-                    Console::out() << "in conflict"; break;
-                    // Instance is embedded within a larger object in the slabs
-                case SlubObjects::ovEmbedded:
-                    Console::out() << "embedded in a struct"; break;
-                    // Instance may be embedded within a larger object in the slabs
-                case SlubObjects::ovEmbeddedUnion:
-                    Console::out() << "embedded in a union"; break;
-                    // Instance is embeddes in another object in the slab when using the SlubObjects::_typeCasts exception list
-                case SlubObjects::ovEmbeddedCastType:
-                    Console::out() << "embedded in a valid cast type"; break;
-                    // Instance lies within reserved slab memory for which no type information is available
-                case SlubObjects::ovMaybeValid:
-                    Console::out() << "maybe valid"; break;
-                    // Instance was either found in the slabs or in a global variable
-                case SlubObjects::ovValid:
-                    Console::out() << "valid"; break;
-                    // Instance matches an object in the slab when using the SlubObjects::_typeCasts exception list
-                case SlubObjects::ovValidCastType:
-                    Console::out() << "a valid cast type"; break;
-                case SlubObjects::ovValidGlobal:
-                    Console::out() << "a valid global variable"; break;
-                }
-
-                Console::out() << Console::color(ctReset) << "." << endl;
-            }
-
-            // Verify against magic numbers
-            bool hasConst, valid = inst.isValidConcerningMagicNumbers(&hasConst);
-            Console::out() << "Magic numbers: instance ";
-            if (hasConst) {
-                Console::out() << "is " << Console::color(ctBold);
-                if (valid)
-                    Console::out() << "valid";
-                else
-                    Console::out() << "invalid";
-                Console::out() << Console::color(ctReset) << "." << endl;
-            }
-            else
-                Console::out() << "has no magic constants." << endl;
-
-
-            return ecOk;
+        if (v == SlubObjects::ovConflict) {
+            Console::out() << "Object in SLUB: ";
+            SlubObject obj = slubs->objectAt(inst.address());
+            Console::out() << Console::colorize(
+                                  QString("0x%0").arg((uint)obj.baseType->id(), 0, 16),
+                                  ctTypeId)
+                           << " "
+                           << Console::prettyNameInColor(obj.baseType)
+                           << Console::color(ctReset) << " @ "
+                           << Console::colorize(
+                                  QString("0x%0").arg(obj.address, 0, 16),
+                                  ctAddress)
+                           << endl;
         }
     }
-    return ecInvalidIndex;
+
+    // Verify against magic numbers
+    bool hasConst, valid = inst.isValidConcerningMagicNumbers(&hasConst);
+    Console::out() << "Magic numbers:  instance ";
+    if (hasConst) {
+        Console::out() << "is " << Console::color(ctBold);
+        if (valid)
+            Console::out() << "valid";
+        else
+            Console::out() << "invalid";
+        Console::out() << Console::color(ctReset) << "." << endl;
+    }
+    else
+        Console::out() << "has no magic constants." << endl;
+
+    if (mem->map()) {
+        // Calculate node probabiility
+        float prob = MemoryMapBuilderCS::calculateNodeProb(inst);
+        Console::out() << "Probability:    " << prob << endl;
+    }
+
+    return ecOk;
 }
 
 
@@ -2260,10 +2293,29 @@ int Shell::cmdMemoryDump(QStringList args)
     int index = parseMemDumpIndex(args);
     // Perform the dump
     if (index >= 0) {
-        QRegExp re("^\\s*([_a-zA-Z][_a-zA-Z0-9]*(?:\\.[_a-zA-Z][_a-zA-Z0-9]*)*)\\s*(?:([0-9]+)\\s*)?@\\s*(?:0x)?([a-fA-F0-9]+)\\s*$");
+#define DEC_LITERAL "[0-9]+"
+#define HEX_LITERAL "(?:0x)?[0-9a-fA-F]+"
+#define IDENTIFIER  "[_a-zA-Z][_a-zA-Z0-9]*"
+#define OPT_WS     "\\s*"
+#define TYPE_NAME  IDENTIFIER
+#define TYPE_FIELD IDENTIFIER
+#define TYPE_ID    HEX_LITERAL
+#define DUMP_LEN   DEC_LITERAL
+#define ADDRESS    HEX_LITERAL
+#define CAP(s) "(" s ")"
+#define GROUP(s) "(?:" s ")"
+        QRegExp re("^" OPT_WS
+                   CAP(GROUP(TYPE_NAME "|" TYPE_ID) GROUP("\\." TYPE_FIELD) "*")
+                   OPT_WS
+                   GROUP(CAP(DUMP_LEN) OPT_WS) "?"
+                   "@" OPT_WS
+                   CAP(ADDRESS)
+                   OPT_WS "$");
 
         if (!re.exactMatch(args.join(" "))) {
             Console::errMsg("Usage: memory dump [index] <raw|char|int|long|type-name|type-id>(.<member>)* [length] @ <address>");
+            debugmsg(args.join(" "));
+            debugmsg(re.pattern());
             return 1;
         }
 
