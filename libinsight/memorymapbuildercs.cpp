@@ -291,10 +291,10 @@ void MemoryMapBuilderCS::processInstanceFromRule(const Instance &parent,
 }
 
 
-float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
-        float parentProbability) const
+float MemoryMapBuilderCS::calculateNodeProb(const Instance &inst,
+                                            float parentProbability,
+                                            MemoryMap *map)
 {
-
 //    if (inst.type()->name() == "sysfs_dirent")
 //        debugmsg("Calculating prob. of " << inst.typeName());
 
@@ -329,8 +329,8 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
                  1.0 :
                  parentProbability * (1.0 - degPerGeneration);
 
-    if (parentProbability >= 0)
-        _map->_shared->degPerGenerationCnt++;
+    if (map && parentProbability >= 0)
+        map->_shared->degPerGenerationCnt++;
 
 //    // Check userland address
 //    if (inst.address() < _map->_vmem->memSpecs().pageOffset) {
@@ -393,7 +393,8 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
         else if (invalidChildren > 0) {
             float invalidPct = invalidChildren / (float) testedChildren;
             prob *= invalidPct * (1.0 - degForInvalidChildAddr) + (1.0 - invalidPct);
-            _map->_shared->degForInvalidChildAddrCnt++;
+            if (map)
+                map->_shared->degForInvalidChildAddrCnt++;
         }
     }
 
@@ -406,7 +407,15 @@ float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
 }
 
 
-int MemoryMapBuilderCS::countInvalidChildren(const Instance &inst, int *total) const
+float MemoryMapBuilderCS::calculateNodeProbability(const Instance& inst,
+        float parentProbability) const
+{
+    return calculateNodeProb(inst, parentProbability, _map);
+}
+
+
+
+int MemoryMapBuilderCS::countInvalidChildren(const Instance &inst, int *total)
 {
     int userlandPtrs = 0, tot = 0;
     int invalid = countInvalidChildrenRek(inst, &tot, &userlandPtrs);
@@ -423,7 +432,7 @@ int MemoryMapBuilderCS::countInvalidChildren(const Instance &inst, int *total) c
 
 
 int MemoryMapBuilderCS::countInvalidChildrenRek(const Instance &inst, int *total,
-                                                int *userlandPtrs) const
+                                                int *userlandPtrs)
 {
     int invalidChildren = 0;
     int invalidListHeads = 0;
