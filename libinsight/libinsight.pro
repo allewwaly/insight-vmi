@@ -98,7 +98,8 @@ HEADERS += \
     include/insight/variable.h \
     include/insight/virtualmemory.h \
     include/insight/volatiletype.h \
-    include/insight/xmlschema.h
+    include/insight/xmlschema.h \
+    include/insight/compiler.h
 
 SOURCES += \
     altreftype.cpp \
