@@ -34,6 +34,10 @@ public:
     virtual float calculateNodeProbability(const Instance &inst,
                                            float parentProbability) const;
 
+    static float calculateNodeProb(const Instance &inst,
+                                   float parentProbability = 1.0,
+                                   MemoryMap* map = 0);
+
 protected:
     virtual void run();
 
@@ -49,9 +53,9 @@ protected:
 
 private:
     void addMembers(const Instance &inst, MemoryMapNode* node);
-    int countInvalidChildren(const Instance &inst, int *total) const;
-    int countInvalidChildrenRek(const Instance &inst, int *total,
-                                int *userlandPtrs) const;
+    static int countInvalidChildren(const Instance &inst, int *total);
+    static int countInvalidChildrenRek(const Instance &inst, int *total,
+                                       int *userlandPtrs);
 };
 
 #endif /* MEMORYMAPBUILDERCS_H_ */
