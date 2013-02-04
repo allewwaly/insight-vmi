@@ -46,8 +46,11 @@ inline base_t* ReferencingType::refTypeTempl(ref_t *ref)
         return 0;
     // Did the types in the factory change?
     if (ref->_refTypeChangeClock != ref->fac()->changeClock()) {
+        ref->_deepResolveMutex.lock();
         ref->_refType = ref->_refTypeDeep = 0;
+        ref->_deepResolvedTypes = 0;
         ref->_refTypeChangeClock = ref->fac()->changeClock();
+        ref->_deepResolveMutex.unlock();
     }
     // Cache the value
     if (!ref->_refType)
@@ -71,9 +74,11 @@ BaseType* ReferencingType::refType()
 template<class ref_t, class base_t, class ref_base_t>
 inline base_t* ReferencingType::refTypeDeepTempl(ref_t *ref, int resolveTypes)
 {
+    ref->_deepResolveMutex.lock();
     // Did the types in the factory change?
     if (ref->_refTypeChangeClock != ref->fac()->changeClock()) {
         ref->_refType = ref->_refTypeDeep = 0;
+        ref->_deepResolvedTypes = 0;
         ref->_refTypeChangeClock = ref->fac()->changeClock();
     }
     // Cache the value
@@ -89,6 +94,7 @@ inline base_t* ReferencingType::refTypeDeepTempl(ref_t *ref, int resolveTypes)
         ref->_refTypeDeep = const_cast<BaseType*>(t);
     }
 
+    ref->_deepResolveMutex.unlock();
     return ref->_refTypeDeep;
 }
 
