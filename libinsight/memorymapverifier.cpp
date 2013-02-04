@@ -689,7 +689,6 @@ void MemoryMapVerifier::statisticsHelper(MemoryMapNode *node)
 
 void MemoryMapVerifier::statistics()
 {
-    QMutexLocker locker(&this->verifierMutex);
     // We can only created statistics if we have access to slub information
     if (!_slubDataAvailable)
         return;

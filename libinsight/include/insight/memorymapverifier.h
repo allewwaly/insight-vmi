@@ -224,8 +224,6 @@ private:
 
     float _minValidProbability;
     float _maxInvalidProbability;
-
-    QMutex verifierMutex;
 };
 
 #endif // MEMORYMAPVERIFIER_H
