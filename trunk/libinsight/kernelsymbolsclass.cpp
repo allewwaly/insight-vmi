@@ -165,7 +165,7 @@ bool KernelSymbolsClass::variableExists(int id) const
 }
 
 
-bool KernelSymbolsClass::typeExists(const QString &name) const
+bool KernelSymbolsClass::variableExists(const QString &name) const
 {
     if (!_symbols)
         return false;
@@ -181,7 +181,7 @@ bool KernelSymbolsClass::typeExists(int id) const
 }
 
 
-bool KernelSymbolsClass::variableExists(const QString &name) const
+bool KernelSymbolsClass::typeExists(const QString &name) const
 {
     if (!_symbols)
         return false;
