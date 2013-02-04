@@ -27,6 +27,9 @@ CONFIG += warn_on
 
 #---------------------------[ End of configuration ]----------------------------
 
+# Create both debug and release build files
+CONFIG += debug_and_release
+
 # Directory where libraries are created
 BUILD_DIR =
 win32 {
