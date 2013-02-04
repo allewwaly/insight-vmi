@@ -28,6 +28,8 @@ function inode_resolve_embedding(inode)
 	// Compare super_operations address linked by inode to all other known
 	// super_operations types
 	for (var ops_name in inode_types) {
+		if (!Symbols.variableExists(ops_name))
+			continue;
 		var sb_ops = new Instance(ops_name);
 		if (i_sb_ops.Address() == sb_ops.Address()) {
 			inode.ChangeType(inode_types[ops_name]);
