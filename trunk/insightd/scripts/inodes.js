@@ -7,7 +7,10 @@ const inode_types = {
 	bdev_sops: "bdev_inode",
 	sockfs_ops: "socket_alloc",
 	mqueue_super_ops: "mqueue_inode_info",
-	hugetlbfs_ops: "hugetlbfs_inode_info"
+	hugetlbfs_ops: "hugetlbfs_inode_info",
+	ext2_sops: "ext2_inode_info",
+	ext3_sops: "ext3_inode_info",
+	ext4_sops: "ext4_inode_info"
 };
 
 /*
