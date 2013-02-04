@@ -126,6 +126,34 @@ public slots:
 	QList<int> variableIds() const;
 
 	/**
+	 * Checks if the variable with the given ID exists.
+	 * @param id variable ID
+	 * @return
+	 */
+	bool variableExists(int id) const;
+
+	/**
+	 * Checks if the variable with the given name exists.
+	 * @param name variable name
+	 * @return
+	 */
+	bool variableExists(const QString& name) const;
+
+	/**
+	 * Checks if the type with the given ID exists.
+	 * @param id type ID
+	 * @return
+	 */
+	bool typeExists(int id) const;
+
+	/**
+	 * Checks if the type with the given name exists.
+	 * @param name type name
+	 * @return
+	 */
+	bool typeExists(const QString& name) const;
+
+	/**
 	 * Creates an Instance of the type with given ID \a id and a null address.
 	 * If no type with ID \a id exists, an empty Instance object is returned.
 	 * @param id the type ID for the instance

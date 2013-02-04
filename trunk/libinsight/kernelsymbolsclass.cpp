@@ -157,6 +157,38 @@ QList<int> KernelSymbolsClass::variableIds() const
 }
 
 
+bool KernelSymbolsClass::variableExists(int id) const
+{
+    if (!_symbols)
+        return false;
+    return _symbols->factory().findVarById(id) != 0;
+}
+
+
+bool KernelSymbolsClass::typeExists(const QString &name) const
+{
+    if (!_symbols)
+        return false;
+    return _symbols->factory().findVarByName(name) != 0;
+}
+
+
+bool KernelSymbolsClass::typeExists(int id) const
+{
+    if (!_symbols)
+        return false;
+    return _symbols->factory().findBaseTypeById(id) != 0;
+}
+
+
+bool KernelSymbolsClass::variableExists(const QString &name) const
+{
+    if (!_symbols)
+        return false;
+    return _symbols->factory().findBaseTypeByName(name) != 0;
+}
+
+
 Instance KernelSymbolsClass::getType(int id, int index) const
 {
 	if (!_symbols)
