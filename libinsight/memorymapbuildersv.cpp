@@ -95,13 +95,6 @@ void MemoryMapBuilderSV::run()
         }
         */
 
-        // Insert in non-critical (non-exception prone) mappings
-        shared->typeInstancesLock.lockForWrite();
-        _map->_typeInstances.insert(node->type()->id(), node);
-        if (shared->maxObjSize < node->size())
-            shared->maxObjSize = node->size();
-        shared->typeInstancesLock.unlock();
-
         // try to save the physical mapping
         try {
             int pageSize;
@@ -158,15 +151,15 @@ void MemoryMapBuilderSV::run()
         queueLock.relock();
     }
 
-#if MEMORY_MAP_VERIFICATION == 1
-    builderMutex.lock();
-    if(!statisticsShown)
-    {
-        statisticsShown = true;
-        _map->verifier().statistics();
-    }
-    builderMutex.unlock();
-#endif
+//#if MEMORY_MAP_VERIFICATION == 1
+//    builderMutex.lock();
+//    if(!statisticsShown)
+//    {
+//        statisticsShown = true;
+//        _map->verifier().statistics();
+//    }
+//    builderMutex.unlock();
+//#endif
 
 }
 
