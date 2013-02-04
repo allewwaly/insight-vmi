@@ -221,12 +221,26 @@ void MemoryMap::addVarInstance(const Instance& inst)
     }
 
     _roots.append(node);
-    _vmemMap.insert(node);
-    _vmemAddresses.insert(node->address());
+    addNodeToHashes(node);
 
 
     if (shouldEnqueue(inst, node))
         _shared->queue.insert(node->probability(), node);
+}
+
+
+void MemoryMap::addNodeToHashes(MemoryMapNode *node)
+{
+    _shared->vmemMapLock.lockForWrite();
+    _vmemAddresses.insert(node->address());
+    _vmemMap.insert(node);
+    if (_shared->maxObjSize < node->size())
+        _shared->maxObjSize = node->size();
+    _shared->vmemMapLock.unlock();
+
+    _shared->typeInstancesLock.lockForWrite();
+    _typeInstances.insert(node->type()->id(), node);
+    _shared->typeInstancesLock.unlock();
 }
 
 
@@ -362,8 +376,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
         }
 
         _roots.append(node);
-        _vmemMap.insert(node);
-        _vmemAddresses.insert(node->address());
+        addNodeToHashes(node);
     }
 
     // The btSlubCache type ONLY adds all slub objects to the map and does not
@@ -382,8 +395,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
                 node = new MemoryMapNode(this, cache.name, it.key(),
                                          cache.objSize, 0);
             _roots.append(node);
-            _vmemMap.insert(node);
-            _vmemAddresses.insert(node->address());
+            addNodeToHashes(node);
         }
     }
     // Regular mode, process all instances in the queue.
@@ -955,10 +967,7 @@ MemoryMapNode *MemoryMap::addChild(
                 return child;
             }
 
-            _shared->vmemMapLock.lockForWrite();
-            _vmemAddresses.insert(child->address());
-            _vmemMap.insert(child);
-            _shared->vmemMapLock.unlock();
+            addNodeToHashes(child);
 
             // Insert the new node into the queue
             if (addToQueue && shouldEnqueue(i, child)) {

@@ -52,13 +52,6 @@ void MemoryMapBuilderCS::run()
         ++shared->processed;
         queueLock.unlock();
 
-        // Insert in non-critical (non-exception prone) mappings
-        shared->typeInstancesLock.lockForWrite();
-        _map->_typeInstances.insert(node->type()->id(), node);
-        if (shared->maxObjSize < node->size())
-            shared->maxObjSize = node->size();
-        shared->typeInstancesLock.unlock();
-
         // try to save the physical mapping
         try {
             int pageSize;
@@ -332,22 +325,6 @@ float MemoryMapBuilderCS::calculateNodeProb(const Instance &inst,
     if (map && parentProbability >= 0)
         map->_shared->degPerGenerationCnt++;
 
-//    // Check userland address
-//    if (inst.address() < _map->_vmem->memSpecs().pageOffset) {
-//        prob *= 1.0 - degForUserlandAddr;
-//        _map->_shared->degForUserlandAddrCnt++;
-//    }
-//    // Check validity
-//    if (! _map->_vmem->safeSeek((qint64) inst.address()) ) {
-//        prob *= 1.0 - degForInvalidAddr;
-//        _map->_shared->degForInvalidAddrCnt++;
-//    }
-//    // Check alignment
-//    else if (inst.address() & 0x3ULL) {
-//        prob *= 1.0 - degForUnalignedAddr;
-//        _map->_shared->degForUnalignedAddrCnt++;
-//    }
-
     // Is the instance valid?
     if (!MemoryMapHeuristics::isValidInstance(inst)) {
         // Instance is invalid, so do not check futher
@@ -399,8 +376,10 @@ float MemoryMapBuilderCS::calculateNodeProb(const Instance &inst,
     }
 
     if (prob < 0 || prob > 1) {
-        debugerr("Probability for node is " << prob << ", should be between "
-                 "0 and 1.");
+        debugerr("Probability for of type '" << inst.typeName() << "' at 0x"
+                 << QString::number(inst.address(), 0, 16) << " is " << prob
+                 << ", should be between 0 and 1.");
+        prob = 0; // Make it safe
     }
 
     return prob;

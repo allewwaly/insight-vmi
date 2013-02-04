@@ -382,6 +382,8 @@ private:
      */
     void addVarInstance(const Instance& inst);
 
+    void addNodeToHashes(MemoryMapNode *node);
+
     MemoryMapBuilder** _threads;
     KernelSymbols* _symbols;     ///< holds the KernelSymbols to operate on
     VirtualMemory* _vmem;        ///< the virtual memory object this map is being built for
