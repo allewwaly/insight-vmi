@@ -12,6 +12,7 @@
 #include "instance.h"
 #include "basetype.h"
 #include "altreftype.h"
+#include <QMutex>
 
 class SymFactory;
 class ASTExpression;
@@ -226,6 +227,7 @@ protected:
     mutable BaseType* _refTypeDeep;
     mutable int _deepResolvedTypes;
     mutable quint32 _refTypeChangeClock;
+    mutable QMutex _deepResolveMutex;
 
     AltRefTypeList _altRefTypes; ///< a list of alternative types
     static const AltRefType _emptyRefType;
