@@ -541,7 +541,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         // Print detailed debug output
         valid = -1;
         _slubConflict++;
-#ifdef MEMMAP_DEBUG
+#if defined(MEMMAP_DEBUG) && 0
         // Only give a warning for objects with good probability
         if (node->probability() > 0.5) {
             SlubObject obj = _slub.objectAt(i.address());
@@ -611,7 +611,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     else {
         if (!valid)
             valid = -1;
-#ifdef MEMMAP_DEBUG
+#if defined(MEMMAP_DEBUG) && 0
         else if (valid > 0) {
             debugmsg("Instance @ 0x" << std::hex << i.address()
                      << std::dec << " with type " << i.type()->prettyName()
@@ -634,7 +634,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         _typeCountValid[node->type()]++;
 
 #ifdef MEMMAP_DEBUG
-        if (valid > 0 && node->probability() < 0.1)
+        if (valid > 0 && node->probability() < 0.3)
             debugmsg(QString("Valid object with prob < 0.1: %1").arg(i.fullName()));
 #endif
     }
@@ -644,7 +644,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         _totalInvalidDistribution[probIndex]++;
         _typeCountInvalid[node->type()]++;
 
-#ifdef MEMMAP_DEBUG
+#if defined(MEMMAP_DEBUG) && 0
         if (node->probability() > 0.9) {
             switch (v) {
             // A conflict has its dedicated error message
