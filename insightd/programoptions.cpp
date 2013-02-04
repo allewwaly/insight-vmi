@@ -313,6 +313,7 @@ bool ProgramOptions::parseCmdOptions(QStringList args)
                 return false;
             }
             MultiThreading::setMaxThreads(threads);
+            nextToken = ntOption;
         }
         }
     }
