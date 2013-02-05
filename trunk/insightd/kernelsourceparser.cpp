@@ -227,7 +227,7 @@ void KernelSourceParser::parse()
         {
             counter++;
             s.clear();
-            QList<QString> constString = (m->constantStringValue());
+            QList<QString> constString = (m->constantStringValues());
             for (int j = 0; j < constString.size(); ++j) {
                 if (j > 0)
                     s += ", ";

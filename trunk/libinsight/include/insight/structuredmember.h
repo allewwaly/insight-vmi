@@ -158,7 +158,7 @@ public:
     {
         return _constIntValues;
     }
-    inline const QStringList& constantStringValue() const
+    inline const QStringList& constantStringValues() const
     {
         return _constStringValues;
     }
