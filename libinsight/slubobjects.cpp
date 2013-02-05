@@ -469,8 +469,17 @@ void SlubObjects::addObject(const QString &name, QString addr, int lineNo)
     bool ok;
     quint64 a = addr.toULongLong(&ok, 16);
 
-    if (ok)
-        addObject(name, a);
+
+    if (ok) {
+        if (a < _factory->memSpecs().pageOffset ||
+            a > _factory->memSpecs().vaddrSpaceEnd())
+        {
+            debugerr(QString("Address 0x%0 in slub %1 is not part of the "
+                             "kernel space!").arg(a, 0, 16).arg(name));
+        }
+        else
+            addObject(name, a);
+    }
     else
         debugerr(QString("Failed parsing address from \"%2\" at line %1")
                  .arg(lineNo).arg(addr));
