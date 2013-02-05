@@ -3792,6 +3792,29 @@ void Shell::printStructMembers(const Structured* s, const Variable* ctx_var,
              << qSetFieldWidth(0) << " "
              << pretty;
 
+        // Show constant member values
+        if (m->hasConstantIntValues()) {
+            Console::out() << " in {";
+            for (int i = 0; i < m->constantIntValues().size(); ++i) {
+                if (i > 0)
+                    Console::out() << ", ";
+                Console::out() << m->constantIntValues().at(i);
+            }
+            Console::out() << "}";
+        }
+        else if (m->hasConstantStringValues()) {
+            Console::out() << " in {";
+            for (int i = 0; i < m->constantStringValues().size(); ++i) {
+                if (i > 0)
+                    Console::out() << ", ";
+                Console::out() << m->constantStringValues().at(i);
+            }
+            Console::out() << "}";
+        }
+        else if (m->hasStringValues()) {
+            Console::out() << "(is a string)";
+        }
+
         // Print members of anonymous structs/unions recursively
         if (rt && (rt->type() & StructOrUnion) && rt->name().isEmpty()) {
             Console::out() << endl << qSetFieldWidth(indent) << "" << qSetFieldWidth(0) << "{" << endl;
