@@ -414,69 +414,98 @@ int MemoryMapBuilderCS::countInvalidChildrenRek(const Instance &inst, int *total
                                                 int *userlandPtrs)
 {
     int invalidChildren = 0;
-    int invalidListHeads = 0;
     int testedChildren = 0;
     bool isUnion = (inst.type()->type() == rtUnion);
+    int unionMemberInvalid = -1, unionMemberTested = 0;
     const int cnt = inst.memberCount();
 
     // Check address of all descendant pointers
     for (int i = 0; i < cnt; ++i) {
         Instance mi(inst.member(i, BaseType::trLexical, 0, ksNone));
+        bool wasTested = false, wasInvalid = false;
 
         if (!mi.isValid()) {
-            ++invalidChildren;
-            ++testedChildren;
+            wasInvalid = wasTested = true;
         }
         else if (mi.type()->type() & rtPointer) {
+            wasTested = true;
             bool isUserland = false;
             if (!MemoryMapHeuristics::isValidUserLandPointer(mi, true, &isUserland))
-                invalidChildren++;
+                wasInvalid = true;
             // Count the user-land pointers
             else if (isUserland)
                 ++(*userlandPtrs);
-            ++testedChildren;
         }
         else if (MemoryMapHeuristics::isFunctionPointer(mi)) {
+            wasTested = true;
             if (!MemoryMapHeuristics::isValidFunctionPointer(mi))
-                invalidChildren++;
-            ++testedChildren;
+                wasInvalid = true;
         }
         else if (MemoryMapHeuristics::isListHead(mi)) {
             if (!MemoryMapHeuristics::isValidListHead(mi, true))
                 return -1; // return immediately for invalid list_heads
-            ++testedChildren;
+            wasTested = true;
         }
         // Test embedded structs/unions recursively
         else if (mi.type()->type() & StructOrUnion) {
             int tot = 0;
             int ret = countInvalidChildrenRek(mi, &tot, userlandPtrs);
-            // Pass invalid list_heads through for structs, count them for unions
-            if (ret < 0) {
-                if (isUnion) {
-                    ++invalidListHeads;
-                    ++invalidChildren;
+
+            // For unions, keep track of the "most valid" child (i.e., the
+            // child with the best invalid/tested ratio.
+            if (isUnion) {
+                // A value of -1 can't get any worse (invalid list head)
+                if (unionMemberInvalid < 0) {
+                    unionMemberInvalid = ret;
+                    unionMemberTested = tot;
                 }
-                else
-                    return ret;
+                // Which child has the better invalid/tested ratio?
+                else if (!unionMemberTested ||
+                         (tot > 0 &&
+                          (unionMemberInvalid / (float) unionMemberTested) >
+                          (ret / (float) tot)))
+                {
+                    unionMemberInvalid = ret;
+                    unionMemberTested = tot;
+                }
             }
+            // For structs, pass invalid list_heads through, otherwise count
+            // invalid and total tested members.
             else {
+                if (ret < 0)
+                    return ret;
                 testedChildren += tot;
                 invalidChildren += ret;
+            }
+        }
+
+        if (wasTested) {
+            if (isUnion) {
+                // Which child has the better validity? -1 is the worst.
+                if (unionMemberInvalid < 0) {
+                    unionMemberTested = 1;
+                    unionMemberInvalid = wasInvalid ? 1 : 0;
+                }
+                // Depending on wasInvalid, the ratio is either 0 or 1,
+                // where 1 is the second to worst.
+                else if (!wasInvalid) {
+                    unionMemberTested = 1;
+                    unionMemberInvalid = 0;
+                }
+            }
+            else {
+                // For structs we just count the valid and invalid children
+                ++testedChildren;
+                if (wasInvalid)
+                    ++invalidChildren;
             }
         }
     }
 
     if (isUnion) {
-        // A union counts for only one child
-        *total = 1;
-        // If all children had invalid list_heads, pass -1 through, otherwise
-        // we assume a least one member was ok.
-        if (invalidChildren < cnt)
-            return 0;
-        else if (invalidListHeads == invalidChildren)
-            return -1;
-        else
-            return 1;
+        // A union counts for the most valid child
+        *total = unionMemberTested;
+        return unionMemberInvalid;
     }
     else {
         *total = testedChildren;
