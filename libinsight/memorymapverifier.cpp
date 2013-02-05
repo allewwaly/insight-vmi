@@ -592,8 +592,8 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     if (i.isValidConcerningMagicNumbers(&hasConst)) {
         _magicNumberValid++;
         if (hasConst){
-            if (valid == 0)
-                valid = 1;
+//            if (valid == 0)
+//                valid = 1;
 //            else if (valid < 0) {
 //                debugmsg("Instance @ 0x" << std::hex << i.address()
 //                         << std::dec << " with type " << i.type()->prettyName()
@@ -602,7 +602,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
 //            }
 
             _magicNumberValid_withConst++;
-            node->setSeemsValid();
+//            node->setSeemsValid();
             if (v == SlubObjects::ovNotFound)
                 _magicNumberValid_notSlub++;
             _magicnumberValidDistribution[probIndex]++;
@@ -635,7 +635,9 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
 
 #ifdef MEMMAP_DEBUG
         if (valid > 0 && node->probability() < 0.3)
-            debugmsg(QString("Valid object with prob < 0.1: %1").arg(i.fullName()));
+            debugmsg(QString("Valid object with prob %0: %1")
+                     .arg(node->probability(), 0, 'f', 4)
+                     .arg(i.fullName()));
 #endif
     }
     // Final decision: Is the object invalid?
