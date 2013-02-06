@@ -415,6 +415,8 @@ int MemoryMapBuilderCS::countInvalidChildrenRek(const Instance &inst, int *total
 {
     int invalidChildren = 0;
     int testedChildren = 0;
+    int invalidLists = 0;
+    int testedLists = 0;
     bool isUnion = (inst.type()->type() == rtUnion);
     int unionMemberInvalid = -1, unionMemberTested = 0;
     const int cnt = inst.memberCount();
@@ -442,9 +444,20 @@ int MemoryMapBuilderCS::countInvalidChildrenRek(const Instance &inst, int *total
                 wasInvalid = true;
         }
         else if (MemoryMapHeuristics::isListHead(mi)) {
-            if (!MemoryMapHeuristics::isValidListHead(mi, true))
-                return -1; // return immediately for invalid list_heads
             wasTested = true;
+            ++testedLists;
+            if (!MemoryMapHeuristics::isValidListHead(mi, true)) {
+                wasInvalid = true;
+                ++invalidLists;
+            }
+        }
+        else if (MemoryMapHeuristics::isHListNode(mi)) {
+            wasTested = true;
+            ++testedLists;
+            if (!MemoryMapHeuristics::isValidHListNode(mi)) {
+                wasInvalid = true;
+                ++invalidLists;
+            }
         }
         // Test embedded structs/unions recursively
         else if (mi.type()->type() & StructOrUnion) {
@@ -469,7 +482,7 @@ int MemoryMapBuilderCS::countInvalidChildrenRek(const Instance &inst, int *total
                     unionMemberTested = tot;
                 }
             }
-            // For structs, pass invalid list_heads through, otherwise count
+            // For structs, pass invalid lists through, otherwise count
             // invalid and total tested members.
             else {
                 if (ret < 0)
@@ -481,15 +494,14 @@ int MemoryMapBuilderCS::countInvalidChildrenRek(const Instance &inst, int *total
 
         if (wasTested) {
             if (isUnion) {
+                unionMemberTested = 1;
                 // Which child has the better validity? -1 is the worst.
                 if (unionMemberInvalid < 0) {
-                    unionMemberTested = 1;
                     unionMemberInvalid = wasInvalid ? 1 : 0;
                 }
                 // Depending on wasInvalid, the ratio is either 0 or 1,
                 // where 1 is the second to worst.
                 else if (!wasInvalid) {
-                    unionMemberTested = 1;
                     unionMemberInvalid = 0;
                 }
             }
@@ -503,12 +515,23 @@ int MemoryMapBuilderCS::countInvalidChildrenRek(const Instance &inst, int *total
     }
 
     if (isUnion) {
-        // A union counts for the most valid child
-        *total = unionMemberTested;
-        return unionMemberInvalid;
+        if (unionMemberTested > 0) {
+            // A union counts for the most valid child
+            *total = unionMemberTested;
+            return unionMemberInvalid;
+        }
+        else {
+            // Defaults to "valid"
+            *total = 1;
+            return 0;
+        }
     }
     else {
         *total = testedChildren;
-        return invalidChildren;
+        // Allow max. 50% of all list_heads to be invalid
+        if ((invalidLists << 1) > testedLists)
+            return -1;
+        else
+            return invalidChildren;
     }
 }

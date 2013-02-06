@@ -210,6 +210,59 @@ bool MemoryMapHeuristics::isHListNode(const Instance &i)
 }
 
 
+bool MemoryMapHeuristics::isValidHListNode(const Instance &node)
+{
+    // Is this even a list_head?
+    if (node.isNull() || !isHListNode(node))
+        return false;
+
+    try {
+        // Test the next pointer
+        Instance next(node.member("next", 0, 0, ksNone));
+        // Get the addresses where next points to
+        quint64 nextAddr = (quint64) next.toPointer();
+
+        // The list is not circular, so null pointers mark the beginning and end
+        if ( !isDefaultValue(nextAddr, node.vmem()->memSpecs()) ) {
+            next = next.dereference(BaseType::trLexicalAllPointers, 1);
+
+            // Can we access the address?
+            if (!next.isAccessible())
+                return false;
+
+            // The next.pprev pointer should point back to the address of the node.
+            quint64 nextPrevAddr =
+                    (quint64) next.member("pprev",0, 0, ksNone).toPointer();
+            if (node.address() != nextPrevAddr)
+                return false;
+        }
+
+        // Test the pprev pointer
+        Instance pprev(node.member("pprev", 0, 0, ksNone));
+        quint64 pprevAddr = (quint64) pprev.toPointer();
+        if ( !isDefaultValue(pprevAddr, node.vmem()->memSpecs()) ) {
+            pprev = pprev.dereference(BaseType::trLexicalAllPointers, 1);
+            // Can we access the address?
+            if (!pprev.isAccessible())
+                return false;
+
+            // Change the type to "struct hlist_node"
+            pprev.setType(node.type());
+            quint64 prevNextAddr =
+                    (quint64) pprev.member("next", 0, 0, ksNone).toPointer();
+            // The pprev.next pointer should point back to the address of the node.
+            if (node.address() != prevNextAddr)
+                return false;
+        }
+    }
+    catch (VirtualMemoryException&) {
+        return false;
+    }
+
+    return true;
+}
+
+
 bool MemoryMapHeuristics::isRadixTreeRoot(const Instance &i)
 {
     return i.typeName() == "struct radix_tree_root";
@@ -295,7 +348,8 @@ bool MemoryMapHeuristics::isHeadOfList(const MemoryMapNode *parentStruct,
 }
 
 
-bool MemoryMapHeuristics::isValidListHead(const Instance &listHead, bool defaultValid)
+bool MemoryMapHeuristics::isValidListHeadRek(const Instance &listHead,
+                                             bool defaultValid, int maxRekDepth)
 {
     // Is this even a list_head?
     if (listHead.isNull() || !isListHead(listHead))
@@ -333,13 +387,25 @@ bool MemoryMapHeuristics::isValidListHead(const Instance &listHead, bool default
 
             // The next.prev pointer should point back to the address of the list_head.
             quint64 nextPrevAddr = (quint64) next.member("prev", 0, 0, ksNone).toPointer();
-            if (listHead.address() != nextPrevAddr)
-                return false;
+            if (listHead.address() != nextPrevAddr) {
+                // Sometimes list_heads are used to build tree-like structures,
+                // in which case list.address() != list.next.prev.address(),
+                // but then list.next must be valid.
+                if (maxRekDepth <= 0 ||
+                    !isValidListHeadRek(next, false, maxRekDepth - 1))
+                    return false;
+            }
 
             // The next.prev pointer should point back to the address of the list_head.
             quint64 prevNextAddr = (quint64) prev.member("next", 0, 0, ksNone).toPointer();
-            if (listHead.address() != prevNextAddr)
-                return false;
+            if (listHead.address() != prevNextAddr) {
+                // Sometimes list_heads are used to build tree-like structures,
+                // in which case list.address() != list.prev.next.address(),
+                // but then list.prev must be valid.
+                if (maxRekDepth <= 0 ||
+                    !isValidListHeadRek(prev, false, maxRekDepth - 1))
+                    return false;
+            }
         }
     }
     catch (VirtualMemoryException&) {

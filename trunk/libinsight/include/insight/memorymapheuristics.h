@@ -42,6 +42,15 @@ public:
     static bool isHListNode(const Instance &i);
 
     /**
+     * Checks if the given instance of type 'struct hlist_node' is valid.
+     * hlist_node objects are arranged in a non-circular, doubly linked list.
+     * These pointer links are verified.
+     * @param node hlist_node instance
+     * @return \c true if the node is valid. \c false otherwise
+     */
+    static bool isValidHListNode(const Instance &node);
+
+    /**
      * Checks if this instance is of type 'struct radix_tree_root'.
      * @return \c true if this object is of type 'struct radix_tree_root', \c false
      * otherwise
@@ -149,13 +158,17 @@ public:
      * next pointer and the list_head would therefore be considered to be valid as well.
      * In other cases, however, one may want to check if the list_head is valid in the sense
      * that it can be dereferenced. In this case default values should be considered as invalid.
-     * @param i the list_head instance to verify
+     * @param listHead the list_head instance to verify
      * @param defaultValid specifies whether default values such as 0 or -1 should
      * be considered as valid values or as invalid values while verifying the given
      * instance \a i. By default all default values are considered to be valid.
      * @return true of the instance is a valid list_head false otherwise.
      */
-    static bool isValidListHead(const Instance &i, bool defaultValid = true);
+    inline static bool isValidListHead(const Instance &listHead,
+                                       bool defaultValid = true)
+    {
+        return isValidListHeadRek(listHead, defaultValid, 1);
+    }
 
     /**
      * Check if the given candidate is a valid candidate for the given list head.
@@ -219,6 +232,9 @@ public:
      * @return \c true if the value seems to be a default value, \c false otherwise
      */
     static bool isDefaultValue(quint64 value, const MemSpecs &specs);
+
+private:
+    static bool isValidListHeadRek(const Instance &listHead, bool defaultValid, int maxRekDepth);
 };
 
 #endif // MEMORYMAPHEURISTICS_H
