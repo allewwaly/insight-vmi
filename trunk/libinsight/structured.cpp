@@ -356,7 +356,7 @@ QString Structured::toString(VirtualMemory *mem, size_t offset,
                 quint64 addr = offset + m->offset();
                 const BaseType* t = m->refType();
                 bool wasPointer = false;
-                while ( addr && !(t->type() & StructOrUnion) ) {
+                if ( addr && !(t->type() & StructOrUnion) ) {
                     const RefBaseType* rbt = dynamic_cast<const RefBaseType*>(t);
                     if (rbt->type() & rtPointer) {
                         try {
@@ -370,7 +370,6 @@ QString Structured::toString(VirtualMemory *mem, size_t offset,
                             errMsg = e.message;
                         }
                     }
-                    t = rbt->refType();
                 }
 
                 if (!wasPointer)

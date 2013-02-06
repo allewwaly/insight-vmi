@@ -58,12 +58,15 @@ QString Pointer::prettyName(const QString &varName) const
                 refTypeDeep(trAnyButTypedef));
     if (fp)
         return fp->prettyName(varName, this);
-    else if (t)
-        return t->prettyName("*" + varName);
-    else if (_refTypeId == 0)
-        return "void *" + varName;
-    else
-        return "(unresolved) *" + varName;
+    else {
+        QString v = varName.isEmpty() ? QString() : QString(" ") + varName;
+        if (t)
+            return t->prettyName("*" + v);
+        else if (_refTypeId == 0)
+            return "void *" + v;
+        else
+            return "(unresolved) *" + v;
+    }
 }
 
 
