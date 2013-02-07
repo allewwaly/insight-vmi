@@ -377,7 +377,7 @@ float MemoryMapBuilderCS::calculateNodeProb(const Instance &inst,
 
     if (prob < 0 || prob > 1) {
         debugerr("Probability for of type '" << inst.typeName() << "' at 0x"
-                 << QString::number(inst.address(), 0, 16) << " is " << prob
+                 << QString::number(inst.address(), 16) << " is " << prob
                  << ", should be between 0 and 1.");
         prob = 0; // Make it safe
     }
