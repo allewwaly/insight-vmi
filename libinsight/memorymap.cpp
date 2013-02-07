@@ -920,6 +920,11 @@ MemoryMapNode *MemoryMap::addChild(
         i = i.dereference(BaseType::trLexical);
 
     if (!i.isNull() && i.type() && (i.type()->type() & interestingTypes)) {
+        // Don't add nodes if the probability is below the threshold
+        float prob = calculateNodeProbability(i, parent ? parent->probability() : 1.0);
+        if (prob <= _shared->minProbability)
+            return 0;
+
         // Is any other thread currently searching for the same address?
         _shared->currAddressesLock.lockForWrite();
         _shared->currAddresses[threadIndex] = 0;
