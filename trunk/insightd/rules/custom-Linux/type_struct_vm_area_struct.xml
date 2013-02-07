@@ -5,9 +5,9 @@
 <typeknowledge version="1.0" os="linux" >
 
 	<rules>
-		<rule priority="101">
-			<name>vm_area_struct.vm_rb.rb_left</name>
-			<description>vm_rb.rb_left points to a "vm_area_struct"</description>
+		<rule priority="102">
+			<name>vm_area_struct.vm_rb.rb_{left,right}</name>
+			<description>vm_rb.rb_{left,right} point to a "vm_area_struct"</description>
 			<filter>
 				<datatype>struct</datatype>
 				<typename>vm_area_struct</typename>
@@ -25,6 +25,48 @@
 				node.ChangeType(vms.TypeId());
 				node.AddToAddress(-vms.MemberOffset(members[0]));
 				return node;
+			</action>
+		</rule>
+		
+		<rule priority="102">
+			<name>vm_area_struct.shared.*</name>
+			<description>Disambiguate the "shared" union.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>vm_area_struct</typename>
+				<members>
+					<member>shared</member>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="inline">
+				var vma = arguments[0];
+				var members = arguments[1];
+				var shared = vma.Member(members[0])
+				var inst = shared.Member(members[1]);
+				
+				var treeValid = true;
+				
+				// If the parent is null, the tree surely is invalid
+				if (shared.vm_set.parent.IsNull()) {
+					treeValid = false;
+				}
+				// Otherwise the prio_tree_node's parent must point to itself
+				else try {
+					var node = shared.prio_tree_node;
+					var parent = node.parent;
+					treeValid = (node.Address() == node.parent.Address());
+				}
+				catch (e) {
+					treeValid = false;
+				}
+				
+				// Now check if the valid field was accessed
+				if ((inst.Name() == "prio_tree_node" &amp;&amp; treeValid) ||
+				    (inst.Name() != "prio_tree_node" &amp;&amp; !treeValid))
+					return inst;
+				else
+					return new Instance();
 			</action>
 		</rule>
 	</rules>
