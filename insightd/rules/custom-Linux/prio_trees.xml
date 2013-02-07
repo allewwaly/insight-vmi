@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Copyright (C) 2013 by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<!--
+			References: 
+			http://lxr.free-electrons.com/source/include/linux/prio_tree.h?v=2.6.32#L28
+		-->
+		<rule priority="101">
+			<name>prio_tree_root.prio_tree_node</name>
+			<description>
+				A prio_tree_root points to either prio_tree_node or 
+				raw_prio_tree_node objects, depending on its "raw" field.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>prio_tree_root</typename>
+				<members>
+					<member>prio_tree_node</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var root = arguments[0];
+				var node = root.Member(arguments[1][0]);
+				
+				if (root.raw &gt; 0)
+					node.ChangeType("raw_prio_tree_node");
+				
+				return node;
+			</action>
+		</rule>
+		
+		<!--
+			References:
+			http://lxr.free-electrons.com/source/lib/prio_tree.c?v=2.6.32#L56
+		-->
+		<rule priority="101">
+			<name>raw_prio_tree_node.*</name>
+			<description>
+				All pointers of a raw_prio_tree_node actually point to a further
+				raw_prio_tree_node objects.
+			</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>raw_prio_tree_node</typename>
+				<members>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="inline">
+				var root = arguments[0];
+				var node = root.Member(arguments[1][0]);
+				node.ChangeType(root.TypeId());
+				return node;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>

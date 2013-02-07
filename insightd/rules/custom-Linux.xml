@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-	File created by Christian Schneider <chrschn@sec.in.tum.de>
+	Copyright (C) 2013 by Christian Schneider <chrschn@sec.in.tum.de>
 -->
 <typeknowledge version="1.0" os="linux" >
 
@@ -17,6 +17,7 @@
 	<include>per_cpu_types.xml</include>
 	<include>radix_trees.xml</include>
 	<include>inodes.xml</include>
+	<include>prio_trees.xml</include>
 
 	<!-- Type-specific rules -->
 	<include>type_struct_acpi_object_region_field.xml</include>
