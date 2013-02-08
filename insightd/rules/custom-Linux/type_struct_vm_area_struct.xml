@@ -27,7 +27,13 @@
 				return node;
 			</action>
 		</rule>
-		
+
+		<!--
+			For empty prio_tree_nodes, the parent points back to the node itself.
+
+			References:
+			http://lxr.free-electrons.com/source/include/linux/prio_tree.h?v=2.6.32#L89
+		-->
 		<rule priority="102">
 			<name>vm_area_struct.shared.*</name>
 			<description>Disambiguate the "shared" union.</description>
@@ -67,6 +73,52 @@
 					return inst;
 				else
 					return new Instance();
+			</action>
+		</rule>
+
+		<!--
+			The struct anon_vma is head of a list to vm_area_struct objects.
+			These objects are linked in their list_head field "anon_vma_node",
+			but they also hold a pointer to the anon_vma struct that is the head
+			of the list. We can use this to detect when the list points back to
+			the head or to the next object.
+			
+			References:
+			http://lxr.free-electrons.com/source/include/linux/rmap.h?v=2.6.32#L13
+		-->
+		<rule priority="102">
+			<name>vm_area_struct.anon_vma_node.{next,prev}</name>
+			<description>The the head of the list linked by "anon_vma_node" is an anon_vma structure.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>vm_area_struct</typename>
+				<members>
+					<member>anon_vma_node</member>
+					<member match="any" />
+				</members>
+			</filter>
+			<action type="inline">
+				var vma = arguments[0];
+				var members = arguments[1];
+				var next_vma = vma.Member(members[0]).Member(members[1]);
+
+				try {
+					// If this the next_vma instance actually belongs to the
+					// vma's anon_vma header, return the anon_vma struct instead.
+					var av = vma.anon_vma;
+					if (av.head.Address() == next_vma.Address())
+						return av;
+				}
+				catch (e) {
+					// In case of an error, the defined type is returned
+					return next_vma;
+				}
+
+				// Otherwise fix the offset and return a vm_area_struct
+				next_vma.ChangeType(vma.TypeId());
+				next_vma.AddToAddress(-vma.MemberOffset(members[0]));
+
+				return next_vma;
 			</action>
 		</rule>
 	</rules>
