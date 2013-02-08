@@ -6,6 +6,7 @@ class MemoryMapVerifier;
 #include "memorymap.h"
 #include "memorymapnodesv.h"
 #include "slubobjects.h"
+#include "colorpalette.h"
 #include <QVarLengthArray>
 
 #include <log.h>
@@ -92,6 +93,22 @@ private:
     bool _flexibleInterval;
 };
 
+
+/**
+ * A struct to count number and size of objects.
+ */
+struct ObjectCount
+{
+    ObjectCount() : count(0), bytes(0) {}
+    inline void clear() { count = bytes = 0; }
+    inline void countObj(const MemoryMapNode* node)
+    { ++count; bytes += node->size(); }
+    inline quint32 kbytes() const { return bytes >> 10; }
+    quint32 count;
+    quint32 bytes;
+};
+
+
 /**
  * A class that contains various helper functions that can either give an indication of the
  * correctness of a memory map or can be used to debug a memory map.
@@ -159,6 +176,8 @@ public:
     inline const SlubObjects& slub() const { return _slub; }
 
 private:
+    typedef QVarLengthArray<quint32, 10> Distribtion;
+
     /**
      * Internal helper function for the statistics function.
      */
@@ -176,6 +195,13 @@ private:
 
     void typeCountStatsHelper(QHash<const BaseType*, int> hash) const;
 
+    void printDistribution(const char* header, int w_hdr,
+                           Distribtion distribution, ColorType color) const;
+
+    void printObjCount(const char* header, int w_hdr, ObjectCount cnt,
+                       ObjectCount total, ColorType color, int w_cnt = -1,
+                       int w_bts = -1) const;
+
     MemoryMap *_map;
     QList<MemoryMapNodeWatcher *> _watchNodes;
     Log _log;
@@ -185,18 +211,18 @@ private:
     bool _slubDataAvailable;
     SlubObjects _slub;
 
-    quint32 _totalObjects;
-    quint32 _totalValid;
-    quint32 _totalInvalid;
-    quint32 _heuristicsValid;
-    quint32 _globalVarValid;
-    quint32 _slubValid;
-    quint32 _slubNotFound;
-    quint32 _slubConflict;
-    quint32 _slubInvalid;
-    quint32 _maybeValidObjects;
-    quint32 _slubMaybeValid;
-    quint32 _objectsFoundInSlub;
+    ObjectCount _totalObjects;
+    ObjectCount _totalValid;
+    ObjectCount _totalInvalid;
+    ObjectCount _heuristicsValid;
+    ObjectCount _globalVarValid;
+    ObjectCount _slubValid;
+    ObjectCount _slubNotFound;
+    ObjectCount _slubConflict;
+    ObjectCount _slubInvalid;
+    ObjectCount _maybeValidObjects;
+    ObjectCount _slubMaybeValid;
+    ObjectCount _objectsFoundInSlub;
     QHash<quint64, MemoryMapNode*> _slubObjectNodes;
     QVector<int> _slubObjFoundPerCache;
     QHash<const BaseType*, int> _typeCountValid;
@@ -204,22 +230,22 @@ private:
     QHash<const BaseType*, int> _typeCountUnknown;
     QHash<const BaseType*, int> _typeCountAll;
     
-    quint32 _seemValidObjects;
+    ObjectCount _seemValidObjects;
 
-    quint32 _magicNumberValid;
-    quint32 _magicNumberValid_withConst;
-    quint32 _magicNumberValid_notSlub;
-    quint32 _magicNumberInvalid;
+    ObjectCount _magicNumberValid;
+    ObjectCount _magicNumberValid_withConst;
+    ObjectCount _magicNumberValid_notSlub;
+    ObjectCount _magicNumberInvalid;
 
-    QVarLengthArray<quint32, 10> _totalDistribution;
-    QVarLengthArray<quint32, 10> _totalValidDistribution;
-    QVarLengthArray<quint32, 10> _totalInvalidDistribution;
+    Distribtion _totalDistribution;
+    Distribtion _totalValidDistribution;
+    Distribtion _totalInvalidDistribution;
 
-    QVarLengthArray<quint32, 10> _slubValidDistribution;
-    QVarLengthArray<quint32, 10> _slubInvalidDistribution;
+    Distribtion _slubValidDistribution;
+    Distribtion _slubInvalidDistribution;
 
-    QVarLengthArray<quint32, 10> _magicnumberValidDistribution;
-    QVarLengthArray<quint32, 10> _magicnumberInvalidDistribution;
+    Distribtion _magicnumberValidDistribution;
+    Distribtion _magicnumberInvalidDistribution;
 
 
     float _minValidProbability;
