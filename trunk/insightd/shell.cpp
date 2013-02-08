@@ -2314,8 +2314,6 @@ int Shell::cmdMemoryDump(QStringList args)
 
         if (!re.exactMatch(args.join(" "))) {
             Console::errMsg("Usage: memory dump [index] <raw|char|int|long|type-name|type-id>(.<member>)* [length] @ <address>");
-            debugmsg(args.join(" "));
-            debugmsg(re.pattern());
             return 1;
         }
 
