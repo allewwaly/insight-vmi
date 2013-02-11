@@ -417,8 +417,12 @@ Instance Instance::arrayElem(int index) const
     else {
         ret = *this;
         // For arrays, the resulting type is the referencing type
-        if (_d->type->type() == rtArray)
+        if (_d->type->type() == rtArray) {
             ret._d->type = p->refType();
+            // Pass the ID along to the array element
+            if (id() > 0)
+                ret._d->id = id();
+        }
     }
 
     // Update address and name
