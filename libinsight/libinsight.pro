@@ -99,7 +99,9 @@ HEADERS += \
     include/insight/virtualmemory.h \
     include/insight/volatiletype.h \
     include/insight/xmlschema.h \
-    include/insight/compiler.h
+    include/insight/compiler.h \
+    include/insight/regexbits.h \
+    include/insight/segmentdescription.h
 
 SOURCES += \
     altreftype.cpp \
@@ -173,7 +175,8 @@ SOURCES += \
     variable.cpp \
     virtualmemory.cpp \
     volatiletype.cpp \
-    xmlschema.cpp
+    xmlschema.cpp \
+    segmentdescription.cpp
 
 # Required libraries for building
 LIBS += \

@@ -25,7 +25,7 @@ Variable::Variable(KernelSymbols *symbols)
 
 Variable::Variable(KernelSymbols *symbols, const TypeInfo& info)
 	: Symbol(symbols, info), ReferencingType(info), SourceRef(info),
-	  _offset(info.location())
+	  SegmentDescription(info), _offset(info.location())
 {
 }
 
@@ -122,6 +122,7 @@ void Variable::readFrom(KernelSymbolStream& in)
     Symbol::readFrom(in);
     ReferencingType::readFrom(in);
     SourceRef::readFrom(in);
+    SegmentDescription::readFrom(in);
     in >> _offset;
 }
 
@@ -131,6 +132,7 @@ void Variable::writeTo(KernelSymbolStream& out) const
     Symbol::writeTo(out);
     ReferencingType::writeTo(out);
     SourceRef::writeTo(out);
+    SegmentDescription::writeTo(out);
     out << _offset;
 }
 

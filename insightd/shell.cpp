@@ -47,6 +47,7 @@
 #include <insight/memorymapbuildercs.h>
 #include <insight/console.h>
 #include <insight/errorcodes.h>
+#include <insight/regexbits.h>
 
 #ifdef CONFIG_WITH_X_SUPPORT
 #include "memorymapwindow.h"
@@ -2293,24 +2294,18 @@ int Shell::cmdMemoryDump(QStringList args)
     int index = parseMemDumpIndex(args);
     // Perform the dump
     if (index >= 0) {
-#define DEC_LITERAL "[0-9]+"
-#define HEX_LITERAL "(?:0x)?[0-9a-fA-F]+"
-#define IDENTIFIER  "[_a-zA-Z][_a-zA-Z0-9]*"
-#define OPT_WS     "\\s*"
-#define TYPE_NAME  IDENTIFIER
-#define TYPE_FIELD IDENTIFIER
-#define TYPE_ID    HEX_LITERAL
-#define DUMP_LEN   DEC_LITERAL
-#define ADDRESS    HEX_LITERAL
-#define CAP(s) "(" s ")"
-#define GROUP(s) "(?:" s ")"
-        QRegExp re("^" OPT_WS
-                   CAP(GROUP(TYPE_NAME "|" TYPE_ID) GROUP("\\." TYPE_FIELD) "*")
-                   OPT_WS
-                   GROUP(CAP(DUMP_LEN) OPT_WS) "?"
-                   "@" OPT_WS
-                   CAP(ADDRESS)
-                   OPT_WS "$");
+#define TYPE_NAME  RX_IDENTIFIER
+#define TYPE_FIELD RX_IDENTIFIER
+#define TYPE_ID    RX_HEX_LITERAL
+#define DUMP_LEN   RX_DEC_LITERAL
+#define ADDRESS    RX_HEX_LITERAL
+        QRegExp re("^" RX_OPT_WS
+                   RX_CAP(RX_GROUP(TYPE_NAME "|" TYPE_ID) RX_GROUP("\\." TYPE_FIELD) "*")
+                   RX_OPT_WS
+                   RX_GROUP(RX_CAP(DUMP_LEN) RX_OPT_WS) "?"
+                   "@" RX_OPT_WS
+                   RX_CAP(ADDRESS)
+                   RX_OPT_WS "$");
 
         if (!re.exactMatch(args.join(" "))) {
             Console::errMsg("Usage: memory dump [index] <raw|char|int|long|type-name|type-id>(.<member>)* [length] @ <address>");
@@ -3556,6 +3551,10 @@ int Shell::cmdShowBaseType(const BaseType* t, const QString &name,
 										16,
 										QChar('0'))
 			 << endl;
+		Console::out() << Console::color(ctColHead) << "  Segment:        "
+					   << Console::color(ctReset)
+					   << (func->segment().isEmpty() ? QString("n/a") : func->segment())
+					   << endl;
 		Console::out() << Console::color(ctColHead) << "  Inlined:        "
 			 << Console::color(ctReset) << (func->inlined() ? "yes" : "no") << endl;
 	}
@@ -3871,6 +3870,10 @@ int Shell::cmdShowVariable(const Variable* v, const ActiveRuleList &matchingRule
 		 << Console::color(ctVariable) << v->name() << endl;
 	Console::out() << Console::color(ctColHead) << "  Address:        "
 		 << Console::color(ctAddress) << "0x" << hex << v->offset() << dec << endl;
+	Console::out() << Console::color(ctColHead) << "  Segment:        "
+				   << Console::color(ctReset)
+				   << (v->segment().isEmpty() ? QString("n/a") : v->segment())
+				   << endl;
 
     const BaseType* rt = v->refType();
     Console::out() << Console::color(ctColHead) << "  Type:           "

@@ -18,6 +18,8 @@
 #include <insight/funcparam.h>
 #include "bugreport.h"
 #include <insight/multithreading.h>
+#include <insight/regexbits.h>
+#include <insight/shellutil.h>
 #include <debug.h>
 
 #define parseInt(i, s, pb) \
@@ -59,7 +61,10 @@
 
 #define parseULongLong16(i, s, pb) \
     do { \
-        i = s.toULongLong(pb, 16); \
+        if (s.startsWith("0x")) \
+            i = s.remove(0, 2).toULongLong(pb, 16); \
+        else \
+            i = s.toULongLong(pb, 16); \
         if (!*pb) \
             parserError(QString("Illegal integer number: %1").arg(s)); \
     } while (0)
@@ -81,6 +86,15 @@ namespace str {
     // Parses strings like:  0x1ffff      (location list)
     // Captures:             0x1ffff
     static const char* boundRegex = "^\\s*((?:0x)?[0-9a-fA-F]+)(?:\\s+.*)?$";
+    // Parses strings like:  00000000 l     O .bss   00000004 ext3_inode_cachep
+    // Captures:             00000000 l     O .bss            ext3_inode_cachep
+    // See man(1) objdump, output format for "--syms"
+    static const char* segmentRegex = "^"
+            RX_CAP(RX_HEX_LITERAL) RX_WS
+            RX_CAP("[lgu!wCWIiDdFfO ]+") RX_WS
+            RX_CAP("[._a-zA-Z][._a-zA-Z0-9]*|\\*[A-Z]+\\*") RX_WS
+            RX_HEX_LITERAL RX_WS
+            RX_CAP(RX_IDENTIFIER) RX_OPT_WS "$";
 
 #   define LOC_ADDR   "addr"
 #   define LOC_OFFSET "plus_uconst"
@@ -97,7 +111,7 @@ namespace str {
     static const char* locOffset = "DW_OP_" LOC_OFFSET;
 
     static const char* regexErrorMsg = "Regex \"%1\" did not match the following string: \"%2\"";
-};
+}
 
 
 //------------------------------------------------------------------------------
@@ -221,6 +235,26 @@ void KernelSymbolParser::WorkerThread::finishLastSymbol()
                     // factory
                     if (_info->symType() & (hsConstType|hsVolatileType))
                         _info->setName(QString());
+                    // Add the segment name for variables and functions
+                    else if ((_info->symType() & (hsVariable|hsSubprogram)) &&
+                             !_info->name().isEmpty())
+                    {
+                        SegmentInfoHash::const_iterator it;
+                        for (it = _segmentInfo.find(_info->name());
+                             it != _segmentInfo.end() && it.key() == _info->name();
+                             ++it)
+                        {
+                            // Compare to function entry point or variable offset
+                            if ( (_info->symType() == hsVariable &&
+                                  it.value().addr == _info->location()) ||
+                                 (_info->symType() == hsSubprogram &&
+                                  it.value().addr == _info->pcLow()))
+                            {
+                                _info->setSegment(it.value().segment);
+                                 break;
+                            }
+                        }
+                    }
                     // Make this function thread-safe
                     QMutexLocker lock(&_parser->_factoryMutex);
                     _parser->_symbols->factory().mapToInternalIds(*_info);
@@ -431,35 +465,111 @@ void KernelSymbolParser::WorkerThread::parseFile(const QString& fileName)
 
 	static const QString cmd("objdump");
 	QStringList args;
-	args << "-W" << fileName;
 
-	// Start objdump process
-	proc.start(cmd, args, QIODevice::ReadOnly);
-	if (!proc.waitForStarted(-1)) {
-		genericError(
-				QString("Could not execute \"%1\". Make sure the "
-					"%1 utility is installed and can be found through "
-					"the PATH variable.").arg(cmd));
+	for (int run = 0; run <= 1; ++run) {
+		args.clear();
+		if (run == 0)
+			// Output segment information
+			args << "-t" << fileName;
+		else
+			// Output debugging symbols
+			args << "-W" << fileName;
+
+		// Start objdump process
+		proc.start(cmd, args, QIODevice::ReadOnly);
+		if (!proc.waitForStarted(-1)) {
+			genericError(
+						QString("Could not execute \"%1\". Make sure the "
+								"%1 utility is installed and can be found through "
+								"the PATH variable.").arg(cmd));
+		}
+
+		// Did the process start normally?
+		if ( proc.state() == QProcess::NotRunning &&
+			 ((proc.exitStatus() != QProcess::NormalExit) || proc.exitCode()) )
+		{
+			genericError(
+						QString("Error encountered executing \"%1 %2\":\n%3")
+						.arg(cmd)
+						.arg(args.join(" "))
+						.arg(QString::fromLocal8Bit(proc.readAllStandardError())));
+		}
+
+		if (run == 0)
+			// Parse the segment information
+			parseSegments(&proc);
+		else
+			// Parse the debugging symbols
+			parseSymbols(&proc);
+		// Avoid warnings "Destroyed while process is still running."
+		proc.waitForFinished();
 	}
-
-    // Did the process start normally?
-    if ( proc.state() == QProcess::NotRunning &&
-         ((proc.exitStatus() != QProcess::NormalExit) || proc.exitCode()) )
-    {
-        genericError(
-                QString("Error encountered executing \"%1 %2\":\n%3")
-                    .arg(cmd)
-                    .arg(args.join(" "))
-                    .arg(QString::fromLocal8Bit(proc.readAllStandardError())));
-    }
-
-    parse(&proc);
-    // Avoid warnings "Destroyed while process is still running."
-    proc.waitForFinished();
 }
 
 
-void KernelSymbolParser::WorkerThread::parse(QIODevice* from)
+void KernelSymbolParser::WorkerThread::parseSegments(QIODevice* from)
+{
+    const int bufSize = 4096;
+    char buf[bufSize];
+
+    QRegExp rxSegment(str::segmentRegex);
+
+	// Create the objdump process
+	QProcess* proc = dynamic_cast<QProcess*>(from);
+
+    quint64 addr;
+    QString line, flags, segment, varname;
+    _line = 0;
+    _segmentInfo.clear();
+    bool ok;
+
+    try {
+        while ( !Console::interrupted() &&
+                ( !from->atEnd() ||
+                  (proc && proc->state() != QProcess::NotRunning) ) )
+        {
+            // Make sure one line is available for sequential devices
+            if (from->isSequential() && !from->canReadLine()) {
+                yieldCurrentThread();
+                QCoreApplication::processEvents();
+                continue;
+            }
+
+            int len = from->readLine(buf, bufSize);
+            if (len == 0)
+                continue;
+            if (len < 0)
+                parserError("An error occured reading from objdump input");
+
+            _line++;
+            line = QString(buf).trimmed();
+
+            try {
+                if (rxSegment.exactMatch(line)) {
+                    flags = rxSegment.cap(2);
+                    // We are only interested in functions and regular symbols
+                    if (flags.contains('d') || flags.contains('f'))
+                        continue;
+                    parseULongLong16(addr, rxSegment.cap(1), &ok);
+                    segment = rxSegment.cap(3);
+                    varname = rxSegment.cap(4);
+                    _segmentInfo.insertMulti(varname, SegLoc(addr, segment));
+                }
+            }
+            catch (GenericException& e) {
+                QString msg = QString("%0: %1\n\n").arg(e.className()).arg(e.message);
+                BugReport::reportErr(msg, e.file, e.line);
+            }
+        }
+    }
+    catch (GenericException& e) {
+        QString msg = QString("%0: %1\n\n").arg(e.className()).arg(e.message);
+        BugReport::reportErr(msg, e.file, e.line);
+    }
+}
+
+
+void KernelSymbolParser::WorkerThread::parseSymbols(QIODevice* from)
 {
     const int bufSize = 4096;
     char buf[bufSize];
@@ -619,7 +729,7 @@ KernelSymbolParser::~KernelSymbolParser()
 void KernelSymbolParser::parse(QIODevice *from)
 {
     WorkerThread worker(this);
-    worker.parse(from);
+    worker.parseSymbols(from);
 }
 
 
@@ -681,8 +791,7 @@ void KernelSymbolParser::parse(bool kernelOnly)
         // Find all modules outside the lib/modules/ directory
         if (dit.fileInfo().suffix() == "ko" &&
     #if defined(DEBUG_SYM_PARSING)
-            (dit.fileInfo().baseName() == "mbp_nvidia_bl" ||
-             dit.fileInfo().baseName() == "ibmaem") &&
+            (dit.fileInfo().baseName() == "ext3") &&
     #endif
             !dit.fileInfo().filePath().contains("/lib/modules/"))
         {

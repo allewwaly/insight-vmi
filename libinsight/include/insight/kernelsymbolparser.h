@@ -18,6 +18,7 @@
 
 // forward declarations
 class KernelSymbols;
+class QProcess;
 
 /**
  * This class parses the kernel debugging symbols from the output of the
@@ -40,10 +41,16 @@ class KernelSymbolParser: public LongOperation
         void stop() { _stopExecution = true; }
 
         /**
-         * Starts the parsing of the debugging symbols from device \a from. This
-         * function is intended for testing purpose only.
+         * Parses the segment information from device \a from.
+         * @param from the device to read the information from
          */
-        void parse(QIODevice* from);
+        void parseSegments(QIODevice* from);
+
+        /**
+         * Parses the debugging symbols from device \a from.
+         * @param from the device to read the information from
+         */
+        void parseSymbols(QIODevice* from);
 
     protected:
         void run();
@@ -52,6 +59,15 @@ class KernelSymbolParser: public LongOperation
         void parseFile(const QString& fileName);
         void finishLastSymbol();
         void parseParam(const ParamSymbolType param, QString value);
+
+        struct SegLoc {
+            SegLoc() : addr(0) {}
+            SegLoc(quint64 addr, const QString& seg) : addr(addr), segment(seg) {}
+            quint64 addr;
+            QString segment;
+        };
+
+        typedef QHash<QString, SegLoc> SegmentInfoHash;
 
         KernelSymbolParser* _parser;
         bool _stopExecution;
@@ -64,6 +80,7 @@ class KernelSymbolParser: public LongOperation
         int _curSrcID;
         qint32 _nextId;
         int _curFileIndex;
+        SegmentInfoHash _segmentInfo;
     };
 
     friend class WorkerThread;
