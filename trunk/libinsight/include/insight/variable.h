@@ -13,6 +13,7 @@
 #include "symbol.h"
 #include "referencingtype.h"
 #include "sourceref.h"
+#include "segmentdescription.h"
 #include <debug.h>
 
 class TypeRuleEngine;
@@ -20,7 +21,8 @@ class TypeRuleEngine;
 /**
  * This class represents a variable variable of a certain type.
  */
-class Variable: public Symbol, public ReferencingType, public SourceRef
+class Variable: public Symbol, public ReferencingType, public SourceRef,
+        public SegmentDescription
 {
 public:
     /**
@@ -150,6 +152,7 @@ protected:
     virtual const SymFactory* fac() const;
 
     quint64 _offset;
+    QString _segment;
     static const TypeRuleEngine* _ruleEngine;
 };
 

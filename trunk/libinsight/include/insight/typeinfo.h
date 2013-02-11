@@ -291,6 +291,9 @@ public:
     ParamList& params();
     const ParamList& params() const;
 
+    const QString& segment() const;
+    void setSegment(const QString& seg);
+
     QString dump(const QStringList &symFiles) const;
 
 private:
@@ -321,7 +324,349 @@ private:
 	DataEncoding _enc;       ///< holds the data encoding of this symbol
 	MemberList _members;     ///< holds all members of a union or struct
 	ParamList _params;       ///< holds all parameters of a function (pointer)
+	QString _segment;        ///< holds the segment name for a variable
 };
+
+
+inline int TypeInfo::fileIndex() const
+{
+	return _fileIndex;
+}
+
+
+inline void TypeInfo::setFileIndex(int index)
+{
+	_fileIndex = index;
+}
+
+
+inline bool TypeInfo::isRelevant() const
+{
+	return _isRelevant;
+}
+
+
+inline void TypeInfo::setIsRelevant(bool value)
+{
+	_isRelevant = value;
+}
+
+
+inline const QString& TypeInfo::name() const
+{
+	return _name;
+}
+
+
+inline void TypeInfo::setName(QString name)
+{
+	this->_name = name;
+}
+
+
+inline const QString& TypeInfo::srcDir() const
+{
+	return _srcDir;
+}
+
+
+inline void TypeInfo::setSrcDir(QString dir)
+{
+	_srcDir = dir;
+}
+
+inline int TypeInfo::srcFileId() const
+{
+	return _srcFileId;
+}
+
+
+inline void TypeInfo::setSrcFileId(int id)
+{
+	_srcFileId = id;
+}
+
+
+inline int TypeInfo::srcLine() const
+{
+	return _srcLine;
+}
+
+
+inline void TypeInfo::setSrcLine(int lineno)
+{
+	_srcLine = lineno;
+}
+
+
+inline int TypeInfo::id() const
+{
+	return _id;
+}
+
+
+inline void TypeInfo::setId(int id)
+{
+	this->_id = id;
+}
+
+
+inline int TypeInfo::origId() const
+{
+	return _origId;
+}
+
+
+inline void TypeInfo::setOrigId(int id)
+{
+	this->_origId = id;
+}
+
+
+inline int TypeInfo::refTypeId() const
+{
+	return _refTypeId;
+}
+
+
+inline void TypeInfo::setRefTypeId(int refTypeID)
+{
+	this->_refTypeId = refTypeID;
+}
+
+
+inline quint32 TypeInfo::byteSize() const
+{
+	return _byteSize;
+}
+
+
+inline void TypeInfo::setByteSize(quint32 byteSize)
+{
+	this->_byteSize = byteSize;
+}
+
+
+inline int TypeInfo::bitSize() const
+{
+	return _bitSize;
+}
+
+
+inline void TypeInfo::setBitSize(int bitSize)
+{
+	_bitSize = bitSize;
+}
+
+
+inline int TypeInfo::bitOffset() const
+{
+	return _bitOffset;
+}
+
+
+inline void TypeInfo::setBitOffset(int bitOffset)
+{
+	_bitOffset = bitOffset;
+}
+
+
+inline quint64 TypeInfo::location() const
+{
+	return _location;
+}
+
+
+inline void TypeInfo::setLocation(quint64 location)
+{
+    this->_location = location;
+    this->_hasLocation = true;
+}
+
+
+inline bool TypeInfo::hasLocation() const
+{
+    return _hasLocation;
+}
+
+
+inline qint32 TypeInfo::dataMemberLocation() const
+{
+    return _dataMemberLoc;
+}
+
+
+inline void TypeInfo::setDataMemberLocation(qint32 location)
+{
+    this->_dataMemberLoc = location;
+}
+
+
+inline HdrSymbolType TypeInfo::symType() const
+{
+    return _symType;
+}
+
+
+inline void TypeInfo::setSymType(HdrSymbolType symType)
+{
+    this->_symType = symType;
+}
+
+
+inline DataEncoding TypeInfo::enc() const
+{
+    return _enc;
+}
+
+
+inline void TypeInfo::setEnc(DataEncoding enc)
+{
+    this->_enc = enc;
+}
+
+
+inline const IntVec& TypeInfo::upperBounds() const
+{
+    return _upperBounds;
+}
+
+
+inline void TypeInfo::setUpperBounds(const IntVec& bounds)
+{
+    _upperBounds = bounds;
+}
+
+
+inline void TypeInfo::addUpperBounds(const IntVec& bounds)
+{
+    _upperBounds += bounds;
+}
+
+
+inline void TypeInfo::addUpperBound(qint32 bound)
+{
+    _upperBounds.append(bound);
+}
+
+
+inline int TypeInfo::external() const
+{
+    return _external;
+}
+
+
+inline void TypeInfo::setExternal(int value)
+{
+    _external = value;
+}
+
+
+inline qint32 TypeInfo::sibling() const
+{
+    return _sibling;
+}
+
+
+inline void TypeInfo::setSibling(qint32 sibling)
+{
+    _sibling = sibling;
+}
+
+
+inline bool TypeInfo::inlined() const
+{
+    return _inlined;
+}
+
+
+inline void TypeInfo::setInlined(bool value)
+{
+    _inlined = value;
+}
+
+
+inline quint64 TypeInfo::pcLow() const
+{
+    return _pcLow;
+}
+
+
+inline void TypeInfo::setPcLow(quint64 pc)
+{
+    _pcLow = pc;
+}
+
+
+inline quint64 TypeInfo::pcHigh() const
+{
+    return _pcHigh;
+}
+
+
+inline void TypeInfo::setPcHigh(quint64 pc)
+{
+    _pcHigh = pc;
+}
+
+// TODO: Currently QVariant is returned
+inline QVariant TypeInfo::constValue() const
+{
+    return _constValue;
+}
+
+
+inline void TypeInfo::setConstValue(QVariant value)
+{
+    _constValue = value;
+}
+
+
+inline const TypeInfo::EnumHash& TypeInfo::enumValues() const
+{
+    return _enumValues;
+}
+
+
+inline void TypeInfo::addEnumValue(const QString& name, qint32 value)
+{
+    _enumValues.insertMulti(value, name);
+}
+
+
+inline MemberList& TypeInfo::members()
+{
+    return _members;
+}
+
+
+inline const MemberList& TypeInfo::members() const
+{
+    return _members;
+}
+
+
+inline ParamList& TypeInfo::params()
+{
+    return _params;
+}
+
+
+inline const ParamList& TypeInfo::params() const
+{
+    return _params;
+}
+
+
+inline const QString &TypeInfo::segment() const
+{
+    return _segment;
+}
+
+inline void TypeInfo::setSegment(const QString &seg)
+{
+    _segment = seg;
+}
 
 
 #endif /* TYPEINFO_H_ */
