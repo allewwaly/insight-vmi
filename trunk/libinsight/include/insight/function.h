@@ -2,14 +2,14 @@
 #define FUNCTION_H
 
 #include "funcpointer.h"
-#include "segmentdescription.h"
+#include "memorysection.h"
 
 /**
  * This class represents a function definition.
  *
  * \sa FuncPointer, FuncParam
  */
-class Function : public FuncPointer, public SegmentDescription
+class Function : public FuncPointer, public MemorySection
 {
 public:
     /**

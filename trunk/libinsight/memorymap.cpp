@@ -190,7 +190,8 @@ void MemoryMap::addVariableWithRules(const Variable *var)
 {
     Instance inst(var->toInstance(_vmem, BaseType::trLexical, _knowSrc));
     while (!interrupted()) {
-        addVarInstance(inst);
+        if (inst.isValid())
+            addVarInstance(inst);
         if (inst.isList()) {
             inst = inst.listNext();
             checkOperationProgress();

@@ -9,6 +9,7 @@
 #define MEMSPECS_H_
 
 #include <QDataStream>
+#include <QDateTime>
 #include <debug.h>
 #include "kernelsymbolstream.h"
 
@@ -120,7 +121,6 @@ struct MemSpecs
         QString machine;
         bool equals(const Version& other) const;
         QString toString() const;
-        QString toFileNameString() const;
     };
 
     /// Constructor
@@ -149,6 +149,13 @@ struct MemSpecs
      * @return specs as string
      */
     QString toString() const;
+
+    /**
+     * Generates a unique file name based on the memory specifications and the
+     * kernel version.
+     * @return version-specific file name
+     */
+    QString toFileNameString() const;
 
     /**
      * @return the real (calculated) VMALLOC_START address that can actually
@@ -181,6 +188,8 @@ struct MemSpecs
     qint32 sizeofLong;
     qint32 sizeofPointer;
     qint32 arch;                 ///< An Architecture value
+    QDateTime created;
+    int symVersion;
     struct Version version;      ///< Linux kernel version information
     bool initialized;            ///< \c true after MemoryDump::init() is complete, \c false otherwise
 };

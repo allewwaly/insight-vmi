@@ -12,6 +12,7 @@
 #include <insight/structured.h>
 #include <insight/symfactory.h>
 #include <insight/variable.h>
+#include <insight/function.h>
 #include <debug.h>
 
 #define INT32MASK 0xFFFFFFFFULL
@@ -507,6 +508,28 @@ QString InstancePrototype::OrigFileName() const
             return v->origFileName();
     }
     return inst->type()->origFileName();
+}
+
+
+QString InstancePrototype::Section() const
+{
+    Instance* inst = thisInstance();
+    if (!inst || !inst->isValid())
+        return QString();
+    // Is this the instance of a variable?
+    if (inst->id() > 0) {
+        // Try to find the variable
+        const Variable* v = inst->type()->factory()->findVarById(inst->id());
+        if (v)
+            return v->section();
+    }
+    // Is this the instance of a function?
+    else if (inst->type()->type() == rtFunction) {
+        const Function* func = static_cast<const Function*>(inst->type());
+        return func->section();
+    }
+
+    return QString();
 }
 
 

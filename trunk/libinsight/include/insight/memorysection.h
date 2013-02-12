@@ -1,35 +1,35 @@
-#ifndef SEGMENTDESCRIPTION_H
-#define SEGMENTDESCRIPTION_H
+#ifndef MEMORYSECTION_H
+#define MEMORYSECTION_H
 
 #include <QString>
 #include "typeinfo.h"
 #include "kernelsymbolstream.h"
 
 /**
- * This interface class adds a segment name to the derived class.
+ * This interface class adds a memory section name to the derived class.
  */
-class SegmentDescription
+class MemorySection
 {
 public:
 	/**
 	 * Constructor
 	 */
-	SegmentDescription() {}
+	MemorySection() {}
 
 	/**
 	 * Constructor
 	 * @param info type information to initialize from
 	 */
-	SegmentDescription(const TypeInfo& info);
+	MemorySection(const TypeInfo& info);
 
 	/**
 	 * Returns the segment where this variable is stored.
 	 * @return name of the segment
 	 * \sa setSegment()
 	 */
-	inline const QString& segment() const
+	inline const QString& section() const
 	{
-		return _segment;
+		return _section;
 	}
 
 	/**
@@ -37,7 +37,7 @@ public:
 	 * @param segment segment name
 	 * \sa segement()
 	 */
-	void setSegment(const QString& segment);
+	void setSection(const QString& section);
 
 	/**
 	 * Reads a serialized version of this object from \a in.
@@ -54,7 +54,7 @@ public:
 	void writeTo(KernelSymbolStream& out) const;
 
 private:
-	QString _segment;
+	QString _section;
 };
 
-#endif // SEGMENTDESCRIPTION_H
+#endif // MEMORYSECTION_H

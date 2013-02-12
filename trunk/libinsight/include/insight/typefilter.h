@@ -56,16 +56,20 @@ enum Option {
     ftVarNameLiteral   = (1 << 1),  ///< literal name match
     ftVarNameWildcard  = (1 << 2),  ///< wildcard name match
     ftVarNameRegEx     = (1 << 3),  ///< regular expression name match
-    ftVarSymFileIndex  = (1 << 4),  ///< match original symbol file index of variable
-    ftTypeNameAny      = (1 << 5),  ///< match any type name
-    ftTypeNameLiteral  = (1 << 6),  ///< literal type name match
-    ftTypeNameWildcard = (1 << 7),  ///< wildcard name match
-    ftTypeNameRegEx    = (1 << 8),  ///< QRegExp type name match
-    ftTypeId           = (1 << 9),  ///< match type ID
-    ftRealType         = (1 << 10), ///< match RealType of type
-    ftSize             = (1 << 11), ///< match type size
+    ftSymFileAny       = (1 << 4),  ///< match original symbol file name of variable
+    ftSymFileLiteral   = (1 << 5),  ///< match original symbol file name of variable
+    ftSymFileWildcard  = (1 << 6),  ///< wildcard match original symbol file name
+    ftSymFileRegEx     = (1 << 7),  ///< regex match original symbol file name
+    ftTypeNameAny      = (1 << 8),  ///< match any type name
+    ftTypeNameLiteral  = (1 << 9),  ///< literal type name match
+    ftTypeNameWildcard = (1 << 10),  ///< wildcard name match
+    ftTypeNameRegEx    = (1 << 11), ///< QRegExp type name match
+    ftTypeId           = (1 << 12), ///< match type ID
+    ftRealType         = (1 << 13), ///< match RealType of type
+    ftSize             = (1 << 14), ///< match type size
     ftTypeNameAll      = ftTypeNameAny|ftTypeNameLiteral|ftTypeNameWildcard|ftTypeNameRegEx,  ///< any kind of type name matching
-    ftVarNameAll       = ftVarNameAny|ftVarNameLiteral|ftVarNameWildcard|ftVarNameRegEx  ///< any kind of variable name matching
+    ftVarNameAll       = ftVarNameAny|ftVarNameLiteral|ftVarNameWildcard|ftVarNameRegEx,  ///< any kind of variable name matching
+    ftSymFileAll       = ftSymFileAny|ftSymFileLiteral|ftSymFileWildcard|ftSymFileRegEx ///< any kind of symbol file name matching
 };
 DECLARE_SAFE_FLAGS(Options, Option)
 
@@ -221,10 +225,13 @@ protected:
      * @param pattern given pattern.
      * @param name variable to set according to \a pattern
      * @param rx \a regular expression object to setup accoring to \a pattern
+     * @param plainPattern regular expression used to decide if the given name
+     * represents a literal match or not (defaults to "[a-zA-Z0-9_]*").
      * @return used pattern syntax
      */
     static Filter::PatternSyntax parseNamePattern(const QString& pattern,
-                                                  QString& name, QRegExp &rx);
+                                                  QString& name, QRegExp &rx,
+                                                  QString plainPattern = "[a-zA-Z0-9_]*");
 
     /**
      * Sets a name matching pattern along with the pattern syntax. If syntax
@@ -235,12 +242,16 @@ protected:
      * @param name variable to set according to \a pattern
      * @param rx \a regular expression object to setup accoring to \a pattern
      * @param syntax the pattern syntax to use
+     * @param plainPattern regular expression used to decide if the given name
+     * represents a literal match or not, if \a syntax = psAuto (defaults to
+     * "[a-zA-Z0-9_]*").
      * @return used pattern syntax, if \a syntax was Filter::psAuto, otherwise
      *  \a syntax is returned
      */
     static Filter::PatternSyntax setNamePattern(const QString& pattern,
                                                 QString& name, QRegExp &rx,
-                                                Filter::PatternSyntax syntax);
+                                                Filter::PatternSyntax syntax,
+                                                QString plainPattern = "[a-zA-Z0-9_]*");
 
     /**
      * Returns the filter syntax specified by key "match", which can be either
@@ -254,8 +265,6 @@ protected:
     bool matchTypeName(const QString& name) const;
 
     Filter::Options _filters;
-
-protected:
     mutable QMutex _regExLock;
 
 private:
@@ -463,7 +472,7 @@ public:
      * @param symFiles list of files the symbols in SymFactory were parsed from
      */
     VariableFilter(const QStringList& symFiles = QStringList())
-        : _varRegEx(0), _symFileIndex(-2), _symFiles(symFiles) {}
+        : _varRegEx(0), _symFileRegEx(0), _symFiles(symFiles) {}
 
     /**
      * Copy constructor
@@ -540,16 +549,24 @@ public:
     Filter::PatternSyntax varNameSyntax() const;
 
     /**
-     * Returns the index of the symbol file this variable filter matches on.
+     * Returns the symbol file name or pattern.
      */
-    inline int symFileIndex() const { return _symFileIndex; }
+    inline const QString& symFileName() const { return _symFile; }
 
     /**
-     * Sets the index of the symbol file this variable filter matches on.
-     * @param i file index
+     * Sets the symbol file name or pattern this filter matches on.
+     * @param name file name or pattern (depending on \a syntax)
+     * @param syntax the pattern syntax used in \a name
+     * \sa symFileName(), symFileNameSyntax()
      */
-    inline void setSymFileIndex(int i)
-    { _symFileIndex = i; _filters |= Filter::ftVarSymFileIndex; }
+    void setSymFileName(const QString& name,
+                        Filter::PatternSyntax syntax = Filter::psAuto);
+
+    /**
+     * Returns the pattern syntax used for the symbol file name.
+     * \sa setSymFileName()
+     */
+    Filter::PatternSyntax symFileNameSyntax() const;
 
     /**
      * \copydoc GenericFilter::toString()
@@ -567,12 +584,14 @@ public:
 
 protected:
     bool matchVarName(const QString& name) const;
+    bool matchSymFileName(const QString& name) const;
 
 private:
     QString _varName;
     QRegExp* _varRegEx;
-    int _symFileIndex;
-    QStringList _symFiles;
+    QRegExp* _symFileRegEx;
+    QString _symFile;
+    const QStringList& _symFiles;
 };
 
 

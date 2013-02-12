@@ -13,7 +13,7 @@
 #include "symbol.h"
 #include "referencingtype.h"
 #include "sourceref.h"
-#include "segmentdescription.h"
+#include "memorysection.h"
 #include <debug.h>
 
 class TypeRuleEngine;
@@ -22,7 +22,7 @@ class TypeRuleEngine;
  * This class represents a variable variable of a certain type.
  */
 class Variable: public Symbol, public ReferencingType, public SourceRef,
-        public SegmentDescription
+        public MemorySection
 {
 public:
     /**

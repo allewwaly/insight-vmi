@@ -106,7 +106,7 @@ public:
     void setOrigFileIndex(int index);
 
     /**
-     * Returns the index of the kernel or module file this symbol was read from.
+     * Returns the file name of the kernel or module file this symbol was read from.
      * \sa origFileIndex()
      */
     const QString& origFileName() const;

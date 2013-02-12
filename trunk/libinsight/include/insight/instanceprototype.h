@@ -677,8 +677,8 @@ public slots:
      *
      * @param typeName the name of the type to change to
      */
-
     void ChangeType(const QString& typeName);
+
     /**
      * Changes the type of this instance to the type specified by its ID
      * \a typeId. If that type cannot be found, a script exception is injected.
@@ -693,6 +693,12 @@ public slots:
      * Returns the name of the kernel or module file this symbol was read from.
      */
     QString OrigFileName() const;
+
+    /**
+     * Returns the name of the memory section this instance resides in.
+     * @return section name
+     */
+    QString Section() const;
 
     /**
      * Explicit representation of this instance as qint8.

@@ -8,7 +8,7 @@ Function::Function(KernelSymbols *symbols)
 
 
 Function::Function(KernelSymbols *symbols, const TypeInfo& info)
-	: FuncPointer(symbols, info), SegmentDescription(info),
+	: FuncPointer(symbols, info), MemorySection(info),
 	  _inlined(info.inlined()), _pcLow(info.pcLow()), _pcHigh(info.pcHigh())
 {
 }

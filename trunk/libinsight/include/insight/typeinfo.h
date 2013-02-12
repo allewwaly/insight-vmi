@@ -291,8 +291,8 @@ public:
     ParamList& params();
     const ParamList& params() const;
 
-    const QString& segment() const;
-    void setSegment(const QString& seg);
+    const QString& section() const;
+    void setSection(const QString& section);
 
     QString dump(const QStringList &symFiles) const;
 
@@ -324,7 +324,7 @@ private:
 	DataEncoding _enc;       ///< holds the data encoding of this symbol
 	MemberList _members;     ///< holds all members of a union or struct
 	ParamList _params;       ///< holds all parameters of a function (pointer)
-	QString _segment;        ///< holds the segment name for a variable
+	QString _section;        ///< holds the segment name for a variable
 };
 
 
@@ -658,14 +658,14 @@ inline const ParamList& TypeInfo::params() const
 }
 
 
-inline const QString &TypeInfo::segment() const
+inline const QString &TypeInfo::section() const
 {
-    return _segment;
+    return _section;
 }
 
-inline void TypeInfo::setSegment(const QString &seg)
+inline void TypeInfo::setSection(const QString &section)
 {
-    _segment = seg;
+    _section = section;
 }
 
 

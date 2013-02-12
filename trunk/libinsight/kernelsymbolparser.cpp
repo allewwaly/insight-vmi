@@ -239,7 +239,7 @@ void KernelSymbolParser::WorkerThread::finishLastSymbol()
                     else if ((_info->symType() & (hsVariable|hsSubprogram)) &&
                              !_info->name().isEmpty())
                     {
-                        SegmentInfoHash::const_iterator it;
+                        SectionInfoHash::const_iterator it;
                         for (it = _segmentInfo.find(_info->name());
                              it != _segmentInfo.end() && it.key() == _info->name();
                              ++it)
@@ -250,7 +250,7 @@ void KernelSymbolParser::WorkerThread::finishLastSymbol()
                                  (_info->symType() == hsSubprogram &&
                                   it.value().addr == _info->pcLow()))
                             {
-                                _info->setSegment(it.value().segment);
+                                _info->setSection(it.value().section);
                                  break;
                             }
                         }
@@ -553,7 +553,7 @@ void KernelSymbolParser::WorkerThread::parseSegments(QIODevice* from)
                     parseULongLong16(addr, rxSegment.cap(1), &ok);
                     segment = rxSegment.cap(3);
                     varname = rxSegment.cap(4);
-                    _segmentInfo.insertMulti(varname, SegLoc(addr, segment));
+                    _segmentInfo.insertMulti(varname, MemSection(addr, segment));
                 }
             }
             catch (GenericException& e) {
