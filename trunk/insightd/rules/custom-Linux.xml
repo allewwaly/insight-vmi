@@ -18,6 +18,7 @@
 	<include>radix_trees.xml</include>
 	<include>inodes.xml</include>
 	<include>prio_trees.xml</include>
+	<include>module_vars.xml</include>
 
 	<!-- Type-specific rules -->
 	<include>type_struct_acpi_object_region_field.xml</include>

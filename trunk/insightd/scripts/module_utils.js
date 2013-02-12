@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2013 by Christian Schneider <chrschn@sec.in.tum.de>
+ */
 
 include("scripts/lib_string.js"); 
 
@@ -90,5 +93,6 @@ function get_module_var(var_name, section_name)
 
 function print_module_var(var_name, section_name)
 {
-	println(get_module_var(var_name, section_name));
+	var i = get_module_var(var_name, section_name);
+	println(i.Dereference());
 }
