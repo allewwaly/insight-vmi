@@ -42,7 +42,7 @@ void TypeInfo::clear()
 	_enumValues.clear();
 	_members.clear();
 	_params.clear();
-	_segment.clear();
+	_section.clear();
 }
 
 
@@ -82,7 +82,7 @@ QString TypeInfo::dump(const QStringList& symFiles) const
     if (_bitOffset >= 0)        ret += QString("  bitOffset :    %1\n").arg(_bitOffset);
 	if (_enc > 0)               ret += QString("  enc:           %1 (%2)\n").arg(_enc).arg(enc);
 	if (_location > 0)          ret += QString("  location:      %1\n").arg(_location);
-	if (!_segment.isEmpty())    ret += QString("  segment:       %1\n").arg(_segment);
+	if (!_section.isEmpty())    ret += QString("  segment:       %1\n").arg(_section);
 	if (_dataMemberLoc >= 0)    ret += QString("  dataMemberLoc: %1\n").arg(_dataMemberLoc);
 	if (_refTypeId != 0)        ret += QString("  refTypeId:     0x%1\n").arg(_refTypeId, 0, 16);
 	if (!ub.isEmpty())          ret += QString("  upperBound(s): %1\n").arg(ub.join(", "));

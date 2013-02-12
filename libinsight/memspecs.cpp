@@ -193,6 +193,7 @@ MemSpecs::MemSpecs() :
     sizeofLong(sizeof(long)),
     sizeofPointer(sizeof(void*)),
     arch(ar_undefined),
+    symVersion(0),
     initialized(false)
 {
 }
@@ -252,6 +253,11 @@ QString MemSpecs::toString() const
     int val_w = sizeofPointer << 1;
     QString pae = arch & ar_pae_enabled ? " (PAE enabled)" : (arch & ar_i386 ? " (PAE disabled)" : "");
 
+    ret += QString("Symbol version %0").arg(symVersion);
+    if (created.isValid())
+        ret += QString(", created on %0\n").arg(created.toString());
+    else
+        ret += "\n";
     ret += QString("%1 = %2%3\n").arg("ARCHITECTURE", key_w).arg(arch & ar_i386 ? "i386" : "x86_64").arg(pae);
     ret += QString("%1 = %2\n").arg("sizeof(long)", key_w).arg(sizeofLong);
     ret += QString("%1 = %2\n").arg("sizeof(void*)", key_w).arg(sizeofPointer);
@@ -299,6 +305,8 @@ QString MemSpecs::toString() const
 
 KernelSymbolStream& operator>>(KernelSymbolStream& in, MemSpecs& specs)
 {
+    specs.symVersion = in.kSymVersion();
+
     in  >> specs.pageOffset
         >> specs.vmallocStart
         >> specs.vmallocEnd
@@ -326,11 +334,17 @@ KernelSymbolStream& operator>>(KernelSymbolStream& in, MemSpecs& specs)
            >> specs.version.version
            >> specs.version.machine;
     }
+
     // Poison information was added in v18
     if (in.kSymVersion() >= kSym::VERSION_18) {
         in >> specs.listPoison1
            >> specs.listPoison2
            >> specs.maxErrNo;
+    }
+
+    // Creation time stamp was added in v20
+    if (in.kSymVersion() >= kSym::VERSION_20) {
+        in >> specs.created;
     }
 
     return in;
@@ -372,6 +386,11 @@ KernelSymbolStream& operator<<(KernelSymbolStream& out, const MemSpecs& specs)
             << specs.maxErrNo;
     }
 
+    // Creation time stamp was added in v20
+    if (out.kSymVersion() >= kSym::VERSION_20) {
+        out << specs.created;
+    }
+
     return out;
 }
 
@@ -395,11 +414,11 @@ QString MemSpecs::Version::toString() const
 }
 
 
-QString MemSpecs::Version::toFileNameString() const
+QString MemSpecs::toFileNameString() const
 {
-    QString ver(version);
+    QString ver(version.version);
     // Try to parse the date and create a shorter version
-    QStringList verParts = version.split(QChar(' '), QString::SkipEmptyParts);
+    QStringList verParts = version.version.split(QChar(' '), QString::SkipEmptyParts);
     if (verParts.size() >= 6) {
         verParts = verParts.mid(verParts.size() - 6);
         verParts.removeAt(4); // get rid of time zone
@@ -408,8 +427,17 @@ QString MemSpecs::Version::toFileNameString() const
             ver = dt.toString("yyyyMMdd-hhmmss");
     }
 
-    QString s = sysname + "_" + release + "_" + machine + "_" + ver;
+    QString s = version.sysname + "_" + version.release + "_" +
+            version.machine + "_" + ver + "_";
+
+    // If we have a valid date, we use that as suffix, otherwise we use the
+    // symbol version
+    if (created.isValid())
+        s += QString::number(created.toTime_t(), 36);
+    else
+        s += "v" + QString::number(symVersion);
+
     s.replace(QChar(' '), "_"); // space to underscore
-    s.replace(QRegExp("[^-._a-zA-Z0-9]+"), QString()); // remove all uncommon
+    s.replace(QRegExp("[^-._a-zA-Z0-9]+"), QString()); // remove uncommon chars
     return s;
 }

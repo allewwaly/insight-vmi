@@ -563,7 +563,7 @@ const XmlSchema &TypeRuleParser::schema()
 
         // Auto-add all children of <fitler>
         intTypes << xml::size;
-        matchTypes << xml::member << xml::variablename << xml::type_name;
+        matchTypes << xml::member << xml::variablename << xml::type_name << xml::filename;
         multiTypes << xml::member;
         for (int i = 0; i < children.size(); ++i) {
             bool allowMatch = matchTypes.contains(children[i]);

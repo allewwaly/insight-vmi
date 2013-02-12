@@ -125,12 +125,26 @@ int TypeRuleEngine::addAllLexicalTypes(const BaseType* type, ActiveRule& arule)
     // as well
     if (arule.rule->match(type) && arule.rule->action()->match(type)) {
         do {
-            _rulesPerType.insertMulti(type->id(), arule);
-            ++hits;
-            if (type->type() & BaseType::trLexical)
-                type = dynamic_cast<const RefBaseType*>(type)->refType();
-            else
+            // Check if we already have added that rule
+            bool found = false;
+            ActiveRuleHash::const_iterator it = _rulesPerType.find(type->id()),
+                    e = _rulesPerType.end();
+            for (; !found && it != e && it.key() == type->id(); ++it) {
+                if (it.value().rule == arule.rule)
+                    found = true;
+            }
+            // If we've added this rule for this type before, we've done so
+            // for all lexical types already.
+            if (found)
                 break;
+            else {
+                _rulesPerType.insertMulti(type->id(), arule);
+                ++hits;
+                if (type->type() & BaseType::trLexical)
+                    type = dynamic_cast<const RefBaseType*>(type)->refType();
+                else
+                    break;
+            }
         } while (type);
     }
     return hits;
@@ -235,6 +249,44 @@ bool TypeRuleEngine::checkRule(TypeRule *rule, int index, const OsSpecs *specs)
     else if (rule->filter()->filterActive(Filter::ftTypeId)) {
         const BaseType* t = factory->findBaseTypeById(rule->filter()->typeId());
         hits += addAllLexicalTypes(t, arule);
+    }
+    // If we have a symbol file name or a literal variable name, we can narrow
+    // the types down to matching variables
+    else if (rule->filter()->filterActive(
+                 Filter::Options(Filter::ftSymFileAll|Filter::ftVarNameLiteral)))
+    {
+        foreach (const Variable* v, factory->vars()) {
+            if (rule->match(v)) {
+                const BaseType* bt = v->refType();
+                const RefBaseType* rbt;
+                // Add all referencing types as well
+                while (bt) {
+                    hits += addAllLexicalTypes(bt, arule);
+                    if ( (rbt = dynamic_cast<const RefBaseType*>(bt)) )
+                        bt = rbt->refType();
+                    else
+                        break;
+                }
+            }
+        }
+    }
+    // If we have to match variable names with wildcards or regexps, we must
+    // consider all variable types.
+    else if (rule->filter()->filterActive(
+                 Filter::Options(Filter::ftVarNameWildcard|Filter::ftVarNameRegEx)))
+    {
+        foreach (const Variable* v, factory->vars()) {
+            const BaseType* bt = v->refType();
+            const RefBaseType* rbt;
+            // Add all referencing types as well
+            while (bt) {
+                hits += addAllLexicalTypes(bt, arule);
+                if ( (rbt = dynamic_cast<const RefBaseType*>(bt)) )
+                    bt = rbt->refType();
+                else
+                    break;
+            }
+        }
     }
     else {
         foreach (const BaseType* bt, factory->types()) {

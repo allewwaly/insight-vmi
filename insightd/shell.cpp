@@ -2866,7 +2866,7 @@ int Shell::cmdRulesLoad(QStringList args)
             Console::errMsg("Directory not found: " + baseDir.absolutePath());
             return ecFileNotFound;
         }
-        QString fileName = _sym.memSpecs().version.toFileNameString() + ".xml";
+        QString fileName = _sym.memSpecs().toFileNameString() + ".xml";
         if (!baseDir.exists(fileName)) {
             Console::warnMsg("No rules for the loaded kernel found in directory \"" +
                     ShellUtil::shortFileName(baseDir.absolutePath()) + "\".");
@@ -3553,7 +3553,7 @@ int Shell::cmdShowBaseType(const BaseType* t, const QString &name,
 			 << endl;
 		Console::out() << Console::color(ctColHead) << "  Segment:        "
 					   << Console::color(ctReset)
-					   << (func->segment().isEmpty() ? QString("n/a") : func->segment())
+					   << (func->section().isEmpty() ? QString("n/a") : func->section())
 					   << endl;
 		Console::out() << Console::color(ctColHead) << "  Inlined:        "
 			 << Console::color(ctReset) << (func->inlined() ? "yes" : "no") << endl;
@@ -3870,9 +3870,9 @@ int Shell::cmdShowVariable(const Variable* v, const ActiveRuleList &matchingRule
 		 << Console::color(ctVariable) << v->name() << endl;
 	Console::out() << Console::color(ctColHead) << "  Address:        "
 		 << Console::color(ctAddress) << "0x" << hex << v->offset() << dec << endl;
-	Console::out() << Console::color(ctColHead) << "  Segment:        "
+	Console::out() << Console::color(ctColHead) << "  Mem. section:   "
 				   << Console::color(ctReset)
-				   << (v->segment().isEmpty() ? QString("n/a") : v->segment())
+				   << (v->section().isEmpty() ? QString("n/a") : v->section())
 				   << endl;
 
     const BaseType* rt = v->refType();
@@ -4187,7 +4187,7 @@ int Shell::cmdSymbolsWriteRules(QStringList args)
     }
 
     QDir baseDir(args[0]);
-    QString baseName = _sym.memSpecs().version.toFileNameString();
+    QString baseName = _sym.memSpecs().toFileNameString();
     QString fileName = baseName + ".xml";
 
     // Check file for existence

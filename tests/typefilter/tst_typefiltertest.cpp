@@ -910,7 +910,7 @@ void TypeFilterTest::setFileName()
     VariableFilter f;
 
     // Cannot be tested, requires further changes in KernelSymbolParser
-    f.setSymFileIndex(3);
+    f.setSymFileName("foobar.ko");
     QVERIFY(!f.matchVar(var_a));
     QVERIFY(!f.matchVar(var_b));
 }

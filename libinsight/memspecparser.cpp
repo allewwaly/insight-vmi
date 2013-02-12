@@ -497,6 +497,7 @@ MemSpecs MemSpecParser::parse()
         memSpecParserError(QString("The file \"%1\" does not exist.").arg(_systemMapFile));
 
     MemSpecs specs;
+    specs.created = QDateTime::currentDateTime();
 
     // Determine configured system architecture
     parseKernelConfig(&specs);

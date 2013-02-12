@@ -225,12 +225,13 @@ PatternSyntax GenericFilter::typeNameSyntax() const
 
 
 PatternSyntax GenericFilter::parseNamePattern(const QString& pattern,
-                                              QString& name, QRegExp &rx)
+                                              QString& name, QRegExp &rx,
+                                              QString plainPattern)
 {
     name = pattern.trimmed();
 
     // Do we have a literal match?
-    QRegExp rxPlain("[a-zA-Z0-9_]*");
+    QRegExp rxPlain(plainPattern);
     if (rxPlain.exactMatch(name))
         return psLiteral;
     // Do we have a valid regular expression?
@@ -255,12 +256,13 @@ PatternSyntax GenericFilter::parseNamePattern(const QString& pattern,
 }
 
 
-PatternSyntax GenericFilter::setNamePattern(
-        const QString &pattern, QString &name, QRegExp &rx,
-        PatternSyntax syntax)
+PatternSyntax GenericFilter::setNamePattern(const QString &pattern,
+                                            QString &name, QRegExp &rx,
+                                            PatternSyntax syntax,
+                                            QString plainPattern)
 {
     if (syntax == psAuto)
-        syntax = parseNamePattern(pattern, name, rx);
+        syntax = parseNamePattern(pattern, name, rx, plainPattern);
     else {
         name = pattern.trimmed();
 
@@ -714,11 +716,15 @@ void TypeFilter::parseOptions(const QStringList &list)
 // VariableFilter
 //------------------------------------------------------------------------------
 
+static const QStringList emptyList;
+
 VariableFilter::VariableFilter(const VariableFilter& from)
-    : TypeFilter(from), _varRegEx(0)
+    : TypeFilter(from), _varRegEx(0), _symFileRegEx(0), _symFiles(emptyList)
 {
     if (from._varRegEx)
         _varRegEx = new QRegExp(*from._varRegEx);
+    if (from._symFileRegEx)
+        _symFileRegEx = new QRegExp(*from._symFileRegEx);
 }
 
 
@@ -726,12 +732,16 @@ VariableFilter::~VariableFilter()
 {
     if (_varRegEx)
         delete _varRegEx;
+    if (_symFileRegEx)
+        delete _symFileRegEx;
 }
 
 
 VariableFilter &VariableFilter::operator=(const VariableFilter &src)
 {
     GenericFilter::operator=(src);
+
+    QMutexLocker lock(&_regExLock);
     if (_varRegEx) {
         delete _varRegEx;
         _varRegEx = 0;
@@ -762,6 +772,25 @@ bool VariableFilter::matchVarName(const QString &name) const
 }
 
 
+bool VariableFilter::matchSymFileName(const QString &name) const
+{
+    if (filterActive(ftSymFileLiteral) &&
+        _symFile.compare(name, Qt::CaseInsensitive) != 0)
+        return false;
+    else {
+        QMutexLocker lock(&_regExLock);
+        if (filterActive(ftSymFileWildcard) &&
+            !_symFileRegEx->exactMatch(name))
+            return false;
+        else if (filterActive(ftSymFileRegEx) &&
+                 _symFileRegEx->indexIn(name) < 0)
+            return false;
+    }
+
+    return true;
+}
+
+
 bool VariableFilter::matchVar(const Variable *var) const
 {
     if (!var)
@@ -769,8 +798,8 @@ bool VariableFilter::matchVar(const Variable *var) const
 
     if (filterActive(ftVarNameAll) && !matchVarName(var->name()))
         return false;
-    else if (filterActive(ftVarSymFileIndex) &&
-             var->origFileIndex() != _symFileIndex)
+    else if (filterActive(ftSymFileAll) &&
+             !matchSymFileName(var->origFileName()))
         return false;
 
     return TypeFilter::matchType(var->refType());
@@ -785,7 +814,11 @@ void VariableFilter::clear()
         _varRegEx = 0;
     }
     _varName.clear();
-    _symFileIndex = -2;
+    if (_symFileRegEx) {
+        delete _symFileRegEx;
+        _symFileRegEx = 0;
+    }
+    _symFile.clear();
 }
 
 
@@ -819,6 +852,42 @@ PatternSyntax VariableFilter::varNameSyntax() const
     else if (filterActive(ftVarNameRegEx))
         return psRegExp;
     else if (filterActive(ftVarNameWildcard))
+        return psWildcard;
+    else
+        return psLiteral;
+}
+
+
+void VariableFilter::setSymFileName(const QString &name, Filter::PatternSyntax syntax)
+{
+    _filters &= ~ftSymFileAll;
+    QRegExp rx;
+    syntax = setNamePattern(name, _symFile, rx, syntax, "[-_.a-zA-Z0-9]*");
+
+    switch (syntax) {
+    case psAuto: break;
+    case psAny:      _filters |= ftSymFileAny; break;
+    case psLiteral:  _filters |= ftSymFileLiteral; break;
+    case psRegExp:   _filters |= ftSymFileRegEx; break;
+    case psWildcard: _filters |= ftSymFileWildcard; break;
+    }
+
+    if (_symFileRegEx)
+        delete _symFileRegEx;
+    if (syntax & (psRegExp|psWildcard))
+        _symFileRegEx = new QRegExp(rx);
+    else
+        _symFileRegEx = 0;
+}
+
+
+Filter::PatternSyntax VariableFilter::symFileNameSyntax() const
+{
+    if (filterActive(ftSymFileAny))
+        return psAny;
+    else if (filterActive(ftSymFileRegEx))
+        return psRegExp;
+    else if (filterActive(ftSymFileWildcard))
         return psWildcard;
     else
         return psLiteral;
@@ -878,25 +947,8 @@ bool VariableFilter::parseOption(const QString &key, const QString &value,
 {
     if (QString(xml::variablename).startsWith(key))
         setVarName(value, givenSyntax(keyVals));
-    else if (QString(xml::filename).startsWith(key)) {
-        QString s = value.toLower();
-        if (s != "vmlinux") {
-            // Make sure kernel modules end with ".ko"
-            if (!s.endsWith(".ko"))
-                s += ".ko";
-            // Name should contain a "/"
-            if (!s.contains(QChar('/')))
-                s.prepend(QChar('/'));
-        }
-        setSymFileIndex(-2);
-        // Find that name
-        for (int i = 0; i < _symFiles.size(); ++i) {
-            if (_symFiles[i].endsWith(s, Qt::CaseInsensitive)) {
-                setSymFileIndex(i);
-                break;
-            }
-        }
-    }
+    else if (QString(xml::filename).startsWith(key))
+        setSymFileName(value, givenSyntax(keyVals));
     else
         return TypeFilter::parseOption(key, value, keyVals);
 
@@ -915,10 +967,12 @@ bool InstanceFilter::matchInst(const Instance *inst) const
 
     if (filterActive(ftVarNameAll) && !matchVarName(inst->name()))
         return false;
-    else if (filterActive(ftVarSymFileIndex) && inst->id() > 0) {
+    else if (filterActive(ftSymFileAll) && inst->id() > 0) {
         const SymFactory* factory = inst->type() ? inst->type()->factory() : 0;
+        if (!factory)
+            return false;
         const Variable* v = factory->findVarById(inst->id());
-        if (v && v->origFileIndex() != symFileIndex())
+        if (v && !matchSymFileName(v->origFileName()))
             return false;
     }
 
