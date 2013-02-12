@@ -25,20 +25,28 @@ function inode_resolve_embedding(inode)
 	if (i_sb_ops === undefined || i_sb_ops.IsNull())
 		return inode;
 
+	var useRulesSave = Instance.useRules;
+
 	// Compare super_operations address linked by inode to all other known
 	// super_operations types
 	for (var ops_name in inode_types) {
 		if (!Symbols.variableExists(ops_name))
 			continue;
+
+		// Enable the rule engine to be able to access module variables
+		Instance.useRules = true;
+		println("### Getting instance for " + ops_name);
 		var sb_ops = new Instance(ops_name);
-		if (i_sb_ops.Address() == sb_ops.Address()) {
+		Instance.useRules = useRulesSave;
+		
+		if (sb_ops.IsValid && i_sb_ops.Address() == sb_ops.Address()) {
 			inode.ChangeType(inode_types[ops_name]);
 			inode.AddToAddress(-inode.MemberOffset("vfs_inode"));
-			return inode;
+			println("### Success with " + ops_name);
+			break;
 		}
 	}
 
-	// We don't know the type (or it is just a plain inode)
 	return inode;
 }
 
