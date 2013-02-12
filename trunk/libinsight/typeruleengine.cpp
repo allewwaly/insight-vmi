@@ -250,10 +250,9 @@ bool TypeRuleEngine::checkRule(TypeRule *rule, int index, const OsSpecs *specs)
         const BaseType* t = factory->findBaseTypeById(rule->filter()->typeId());
         hits += addAllLexicalTypes(t, arule);
     }
-    // If we have a symbol file name or a literal variable name, we can narrow
-    // the types down to matching variables
-    else if (rule->filter()->filterActive(
-                 Filter::Options(Filter::ftSymFileAll|Filter::ftVarNameLiteral)))
+    // If we have a symbol file name, we can narrow the types down to matching
+    // variables
+    else if (rule->filter()->filterActive(Filter::ftSymFileAll))
     {
         foreach (const Variable* v, factory->vars()) {
             if (rule->match(v)) {
@@ -267,6 +266,22 @@ bool TypeRuleEngine::checkRule(TypeRule *rule, int index, const OsSpecs *specs)
                     else
                         break;
                 }
+            }
+        }
+    }
+    // If we have a literal variable name, we don't need to consider all variables
+    else if (rule->filter()->filterActive(Filter::ftVarNameLiteral)) {
+        const Variable* v = factory->findVarByName(rule->filter()->varName());
+        if (rule->match(v)) {
+            const BaseType* bt = v->refType();
+            const RefBaseType* rbt;
+            // Add all referencing types as well
+            while (bt) {
+                hits += addAllLexicalTypes(bt, arule);
+                if ( (rbt = dynamic_cast<const RefBaseType*>(bt)) )
+                    bt = rbt->refType();
+                else
+                    break;
             }
         }
     }
