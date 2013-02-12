@@ -238,9 +238,11 @@ void MemoryMap::addNodeToHashes(MemoryMapNode *node)
         _shared->maxObjSize = node->size();
     _shared->vmemMapLock.unlock();
 
-    _shared->typeInstancesLock.lockForWrite();
-    _typeInstances.insert(node->type()->id(), node);
-    _shared->typeInstancesLock.unlock();
+    if (node->type()) {
+        _shared->typeInstancesLock.lockForWrite();
+        _typeInstances.insert(node->type()->id(), node);
+        _shared->typeInstancesLock.unlock();
+    }
 }
 
 
