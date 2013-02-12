@@ -60,14 +60,14 @@ class KernelSymbolParser: public LongOperation
         void finishLastSymbol();
         void parseParam(const ParamSymbolType param, QString value);
 
-        struct SegLoc {
-            SegLoc() : addr(0) {}
-            SegLoc(quint64 addr, const QString& seg) : addr(addr), segment(seg) {}
+        struct MemSection {
+            MemSection() : addr(0) {}
+            MemSection(quint64 addr, const QString& sec) : addr(addr), section(sec) {}
             quint64 addr;
-            QString segment;
+            QString section;
         };
 
-        typedef QHash<QString, SegLoc> SegmentInfoHash;
+        typedef QHash<QString, MemSection> SectionInfoHash;
 
         KernelSymbolParser* _parser;
         bool _stopExecution;
@@ -80,7 +80,7 @@ class KernelSymbolParser: public LongOperation
         int _curSrcID;
         qint32 _nextId;
         int _curFileIndex;
-        SegmentInfoHash _segmentInfo;
+        SectionInfoHash _segmentInfo;
     };
 
     friend class WorkerThread;
