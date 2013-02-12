@@ -217,11 +217,6 @@ void KernelSourceParser::parse()
                     s += ", ";
                 s += QString::number(constInt[j]);
             }
-//            debugmsg(QString("Found Constant: %0 %1.%2 = {%3}")
-//                     .arg(m->refType() ? m->refType()->prettyName() : QString("(unknown)"))
-//                     .arg(m->belongsTo()->name())
-//                     .arg(m->name())
-//                     .arg(s));
         }
         else if (m->hasConstantStringValues())
         {
