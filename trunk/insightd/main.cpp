@@ -107,6 +107,7 @@
 
 #include <debug.h>
 #include <insight/kernelsymbols.h>
+#include <insight/compiler.h>
 #include "shell.h"
 #include <insight/console.h>
 #include "genericexception.h"
