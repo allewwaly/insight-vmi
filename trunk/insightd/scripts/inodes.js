@@ -13,6 +13,7 @@ const inode_types = {
 	ext4_sops: "ext4_inode_info"
 };
 
+// Required to get correct offset of module variables
 include("module_vars.js");
 
 /*
@@ -27,33 +28,27 @@ function inode_resolve_embedding(inode)
 	if (i_sb_ops === undefined || i_sb_ops.IsNull())
 		return inode;
 
-// 	var useRulesSave = Instance.useRules;
-
 	// Compare super_operations address linked by inode to all other known
 	// super_operations types
 	for (var ops_name in inode_types) {
 		if (!Symbols.variableExists(ops_name))
 			continue;
 
-		// Enable the rule engine to be able to access module variables
-// 		Instance.useRules = true;
-		println("### Getting instance for " + ops_name);
 		var sb_ops = new Instance(ops_name);
 		// If this variable belongs to a module, then let its offset be fixed
 		try {
-			if (sb_obs.OrigFileName() != "vmlinux")
-				sb_obs = module_var_in_section(sb_obs);
+			if (sb_ops.OrigFileName() != "vmlinux") {
+				sb_ops = module_var_in_section(sb_ops);
+			}
 		}
 		catch (e) {
 			continue;
 		}
-// 		Instance.useRules = useRulesSave;
 		
 		
 		if (sb_ops.IsValid && i_sb_ops.Address() == sb_ops.Address()) {
 			inode.ChangeType(inode_types[ops_name]);
 			inode.AddToAddress(-inode.MemberOffset("vfs_inode"));
-			println("### Success with " + ops_name);
 			break;
 		}
 	}
