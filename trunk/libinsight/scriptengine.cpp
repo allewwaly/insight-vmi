@@ -33,6 +33,9 @@ const char* path_sep        = ":";
 }
 
 
+QMutex ScriptEngine::_printMutex;
+
+
 ScriptEngine::ScriptEngine(KernelSymbols *symbols, int knowledgeSources)
 	: _engine(0), _instClass(0), _symClass(0), _memClass(0),
 	  _lastEvalFailed(false), _initialized(false), _knowSrc(knowledgeSources),
@@ -378,6 +381,8 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
 
 QScriptValue ScriptEngine::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
 {
+    QMutexLocker lock(&_printMutex);
+
     for (int i = 0; i < ctx->argumentCount(); ++i) {
         if (i > 0)
             Console::out() << " ";
@@ -391,10 +396,16 @@ QScriptValue ScriptEngine::scriptPrint(QScriptContext* ctx, QScriptEngine* eng)
 
 QScriptValue ScriptEngine::scriptPrintLn(QScriptContext* ctx, QScriptEngine* eng)
 {
-    QScriptValue ret = scriptPrint(ctx, eng);
+    QMutexLocker lock(&_printMutex);
+
+    for (int i = 0; i < ctx->argumentCount(); ++i) {
+        if (i > 0)
+            Console::out() << " ";
+        Console::out() << ctx->argument(i).toString();
+    }
     Console::out() << endl;
 
-    return ret;
+    return eng->undefinedValue();
 }
 
 
