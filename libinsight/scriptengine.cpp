@@ -261,7 +261,7 @@ ScriptEngine::FuncExistsResult ScriptEngine::functionExists(const QString& func,
 		const QScriptProgram& program)
 {
 	QStringList argv(program.fileName());
-	QStringList includePaths(QFileInfo(program.fileName()).absoluteFilePath());
+	QStringList includePaths(QFileInfo(program.fileName()).absolutePath());
 	QScriptValue ret(evaluate(program, argv, includePaths, 0));
 
 	if (_lastEvalFailed)
