@@ -18,7 +18,7 @@ class Enum: public BaseType
 {
 public:
 	typedef QMultiHash<qint32, QString> EnumHash;
-	typedef QMultiHash<typename EnumHash::mapped_type, typename EnumHash::key_type>
+	typedef QMultiHash<EnumHash::mapped_type, EnumHash::key_type>
 		EnumValueHash;
 
 	/**
