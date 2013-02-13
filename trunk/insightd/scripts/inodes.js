@@ -13,6 +13,8 @@ const inode_types = {
 	ext4_sops: "ext4_inode_info"
 };
 
+include("module_vars.js");
+
 /*
 Compares characteristic pointers of the given inode against other well-known
 objects, such as the super_block operations. If the type is known, the inode's
@@ -25,7 +27,7 @@ function inode_resolve_embedding(inode)
 	if (i_sb_ops === undefined || i_sb_ops.IsNull())
 		return inode;
 
-	var useRulesSave = Instance.useRules;
+// 	var useRulesSave = Instance.useRules;
 
 	// Compare super_operations address linked by inode to all other known
 	// super_operations types
@@ -34,10 +36,19 @@ function inode_resolve_embedding(inode)
 			continue;
 
 		// Enable the rule engine to be able to access module variables
-		Instance.useRules = true;
+// 		Instance.useRules = true;
 		println("### Getting instance for " + ops_name);
 		var sb_ops = new Instance(ops_name);
-		Instance.useRules = useRulesSave;
+		// If this variable belongs to a module, then let its offset be fixed
+		try {
+			if (sb_obs.OrigFileName() != "vmlinux")
+				sb_obs = module_var_in_section(sb_obs);
+		}
+		catch (e) {
+			continue;
+		}
+// 		Instance.useRules = useRulesSave;
+		
 		
 		if (sb_ops.IsValid && i_sb_ops.Address() == sb_ops.Address()) {
 			inode.ChangeType(inode_types[ops_name]);
