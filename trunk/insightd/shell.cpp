@@ -2135,14 +2135,15 @@ int Shell::cmdMemoryList(QStringList /*args*/)
 int Shell::cmdMemorySpecs(QStringList args)
 {
     // See if we got an index to a specific memory dump
-    int index = parseMemDumpIndex(args);
+    int index = parseMemDumpIndex(args, 0, true);
     // Output the specs
     if (index >= 0) {
         Console::out() << _sym.memDumps().at(index)->memSpecs().toString() << endl;
-        return ecOk;
     }
+    else
+        Console::out() << _sym.memSpecs().toString() << endl;
 
-    return 1;
+    return ecOk;
 }
 
 
