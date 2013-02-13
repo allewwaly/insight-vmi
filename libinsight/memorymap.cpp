@@ -247,6 +247,39 @@ void MemoryMap::addNodeToHashes(MemoryMapNode *node)
 }
 
 
+QStringList MemoryMap::loadedKernelModules()
+{
+    QStringList ret;
+    const MemoryDump* mem = _symbols->memDumps().at(_vmem->memDumpIndex());
+    Instance modules = mem->queryInstance("modules", ksNone);
+    const Structured* module_t = dynamic_cast<const Structured*>(
+                factory()->findBaseTypeByName("module"));
+
+    if (modules.isValid() && module_t) {
+        // First module in the list
+        Instance m = modules.member("next", BaseType::trAny, 1, ksNone);
+        qint64 offset = -module_t->memberOffset("list");
+        // Go through linked list and add all module names
+        while (m.isValid() && m.address() != modules.address()) {
+            m.setType(module_t);
+            m.addToAddress(offset);
+            QString name = m.member("name").toString();
+            if (!name.isEmpty()) {
+                // Get rid of quotes
+                if (name.startsWith('"'))
+                    name = name.mid(1, name.size() - 2);
+                // Module binaries use dashes, the names use underscores
+                name.replace('_', "-");
+                ret += name + ".ko";
+            }
+            m = m.member("list").member("next", BaseType::trAny, 1, ksNone);
+        }
+    }
+
+    return ret;
+}
+
+
 void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
                       const QString& slubObjFile)
 {
@@ -325,6 +358,9 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
         }
     }
 
+    // Find the list of loaded kernel  modules
+    QStringList loadedModules = loadedKernelModules();
+
     // Go through the global vars and add their instances to the queue
     for (VariableList::const_iterator it = factory()->vars().begin(),
          e = factory()->vars().end(); !interrupted() && it != e; ++it)
@@ -334,9 +370,24 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
 //         if (v->name() != "dentry_hashtable")
 //            continue;
 
-        // For now ignore all symbols that have been defined in modules
-        if (v->symbolSource() == ssModule)
-            continue;
+        // Skip all variables from kernel modules that are not loaded
+        if (v->symbolSource() == ssModule) {
+            // We must use the rule engine to process module variables
+            if (!_useRuleEngine)
+                continue;
+            // Ignore symbols in the ".modinfo" and "__versions" sections, they
+            // can't be resolved anyway
+            if (v->section() == ".modinfo" || v->section() == "__versions")
+                continue;
+
+            // Get file name of kernel module without path
+            QString name = v->origFileName();
+            int index = name.lastIndexOf('/');
+            if (index >= 0)
+                name = name.right(name.size() - index - 1);
+            if (!loadedModules.contains(name))
+                continue;
+        }
 
         // Process all variables
         try {
