@@ -1787,6 +1787,9 @@ void SymFactory::sourceParcingFinished()
             uniqueTypesMerged++;
             totalTypesMerged += sameTypes.size();
         }
+
+        if (_totalTypesChanged  > 0)
+            _changeClock++;
     }
 
     Console::out() << "Statistics:" << endl;
