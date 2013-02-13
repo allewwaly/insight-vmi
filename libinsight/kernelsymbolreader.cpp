@@ -85,6 +85,10 @@ void KernelSymbolReader::read()
           .arg(version)
           .arg(kSym::VERSION_MAX));
     }
+
+    _specs->createdChangeClock = _symbols->factory().changeClock();
+    if (!_specs->created.isValid())
+        _specs->created = QDateTime::currentDateTime();
 }
 
 

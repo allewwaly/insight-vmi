@@ -189,6 +189,7 @@ struct MemSpecs
     qint32 sizeofPointer;
     qint32 arch;                 ///< An Architecture value
     QDateTime created;
+    quint32 createdChangeClock;
     int symVersion;
     struct Version version;      ///< Linux kernel version information
     bool initialized;            ///< \c true after MemoryDump::init() is complete, \c false otherwise
