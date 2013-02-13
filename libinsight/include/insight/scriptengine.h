@@ -12,6 +12,7 @@
 #include <QTextStream>
 #include <QScriptSyntaxCheckResult>
 #include <QVector>
+#include <QMutex>
 
 // Forward declaration
 class QScriptEngine;
@@ -241,6 +242,7 @@ private:
 	int _knowSrc;
 	int _memDumpIndex;
 	KernelSymbols* _symbols;
+	static QMutex _printMutex;
 
 	void prepareEvaluation(const QStringList &argv, const QStringList &includePaths);
 
