@@ -193,8 +193,8 @@ MemSpecs::MemSpecs() :
     sizeofLong(sizeof(long)),
     sizeofPointer(sizeof(void*)),
     arch(ar_undefined),
-    symVersion(0),
     createdChangeClock(0),
+    symVersion(0),
     initialized(false)
 {
 }
