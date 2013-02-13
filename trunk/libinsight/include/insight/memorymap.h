@@ -384,6 +384,8 @@ private:
 
     void addNodeToHashes(MemoryMapNode *node);
 
+    QStringList loadedKernelModules();
+
     MemoryMapBuilder** _threads;
     KernelSymbols* _symbols;     ///< holds the KernelSymbols to operate on
     VirtualMemory* _vmem;        ///< the virtual memory object this map is being built for
