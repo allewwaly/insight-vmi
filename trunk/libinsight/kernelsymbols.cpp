@@ -102,6 +102,7 @@ void KernelSymbols::parseSymbols(const QString& kernelSrc, bool kernelOnly)
 
 	// Parse the debugging symbols
 	symParser.parse(kernelOnly);
+	_memSpecs.createdChangeClock = _factory.changeClock();
 }
 
 

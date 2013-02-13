@@ -36,6 +36,12 @@ void KernelSymbolWriter::write()
 {
     operationStarted();
 
+    // Update the time stamp if the symbols have changed
+    if (_factory->changeClock() != _specs->createdChangeClock) {
+        _specs->created = QDateTime::currentDateTime();
+        _specs->createdChangeClock = _factory->changeClock();
+    }
+
     // Disable compression by default
     qint16 flags = 0; // kSym::flagCompressed;
 
