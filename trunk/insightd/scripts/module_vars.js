@@ -14,12 +14,18 @@ function module_var_in_section(v)
 	// We require a section
 	if (!section_name)
 		throw "Variable '" + v.Name() + "' does not have a section.";
+	
+	// We can't resolve the ".modinfo" and "__versions" sections
+	if (section_name == ".modinfo" || section_name == "__versions")
+		return new Instance();
 
 	// Extract module name
 	var fileName = v.OrigFileName();
 	if (fileName == "vmlinux")
 		throw("Variable '" + v.Name() + "' belongs to the kernel.");
 	var moduleName = fileName.substring(fileName.lastIndexOf("/")+1, fileName.lastIndexOf("."));
+	// Underscores in module names are dashes in file names
+	moduleName = moduleName.replace(/-/g, "_");
 
 	// Find the corresponding module structure
 	var modules = new Instance("modules");
