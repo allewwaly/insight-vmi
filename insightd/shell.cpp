@@ -1316,7 +1316,7 @@ int Shell::cmdListTypesUsing(QStringList args)
     for (int i = 0; i < types.size() && !Console::interrupted(); i++) {
         BaseType* type = types[i];
         Console::out() << Console::color(ctTypeId)
-             << qSetFieldWidth(w_id)  << right << hex << (uint)type->id()
+             << qSetFieldWidth(w_id)  << right << hex << (uint)type->id() << dec
              << qSetFieldWidth(0) << Console::color(ctReset)
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(0) << Console::color(ctRealType)
