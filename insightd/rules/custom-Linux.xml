@@ -16,8 +16,9 @@
 <!-- 	<include>no_union_members.xml</include> -->
 	<include>per_cpu_types.xml</include>
 	<include>radix_trees.xml</include>
-	<include>inodes.xml</include>
 	<include>prio_trees.xml</include>
+	<include>inodes.xml</include>
+	<include>sockets.xml</include>
 	<include>module_vars.xml</include>
 
 	<!-- Type-specific rules -->
