@@ -53,6 +53,14 @@ function socket_resolve_embedding(sock)
 /**
 Handles a generic member pointing to a socket object and resolves its exact type.
 */
+function generic_socket_pointer(inst)
+{
+	return socket_resolve_embedding(inst.Dereference());
+}
+
+/**
+Handles a generic member pointing to a socket object and resolves its exact type.
+*/
 function generic_socket_member(inst, members)
 {
 	for (var i in members) {
@@ -61,6 +69,26 @@ function generic_socket_member(inst, members)
 			return false;
 	}
 
+	return socket_resolve_embedding(inst);
+}
+
+/**
+Handles a generic member pointing to a socket object and resolves its exact type.
+*/
+function generic_hlist_nulls_socket_member(inst, members)
+{
+	for (var i in members) {
+		inst = inst.Member(members[i]);
+		if (!inst.IsValid() || inst.IsNull())
+			return false;
+	}
+
+	// hlist_nulls_nodes are terminated by pointers that have the LSB set
+	// See: http://lxr.free-electrons.com/source/include/linux/list_nulls.h?v=2.6.32#L4
+	if (inst.AddressLow() & 1)
+		return new Instance();
+	
+	inst.ChangeType("sock");
 	return socket_resolve_embedding(inst);
 }
 
