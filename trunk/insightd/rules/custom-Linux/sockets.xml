@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Copyright (C) 2013 by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules priority="100">
+		<rule priority="101">
+			<name>netns_ipv4 sockets</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>netns_ipv4</typename>
+				<members>
+					<member match="regex">^(tcp_sock|fibnl|icmp_sk|mroute_sk)$</member>
+				</members>
+			</filter>
+			<action type="function" file="sockets.js">generic_socket_member</action>
+		</rule>
+
+		<rule priority="101">
+			<name>netns_ipv6 sockets</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>netns_ipv6</typename>
+				<members>
+					<member match="regex">^(icmp_sk|ndisc_sk|tcp_sk|igmp_sk|mroute6_sk)$</member>
+				</members>
+			</filter>
+			<action type="function" file="sockets.js">generic_socket_member</action>
+		</rule>
+		
+		<rule priority="101">
+			<name>net sockets</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>net</typename>
+				<members>
+					<member match="regex">^(rtnl|genl_sock)$</member>
+				</members>
+			</filter>
+			<action type="function" file="sockets.js">generic_socket_member</action>
+		</rule>
+		
+		<rule priority="101">
+			<name>sk_buff.sk</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>sk_buff</typename>
+				<members>
+					<member>sk</member>
+				</members>
+			</filter>
+			<action type="function" file="sockets.js">generic_socket_member</action>
+		</rule>
+		
+		<rule priority="101">
+			<name>socket.sk</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>socket</typename>
+				<members>
+					<member>sk</member>
+				</members>
+			</filter>
+			<action type="function" file="sockets.js">generic_socket_member</action>
+		</rule>
+		
+		<rule priority="101">
+			<name>request_sock.sk</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>request_sock</typename>
+				<members>
+					<member>sk</member>
+				</members>
+			</filter>
+			<action type="function" file="sockets.js">generic_socket_member</action>
+		</rule>
+
+		<rule priority="101">
+			<name>unix_sock sockets</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>unix_sock</typename>
+				<members>
+					<member match="regex">^(peer|other)$</member>
+				</members>
+			</filter>
+			<action type="function" file="sockets.js">generic_socket_member</action>
+		</rule>
+	</rules>
+</typeknowledge>
