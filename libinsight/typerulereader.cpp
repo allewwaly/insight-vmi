@@ -49,8 +49,11 @@ void TypeRuleReader::readFrom(const QStringList &fileNames)
     operationStarted();
     clear();
     try {
-        for (int i = 0; i < fileNames.size(); ++i)
+        for (int i = 0; i < fileNames.size(); ++i) {
+            pushContext();
             readFromRek(fileNames[i]);
+            popContext();
+        }
         operationStopped();
         operationProgress();
         shellEndl();
