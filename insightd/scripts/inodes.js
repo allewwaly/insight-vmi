@@ -46,7 +46,7 @@ function inode_resolve_embedding(inode)
 		}
 		
 		
-		if (sb_ops.IsValid && i_sb_ops.Address() == sb_ops.Address()) {
+		if (sb_ops.IsValid() && i_sb_ops.Address() == sb_ops.Address()) {
 			inode.ChangeType(inode_types[ops_name]);
 			inode.AddToAddress(-inode.MemberOffset("vfs_inode"));
 			break;
