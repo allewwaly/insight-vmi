@@ -94,5 +94,92 @@
 			</filter>
 			<action type="function" file="sockets.js">generic_socket_member</action>
 		</rule>
+		
+		<rule priority="102">
+			<name>inet_listen_hashbucket.head.first</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>inet_listen_hashbucket</typename>
+				<members>
+					<member>head</member>
+					<member>first</member>
+				</members>
+			</filter>
+			<action type="function" file="sockets.js">generic_hlist_nulls_socket_member</action>
+		</rule>
+		
+		<rule priority="102">
+			<name>udp_hslot.head.first</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>udp_hslot</typename>
+				<members>
+					<member>head</member>
+					<member>first</member>
+				</members>
+			</filter>
+			<action type="function" file="sockets.js">generic_hlist_nulls_socket_member</action>
+		</rule>
+		
+		<rule priority="102">
+			<name>inet_ehash_bucket.head.first</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>inet_ehash_bucket</typename>
+				<members>
+					<member match="regex">^(tw)?chain$</member>
+					<member>first</member>
+				</members>
+			</filter>
+			<action type="function" file="sockets.js">generic_hlist_nulls_socket_member</action>
+		</rule>
+		
+		<rule priority="102">
+			<name>sock_common.skc_nulls_node.next</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>sock_common</typename>
+				<members>
+					<member></member>
+					<member>skc_nulls_node</member>
+					<member>next</member>
+				</members>
+			</filter>
+			<action type="function" file="sockets.js">generic_hlist_nulls_socket_member</action>
+		</rule>
+		
+		<rule priority="110">
+			<name>selnl</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<variablename>selnl</variablename>
+				<datatype>pointer</datatype>
+			</filter>
+			<action type="function" file="sockets.js">generic_socket_pointer</action>
+		</rule>
+		
+		<rule priority="110">
+			<name>uevent_sock</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<variablename>uevent_sock</variablename>
+				<datatype>pointer</datatype>
+			</filter>
+			<action type="function" file="sockets.js">generic_socket_pointer</action>
+		</rule>
+		
+		<rule priority="110">
+			<name>audit_sock</name>
+			<description>Resolve correct socket type.</description>
+			<filter>
+				<variablename>audit_sock</variablename>
+				<datatype>pointer</datatype>
+			</filter>
+			<action type="function" file="sockets.js">generic_socket_pointer</action>
+		</rule>
 	</rules>
 </typeknowledge>
