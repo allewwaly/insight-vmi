@@ -22,6 +22,7 @@
 
 	<!-- Type-specific rules -->
 	<include>type_struct_acpi_object_region_field.xml</include>
+	<include>type_struct_buffer_head.xml</include>
 	<include>type_struct_ctl_table.xml</include>
 	<include>type_struct_dentry.xml</include>
 	<include>type_struct_idr_layer.xml</include>
