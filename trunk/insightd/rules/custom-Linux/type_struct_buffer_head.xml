@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Copyright (C) 2013 by Christian Schneider <chrschn@sec.in.tum.de>
+-->
+<typeknowledge version="1">
+	<rules>
+		<rule priority="101">
+			<name>buffer_head.b_data</name>
+			<description>(struct buffer_head *)-&gt;b_data might point to a "journal_head" object</description>
+			<filter>
+				<datatype>struct</datatype>
+				<typename>buffer_head</typename>
+				<members>
+					<member>b_private</member>
+				</members>
+			</filter>
+			<action type="inline">
+				var bh = arguments[0];
+				var data = bh.Member(arguments[1][0]);
+				// If this is a journal_head, it points back to bh
+				if (!data.IsNull()) {
+					data.ChangeType("journal_head");
+					try {
+						if (data.b_bh.Address() == bh.Address())
+							return data;
+					}
+					catch (e) {
+						// do nothing
+					}
+				}
+				return false;
+			</action>
+		</rule>
+	</rules>
+</typeknowledge>
