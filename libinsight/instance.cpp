@@ -886,6 +886,8 @@ ExpressionResult Instance::toExpressionResult(bool addrOp) const
 									 (quint64)t->toUInt32(_d->vmem, _d->address)) :
 					ExpressionResult(ert, esUInt64,
 									 (quint64)t->toUInt64(_d->vmem, _d->address));
+	case rtArray:
+		return toExpressionResult(true);
 	default:
 		return ExpressionResult(erUndefined);
 	}
