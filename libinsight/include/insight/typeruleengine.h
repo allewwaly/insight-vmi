@@ -33,12 +33,13 @@ extern const char* inlinefunc;
 /// Represents an active TypeRule
 struct ActiveRule
 {
-    ActiveRule() : index(-1), rule(0) {}
+    ActiveRule() : index(-1), usageCount(0), rule(0) {}
     explicit ActiveRule(int index, const TypeRule* rule, const QScriptProgram* prog)
-        : index(index), rule(rule), prog(prog) {}
+        : index(index), usageCount(0), rule(rule), prog(prog) {}
     explicit ActiveRule(int index, const TypeRule* rule, const QScriptProgramPtr& prog)
-        : index(index), rule(rule), prog(prog) {}
+        : index(index), usageCount(0), rule(rule), prog(prog) {}
     int index;
+    uint usageCount;
     const TypeRule* rule;
     QScriptProgramPtr prog;
 };
@@ -47,10 +48,11 @@ struct ActiveRule
 typedef QList<TypeRule*> TypeRuleList;
 
 /// List of type rules
-typedef QList<ActiveRule> ActiveRuleList;
+typedef QList<ActiveRule*> ActiveRuleList;
+typedef QList<const ActiveRule*> ActiveRuleCList;
 
 /// List of type rules
-typedef QHash<int, ActiveRule> ActiveRuleHash;
+typedef QHash<int, ActiveRule*> ActiveRuleHash;
 
 /// Hash of OsFilter objects
 typedef QHash<uint, const OsFilter*> OsFilterHash;
@@ -219,6 +221,11 @@ public:
     bool setInactive(const TypeRule* rule);
 
     /**
+     * Resets all usage counters to zero.
+     */
+    void resetActiveRulesUsage();
+
+    /**
      * Matches the given Instance with the given member access pattern agains
      * the rule set.
      *
@@ -245,8 +252,8 @@ public:
      *  to by \a inst
      * @return list of matching rules
      */
-    ActiveRuleList rulesMatching(const Instance* inst,
-                                 const ConstMemberList &members) const;
+    ActiveRuleCList rulesMatching(const Instance* inst,
+                                  const ConstMemberList &members) const;
 
     /**
      * Returns a list of all rules that match variable \a var.
@@ -255,8 +262,8 @@ public:
      *  to by \a inst
      * @return list of matching rules
      */
-    ActiveRuleList rulesMatching(const Variable* var,
-                                 const ConstMemberList &members) const;
+    ActiveRuleCList rulesMatching(const Variable* var,
+                                  const ConstMemberList &members) const;
 
     /**
      * Returns a list of all rules that match type \a type.
@@ -265,7 +272,7 @@ public:
      *  to by \a inst
      * @return list of matching rules
      */
-    ActiveRuleList rulesMatching(const BaseType* type,
+    ActiveRuleCList rulesMatching(const BaseType* type,
                                  const ConstMemberList &members) const;
 
     /**
@@ -318,11 +325,11 @@ public:
      * @param indent
      * @return
      */
-    static QString matchingRulesToStr(const ActiveRuleList &rules, int indent,
+    static QString matchingRulesToStr(const ActiveRuleCList &rules, int indent,
                                       const ColorPalette *col = 0);
 
 private:
-    Instance evaluateRule(const ActiveRule &arule, const Instance* inst,
+    Instance evaluateRule(const ActiveRule *arule, const Instance* inst,
                           const ConstMemberList &members, bool *matched,
                           TypeRuleEngineContext* ctx) const;
 
@@ -331,11 +338,11 @@ private:
     void errRule(const TypeRule *rule, int index, const QString& msg) const;
     void ruleMsg(const TypeRule* rule, int index, const QString &severity,
                  const QString &msg, ColorType light,  ColorType normal) const;
-    bool ruleMatchInfo(const ActiveRule& arule, const Instance *inst,
+    bool ruleMatchInfo(const ActiveRule *arule, const Instance *inst,
                        const ConstMemberList &members, int matched,
                        bool evaluated, bool skipped) const;
     const OsFilter* insertOsFilter(const OsFilter* osf);
-    int addAllLexicalTypes(const BaseType* type, ActiveRule& arule);
+    int addAllLexicalTypes(const BaseType* type, ActiveRule *arule);
 
     bool checkRule(TypeRule *rule, int index, const OsSpecs *specs);
 

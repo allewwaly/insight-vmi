@@ -50,8 +50,10 @@ void TypeRuleEngine::clear()
     for (int i = 0; i < _rules.size(); ++i)
         delete _rules[i];
     _rules.clear();
-    _activeRules.clear();
     _rulesPerType.clear();
+    for (int i = 0; i < _activeRules.size(); ++i)
+        delete _activeRules[i];
+    _activeRules.clear();
 
     for (OsFilterHash::const_iterator it = _osFilters.constBegin(),
          e = _osFilters.constEnd(); it != e; ++it)
@@ -115,7 +117,7 @@ bool TypeRuleEngine::fileAlreadyRead(const QString &fileName)
 }
 
 
-int TypeRuleEngine::addAllLexicalTypes(const BaseType* type, ActiveRule& arule)
+int TypeRuleEngine::addAllLexicalTypes(const BaseType* type, ActiveRule* arule)
 {
     if (!type)
         return 0;
@@ -123,14 +125,14 @@ int TypeRuleEngine::addAllLexicalTypes(const BaseType* type, ActiveRule& arule)
     int hits = 0;
     // If the rule matches the original type, we add it for all lexical types
     // as well
-    if (arule.rule->match(type) && arule.rule->action()->match(type)) {
+    if (arule->rule->match(type) && arule->rule->action()->match(type)) {
         do {
             // Check if we already have added that rule
             bool found = false;
             ActiveRuleHash::const_iterator it = _rulesPerType.find(type->id()),
                     e = _rulesPerType.end();
             for (; !found && it != e && it.key() == type->id(); ++it) {
-                if (it.value().rule == arule.rule)
+                if (it.value()->rule == arule->rule)
                     found = true;
             }
             // If we've added this rule for this type before, we've done so
@@ -160,8 +162,10 @@ void TypeRuleEngine::checkRules(int from)
     if (from <= 0) {
         from = 0;
         _hits.fill(0, _rules.size());
-        _activeRules.clear();
         _rulesPerType.clear();
+        for (int i = 0; i < _activeRules.size(); ++i)
+            delete _activeRules[i];
+        _activeRules.clear();
         _rulesToCheck = _rules.size();
     }
     else {
@@ -231,7 +235,7 @@ bool TypeRuleEngine::checkRule(TypeRule *rule, int index, const OsSpecs *specs)
     }
 
     QScriptProgramPtr prog;
-    ActiveRule arule(index, rule, prog);
+    ActiveRule* arule = new ActiveRule(index, rule, prog);
 
     // Should we check variables or types?
     int hits = 0;
@@ -314,8 +318,10 @@ bool TypeRuleEngine::checkRule(TypeRule *rule, int index, const OsSpecs *specs)
         _hits[index] = hits;
         _activeRules.append(arule);
     }
-    else
+    else {
         warnRule(rule, index, "does not match any type.");
+        delete arule;
+    }
 
     return hits > 0;
 }
@@ -351,35 +357,45 @@ bool TypeRuleEngine::setActive(const TypeRule *rule)
 
 bool TypeRuleEngine::setInactive(const TypeRule *rule)
 {
-    bool wasActive = false;
+    ActiveRule* arule = 0;
     // Remove this rule from the list of active rules
     ActiveRuleList::iterator lit = _activeRules.begin(),
             le = _activeRules.end();
     while (lit != le) {
-        if (lit->rule == rule) {
-            if (lit->index >= 0 && lit->index < _hits.size())
-                _hits[lit->index] = 0;
+        ActiveRule* cur = *lit;
+        if (cur->rule == rule) {
+            if (cur->index >= 0 && cur->index < _hits.size())
+                _hits[cur->index] = 0;
             lit = _activeRules.erase(lit);
-            wasActive = true;
+            arule = cur;
             break;
         }
         else
             ++lit;
     }
 
-    if (wasActive) {
+    if (arule) {
         // Remove this rule from the matching type hash
         ActiveRuleHash::iterator hit = _rulesPerType.begin(),
                 he = _rulesPerType.end();
         while (hit != he) {
-            if (hit.value().rule == rule)
+            if (hit.value()->rule == rule)
                 hit = _rulesPerType.erase(hit);
             else
                 ++hit;
         }
     }
 
-    return wasActive;
+    delete arule;
+
+    return arule != 0;
+}
+
+
+void TypeRuleEngine::resetActiveRulesUsage()
+{
+    for (int i = 0; i < _activeRules.size(); ++i)
+        _activeRules[i]->usageCount = 0;
 }
 
 
@@ -393,7 +409,8 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     if (!inst || !inst->type())
         return mrNoMatch;
 
-    int ret = mrNoMatch, prio = 0, usedRule = -1, tmp_ret = 0;
+    int ret = mrNoMatch, prio = 0, tmp_ret = 0;
+    ActiveRule* usedRule = 0;
     *newInst = 0;
     int ruleInfosPrinted = 0;
 
@@ -403,9 +420,8 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
     // Rules with variable names might need to match inst->name(), so check all.
     // We can stop as soon as all possibly ORed values are included.
     for (; it != e && it.key() == inst->type()->id(); ++it) {
-        const ActiveRule& arule = it.value();
-        const TypeRule* rule = arule.rule;
-        int index = arule.index;
+        const ActiveRule* arule = it.value();
+        const TypeRule* rule = arule->rule;
 
         // If the result is already clear, check only for higher priority rules
         if (ret == (mrMatch|mrAmbiguous|mrDefer) && rule->priority() <= prio) {
@@ -466,7 +482,7 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                         bool alreadyMatched = (ret & mrMatch);
                         evaluated = true;
                         if (ctx)
-                            ctx->currentRule = &arule;
+                            ctx->currentRule = arule;
                         Instance instRet(evaluateRule(arule, inst, members,
                                                       &match, ctx ? ctx : _ctx));
                         if (ctx)
@@ -488,14 +504,14 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
                             {
                                 // Ambiguous rules
                                 ret |= tmp_ret |= mrAmbiguous;
-                                usedRule = -1;
+                                usedRule = 0;
                             }
                         }
 
                         // Is this the first match for the current priority?
                         if (!alreadyMatched) {
                             prio = rule->priority();
-                            usedRule = index;
+                            usedRule = const_cast<ActiveRule*>(arule);
                             if (priority)
                                 *priority = prio;
                             // The rule returned an instance (valid or invalid)
@@ -523,9 +539,9 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
 
     if (ruleInfosPrinted > 0) {
         Console::out() << "==> Result: ";
-        if (usedRule >= 0)
+        if (usedRule)
             Console::out() << "applied rule " << Console::color(ctBold)
-                         << (usedRule + 1) << Console::color(ctReset) << " ";
+                         << (usedRule->index + 1) << Console::color(ctReset) << " ";
 
         if (ret & mrMatch)
             Console::out() << "prio. " << prio << " "
@@ -548,15 +564,19 @@ int TypeRuleEngine::match(const Instance *inst, const ConstMemberList &members,
         *newInst = 0;
     }
 
+    // Increase usage counter for matched rule
+    if (usedRule)
+        ++usedRule->usageCount;
+
     return ret;
 }
 
 template<class T>
-ActiveRuleList rulesMatchingTempl(const T *t, const ConstMemberList &members,
-                                  const ActiveRuleHash& rules,
-                                  const BaseType* (*get_type_func)(const T*))
+ActiveRuleCList rulesMatchingTempl(const T *t, const ConstMemberList &members,
+                                   const ActiveRuleHash& rules,
+                                   const BaseType* (*get_type_func)(const T*))
 {
-    ActiveRuleList ret;
+    ActiveRuleCList ret;
     const BaseType* srcType;
 
     if (!t || !(srcType = get_type_func(t)) )
@@ -568,7 +588,7 @@ ActiveRuleList rulesMatchingTempl(const T *t, const ConstMemberList &members,
 
     // Check out all matching rules
     for (; it != e && it.key() == srcType->id(); ++it) {
-        const TypeRule* rule = it.value().rule;
+        const TypeRule* rule = it.value()->rule;
         const InstanceFilter* filter = rule->filter();
 
         // Ignore rules with a lower priority than the previously matched one
@@ -602,10 +622,10 @@ inline const BaseType* get_inst_type(const Instance* inst)
 }
 
 
-ActiveRuleList TypeRuleEngine::rulesMatching(const Instance *inst,
-                                             const ConstMemberList &members) const
+ActiveRuleCList TypeRuleEngine::rulesMatching(const Instance *inst,
+                                              const ConstMemberList &members) const
 {
-    ActiveRuleList list =
+    ActiveRuleCList list =
             rulesMatchingTempl(inst, members, _rulesPerType, &get_inst_type);
 
     if (inst->hasParent() && inst->fromParent()) {
@@ -614,10 +634,10 @@ ActiveRuleList TypeRuleEngine::rulesMatching(const Instance *inst,
         mlist.prepend(inst->fromParent());
         // Find matching rules in parent instance. The rule set with highest
         // priority wins.
-        ActiveRuleList pList = rulesMatching(&parent, mlist);
+        ActiveRuleCList pList = rulesMatching(&parent, mlist);
         if ( !pList.isEmpty() &&
              (list.isEmpty() ||
-              list.first().rule->priority() <= pList.first().rule->priority()) )
+              list.first()->rule->priority() <= pList.first()->rule->priority()) )
             return pList;
     }
 
@@ -631,8 +651,8 @@ inline const BaseType* get_var_type(const Variable* var)
 }
 
 
-ActiveRuleList TypeRuleEngine::rulesMatching(const Variable *var,
-                                             const ConstMemberList &members) const
+ActiveRuleCList TypeRuleEngine::rulesMatching(const Variable *var,
+                                              const ConstMemberList &members) const
 {
     return rulesMatchingTempl(var, members, _rulesPerType, &get_var_type);
 }
@@ -644,23 +664,23 @@ inline const BaseType* get_bt_type(const BaseType* type)
 }
 
 
-ActiveRuleList TypeRuleEngine::rulesMatching(const BaseType *type,
-                                             const ConstMemberList &members) const
+ActiveRuleCList TypeRuleEngine::rulesMatching(const BaseType *type,
+                                              const ConstMemberList &members) const
 {
     return rulesMatchingTempl(type, members, _rulesPerType, &get_bt_type);
 }
 
 
-Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
+Instance TypeRuleEngine::evaluateRule(const ActiveRule* arule,
                                       const Instance *inst,
                                       const ConstMemberList &members,
                                       bool* matched, TypeRuleEngineContext *ctx) const
 {
     bool m = false;
     Instance ret;
-    if (arule.rule->action()) {
+    if (arule->rule->action()) {
         try {
-            ret = arule.rule->action()->evaluate(inst, members,
+            ret = arule->rule->action()->evaluate(inst, members,
                                                  ctx ? &ctx->eng : &_ctx->eng, &m);
             if (matched)
                 *matched = m;
@@ -708,8 +728,8 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
             return Instance(Instance::orRuleEngine);
         }
         catch (GenericException& e) {
-//            errRule(arule.rule, arule.index, QString("raised an exception."));
-            errRule(arule.rule, arule.index, QString("raised a %1 at %2:%3: %4")
+//            errRule(arule->rule, arule->index, QString("raised an exception."));
+            errRule(arule->rule, arule->index, QString("raised a %1 at %2:%3: %4")
                     .arg(e.className())
                     .arg(e.file)
                     .arg(e.line)
@@ -722,7 +742,7 @@ Instance TypeRuleEngine::evaluateRule(const ActiveRule& arule,
 }
 
 
-bool TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
+bool TypeRuleEngine::ruleMatchInfo(const ActiveRule* arule,
                                    const Instance *inst,
                                    const ConstMemberList &members,
                                    int matched, bool evaluated, bool skipped) const
@@ -735,10 +755,10 @@ bool TypeRuleEngine::ruleMatchInfo(const ActiveRule& arule,
     {
         int w = ShellUtil::getFieldWidth(_rules.size(), 10);
         Console::out() << "Rule " << Console::color(ctBold)
-                     << qSetFieldWidth(w) << right << (arule.index + 1)
+                     << qSetFieldWidth(w) << right << (arule->index + 1)
                      << qSetFieldWidth(0) << Console::color(ctReset)
                      << " prio."
-                     << qSetFieldWidth(4) << right << arule.rule->priority()
+                     << qSetFieldWidth(4) << right << arule->rule->priority()
                      << qSetFieldWidth(0) << left << " ";
         if (skipped)
             Console::out() << Console::color(ctDim) << "skipped";
@@ -871,7 +891,7 @@ void TypeRuleEngine::deleteContext(TypeRuleEngineContext *ctx)
 }
 
 
-QString TypeRuleEngine::matchingRulesToStr(const ActiveRuleList &rules,
+QString TypeRuleEngine::matchingRulesToStr(const ActiveRuleCList &rules,
 										   int indent, const ColorPalette *col)
 {
 	if (rules.isEmpty())
@@ -879,7 +899,7 @@ QString TypeRuleEngine::matchingRulesToStr(const ActiveRuleList &rules,
 
 	uint max_id = 0;
 	for (int i = 0; i < rules.size(); ++i) {
-		const TypeRuleAction* action = rules[i].rule->action();
+		const TypeRuleAction* action = rules[i]->rule->action();
 		if (action && action->actionType() == TypeRuleAction::atExpression) {
 			const ExpressionAction* ea =
 					dynamic_cast<const ExpressionAction*>(action);
@@ -888,19 +908,19 @@ QString TypeRuleEngine::matchingRulesToStr(const ActiveRuleList &rules,
 		}
 	}
 
-	const int w_idx = ShellUtil::getFieldWidth(rules.last().index + 1, 10);
+	const int w_idx = ShellUtil::getFieldWidth(rules.last()->index + 1, 10);
 	const int w_id = ShellUtil::getFieldWidth(max_id);
 
 	QString s;
 	QTextStream out(&s);
 
 	for (int i = 0; i < rules.size(); ++i) {
-		const TypeRuleAction* action = rules[i].rule->action();
+		const TypeRuleAction* action = rules[i]->rule->action();
 		if (!action)
 			continue;
 
 		out << qSetFieldWidth(indent) << right
-			<< QString("Rule %0: ").arg(rules[i].index + 1, w_idx)
+			<< QString("Rule %0: ").arg(rules[i]->index + 1, w_idx)
 			<< qSetFieldWidth(0);
 
 		switch (action->actionType())

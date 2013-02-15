@@ -212,6 +212,7 @@ Shell::Shell(bool listenOnSocket)
                  "  rules show <index>       Show details of rule <index>\n"
                  "  rules enable <index>     Enable rule <index>\n"
                  "  rules disable <index>    Disable rule <index>\n"
+                 "  rules reset              Resets the usage counters for all rules\n"
                  "  rules verbose [<level>]  Set the verbose level when evaluating\n"
                  "                           rules, may be between 0 (off) and 4 (on)\n"
                  "  rules flush              Removes all rules"));
@@ -2791,14 +2792,21 @@ inline int getTypeRuleIndex(const TypeRuleList& list, int index)
     return index;
 }
 
+typedef uint (*TypeRuleUsageFunc)(const TypeRuleList&, int);
+
 inline const TypeRule* getActiveRule(const ActiveRuleList& list, int index)
 {
-    return list[index].rule;
+    return list[index]->rule;
 }
 
 inline int getActiveRuleIndex(const ActiveRuleList& list, int index)
 {
-    return list[index].index;
+    return list[index]->index;
+}
+
+inline uint getActiveRuleUsage(const ActiveRuleList& list, int index)
+{
+    return list[index]->usageCount;
 }
 
 
@@ -2822,6 +2830,8 @@ int Shell::cmdRules(QStringList args)
         return cmdRulesDisable(args);
     else if (QString("enable").startsWith(cmd))
         return cmdRulesEnable(args);
+    else if (QString("reset").startsWith(cmd))
+        return cmdRulesResetUsage(args);
     else if (QString("flush").startsWith(cmd))
         return cmdRulesFlush(args);
     else if (QString("show").startsWith(cmd))
@@ -2927,7 +2937,7 @@ int Shell::cmdRulesList(QStringList args)
     }
 
     return printRulesList(_sym.ruleEngine().rules(),  "Total rules: ",
-                          getTypeRule, getTypeRuleIndex);
+                          getTypeRule, getTypeRuleIndex, (TypeRuleUsageFunc)0);
 }
 
 
@@ -2945,7 +2955,21 @@ int Shell::cmdRulesActive(QStringList args)
 
     return printRulesList(_sym.ruleEngine().activeRules(),
                           "Total active rules: ",
-                          getActiveRule, getActiveRuleIndex, true);
+                          getActiveRule, getActiveRuleIndex, getActiveRuleUsage,
+                          true);
+}
+
+
+int Shell::cmdRulesResetUsage(QStringList args)
+{
+    if (!args.isEmpty()) {
+        cmdHelp(QStringList("rules"));
+        return ecInvalidArguments;
+    }
+
+    _sym.ruleEngine().resetActiveRulesUsage();
+    Console::out() << "All usage counters have been reset." << endl;
+    return ecOk;
 }
 
 
@@ -2994,9 +3018,9 @@ int Shell::cmdRulesDisable(QStringList args)
 template <class list_t>
 int Shell::printRulesList(const list_t& rules,
                           const QString& totalDesc,
-                          const TypeRule* (*getRuleFunc)(const list_t& list,
-                                                         int index),
-                          int (*getIndexFunc)(const list_t& list, int index),
+                          const TypeRule* (*getRuleFunc)(const list_t&, int),
+                          int (*getIndexFunc)(const list_t&, int),
+                          uint (*getUsageFunc)(const list_t&, int),
                           bool reverse)
 {
     // Find out required field width (the types are sorted by ascending ID)
@@ -3006,10 +3030,13 @@ int Shell::printRulesList(const list_t& rules,
     const int w_name = 25;
     const int w_matches = qstrlen("Match");
     const int w_prio = qstrlen("Prio.");
+    const int w_usage = qstrlen("Usage");
     const int w_actionType = qstrlen("inline");
     const int w_colsep = 2;
-    const int avail = tsize.width() - (w_index + w_name + w_matches + w_prio +
-                                       w_actionType + 6*w_colsep + 1);
+    int avail = tsize.width() - (w_index + w_name + w_matches + w_prio +
+                                 w_actionType + 6*w_colsep + 1);
+    if (getUsageFunc)
+        avail -= (w_usage + w_colsep);
     const int w_desc = avail >= 8 ? (avail >> 1) : 0;
     const int w_file = avail - w_desc;
     const int w_total = w_index + w_name + w_matches + w_prio + w_actionType +
@@ -3022,6 +3049,7 @@ int Shell::printRulesList(const list_t& rules,
     while ((!reverse && i < rules.size()) || (reverse && i >= 0)) {
         const TypeRule* rule = getRuleFunc(rules, i);
         int index = getIndexFunc(rules, i);
+        int usage = getUsageFunc ? getUsageFunc(rules, i) : -1;
 
         // Print header if not yet done
         if (!headerPrinted) {
@@ -3038,8 +3066,11 @@ int Shell::printRulesList(const list_t& rules,
             Console::out() << qSetFieldWidth(w_matches)  << right << "Match"
                  << qSetFieldWidth(w_colsep) << " "
                  << qSetFieldWidth(w_prio) << right << "Prio."
-                 << qSetFieldWidth(w_colsep) << " "
-                 << qSetFieldWidth(w_actionType) << left << "Action"
+                 << qSetFieldWidth(w_colsep) << " ";
+            if (getUsageFunc)
+                Console::out() << qSetFieldWidth(w_usage) << "Usage"
+                               << qSetFieldWidth(w_colsep) << " ";
+            Console::out() << qSetFieldWidth(w_actionType) << left << "Action"
                  << qSetFieldWidth(w_colsep) << " "
                  << qSetFieldWidth(w_file) << "File:Line"
                  << qSetFieldWidth(0) << Console::color(ctReset) << endl;
@@ -3071,8 +3102,12 @@ int Shell::printRulesList(const list_t& rules,
              << _sym.ruleEngine().ruleHits(index)
              << qSetFieldWidth(w_colsep) << " "
              << qSetFieldWidth(w_prio) << right << rule->priority()
-             << qSetFieldWidth(w_colsep) << " "
-             << qSetFieldWidth(w_actionType) << left;
+             << qSetFieldWidth(w_colsep) << " ";
+        if (getUsageFunc) {
+            Console::out() << qSetFieldWidth(w_usage) << usage
+                           << qSetFieldWidth(w_colsep) << " ";
+        }
+        Console::out() << qSetFieldWidth(w_actionType) << left;
 
         switch (rule->action() ?
                 rule->action()->actionType() : TypeRuleAction::atNone)
@@ -3355,7 +3390,7 @@ int Shell::cmdShow(QStringList args)
     const BaseType* bt = 0;
     const Variable *var = 0, *ctx_var = 0;
     QList<IntEnumPair> enums;
-    ActiveRuleList rules;
+    ActiveRuleCList rules;
     bool exprIsVar = false;
     bool exprIsId = false;
 
@@ -3517,14 +3552,14 @@ int Shell::cmdShow(QStringList args)
 }
 
 
-void Shell::printMatchingRules(const ActiveRuleList &rules, int indent)
+void Shell::printMatchingRules(const ActiveRuleCList &rules, int indent)
 {
 	Console::out() << TypeRuleEngine::matchingRulesToStr(rules, indent, &Console::colors());
 }
 
 
 int Shell::cmdShowBaseType(const BaseType* t, const QString &name,
-						   ColorType nameType, const ActiveRuleList& matchingRules,
+						   ColorType nameType, const ActiveRuleCList &matchingRules,
 						   const Variable* ctx_var, const Structured* ctx_s,
 						   ConstMemberList members)
 {
@@ -3848,7 +3883,7 @@ void Shell::printStructMembers(const Structured* s, const Variable* ctx_var,
 		}
 
 		if (printAlt) {
-			ActiveRuleList rules;
+			ActiveRuleCList rules;
 			if (ctx_var)
 				rules = _sym.ruleEngine().rulesMatching(ctx_var, members);
 			else
@@ -3861,7 +3896,7 @@ void Shell::printStructMembers(const Structured* s, const Variable* ctx_var,
 }
 
 
-int Shell::cmdShowVariable(const Variable* v, const ActiveRuleList &matchingRules)
+int Shell::cmdShowVariable(const Variable* v, const ActiveRuleCList &matchingRules)
 {
 	assert(v != 0);
 
@@ -3917,7 +3952,7 @@ int Shell::cmdShowVariable(const Variable* v, const ActiveRuleList &matchingRule
 
 	if (rt) {
 		Console::out() << "Corresponding type information:" << endl;
-		cmdShowBaseType(v->refType(), v->name(), ctVariable, ActiveRuleList(), v);
+		cmdShowBaseType(v->refType(), v->name(), ctVariable, ActiveRuleCList(), v);
 	}
 
 	return ecOk;

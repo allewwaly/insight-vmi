@@ -216,8 +216,9 @@ private:
     int printRulesList(const list_t& rules, const QString& totalDesc,
                        const TypeRule* (*getRuleFunc)(const list_t& list, int index),
                        int (*getIndexFunc)(const list_t& list, int index),
+                       uint (*getUsageFunc)(const list_t& list, int index),
                        bool reverse = false);
-    void printMatchingRules(const ActiveRuleList& rules, int indent);
+    void printMatchingRules(const ActiveRuleCList &rules, int indent);
     const TypeRule* parseRuleIndex(const QString& s);
 
     QList<QPair<const BaseType*, QStringList> >
@@ -269,6 +270,7 @@ private:
     int cmdRulesLoad(QStringList args);
     int cmdRulesList(QStringList args);
     int cmdRulesActive(QStringList args);
+    int cmdRulesResetUsage(QStringList args);
     int cmdRulesEnable(QStringList args);
     int cmdRulesDisable(QStringList args);
     int cmdRulesFlush(QStringList args);
@@ -282,11 +284,11 @@ private:
     int cmdShow(QStringList args);
     int cmdShowBaseType(const BaseType* t, const QString& name = QString(),
                         ColorType nameType = ctReset,
-                        const ActiveRuleList& matchingRules = ActiveRuleList(),
+                        const ActiveRuleCList& matchingRules = ActiveRuleCList(),
                         const Variable *ctx_var = 0, const Structured *ctx_s = 0,
                         ConstMemberList members = ConstMemberList());
     int cmdShowVariable(const Variable* v,
-                        const ActiveRuleList& matchingRules = ActiveRuleList());
+                        const ActiveRuleCList &matchingRules = ActiveRuleCList());
 
     int cmdStats(QStringList args);
     int cmdStatsPostponed(QStringList args);

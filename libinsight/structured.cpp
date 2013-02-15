@@ -461,7 +461,7 @@ QString Structured::toString(VirtualMemory *mem, size_t offset,
         }
 
         // Print matching rules.
-        ActiveRuleList rules;
+        ActiveRuleCList rules;
         if (inst)
             rules = _symbols->ruleEngine().rulesMatching(inst, ConstMemberList() << m);
         else
