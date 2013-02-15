@@ -2477,9 +2477,12 @@ ASTType* ASTTypeEvaluator::preprendArrays(const ASTNode *dd_dad, ASTType* type)
         {
             type = createASTType(rtArray, ds_ads, type);
             // Evaluate expression in brackets, if possible
+            struct ASTNode* expr =
+                    (ds_ads->type == nt_declarator_suffix_brackets)
+                            ? ds_ads->u.declarator_suffix.constant_expression
+                            : ds_ads->u.abstract_declarator_suffix.constant_expression;
             bool ok = false;
-            int size = evaluateIntExpression(
-                        ds_ads->u.declarator_suffix.constant_expression, &ok);
+            int size = evaluateIntExpression(expr, &ok);
             if (ok)
                 type->setArraySize(size);
         }
