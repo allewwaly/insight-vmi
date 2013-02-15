@@ -15,10 +15,10 @@
 #include <insight/memspecs.h>
 #include <insight/console.h>
 #include <insight/instanceclass.h>
+#include <insight/kernelsourcetypeevaluator.h>
 #include <abstractsyntaxtree.h>
 #include <astbuilder.h>
 #include <astscopemanager.h>
-#include <asttypeevaluator.h>
 #include <astnodefinder.h>
 #include <QDir>
 #include <QScriptProgram>
@@ -463,8 +463,7 @@ const BaseType* ExpressionAction::parseTypeStr(
         id = ast.antlrTokenToStr(dd->u.direct_declarator.identifier);
     }
 
-    ASTTypeEvaluator t_eval(&ast, factory->memSpecs().sizeofLong,
-                            factory->memSpecs().sizeofPointer, factory);
+    KernelSourceTypeEvaluator t_eval(&ast, factory);
 
     // Evaluate type of parameter_declaration
     ASTType* astType = t_eval.typeofNode(paramNode);
@@ -493,8 +492,22 @@ const BaseType* ExpressionAction::parseTypeStr(
                     if (match_idx < 0)
                         match_idx = i;
                     else {
-                        match_idx = type_ambiguous;
-                        break;
+                        const BaseType* t1 =
+                                found.typesNonPtr.at(match_idx)->dereferencedBaseType(BaseType::trLexical);
+                        const BaseType* t2 =
+                                found.typesNonPtr.at(i)->dereferencedBaseType(BaseType::trLexical);
+                        // Compare the hashes of the non-lexical types, only if
+                        // they are different the type is ambiguous.
+                        if (t1->hash() != t2->hash()) {
+                            match_idx = type_ambiguous;
+                            break;
+                        }
+                        else {
+                            // Prefer the type that exactly corresponds to the
+                            // ASTType
+                            if (found.typesNonPtr.at(i)->type() == found.astTypeNonPtr->type())
+                                match_idx = i;
+                        }
                     }
                 }
             }
@@ -642,7 +655,7 @@ bool ExpressionAction::match(const BaseType *type, const OsSpecs *specs) const
              !(type->type() == rtArray && srcType->type() == rtArray &&
                // For array types, we ignore the array length by comparing the
                // arrays' referencing type directly
-               typeNonArray && srcType->type() == rtArray &&
+               typeNonArray &&
                (*typeNonArray == *srcType->dereferencedBaseType(rtArray, 1)) ) ) )
     {
         if (srcType->type() & BaseType::trLexicalAndPointers) {
