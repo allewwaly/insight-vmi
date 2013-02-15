@@ -541,7 +541,7 @@ QList<int> SymFactory::equivalentTypes(int id) const
 }
 
 
-QList<BaseType*> SymFactory::typesUsingId(int id) const
+QList<BaseType*> SymFactory::typesUsingId(int id, int typeFilter) const
 {
     QList<int> typeIds = equivalentTypes(id);
     if (typeIds.isEmpty())
@@ -549,13 +549,25 @@ QList<BaseType*> SymFactory::typesUsingId(int id) const
     QSet<BaseType*> ret;
 
     for (int i = 0; i < typeIds.size(); ++i) {
-        for (RefBaseTypeMultiHash::const_iterator it = _usedByRefTypes.find(typeIds[i]);
-             it != _usedByRefTypes.end() && it.key() == typeIds[i]; ++it)
-            ret += it.value();
+        if (typeFilter & RefBaseTypes) {
+            for (RefBaseTypeMultiHash::const_iterator it = _usedByRefTypes.find(typeIds[i]);
+                 it != _usedByRefTypes.end() && it.key() == typeIds[i]; ++it)
+            {
+                 BaseType* t = it.value();
+                if (t && (t->type() & typeFilter))
+                    ret += t;
+            }
+        }
 
-        for (StructMemberMultiHash::const_iterator it = _usedByStructMembers.find(typeIds[i]);
-             it != _usedByStructMembers.end() && it.key() == typeIds[i]; ++it)
-            ret += it.value()->belongsTo();
+        if (typeFilter & StructOrUnion) {
+            for (StructMemberMultiHash::const_iterator it = _usedByStructMembers.find(typeIds[i]);
+                 it != _usedByStructMembers.end() && it.key() == typeIds[i]; ++it)
+            {
+                BaseType* t = it.value()->belongsTo();
+                if (t && (t->type() & typeFilter))
+                    ret += t;
+            }
+        }
     }
 
     return ret.toList();
@@ -1672,12 +1684,8 @@ void SymFactory::sourceParcingFinished()
         varsUsingType.clear();
         for (int j = 0; j < sameTypes.size() /*&& usedByStructs <= 1*/; ++j) {
             // Count no. of structs/unions using that type
-            structsUsingType = typesUsingId(sameTypes[j]->id());
-            for (int k = 0; k < structsUsingType.size(); ++k) {
-                if (structsUsingType[k]->type() & StructOrUnion)
-                    ++usedByStructs;
-            }
-
+            structsUsingType = typesUsingId(sameTypes[j]->id(), StructOrUnion);
+            usedByStructs += structsUsingType.size();
             varsUsingType += varsUsingId(sameTypes[j]->id());
         }
         if (usedByStructs > 1) {
@@ -1991,23 +1999,7 @@ void SymFactory::insertUsedBy(FuncParam* param)
 
 BaseTypeList SymFactory::typedefsOfType(BaseType* type) const
 {
-    BaseTypeList ret;
-
-    if (!type)
-        return ret;
-    QList<RefBaseType*> rbtList = _usedByRefTypes.values(type->id());
-    for (int i = rbtList.size() - 1; i >= 0; --i) {
-        // Remove all non-typedefs
-        if (rbtList[i]->type() != rtTypedef)
-            rbtList.removeAt(i);
-        // Recursively add all futher typedefs
-        else {
-            ret += rbtList[i];
-            ret += typedefsOfType(rbtList[i]);
-        }
-    }
-
-    return ret;
+    return typesUsingId(type->id(), rtTypedef);
 }
 
 
@@ -2248,32 +2240,44 @@ FoundBaseTypes SymFactory::findBaseTypesForAstType(const ASTType* astType,
         candidates += baseTypes[i];
         // Try to match all pointer/array usages
         for (int j = preceedingPtrs.size() - 1; j >= 0; --j) {
+            const ASTType* precPtr = preceedingPtrs[j];
             nextCandidates.clear();
             // Try it on all candidates
             for (int k = 0; k < candidates.size(); ++k) {
                 BaseType* candidate = candidates[k];
                 // Get all types that use the current candidate
-                typesUsingSrc = typesUsingId(candidate ? candidate->id() : 0);
+                typesUsingSrc = typesUsingId(candidate ? candidate->id() : 0,
+                                             precPtr->type());
 
                 // Next candidates are all that use the type in the way
                 // defined by targetPointers[j]
-                for (int l = 0; l < typesUsingSrc.size(); ++l) {
-                    if (typesUsingSrc[l]->type() == preceedingPtrs[j]->type()) {
-                        // Match the array size, if given
-                        if (preceedingPtrs[j]->type() == rtArray &&
-                                preceedingPtrs[j]->arraySize() >= 0)
-                        {
-                            const Array* a =
-                                    dynamic_cast<Array*>(typesUsingSrc[l]);
-                            // In case the array has a specified length and it
-                            // does not match the expected length, then skip it.
-                            if (a->length() >= 0 &&
-                                    a->length() != preceedingPtrs[j]->arraySize())
-                                continue;
+                if (precPtr->type() == rtPointer)
+                    nextCandidates += typesUsingSrc;
+                // For array, try to match the array length as well
+                else {
+                    Array* undefLenAry = 0;
+                    bool exactMatch = false;
+                    for (int l = 0; l < typesUsingSrc.size(); ++l) {
+                        Array* a = dynamic_cast<Array*>(typesUsingSrc[l]);
+                        if (a->length() < 0)
+                            undefLenAry = a;
+                        // Match the array size
+                        if (a->length() == precPtr->arraySize()) {
+                            exactMatch = true;
+                            nextCandidates.append(a);
+                            // Additonally add all typedefs for that type
+                            nextCandidates.append(typedefsOfType(a));
                         }
-                        nextCandidates.append(typesUsingSrc[l]);
-                        // Additonally add all typedefs for that type
-                        nextCandidates.append(typedefsOfType(typesUsingSrc[l]));
+                    }
+
+                    // If we did not have an exact match and this is the last
+                    // array elem, use the array with undef. length (if
+                    // available), otherwise use all arrays as next candidates
+                    if (!exactMatch) {
+                        if (undefLenAry && (k + 1 == candidates.size()))
+                            nextCandidates.append(undefLenAry);
+                        else
+                            nextCandidates.append(typesUsingSrc);
                     }
                 }
             }

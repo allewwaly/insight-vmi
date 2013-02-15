@@ -234,13 +234,9 @@ int AltRefTypeRuleWriter::writeStructDeep(const BaseType* srcType,
                 srcType->dereferencedBaseType(BaseType::trLexicalPointersArrays));
     // If s is an anonymous struct/union, try to find a typedef defining it
     if (s && s->name().isEmpty()) {
-        BaseTypeList list = _factory->typesUsingId(s->id());
-        foreach (const BaseType* t, list) {
-            if (t->type() == rtTypedef) {
-                srcType = t;
-                break;
-            }
-        }
+        BaseTypeList list = _factory->typesUsingId(s->id(), rtTypedef);
+        if (!list.isEmpty())
+            srcType = list.first();
     }
 
     int i = 0, count = 0;

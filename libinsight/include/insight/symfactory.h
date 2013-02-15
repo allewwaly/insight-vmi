@@ -444,7 +444,15 @@ public:
      */
     QList<int> equivalentTypes(int id) const;
 
-    QList<BaseType*> typesUsingId(int id) const;
+    /**
+     * Returns a list of types that use type \a id or any equivalent type. The
+     * list of types can be filtered by a bitwise ORed combination of
+     * RealType values. The default value of -1 does not apply any filter.
+     * @param id the type ID to look for
+     * @param typeFilter combination of RealType values
+     * @return list of types that are using type \a id
+     */
+    QList<BaseType*> typesUsingId(int id, int typeFilter = -1) const;
 
     QList<Variable*> varsUsingId(int id) const;
 
