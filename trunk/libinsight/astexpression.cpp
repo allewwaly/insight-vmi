@@ -240,7 +240,8 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         return ExpressionResult(erUndefined);
 
     const uint instHash = inst->typeHash();
-    const BaseType* instNoArrayType = inst->type()->dereferencedBaseType(BaseType::trLexicalAndPointers);
+    const BaseType* instNoArrayType =
+            inst->type()->dereferencedBaseType(BaseType::trLexicalAndPointers);
     instNoArrayType = instNoArrayType->type() == rtArray ?
                 instNoArrayType->dereferencedBaseType(rtArray, 1) : 0;
     const uint instNoArrayHash = instNoArrayType ? instNoArrayType->hash() : 0;
@@ -252,11 +253,13 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         const BaseType* t = _baseType;
         bool takeAddress = false;
         do {
-            // For array types, ignore the length parameter
-            if (instHash == t->hash() ||
-                (instNoArrayType && t->type() == rtArray &&
-                 instNoArrayHash == dynamic_cast<const RefBaseType*>(t)->refType()->hash()))
+            if (instHash == t->hash())
                 return inst->toExpressionResult(takeAddress);
+            // For array types, ignore the length parameter and return the
+            // array's address
+            if (instNoArrayType && t->type() == rtArray &&
+                instNoArrayHash == dynamic_cast<const RefBaseType*>(t)->refType()->hash())
+                return inst->toExpressionResult(true);
             // Dereference the type, if possible, but no arrays, only pointers
             if (t->type() & RefBaseTypes) {
                 if (t->type() & rtPointer)
