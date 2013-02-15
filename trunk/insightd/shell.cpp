@@ -1263,7 +1263,7 @@ int Shell::cmdListTypesUsing(QStringList args)
 
     // Did we parse an ID?
     if (ok) {
-        types = _sym.factory().typesUsingId(id);
+        types = _sym.factory().typesUsingId(id, ~FunctionTypes);
     }
     // No ID given, so try to find the type by name
     else {
@@ -1275,7 +1275,7 @@ int Shell::cmdListTypesUsing(QStringList args)
         }
 
         for (int i = 0; i < tmp.size(); ++i)
-            types += _sym.factory().typesUsingId(tmp[i]->id());
+            types += _sym.factory().typesUsingId(tmp[i]->id(), ~FunctionTypes);
     }
 
     if (types.isEmpty()) {
@@ -1614,7 +1614,7 @@ Shell::typesUsingTypeRek(const BaseType* usedType, const QStringList& members,
         return ret;
 
     visited.push(usedType->id());
-    BaseTypeList types = _sym.factory().typesUsingId(usedType->id());
+    BaseTypeList types = _sym.factory().typesUsingId(usedType->id(), ~FunctionTypes);
 
     foreach(const BaseType* t, types) {
         // For structs/unions, find the member that uses usedType
@@ -1634,8 +1634,7 @@ Shell::typesUsingTypeRek(const BaseType* usedType, const QStringList& members,
         else {
             if (depth == 0)
                 ret += QPair<const BaseType*, QStringList>(t, members);
-            if (!(t->type() & FunctionTypes))
-                ret += typesUsingTypeRek(t, members, depth, visited);
+            ret += typesUsingTypeRek(t, members, depth, visited);
         }
     }
 
