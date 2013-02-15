@@ -1,6 +1,6 @@
 #include <insight/typefilter.h>
 #include <realtypes.h>
-#include <insight/basetype.h>
+#include <insight/refbasetype.h>
 #include <insight/variable.h>
 #include <insight/structured.h>
 #include <insight/structuredmember.h>
@@ -176,14 +176,46 @@ bool GenericFilter::matchType(const BaseType *type) const
     if (!type)
         return false;
 
-    if (filterActive(ftRealType) && !(type->type() & _realTypes))
+    if (filterActive(ftRealType)) {
+        const BaseType* t = type;
+        while (t && !(t->type() & _realTypes)) {
+            if (t->type() & BaseType::trLexical)
+                t = dynamic_cast<const RefBaseType*>(t)->refType();
+            else
+                return false;
+        }
+        if (!t)
+            return false;
+    }
+
+    if (filterActive(ftSize) && type->size() != _size)
         return false;
-    else if (filterActive(ftSize) && type->size() != _size)
-        return false;
-    else if (filterActive(ftTypeId) && type->id() != _typeId)
-        return false;
-    else if (filterActive(ftTypeNameAll) && !matchTypeName(type->name()))
-        return false;
+
+    if (filterActive(ftTypeId)) {
+        const BaseType* t = type;
+        while (t && !(t->id() & _typeId)) {
+            if (t->type() & BaseType::trLexical)
+                t = dynamic_cast<const RefBaseType*>(t)->refType();
+            else
+                return false;
+        }
+        if (!t)
+            return false;
+
+    }
+
+    if (filterActive(ftTypeNameAll)) {
+        const BaseType* t = type;
+        while (t && !matchTypeName(t->name())) {
+            if (t->type() & BaseType::trLexical)
+                t = dynamic_cast<const RefBaseType*>(t)->refType();
+            else
+                return false;
+        }
+        if (!t)
+            return false;
+    }
+
     return true;
 }
 
