@@ -240,10 +240,12 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         return ExpressionResult(erUndefined);
 
     const uint instHash = inst->typeHash();
-    const BaseType* instNoArrayType =
-            inst->type()->dereferencedBaseType(BaseType::trLexicalAndPointers);
-    instNoArrayType = instNoArrayType->type() == rtArray ?
-                instNoArrayType->dereferencedBaseType(rtArray, 1) : 0;
+    int instDerefCnt = 0, typeDerefCnt = 0;
+    const BaseType* instNoPtrType =
+            inst->type()->dereferencedBaseType(BaseType::trLexicalAndPointers,
+                                               -1, &instDerefCnt);
+    const BaseType* instNoArrayType = instNoPtrType->type() == rtArray ?
+                instNoPtrType->dereferencedBaseType(rtArray, 1) : 0;
     const uint instNoArrayHash = instNoArrayType ? instNoArrayType->hash() : 0;
 
     if (_transformations.isEmpty()) {
@@ -252,9 +254,19 @@ ExpressionResult ASTVariableExpression::result(const Instance *inst) const
         // the result
         const BaseType* t = _baseType;
         bool takeAddress = false;
+        uint instNoPtrHash = instNoPtrType ? instNoPtrType->hash() : 0;
         do {
             if (instHash == t->hash())
                 return inst->toExpressionResult(takeAddress);
+            else {
+                // Check if the dereferenced type hashes and the pointer levels
+                // match
+                const BaseType* typeNoPtr = t->dereferencedBaseType(
+                            BaseType::trLexicalAndPointers, -1, &typeDerefCnt);
+                uint typeNoPtrHash = typeNoPtr ? typeNoPtr->hash() : 0;
+                if (instNoPtrHash == typeNoPtrHash && instDerefCnt == typeDerefCnt)
+                    return inst->toExpressionResult(takeAddress);
+            }
             // For array types, ignore the length parameter and return the
             // array's address
             if (instNoArrayType && t->type() == rtArray &&
