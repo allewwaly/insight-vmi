@@ -781,11 +781,11 @@ MemoryMapNode* MemoryMap::existsNode(const Instance& origInst,
     if (!origInst.type())
         return 0;
 
-    if (origInst.type()->type() & BaseType::trLexical)
-        debugerr(QString("The given instance '%0' has the lexical type '%1' (0x%2)!")
-                 .arg(origInst.fullName())
-                 .arg(origInst.typeName())
-                 .arg((uint)origInst.type()->id()));
+//    if (origInst.type()->type() & BaseType::trLexical)
+//        debugerr(QString("The given instance '%0' has the lexical type '%1' (0x%2)!")
+//                 .arg(origInst.fullName())
+//                 .arg(origInst.typeName())
+//                 .arg((uint)origInst.type()->id()));
 
     MemMapList nodes(findAllNodes(origInst, candidates));
 
