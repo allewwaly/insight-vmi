@@ -650,6 +650,8 @@ bool ExpressionAction::match(const BaseType *type, const OsSpecs *specs) const
     typeNonArray = typeNonArray->type() == rtArray ?
                 typeNonArray->dereferencedBaseType(rtArray, 1) : 0;
 
+    int ptrsDerefed = 0;
+
     while (srcType &&
            ( (*type != *srcType) &&
              !(type->type() == rtArray && srcType->type() == rtArray &&
@@ -658,12 +660,25 @@ bool ExpressionAction::match(const BaseType *type, const OsSpecs *specs) const
                typeNonArray &&
                (*typeNonArray == *srcType->dereferencedBaseType(rtArray, 1)) ) ) )
     {
+        // Can we dereference the source type?
         if (srcType->type() & BaseType::trLexicalAndPointers) {
             last = srcType;
-            srcType = srcType->dereferencedBaseType(BaseType::trLexicalAndPointers, 1);
+            int cnt = 0;
+            srcType = srcType->dereferencedBaseType(BaseType::trLexicalAndPointers, 1, &cnt);
+            ptrsDerefed += cnt;
             // void* pointers are not dereferenced anymore
             if (srcType == last)
                 srcType = 0;
+        }
+        // If we dereferenced the source type, we can try to dereference the
+        // tested type as well
+        else if (ptrsDerefed > 0 && type->type() == rtPointer) {
+            int cnt = 0;
+            type = type->dereferencedBaseType(BaseType::trLexicalAndPointers,
+                                              ptrsDerefed, &cnt);
+            if (ptrsDerefed != cnt)
+                return false;
+            ptrsDerefed = 0;
         }
         else
             return false;
