@@ -15,6 +15,9 @@
 				</members>
 			</filter>
 			<action type="inline">
+				// Only continue if the type exists
+				if (!Symbols.typeExists("journal_head"))
+					return false;
 				var bh = arguments[0];
 				var data = bh.Member(arguments[1][0]);
 				// If this is a journal_head, it points back to bh
