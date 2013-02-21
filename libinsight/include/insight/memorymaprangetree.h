@@ -25,6 +25,7 @@ struct MemMapProperties
     float maxProbability;  ///< Maximal probability within this range
     int objectCount;       ///< No. of objects within this range
     int baseTypes;         ///< OR'ed BaseType::RealType's within this range
+    int slubValidities;    ///< OR'ed SlubObjects::ObjectValidity within this range
 
     MemMapProperties() { reset(); }
 
