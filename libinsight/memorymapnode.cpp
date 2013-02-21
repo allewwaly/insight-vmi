@@ -19,7 +19,7 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
 	: _belongsTo(belongsTo), _parent(parent),
 	  _name(MemoryMap::insertName(name)), _address(address), _type(type),
 	  _id(id), _probability(1.0), _origInst(0), _seemsValid(false),
-	  _foundInPtrChains(0), _size(-1)
+	  _slubValidity(SlubObjects::ovUnknown), _foundInPtrChains(0), _size(-1)
 {
     if (_belongsTo && (_belongsTo->vmem()->memSpecs().arch & MemSpecs::ar_i386))
         if (_address >= (1ULL << 32))
@@ -35,7 +35,7 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const QString& name,
 	: _belongsTo(belongsTo), _parent(parent),
 	  _name(MemoryMap::insertName(name)), _address(address), _type(0),
 	  _id(-1), _probability(1.0), _origInst(0), _seemsValid(false),
-	  _foundInPtrChains(0), _size(size)
+	  _slubValidity(SlubObjects::ovUnknown), _foundInPtrChains(0), _size(size)
 {
     if (_belongsTo && (_belongsTo->vmem()->memSpecs().arch & MemSpecs::ar_i386))
         if (_address >= (1ULL << 32))
@@ -50,8 +50,9 @@ MemoryMapNode::MemoryMapNode(MemoryMap* belongsTo, const Instance& inst,
         MemoryMapNode* parent)
     : _belongsTo(belongsTo), _parent(parent),
       _name(getNameFromInstance(parent, inst)), _address(inst.address()),
-      _type(inst.type()), _id(inst.id()), _probability(1.0),
-      _origInst(0), _seemsValid(false), _foundInPtrChains(0), _size(-1)
+      _type(inst.type()), _id(inst.id()), _probability(1.0), _origInst(0),
+      _seemsValid(false), _slubValidity(SlubObjects::ovUnknown),
+      _foundInPtrChains(0), _size(-1)
 {
     if (_belongsTo && _address > _belongsTo->vmem()->memSpecs().vaddrSpaceEnd())
             genericError(QString("Address 0x%1 exceeds 32 bit address space")
@@ -225,3 +226,5 @@ void MemoryMapNode::setSeemsValid(bool valid)
             _parent->setSeemsValid(valid);
     }
 }
+
+

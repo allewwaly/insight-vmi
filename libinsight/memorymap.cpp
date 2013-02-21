@@ -232,6 +232,13 @@ void MemoryMap::addVarInstance(const Instance& inst)
 
 void MemoryMap::addNodeToHashes(MemoryMapNode *node)
 {
+#if MEMORY_MAP_VERIFICATION == 1
+    if (!_verifier.slub().caches().isEmpty()) {
+        Instance inst(node->toInstance(false));
+        node->setSlubValidity(_verifier.slub().objectValid(&inst));
+    }
+#endif
+
     _shared->vmemMapLock.lockForWrite();
     _vmemAddresses.insert(node->address());
     _vmemMap.insert(node);
@@ -306,16 +313,9 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
         return;
     }
 
-    if (Instance::ruleEngine() && Instance::ruleEngine()->count() > 0) {
-        _useRuleEngine = true;
-        _knowSrc = ksNoAltTypes;
-        debugmsg("Building map with TYPE RULES");
-    }
-    else {
-        _useRuleEngine = false;
-        _knowSrc = ksNoRulesEngine;
-        debugmsg("Building map with CANDIDATE TYPES");
-    }
+    _useRuleEngine = true;
+    _knowSrc = ksNoAltTypes;
+    debugmsg("Building map with TYPE RULES");
 
     // Initialization of non-rule engine based map
     if (!_useRuleEngine)

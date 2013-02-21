@@ -13,6 +13,7 @@
 #include <QMutex>
 #include "basetype.h"
 #include "instance.h"
+#include "slubobjects.h"
 
 class MemoryMap;
 class MemoryMapNode;
@@ -173,6 +174,19 @@ public:
 
     bool seemsValid() const;
 
+    /**
+     * Returns this node's validity according to the SLUB caches.
+     * @return the validity
+     * \sa SlubObjects::ObjectValidity
+     */
+    SlubObjects::ObjectValidity slubValidity() const;
+
+    /**
+     * Sets this node's validity compared to the SLUB objects.
+     * @param validity
+     */
+    void setSlubValidity(SlubObjects::ObjectValidity validity);
+
     int foundInPtrChains() const;
 
     void incFoundInPtrChains();
@@ -205,6 +219,7 @@ protected:
     float _probability;      ///< probability of "correctness" of this node
     Instance* _origInst;
     bool _seemsValid;
+    qint16 _slubValidity;
     int _foundInPtrChains;    ///< how often this node was found through other chains of pointers
     int _size;
     QMutex _nodeLock;
@@ -309,6 +324,18 @@ inline float MemoryMapNode::probability() const
 inline bool MemoryMapNode::seemsValid() const
 {
     return _seemsValid;
+}
+
+
+inline SlubObjects::ObjectValidity MemoryMapNode::slubValidity() const
+{
+    return static_cast<SlubObjects::ObjectValidity>(_slubValidity);
+}
+
+
+inline void MemoryMapNode::setSlubValidity(SlubObjects::ObjectValidity validity)
+{
+    _slubValidity = validity;
 }
 
 
