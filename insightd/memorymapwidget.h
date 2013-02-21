@@ -15,6 +15,7 @@ class QEvent;
 class QPaintEvent;
 class QMouseEvent;
 class QCloseEvent;
+struct Cell;
 
 #include <insight/memorymaprangetree.h>
 #include <insight/memorydifftree.h>
@@ -56,6 +57,9 @@ protected:
     bool event(QEvent *event);
 
 private:
+    void getCellProbabilityColors(Cell* cell, const MemMapProperties& props);
+    void getCellValidityColors(Cell *cell, const MemMapProperties& props);
+
     int drawWidth() const;
     int drawHeight() const;
 
