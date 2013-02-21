@@ -253,6 +253,7 @@ bool MemoryMapVerifier::performChecks(MemoryMapNode *n)
     SlubObjects::ObjectValidity v = _slub.objectValid(&lastNodei);
 
     switch(v) {
+        case SlubObjects::ovUnknown: // is never returned
         case SlubObjects::ovValid:
         case SlubObjects::ovValidCastType:
         case SlubObjects::ovValidGlobal:
@@ -379,6 +380,7 @@ void MemoryMapVerifier::statisticsCountNodeSV(MemoryMapNodeSV *node)
     _totalDistribution[nodeProbability]++;
 
     switch(v) {
+    case SlubObjects::ovUnknown: // is never returned
     case SlubObjects::ovValid:
     case SlubObjects::ovValidCastType:
     case SlubObjects::ovValidGlobal:
@@ -464,7 +466,7 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
     _typeCountAll[node->type()]++;
     Instance i = node->toInstance(true);
 
-    SlubObjects::ObjectValidity v = _slub.objectValid(&i);
+    SlubObjects::ObjectValidity v = node->slubValidity();
     int valid = 0;
     bool heurValid = MemoryMapHeuristics::isValidInstance(i);
     if (heurValid)
@@ -475,6 +477,8 @@ void MemoryMapVerifier::statisticsCountNodeCS(MemoryMapNode *node)
         probIndex = _slubValidDistribution.size() - 1;
 
     switch(v) {
+    case SlubObjects::ovUnknown: // is never returned
+        break;
     case SlubObjects::ovValid:
     case SlubObjects::ovValidCastType:
 //#ifdef MEMMAP_DEBUG

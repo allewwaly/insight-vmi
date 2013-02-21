@@ -13,6 +13,7 @@ void MemMapProperties::reset()
     maxProbability = 0;
     objectCount = 0;
     baseTypes = 0;
+    slubValidities = 0;
 }
 
 
@@ -29,6 +30,7 @@ void MemMapProperties::update(const MemoryMapNode* mmnode)
     ++objectCount;
     if (mmnode->type())
         baseTypes |= mmnode->type()->type();
+    slubValidities |= mmnode->slubValidity();
 }
 
 
@@ -40,6 +42,7 @@ MemMapProperties& MemMapProperties::unite(const MemMapProperties& other)
         maxProbability = other.maxProbability;
     objectCount += other.objectCount;
     baseTypes |= other.baseTypes;
+    slubValidities |= other.slubValidities;
     return *this;
 }
 

@@ -95,17 +95,18 @@ class SlubObjects
 public:
     /// Is a given instance valid according to the slab caches?
     enum ObjectValidity {
-        ovInvalid,       ///< Instance is invalid, no further information avaliable
-        ovNoSlabType,    ///< Instance not found, but base type actually not present in any slab
-        ovNotFound,      ///< Instance not found, even though base type is managed in slabs
-        ovConflict,      ///< Instance type or address conflicts with object in the slabs
-        ovEmbedded,      ///< Instance is embedded within a larger object in the slabs
-        ovEmbeddedUnion, ///< Instance may be embedded within a larger object in the slabs
-        ovMaybeValid,    ///< Instance lies within reserved slab memory for which no type information is available
-        ovValidCastType, ///< Instance matches an object in the slab when using the SlubObjects::_typeCasts exception list
-        ovEmbeddedCastType, ///< Instance is embeddes in another object in the slab when using the SlubObjects::_typeCasts exception list
-        ovValidGlobal,   ///< Instance is a slub type and was found in a global variable
-        ovValid          ///< Instance was found in the slabs
+        ovUnknown          = 0,        ///< The validity is unknown
+        ovInvalid          = (1 << 0), ///< Instance is invalid, no further information avaliable
+        ovNoSlabType       = (1 << 1), ///< Instance not found, but base type actually not present in any slab
+        ovNotFound         = (1 << 2), ///< Instance not found, even though base type is managed in slabs
+        ovConflict         = (1 << 3), ///< Instance type or address conflicts with object in the slabs
+        ovEmbedded         = (1 << 4), ///< Instance is embedded within a larger object in the slabs
+        ovEmbeddedUnion    = (1 << 5), ///< Instance may be embedded within a larger object in the slabs
+        ovMaybeValid       = (1 << 6), ///< Instance lies within reserved slab memory for which no type information is available
+        ovValidCastType    = (1 << 7), ///< Instance matches an object in the slab when using the SlubObjects::_typeCasts exception list
+        ovEmbeddedCastType = (1 << 8), ///< Instance is embeddes in another object in the slab when using the SlubObjects::_typeCasts exception list
+        ovValidGlobal      = (1 << 9), ///< Instance is a slub type and was found in a global variable
+        ovValid            = (1 << 10) ///< Instance was found in the slabs
     };
 
     SlubObjects(const SymFactory* factory, VirtualMemory* vmem);

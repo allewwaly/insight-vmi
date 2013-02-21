@@ -2213,7 +2213,9 @@ int Shell::cmdMemoryVerify(QStringList args)
         Console::out() << "instance is " << Console::color(ctBold);
 
         switch(v) {
-        // Instance is invalid, no further information avaliable
+        case SlubObjects::ovUnknown:
+            Console::out() << "unknown"; break;
+            // Instance is invalid, no further information avaliable
         case SlubObjects::ovInvalid:
             Console::out() << "invalid"; break;
             // Instance not found, but base type actually not present in any slab
@@ -2521,7 +2523,10 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
         Instance inst(node->toInstance(false));
         SlubObjects::ObjectValidity v = slub.objectValid(&inst);
         switch(v) {
-        // Instance is invalid, no further information avaliable
+        case SlubObjects::ovUnknown:
+            Console::out() << Console::colorize("unknown", ctReset, w_valid);
+            break;
+            // Instance is invalid, no further information avaliable
         case SlubObjects::ovInvalid:
             Console::out() << Console::colorize("invalid", ctMissed, w_valid);
             break;

@@ -57,6 +57,9 @@ SlubObjects::ObjectValidity SlubObjects::objectValid(const Instance *inst) const
     if (!inst || inst->isNull() || !inst->isValid())
         return ovInvalid;
 
+    if (_objects.isEmpty())
+        return ovUnknown;
+
     SlubObject obj(objectAt(inst->address()));
 
     // Did we find an object at that address?
