@@ -495,7 +495,7 @@ bool MemoryMapWidget::event(QEvent *event)
 
                     const MemoryMapNode* node = *it;
                     int colorIdx = (unsigned char)(PROB_MAX * node->probability());
-                    cellProbCharFmt.setForeground(QBrush(probColor[colorIdx]));
+                    cellProbCharFmt.setForeground(QBrush(cellColors[colorIdx]));
 
                     cur.setBlockFormat(defBlkFmt);
                     cur.setCharFormat(cellAddrCharFmt);
