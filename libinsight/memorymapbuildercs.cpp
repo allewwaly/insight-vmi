@@ -150,8 +150,8 @@ void MemoryMapBuilderCS::processPointer(const Instance& inst, MemoryMapNode *nod
 
     quint64 addr = (quint64) inst.toPointer();
 
-    // Ignore pointers that point back into the node
-    if (addr >= node->address() && addr <= node->endAddress())
+    // Ignore null pointers and pointers that point back into the node
+    if (!addr || (addr >= node->address() && addr <= node->endAddress()))
         return;
 
     _map->_shared->pointersToLock.lockForWrite();
@@ -161,7 +161,7 @@ void MemoryMapBuilderCS::processPointer(const Instance& inst, MemoryMapNode *nod
     int cnt = 0;
     Instance deref(inst.dereference(BaseType::trLexicalAllPointers, 1, &cnt));
 
-    if (cnt && MemoryMapHeuristics::hasValidAddress(inst, false)) {
+    if (cnt && MemoryMapHeuristics::hasValidAddress(deref, false)) {
         _map->addChildIfNotExistend(deref, InstanceList(), node, _index, node->address());
     }
 }
