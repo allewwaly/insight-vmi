@@ -2379,7 +2379,7 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
 {
     QTime timer;
     timer.start();
-    float prob = 0.0;
+    float prob = 0.1;
 
     // First argument must be builder type
     if (args.isEmpty()) {

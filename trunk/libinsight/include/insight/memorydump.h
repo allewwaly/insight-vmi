@@ -236,7 +236,7 @@ public:
      * @param minProbability stop building when the node's probability drops
      *  below this threshold
      */
-    void setupRevMap(MemoryMapBuilderType type, float minProbability = 0.0,
+    void setupRevMap(MemoryMapBuilderType type, float minProbability,
                      const QString& slubObjFile = QString());
 
     /**
