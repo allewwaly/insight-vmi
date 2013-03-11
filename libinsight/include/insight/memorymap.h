@@ -152,7 +152,7 @@ public:
 	 * @param minProbability stop building when the node's probability drops
 	 *  below this threshold
 	 */
-	void build(MemoryMapBuilderType type, float minProbability = 0.0,
+	void build(MemoryMapBuilderType type, float minProbability,
 			   const QString &slubObjFile = QString());
 
 	bool dump(const QString& fileName) const;
