@@ -318,22 +318,6 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
         return QScriptValue();
     }
 
-    // Without any argument, return a null instance
-    if (ctx->argumentCount() == 0)
-        return this_eng->_instClass->newInstance(Instance());
-
-    // First argument must be a query string or an ID
-    QString queryStr;
-    int queryId = -1;
-    if (ctx->argument(0).isString())
-        queryStr = ctx->argument(0).toString();
-    else if (ctx->argument(0).isNumber())
-        queryId = ctx->argument(0).toInt32();
-    else {
-        ctx->throwError("First argument must be a string or an integer value");
-        return QScriptValue();
-    }
-
     int index = this_eng->_memDumpIndex;
     const MemDumpArray& memDumps = this_eng->_symbols->memDumps();
 
@@ -346,6 +330,23 @@ QScriptValue ScriptEngine::scriptGetInstance(QScriptContext* ctx,
             ctx->throwError("No memory dumps loaded");
             return QScriptValue();
         }
+    }
+
+    // Without any argument, return a null instance
+    if (ctx->argumentCount() == 0)
+        return this_eng->_instClass->newInstance(
+                    Instance(0, 0, memDumps[index]->vmem()));
+
+    // First argument must be a query string or an ID
+    QString queryStr;
+    int queryId = -1;
+    if (ctx->argument(0).isString())
+        queryStr = ctx->argument(0).toString();
+    else if (ctx->argument(0).isNumber())
+        queryId = ctx->argument(0).toInt32();
+    else {
+        ctx->throwError("First argument must be a string or an integer value");
+        return QScriptValue();
     }
 
     // Second argument is optional and defines the memDump index
