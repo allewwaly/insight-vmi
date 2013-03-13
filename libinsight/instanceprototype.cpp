@@ -200,13 +200,18 @@ bool InstancePrototype::IsInteger() const
             false;
 }
 
-
 bool InstancePrototype::IsReal() const
 {
     Instance* inst;
     return ((inst = thisInstance())) && inst->type() ?
             (inst->type()->type() & FloatingTypes) :
             false;
+}
+
+bool InstancePrototype::IsExecutable() const
+{
+    Instance* inst = thisInstance();
+    return inst->vmem()->isExecutable(inst->address());
 }
 
 QString InstancePrototype::Name() const
