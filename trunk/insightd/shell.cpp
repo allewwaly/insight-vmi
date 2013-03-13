@@ -2451,14 +2451,26 @@ bool cmdAddrLessThan(const MemoryMapNode* n1, const MemoryMapNode* n2)
 
 int Shell::cmdMemoryRevmapList(int index, QStringList args)
 {
-    if (args.size() != 1)
+    if (args.size() < 1 || args.size() > 2)
         return cmdHelp(QStringList("memory"));
 
     if (!isRevmapReady(index))
         return ecOk;
 
+
+    int dumpIn = 0;
     ConstNodeList nodes;
-    BaseTypeList types = typeIdOrName(args.front());
+    NodeList inNodes;
+    BaseTypeList types;
+
+    if (args.size() > 1)
+    {
+        dumpIn = args.front().toInt();
+        args.pop_front();
+    }
+
+    types = typeIdOrName(args.front());
+
     if (types.isEmpty()) {
         Console::out() << "No type by that name or ID found." << endl;
         return ecOk;
@@ -2600,6 +2612,20 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
         }
 
         Console::out() << endl;
+
+
+        if (dumpIn)
+        {
+            for (quint64 k = node->address(); k < node->endAddress(); ++k)
+            {
+                inNodes = _sym.memDumps().at(index)->map()->pointersTo().values(k);
+
+                for (int l = 0; l < inNodes.size(); ++l)
+                {
+                    Console::out() << "\t -> " << inNodes.at(l)->type()->prettyName() << " - " << inNodes.at(l)->fullName() << endl;
+                }
+            }
+        }
     }
 
     // Print footer
