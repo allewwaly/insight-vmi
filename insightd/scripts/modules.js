@@ -28,7 +28,10 @@ function printModuleListCand()
 			u = u.list.next;
 		}
 
-		var name = m.name.toString();
+		var name = m.Address().toString(16);
+		name += " (" + m.module_core + ")";	
+		name += " ";
+		name += m.name.toString();
 		if (m.args.toString().length > 0)
 			name += " [" + m.args.toString() + "]";
 
@@ -66,7 +69,18 @@ function printModuleListRules()
             u = u.list.next;
         }
 
-        var name = m.name.toString();
+        var name = m.Address().toString(16);
+        name += " (" + m.module_core + ")";
+	try
+	{
+		name += " (" + m.init.toPointer().toLong() + ")";
+	}
+	catch(e)
+	{
+		name += " (NOT PRESENT)";
+	}	
+        name += " ";
+        name += m.name.toString();
         if (m.args.toString().length > 0)
         name += " [" + m.args.toString() + "]";
 
