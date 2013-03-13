@@ -669,6 +669,13 @@ public slots:
     bool IsReal() const;
 
     /**
+     * Checks if the address of the instance is executable.
+     * @return \c true if the address is marked executable within the page
+     * tables, \c false otherwise.
+     */
+    bool IsExecutable() const;
+
+    /**
      * Changes the type of this instance to the type specified by its name
      * \a typeName. If that type cannot be found, a script exception is
      * injected.
