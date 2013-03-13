@@ -1314,26 +1314,33 @@ QString Instance::toStringPrivate(const ColorPalette *col, bool firstArrayElem) 
             return nullStr;
     }
 
-    const BaseType* bt;
-    if (_d->bitSize >= 0 &&
-        (bt = _d->type->dereferencedBaseType(BaseType::trLexical)) &&
-        (bt->type() & IntegerTypes))
-    {
-        const IntegerBitField* ibf = dynamic_cast<const IntegerBitField*>(bt);
-        quint64 val = ibf->toIntBitField(_d->vmem, _d->address, _d->bitSize, _d->bitOffset);
-        QString s = QString::number(val);
-        if (col)
-            return col->color(ctNumber) + s + col->color(ctReset);
-        else
-            return s;
-    }
+    // Does the instance have a type?
+    if (_d->type) {
+        const BaseType* bt;
+        if (_d->bitSize >= 0 &&
+            (bt = _d->type->dereferencedBaseType(BaseType::trLexical)) &&
+            (bt->type() & IntegerTypes))
+        {
+            const IntegerBitField* ibf = dynamic_cast<const IntegerBitField*>(bt);
+            quint64 val = ibf->toIntBitField(_d->vmem, _d->address, _d->bitSize, _d->bitOffset);
+            QString s = QString::number(val);
+            if (col)
+                return col->color(ctNumber) + s + col->color(ctReset);
+            else
+                return s;
+        }
 
-    if (_d->type->type() & StructOrUnion) {
-        const Structured* s = static_cast<const Structured*>(_d->type);
-        return s->toString(_d->vmem, _d->address, this, col);
+        if (_d->type->type() & StructOrUnion) {
+            const Structured* s = static_cast<const Structured*>(_d->type);
+            return s->toString(_d->vmem, _d->address, this, col);
+        }
+        else
+            return _d->type->toString(_d->vmem, _d->address, col);
     }
-    else
-        return _d->type->toString(_d->vmem, _d->address, col);
+    // No type, so just return the address
+    else {
+        return QString("%0").arg(address(), sizeofPointer() << 1, 16, QChar('0'));
+    }
 }
 
 
