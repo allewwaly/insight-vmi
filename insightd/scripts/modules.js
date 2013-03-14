@@ -13,7 +13,7 @@ function printModuleListCand()
         throw new Error("\"" + head.Name() + "\" does not have any candidate types for member \"next\"");
 
     var w_mod = 20;
-    println(lalign("Module [Args]", w_mod) + " Used by");
+    println(lalign("Adress", 18) + " " + lalign("Module [Args]", w_mod) + " Used by");
 
 	// Iterate over all modules
 	var m = head.next;
@@ -28,8 +28,7 @@ function printModuleListCand()
 			u = u.list.next;
 		}
 
-		var name = m.Address().toString(16);
-		name += " (" + m.module_core + ")";	
+		var name = "0x" + lalign(m.Address().toString(16), 16);
 		name += " ";
 		name += m.name.toString();
 		if (m.args.toString().length > 0)
@@ -49,7 +48,7 @@ function printModuleListRules()
     var head = new Instance("modules");
 
     var w_mod = 20;
-    println(lalign("Module [Args]", w_mod) + " Used by");
+    println(lalign("Adress", 18) + " " + lalign("Module [Args]", w_mod) + " Used by");
 
     // Iterate over all modules
     var m = head.next;
@@ -69,16 +68,7 @@ function printModuleListRules()
             u = u.list.next;
         }
 
-        var name = m.Address().toString(16);
-        name += " (" + m.module_core + ")";
-	try
-	{
-		name += " (" + m.init.toPointer().toLong() + ")";
-	}
-	catch(e)
-	{
-		name += " (NOT PRESENT)";
-	}	
+        var name = "0x" + lalign(m.Address().toString(16), 16);
         name += " ";
         name += m.name.toString();
         if (m.args.toString().length > 0)
