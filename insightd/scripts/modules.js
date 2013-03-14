@@ -13,7 +13,7 @@ function printModuleListCand()
         throw new Error("\"" + head.Name() + "\" does not have any candidate types for member \"next\"");
 
     var w_mod = 20;
-    println(lalign("Adress", 18) + " " + lalign("Module [Args]", w_mod) + " Used by");
+    println(lalign("Address", 18) + " " + lalign("Module [Args]", w_mod) + " Used by");
 
 	// Iterate over all modules
 	var m = head.next;
@@ -48,7 +48,7 @@ function printModuleListRules()
     var head = new Instance("modules");
 
     var w_mod = 20;
-    println(lalign("Adress", 18) + " " + lalign("Module [Args]", w_mod) + " Used by");
+    println(lalign("Address", 18) + " " + lalign("Module [Args]", w_mod) + " Used by");
 
     // Iterate over all modules
     var m = head.next;
