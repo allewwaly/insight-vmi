@@ -451,7 +451,7 @@ inline quint64 VirtualMemory::tlbLookup(quint64 vaddr, int* pageSize)
 
 
 quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
-        bool enableExceptions, struct pageTableEntries *ptEntries)
+        bool enableExceptions, struct PageTableEntries *ptEntries)
 {
 #ifdef ENABLE_TLB
     bool doLock = _threadSafe;
@@ -604,7 +604,7 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
 
 
 quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
-        bool enableExceptions, struct pageTableEntries *ptEntries)
+        bool enableExceptions, struct PageTableEntries *ptEntries)
 {
 #ifdef ENABLE_TLB
     bool doLock = _threadSafe;
@@ -749,7 +749,7 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 
 
 quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
-        bool enableExceptions, struct pageTableEntries *ptEntries)
+        bool enableExceptions, struct PageTableEntries *ptEntries)
 {
     quint64 physAddr = (_specs.arch & MemSpecs::ar_i386) ?
             virtualToPhysical32(vaddr, pageSize, enableExceptions, ptEntries) :
@@ -767,7 +767,7 @@ quint64 VirtualMemory::virtualToPhysical(quint64 vaddr, int* pageSize,
 
 
 quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
-        bool enableExceptions, struct pageTableEntries *ptEntries)
+		bool enableExceptions, struct PageTableEntries *ptEntries)
 {
 
 	if (_userland){
@@ -830,7 +830,7 @@ quint64 VirtualMemory::virtualToPhysical32(quint64 vaddr, int* pageSize,
 
 
 quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
-        bool enableExceptions, struct pageTableEntries *ptEntries)
+        bool enableExceptions, struct PageTableEntries *ptEntries)
 {
     quint64 physaddr = 0;
 
@@ -956,7 +956,7 @@ quint64 VirtualMemory::updateFlags(quint64 currentFlags, quint64 entry)
 }
 
 quint64 VirtualMemory::getFlags(quint64 vaddr) {
-    struct pageTableEntries ptEntries;
+    struct PageTableEntries ptEntries;
     int data;
     quint64 flags = 0;
 
