@@ -38,7 +38,7 @@
 	<include>type_union_acpi_operand_object.xml</include>
 
 	<!-- Variable-specific rules -->
-	<include>var_modules_struct_list_head.xml</include>
+<!-- 	<include>var_modules_struct_list_head.xml</include> -->
 	<include>var_shm_mnt_struct_vfsmount_ptr.xml</include>
 
 </typeknowledge>
