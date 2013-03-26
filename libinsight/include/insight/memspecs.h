@@ -12,6 +12,7 @@
 #include <QDateTime>
 #include <debug.h>
 #include "kernelsymbolstream.h"
+#include "systemmapentry.h"
 
 #define VADDR_SPACE_X86    0xFFFFFFFFUL
 #define VADDR_SPACE_X86_64 0xFFFFFFFFFFFFFFFFULL
@@ -192,6 +193,7 @@ struct MemSpecs
     quint32 createdChangeClock;
     int symVersion;
     struct Version version;      ///< Linux kernel version information
+    SystemMapEntries systemMap;  ///< all entries from the <tt>System.map</tt> file
     bool initialized;            ///< \c true after MemoryDump::init() is complete, \c false otherwise
 };
 
