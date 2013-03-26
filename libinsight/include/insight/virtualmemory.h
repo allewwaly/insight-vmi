@@ -35,7 +35,8 @@ static const quint64 HIGH_MEMORY_FAILSAFE_X86_64 = 0xffffc7ffffffffffULL;
  * Struct to store the page table entries in case they are requested.
  * Entries that are invalid should be set to PADDR_ERROR.
  */
-struct pageTableEntries {
+struct PageTableEntries {
+    PageTableEntries() : pgd(0), pud(0), pmd(0), pte(0) {}
     quint64 pgd;
     quint64 pud;
     quint64 pmd;
@@ -157,7 +158,7 @@ public:
      * \exception VirtualMemoryException
      */
     quint64 virtualToPhysical(quint64 vaddr, int* pageSize,
-            bool enableExceptions = true, struct pageTableEntries *ptEntries = 0);
+            bool enableExceptions = true, struct PageTableEntries *ptEntries = 0);
 
     quint64 virtualToPhysicalUserLand(quint64 vaddr, int* pageSize, quint64 pgd,
                 bool enableExceptions = true);
@@ -242,7 +243,7 @@ private:
      * address resolution failure
      */
     quint64 pageLookup64(quint64 vaddr, int* pageSize,
-            bool enableExceptions, struct pageTableEntries *ptEntries);
+            bool enableExceptions, struct PageTableEntries *ptEntries);
 
     /**
      * Looks up a virtual address in the i386 page table and returns the
@@ -260,7 +261,7 @@ private:
      * address resolution failure
      */
     quint64 pageLookup32(quint64 vaddr, int* pageSize,
-            bool enableExceptions, struct pageTableEntries *ptEntries);
+            bool enableExceptions, struct PageTableEntries *ptEntries);
 
     /**
      * i386 specific translation
@@ -277,7 +278,7 @@ private:
      * address resolution failure
      */
     quint64 virtualToPhysical32(quint64 vaddr, int* pageSize,
-            bool enableExceptions, struct pageTableEntries *ptEntries);
+            bool enableExceptions, struct PageTableEntries *ptEntries);
 
     /**
      * x86_64 specific translation
@@ -294,7 +295,7 @@ private:
      * address resolution failure
      */
     quint64 virtualToPhysical64(quint64 vaddr, int* pageSize,
-            bool enableExceptions, struct pageTableEntries *ptEntries);
+            bool enableExceptions, struct PageTableEntries *ptEntries);
 
     /**
      * Reads a value of type \a T from memory and returns it.
