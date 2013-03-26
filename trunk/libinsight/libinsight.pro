@@ -194,3 +194,9 @@ INCLUDEPATH += ./include \
     ../libcparser/include
 
 SUBDIRS = tests
+
+HEADERS += \
+    include/insight/systemmapentry.h
+
+SOURCES += \
+    systemmapentry.cpp

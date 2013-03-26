@@ -348,6 +348,11 @@ KernelSymbolStream& operator>>(KernelSymbolStream& in, MemSpecs& specs)
         in >> specs.created;
     }
 
+    // System.map was added in v21
+    if (in.kSymVersion() >= kSym::VERSION_21) {
+        in >> specs.systemMap;
+    }
+
     return in;
 }
 
@@ -390,6 +395,11 @@ KernelSymbolStream& operator<<(KernelSymbolStream& out, const MemSpecs& specs)
     // Creation time stamp was added in v20
     if (out.kSymVersion() >= kSym::VERSION_20) {
         out << specs.created;
+    }
+
+    // System.map was added in v21
+    if (out.kSymVersion() >= kSym::VERSION_21) {
+        out << specs.systemMap;
     }
 
     return out;

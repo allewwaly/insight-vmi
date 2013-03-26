@@ -414,19 +414,39 @@ void MemSpecParser::parseSystemMap(MemSpecs* specs)
         memSpecParserError(QString("Cannot open file \"%1\" for reading.").arg(_systemMapFile));
 
     bool lvl4_ok = false, swp_ok = false, ok;
-    QRegExp re("^\\s*([0-9a-fA-F]+)\\s+.\\s+(.*)$");
+    QRegExp re("^\\s*([0-9a-fA-F]+)\\s+(.)\\s+(.*)$");
+    QString sym, type;
+    int lineNo = 0;
 
-    while (!lvl4_ok && !sysMap.atEnd() && sysMap.readLine(buf, bufsize) > 0) {
-        QString line(buf);
-        if (line.contains(str::initLvl4Pgt) && re.exactMatch(line))
-            // Update the given MemSpecs object with the parsed key-value pair
-            specs->initLevel4Pgt = re.cap(1).toULong(&lvl4_ok, 16);
-        else if (line.contains(str::swapperPgDir) && re.exactMatch(line))
-            // Update the given MemSpecs object with the parsed key-value pair
-            specs->swapperPgDir = re.cap(1).toULong(&swp_ok, 16);
-        // TODO This is overwritten in MemoryDump::init() anyway, why check here?
-        else if (line.contains(str::vmallocEarlyres) && re.exactMatch(line))
-            _vmallocEarlyreserve = re.cap(1).toULong(&ok, 16);
+    while (!sysMap.atEnd() && sysMap.readLine(buf, bufsize) > 0) {
+        ++lineNo;
+        if (re.exactMatch(QString(buf))) {
+            quint64 addr = re.cap(1).toULongLong(&ok, 16);
+            type = re.cap(2).trimmed();
+            sym = re.cap(3).trimmed();
+            if (ok && !type.isEmpty() && !sym.isEmpty()) {
+                // Store symbol in hash table
+                specs->systemMap.insertMulti(
+                            sym, SystemMapEntry(addr, type.toAscii().at(0)));
+
+                // Store special symbols in dedicated variables
+                if (sym == str::initLvl4Pgt) {
+                    specs->initLevel4Pgt = addr;
+                    lvl4_ok = true;
+                }
+                else if (sym == str::swapperPgDir) {
+                    specs->swapperPgDir = addr;
+                    swp_ok = true;
+                }
+                else if (sym == str::vmallocEarlyres)
+                    _vmallocEarlyreserve = addr;
+            }
+            else
+                memSpecParserError(QString("Error parsing line %0 of file "
+                                           "\"%1\".")
+                                   .arg(lineNo)
+                                   .arg(_systemMapFile));
+        }
     }
 
     sysMap.close();
