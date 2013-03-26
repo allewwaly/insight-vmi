@@ -90,6 +90,15 @@ public:
     MemSpecs parse();
 
     /**
+     * Parses only the <tt>System.map</tt> file and returns its entries.
+     * This is done automatically when the symbols are parsed with a call to
+     * parse(). However, this method can be used to parse the data for symbols
+     * that did not already include the <tt>System.map</tt> table.
+     * @return hash table of <tt>System.map</tt> entries
+     */
+    SystemMapEntries parseSystemMapEntries();
+
+    /**
      * Returns the temporary build directory after it has been successfully
      * created by a call to parse(). Before that, an empty string is
      * returned.

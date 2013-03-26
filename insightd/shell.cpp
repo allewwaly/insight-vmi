@@ -4061,6 +4061,8 @@ int Shell::cmdSymbols(QStringList args)
 #endif
     else if (QString("source").startsWith(action))
         return cmdSymbolsSource(args);
+    else if (QString("map").startsWith(action))
+        return cmdSymbolsSysMap(args);
     else if (QString("writerules").startsWith(action))
         return cmdSymbolsWriteRules(args);
     else {
@@ -4097,7 +4099,30 @@ int Shell::cmdSymbolsSource(QStringList args)
     KernelSourceParser srcParser(&_sym.factory(), args[0]);
     srcParser.parse();
 
-   return ecOk;
+    return ecOk;
+}
+
+
+int Shell::cmdSymbolsSysMap(QStringList args)
+{
+    // Show cmdHelp, of an invalid number of arguments is given
+    if (args.size() != 1) {
+        cmdHelp(QStringList("symbols"));
+        return ecInvalidArguments;
+    }
+
+    // Check files for existence
+    if (!QFile::exists(args[0])) {
+        Console::errMsg(QString("File not found: %1").arg(args[0]));
+        return ecFileNotFound;
+    }
+
+    MemSpecParser parser(QString(), args[0]);
+    MemSpecs specs = _sym.memSpecs();
+    specs.systemMap = parser.parseSystemMapEntries();
+    _sym.setMemSpecs(specs);
+
+    return ecOk;
 }
 
 
