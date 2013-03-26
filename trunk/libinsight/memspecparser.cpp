@@ -418,6 +418,8 @@ void MemSpecParser::parseSystemMap(MemSpecs* specs)
     QString sym, type;
     int lineNo = 0;
 
+    specs->systemMap.clear();
+
     while (!sysMap.atEnd() && sysMap.readLine(buf, bufsize) > 0) {
         ++lineNo;
         if (re.exactMatch(QString(buf))) {
@@ -532,4 +534,12 @@ MemSpecs MemSpecParser::parse()
     parseHelperProg(&specs);
 
     return specs;
+}
+
+
+SystemMapEntries MemSpecParser::parseSystemMapEntries()
+{
+    MemSpecs specs;
+    parseSystemMap(&specs);
+    return specs.systemMap;
 }

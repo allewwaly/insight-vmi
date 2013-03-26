@@ -300,6 +300,7 @@ private:
     int cmdSymbolsPostProcess(QStringList args);
 #endif
     int cmdSymbolsSource(QStringList args);
+    int cmdSymbolsSysMap(QStringList args);
     int cmdSymbolsParse(QStringList args);
     int cmdSymbolsLoad(QStringList args);
     int cmdSymbolsStore(QStringList args);
