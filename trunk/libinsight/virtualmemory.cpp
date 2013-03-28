@@ -36,7 +36,9 @@
 #define PTRS_PER_PMD_X86_64    512
 #define PTRS_PER_PTE_X86_64    512
 
+#define KILOBYTES(x)  ((x) * (1024))
 #define MEGABYTES(x)  ((x) * (1024*1024))
+#define GIGABYTES(x)  ((quint64) (x) * (1024*1024*1024))
 
 // See <linux/include/asm-x86/page_32.h>
 #define __PHYSICAL_MASK_SHIFT_X86     32
@@ -489,8 +491,15 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
                 + PAGEOFFSET(pgd_index_x86_pae(vaddr) << 3),
                 enableExceptions, &ok);
 
-        if (!enableExceptions && !ok)
+        if (ptEntries)
+            ptEntries->pgd = pgd;
+
+        if (!enableExceptions && !ok) {
+            if (ptEntries)
+                ptEntries->pgd = PADDR_ERROR;
+
             return PADDR_ERROR;
+        }
 
         if (!(pgd & _PAGE_PRESENT))
             virtualMemoryPageError(vaddr, "pgd", enableExceptions);
@@ -502,8 +511,15 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
                 + PAGEOFFSET(pmd_index_x86_pae(vaddr) << 3),
                 enableExceptions, &ok);
 
-        if (!enableExceptions && !ok)
+        if (ptEntries)
+            ptEntries->pmd = pmd;
+
+        if (!enableExceptions && !ok) {
+            if (ptEntries)
+                ptEntries->pmd = PADDR_ERROR;
+
             return PADDR_ERROR;
+        }
 
         if (!(pmd & _PAGE_PRESENT))
             virtualMemoryPageError(vaddr, "pmd", enableExceptions);
@@ -524,8 +540,15 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
                     + PAGEOFFSET(pte_index_x86_pae(vaddr) << 3),
                     enableExceptions, &ok);
 
-            if (!enableExceptions && !ok)
+            if (ptEntries)
+                ptEntries->pte = pte;
+
+            if (!enableExceptions && !ok) {
+                if (ptEntries)
+                    ptEntries->pte = PADDR_ERROR;
+
                 return PADDR_ERROR;
+            }
 
             if (!(pte & _PAGE_PRESENT))
                 virtualMemoryPageError(vaddr, "pte", enableExceptions);
@@ -546,8 +569,15 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
                 + PAGEOFFSET(pgd_index_x86(vaddr) << 2),
                 enableExceptions, &ok);
 
-        if (!enableExceptions && !ok)
+        if (ptEntries)
+            ptEntries->pgd = pgd;
+
+        if (!enableExceptions && !ok) {
+            if (ptEntries)
+                ptEntries->pgd = PADDR_ERROR;
+
             return PADDR_ERROR;
+        }
 
         if (!(pgd & _PAGE_PRESENT))
             virtualMemoryPageError(vaddr, "pgd", enableExceptions);
@@ -567,8 +597,15 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
                     + PAGEOFFSET(pte_index_x86(vaddr) << 2),
                     enableExceptions, &ok);
 
-            if (!enableExceptions && !ok)
+            if (ptEntries)
+                ptEntries->pte = pte;
+
+            if (!enableExceptions && !ok) {
+                if (ptEntries)
+                    ptEntries->pte = PADDR_ERROR;
+
                 return PADDR_ERROR;
+            }
 
             if (!(pte & _PAGE_PRESENT))
                 virtualMemoryPageError(vaddr, "pte", enableExceptions);
@@ -587,16 +624,6 @@ quint64 VirtualMemory::pageLookup32(quint64 vaddr, int* pageSize,
             new TLBEntry(physaddr & ~((*pageSize) - 1), *pageSize));
     if (doLock) _tlbMutex.unlock();
 #endif
-
-    // Return the page table entries if requested.
-    if (ptEntries) {
-        // Unused Entries will be set to PADDR_ERROR
-        pgd ? ptEntries->pgd = pgd : ptEntries->pgd = PADDR_ERROR;
-        pmd ? ptEntries->pmd = pmd : ptEntries->pmd = PADDR_ERROR;
-        pte ? ptEntries->pte = pte : ptEntries->pte = PADDR_ERROR;
-
-        ptEntries->pud = PADDR_ERROR;
-    }
 
     return physaddr;
 }
@@ -653,8 +680,13 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 			+ PAGEOFFSET(pml4_index_x86_64(vaddr) << 3),
 			enableExceptions, &ok);
 
+    if (ptEntries)
+        ptEntries->pgd = pgd;
 
-    if (!enableExceptions && !ok){
+    if (!enableExceptions && !ok) {
+        if (ptEntries)
+            ptEntries->pgd = PADDR_ERROR;
+
         return PADDR_ERROR;
     }
 
@@ -669,7 +701,13 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 			+ PAGEOFFSET(pgd_index_x86_64(vaddr) << 3),
 			enableExceptions, &ok);
 
-    if (!enableExceptions && !ok){
+    if (ptEntries)
+        ptEntries->pud = pud;
+
+    if (!enableExceptions && !ok) {
+        if (ptEntries)
+            ptEntries->pud = PADDR_ERROR;
+
         return PADDR_ERROR;
     }
 
@@ -685,7 +723,13 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
 			+ PAGEOFFSET(pmd_index_x86_64(vaddr) << 3),
 			enableExceptions, &ok);
 
-    if (!enableExceptions && !ok){
+    if (ptEntries)
+        ptEntries->pmd = pmd;
+
+    if (!enableExceptions && !ok) {
+        if (ptEntries)
+            ptEntries->pmd = PADDR_ERROR;
+
         return PADDR_ERROR;
     }
 
@@ -706,7 +750,13 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
                 + PAGEOFFSET(pte_index_x86_64(vaddr) << 3),
                 enableExceptions, &ok);
 
-        if (!enableExceptions && !ok){
+        if (ptEntries)
+            ptEntries->pte = pte;
+
+        if (!enableExceptions && !ok) {
+            if (ptEntries)
+                ptEntries->pte = PADDR_ERROR;
+
             return PADDR_ERROR;
         }
 
@@ -734,15 +784,6 @@ quint64 VirtualMemory::pageLookup64(quint64 vaddr, int* pageSize,
     // if we connect it to a real machine
     // performance improvement: save last known _userPGD and flushTLB() on an new value
 #endif
-
-    // Return the page table entries if requested.
-    if (ptEntries) {
-        // Unused Entries will be set to PADDR_ERROR
-        pgd ? ptEntries->pgd = pgd : ptEntries->pgd = PADDR_ERROR;
-        pud ? ptEntries->pud = pud : ptEntries->pud = PADDR_ERROR;
-        pmd ? ptEntries->pmd = pmd : ptEntries->pmd = PADDR_ERROR;
-        pte ? ptEntries->pte = pte : ptEntries->pte = PADDR_ERROR;
-    }
 
     return physaddr;
 }
@@ -865,7 +906,7 @@ quint64 VirtualMemory::virtualToPhysical64(quint64 vaddr, int* pageSize,
         // First 512MB of phys. memory are linearly mapped here:
         // __START_KERNEL_map - MODULES_VADDR
         // (ffffffff80000000 - ffffffffa0000000)
-        if (vaddr >= _specs.startKernelMap && vaddr < _specs.modulesVaddr) {
+        if ((vaddr >= _specs.startKernelMap && vaddr < _specs.modulesVaddr) && !ptEntries) {
             physaddr = ((vaddr) - _specs.startKernelMap);
             *pageSize = -1;
         }
@@ -1031,4 +1072,229 @@ bool VirtualMemory::isExecutable(quint64 vaddr)
         return false;
 
     return true;
+}
+
+bool PageTableEntries::isLargePage() const
+{
+    // Determine which paging mode is used.
+    if (pgd != PADDR_ERROR && pud == 0 && pmd == 0) {
+        // 32-paging
+        return (pgd & _PAGE_PSE);
+    }
+
+    // PAE or IA-32 paging
+    if (pud != PADDR_ERROR && (pud & _PAGE_PSE))
+        return true;
+
+    if (pmd != PADDR_ERROR && (pmd & _PAGE_PSE))
+        return true;
+
+    return false;
+}
+
+bool PageTableEntries::isPresent() const
+{
+    // Need to check the first level for all paging modes
+    if (pgd == PADDR_ERROR || !(pgd & _PAGE_PRESENT))
+        return false;
+
+    // Determine which paging mode is used.
+    if (pud == 0 && pmd == 0) {
+        // 32-bit paging
+        // If this is a large page the other entries do not matter
+        if (pgd & _PAGE_PSE)
+            return true;
+    }
+    else {
+        // PAE or IA-32
+        if (pud != 0) {
+            // IA-32
+            // In case of IA-32 pud can point to a large page
+            if (pud == PADDR_ERROR || !(pud & _PAGE_PRESENT))
+                return false;
+
+            // If this is a large page the other entries do not matter
+            if (pud & _PAGE_PSE)
+                return true;
+        }
+
+        if (pmd == PADDR_ERROR || !(pmd & _PAGE_PRESENT))
+            return false;
+
+        // If this is a large page the other entries do not matter
+        if (pmd & _PAGE_PSE)
+            return true;
+    }
+
+    // Needs to be checked for all paging modes
+    if (pte != PADDR_ERROR && (pte & _PAGE_PRESENT))
+        return true;
+
+    return false;
+}
+
+bool PageTableEntries::isExecutable() const
+{
+    // A page that is not present is not executable
+    if (!isPresent())
+        return false;
+
+    // Determine which paging mode is used.
+    if (pgd != PADDR_ERROR && pud == 0 && pmd == 0) {
+        // 32-bit paging does not support the NX-bit, so
+        // every page is actually executable.
+        return true;
+    }
+
+    // PAE or IA-32 paging
+    // Check each entry. Notice that unused entries are 0
+    // thus the if clause of an unused entry is not triggered.
+    if ((pgd & VirtualMemory::NX))
+        return false;
+
+    if ((pud & VirtualMemory::NX))
+        return false;
+
+    if ((pmd & VirtualMemory::NX))
+        return false;
+
+    if ((pte & VirtualMemory::NX))
+        return false;
+
+    return true;
+}
+
+bool PageTableEntries::isSupervisor() const
+{
+    // A page that is not present is not a supervisor page
+    if (!isPresent())
+        return false;
+
+    // Determine which paging mode is used.
+    if (pgd != PADDR_ERROR && pud == 0 && pmd == 0) {
+        // 32-bit paging
+        if (!(pgd & VirtualMemory::Supervisor))
+            return true;
+
+        // If this is a large page we are done
+        if (pgd & _PAGE_PSE)
+            return true;
+    }
+    else if (pud == 0 && pmd != 0) {
+        // PAE paging
+        // The pgd does not have a supervisor flag
+        if (!(pmd & VirtualMemory::Supervisor))
+            return true;
+
+        // If this is a large page we are done
+        if (pmd & _PAGE_PSE)
+            return true;
+    }
+    else {
+        // IA-32
+        if (!(pgd & VirtualMemory::Supervisor))
+            return true;
+
+        if (!(pud & VirtualMemory::Supervisor))
+            return true;
+
+        // If this is a large page we are done
+        if (pud & _PAGE_PSE)
+            return true;
+
+        if (!(pmd & VirtualMemory::Supervisor))
+            return true;
+
+        // If this is a large page we are done
+        if (pmd & _PAGE_PSE)
+            return true;
+    }
+
+    // Pte needs to be checked for all modes if we reach this point
+    return !(pte && VirtualMemory::Supervisor);
+}
+
+bool PageTableEntries::isWriteable() const
+{
+    // A page that is not present is not a supervisor page
+    if (!isPresent())
+        return false;
+
+    // Determine which paging mode is used.
+    if (pgd != PADDR_ERROR && pud == 0 && pmd == 0) {
+        // 32-bit paging
+        if (!(pgd & VirtualMemory::ReadWrite))
+            return false;
+
+        // If this is a large page we are done
+        if (pgd & _PAGE_PSE)
+            return true;
+    }
+    else if (pud == 0 && pmd != 0) {
+        // PAE paging
+        // The pgd does not have a r/w flag
+        if (!(pmd & VirtualMemory::ReadWrite))
+            return false;
+
+        // If this is a large page we are done
+        if (pmd & _PAGE_PSE)
+            return true;
+    }
+    else {
+        // IA-32
+        if (!(pgd & VirtualMemory::ReadWrite))
+            return false;
+
+        if (!(pud & VirtualMemory::ReadWrite))
+            return false;
+
+        // If this is a large page we are done
+        if (pud & _PAGE_PSE)
+            return true;
+
+        if (!(pmd & VirtualMemory::ReadWrite))
+            return false;
+
+        // If this is a large page we are done
+        if (pmd & _PAGE_PSE)
+            return true;
+    }
+
+    // Pte needs to be checked for all modes if we reach this point
+    return (pte && VirtualMemory::ReadWrite);
+}
+
+quint64 PageTableEntries::nextPageOffset(const MemSpecs &specs) const
+{
+    // Determine which paging mode is used.
+    if (specs.arch & MemSpecs::ar_i386) {
+        // 32 bit architecture
+        if (specs.arch & MemSpecs::ar_pae_enabled) {
+            // PAE
+            if (pgd == PADDR_ERROR || !(pgd & _PAGE_PRESENT))
+                return GIGABYTES(1);
+            else if (pmd == PADDR_ERROR || !(pmd & _PAGE_PRESENT) || (pmd & _PAGE_PSE))
+                return MEGABYTES(2);
+            else
+                return KILOBYTES(4);
+        }
+        else {
+            // 32-bit paging
+            if (pgd == PADDR_ERROR || !(pgd & _PAGE_PRESENT) || (pgd & _PAGE_PSE))
+                return MEGABYTES(4);
+            else
+                return KILOBYTES(4);
+        }
+    }
+    else {
+        // 64-bit architecture
+        if (pgd == PADDR_ERROR || !(pgd & _PAGE_PRESENT))
+            return GIGABYTES(512);
+        else if (pud == PADDR_ERROR || !(pud & _PAGE_PRESENT) || (pud & _PAGE_PSE))
+            return GIGABYTES(1);
+        else if (pmd == PADDR_ERROR || !(pmd & _PAGE_PRESENT) || (pmd & _PAGE_PSE))
+            return MEGABYTES(2);
+        else
+            return KILOBYTES(4);
+    }
 }

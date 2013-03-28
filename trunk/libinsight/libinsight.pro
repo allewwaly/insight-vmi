@@ -101,7 +101,8 @@ HEADERS += \
     include/insight/xmlschema.h \
     include/insight/compiler.h \
     include/insight/regexbits.h \
-    include/insight/memorysection.h
+    include/insight/memorysection.h \
+    include/insight/detect.h
 
 SOURCES += \
     altreftype.cpp \
@@ -176,7 +177,8 @@ SOURCES += \
     virtualmemory.cpp \
     volatiletype.cpp \
     xmlschema.cpp \
-    memorysection.cpp
+    memorysection.cpp \
+    detect.cpp
 
 # Required libraries for building
 LIBS += \
