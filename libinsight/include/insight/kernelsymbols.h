@@ -139,8 +139,16 @@ public:
     /**
      * Returns the memory dump files loaded for these symbols.
      * @return dump files
+     * \sa memDump()
      */
     const MemDumpArray& memDumps() const { return _memDumps; }
+
+    /**
+     * Returns the memory dump no. \a index for these symbols.
+     * @return memory dump
+     * \sa memDumps()
+     */
+    MemoryDump* memDump(int index) const { return _memDumps[index]; }
 
     /**
      * Loads a memory file.
