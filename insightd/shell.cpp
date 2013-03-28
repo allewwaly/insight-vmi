@@ -48,6 +48,7 @@
 #include <insight/console.h>
 #include <insight/errorcodes.h>
 #include <insight/regexbits.h>
+#include <insight/detect.h>
 
 #ifdef CONFIG_WITH_X_SUPPORT
 #include "memorymapwindow.h"
@@ -185,6 +186,9 @@ Shell::Shell(bool listenOnSocket)
 				"  memory revmap [index] list <type>\n"
 				"                              List all instances of given type in the \n"
 				"                              reverse mapping for dump <index>\n"
+                "  memory detect [index] code\n"
+                "                              Detect hidden code within the dump with \n"
+                "                              index <index>"
 #ifdef CONFIG_WITH_X_SUPPORT
                 "  memory revmap [index] visualize\n"
                 "                              Visualize the reverse mapping for dump <index>\n"
@@ -1985,6 +1989,9 @@ int Shell::cmdMemory(QStringList args)
     else if (QString("diff").startsWith(action) && (action.size() >= 1)) {
         return cmdMemoryDiff(args);
     }
+    else if (QString("detect").startsWith(action) && (action.size() >= 1)) {
+        return cmdMemoryDetect(args);
+    }
     else {
         cmdHelp(QStringList("memory"));
         return 1;
@@ -2809,6 +2816,34 @@ int Shell::cmdMemoryDiffVisualize(int index)
 }
 
 #endif /* CONFIG_WITH_X_SUPPORT */
+
+int Shell::cmdMemoryDetect(QStringList args)
+{
+    Detect d(_sym);
+    QString type;
+    int index = 0;
+
+    if (args.size() < 1)
+        return cmdHelp(QStringList("memory"));
+
+    // Get the type
+    type = args.at(0);
+    args.pop_front();
+
+    // Did the user provie an index?
+    if (args.size() >= 1)
+    {
+        index = parseMemDumpIndex(args);
+    }
+
+    if (index < 0)
+        return index;
+
+    if (type == "code")
+        d.hiddenCode(index);
+
+    return ecOk;
+}
 
 
 inline const TypeRule* getTypeRule(const TypeRuleList& list, int index)

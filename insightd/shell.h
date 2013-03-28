@@ -265,6 +265,7 @@ private:
 #ifdef CONFIG_WITH_X_SUPPORT
     int cmdMemoryDiffVisualize(int index);
 #endif
+    int cmdMemoryDetect(QStringList args);
 
     int cmdRules(QStringList args);
     int cmdRulesLoad(QStringList args);

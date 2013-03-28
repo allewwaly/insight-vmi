@@ -33,10 +33,56 @@ static const quint64 HIGH_MEMORY_FAILSAFE_X86_64 = 0xffffc7ffffffffffULL;
 
 /**
  * Struct to store the page table entries in case they are requested.
- * Entries that are invalid should be set to PADDR_ERROR.
+ * Entries that are invalid should be set to PADDR_ERROR. Unused entries
+ * are set to 0.
  */
 struct PageTableEntries {
     PageTableEntries() : pgd(0), pud(0), pmd(0), pte(0) {}
+
+    /**
+     * Is the page referenced by the structure a large page
+     * or a 4kB page?
+     */
+    bool isLargePage() const;
+
+    /**
+     * Is the page referenced by the structure present?
+     */
+    bool isPresent() const;
+
+    /**
+     * Is the page referenced by this structure executable?
+     *
+     * Notice that this function only can be used if the NX
+     * flag is used by the OS. This is usually the case if
+     * PAE or IA-32 paging is used. The function will return
+     * false in case the page that this entry references is
+     * not present.
+     */
+    bool isExecutable() const;
+
+    /**
+     * Is the page referenced by this structure a supervisor page?
+     *
+     * Notice that this function will return false in case the page
+     * that this entry references is not present.
+     */
+    bool isSupervisor() const;
+
+    /**
+     * Is the page referenced by this structure a writeable?
+     *
+     * Notice that this function will return false in case the page
+     * that this entry references is not present.
+     */
+    bool isWriteable() const;
+
+    /**
+     * Get the offset to the next page that can follow the page
+     * referenced by this entry.
+     */
+    quint64 nextPageOffset(const MemSpecs &specs) const;
+
     quint64 pgd;
     quint64 pud;
     quint64 pmd;
