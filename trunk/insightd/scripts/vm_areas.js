@@ -62,8 +62,10 @@ function printVmAreas()
     var tmp = new Instance("vmlist");
 
     while (!item.IsNull()) {
+        // Size Minus Safety Interval
         var size = item.size - 4096;
-        var addr_start = item.addr.toPointer();
+        //var size = item.size;
+        var addr_start = item.addr;
         tmp.SetAddress(addr_start);
         tmp.AddToAddress(size - 1);
         var addr_end = tmp.Address();
