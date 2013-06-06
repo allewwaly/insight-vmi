@@ -1442,12 +1442,15 @@ ASTType *SymFactory::typeOfMember(const ASTType *embeddingType,
     const BaseType* memberType = 0;
     BaseTypeList types;
 
+    if (!embeddingType)
+        return 0;
+
     // If we got a type ID, it becomes straightforward
     if (embeddingType->typeId()) {
         types += _typesById.value(embeddingType->typeId());
     }
-    // We required a non-anonymous struct or union
-    else if (embeddingType && (embeddingType->type() & StructOrUnion) &&
+    // We required a non-anonymous struct or union (may be a typedef)
+    else if ((embeddingType->type() & (StructOrUnion|rtTypedef)) &&
         !embeddingType->identifier().isNull())
     {
         // Find all structs, unions, or typedefs with the given name
@@ -1467,13 +1470,7 @@ ASTType *SymFactory::typeOfMember(const ASTType *embeddingType,
             const BaseType* tmp = m->refTypeDeep(BaseType::trLexical);
             // Do we have more than one type that matches?
             if (memberType && tmp->hash() != memberType->hash())
-                factoryError(QString("Ambiguous member requested for %1.%2: "
-                                     "'%3' vs. '%4'")
-                             .arg(embeddingType->identifier())
-                             .arg(memberName)
-                             .arg(memberType->prettyName())
-                             .arg(tmp->prettyName()));
-            memberType = tmp;
+                return 0;
         }
     }
 
@@ -1539,6 +1536,10 @@ ASTType* SymFactory::baseTypeToAstType(const BaseType* type) const
         else
             break;
     }
+
+    // Terminate void pointers with a rtVoid object
+    if (last && last->type() == rtPointer)
+        last->setNext(new ASTType(rtVoid));
 
     return first;
 }

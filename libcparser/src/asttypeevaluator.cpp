@@ -1658,7 +1658,7 @@ const ASTSymbol* ASTTypeEvaluator::findSymbolOfPrimaryExpression(
             // If we have an ASTType node, try to find most inner struct/union
             while (t && !(t->type() & StructOrUnion))
                 t = t->next();
-            if (t && (sym = t->node()->childrenScope->find(id)))
+            if (t && t->node() && (sym = t->node()->childrenScope->find(id)))
                 _symbolOfNode.insert(node, sym);
         }
         // Otherwise do a normal resolution of symbol in scope of node
@@ -2011,13 +2011,17 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(const ASTNode *node)
                             .arg(pes->start->charPosition));
             }
 
-            // Ask the oracle, if it exists
-            if (_oracle) {
+            // Ask the oracle, if we have a valid identifier or ID
+            if (_oracle && (t->typeId() || !t->identifier().isEmpty())) {
                 type = _oracle->typeOfMember(t, memberName);
                 // Take over the ownership of returned ASTTypes
                 for (ASTType* tmp = type; tmp; tmp = tmp->next())
                     _allTypes.append(tmp);
-                break;
+                // The oracle may fail to resolve types which are not included
+                // in the debugging symbols. In that case, we try to resolve the
+                // member type as without oracle.
+                if (type)
+                    break;
             }
 
             // Queue for search of members in nested structs
@@ -2144,6 +2148,12 @@ ASTType* ASTTypeEvaluator::typeofPostfixExpressionSuffix(const ASTNode *node)
 
         case nt_postfix_expression_parens: {
             // Function operator, i.e., function call
+            // FIXME: For function pointers coming from the oracle, we actually
+            // see the rtPointer at the front, but not in the AST type model.
+            // The AST model should be fixed.
+            if (type && (type->type() == rtPointer))
+                type = type->next();
+
             if (!type || !(type->type() & (rtFuncPointer)))
                 typeEvaluatorError(
                         QString("Expected a function pointer type here instead of \"%1\" at %2:%3:%4")
