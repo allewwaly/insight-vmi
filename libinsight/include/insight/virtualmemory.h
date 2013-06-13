@@ -40,6 +40,11 @@ struct PageTableEntries {
     PageTableEntries() : pgd(0), pud(0), pmd(0), pte(0) {}
 
     /**
+     * Reset all entries to zero.
+     */
+    void reset();
+
+    /**
      * Is the page referenced by the structure a large page
      * or a 4kB page?
      */

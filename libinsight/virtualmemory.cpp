@@ -1074,6 +1074,13 @@ bool VirtualMemory::isExecutable(quint64 vaddr)
     return true;
 }
 
+
+void PageTableEntries::reset()
+{
+    pgd = pud = pmd = pte = 0;
+}
+
+
 bool PageTableEntries::isLargePage() const
 {
     // Determine which paging mode is used.
