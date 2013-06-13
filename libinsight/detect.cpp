@@ -62,6 +62,8 @@ void Detect::hiddenCode(int index)
     Instance currentModule = firstModule;
     quint64 currentModuleCore = 0;
     quint64 currentModuleCoreSize = 0;
+    quint64 currentModuleInit = 0;
+    quint64 currentModuleInitSize = 0;
 
     bool found = false;
     quint64 i = 0;
@@ -87,6 +89,11 @@ void Detect::hiddenCode(int index)
 
     // Start the Operation
     operationStarted();
+
+    // Debug
+    quint64 j = 0;
+    quint64 debug_data = 0;
+    bool debug_printed = false;
 
     for (i = begin; i < end && i >= begin; i += ptEntries.nextPageOffset(_sym.memSpecs()))
     {
@@ -117,7 +124,11 @@ void Detect::hiddenCode(int index)
         /*
           In case of UBUNTU 2.6.15 the whole kernel address space seems to be
           writable. So we removed this part, since it really did non provide
-          useful information
+          useful information.
+
+          The reason for this seems to be that the kernel uses default allocation
+          flags for the pages which are readable and writeable independent of the pages
+          content.
 
         if (((_sym.memSpecs().arch & (_sym.memSpecs().ar_x86_64)) ||
                 (_sym.memSpecs().arch & (_sym.memSpecs().ar_pae_enabled))) &&
@@ -165,6 +176,7 @@ void Detect::hiddenCode(int index)
                 continue;
 
             // Does it belong to a module
+
 //            currentModule = firstModule;
             currentModule = _sym.factory().varsByName().values("modules").at(0)->toInstance(vmem).member("next");
             do {
@@ -172,12 +184,12 @@ void Detect::hiddenCode(int index)
                 if (_sym.memSpecs().sizeofPointer == 4)
                 {
                     currentModuleCore = currentModule.member("module_core").toUInt32();
-                    currentModuleCoreSize = currentModule.member("core_size").toUInt32();
+                    currentModuleCoreSize = currentModule.member("core_text_size").toUInt32();
                 }
                 else
                 {
                     currentModuleCore = currentModule.member("module_core").toUInt64();
-                    currentModuleCoreSize = currentModule.member("core_size").toUInt64();
+                    currentModuleCoreSize = currentModule.member("core_text_size").toUInt64();
                 }
 
                 if (i >= currentModuleCore &&
@@ -229,6 +241,8 @@ void Detect::hiddenCode(int index)
 
             } while (currentModule.address() != firstModule.address() &&
                      currentModule.address() != modules.address() &&
+                     // Seems like the rule engine does not work correctly here
+                     currentModule.address() + 0x8 != modules.address() &&
                      !found);
 
             if (!found)
@@ -244,6 +258,24 @@ void Detect::hiddenCode(int index)
                           << ", PMD: 0x" << std::hex << ptEntries.pmd << std::dec
                           << ", PTE: 0x" << std::hex << ptEntries.pte << std::dec
                           << std::endl;
+
+                // DEBUG
+                debug_printed = false;
+
+//                for(j = i; j < (i + ptEntries.nextPageOffset(_sym.memSpecs())); j += 8)
+//                {
+//                    debug_data = 0;
+//                    vmem->readAtomic(j, (char *)&debug_data, 8);
+
+//                    if (debug_data != 0)
+//                    {
+//                        debug_printed = true;
+//                        std::cout << "0x" << std::hex << j << ": 0x" << debug_data << std::dec << std::endl;
+//                    }
+//                }
+
+//                if (!debug_printed)
+//                    std::cout << "Entire page conists of '0'-bytes!" << std::endl;
 
                 hidden_pages++;
             }
