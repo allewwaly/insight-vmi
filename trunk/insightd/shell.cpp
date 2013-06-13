@@ -1696,6 +1696,18 @@ BaseTypeList Shell::typeIdOrName(QString s) const
 }
 
 
+quint64 Shell::parseInt16(QString s, bool *ok) const
+{
+    if (s.startsWith("0x"))
+        s = s.right(s.size() - 2);
+    bool okay = false;
+    quint64 i = s.toULongLong(&okay, 16);
+    if (ok)
+        *ok = okay;
+    return i;
+}
+
+
 bool Shell::isRevmapReady(int index) const
 {
     if (!_sym.memDumps().at(index)->map() || _sym.memDumps().at(index)->map()->vmemMap().isEmpty())
@@ -2364,6 +2376,10 @@ int Shell::cmdMemoryRevmap(QStringList args)
             args.pop_front();
             return cmdMemoryRevmapDumpInit(index, args);
         }
+        else if (QString("contains").startsWith(args[0])) {
+            args.pop_front();
+            return cmdMemoryRevmapContains(index, args);
+        }
 #ifdef CONFIG_WITH_X_SUPPORT
         else if (QString("visualize").startsWith(args[0])) {
             if (args.size() > 1)
@@ -2390,7 +2406,8 @@ int Shell::cmdMemoryRevmapBuild(int index, QStringList args)
 
     // First argument must be builder type
     if (args.isEmpty()) {
-        cmdHelp(QStringList("memory"));
+        Console::out() << "Please specify the builder to use, valid arguments "
+                          "are: chrschn, sibi, slub" << endl;
         return 1;
     }
 
@@ -2644,6 +2661,94 @@ int Shell::cmdMemoryRevmapList(int index, QStringList args)
 }
 
 
+bool cmpNodeAddrLessThan(const MemoryMapNode* n1, const MemoryMapNode* n2)
+{
+    return n1->address() < n2->address();
+}
+
+
+int Shell::cmdMemoryRevmapContains(int index, QStringList args)
+{
+    if (args.size() < 1 || args.size() > 2) {
+        cmdHelp(QStringList("memory"));
+        return ecInvalidArguments;
+    }
+
+    if (!isRevmapReady(index))
+        return ecOk;
+
+    // Parse the start address and optionally the end address
+    bool ok;
+    quint64 startAddr = parseInt16(args[0], &ok), endAddr = startAddr;
+    if (!ok)
+        Console::errMsg("Invalid start address: " + args[0]);
+
+    if (args.size() > 1) {
+        endAddr = parseInt16(args[1], &ok);
+        if (!ok)
+            Console::errMsg("Invalid end address: " + args[1]);
+    }
+
+    MemoryDump* mem = _sym.memDump(index);
+
+    // Find all objects within that memory range
+    MemMapList nodes(mem->map()->vmemMapsInRange(startAddr, endAddr).toList());
+    qSort(nodes.begin(), nodes.end(), cmpNodeAddrLessThan);
+
+    if (nodes.isEmpty()) {
+        Console::out() << "No objects found "
+                       << (startAddr == endAddr ? "at that address"
+                                                : "in that memory area")
+                       << "." << endl;
+        return ecOk;
+    }
+
+    int w_colsep = 2;
+    int w_total = ShellUtil::termSize().width();
+    int w_addr = 2 + (mem->memSpecs().sizeofPointer << 1);
+    int w_typeId = 10;
+    int w_dyn = w_total - (w_addr + w_typeId + 3 * w_colsep);
+    if (w_dyn < 0)
+        w_dyn = 10;
+    int w_typeName = w_dyn / 2;
+    int w_path = w_dyn - w_typeName + 2 * w_total;
+
+    QString sep(w_colsep, QChar(' '));
+
+    int count = 0;
+    for (MemMapList::const_iterator it = nodes.begin(), e = nodes.end();
+         it != e; ++it)
+    {
+        MemoryMapNode* node = *it;
+        QString addr = QString("0x%0").arg(node->address(), 0, 16);
+        QString typeId = QString("0x%0").arg((uint)node->type()->id(), 0, 16);
+
+        Console::out() << Console::colorize(addr, ctAddress, w_addr) << sep
+                       << Console::colorize(typeId, ctTypeId, w_typeId) << sep
+                       << Console::prettyNameInColor(node->type(), w_typeName,
+                                                     w_typeName) << sep;
+
+        QString path = ShellUtil::abbrvStrRight(node->fullName(), w_path);
+        QStringList comp = path.split('.');
+        for (int i = 0; i < comp.size(); ++i) {
+            if (i)
+                Console::out() << '.';
+
+            if (!comp[i].isEmpty())
+                Console::out() << Console::colorize(comp[i], i ? ctMember : ctVariable);
+        }
+
+        Console::out() << endl;
+        ++count;
+    }
+
+    Console::out() << "Total objects: " << Console::color(ctBold) << count
+                   << Console::color(ctReset) << endl;
+
+    return ecOk;
+}
+
+
 int Shell::cmdMemoryRevmapDump(int index, QStringList args)
 {
     if (args.size() != 1) {
@@ -2718,15 +2823,81 @@ int Shell::cmdMemoryRevmapVisualize(int index, QString type)
         return ecOk;
 
     int ret = 0;
+    MemoryDump* mem = _sym.memDump(index);
+
     /*if (QString("physical").startsWith(type) || QString("pmem").startsWith(type))
         memMapWindow->mapWidget()->setMap(&_sym.memDumps().at(index)->map()->pmemMap(),
                                           _sym.memDumps().at(index)->memSpecs());
-    else*/ if (QString("virtual").startsWith(type) || QString("vmem").startsWith(type))
-        memMapWindow->mapWidget()->setMap(&_sym.memDumps().at(index)->map()->vmemMap(),
-                                          _sym.memDumps().at(index)->memSpecs());
+    else*/
+    if (QString("virtual").startsWith(type) || QString("vmem").startsWith(type))
+        memMapWindow->mapWidget()->setMap(&mem->map()->vmemMap(), mem->memSpecs());
     else {
-        cmdHelp(QStringList("memory"));
-        ret = 1;
+        // TODO: Check if we have a function with that name
+
+        // Try to query the object (might throw exceptions)
+        Instance inst(mem->queryInstance(type));
+        // Find the corresponding object in the revmap
+        MemMapSet nodes(mem->map()->vmemMapsInRange(inst.address(),
+                                                    inst.endAddress()));
+        MemoryMapNode* node = 0;
+        for (MemMapSet::const_iterator it = nodes.begin(), e = nodes.end();
+             it != e && !node; ++it)
+        {
+            MemoryMapNode* n = *it;
+            if (n->type()->id() == inst.type()->id())
+                node = n;
+        }
+        // Make sure we found the right node
+        if (!node) {
+            Console::errMsg("Instance not found in memory map.");
+            return 1;
+        }
+
+        // Find all pointers that point at or into this instance
+        typedef QMap<typename PointerNodeHash::key_type,
+                    typename PointerNodeHash::mapped_type> PointerNodeMap;
+        PointerNodeMap pointersTo;
+
+        for (quint64 addr = inst.address(), endAddr = inst.endAddress();
+             addr <= endAddr; ++addr)
+        {
+            for (PointerNodeHash::const_iterator it =
+                    mem->map()->pointersTo().find(addr),
+                    e = mem->map()->pointersTo().end();
+                 it != e && it.key() == addr; ++it)
+            {
+                pointersTo.insertMulti(addr, it.value());
+            }
+        }
+
+        debugmsg(QString("Object '%0' lives at 0x%1 - 0x%2 (%3 byte)")
+                 .arg(type)
+                 .arg(inst.address(), 0, 16)
+                 .arg(inst.endAddress(), 0, 16)
+                 .arg(inst.size()));
+
+        int pagesize = 0;
+        debugmsg(QString("Physical address is 0x%0 on a page of size %1")
+                 .arg(inst.vmem()->virtualToPhysical(inst.address(), &pagesize), 0, 16)
+                 .arg(pagesize));
+
+        if (pointersTo.isEmpty())
+            debugmsg("There are no pointers to this object.");
+        else {
+            debugmsg("The following " << pointersTo.size()
+                     << " objects point here:");
+
+            for (PointerNodeMap::const_iterator it = pointersTo.begin(),
+                 e = pointersTo.end();
+                 it != e; ++it)
+            {
+                debugmsg(QString("@ 0x%0: ").arg(it.key(), 0, 16)
+                         << it.value()->fullName());
+            }
+        }
+
+        debugmsg("We recorded " << node->foundInPtrChains()
+                 << " pointer chains to this object during object graph construction.");
     }
 
     if (!ret) {
