@@ -1,6 +1,7 @@
 #include <insight/detect.h>
 #include <insight/function.h>
 #include <insight/variable.h>
+#include <insight/console.h>
 
 #include <limits>
 
@@ -80,9 +81,9 @@ void Detect::hiddenCode(int index)
     quint64 hidden_pages = 0;
 
     // DEBIAN 64-bit test
-    _kernel_code_begin = 0xffffffff81000000;
-    _kernel_code_end = 0xffffffff812f8d3b;
-    _vsyscall_page = 0xffffffffff600000;
+    _kernel_code_begin = 0xffffffff81000000ULL;
+    _kernel_code_end = 0xffffffff8157f000ULL;
+    _vsyscall_page = 0xffffffffff600000ULL;
 
     // Start the Operation
     operationStarted();
@@ -95,6 +96,9 @@ void Detect::hiddenCode(int index)
 
         // Check
         checkOperationProgress();
+
+        ptEntries.reset();
+//        ptEntries.pgd_addr = 0x1fb8d000UL;
 
         // Try to resolve address
         vmem->virtualToPhysical(i, &pageSize, false, &ptEntries);
@@ -161,7 +165,8 @@ void Detect::hiddenCode(int index)
                 continue;
 
             // Does it belong to a module
-            currentModule = firstModule;
+//            currentModule = firstModule;
+            currentModule = _sym.factory().varsByName().values("modules").at(0)->toInstance(vmem).member("next");
             do {
 
                 if (_sym.memSpecs().sizeofPointer == 4)
@@ -180,11 +185,51 @@ void Detect::hiddenCode(int index)
                     found = true;
                     break;
                 }
+                else {
+                    // Try to find a matching section
+                    Instance attrs = currentModule.member("sect_attrs", BaseType::trLexicalAndPointers);
+                    uint attr_cnt = attrs.member("nsections").toUInt32();
+
+                    quint64 prevSectAddr = 0, sectAddr;
+                    QString prevSectName, sectName;
+                    for (uint j = 0; j <= attr_cnt && !found; ++j) {
+
+                        if (j < attr_cnt) {
+                            Instance attr = attrs.member("attrs").arrayElem(j);
+                            sectAddr = attr.member("address").toULong();
+                            sectName = attr.member("name").toString();
+                        }
+                        else {
+                            sectAddr = (prevSectAddr | 0xfffULL) + 1;
+                        }
+                        // Make sure we have a chance to contain this address
+                        if (j == 0 && i < sectAddr) {
+                            attr_cnt = 0;
+                            break;
+                        }
+
+                        if (prevSectAddr <= i && i < sectAddr) {
+                            std::cout << QString("Page @ 0x%0 belongs to module %1, section %2 (0x%3 - 0x%4)")
+                                         .arg(i, 0, 16)
+                                         .arg(currentModule.member("name").toString())
+                                         .arg(prevSectName)
+                                         .arg(prevSectAddr, 0, 16)
+                                         .arg(sectAddr-1, 0, 16)
+                                      << std::endl;
+                            found = true;
+                        }
+
+                        prevSectAddr = sectAddr;
+                        prevSectName = sectName;
+                    }
+
+                }
 
                 currentModule = currentModule.member("list").member("next");
 
             } while (currentModule.address() != firstModule.address() &&
-                     currentModule.address() != modules.address());
+                     currentModule.address() != modules.address() &&
+                     !found);
 
             if (!found)
             {
@@ -194,10 +239,11 @@ void Detect::hiddenCode(int index)
                           << " (W/R: " << ptEntries.isWriteable() << ", "
                           << "S: " << ptEntries.isSupervisor() << ")" << std::endl;
 
-                std::cout << "PGD: 0x" << std::hex << ptEntries.pgd << std::dec << std::endl;
-                std::cout << "PUD: 0x" << std::hex << ptEntries.pud << std::dec << std::endl;
-                std::cout << "PMD: 0x" << std::hex << ptEntries.pmd << std::dec << std::endl;
-                std::cout << "PTE: 0x" << std::hex << ptEntries.pte << std::dec << std::endl;
+                std::cout << "PGD: 0x" << std::hex << ptEntries.pgd << std::dec
+                          << ", PUD: 0x" << std::hex << ptEntries.pud << std::dec
+                          << ", PMD: 0x" << std::hex << ptEntries.pmd << std::dec
+                          << ", PTE: 0x" << std::hex << ptEntries.pte << std::dec
+                          << std::endl;
 
                 hidden_pages++;
             }
