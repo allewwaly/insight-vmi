@@ -1,4 +1,5 @@
 Makefile*
+insight-vmi.pro.user*
 
 debug/
 release/
@@ -18,15 +19,12 @@ temp
 
 insight/insight
 insightd/insightd
-insightd/tests/astexpressionevaluator/astexpressionevaluatortester
-insightd/tests/astexpressionevaluator/ui_memorymapwindow.h
-insightd/tests/memoryrangetree/memoryrangetreetester
-insightd/tests/priorityqueue/priorityqueuetester
 insightd/ui_memorymapwindow.h
+insightd/rules/Linux_*
+insightd/tests
 libantlr3c/libantlr3c.a
 libantlr3c/libantlr3c.prl
 libcparser/libcparser.a
 libcparser/libcparser.prl
-libcparser/tests/asttypeevaluator/asttypeevaluator
 libdebug/libdebug.a
 libdebug/libdebug.prl
