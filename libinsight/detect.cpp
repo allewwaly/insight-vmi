@@ -32,8 +32,21 @@ Detect::Detect(KernelSymbols &sym) :
 
 quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
 {
-    Instance vmap_area = _sym.factory().varsByName().values("vmap_area_root").at(0)->toInstance(vmem).member("rb_node");
+    const Variable* var_vmap_area = _sym.factory().findVarByName("vmap_area_root");
+    if (!var_vmap_area) {
+        debugerr("Variable \"vmap_area_root\" does not exist, '"
+                 << __PRETTY_FUNCTION__ << "'' will not work!");
+        return 0;
+    }
+
+    Instance vmap_area = var_vmap_area->toInstance(vmem).member("rb_node");
     Instance rb_node = vmap_area.member("rb_node");
+
+    if (!rb_node.isValid()) {
+        debugerr("It seems not all required rules are loaded, '"
+                 << __PRETTY_FUNCTION__ << "'' will not work!");
+        return 0;
+    }
 
     quint64 offset = rb_node.address() - vmap_area.address();
     quint64 va_start = 0;
