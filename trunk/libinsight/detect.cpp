@@ -53,42 +53,19 @@ quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
     quint64 va_end = 0;
 
     while (rb_node.address() != 0) {
-        va_start = 0;
-        va_end = 0;
-
-        if (_sym.memSpecs().sizeofPointer == 4) {
-            // 32 bit
-            va_start = vmap_area.member("va_start").toUInt32();
-            va_end = vmap_area.member("va_end").toUInt32();
-
-            if (address >= va_start && address <= va_end) {
-                return (quint64)vmap_area.member("flags").toUInt32();
-            }
-            else if (address > va_end) {
-                // Continue right
-                rb_node = rb_node.member("rb_right", BaseType::trLexicalAndPointers);
-            }
-            else {
-                // Continue left
-                rb_node = rb_node.member("rb_left", BaseType::trLexicalAndPointers);
-            }
+        va_start = (quint64)vmap_area.member("va_start").toPointer();
+        va_end = (quint64)vmap_area.member("va_end").toPointer();
+        
+        if (address >= va_start && address <= va_end) {
+            return vmap_area.member("flags").toULong();
+        }
+        else if (address > va_end) {
+            // Continue right
+            rb_node = rb_node.member("rb_right", BaseType::trLexicalAndPointers);
         }
         else {
-            // 64-bit
-            va_start = vmap_area.member("va_start").toUInt64();
-            va_end = vmap_area.member("va_end").toUInt64();
-
-            if (address >= va_start && address <= va_end) {
-                return vmap_area.member("flags").toUInt64();
-            }
-            else if (address > va_end) {
-                // Continue right
-                rb_node = rb_node.member("rb_right", BaseType::trLexicalAndPointers);
-            }
-            else {
-                // Continue left
-                rb_node = rb_node.member("rb_left", BaseType::trLexicalAndPointers);
-            }
+            // Continue left
+            rb_node = rb_node.member("rb_left", BaseType::trLexicalAndPointers);
         }
 
         // Cast next area
