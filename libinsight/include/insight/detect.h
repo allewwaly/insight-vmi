@@ -8,6 +8,7 @@ class Detect : public LongOperation
 public:
     Detect(KernelSymbols &sym);
 
+    quint64 inVmap(quint64 address, VirtualMemory *vmem);
     void hiddenCode(int index);
     void operationProgress();
 private:

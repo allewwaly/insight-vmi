@@ -8,52 +8,82 @@
 #define PAGE_SIZE 4096
 
 Detect::Detect(KernelSymbols &sym) :
-    _kernel_code_begin(std::numeric_limits<quint64>::max()),
-    _kernel_code_end(0), _vsyscall_page(0),_sym(sym)
+    _kernel_code_begin(0),
+    _kernel_code_end(0), _vsyscall_page(0), _sym(sym)
 {
-    int i = 0;
-    Function *func = NULL;
+    // Get data from System.map
+    _kernel_code_begin = _sym.memSpecs().systemMap.value("_text").address;
+    // This includes more than the kernel code. We may need to change this value.
+    _kernel_code_end = _sym.memSpecs().systemMap.value("__bss_stop").address;
+    _vsyscall_page = _sym.memSpecs().systemMap.value("vgettimeofday").address;
 
-    // Determine the kernel code pages based on the function addresses
-    const QList<BaseType *> types = _sym.factory().types();
+    if (!_kernel_code_begin || !_kernel_code_end || !_vsyscall_page) {
+        std::cout << "WARNING - Could not find all required values within the System.Map!" << std::endl;
+        std::cout << "\t Kernel CODE begin: " << std::hex << _kernel_code_begin << std::dec << std::endl;
+        std::cout << "\t Kernel CODE end:   " << std::hex << _kernel_code_end << std::dec << std::endl;
+        std::cout << "\t VSYSCALL:          " << std::hex << _vsyscall_page << std::dec << std::endl;
+    }
+}
 
-    for (i = 0; i < types.size(); ++i) {
-        if (types.at(i)->type() == rtFunction)
-        {
-            func = dynamic_cast<Function *>(types.at(i));
+quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
+{
+    Instance vmap_area = _sym.factory().varsByName().values("vmap_area_root").at(0)->toInstance(vmem).member("rb_node");
+    Instance rb_node = vmap_area.member("rb_node");
 
-            /*
-              Currently cannot use this functionality, since executable pages
-              also lie BEFORE the kernel code. These are the pages that are used
-              during booting. Thus we fix _kernel_code_begin to PAGE_OFFSET.
+    quint64 offset = rb_node.address() - vmap_area.address();
+    quint64 va_start = 0;
+    quint64 va_end = 0;
 
-            // Make sure the function value is a
-            if (func->pcLow() > _sym.memSpecs().pageOffset &&
-                _kernel_code_begin > func->pcLow())
-                _kernel_code_begin = (func->pcLow() & ~(PAGE_SIZE - 1));
-            */
+    while (rb_node.address() != 0) {
+        va_start = 0;
+        va_end = 0;
 
-            if (_kernel_code_end < func->pcHigh())
-                _kernel_code_end = (func->pcHigh() | (PAGE_SIZE - 1));
-         }
+        if (_sym.memSpecs().sizeofPointer == 4) {
+            // 32 bit
+            va_start = vmap_area.member("va_start").toUInt32();
+            va_end = vmap_area.member("va_end").toUInt32();
+
+            if (address >= va_start && address <= va_end) {
+                return (quint64)vmap_area.member("flags").toUInt32();
+            }
+            else if (address > va_end) {
+                // Continue right
+                rb_node = rb_node.member("rb_right", BaseType::trLexicalAndPointers);
+            }
+            else {
+                // Continue left
+                rb_node = rb_node.member("rb_left", BaseType::trLexicalAndPointers);
+            }
+        }
+        else {
+            // 64-bit
+            va_start = vmap_area.member("va_start").toUInt64();
+            va_end = vmap_area.member("va_end").toUInt64();
+
+            if (address >= va_start && address <= va_end) {
+                return vmap_area.member("flags").toUInt64();
+            }
+            else if (address > va_end) {
+                // Continue right
+                rb_node = rb_node.member("rb_right", BaseType::trLexicalAndPointers);
+            }
+            else {
+                // Continue left
+                rb_node = rb_node.member("rb_left", BaseType::trLexicalAndPointers);
+            }
+        }
+
+        // Cast next area
+        if (rb_node.address() != 0)
+            vmap_area.setAddress(rb_node.address() - offset);
     }
 
-    // Fix _kernel_code_begin to PAGE_OFFSET. See above.
-    _kernel_code_begin = (_sym.memSpecs().pageOffset & ~(PAGE_SIZE - 1));
-
-    // Since the vsyscall table is only defined in ASM, we will fix it to
-    // the second to last page for now.
-    _vsyscall_page = ((_sym.memSpecs().vaddrSpaceEnd() - PAGE_SIZE) & ~(PAGE_SIZE - 1));
-
-    // std::cout << "Kernel CODE begin set to: " << std::hex << _kernel_code_begin << std::dec << std::endl;
-    // std::cout << "Kernel CODE end set to: " << std::hex << _kernel_code_end << std::dec << std::endl;
-    // std::cout << "VSYSCALL set to: " << std::hex << _vsyscall_page << std::dec << std::endl;
+    return 0;
 }
 
 void Detect::hiddenCode(int index)
 {
-    //quint64 begin = (_sym.memSpecs().pageOffset & ~(PAGE_SIZE - 1));
-    quint64 begin = 0xffffc7ffffffffff + 1;
+    quint64 begin = (_sym.memSpecs().pageOffset & ~(PAGE_SIZE - 1));
     quint64 end = _sym.memSpecs().vaddrSpaceEnd();
 
     VirtualMemory *vmem = _sym.memDumps().at(index)->vmem();
@@ -62,12 +92,10 @@ void Detect::hiddenCode(int index)
     Instance currentModule = firstModule;
     quint64 currentModuleCore = 0;
     quint64 currentModuleCoreSize = 0;
-    quint64 currentModuleInit = 0;
-    quint64 currentModuleInitSize = 0;
 
     bool found = false;
     quint64 i = 0;
-    quint64 tmp = 0;
+    quint64 flags = 0;
 
     struct PageTableEntries ptEntries;
     int pageSize = 0;
@@ -81,19 +109,22 @@ void Detect::hiddenCode(int index)
     quint64 processed_pages = 0;
     quint64 executeable_pages = 0;
     quint64 hidden_pages = 0;
+    quint64 lazy_pages = 0;
 
     // DEBIAN 64-bit test
-    _kernel_code_begin = 0xffffffff81000000ULL;
-    _kernel_code_end = 0xffffffff8157f000ULL;
-    _vsyscall_page = 0xffffffffff600000ULL;
+    //_kernel_code_begin = 0xffffffff81000000ULL;
+    //_kernel_code_end = 0xffffffff81600000ULL;
+    //_vsyscall_page = 0xffffffffff600000ULL;
 
     // Start the Operation
     operationStarted();
 
-    // Debug
-    quint64 j = 0;
-    quint64 debug_data = 0;
-    bool debug_printed = false;
+    // In case of a 64-bit architecture there are TWO references to the same pages.
+    // This is due to the fact that the complete physical memory region
+    // is mapped to ffff8800 00000000 - ffffc7ff ffffffff (=64 TB).
+    // Thus we start in this case after the direct mapping
+    if ((_sym.memSpecs().arch & _sym.memSpecs().ar_x86_64))
+        begin = 0xffffc7ffffffffff + 1;
 
     for (i = begin; i < end && i >= begin; i += ptEntries.nextPageOffset(_sym.memSpecs()))
     {
@@ -104,8 +135,8 @@ void Detect::hiddenCode(int index)
         // Check
         checkOperationProgress();
 
+        // Reset the entries
         ptEntries.reset();
-//        ptEntries.pgd_addr = 0x1fb8d000UL;
 
         // Try to resolve address
         vmem->virtualToPhysical(i, &pageSize, false, &ptEntries);
@@ -154,19 +185,6 @@ void Detect::hiddenCode(int index)
         {
             executeable_pages++;
 
-            // In case of a 64-bit architecture there are TWO references to the kernel
-            // code. This is due to the fact that the complete physical memory region
-            // is mapped to ffff8800 00000000 - ffffc7ff ffffffff (=64 TB).
-            if ((_sym.memSpecs().arch & _sym.memSpecs().ar_x86_64) &&
-                 i >= 0xffff880000000000 && i < 0xffffc7ffffffffff) {
-                // Calculate the corresponding address within the kernel code section
-                tmp = _kernel_code_begin + (i - 0xffff880000000000);
-
-                // Verify if the address lies within the kernel code section
-                if (tmp >= _kernel_code_begin && tmp <= _kernel_code_end)
-                    continue;
-            }
-
             // Lies the page within the kernel code area?
             if (i >= _kernel_code_begin && i <= _kernel_code_end)
                 continue;
@@ -176,8 +194,6 @@ void Detect::hiddenCode(int index)
                 continue;
 
             // Does it belong to a module
-
-//            currentModule = firstModule;
             currentModule = _sym.factory().varsByName().values("modules").at(0)->toInstance(vmem).member("next");
             do {
 
@@ -197,45 +213,45 @@ void Detect::hiddenCode(int index)
                     found = true;
                     break;
                 }
-                else {
-                    // Try to find a matching section
-                    Instance attrs = currentModule.member("sect_attrs", BaseType::trLexicalAndPointers);
-                    uint attr_cnt = attrs.member("nsections").toUInt32();
+//                else {
+//                    // Try to find a matching section
+//                    Instance attrs = currentModule.member("sect_attrs", BaseType::trLexicalAndPointers);
+//                    uint attr_cnt = attrs.member("nsections").toUInt32();
 
-                    quint64 prevSectAddr = 0, sectAddr;
-                    QString prevSectName, sectName;
-                    for (uint j = 0; j <= attr_cnt && !found; ++j) {
+//                    quint64 prevSectAddr = 0, sectAddr;
+//                    QString prevSectName, sectName;
+//                    for (uint j = 0; j <= attr_cnt && !found; ++j) {
 
-                        if (j < attr_cnt) {
-                            Instance attr = attrs.member("attrs").arrayElem(j);
-                            sectAddr = attr.member("address").toULong();
-                            sectName = attr.member("name").toString();
-                        }
-                        else {
-                            sectAddr = (prevSectAddr | 0xfffULL) + 1;
-                        }
-                        // Make sure we have a chance to contain this address
-                        if (j == 0 && i < sectAddr) {
-                            attr_cnt = 0;
-                            break;
-                        }
+//                        if (j < attr_cnt) {
+//                            Instance attr = attrs.member("attrs").arrayElem(j);
+//                            sectAddr = attr.member("address").toULong();
+//                            sectName = attr.member("name").toString();
+//                        }
+//                        else {
+//                            sectAddr = (prevSectAddr | 0xfffULL) + 1;
+//                        }
+//                        // Make sure we have a chance to contain this address
+//                        if (j == 0 && i < sectAddr) {
+//                            attr_cnt = 0;
+//                            break;
+//                        }
 
-                        if (prevSectAddr <= i && i < sectAddr) {
-                            std::cout << QString("Page @ 0x%0 belongs to module %1, section %2 (0x%3 - 0x%4)")
-                                         .arg(i, 0, 16)
-                                         .arg(currentModule.member("name").toString())
-                                         .arg(prevSectName)
-                                         .arg(prevSectAddr, 0, 16)
-                                         .arg(sectAddr-1, 0, 16)
-                                      << std::endl;
-                            found = true;
-                        }
+//                        if (prevSectAddr <= i && i < sectAddr) {
+//                            std::cout << QString("Page @ 0x%0 belongs to module %1, section %2 (0x%3 - 0x%4)")
+//                                         .arg(i, 0, 16)
+//                                         .arg(currentModule.member("name").toString())
+//                                         .arg(prevSectName)
+//                                         .arg(prevSectAddr, 0, 16)
+//                                         .arg(sectAddr-1, 0, 16)
+//                                      << std::endl;
+//                            found = true;
+//                        }
 
-                        prevSectAddr = sectAddr;
-                        prevSectName = sectName;
-                    }
+//                        prevSectAddr = sectAddr;
+//                        prevSectName = sectName;
+//                    }
 
-                }
+//                }
 
                 currentModule = currentModule.member("list").member("next");
 
@@ -244,6 +260,15 @@ void Detect::hiddenCode(int index)
                      // Seems like the rule engine does not work correctly here
                      currentModule.address() + 0x8 != modules.address() &&
                      !found);
+
+            // Check VMAP
+            if ((flags = inVmap(i, vmem))) {
+                found = true;
+
+                if (flags & 0x1)
+                    lazy_pages++;
+            }
+
 
             if (!found)
             {
@@ -259,24 +284,6 @@ void Detect::hiddenCode(int index)
                           << ", PTE: 0x" << std::hex << ptEntries.pte << std::dec
                           << std::endl;
 
-                // DEBUG
-                debug_printed = false;
-
-//                for(j = i; j < (i + ptEntries.nextPageOffset(_sym.memSpecs())); j += 8)
-//                {
-//                    debug_data = 0;
-//                    vmem->readAtomic(j, (char *)&debug_data, 8);
-
-//                    if (debug_data != 0)
-//                    {
-//                        debug_printed = true;
-//                        std::cout << "0x" << std::hex << j << ": 0x" << debug_data << std::dec << std::endl;
-//                    }
-//                }
-
-//                if (!debug_printed)
-//                    std::cout << "Entire page conists of '0'-bytes!" << std::endl;
-
                 hidden_pages++;
             }
         }
@@ -288,6 +295,7 @@ void Detect::hiddenCode(int index)
     // Print Stats
     std::cout << "\r\nProcessed " << processed_pages << " pages in " << elapsedTime() << " min" << std::endl;
     std::cout << "\t Found " << executeable_pages << " executable pages." << std::endl;
+    std::cout << "\t Found " << lazy_pages << " not yet unmapped pages." << std::endl;
     std::cout << "\t Detected " << hidden_pages << " hidden pages." << std::endl;
 }
 
