@@ -460,7 +460,6 @@ bool MemoryMapWidget::event(QEvent *event)
 //            cur.setCharFormat(hdrChrFmt);
 
 
-            QString elem;
             NodeList nodes = _map ?
                     _map->objectsInRange(addrStart, addrEnd).toList()
                     : NodeList();
