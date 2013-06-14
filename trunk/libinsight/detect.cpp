@@ -29,6 +29,7 @@ Detect::Detect(KernelSymbols &sym) :
     }
 }
 
+
 quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
 {
     Instance vmap_area = _sym.factory().varsByName().values("vmap_area_root").at(0)->toInstance(vmem).member("rb_node");
@@ -85,6 +86,7 @@ quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
     return 0;
 }
 
+
 void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
 {
     if (!ExecutablePages || !current) {
@@ -140,15 +142,26 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
     ExecutablePages = current;
 }
 
+
 void Detect::hiddenCode(int index)
 {
     quint64 begin = (_sym.memSpecs().pageOffset & ~(PAGE_SIZE - 1));
     quint64 end = _sym.memSpecs().vaddrSpaceEnd();
 
     VirtualMemory *vmem = _sym.memDumps().at(index)->vmem();
-    Instance modules = _sym.factory().varsByName().values("modules").at(0)->toInstance(vmem);
-    Instance firstModule = _sym.factory().varsByName().values("modules").at(0)->toInstance(vmem).member("next");
-    Instance currentModule = firstModule;
+    const Variable *varModules = _sym.factory().findVarByName("modules");
+    const Structured *typeModule = dynamic_cast<const Structured *>
+            (_sym.factory().findBaseTypeByName("module"));
+    assert(varModules != 0);
+    assert(typeModule != 0);
+
+    // Don't depend on the rule engine
+    const int listOffset = typeModule->memberOffset("list");
+    Instance firstModule = varModules->toInstance(vmem).member("next", BaseType::trAny, -1, ksNone);
+    firstModule.setType(typeModule);
+    firstModule.addToAddress(-listOffset);
+
+    Instance currentModule;
     quint64 currentModuleCore = 0;
     quint64 currentModuleCoreSize = 0;
 
@@ -201,11 +214,6 @@ void Detect::hiddenCode(int index)
         // Try to resolve address
         vmem->virtualToPhysical(i, &pageSize, false, &ptEntries);
 
-//        std::cout << "PGD: 0x" << std::hex << ptEntries.pgd << std::dec << std::endl;
-//        std::cout << "PUD: 0x" << std::hex << ptEntries.pud << std::dec << std::endl;
-//        std::cout << "PMD: 0x" << std::hex << ptEntries.pmd << std::dec << std::endl;
-//        std::cout << "PTE: 0x" << std::hex << ptEntries.pte << std::dec << std::endl;
-
         // Present?
         if (!ptEntries.isPresent())
             continue;
@@ -225,8 +233,8 @@ void Detect::hiddenCode(int index)
                 (_sym.memSpecs().arch & (_sym.memSpecs().ar_pae_enabled))) &&
                 ((flags & vmem->ReadWrite) && !(flags & vmem->NX)))
         {
-            std::cout << "\rWARNING: Detected a writable and executable page @ 0x"
-                      << std::hex << i << std::dec << std::endl;
+            Console::out() << "\rWARNING: Detected a writable and executable page @ 0x"
+                      << hex << i << dec << endl;
         }
 
         else if ((flags & vmem->NX))
@@ -279,20 +287,16 @@ void Detect::hiddenCode(int index)
                 continue;
             }
 
-            // Does it belong to a module
-            currentModule = _sym.factory().varsByName().values("modules").at(0)->toInstance(vmem).member("next");
-            do {
+            // Does the page belong to a module?
 
-                if (_sym.memSpecs().sizeofPointer == 4)
-                {
-                    currentModuleCore = currentModule.member("module_core").toUInt32();
-                    currentModuleCoreSize = currentModule.member("core_text_size").toUInt32();
-                }
-                else
-                {
-                    currentModuleCore = currentModule.member("module_core").toUInt64();
-                    currentModuleCoreSize = currentModule.member("core_text_size").toUInt64();
-                }
+            // Don't depend on the rule engine
+            currentModule = varModules->toInstance(vmem).member("next", BaseType::trAny, -1, ksNone);
+            currentModule.setType(typeModule);
+            currentModule.addToAddress(-listOffset);
+
+            do {
+                currentModuleCore = (quint64)currentModule.member("module_core").toPointer();
+                currentModuleCoreSize = (quint64)currentModule.member("core_text_size").toPointer();
 
                 if (i >= currentModuleCore &&
                     i <= (currentModuleCore + currentModuleCoreSize)) {
@@ -301,8 +305,8 @@ void Detect::hiddenCode(int index)
                     break;
                 }
 //                else {
-//                    // Try to find a matching section
-//                    Instance attrs = currentModule.member("sect_attrs", BaseType::trLexicalAndPointers);
+//                    // Check if address falls into any section of any module
+//                    Instance attrs = currentModule.member("sect_attrs", BaseType::trAny);
 //                    uint attr_cnt = attrs.member("nsections").toUInt32();
 
 //                    quint64 prevSectAddr = 0, sectAddr;
@@ -324,13 +328,17 @@ void Detect::hiddenCode(int index)
 //                        }
 
 //                        if (prevSectAddr <= i && i < sectAddr) {
-//                            std::cout << QString("Page @ 0x%0 belongs to module %1, section %2 (0x%3 - 0x%4)")
-//                                         .arg(i, 0, 16)
-//                                         .arg(currentModule.member("name").toString())
-//                                         .arg(prevSectName)
-//                                         .arg(prevSectAddr, 0, 16)
-//                                         .arg(sectAddr-1, 0, 16)
-//                                      << std::endl;
+//                            Console::out()
+//                                    << "Page @ " << Console::color(ctAddress)
+//                                    << QString("0x%0%6 belongs to module %5%1%6, section %5%2%6 (0x%3 - 0x%4)")
+//                                       .arg(i, 0, 16)
+//                                       .arg(currentModule.member("name").toString())
+//                                       .arg(prevSectName)
+//                                       .arg(prevSectAddr, 0, 16)
+//                                       .arg(sectAddr-1, 0, 16)
+//                                       .arg(Console::color(ctString))
+//                                       .arg(Console::color(ctReset))
+//                                    << endl;
 //                            found = true;
 //                        }
 
@@ -340,12 +348,13 @@ void Detect::hiddenCode(int index)
 
 //                }
 
-                currentModule = currentModule.member("list").member("next");
+                // Don't depend on the rule engine
+                currentModule = currentModule.member("list").member("next", BaseType::trAny, -1, ksNone);
+                currentModule.setType(typeModule);
+                currentModule.addToAddress(-listOffset);
 
             } while (currentModule.address() != firstModule.address() &&
-                     currentModule.address() != modules.address() &&
-                     // Seems like the rule engine does not work correctly here
-                     currentModule.address() + 0x8 != modules.address() &&
+                     currentModule.address() != varModules->offset() - listOffset &&
                      !found);
 
             // Check VMAP
@@ -366,16 +375,36 @@ void Detect::hiddenCode(int index)
             if (!found)
             {
                 // Well this seems to be a hidden page
-                std::cout << "\rWARNING: Detected hidden code page @ 0x"
-                          << std::hex << i << std::dec
-                          << " (W/R: " << ptEntries.isWriteable() << ", "
-                          << "S: " << ptEntries.isSupervisor() << ")" << std::endl;
+                Console::out()
+                        << "\r" << Console::color(ctWarningLight)
+                        << "WARNING:" << Console::color(ctReset)
+                        << " Detected hidden code page @ "
+                        << Console::color(ctAddress) << "0x" << hex << i << dec
+                        << Console::color(ctReset)
+                        << " (Flags: ";
+                if (ptEntries.isWriteable()) {
+                    Console::out()
+                            << Console::color(ctError) << 'W'
+                            << Console::color(ctReset);
+                }
+                else
+                    Console::out() << ' ';
+                if (ptEntries.isSupervisor()) {
+                    Console::out()
+                            << Console::color(ctNumber) << 'S'
+                            << Console::color(ctReset);
+                }
+                else
+                    Console::out() << ' ';
+                Console::out() << ")" << endl;
 
-                std::cout << "PGD: 0x" << std::hex << ptEntries.pgd << std::dec
-                          << ", PUD: 0x" << std::hex << ptEntries.pud << std::dec
-                          << ", PMD: 0x" << std::hex << ptEntries.pmd << std::dec
-                          << ", PTE: 0x" << std::hex << ptEntries.pte << std::dec
-                          << std::endl;
+                Console::out()
+                        << Console::color(ctDim)
+                        << "PGD: 0x" << hex << ptEntries.pgd
+                        << ", PUD: 0x" << hex << ptEntries.pud
+                        << ", PMD: 0x" << hex << ptEntries.pmd
+                        << ", PTE: 0x" << hex << ptEntries.pte
+                        << dec << Console::color(ctReset) << endl;
 
                 hidden_pages++;
             }
@@ -386,26 +415,27 @@ void Detect::hiddenCode(int index)
     operationStopped();
 
     // Print Stats
-    std::cout << "\r\nProcessed " << processed_pages << " pages in " << elapsedTime() << " min" << std::endl;
-    std::cout << "\t Found " << executeable_pages << " executable pages." << std::endl;
-    std::cout << "\t Found " << vmap_pages << " vmapped pages." << std::endl;
-    std::cout << "\t Found " << lazy_pages << " not yet unmapped pages." << std::endl;
-    std::cout << "\t Detected " << hidden_pages << " hidden pages.\n" << std::endl;
+    Console::out() << "\r\nProcessed " << processed_pages << " pages in " << elapsedTime() << " min" << endl;
+    Console::out() << "\t Found " << executeable_pages << " executable pages." << endl;
+    Console::out() << "\t Found " << vmap_pages << " vmapped pages." << endl;
+    Console::out() << "\t Found " << lazy_pages << " not yet unmapped pages." << endl;
+    Console::out() << "\t Detected " << hidden_pages << " hidden pages." << endl;
 
     // Verify hashes
     verifyHashes(currentHashes);
 }
 
+
 void Detect::operationProgress()
 {
     // Print Status
-    QString out;
-    out += QString("\rProcessed %1 of %2 pages (%3%), elapsed %4").arg((_current_page - _first_page) / PAGE_SIZE)
-            .arg((_final_page - _first_page) / PAGE_SIZE)
-            .arg((int)(((_current_page - _first_page) / (float)(_final_page - _first_page)) * 100))
-            .arg(elapsedTime());
+//    QString out;
+//    out += QString("\rProcessed %1 of %2 pages (%3%), elapsed %4").arg((_current_page - _first_page) / PAGE_SIZE)
+//            .arg((_final_page - _first_page) / PAGE_SIZE)
+//            .arg((int)(((_current_page - _first_page) / (float)(_final_page - _first_page)) * 100))
+//            .arg(elapsedTime());
 
-    shellOut(out, false);
+//    shellOut(out, false);
 }
 
 
