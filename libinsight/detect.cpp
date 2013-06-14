@@ -3,9 +3,13 @@
 #include <insight/variable.h>
 #include <insight/console.h>
 
+#include <QCryptographicHash>
+
 #include <limits>
 
 #define PAGE_SIZE 4096
+
+QMultiHash<quint64, Detect::ExecutablePage> *Detect::ExecutablePages = 0;
 
 Detect::Detect(KernelSymbols &sym) :
     _kernel_code_begin(0),
@@ -81,6 +85,61 @@ quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
     return 0;
 }
 
+void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
+{
+    if (!ExecutablePages || !current) {
+        ExecutablePages = current;
+        return;
+    }
+
+    QList<ExecutablePage> currentPages = current->values();
+
+    // Stats
+    quint64 changedPages = 0;
+    quint64 newPages = 0;
+    quint64 totalVerified = 0;
+
+    // Prepare status output
+    _first_page = 1;
+    _current_page = 1;
+    _final_page = currentPages.size();
+
+    // Start the Operation
+    operationStarted();
+
+    for (int i = 0; i < currentPages.size(); ++i) {
+        // New page?
+        if (!ExecutablePages->contains(currentPages.at(i).address)) {
+            newPages++;
+            continue;
+        }
+
+        // Changed page?
+        if (ExecutablePages->value(currentPages.at(i).address).hash !=
+            currentPages.at(i).hash) {
+            changedPages++;
+
+            std::cout << "\rWARNING: Detected changed code page @ 0x"
+                      << std::hex << currentPages.at(i).address << std::dec
+                      << " (" << currentPages.at(i).module << ")" << std::endl;
+        }
+
+        totalVerified++;
+    }
+
+    // Finish
+    operationStopped();
+
+    // Print Stats
+    std::cout << "\r\nVerified " << totalVerified << " hashes in " << elapsedTime() << " min" << std::endl;
+    std::cout << "\t Found " << newPages << " new pages." << std::endl;
+    std::cout << "\t Detected " << changedPages << " modified pages." << std::endl;
+
+    // Exchange
+    delete(ExecutablePages);
+    ExecutablePages = current;
+}
+
 void Detect::hiddenCode(int index)
 {
     quint64 begin = (_sym.memSpecs().pageOffset & ~(PAGE_SIZE - 1));
@@ -110,11 +169,12 @@ void Detect::hiddenCode(int index)
     quint64 executeable_pages = 0;
     quint64 hidden_pages = 0;
     quint64 lazy_pages = 0;
+    quint64 vmap_pages = 0;
 
-    // DEBIAN 64-bit test
-    //_kernel_code_begin = 0xffffffff81000000ULL;
-    //_kernel_code_end = 0xffffffff81600000ULL;
-    //_vsyscall_page = 0xffffffffff600000ULL;
+    // Hash
+    QMultiHash<quint64, ExecutablePage> *currentHashes = new QMultiHash<quint64, ExecutablePage>();
+    QCryptographicHash hash(QCryptographicHash::Sha1);
+    char* data = 0;
 
     // Start the Operation
     operationStarted();
@@ -185,13 +245,39 @@ void Detect::hiddenCode(int index)
         {
             executeable_pages++;
 
+            // Allocate mem
+            if (data)
+                free(data);
+
+            data = (char *)malloc(ptEntries.nextPageOffset(_sym.memSpecs()) * sizeof(char));
+
+            if (!data) {
+                std::cout << "ERROR: Could not allocate memory!" << std::endl;
+                return;
+            }
+
+            // Get data
+            if ((quint64)vmem->readAtomic(i, data, ptEntries.nextPageOffset(_sym.memSpecs())) !=
+                    ptEntries.nextPageOffset(_sym.memSpecs())) {
+                std::cout << "ERROR: Could not read data of page!" << std::endl;
+                return;
+            }
+
+            // Calculate hash
+            hash.reset();
+            hash.addData(data, ptEntries.nextPageOffset(_sym.memSpecs()));
+
             // Lies the page within the kernel code area?
-            if (i >= _kernel_code_begin && i <= _kernel_code_end)
+            if (i >= _kernel_code_begin && i <= _kernel_code_end) {
+                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result()));
                 continue;
+            }
 
             // Vsyscall page?
-            if (i == _vsyscall_page)
+            if (i == _vsyscall_page) {
+                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result()));
                 continue;
+            }
 
             // Does it belong to a module
             currentModule = _sym.factory().varsByName().values("modules").at(0)->toInstance(vmem).member("next");
@@ -211,6 +297,7 @@ void Detect::hiddenCode(int index)
                 if (i >= currentModuleCore &&
                     i <= (currentModuleCore + currentModuleCoreSize)) {
                     found = true;
+                    currentHashes->insert(i, ExecutablePage(i, MODULE, currentModule.member("name").toString(), hash.result()));
                     break;
                 }
 //                else {
@@ -265,8 +352,14 @@ void Detect::hiddenCode(int index)
             if ((flags = inVmap(i, vmem))) {
                 found = true;
 
-                if (flags & 0x1)
+                if (flags & 0x1) {
                     lazy_pages++;
+                    currentHashes->insert(i, ExecutablePage(i, LAZY, "vmap-lazy", hash.result()));
+                }
+                else {
+                    vmap_pages++;
+                    currentHashes->insert(i, ExecutablePage(i, VMAP, "vmap", hash.result()));
+                }
             }
 
 
@@ -295,8 +388,12 @@ void Detect::hiddenCode(int index)
     // Print Stats
     std::cout << "\r\nProcessed " << processed_pages << " pages in " << elapsedTime() << " min" << std::endl;
     std::cout << "\t Found " << executeable_pages << " executable pages." << std::endl;
+    std::cout << "\t Found " << vmap_pages << " vmapped pages." << std::endl;
     std::cout << "\t Found " << lazy_pages << " not yet unmapped pages." << std::endl;
-    std::cout << "\t Detected " << hidden_pages << " hidden pages." << std::endl;
+    std::cout << "\t Detected " << hidden_pages << " hidden pages.\n" << std::endl;
+
+    // Verify hashes
+    verifyHashes(currentHashes);
 }
 
 void Detect::operationProgress()
