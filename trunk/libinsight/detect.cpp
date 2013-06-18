@@ -39,16 +39,21 @@ quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
         return 0;
     }
 
-    Instance vmap_area = var_vmap_area->toInstance(vmem).member("rb_node");
-    Instance rb_node = vmap_area.member("rb_node");
+    // Don't depend on the script engine
+    Instance vmap_area = var_vmap_area->toInstance(vmem, BaseType::trAny, ksNone);
+    vmap_area = vmap_area.member("rb_node", BaseType::trAny, -1, ksNone);
+    vmap_area.setType(_sym.factory().findBaseTypeByName("vmap_area"));
+    quint64 offset = vmap_area.memberOffset("rb_node");
+    vmap_area.addToAddress(-offset);
 
-    if (!rb_node.isValid()) {
-        debugerr("It seems not all required rules are loaded, '"
+    Instance rb_node = vmap_area.member("rb_node", BaseType::trAny, -1, ksNone);
+
+    if (!vmap_area.isValid() || !rb_node.isValid()) {
+        debugerr("It seems not all required symbols have been found, '"
                  << __PRETTY_FUNCTION__ << "'' will not work!");
         return 0;
     }
 
-    quint64 offset = rb_node.address() - vmap_area.address();
     quint64 va_start = 0;
     quint64 va_end = 0;
 
@@ -61,11 +66,11 @@ quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
         }
         else if (address > va_end) {
             // Continue right
-            rb_node = rb_node.member("rb_right", BaseType::trLexicalAndPointers);
+            rb_node = rb_node.member("rb_right", BaseType::trAny, -1, ksNone);
         }
         else {
             // Continue left
-            rb_node = rb_node.member("rb_left", BaseType::trLexicalAndPointers);
+            rb_node = rb_node.member("rb_left", BaseType::trAny, -1, ksNone);
         }
 
         // Cast next area
