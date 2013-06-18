@@ -155,8 +155,8 @@ if ($compile && !$assembly && ("-" ne $source)) {
 	# Invoke preprocessor
 	$debug && print "Invoking preprocessor: ".join(" ", @PP_ARGS)."\n";	
 	system(@PP_ARGS) && die "$0: Error calling ".join(" ", @PP_ARGS);
-	# Compress output file
-	system(('gzip', $outfile));
+	# Compress output file, if it exists
+	system(('gzip', '-f', $outfile)) if (-f $outfile);
 }
 
 # Prepare compiler invocation
