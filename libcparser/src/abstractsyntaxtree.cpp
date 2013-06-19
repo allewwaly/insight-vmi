@@ -10,6 +10,7 @@
 #include <abstractsyntaxtree.h>
 #include <astscopemanager.h>
 #include <debug.h>
+#include <gzip.h>
 #include <QFile>
 
 AbstractSyntaxTree::AbstractSyntaxTree()
@@ -78,11 +79,12 @@ void AbstractSyntaxTree::clear()
 }
 
 
-int AbstractSyntaxTree::parse(const QByteArray& asciiText, ASTBuilder* builder)
+int AbstractSyntaxTree::parse(const QByteArray& asciiText, ASTBuilder* builder,
+                              QString fileName)
 {
     clear();
 
-    _fileName.clear();
+    _fileName = fileName;
     _input = antlr3NewAsciiStringCopyStream(
     		(pANTLR3_UINT8)asciiText.constData(),
     		asciiText.size(),
@@ -101,6 +103,24 @@ int AbstractSyntaxTree::parse(const QString& fileName, ASTBuilder* builder)
         return ANTLR3_ERR_NOFILE;
     }
 
+    // Deflate compressed input files
+    if (fileName.endsWith(".gz")) {
+        QFile in(fileName);
+        if (!in.open(QFile::ReadOnly)) {
+            debugerr("Error opening file \"" << fileName << "\" for reading.");
+            return ANTLR3_ERR_NOFILE;
+        }
+
+        QByteArray deflated = Gzip::gUncompress(in.readAll());
+        if (deflated.isEmpty()) {
+            debugerr("Error deflating file \"" << fileName << "\".");
+            return ANTLR3_ERR_NOFILE;
+        }
+
+        return parse(deflated, builder, fileName);
+    }
+
+    // Otherwise use the ANTLR file input stream
     _fileName = fileName;
     QByteArray s = fileName.toAscii();
     _input = antlr3AsciiFileStreamNew((pANTLR3_UINT8) s.constData());

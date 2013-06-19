@@ -110,13 +110,16 @@ private:
 
     /**
      * Parses the source code from \a asciiText and builds the AST.
+     * @param asciiText the source code to parse
      * @param builder the builder object that interfaces with the C bindings
+     * @param fileName an optional file name to use for the input
      * @return In case of an unrecoverable error, the total number of errors
      * that occured before parsing was given up is returned. In case of one or
      * more recoverable errors, -1 is returned, otherwise the return value is 0.
      * \sa errorCount()
      */
-    int parse(const QByteArray& asciiText, ASTBuilder* builder);
+    int parse(const QByteArray& asciiText, ASTBuilder* builder,
+              QString fileName = QString());
 
     /**
      * Parses the source code builds the AST.
