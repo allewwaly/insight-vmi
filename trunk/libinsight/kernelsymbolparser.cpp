@@ -631,9 +631,6 @@ void KernelSymbolParser::WorkerThread::parseSymbols(QIODevice* from)
                     // If the symbol does not exist in the hash, it will return 0, which
                     // corresponds to hsUnknownSymbol.
                     _hdrSym = hdrMap.value(rxHdr.cap(2));
-                    if (_hdrSym == hsUnknownSymbol)
-                        parserError(QString("Unknown debug symbol type "
-                                            "encountered: %1").arg(rxHdr.cap(2)));
                     parseInt16(_nextId, rxHdr.cap(1), &ok);
 
                     // Finish the last symbol before we continue parsing
