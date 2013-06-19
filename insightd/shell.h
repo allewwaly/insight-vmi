@@ -244,6 +244,7 @@ private:
     int cmdListTypesUsing(QStringList args);
     int cmdListTypesById(QStringList args);
     int cmdListTypesByName(QStringList args);
+    int cmdListSystemMap(QStringList args);
 
     int cmdMemory(QStringList args);
     int cmdMemoryLoad(QStringList args);
