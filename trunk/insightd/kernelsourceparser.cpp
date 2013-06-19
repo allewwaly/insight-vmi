@@ -146,13 +146,23 @@ void KernelSourceParser::parse()
         const CompileUnit* unit = it.value();
         // Skip assembly files
         if (!unit->name().endsWith(".S")) {
+            // Try regular file first
             fileName = unit->name() + ".i";
             if (_srcDir.exists(fileName)) {
                 _fileNames.append(fileName);
                 _bytesTotal += QFileInfo(_srcDir, fileName).size();
             }
-            else
-                shellErr(QString("File not found: %1").arg(fileName));
+            else {
+                // Try gzip'ed file next
+                fileName += ".gz";
+                if (_srcDir.exists(fileName)) {
+                    _fileNames.append(fileName);
+                    _bytesTotal += QFileInfo(_srcDir, fileName).size();
+                }
+                // We expect to find all files, so this is an error!
+                else
+                    shellErr(QString("File not found: %1").arg(fileName));
+            }
         }
         ++it;
     }
