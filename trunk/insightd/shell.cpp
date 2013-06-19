@@ -157,7 +157,9 @@ Shell::Shell(bool listenOnSocket)
                 "  list variables [<filter>] List all variables, optionally filtered by\n"
                 "                            filters <filter>\n"
                 "  list vars-using <id>      List the variables of type <id>\n"
-                "  list vars-matching <id>   List the variables matching rule <id>"));
+                "  list vars-matching <id>   List the variables matching rule <id>\n"
+                "  list system.map [<filter>] List contents of System.map, optionally\n"
+                "                            filtered by <filter>"));
 
     _commands.insert("memory",
             Command(
@@ -1026,6 +1028,9 @@ int Shell::cmdList(QStringList args)
         else if (s.length() > 3 && QString("vars-matching").startsWith(s)) {
             return cmdListVarsMatching(args);
         }
+        else if (s.length() > 3 && QString("system.map").startsWith(s)) {
+            return cmdListSystemMap(args);
+        }
         else if (QString("variables").startsWith(s)) {
             return cmdListVars(args);
         }
@@ -1459,6 +1464,106 @@ int Shell::cmdListTypesByName(QStringList /*args*/)
              << dec << _sym.factory()._typesByName.size()
              << Console::color(ctReset) << endl;
     }
+    return ecOk;
+}
+
+
+bool cmpSystemMapAddrLessThan(const FullSystemMapEntry& e1,
+                              const FullSystemMapEntry& e2)
+{
+    return e1.address < e2.address;
+}
+
+
+int Shell::cmdListSystemMap(QStringList args)
+{
+    if (args.size() > 1) {
+        cmdHelp(QStringList("list"));
+        return ecInvalidArguments;
+    }
+
+    QRegExp filter;
+    if (!args.isEmpty()) {
+        filter.setPattern(args[0]);
+        filter.setPatternSyntax(QRegExp::WildcardUnix);
+        if (!filter.isEmpty() && !filter.isValid()) {
+            Console::errMsg("Invalid filter pattern: " + filter.errorString());
+            return ecInvalidExpression;
+        }
+    }
+
+    if (_sym.memSpecs().systemMap.isEmpty()) {
+        Console::out() << "The kernel symbols do not include the System.map "
+                          "information." << endl;
+        return ecOk;
+    }
+
+    SystemMapEntryList entries = _sym.memSpecs().systemMapToList();
+    // Sort entries by address
+    qSort(entries.begin(), entries.end(), cmpSystemMapAddrLessThan);
+
+    // Find out required field width (the types are sorted by ascending ID)
+    const int w_addr = _sym.memSpecs().sizeofPointer << 1;
+    const int w_total = ShellUtil::termSize().width();
+    const int w_colsep = 2;
+
+    bool headerPrinted = false;
+    int count = 0;
+
+
+    for (int i = 0; i < entries.size(); ++i) {
+        QString addr = QString("0x%0").arg(entries[i].address, 0, w_addr, QChar('0'));
+        // Apply filter
+        if (!filter.isEmpty() &&
+            !(filter.exactMatch(entries[i].name) ||
+              filter.exactMatch(QString(QChar(entries[i].type))) ||
+              filter.exactMatch(addr)))
+            continue;
+
+        if (!headerPrinted) {
+            headerPrinted = true;
+            Console::out()
+                    << Console::color(ctBold) << left
+                    << qSetFieldWidth(w_addr + 2)
+                    << "Address"
+                    << qSetFieldWidth(w_colsep) << ' '
+                    << qSetFieldWidth(0) << 'T'
+                    << qSetFieldWidth(w_colsep) << ' '
+                    << qSetFieldWidth(0)
+                    << "Symbol Name"
+                    << Console::color(ctReset) << endl;
+            hline(w_total);
+        }
+
+        Console::out()
+                << Console::color(ctAddress) << addr << Console::color(ctReset)
+                << qSetFieldWidth(w_colsep) << ' '
+                << qSetFieldWidth(0) << (char)entries[i].type
+                << qSetFieldWidth(w_colsep) << ' '
+                << qSetFieldWidth(0) << Console::color(ctMember)
+                << entries[i].name << Console::color(ctReset)
+                << endl;
+
+        ++count;
+    }
+
+    // Did the filer match any
+    if (count > 0) {
+        hline(w_total);
+        if (filter.isEmpty())
+            Console::out() << "Total symbols in System.map: "
+                           << Console::color(ctBold) << entries.size()
+                           << Console::color(ctReset) << endl;
+        else
+            Console::out() << "Matching symbols in System.map: "
+                           << Console::color(ctBold) << count
+                           << Console::color(ctReset) << " of "
+                           << entries.size() << " in total" << endl;
+    }
+    else {
+        Console::out() << "No symbol in System.map matched the given filter." << endl;
+    }
+
     return ecOk;
 }
 
