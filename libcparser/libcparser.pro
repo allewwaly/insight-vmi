@@ -30,7 +30,8 @@ HEADERS += include/ast_interface.h \
     include/expressionevalexception.h \
     include/bitop.h \
     include/astnodefinder.h \
-    include/typeinfooracle.h
+    include/typeinfooracle.h \
+    include/gzip.h
 SOURCES += \
     antlr_generated/CLexer.c \
     antlr_generated/CParser.c \
@@ -46,7 +47,8 @@ SOURCES += \
     src/astsymbol.cpp \
     src/astwalker.cpp \
     src/genericexception.cpp \
-    src/realtypes.cpp
+    src/realtypes.cpp \
+    src/gzip.cpp
 
 LIBS += -L../libantlr3c$$BUILD_DIR \
     -l$$ANTLR_LIB \
