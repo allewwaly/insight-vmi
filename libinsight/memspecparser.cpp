@@ -510,8 +510,7 @@ MemSpecs MemSpecParser::parse()
     QDir kernelSrc(_kernelSrcDir);
     if (! (kernelSrc.exists() && kernelSrc.exists("Makefile")) )
         memSpecParserError(QString("Directory \"%1\" does not seem to be a kernel source or header tree.").arg(kernelSrc.absolutePath()));
-    if (! (kernelSrc.exists(".config") &&
-                kernelSrc.exists("include/linux/version.h")) )
+    if (! kernelSrc.exists(".config") )
         memSpecParserError(QString("Kernel source in \"%1\" does not seem to be configured properly.").arg(kernelSrc.absolutePath()));
 
     // Check the System.map file
