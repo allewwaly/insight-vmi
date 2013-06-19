@@ -452,3 +452,18 @@ QString MemSpecs::toFileNameString() const
     s.replace(QRegExp("[^-._a-zA-Z0-9]+"), QString()); // remove uncommon chars
     return s;
 }
+
+
+SystemMapEntryList MemSpecs::systemMapToList() const
+{
+    SystemMapEntryList list;
+
+    for (SystemMapEntries::const_iterator
+            it = systemMap.begin(), e = systemMap.end();
+         it != e; ++it)
+    {
+        list.append(FullSystemMapEntry(it.key(), it.value()));
+    }
+
+    return list;
+}
