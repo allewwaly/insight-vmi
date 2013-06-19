@@ -170,6 +170,12 @@ struct MemSpecs
      */
     quint64 vaddrSpaceEnd() const;
 
+    /**
+     * Returns the information in the string-indexed systemMap hash in a more
+     * easily processible QList.
+     */
+    SystemMapEntryList systemMapToList() const;
+
     quint64 pageOffset;
     quint64 vmallocStart;
     quint64 vmallocEnd;

@@ -2,10 +2,12 @@
 #define SYSTEMMAPENTRY_H
 
 #include <QMultiHash>
+#include <QList>
 #include <QDataStream>
 
 /**
- * This struct represents an entry in the <tt>System.map</tt> file.
+ * This struct represents an entry in the <tt>System.map</tt> file excluding
+ * the symbol name.
  */
 struct SystemMapEntry
 {
@@ -14,6 +16,23 @@ struct SystemMapEntry
     quint64 address;
     qint8 type;
 };
+
+/**
+ * This struct represents an entry in the <tt>System.map</tt> file including
+ * the symbol name.
+ */
+struct FullSystemMapEntry: public SystemMapEntry
+{
+    FullSystemMapEntry() {}
+    FullSystemMapEntry(const QString& name, const SystemMapEntry& entry)
+        : SystemMapEntry(entry), name(name) {}
+    FullSystemMapEntry(const QString& name, quint64 address, qint8 type)
+        : SystemMapEntry(address, type), name(name) {}
+    QString name;
+};
+
+/// A self-contained list of FullSystemMapEntry items
+typedef QList<FullSystemMapEntry> SystemMapEntryList;
 
 /**
 * Operator for native usage of the SystemMapEntry class for streams
