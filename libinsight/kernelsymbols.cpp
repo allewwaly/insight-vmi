@@ -287,6 +287,17 @@ int KernelSymbols::loadMemDump(const QString &fileName)
     _memDumps[index] =
             new MemoryDump(fileName, this, index);
 
+    // Verify the memory image size
+    quint64 expectedSize;
+    if (!_memDumps[index]->verifyPhysMemSize(&expectedSize)) {
+        Console::warnMsg("Warning",
+                         QString("The size of the memory image (%0 MB) does "
+                                 "not seem to match the VM's physical memory "
+                                 "size (%1 MB).")
+                         .arg(qRound(file.size() / (float)(1024*1024)))
+                         .arg(qRound(expectedSize / (float)(1024*1024))));
+    }
+
     return index;
 }
 
