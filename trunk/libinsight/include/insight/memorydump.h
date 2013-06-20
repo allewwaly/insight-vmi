@@ -249,6 +249,15 @@ public:
 
     bool loadSlubFile(const QString& fileName);
 
+    /**
+     * Tries to assess if the size of the physical memory matches the number
+     * of pages the kernel knows about
+     * @param expectedSize the expected size in bytes is returned here
+     * @return \c false if the no. of pages does not match the expected number,
+     * \c true otherwise
+     */
+    bool verifyPhysMemSize(quint64 *expectedSize) const;
+
     SlubObjects::ObjectValidity validate(const Instance* inst) const;
 
     SlubObjects::ObjectValidity validate(const QString& queryString,

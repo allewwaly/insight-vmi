@@ -722,6 +722,28 @@ bool MemoryDump::loadSlubFile(const QString &fileName)
 }
 
 
+bool MemoryDump::verifyPhysMemSize(quint64 *expectedSize) const
+{
+    // We can only verify the size if we have a size given
+    if (!_file || _file->size() <= 0)
+        return true;
+
+    Instance size = queryInstance("num_physpages");
+    if (!size.isValid()) {
+        debugerr("Failed to query variable \"num_physpages\".");
+        return true;
+    }
+    quint64 nr_pages = size.toULong();
+
+    if (expectedSize)
+        *expectedSize = nr_pages << 12;
+
+    // Make sure the no. of pages matches approximately +-10%
+    quint64 avail_pages = _file->size() >> 12;
+    return (avail_pages * 0.9 <= nr_pages) && (avail_pages * 1.1 >= nr_pages);
+}
+
+
 SlubObjects::ObjectValidity MemoryDump::validate(const Instance *inst) const
 {
     return _slubs.objectValid(inst);
