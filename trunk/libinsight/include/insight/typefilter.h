@@ -462,9 +462,116 @@ private:
 
 
 /**
+ * This class manages the filter options for a Function object.
+ */
+class FunctionFilter: public TypeFilter
+{
+public:
+    /**
+     * Constructor
+     * @param symFiles list of files the symbols in SymFactory were parsed from
+     */
+    FunctionFilter(const QStringList& symFiles = QStringList())
+        : _symFileRegEx(0), _symFiles(symFiles) {}
+
+    /**
+     * Copy constructor
+     * @param from initialize from this object
+     */
+    FunctionFilter(const FunctionFilter& from);
+
+    /**
+     * Destructor
+     */
+    virtual ~FunctionFilter();
+
+    /**
+     * Assignment operator
+     */
+    FunctionFilter& operator=(const FunctionFilter& src);
+
+    /**
+     * Comparison operator
+     * @param other compare to
+     */
+    inline bool operator==(const FunctionFilter& other) const
+    {
+        return TypeFilter::operator ==(other) && _symFile == other._symFile;
+    }
+
+    /**
+     * Comparison operator
+     * @param other compare to
+     */
+    inline bool operator!=(const FunctionFilter& other) const
+    {
+        return !operator==(other);
+    }
+
+    /**
+     * \copydoc GenericFilter::clear()
+     */
+    virtual void clear();
+
+    /**
+     * @copydoc TypeFilter::matchType()
+     */
+    bool matchType(const BaseType* type) const;
+
+    /**
+     * \copydoc GenericFilter::parseOption()
+     */
+    virtual bool parseOption(const QString& key, const QString& value,
+                             const KeyValueStore *keyVals = 0);
+
+    /**
+     * Returns the symbol file name or pattern.
+     */
+    inline const QString& symFileName() const { return _symFile; }
+
+    /**
+     * Sets the symbol file name or pattern this filter matches on.
+     * @param name file name or pattern (depending on \a syntax)
+     * @param syntax the pattern syntax used in \a name
+     * \sa symFileName(), symFileNameSyntax()
+     */
+    void setSymFileName(const QString& name,
+                        Filter::PatternSyntax syntax = Filter::psAuto);
+
+    /**
+     * Returns the pattern syntax used for the symbol file name.
+     * \sa setSymFileName()
+     */
+    Filter::PatternSyntax symFileNameSyntax() const;
+
+    /**
+     * \copydoc GenericFilter::toString()
+     */
+    virtual QString toString(const ColorPalette* col = 0) const;
+
+    /**
+     * Returns a key-value list of parameters this filter can parse. The key
+     * is the name of the parameter, the value holds a short description of the
+     * parameter and its values.
+     * @return key-value list of parameters this filter parses
+     * \sa parseOption()
+     */
+    static const KeyValueStore& supportedFilters();
+
+protected:
+    bool matchSymFileName(const QString& name) const;
+
+private:
+    QRegExp* _symFileRegEx;
+    QString _symFile;
+    const QStringList& _symFiles;
+};
+
+
+/**
  * This class manages the filter options for a Variable object.
  */
-class VariableFilter: public TypeFilter
+class VariableFilter: public FunctionFilter
 {
 public:
     /**
@@ -472,7 +579,7 @@ public:
      * @param symFiles list of files the symbols in SymFactory were parsed from
      */
     VariableFilter(const QStringList& symFiles = QStringList())
-        : _varRegEx(0), _symFileRegEx(0), _symFiles(symFiles) {}
+        : FunctionFilter(symFiles), _varRegEx(0) {}
 
     /**
      * Copy constructor
@@ -497,7 +604,7 @@ public:
     inline bool operator==(const VariableFilter& other) const
     {
         // Do NOT compare the _varRegEx pointer
-        return TypeFilter::operator ==(other);
+        return FunctionFilter::operator ==(other);
     }
 
     /**
@@ -549,26 +656,6 @@ public:
     Filter::PatternSyntax varNameSyntax() const;
 
     /**
-     * Returns the symbol file name or pattern.
-     */
-    inline const QString& symFileName() const { return _symFile; }
-
-    /**
-     * Sets the symbol file name or pattern this filter matches on.
-     * @param name file name or pattern (depending on \a syntax)
-     * @param syntax the pattern syntax used in \a name
-     * \sa symFileName(), symFileNameSyntax()
-     */
-    void setSymFileName(const QString& name,
-                        Filter::PatternSyntax syntax = Filter::psAuto);
-
-    /**
-     * Returns the pattern syntax used for the symbol file name.
-     * \sa setSymFileName()
-     */
-    Filter::PatternSyntax symFileNameSyntax() const;
-
-    /**
      * \copydoc GenericFilter::toString()
      */
     virtual QString toString(const ColorPalette* col = 0) const;
@@ -584,14 +671,10 @@ public:
 
 protected:
     bool matchVarName(const QString& name) const;
-    bool matchSymFileName(const QString& name) const;
 
 private:
     QString _varName;
     QRegExp* _varRegEx;
-    QRegExp* _symFileRegEx;
-    QString _symFile;
-    const QStringList& _symFiles;
 };
 
 
