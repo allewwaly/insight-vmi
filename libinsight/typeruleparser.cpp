@@ -483,10 +483,10 @@ void TypeRuleParser::handleError(const QString& severity,
 }
 
 
-static XmlSchema ruleSchema;
-
 const XmlSchema &TypeRuleParser::schema()
 {
+    static XmlSchema ruleSchema;
+
     if (ruleSchema.isEmpty()) {
         QStringList osfAttr(OsFilter::supportedFilters().keys());
         osfAttr.prepend(xml::priority);
