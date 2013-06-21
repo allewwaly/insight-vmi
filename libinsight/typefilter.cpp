@@ -193,7 +193,7 @@ bool GenericFilter::matchType(const BaseType *type) const
 
     if (filterActive(ftTypeId)) {
         const BaseType* t = type;
-        while (t && !(t->id() & _typeId)) {
+        while (t && !(t->id() == _typeId)) {
             if (t->type() & BaseType::trLexical)
                 t = dynamic_cast<const RefBaseType*>(t)->refType();
             else
