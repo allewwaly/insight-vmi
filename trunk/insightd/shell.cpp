@@ -1005,10 +1005,12 @@ int Shell::cmdList(QStringList args)
             return cmdListSources(args);
         }
         else if (QString("functions").startsWith(s)) {
-            return cmdListTypes(args, rtFunction);
+            FunctionFilter filter;
+            return cmdListTypes(args, filter, rtFunction);
         }
         else if (s.length() <= 5 && QString("types").startsWith(s)) {
-            return cmdListTypes(args, ~rtFunction);
+            TypeFilter filter;
+            return cmdListTypes(args, filter, ~rtFunction);
         }
         else if (s.length() >= 7 && QString("types-using").startsWith(s)) {
             return cmdListTypesUsing(args);
@@ -1083,12 +1085,15 @@ int Shell::cmdListSources(QStringList /*args*/)
 }
 
 
-int Shell::cmdListTypes(QStringList args, int typeFilter)
+int Shell::cmdListTypes(QStringList args, TypeFilter& filter, int typeFilter)
 {
-    if (!args.isEmpty() && args.first() == "help")
-        return printFilterHelp(TypeFilter::supportedFilters());
+    if (!args.isEmpty() && args.first() == "help") {
+        return printFilterHelp(
+                    dynamic_cast<FunctionFilter*>(&filter)
+                    ? FunctionFilter::supportedFilters()
+                    : TypeFilter::supportedFilters());
+    }
 
-    TypeFilter filter;
     try {
         filter.parseOptions(args);
         if (filter.filterActive(Filter::ftRealType))
@@ -3097,7 +3102,6 @@ int Shell::cmdMemoryDetect(QStringList args)
 {
     Detect d(_sym);
     QString type;
-    int index = 0;
 
     if (args.size() < 1)
         return cmdHelp(QStringList("memory"));
@@ -3107,11 +3111,7 @@ int Shell::cmdMemoryDetect(QStringList args)
     args.pop_front();
 
     // Did the user provie an index?
-    if (args.size() >= 1)
-    {
-        index = parseMemDumpIndex(args);
-    }
-
+    int index = parseMemDumpIndex(args);
     if (index < 0)
         return index;
 
