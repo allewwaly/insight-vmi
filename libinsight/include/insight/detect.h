@@ -17,15 +17,25 @@ public:
 
     struct ExecutablePage
     {
-        ExecutablePage() : address(0), type(UNDEFINED), module(""), hash() {}
+        ExecutablePage() : address(0), type(UNDEFINED), module(""),
+                           hash(), data(0), data_len(0) {}
 
-        ExecutablePage(quint64 address, PageType type, QString module, QByteArray hash) :
-            address(address), type(type), module(module), hash(hash) {}
+        ExecutablePage(quint64 address, PageType type, QString module,
+                       QByteArray hash, char *data, quint32 data_len) :
+                        address(address), type(type), module(module),
+                        hash(hash), data(data), data_len(data_len) {}
+
+        ~ExecutablePage()
+        {
+            //free(data);
+        }
 
         quint64 address;
         PageType type;
         QString module;
         QByteArray hash;
+        char *data;
+        quint32 data_len;
     };
 
     Detect(KernelSymbols &sym);
@@ -42,10 +52,16 @@ private:
     quint64 _current_page;
     quint64 _final_page;
 
+    QList<quint64> _current_offsets;
+    QList<quint64> _current_sizes;
+    char *_current_data;
+    QString _current_file;
+
     KernelSymbols &_sym;
 
     static QMultiHash<quint64, ExecutablePage> *ExecutablePages;
 
+    void getExecutableSections(QString file);
     quint64 inVmap(quint64 address, VirtualMemory *vmem);
     void verifyHashes(QMultiHash<quint64, ExecutablePage> *current);
 };
