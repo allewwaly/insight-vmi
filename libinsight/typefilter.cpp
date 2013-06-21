@@ -745,18 +745,170 @@ void TypeFilter::parseOptions(const QStringList &list)
 
 
 //------------------------------------------------------------------------------
-// VariableFilter
+// FunctionFilter
 //------------------------------------------------------------------------------
 
 static const QStringList emptyList;
 
+FunctionFilter::FunctionFilter(const FunctionFilter &from)
+    : TypeFilter(from), _symFileRegEx(0), _symFiles(emptyList)
+{
+    if (from._symFileRegEx)
+        _symFileRegEx = new QRegExp(*from._symFileRegEx);
+}
+
+
+FunctionFilter::~FunctionFilter()
+{
+    if (_symFileRegEx)
+        delete _symFileRegEx;
+}
+
+
+void FunctionFilter::setSymFileName(const QString &name, Filter::PatternSyntax syntax)
+{
+    _filters &= ~ftSymFileAll;
+    QRegExp rx;
+    syntax = setNamePattern(name, _symFile, rx, syntax, "[-_.a-zA-Z0-9]*");
+
+    switch (syntax) {
+    case psAuto: break;
+    case psAny:      _filters |= ftSymFileAny; break;
+    case psLiteral:  _filters |= ftSymFileLiteral; break;
+    case psRegExp:   _filters |= ftSymFileRegEx; break;
+    case psWildcard: _filters |= ftSymFileWildcard; break;
+    }
+
+    if (_symFileRegEx)
+        delete _symFileRegEx;
+    if (syntax & (psRegExp|psWildcard))
+        _symFileRegEx = new QRegExp(rx);
+    else
+        _symFileRegEx = 0;
+}
+
+
+Filter::PatternSyntax FunctionFilter::symFileNameSyntax() const
+{
+    if (filterActive(ftSymFileAny))
+        return psAny;
+    else if (filterActive(ftSymFileRegEx))
+        return psRegExp;
+    else if (filterActive(ftSymFileWildcard))
+        return psWildcard;
+    else
+        return psLiteral;
+}
+
+
+void FunctionFilter::clear()
+{
+    TypeFilter::clear();
+    if (_symFileRegEx) {
+        delete _symFileRegEx;
+        _symFileRegEx = 0;
+    }
+    _symFile.clear();
+}
+
+
+bool FunctionFilter::matchType(const BaseType *type) const
+{
+    if (!type)
+        return false;
+
+    if (filterActive(ftSymFileAll) &&
+             !matchSymFileName(type->origFileName()))
+        return false;
+
+    return TypeFilter::matchType(type);
+}
+
+
+bool FunctionFilter::matchSymFileName(const QString &name) const
+{
+    if (filterActive(ftSymFileLiteral) &&
+        _symFile.compare(name, Qt::CaseInsensitive) != 0)
+        return false;
+    else {
+        QMutexLocker lock(&_regExLock);
+        if (filterActive(ftSymFileWildcard) &&
+            !_symFileRegEx->exactMatch(name))
+            return false;
+        else if (filterActive(ftSymFileRegEx) &&
+                 _symFileRegEx->indexIn(name) < 0)
+            return false;
+    }
+
+    return true;
+}
+
+
+bool FunctionFilter::parseOption(const QString &key, const QString &value,
+                                 const KeyValueStore* keyVals)
+{
+    if (QString(xml::filename).startsWith(key))
+        setSymFileName(value, givenSyntax(keyVals));
+    else
+        return TypeFilter::parseOption(key, value, keyVals);
+
+    return true;
+}
+
+
+QString FunctionFilter::toString(const ColorPalette *col) const
+{
+    QString s(TypeFilter::toString(col));
+
+    if (filterActive(ftSymFileAny)) {
+        s += QString("%0 %1\n")
+                .arg(Console::colorize("Sym. file:", ctColHead, col))
+                .arg(Console::colorize(QString("(%1)").arg(xml::any),
+                                         ctSrcFile, col));
+    }
+    else if (filterActive(ftSymFileLiteral)) {
+        s += QString("%0 %1\n")
+                .arg(Console::colorize("Sym. file:", ctColHead, col))
+                .arg(Console::colorize(_symFile, ctSrcFile, col));
+    }
+    else if (filterActive(ftSymFileRegEx)) {
+        s += QString("%0 %2\n")
+                .arg(Console::colorize("Sym. file (%1):", ctColHead, col))
+                .arg(xml::regex)
+                .arg(Console::colorize(_symFile, ctSrcFile, col));
+    }
+    else if (filterActive(ftSymFileWildcard)) {
+        s += QString("%0 %2\n")
+                .arg(Console::colorize("Sym. file (%1):", ctColHead, col))
+                .arg(xml::wildcard)
+                .arg(Console::colorize(_symFile, ctSrcFile, col));
+    }
+
+    return s;
+}
+
+
+const KeyValueStore &FunctionFilter::supportedFilters()
+{
+    static KeyValueStore funcFilters;
+    if (funcFilters.isEmpty()) {
+        funcFilters = TypeFilter::supportedFilters();
+        funcFilters[xml::filename] = "Match symbol file the symbol belongs to, "
+                "e.g. \"vmlinux\" or \"*/snd.ko\".";
+    }
+    return funcFilters;
+}
+
+
+//------------------------------------------------------------------------------
+// VariableFilter
+//------------------------------------------------------------------------------
+
 VariableFilter::VariableFilter(const VariableFilter& from)
-    : TypeFilter(from), _varRegEx(0), _symFileRegEx(0), _symFiles(emptyList)
+    : FunctionFilter(from), _varRegEx(0)
 {
     if (from._varRegEx)
         _varRegEx = new QRegExp(*from._varRegEx);
-    if (from._symFileRegEx)
-        _symFileRegEx = new QRegExp(*from._symFileRegEx);
 }
 
 
@@ -764,8 +916,6 @@ VariableFilter::~VariableFilter()
 {
     if (_varRegEx)
         delete _varRegEx;
-    if (_symFileRegEx)
-        delete _symFileRegEx;
 }
 
 
@@ -804,25 +954,6 @@ bool VariableFilter::matchVarName(const QString &name) const
 }
 
 
-bool VariableFilter::matchSymFileName(const QString &name) const
-{
-    if (filterActive(ftSymFileLiteral) &&
-        _symFile.compare(name, Qt::CaseInsensitive) != 0)
-        return false;
-    else {
-        QMutexLocker lock(&_regExLock);
-        if (filterActive(ftSymFileWildcard) &&
-            !_symFileRegEx->exactMatch(name))
-            return false;
-        else if (filterActive(ftSymFileRegEx) &&
-                 _symFileRegEx->indexIn(name) < 0)
-            return false;
-    }
-
-    return true;
-}
-
-
 bool VariableFilter::matchVar(const Variable *var) const
 {
     if (!var)
@@ -830,27 +961,29 @@ bool VariableFilter::matchVar(const Variable *var) const
 
     if (filterActive(ftVarNameAll) && !matchVarName(var->name()))
         return false;
-    else if (filterActive(ftSymFileAll) &&
+
+    // Note: FunctionFilter::matchType() matches the type's origFileName()
+    // against the symFile. What we want here is to match var-origFileName()
+    // against the symFile. So we do the check here ourself and delegate the
+    // final decision to TypeFilter::matchType() below as opposed to
+    // FunctionFilter::matchType().
+    if (filterActive(ftSymFileAll) &&
              !matchSymFileName(var->origFileName()))
         return false;
 
+    // DON'T call FunctionFilter::matchType() here!
     return TypeFilter::matchType(var->refType());
 }
 
 
 void VariableFilter::clear()
 {
-    TypeFilter::clear();
+    FunctionFilter::clear();
     if (_varRegEx) {
         delete _varRegEx;
         _varRegEx = 0;
     }
     _varName.clear();
-    if (_symFileRegEx) {
-        delete _symFileRegEx;
-        _symFileRegEx = 0;
-    }
-    _symFile.clear();
 }
 
 
@@ -890,45 +1023,9 @@ PatternSyntax VariableFilter::varNameSyntax() const
 }
 
 
-void VariableFilter::setSymFileName(const QString &name, Filter::PatternSyntax syntax)
-{
-    _filters &= ~ftSymFileAll;
-    QRegExp rx;
-    syntax = setNamePattern(name, _symFile, rx, syntax, "[-_.a-zA-Z0-9]*");
-
-    switch (syntax) {
-    case psAuto: break;
-    case psAny:      _filters |= ftSymFileAny; break;
-    case psLiteral:  _filters |= ftSymFileLiteral; break;
-    case psRegExp:   _filters |= ftSymFileRegEx; break;
-    case psWildcard: _filters |= ftSymFileWildcard; break;
-    }
-
-    if (_symFileRegEx)
-        delete _symFileRegEx;
-    if (syntax & (psRegExp|psWildcard))
-        _symFileRegEx = new QRegExp(rx);
-    else
-        _symFileRegEx = 0;
-}
-
-
-Filter::PatternSyntax VariableFilter::symFileNameSyntax() const
-{
-    if (filterActive(ftSymFileAny))
-        return psAny;
-    else if (filterActive(ftSymFileRegEx))
-        return psRegExp;
-    else if (filterActive(ftSymFileWildcard))
-        return psWildcard;
-    else
-        return psLiteral;
-}
-
-
 QString VariableFilter::toString(const ColorPalette *col) const
 {
-    QString s(TypeFilter::toString(col));
+    QString s(FunctionFilter::toString(col));
 
     if (filterActive(ftVarNameAny)) {
         s += QString("%0 %1\n")
@@ -958,15 +1055,11 @@ QString VariableFilter::toString(const ColorPalette *col) const
 }
 
 
-static KeyValueStore varFilters;
-
 const KeyValueStore &VariableFilter::supportedFilters()
 {
+    static KeyValueStore varFilters;
     if (varFilters.isEmpty()) {
-        varFilters = TypeFilter::supportedFilters();
-        varFilters[xml::variablename] = "Match variable name, either by a "
-                "literal match, by a wildcard expression *glob*, or by a "
-                "regular expression /re/.";
+        varFilters = FunctionFilter::supportedFilters();
         varFilters[xml::filename] = "Match symbol file the variable belongs to, "
                 "e.g. \"vmlinux\" or \"snd.ko\".";
     }
@@ -979,10 +1072,8 @@ bool VariableFilter::parseOption(const QString &key, const QString &value,
 {
     if (QString(xml::variablename).startsWith(key))
         setVarName(value, givenSyntax(keyVals));
-    else if (QString(xml::filename).startsWith(key))
-        setSymFileName(value, givenSyntax(keyVals));
     else
-        return TypeFilter::parseOption(key, value, keyVals);
+        return FunctionFilter::parseOption(key, value, keyVals);
 
     return true;
 }
