@@ -4,22 +4,27 @@
 #include <insight/console.h>
 
 #include <QCryptographicHash>
+#include <QRegExp>
+#include <QProcess>
 
 #include <limits>
 
 #define PAGE_SIZE 4096
+#define OFFSET_PREFIX "OFFSET"
+#define SIZE_PREFIX "SIZE"
 
 QMultiHash<quint64, Detect::ExecutablePage> *Detect::ExecutablePages = 0;
 
 Detect::Detect(KernelSymbols &sym) :
     _kernel_code_begin(0),
-    _kernel_code_end(0), _vsyscall_page(0), _sym(sym)
+    _kernel_code_end(0), _vsyscall_page(0), _current_data(0), _sym(sym)
 {
     // Get data from System.map
     _kernel_code_begin = _sym.memSpecs().systemMap.value("_text").address;
     // This includes more than the kernel code. We may need to change this value.
     _kernel_code_end = _sym.memSpecs().systemMap.value("__bss_stop").address;
-    _vsyscall_page = _sym.memSpecs().systemMap.value("vgettimeofday").address;
+    //_kernel_code_end = _sym.memSpecs().systemMap.value("_etext").address;
+    _vsyscall_page = _sym.memSpecs().systemMap.value("VDSO64_PRELINK").address;
 
     if (!_kernel_code_begin || !_kernel_code_end || !_vsyscall_page) {
         std::cout << "WARNING - Could not find all required values within the System.Map!" << std::endl;
@@ -29,6 +34,89 @@ Detect::Detect(KernelSymbols &sym) :
     }
 }
 
+void Detect::getExecutableSections(QString file)
+{
+    QProcess helper;
+    quint64 total_size = 0;
+    quint64 current_pos = 0;
+
+    // Regex
+    int pos = 0;
+    QRegExp regex_offsets(OFFSET_PREFIX ":\\s*([0-9a-fA-F]+)", Qt::CaseInsensitive);
+    QRegExp regex_sizes(SIZE_PREFIX ":\\s*([0-9a-fA-F]+)", Qt::CaseInsensitive);
+
+    // Free old data
+    _current_offsets.clear();
+    _current_sizes.clear();
+
+    if (_current_data)
+    {
+        free(_current_data);
+        _current_data = 0;
+    }
+
+    // Get Executable Sections
+    helper.start("readelf -a /lib/modules/3.2.0-44-generic/kernel/arch/x86/kvm/kvm.ko | grep \"AX\" -B 1 | "
+                 "awk \'/\[ / { print \"Offset: \" $6 } /\[[0-9]/ {print \"" OFFSET_PREFIX ": \" $5} "
+                 "{ if(!/(\[|-)/) print \"" SIZE_PREFIX ": \" $1}\'\")");
+
+    helper.waitForFinished();
+
+    QString output(helper.readAll());
+
+    // Extract data
+    // First offsets
+    while ((pos = regex_offsets.indexIn(output, pos)) != -1)
+    {
+        _current_offsets << regex_offsets.cap(1).toULongLong(0, 16);
+        pos += regex_offsets.matchedLength();
+    }
+
+    // Then Sizes
+    while ((pos = regex_sizes.indexIn(output, pos)) != -1)
+    {
+        _current_sizes << regex_sizes.cap(1).toULongLong(0, 16);
+        total_size += regex_sizes.cap(1).toULongLong(0, 16);
+        pos += regex_sizes.matchedLength();
+    }
+
+    // Reserve memory
+    _current_data = (char *)malloc(total_size * sizeof(char));
+
+    if (!_current_data)
+    {
+        debugerr("Could not reserve memory for the data region!");
+        return;
+    }
+
+    // Open file
+    QFile f(file);
+
+    if (!f.open(QIODevice::ReadOnly))
+    {
+        debugerr("Could not open file " << file << "!");
+        return;
+    }
+
+    // Get the data from the sections
+    current_pos = 0;
+    for (pos = 0; pos < _current_offsets.count(); ++pos)
+    {
+        if (!f.seek(_current_offsets.at(pos)))
+        {
+            debugerr("Could not seek to position " << _current_offsets.at(pos) << "!");
+            return;
+        }
+
+        if ((quint64)f.read(_current_data + current_pos, _current_sizes.at(pos)) != _current_sizes.at(pos))
+        {
+            debugerr("An error occurred while reading " << _current_sizes.at(pos) << " from pos " << _current_offsets.at(pos) << "!");
+        }
+
+        current_pos += _current_sizes.at(pos);
+    }
+
+}
 
 quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
 {
@@ -116,9 +204,29 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
             currentPages.at(i).hash) {
             changedPages++;
 
-            std::cout << "\rWARNING: Detected changed code page @ 0x"
-                      << std::hex << currentPages.at(i).address << std::dec
-                      << " (" << currentPages.at(i).module << ")" << std::endl;
+            Console::out()
+                    << "\r" << Console::color(ctWarningLight)
+                    << "WARNING:" << Console::color(ctReset)
+                    << " Detected modified code page @ "
+                    << Console::color(ctAddress) << "0x" << hex
+                    << currentPages.at(i).address
+                    << Console::color(ctReset)<< dec
+                    << " (" << currentPages.at(i).module << ")" << endl;
+
+            // Compare pages and print diffs
+            for (quint32 j = 0; j < currentPages.at(i).data_len; ++j) {
+
+                if (currentPages.at(i).data[j] !=
+                    ExecutablePages->value(currentPages.at(i).address).data[j]) {
+
+                    Console::out()
+                            << "\t" << hex << "0x" << (currentPages.at(i).address + j) << ": "
+                            << (quint8) ExecutablePages->value(currentPages.at(i).address).data[j]
+                            << " => "
+                            << (quint8) currentPages.at(i).data[j]
+                            << dec << endl;
+                }
+            }
         }
 
         totalVerified++;
@@ -128,9 +236,10 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
     operationStopped();
 
     // Print Stats
-    std::cout << "\r\nVerified " << totalVerified << " hashes in " << elapsedTime() << " min" << std::endl;
-    std::cout << "\t Found " << newPages << " new pages." << std::endl;
-    std::cout << "\t Detected " << changedPages << " modified pages." << std::endl;
+    Console::out()
+        << "\r\nVerified " << totalVerified << " hashes in " << elapsedTime() << " min" << endl
+        << "\t Found " << newPages << " new pages." << endl
+        << "\t Detected " << Console::color(ctError) << changedPages << Console::color(ctReset) << " modified pages." << endl;
 
     // Exchange
     delete(ExecutablePages);
@@ -175,6 +284,8 @@ void Detect::hiddenCode(int index)
     // Statistics
     quint64 processed_pages = 0;
     quint64 executeable_pages = 0;
+    quint64 nonexecutable_pages = 0;
+    quint64 nonsupervisor_pages = 0;
     quint64 hidden_pages = 0;
     quint64 lazy_pages = 0;
     quint64 vmap_pages = 0;
@@ -183,6 +294,7 @@ void Detect::hiddenCode(int index)
     QMultiHash<quint64, ExecutablePage> *currentHashes = new QMultiHash<quint64, ExecutablePage>();
     QCryptographicHash hash(QCryptographicHash::Sha1);
     char* data = 0;
+    qint32 data_len = 0;
 
     // Start the Operation
     operationStarted();
@@ -213,46 +325,38 @@ void Detect::hiddenCode(int index)
         if (!ptEntries.isPresent())
             continue;
 
-        // Is this an executable and writeable page?
-        // This check is only possible on 64-bit systems or if PAE is enabled
-        /*
-          In case of UBUNTU 2.6.15 the whole kernel address space seems to be
-          writable. So we removed this part, since it really did non provide
-          useful information.
+        //debugmsg("Address: " << std::hex << i << std::dec << ", Size: " << ptEntries.nextPageOffset(_sym.memSpecs()));
 
-          The reason for this seems to be that the kernel uses default allocation
-          flags for the pages which are readable and writeable independent of the pages
-          content.
-
-        if (((_sym.memSpecs().arch & (_sym.memSpecs().ar_x86_64)) ||
-                (_sym.memSpecs().arch & (_sym.memSpecs().ar_pae_enabled))) &&
-                ((flags & vmem->ReadWrite) && !(flags & vmem->NX)))
-        {
-            Console::out() << "\rWARNING: Detected a writable and executable page @ 0x"
-                      << hex << i << dec << endl;
-        }
-
-        else if ((flags & vmem->NX))
+        if (!ptEntries.isExecutable())
         {
             // This one is not executable
+            nonexecutable_pages++;
             continue;
         }
-        */
-        if (!ptEntries.isSupervisor())
+        else if (!ptEntries.isSupervisor())
         {
             // We are only interested in supervisor pages.
             // Notice that this filter allows us to get rid of I/O pages.
+            nonsupervisor_pages++;
             continue;
         }
-        else if (ptEntries.isExecutable())
+        else
         {
             executeable_pages++;
 
-            // Allocate mem
-            if (data)
-                free(data);
+            // Is this page also writeable?
+            /*
+            if (ptEntries.isWriteable())
+            {
+                Console::out() << "\rWARNING: Detected a writable and executable page @ 0x"
+                               << hex << i << dec << endl;
+            }
+            */
 
-            data = (char *)malloc(ptEntries.nextPageOffset(_sym.memSpecs()) * sizeof(char));
+            // Allocate mem
+            data = 0;
+            data_len = ptEntries.nextPageOffset(_sym.memSpecs());
+            data = (char *)malloc(data_len * sizeof(char));
 
             if (!data) {
                 std::cout << "ERROR: Could not allocate memory!" << std::endl;
@@ -260,25 +364,24 @@ void Detect::hiddenCode(int index)
             }
 
             // Get data
-            if ((quint64)vmem->readAtomic(i, data, ptEntries.nextPageOffset(_sym.memSpecs())) !=
-                    ptEntries.nextPageOffset(_sym.memSpecs())) {
+            if ((quint64)vmem->readAtomic(i, data, data_len) != data_len) {
                 std::cout << "ERROR: Could not read data of page!" << std::endl;
                 return;
             }
 
             // Calculate hash
             hash.reset();
-            hash.addData(data, ptEntries.nextPageOffset(_sym.memSpecs()));
+            hash.addData(data, data_len);
 
             // Lies the page within the kernel code area?
             if (i >= _kernel_code_begin && i <= _kernel_code_end) {
-                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result()));
+                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result(), data, data_len));
                 continue;
             }
 
             // Vsyscall page?
             if (i == _vsyscall_page) {
-                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result()));
+                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result(), data, data_len));
                 continue;
             }
 
@@ -296,7 +399,8 @@ void Detect::hiddenCode(int index)
                 if (i >= currentModuleCore &&
                     i <= (currentModuleCore + currentModuleCoreSize)) {
                     found = true;
-                    currentHashes->insert(i, ExecutablePage(i, MODULE, currentModule.member("name").toString(), hash.result()));
+                    currentHashes->insert(i, ExecutablePage(i, MODULE, currentModule.member("name").toString(),
+                                                            hash.result(), data, data_len));
                     break;
                 }
 //                else {
@@ -358,11 +462,11 @@ void Detect::hiddenCode(int index)
 
                 if (flags & 0x1) {
                     lazy_pages++;
-                    currentHashes->insert(i, ExecutablePage(i, LAZY, "vmap-lazy", hash.result()));
+                    currentHashes->insert(i, ExecutablePage(i, LAZY, "vmap-lazy", hash.result(), data, data_len));
                 }
                 else {
                     vmap_pages++;
-                    currentHashes->insert(i, ExecutablePage(i, VMAP, "vmap", hash.result()));
+                    currentHashes->insert(i, ExecutablePage(i, VMAP, "vmap", hash.result(), data, data_len));
                 }
             }
 
@@ -391,7 +495,10 @@ void Detect::hiddenCode(int index)
                 }
                 else
                     Console::out() << ' ';
-                Console::out() << ")" << endl;
+                Console::out() << ") (Size: 0x"
+                               << hex << ptEntries.nextPageOffset(_sym.memSpecs()) << dec
+                               << ")"
+                               << endl;
 
                 Console::out()
                         << Console::color(ctDim)
@@ -411,10 +518,12 @@ void Detect::hiddenCode(int index)
 
     // Print Stats
     Console::out() << "\r\nProcessed " << processed_pages << " pages in " << elapsedTime() << " min" << endl;
-    Console::out() << "\t Found " << executeable_pages << " executable pages." << endl;
+    Console::out() << "\t Found " << nonexecutable_pages << " non-executable pages." << endl;
+    Console::out() << "\t Found " << nonsupervisor_pages << " executable non-supervisor pages." << endl;
+    Console::out() << "\t Found " << executeable_pages << " executable supervisor pages." << endl;
     Console::out() << "\t Found " << vmap_pages << " vmapped pages." << endl;
     Console::out() << "\t Found " << lazy_pages << " not yet unmapped pages." << endl;
-    Console::out() << "\t Detected " << hidden_pages << " hidden pages." << endl;
+    Console::out() << "\t Detected " << Console::color(ctError) << hidden_pages << Console::color(ctReset) << " hidden pages.\n" << endl;
 
     // Verify hashes
     verifyHashes(currentHashes);
