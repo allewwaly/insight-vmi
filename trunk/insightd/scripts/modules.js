@@ -47,8 +47,9 @@ function printModuleListRules()
 {
     var head = new Instance("modules");
 
+    var w_addr = 18;
     var w_mod = 20;
-    println(lalign("Address", 18) + " " + lalign("Module [Args]", w_mod) + " Used by");
+    println(lalign("Address", w_addr) + " " + lalign("Module [Args]", w_mod) + " Used by");
 
     // Iterate over all modules
     var m = head.next;
@@ -58,26 +59,31 @@ function printModuleListRules()
     {
         // Build list of modules which use the current module
         var usedList = "";
-        var u = m.modules_which_use_me.next;
-        while (u.TypeId() == m.TypeId() &&
-               u.MemberAddress("list", true) != m.modules_which_use_me.Address())
-        {
-            if (usedList.length > 0)
-            usedList = usedList + ", ";
-            usedList = usedList + u.module_which_uses.name.toString();
-            u = u.list.next;
+        if (m.MemberExists("modules_which_use_me")) {
+            var u = m.modules_which_use_me.next;
+            while (u.TypeId() == m.TypeId() &&
+                   u.MemberAddress("list", true) != m.modules_which_use_me.Address())
+            {
+                if (usedList.length > 0)
+                    usedList = usedList + ", ";
+                usedList = usedList + u.module_which_uses.name.toString();
+                u = u.list.next;
+            }
+        }
+        else {
+            usedList = "n/a";
         }
 
-        var name = "0x" + lalign(m.Address().toString(16), 16);
-        name += " ";
-        name += m.name.toString();
+        print("0x" + lalign(m.Address().toString(16), 16) + " ");
+
+        var name = m.name.toString();
         if (m.args.toString().length > 0)
-        name += " [" + m.args.toString() + "]";
+            name += " [" + m.args.toString() + "]";
 
         if (usedList.length > 0)
-        println(lalign(name, w_mod) + " " + usedList);
+            println(lalign(name, w_mod) + " " + usedList);
         else
-        println(name);
+            println(name);
 
         m = m.list.next;
     }
