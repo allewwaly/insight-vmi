@@ -1060,8 +1060,9 @@ const KeyValueStore &VariableFilter::supportedFilters()
     static KeyValueStore varFilters;
     if (varFilters.isEmpty()) {
         varFilters = FunctionFilter::supportedFilters();
-        varFilters[xml::filename] = "Match symbol file the variable belongs to, "
-                "e.g. \"vmlinux\" or \"snd.ko\".";
+        varFilters[xml::variablename] = "Match variable name, either by a "
+                "literal match, by a wildcard expression *glob*, or by a "
+                "regular expression /re/.";
     }
     return varFilters;
 }
