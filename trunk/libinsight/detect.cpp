@@ -214,7 +214,7 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
                     << " (" << currentPages.at(i).module << ")" << endl;
 
             // Compare pages and print diffs
-            for (quint32 j = 0; j < currentPages.at(i).data_len; ++j) {
+            for (int j = 0; j < currentPages.at(i).data.size(); ++j) {
 
                 if (currentPages.at(i).data[j] !=
                     ExecutablePages->value(currentPages.at(i).address).data[j]) {
@@ -293,8 +293,6 @@ void Detect::hiddenCode(int index)
     // Hash
     QMultiHash<quint64, ExecutablePage> *currentHashes = new QMultiHash<quint64, ExecutablePage>();
     QCryptographicHash hash(QCryptographicHash::Sha1);
-    char* data = 0;
-    qint32 data_len = 0;
 
     // Start the Operation
     operationStarted();
@@ -353,35 +351,29 @@ void Detect::hiddenCode(int index)
             }
             */
 
-            // Allocate mem
-            data = 0;
-            data_len = ptEntries.nextPageOffset(_sym.memSpecs());
-            data = (char *)malloc(data_len * sizeof(char));
-
-            if (!data) {
-                std::cout << "ERROR: Could not allocate memory!" << std::endl;
-                return;
-            }
+            // Create ByteArray
+            QByteArray data;
+            data.resize(ptEntries.nextPageOffset(_sym.memSpecs()));
 
             // Get data
-            if ((quint64)vmem->readAtomic(i, data, data_len) != data_len) {
+            if ((quint64)vmem->readAtomic(i, data.data(), data.size()) != data.size()) {
                 std::cout << "ERROR: Could not read data of page!" << std::endl;
                 return;
             }
 
             // Calculate hash
             hash.reset();
-            hash.addData(data, data_len);
+            hash.addData(data);
 
             // Lies the page within the kernel code area?
             if (i >= _kernel_code_begin && i <= _kernel_code_end) {
-                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result(), data, data_len));
+                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result(), data));
                 continue;
             }
 
             // Vsyscall page?
             if (i == _vsyscall_page) {
-                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result(), data, data_len));
+                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result(), data));
                 continue;
             }
 
@@ -400,7 +392,7 @@ void Detect::hiddenCode(int index)
                     i <= (currentModuleCore + currentModuleCoreSize)) {
                     found = true;
                     currentHashes->insert(i, ExecutablePage(i, MODULE, currentModule.member("name").toString(),
-                                                            hash.result(), data, data_len));
+                                                            hash.result(), data));
                     break;
                 }
 //                else {
@@ -462,11 +454,11 @@ void Detect::hiddenCode(int index)
 
                 if (flags & 0x1) {
                     lazy_pages++;
-                    currentHashes->insert(i, ExecutablePage(i, LAZY, "vmap-lazy", hash.result(), data, data_len));
+                    currentHashes->insert(i, ExecutablePage(i, LAZY, "vmap-lazy", hash.result(), data));
                 }
                 else {
                     vmap_pages++;
-                    currentHashes->insert(i, ExecutablePage(i, VMAP, "vmap", hash.result(), data, data_len));
+                    currentHashes->insert(i, ExecutablePage(i, VMAP, "vmap", hash.result(), data));
                 }
             }
 
