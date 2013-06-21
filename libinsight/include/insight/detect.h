@@ -18,24 +18,18 @@ public:
     struct ExecutablePage
     {
         ExecutablePage() : address(0), type(UNDEFINED), module(""),
-                           hash(), data(0), data_len(0) {}
+                           hash(), data() {}
 
         ExecutablePage(quint64 address, PageType type, QString module,
-                       QByteArray hash, char *data, quint32 data_len) :
+                       QByteArray hash, QByteArray data) :
                         address(address), type(type), module(module),
-                        hash(hash), data(data), data_len(data_len) {}
-
-        ~ExecutablePage()
-        {
-            //free(data);
-        }
+                        hash(hash), data(data) {}
 
         quint64 address;
         PageType type;
         QString module;
         QByteArray hash;
-        char *data;
-        quint32 data_len;
+        QByteArray data;
     };
 
     Detect(KernelSymbols &sym);
