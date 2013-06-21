@@ -4167,23 +4167,40 @@ void Shell::printStructMembers(const Structured* s, const Variable* ctx_var,
              << pretty;
 
         // Show constant member values
+        int w_const_max = ShellUtil::termSize().width()
+                - indent
+                - offset_width - 2
+                - w_name - 2
+                - id_width - 1
+                - (rt ? rt->prettyName().size() : 0)
+                - qstrlen(" in {}");
+        if (w_const_max <= 0)
+            w_const_max = 3;
         if (m->hasConstantIntValues()) {
             Console::out() << " in {";
-            for (int i = 0; i < m->constantIntValues().size(); ++i) {
+            QString s;
+            for (int i = 0;
+                 i < m->constantIntValues().size() && s.size() <= w_const_max;
+                 ++i)
+            {
                 if (i > 0)
-                    Console::out() << ", ";
-                Console::out() << m->constantIntValues().at(i);
+                    s += ", ";
+                s += QString::number(m->constantIntValues().at(i));
             }
-            Console::out() << "}";
+            Console::out() << ShellUtil::abbrvStrRight(s, w_const_max) << "}";
         }
         else if (m->hasConstantStringValues()) {
             Console::out() << " in {";
-            for (int i = 0; i < m->constantStringValues().size(); ++i) {
+            QString s;
+            for (int i = 0;
+                 i < m->constantStringValues().size() && s.size() <= w_const_max;
+                 ++i)
+            {
                 if (i > 0)
-                    Console::out() << ", ";
-                Console::out() << m->constantStringValues().at(i);
+                    s += ", ";
+                s += m->constantStringValues().at(i);
             }
-            Console::out() << "}";
+            Console::out() << ShellUtil::abbrvStrRight(s, w_const_max) << "}";
         }
         else if (m->hasStringValues()) {
             Console::out() << "(is a string)";
