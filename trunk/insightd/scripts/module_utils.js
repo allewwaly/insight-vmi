@@ -4,11 +4,39 @@
 
 include("scripts/lib_string.js"); 
 
+function find_module(name)
+{
+    var head = new Instance("modules");
+
+    // Iterate over all modules
+    var m = head.next;
+    while (m &&
+           m.Address() != head.Address() &&
+           m.MemberAddress("list") != head.Address())
+    {
+        if (m.name == name)
+            return m;
+        m = m.list.next;
+    }
+
+    return false;
+}
+
+
+function print_module_heading(m)
+{
+    print("===", m.name);
+    if (m.MemberExists("module_core"))
+        print(".module_core = 0x" + m.module_core.Address());
+    println(" ===");
+}
+
+
 function print_module_syms(m)
 {
-	println("===", m.name + ".module_core = 0x" + m.module_core.Address(), "===");
-	
-	var cnt = m.num_syms; 
+    print_module_heading(m);
+
+    var cnt = m.num_syms;
 	
 	for (var i = 0; i < cnt; ++i) { 
 		var sym = m.syms.ArrayElem(i); 
@@ -19,8 +47,8 @@ function print_module_syms(m)
 
 function print_module_sections(m)
 {
-	println("===", m.name + ".module_core = 0x" + m.module_core.Address(), "===");
-	
+    print_module_heading(m);
+
 	var attrs = m.sect_attrs;
 	var cnt = attrs.nsections;
 	
