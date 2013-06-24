@@ -165,6 +165,7 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
     quint64 changedDataPages = 0;
     quint64 newPages = 0;
     quint64 totalVerified = 0;
+    quint64 firstChange = 0;
     // quint64 changes = 0;
 
     // Prepare status output
@@ -233,7 +234,21 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
         if (ExecutablePages->value(currentPages.at(i).address).hash !=
             currentPages.at(i).hash) {
 
-            if (currentPages.at(i).type == KERNEL_CODE) {
+            // Find the first changed byte
+            firstChange = 0;
+            for (int j = 0; j < currentPages.at(i).data.size(); ++j) {
+
+                if (currentPages.at(i).data[j] !=
+                    ExecutablePages->value(currentPages.at(i).address).data[j]) {
+
+                    firstChange = j;
+                    break;
+                }
+            }
+
+
+            if (currentPages.at(i).type == KERNEL_CODE &&
+                currentPages.at(i).address + firstChange <= _kernel_code_end) {
                 changedPages++;
 
                 Console::out()
@@ -435,7 +450,7 @@ void Detect::hiddenCode(int index)
 
             // Vsyscall page?
             if (i == _vsyscall_page) {
-                currentHashes->insert(i, ExecutablePage(i, KERNEL_CODE, "kernel", hash.result(), data));
+                currentHashes->insert(i, ExecutablePage(i, KERNEL_CODE, "kernel (code)", hash.result(), data));
                 continue;
             }
 
