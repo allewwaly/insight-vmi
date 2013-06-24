@@ -8,10 +8,11 @@ class Detect : public LongOperation
 public:
     enum PageType
     {
-        KERNEL,
+        KERNEL_CODE,
+        KERNEL_DATA,
         MODULE,
-        LAZY,
         VMAP,
+        VMAP_LAZY,
         UNDEFINED
     };
 
@@ -32,6 +33,18 @@ public:
         QByteArray data;
     };
 
+    struct ExecutableSection
+    {
+        ExecutableSection() : name(""), address(0), offset(0), data() {}
+        ExecutableSection(QString name, quint64 address, quint64 offset, QByteArray data) :
+                          name(name), address(address), offset(offset), data(data) {}
+
+        QString name;
+        quint64 address;
+        quint64 offset;
+        QByteArray data;
+    };
+
     Detect(KernelSymbols &sym);
 
     void hiddenCode(int index);
@@ -40,16 +53,15 @@ public:
 private:
     quint64 _kernel_code_begin;
     quint64 _kernel_code_end;
+    quint64 _kernel_data_exec_end;
     quint64 _vsyscall_page;
 
     quint64 _first_page;
     quint64 _current_page;
     quint64 _final_page;
 
-    QList<quint64> _current_offsets;
-    QList<quint64> _current_sizes;
-    char *_current_data;
     QString _current_file;
+    QMultiHash<QString, ExecutableSection> *ExecutableSections;
 
     KernelSymbols &_sym;
 

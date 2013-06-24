@@ -10,84 +10,51 @@
 #include <limits>
 
 #define PAGE_SIZE 4096
-#define OFFSET_PREFIX "OFFSET"
-#define SIZE_PREFIX "SIZE"
 
 QMultiHash<quint64, Detect::ExecutablePage> *Detect::ExecutablePages = 0;
 
 Detect::Detect(KernelSymbols &sym) :
-    _kernel_code_begin(0),
-    _kernel_code_end(0), _vsyscall_page(0), _current_data(0), _sym(sym)
+    _kernel_code_begin(0), _kernel_code_end(0), _kernel_data_exec_end(0),
+    _vsyscall_page(0), ExecutableSections(0), _sym(sym)
 {
     // Get data from System.map
     _kernel_code_begin = _sym.memSpecs().systemMap.value("_text").address;
     // This includes more than the kernel code. We may need to change this value.
-    _kernel_code_end = _sym.memSpecs().systemMap.value("__bss_stop").address;
-    //_kernel_code_end = _sym.memSpecs().systemMap.value("_etext").address;
+    _kernel_code_end = _sym.memSpecs().systemMap.value("_etext").address;
+    // There may be executable data pages within kernelspace
+    _kernel_data_exec_end = _sym.memSpecs().systemMap.value("__bss_stop").address;
     _vsyscall_page = _sym.memSpecs().systemMap.value("VDSO64_PRELINK").address;
 
-    if (!_kernel_code_begin || !_kernel_code_end || !_vsyscall_page) {
+    if (!_kernel_code_begin || !_kernel_code_end || !_kernel_data_exec_end || !_vsyscall_page) {
         std::cout << "WARNING - Could not find all required values within the System.Map!" << std::endl;
-        std::cout << "\t Kernel CODE begin: " << std::hex << _kernel_code_begin << std::dec << std::endl;
-        std::cout << "\t Kernel CODE end:   " << std::hex << _kernel_code_end << std::dec << std::endl;
-        std::cout << "\t VSYSCALL:          " << std::hex << _vsyscall_page << std::dec << std::endl;
+        std::cout << "\t Kernel CODE begin:        " << std::hex << _kernel_code_begin << std::dec << std::endl;
+        std::cout << "\t Kernel CODE end:          " << std::hex << _kernel_code_end << std::dec << std::endl;
+        std::cout << "\t Kernel DATA (exec) end:   " << std::hex << _kernel_data_exec_end << std::dec << std::endl;
+        std::cout << "\t VSYSCALL:                 " << std::hex << _vsyscall_page << std::dec << std::endl;
     }
 }
 
 void Detect::getExecutableSections(QString file)
 {
     QProcess helper;
-    quint64 total_size = 0;
-    quint64 current_pos = 0;
 
     // Regex
     int pos = 0;
-    QRegExp regex_offsets(OFFSET_PREFIX ":\\s*([0-9a-fA-F]+)", Qt::CaseInsensitive);
-    QRegExp regex_sizes(SIZE_PREFIX ":\\s*([0-9a-fA-F]+)", Qt::CaseInsensitive);
+    QRegExp regex("\\s*\\[\\s*[0-9]{1,2}\\]\\s*([\\.a-zA-Z0-9_-]+)\\s*[A-Za-z]+\\s*([0-9A-Fa-f]+)"
+                  "\\s*([0-9A-Fa-f]+)\\s*([0-9A-Fa-f]+)", Qt::CaseInsensitive);
 
     // Free old data
-    _current_offsets.clear();
-    _current_sizes.clear();
+    if (ExecutableSections != 0)
+        delete(ExecutableSections);
 
-    if (_current_data)
-    {
-        free(_current_data);
-        _current_data = 0;
-    }
+    // Create HashMap
+    ExecutableSections = new QMultiHash<QString, ExecutableSection>();
 
     // Get Executable Sections
-    helper.start("readelf -a /lib/modules/3.2.0-44-generic/kernel/arch/x86/kvm/kvm.ko | grep \"AX\" -B 1 | "
-                 "awk \'/\[ / { print \"Offset: \" $6 } /\[[0-9]/ {print \"" OFFSET_PREFIX ": \" $5} "
-                 "{ if(!/(\[|-)/) print \"" SIZE_PREFIX ": \" $1}\'\")");
-
+    helper.start("/bin/bash -c \"readelf -a " + file + " | grep -B1 \\\"AX\\\"");
     helper.waitForFinished();
 
     QString output(helper.readAll());
-
-    // Extract data
-    // First offsets
-    while ((pos = regex_offsets.indexIn(output, pos)) != -1)
-    {
-        _current_offsets << regex_offsets.cap(1).toULongLong(0, 16);
-        pos += regex_offsets.matchedLength();
-    }
-
-    // Then Sizes
-    while ((pos = regex_sizes.indexIn(output, pos)) != -1)
-    {
-        _current_sizes << regex_sizes.cap(1).toULongLong(0, 16);
-        total_size += regex_sizes.cap(1).toULongLong(0, 16);
-        pos += regex_sizes.matchedLength();
-    }
-
-    // Reserve memory
-    _current_data = (char *)malloc(total_size * sizeof(char));
-
-    if (!_current_data)
-    {
-        debugerr("Could not reserve memory for the data region!");
-        return;
-    }
 
     // Open file
     QFile f(file);
@@ -98,24 +65,38 @@ void Detect::getExecutableSections(QString file)
         return;
     }
 
-    // Get the data from the sections
-    current_pos = 0;
-    for (pos = 0; pos < _current_offsets.count(); ++pos)
+    // Extract data
+    while ((pos = regex.indexIn(output, pos)) != -1)
     {
-        if (!f.seek(_current_offsets.at(pos)))
+        quint64 address = regex.cap(2).toULongLong(0, 16);
+        quint64 offset = regex.cap(3).toULongLong(0, 16);
+        quint64 size = regex.cap(4).toULongLong(0, 16);
+
+        QByteArray data;
+        data.resize(size);
+
+        // Seek
+        if (!f.seek(offset))
         {
-            debugerr("Could not seek to position " << _current_offsets.at(pos) << "!");
+            debugerr("Could not seek to position " << offset << "!");
             return;
         }
 
-        if ((quint64)f.read(_current_data + current_pos, _current_sizes.at(pos)) != _current_sizes.at(pos))
+        // Read
+        if ((quint64)f.read(data.data(), size) != size)
         {
-            debugerr("An error occurred while reading " << _current_sizes.at(pos) << " from pos " << _current_offsets.at(pos) << "!");
+            debugerr("An error occurred while reading " << size << " bytes from pos " << offset << "!");
+            return;
         }
 
-        current_pos += _current_sizes.at(pos);
-    }
+        // Add this section
+        ExecutableSections->insert(regex.cap(1), ExecutableSection(regex.cap(1), address, offset, data));
 
+        //debugmsg("Added Section " << regex.cap(1) << " (address: " << std::hex << address << std::dec
+        //         << ", size: " << size << ", offset: " << offset << ")");
+
+        pos += regex.matchedLength();
+    }
 }
 
 quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
@@ -181,8 +162,10 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
 
     // Stats
     quint64 changedPages = 0;
+    quint64 changedDataPages = 0;
     quint64 newPages = 0;
     quint64 totalVerified = 0;
+    // quint64 changes = 0;
 
     // Prepare status output
     _first_page = 1;
@@ -192,6 +175,13 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
     // Start the Operation
     operationStarted();
 
+    // Hash
+    QCryptographicHash hash(QCryptographicHash::Sha1);
+
+    // Load Kernel Sections
+    // getExecutableSections("<path>");
+
+    // Compare all pages
     for (int i = 0; i < currentPages.size(); ++i) {
         // New page?
         if (!ExecutablePages->contains(currentPages.at(i).address)) {
@@ -199,22 +189,79 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
             continue;
         }
 
+        /*
+        if (currentPages.at(i).address >= _kernel_code_begin &&
+                currentPages.at(i).address <= _kernel_code_end)
+        {
+            debugmsg("Trying to match " << std::hex << currentPages.at(i).address << std::dec << "...");
+            QList<ExecutableSection> sections = ExecutableSections->values();
+
+            for (int j = 0; j < sections.size(); ++j) {
+
+                if (sections.at(j).address <= currentPages.at(i).address &&
+                        currentPages.at(i).address + currentPages.at(i).data.size() <= sections.at(j).address + sections.at(j).data.size()) {
+
+                    hash.reset();
+                    hash.addData(sections.at(j).data.data() + (currentPages.at(i).address - _kernel_code_begin),
+                                 currentPages.at(i).data.size());
+
+                    if (hash.result() == currentPages.at(i).hash) {
+                        debugmsg("MATCHED!");
+                    }
+                    /*
+                    for (int k = 0; k < currentPages.at(i).data.size(); ++k) {
+                        if (sections.at(j).data[(uint)(k + (currentPages.at(i).address - _kernel_code_begin))] !=
+                               currentPages.at(i).data[k]) {
+                        Console::out()
+                                << "\t" << hex << "0x" << (currentPages.at(i).address + k) << ": "
+                                << (quint8) sections.at(j).data[(uint)(k + (currentPages.at(i).address - _kernel_code_begin))]
+                                << " => "
+                                << (quint8) currentPages.at(i).data[k]
+                                << dec << endl;
+                        }
+                    }
+                    */
+                    /*
+                    break;
+
+                }
+            }
+        }
+        */
+
         // Changed page?
         if (ExecutablePages->value(currentPages.at(i).address).hash !=
             currentPages.at(i).hash) {
-            changedPages++;
 
-            Console::out()
-                    << "\r" << Console::color(ctWarningLight)
-                    << "WARNING:" << Console::color(ctReset)
-                    << " Detected modified code page @ "
-                    << Console::color(ctAddress) << "0x" << hex
-                    << currentPages.at(i).address
-                    << Console::color(ctReset)<< dec
-                    << " (" << currentPages.at(i).module << ")" << endl;
+            if (currentPages.at(i).type == KERNEL_CODE) {
+                changedPages++;
+
+                Console::out()
+                        << "\r" << Console::color(ctWarningLight)
+                        << "WARNING:" << Console::color(ctReset)
+                        << " Detected modified CODE page @ "
+                        << Console::color(ctAddress) << "0x" << hex
+                        << currentPages.at(i).address
+                        << Console::color(ctReset)<< dec
+                        << " (" << currentPages.at(i).module << ")" << endl;
+            }
+            else {
+                changedDataPages++;
+
+                Console::out()
+                        << "\r" << Console::color(ctWarningLight)
+                        << "WARNING:" << Console::color(ctReset)
+                        << " Detected modified executable DATA page @ "
+                        << Console::color(ctAddress) << "0x" << hex
+                        << currentPages.at(i).address
+                        << Console::color(ctReset)<< dec
+                        << " (" << currentPages.at(i).module << ")" << endl;
+            }
 
             // Compare pages and print diffs
-            for (int j = 0; j < currentPages.at(i).data.size(); ++j) {
+            /*
+            changes = 0;
+            for (int j = 0; j < currentPages.at(i).data.size() && changes < 50; ++j) {
 
                 if (currentPages.at(i).data[j] !=
                     ExecutablePages->value(currentPages.at(i).address).data[j]) {
@@ -225,8 +272,11 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
                             << " => "
                             << (quint8) currentPages.at(i).data[j]
                             << dec << endl;
+
+                    changes += 1;
                 }
             }
+            */
         }
 
         totalVerified++;
@@ -237,9 +287,15 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
 
     // Print Stats
     Console::out()
-        << "\r\nVerified " << totalVerified << " hashes in " << elapsedTime() << " min" << endl
-        << "\t Found " << newPages << " new pages." << endl
-        << "\t Detected " << Console::color(ctError) << changedPages << Console::color(ctReset) << " modified pages." << endl;
+        << "\r\nProcessed " << Console::color(ctWarningLight)
+        << totalVerified << Console::color(ctReset)
+        << " hashes in " << elapsedTime() << " min" << endl
+        << "\t Found " << Console::color(ctNumber)
+        << newPages << Console::color(ctReset) << " new pages." << endl
+        << "\t Detected " << Console::color(ctError) << changedDataPages << Console::color(ctReset)
+        << " modified executable DATA pages." << endl
+        << "\t Detected " << Console::color(ctError) << changedPages << Console::color(ctReset)
+        << " modified CODE pages." << endl;
 
     // Exchange
     delete(ExecutablePages);
@@ -367,18 +423,23 @@ void Detect::hiddenCode(int index)
 
             // Lies the page within the kernel code area?
             if (i >= _kernel_code_begin && i <= _kernel_code_end) {
-                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result(), data));
+                currentHashes->insert(i, ExecutablePage(i, KERNEL_CODE, "kernel (code)", hash.result(), data));
+                continue;
+            }
+
+            // Lies the page within an executable kernel data region
+            if (i >= _kernel_code_end && i <= _kernel_data_exec_end) {
+                currentHashes->insert(i, ExecutablePage(i, KERNEL_DATA, "kernel (data)", hash.result(), data));
                 continue;
             }
 
             // Vsyscall page?
             if (i == _vsyscall_page) {
-                currentHashes->insert(i, ExecutablePage(i, KERNEL, "kernel", hash.result(), data));
+                currentHashes->insert(i, ExecutablePage(i, KERNEL_CODE, "kernel", hash.result(), data));
                 continue;
             }
 
             // Does the page belong to a module?
-
             // Don't depend on the rule engine
             currentModule = varModules->toInstance(vmem).member("next", BaseType::trAny, -1, ksNone);
             currentModule.setType(typeModule);
@@ -454,7 +515,7 @@ void Detect::hiddenCode(int index)
 
                 if (flags & 0x1) {
                     lazy_pages++;
-                    currentHashes->insert(i, ExecutablePage(i, LAZY, "vmap-lazy", hash.result(), data));
+                    currentHashes->insert(i, ExecutablePage(i, VMAP_LAZY, "vmap (lazy)", hash.result(), data));
                 }
                 else {
                     vmap_pages++;
@@ -509,13 +570,26 @@ void Detect::hiddenCode(int index)
     operationStopped();
 
     // Print Stats
-    Console::out() << "\r\nProcessed " << processed_pages << " pages in " << elapsedTime() << " min" << endl;
-    Console::out() << "\t Found " << nonexecutable_pages << " non-executable pages." << endl;
-    Console::out() << "\t Found " << nonsupervisor_pages << " executable non-supervisor pages." << endl;
-    Console::out() << "\t Found " << executeable_pages << " executable supervisor pages." << endl;
-    Console::out() << "\t Found " << vmap_pages << " vmapped pages." << endl;
-    Console::out() << "\t Found " << lazy_pages << " not yet unmapped pages." << endl;
-    Console::out() << "\t Detected " << Console::color(ctError) << hidden_pages << Console::color(ctReset) << " hidden pages.\n" << endl;
+    Console::out() << "\r\nProcessed " << Console::color(ctWarningLight)
+                   << processed_pages << Console::color(ctReset)
+                   << " pages in " << elapsedTime() << " min" << endl;
+    Console::out() << "\t Found " << Console::color(ctNumber)
+                   << nonexecutable_pages << Console::color(ctReset)
+                   << " non-executable pages." << endl;
+    Console::out() << "\t Found " << Console::color(ctNumber)
+                   << nonsupervisor_pages << Console::color(ctReset)
+                   << " executable non-supervisor pages." << endl;
+    Console::out() << "\t Found " << Console::color(ctNumber)
+                   << executeable_pages << Console::color(ctReset)
+                   << " executable supervisor pages." << endl;
+    Console::out() << "\t Found " << Console::color(ctNumber)
+                   << vmap_pages << Console::color(ctReset)
+                   << " vmapped pages." << endl;
+    Console::out() << "\t Found " << Console::color(ctNumber)
+                   << lazy_pages << Console::color(ctReset)
+                   << " not yet unmapped pages." << endl;
+    Console::out() << "\t Detected " << Console::color(ctError)
+                   << hidden_pages << Console::color(ctReset) << " hidden pages.\n" << endl;
 
     // Verify hashes
     verifyHashes(currentHashes);
