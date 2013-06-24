@@ -42,6 +42,9 @@ StringSet MemoryMap::_names;
 
 const QString& MemoryMap::insertName(const QString& name)
 {
+    static QMutex mutex;
+    QMutexLocker lock(&mutex);
+
     StringSet::const_iterator it = _names.constFind(name);
     if (it == _names.constEnd())
         it = _names.insert(name);
