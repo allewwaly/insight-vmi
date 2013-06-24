@@ -470,6 +470,31 @@ public:
                     int *result = 0) const;
 
     /**
+     * Retrieves a member of this Instance based on a provided MemberList.
+     * If this Instance is not a structure or union or if the member cannot
+     * be resolved based on the provided list, a default Instance is returned.
+     *
+     * \note Make sure to check Instance::isNull() on the returned object to
+     * see if it is valid or not.
+     *
+     * @param members the memberlist that defines the location of the member
+     * one wants to retrieve
+     * @param resolveTypes which types to automatically resolve, see
+     * BaseType::TypeResolution
+     * @param maxPtrDeref the maximum levels of pointers that should be
+     * dereferenced
+     * @param src selects which sources of knowledge to use when accessing
+     *  members
+     * @param result provides the result of the knowledge source evaluation,
+     * see TypeRuleEngine::MatchResult
+     * @return Instance object of the specified member
+     * \sa BaseType::TypeResolution, KnowledgeSources
+     */
+    Instance member(const ConstMemberList& members, int resolveTypes,
+                    int maxPtrDeref, KnowledgeSources src = ksAll,
+                    int *result = 0) const;
+
+    /**
      * Obtain the member of this instance that has the given offset provided that
      * this instance is a structure. If \a exactMatch is true the function will only
      * return a member if it can find a member within the struct that has the exact
@@ -1033,9 +1058,6 @@ private:
 
     void setListNext(const Instance& inst);
 
-    Instance member(const ConstMemberList& members, int resolveTypes,
-                    int maxPtrDeref, KnowledgeSources src = ksAll,
-                    int *result = 0) const;
 
     Instance *typeRuleMatchRek(ConstMemberList &members, int *match) const;
 
