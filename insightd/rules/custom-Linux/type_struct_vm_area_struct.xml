@@ -34,7 +34,7 @@
 			References:
 			http://lxr.free-electrons.com/source/include/linux/prio_tree.h?v=2.6.32#L89
 		-->
-		<rule priority="102">
+        <rule priority="102" maxosversion="3.6.999">
 			<name>vm_area_struct.shared.*</name>
 			<description>Disambiguate the "shared" union.</description>
 			<filter>
