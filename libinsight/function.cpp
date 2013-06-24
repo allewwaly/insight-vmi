@@ -78,6 +78,9 @@ Instance Function::toInstance(size_t address, VirtualMemory *vmem,
 void Function::readFrom(KernelSymbolStream& in)
 {
     FuncPointer::readFrom(in);
+    // This bugfix was introduced in symbol verison 22
+    if (in.kSymVersion() >= kSym::VERSION_22)
+        MemorySection::readFrom(in);
 
     quint64 l, h;
     in >> _inlined >> l >> h;
@@ -89,6 +92,9 @@ void Function::readFrom(KernelSymbolStream& in)
 void Function::writeTo(KernelSymbolStream& out) const
 {
     FuncPointer::writeTo(out);
+    // This bugfix was introduced in symbol verison 22
+    if (out.kSymVersion() >= kSym::VERSION_22)
+        MemorySection::writeTo(out);
 
     out << _inlined << (quint64)_pcLow << (quint64)_pcHigh;
 }
