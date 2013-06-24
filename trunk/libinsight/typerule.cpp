@@ -200,8 +200,12 @@ Instance ScriptAction::evaluate(const Instance *inst,
 void ScriptAction::warnEvalError(const ScriptEngine *eng,
                                  const QString &fileName) const
 {
+    static QMutex mutex;
     // Print errors as warnings
     if (eng && eng->lastEvaluationFailed()) {
+        // Do this exclusively
+        QMutexLocker lock(&mutex);
+
         QString file(ShellUtil::shortFileName(fileName));
         Console::err() << Console::color(ctWarning) << "At "
                      << Console::color(ctBold) << file
