@@ -115,12 +115,13 @@ void MemoryMapBuilderCS::processNode(MemoryMapNode *node)
 
     // Create an instance from the node
     Instance inst(node->toInstance(false));
+
     processInstance(inst, node);
 }
 
 
 void MemoryMapBuilderCS::processInstance(const Instance &inst, MemoryMapNode *node,
-                                         bool isNested)
+                                         ConstMemberList *path)
 {
     // Ignore user-land objects
     if (inst.address() < _map->_vmem->memSpecs().pageOffset)
@@ -131,18 +132,57 @@ void MemoryMapBuilderCS::processInstance(const Instance &inst, MemoryMapNode *no
         return;
 
     try {
-        if (inst.type()->type() & rtPointer)
+        if (MemoryMapHeuristics::isFunctionPointer(inst))
+            processFunctionPointer(inst, node, path);
+        else if (inst.type()->type() & rtPointer)
             processPointer(inst, node);
         else if (inst.type()->type() & rtArray)
-            processArray(inst, node);
+            processArray(inst, node, path);
         else if (inst.type()->type() & StructOrUnion)
-            processStructured(inst, node, isNested);
+            processStructured(inst, node, path);
     }
     catch (GenericException&) {
         // Do nothing
     }
 }
 
+void MemoryMapBuilderCS::processFunctionPointer(const Instance &inst,
+                                                MemoryMapNode *node,
+                                                ConstMemberList *path)
+{
+    assert(node);
+
+    if (path)
+        path->append((const StructuredMember *)inst.type());
+    else {
+        _map->_shared->functionPointersLock.lock();
+        _map->_funcPointers.append(FuncPointersInNode(node, path));
+        _map->_shared->functionPointersLock.unlock();
+        return;
+    }
+
+    _map->_shared->functionPointersLock.lock();
+    if (_map->_funcPointers.size() == 0) {
+        _map->_funcPointers.append(FuncPointersInNode(node, path));
+    }
+    else {
+        // Check if the MemoryMapNode is already within the list
+        int position = -1;
+
+        for (int j = 0; j < _map->_funcPointers.size(); ++j) {
+            if (_map->_funcPointers[j].node == node) {
+                position = j;
+                break;
+            }
+        }
+
+        if (position != -1)
+            _map->_funcPointers[position].funcPointers.append((*path));
+        else
+            _map->_funcPointers.append(FuncPointersInNode(node, path));
+    }
+    _map->_shared->functionPointersLock.unlock();
+}
 
 void MemoryMapBuilderCS::processPointer(const Instance& inst, MemoryMapNode *node)
 {
@@ -168,7 +208,8 @@ void MemoryMapBuilderCS::processPointer(const Instance& inst, MemoryMapNode *nod
 
 
 
-void MemoryMapBuilderCS::processArray(const Instance& inst, MemoryMapNode *node)
+void MemoryMapBuilderCS::processArray(const Instance& inst, MemoryMapNode *node,
+                                      ConstMemberList *path)
 {
     assert(inst.type()->type() == rtArray);
 
@@ -177,26 +218,36 @@ void MemoryMapBuilderCS::processArray(const Instance& inst, MemoryMapNode *node)
     for (int i = 0; i < len; ++i) {
         Instance e(inst.arrayElem(i).dereference(BaseType::trLexical));
         // Pass the "nested" flag to all elements of this array
-        processInstance(e, node, true);
+        processInstance(e, node, path);
     }
 }
 
 
 void MemoryMapBuilderCS::processStructured(const Instance& inst,
-                                           MemoryMapNode *node, bool isNested)
+                                           MemoryMapNode *node,
+                                           ConstMemberList *path)
 {
     assert(inst.type()->type() & StructOrUnion);
 
     // Ignore non-nested structs/unions that are not aligned at a four-byte
     // boundary
-    if (!isNested && (inst.address() & 0x3ULL))
+    if (!path && (inst.address() & 0x3ULL))
         return;
 
-    addMembers(inst, node);
+    if (!path) {
+        ConstMemberList p;
+        addMembers(inst, node, &p);
+    }
+    else {
+        ConstMemberList p((*path));
+        p.append((const StructuredMember *)inst.type());
+        addMembers(inst, node, &p);
+    }
 }
 
 
-void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
+void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node,
+                                    ConstMemberList *path)
 {
     const int cnt = inst.memberCount();
 
@@ -212,11 +263,11 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
 
             // Did the rules engine decide which instance to use?
             if (TypeRuleEngine::useMatchedInst(result)) {
-                processInstanceFromRule(inst, mi, i, node);
+                processInstanceFromRule(inst, mi, i, node, path);
             }
             // Pass the "nested" flag to nested structs/unions
             else {
-                processInstance(mi, node, true);
+                processInstance(mi, node, path);
             }
         }
         catch (GenericException&) {
@@ -228,7 +279,8 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node)
 
 void MemoryMapBuilderCS::processInstanceFromRule(const Instance &parent,
                                                  const Instance &member,
-                                                 int mbrIdx, MemoryMapNode *node)
+                                                 int mbrIdx, MemoryMapNode *node,
+                                                 ConstMemberList *path)
 {
     if (!member.isNull()) {
         // How does the returned instance relate to the given one?
@@ -247,7 +299,8 @@ void MemoryMapBuilderCS::processInstanceFromRule(const Instance &parent,
             // Preserve used-defined properties, if any
             if (!member.properties().isEmpty())
                 mOrig.setProperties(member.properties());
-            processInstance(mOrig, node, true);
+
+            processInstance(mOrig, node, path);
             break;
         }
             // We followed a pointer
@@ -280,7 +333,7 @@ void MemoryMapBuilderCS::processInstanceFromRule(const Instance &parent,
     }
 
     if (member.isList())
-        processInstanceFromRule(parent, member.listNext(), mbrIdx, node);
+        processInstanceFromRule(parent, member.listNext(), mbrIdx, node, path);
 }
 
 
@@ -370,6 +423,7 @@ float MemoryMapBuilderCS::calculateNodeProb(const Instance &inst,
         else if (invalidChildren > 0) {
             float invalidPct = invalidChildren / (float) testedChildren;
             prob *= invalidPct * (1.0 - degForInvalidChildAddr) + (1.0 - invalidPct);
+
             if (map)
                 map->_shared->degForInvalidChildAddrCnt++;
         }
@@ -403,8 +457,12 @@ int MemoryMapBuilderCS::countInvalidChildren(const Instance &inst, int *total)
         *total = tot;
 
     // Allow at most 20% user-land pointers of all children
-    if (tot > 1 && invalid >= 0 && userlandPtrs > (tot / 5))
+    if (tot > 1 && invalid >= 0 && userlandPtrs > (tot / 5)) {
         invalid += userlandPtrs - (tot / 5);
+
+        if (total)
+            (*total) += (userlandPtrs - (tot / 5));
+    }
 
     return invalid;
 }

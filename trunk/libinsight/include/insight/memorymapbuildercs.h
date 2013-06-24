@@ -9,6 +9,7 @@
 #define MEMORYMAPBUILDERCS_H_
 
 #include "memorymapbuilder.h"
+#include "memberlist.h"
 
 // Forward declaration
 class Instance;
@@ -43,16 +44,19 @@ protected:
 
     void processNode(MemoryMapNode* node);
     void processInstance(const Instance &inst, MemoryMapNode* node,
-                         bool isNested = false);
+                         ConstMemberList *path = 0);
     void processInstanceFromRule(const Instance &parent, const Instance& member,
-                                 int mbrIdx, MemoryMapNode* node);
+                                 int mbrIdx, MemoryMapNode* node, ConstMemberList *path);
     void processPointer(const Instance &inst, MemoryMapNode* node);
-    void processArray(const Instance& inst, MemoryMapNode* node);
+    void processFunctionPointer(const Instance &inst, MemoryMapNode *node,
+                                ConstMemberList *path);
+    void processArray(const Instance& inst, MemoryMapNode* node,
+                      ConstMemberList *path);
     void processStructured(const Instance &inst, MemoryMapNode* node,
-                           bool isNested = false);
+                           ConstMemberList *path);
 
 private:
-    void addMembers(const Instance &inst, MemoryMapNode* node);
+    void addMembers(const Instance &inst, MemoryMapNode* node, ConstMemberList *path);
     static int countInvalidChildren(const Instance &inst, int *total);
     static int countInvalidChildrenRek(const Instance &inst, int *total,
                                        int *userlandPtrs);

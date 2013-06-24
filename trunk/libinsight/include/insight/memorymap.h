@@ -56,7 +56,6 @@ typedef QMultiMap<quint64, IntNodePair> PointerIntNodeMap;
 /// Holds the nodes to be visited, sorted by their probability
 typedef PriorityQueue<float, MemoryMapNode*> NodeQueue;
 
-
 #define MAX_BUILDER_THREADS 8
 
 /**
@@ -91,6 +90,7 @@ struct BuilderSharedState
     MemoryMapNode* lastNode;
     qint64 processed;
     QMutex queueLock;
+    QMutex functionPointersLock;
     QReadWriteLock pmemMapLock, vmemMapLock, currAddressesLock,
         typeInstancesLock, pointersToLock;
 
@@ -103,6 +103,24 @@ struct BuilderSharedState
 	mutable quint32 degForInvalidChildAddrCnt;
 	mutable quint32 degForInvalidListHeadCnt;
 #endif
+};
+
+/**
+ * Holds information about all function pointers contained
+ * within a specific \sa MemoryMapNode.
+ */
+struct FuncPointersInNode
+{
+    FuncPointersInNode() : node(0) {}
+    FuncPointersInNode(MemoryMapNode *node, ConstMemberList *path) :
+        node(node)
+    {
+        if (path)
+            funcPointers.append((*path));
+    }
+
+    MemoryMapNode *node;
+    QList<ConstMemberList> funcPointers;
 };
 
 
@@ -239,6 +257,15 @@ public:
      * @return an address-indexed hash of objects that point to that address
      */
     const PointerNodeHash& pointersTo() const;
+
+    /**
+     * This data structure allows to access all function pointers that are
+     * contained within the map.
+     * @return a list of FuncPointersInNode structures that contain the
+     * MemoryMapNode as well as a list of MemberLists that can be used to
+     * retrieve the individual function pointers.
+     */
+    const QList<FuncPointersInNode> & funcPointers() const;
 
     /**
      * This property indicates whether the memory map is currently being built.
@@ -391,6 +418,7 @@ private:
     VirtualMemory* _vmem;        ///< the virtual memory object this map is being built for
 	NodeList _roots;             ///< the nodes of the global kernel variables
     PointerNodeHash _pointersTo; ///< holds all pointers that point to a certain address
+    QList<FuncPointersInNode> _funcPointers; ///< holds all function pointers
     IntNodeHash _typeInstances;  ///< holds all instances of a given type ID
     MemoryMapRangeTree _vmemMap; ///< map of all used kernel-space virtual memory
     PhysMemoryMapRangeTree _pmemMap; ///< map of all used physical memory
@@ -453,6 +481,10 @@ inline const PointerNodeHash& MemoryMap::pointersTo() const
     return _pointersTo;
 }
 
+inline const QList<FuncPointersInNode> & MemoryMap::funcPointers() const
+{
+    return _funcPointers;
+}
 
 inline bool MemoryMap::isBuilding() const
 {
