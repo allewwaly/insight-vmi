@@ -83,7 +83,10 @@ inline base_t* ReferencingType::refTypeDeepTempl(ref_t *ref, int resolveTypes)
     }
     // Cache the value
     if (!ref->_refTypeDeep || resolveTypes != ref->_deepResolvedTypes) {
-        ref->_deepResolvedTypes = resolveTypes;
+        // Calling refType() might lead to recurisve locks, so release the
+        // lock for now
+        ref->_deepResolveMutex.unlock();
+
         base_t* t = ref->refType();
         if ( t && (t->type() & resolveTypes & RefBaseTypes) ) {
             ref_base_t* rbt = static_cast<ref_base_t*>(t);
@@ -91,6 +94,9 @@ inline base_t* ReferencingType::refTypeDeepTempl(ref_t *ref, int resolveTypes)
                 rbt = static_cast<ref_base_t*>(t = rbt->refType());
             }
         }
+        // Lock the mutex again before applying the result
+        ref->_deepResolveMutex.lock();
+        ref->_deepResolvedTypes = resolveTypes;
         ref->_refTypeDeep = const_cast<BaseType*>(t);
     }
 
