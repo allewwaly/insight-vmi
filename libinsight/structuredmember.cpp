@@ -61,12 +61,11 @@ QString StructuredMember::prettyName(const QString &varName) const
         return QString("(unresolved type 0x%1) %2").arg((uint)_refTypeId, 0, 16).arg(_name);
 }
 
-
 Instance StructuredMember::toInstance(size_t structAddress,
 		VirtualMemory* vmem, const Instance* parent,
 		int resolveTypes, int maxPtrDeref) const
 {
-	Instance inst = createRefInstance(structAddress + _offset, vmem, _name,
+    Instance inst = createRefInstance(structAddress + _offset, vmem, _name,
 			parent ? parent->fullNameComponents() : QStringList(),
 			resolveTypes, maxPtrDeref);
 	// Is this a bit-field with bit-size/offset?

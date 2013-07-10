@@ -112,15 +112,16 @@ struct BuilderSharedState
 struct FuncPointersInNode
 {
     FuncPointersInNode() : node(0) {}
-    FuncPointersInNode(MemoryMapNode *node, ConstMemberList *path) :
+    FuncPointersInNode(const MemoryMapNode *node,
+                       VariableTypeContainerList *path) :
         node(node)
     {
         if (path)
-            funcPointers.append((*path));
+            paths.append((*path));
     }
 
-    MemoryMapNode *node;
-    QList<ConstMemberList> funcPointers;
+    const MemoryMapNode *node;
+    QList<VariableTypeContainerList> paths;
 };
 
 

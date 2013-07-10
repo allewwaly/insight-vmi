@@ -3,6 +3,9 @@
 #include <insight/variable.h>
 #include <insight/console.h>
 
+#include <insight/memorymap.h>
+#include <insight/memorymapheuristics.h>
+
 #include <QCryptographicHash>
 #include <QRegExp>
 #include <QProcess>
@@ -317,6 +320,87 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
     ExecutablePages = current;
 }
 
+void Detect::verifyFunctionPointers(MemoryMap *map)
+{
+    assert(map);
+
+    quint64 validPointers = 0;
+    quint64 invalidPointers = 0;
+
+    const QList<FuncPointersInNode> funcPointers = map->funcPointers();
+
+    // Start the Operation
+    operationStarted();
+
+    for (int i = 0; i < funcPointers.size(); ++i) {
+        Instance node = funcPointers[i].node->toInstance();
+
+        if (!funcPointers[i].paths.empty()) {
+            // Reconstruct each function pointer by following the path
+            for (int j = 0; j < funcPointers[i].paths.size(); ++j) {
+
+                Instance funcPointer = node;
+
+                for (int k = 0; k < funcPointers[i].paths[j].size(); ++k) {
+                    const BaseType *t = funcPointers[i].paths[j].at(k).type;
+                    int index = funcPointers[i].paths[j].at(k).index;
+
+                    if (t->type() & StructOrUnion) {
+                        funcPointer = funcPointer.member(index, BaseType::trLexical, 0,
+                                                         map->knowSrc());
+                    }
+                    else if (t->type() & rtArray) {
+                        funcPointer = funcPointer.arrayElem(index);
+                    }
+                    else {
+                        debugerr("This should be a struct or an array!");
+                    }
+                }
+
+                // What we have now, should be a function pointer
+                if (!MemoryMapHeuristics::isFunctionPointer(funcPointer)) {
+                    debugerr("The instance with name " << funcPointer.name()
+                             << " and type " << funcPointer.typeName()
+                             << "is not a function pointer!\n");
+                    continue;
+                }
+
+                // Verify Function Pointer
+                if (!MemoryMapHeuristics::isValidFunctionPointer(funcPointer))
+                    invalidPointers++;
+                else
+                    validPointers++;
+            }
+        }
+        else {
+            // The node itself must be a function pointer
+            if (!MemoryMapHeuristics::isFunctionPointer(node)) {
+                debugerr("The node with name " << node.name()
+                         << " and type " << node.typeName()
+                         << "is not a function pointer!\n");
+                continue;
+            }
+
+            // Verify Function Pointer
+            if (!MemoryMapHeuristics::isValidFunctionPointer(node))
+                invalidPointers++;
+            else
+                validPointers++;
+        }
+
+    }
+
+    // Finish
+    operationStopped();
+
+    // Print Stats
+    Console::out() << "\r\nProcessed " << Console::color(ctWarningLight)
+                   << invalidPointers+validPointers << Console::color(ctReset)
+                   << " Function Pointers in " << elapsedTime() << " min" << endl;
+    Console::out() << "\t Detected " << Console::color(ctError)
+                   << invalidPointers << Console::color(ctReset) << " invalid Function Pointers.\n" << endl;
+}
+
 
 void Detect::hiddenCode(int index)
 {
@@ -608,6 +692,10 @@ void Detect::hiddenCode(int index)
 
     // Verify hashes
     verifyHashes(currentHashes);
+
+    // Verify function pointers?
+    if (_sym.memDumps().at(index)->map())
+        verifyFunctionPointers(_sym.memDumps().at(index)->map());
 }
 
 
