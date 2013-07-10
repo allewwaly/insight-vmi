@@ -10,6 +10,7 @@
 
 #include "memorymapbuilder.h"
 #include "memberlist.h"
+#include "structured.h"
 
 // Forward declaration
 class Instance;
@@ -44,19 +45,21 @@ protected:
 
     void processNode(MemoryMapNode* node);
     void processInstance(const Instance &inst, MemoryMapNode* node,
-                         ConstMemberList *path = 0);
+                         VariableTypeContainerList *path = 0);
     void processInstanceFromRule(const Instance &parent, const Instance& member,
-                                 int mbrIdx, MemoryMapNode* node, ConstMemberList *path);
+                                 int mbrIdx, MemoryMapNode* node,
+                                 VariableTypeContainerList *path);
     void processPointer(const Instance &inst, MemoryMapNode* node);
     void processFunctionPointer(const Instance &inst, MemoryMapNode *node,
-                                ConstMemberList *path);
+                                VariableTypeContainerList *path);
     void processArray(const Instance& inst, MemoryMapNode* node,
-                      ConstMemberList *path);
+                      VariableTypeContainerList *path);
     void processStructured(const Instance &inst, MemoryMapNode* node,
-                           ConstMemberList *path);
+                           VariableTypeContainerList *path);
 
 private:
-    void addMembers(const Instance &inst, MemoryMapNode* node, ConstMemberList *path);
+    void addMembers(const Instance &inst, MemoryMapNode* node,
+                    VariableTypeContainerList *path);
     static int countInvalidChildren(const Instance &inst, int *total);
     static int countInvalidChildrenRek(const Instance &inst, int *total,
                                        int *userlandPtrs);

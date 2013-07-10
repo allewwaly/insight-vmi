@@ -70,6 +70,7 @@ private:
     void getExecutableSections(QString file);
     quint64 inVmap(quint64 address, VirtualMemory *vmem);
     void verifyHashes(QMultiHash<quint64, ExecutablePage> *current);
+    void verifyFunctionPointers(MemoryMap *map);
 };
 
 #endif // DETECT_H

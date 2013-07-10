@@ -121,7 +121,7 @@ void MemoryMapBuilderCS::processNode(MemoryMapNode *node)
 
 
 void MemoryMapBuilderCS::processInstance(const Instance &inst, MemoryMapNode *node,
-                                         ConstMemberList *path)
+                                         VariableTypeContainerList *path)
 {
     // Ignore user-land objects
     if (inst.address() < _map->_vmem->memSpecs().pageOffset)
@@ -148,21 +148,14 @@ void MemoryMapBuilderCS::processInstance(const Instance &inst, MemoryMapNode *no
 
 void MemoryMapBuilderCS::processFunctionPointer(const Instance &inst,
                                                 MemoryMapNode *node,
-                                                ConstMemberList *path)
+                                                VariableTypeContainerList *path)
 {
     assert(node);
 
-    if (path)
-        path->append((const StructuredMember *)inst.type());
-    else {
-        _map->_shared->functionPointersLock.lock();
-        _map->_funcPointers.append(FuncPointersInNode(node, path));
-        _map->_shared->functionPointersLock.unlock();
-        return;
-    }
-
     _map->_shared->functionPointersLock.lock();
-    if (_map->_funcPointers.size() == 0) {
+    if (_map->_funcPointers.size() == 0 || !path) {
+        // Insert if the list is empty or if we have no path, which means that
+        // node is a function pointer
         _map->_funcPointers.append(FuncPointersInNode(node, path));
     }
     else {
@@ -176,8 +169,9 @@ void MemoryMapBuilderCS::processFunctionPointer(const Instance &inst,
             }
         }
 
-        if (position != -1)
-            _map->_funcPointers[position].funcPointers.append((*path));
+        if (position != -1) {
+            _map->_funcPointers[position].paths.append((*path));
+        }
         else
             _map->_funcPointers.append(FuncPointersInNode(node, path));
     }
@@ -209,7 +203,7 @@ void MemoryMapBuilderCS::processPointer(const Instance& inst, MemoryMapNode *nod
 
 
 void MemoryMapBuilderCS::processArray(const Instance& inst, MemoryMapNode *node,
-                                      ConstMemberList *path)
+                                      VariableTypeContainerList *path)
 {
     assert(inst.type()->type() == rtArray);
 
@@ -218,14 +212,23 @@ void MemoryMapBuilderCS::processArray(const Instance& inst, MemoryMapNode *node,
     for (int i = 0; i < len; ++i) {
         Instance e(inst.arrayElem(i).dereference(BaseType::trLexical));
         // Pass the "nested" flag to all elements of this array
-        processInstance(e, node, path);
+        // Create a copy/new List
+        VariableTypeContainerList l;
+
+        // Do we have a path yet?
+        if (path) {
+            l.append((*path));
+        }
+
+        l.append(VariableTypeContainer(inst.type(), i));
+        addMembers(inst, node, &l);
     }
 }
 
 
 void MemoryMapBuilderCS::processStructured(const Instance& inst,
                                            MemoryMapNode *node,
-                                           ConstMemberList *path)
+                                           VariableTypeContainerList *path)
 {
     assert(inst.type()->type() & StructOrUnion);
 
@@ -234,20 +237,12 @@ void MemoryMapBuilderCS::processStructured(const Instance& inst,
     if (!path && (inst.address() & 0x3ULL))
         return;
 
-    if (!path) {
-        ConstMemberList p;
-        addMembers(inst, node, &p);
-    }
-    else {
-        ConstMemberList p((*path));
-        p.append((const StructuredMember *)inst.type());
-        addMembers(inst, node, &p);
-    }
+    addMembers(inst, node, path);
 }
 
 
 void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node,
-                                    ConstMemberList *path)
+                                    VariableTypeContainerList *path)
 {
     const int cnt = inst.memberCount();
 
@@ -261,13 +256,23 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node,
             if (!mi.isValid() || mi.isNull())
                 continue;
 
+            // Create a copy/new List
+            VariableTypeContainerList l;
+
+            // Do we have a path yet?
+            if (path) {
+                l.append((*path));
+            }
+
+            l.append(VariableTypeContainer(inst.type(), i));
+
             // Did the rules engine decide which instance to use?
             if (TypeRuleEngine::useMatchedInst(result)) {
-                processInstanceFromRule(inst, mi, i, node, path);
+                processInstanceFromRule(inst, mi, i, node, &l);
             }
             // Pass the "nested" flag to nested structs/unions
             else {
-                processInstance(mi, node, path);
+                processInstance(mi, node, &l);
             }
         }
         catch (GenericException&) {
@@ -280,7 +285,7 @@ void MemoryMapBuilderCS::addMembers(const Instance &inst, MemoryMapNode* node,
 void MemoryMapBuilderCS::processInstanceFromRule(const Instance &parent,
                                                  const Instance &member,
                                                  int mbrIdx, MemoryMapNode *node,
-                                                 ConstMemberList *path)
+                                                 VariableTypeContainerList *path)
 {
     if (!member.isNull()) {
         // How does the returned instance relate to the given one?
