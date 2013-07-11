@@ -410,7 +410,7 @@ void MemoryMap::build(MemoryMapBuilderType type, float minProbability,
         checkOperationProgress();
     }
 
-    // Add all functions to the map, but no to the queue
+    // Add all functions to the map, but not to the queue
     for (BaseTypeList::const_iterator it = factory()->types().begin(),
          e = factory()->types().end(); it != e; ++it)
     {

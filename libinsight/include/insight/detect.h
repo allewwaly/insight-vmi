@@ -17,6 +17,13 @@ public:
         UNDEFINED
     };
 
+    enum FunctionSource
+    {
+        MEMORY_MAP,
+        SYSTEM_MAP,
+        UNKOWN
+    };
+
     struct ExecutablePage
     {
         ExecutablePage() : address(0), type(UNDEFINED), module(""),
@@ -49,7 +56,8 @@ public:
     struct FunctionPointerStats
     {
         FunctionPointerStats() : total(0), userlandPointer(0), defaultValue(0),
-            invalidAddress(0), pointToNXMemory(0), pointsNotToKernelFunction(0) {}
+            pointToKernelFunction(0), pointToModule(0),
+            invalidAddress(0), pointToNXMemory(0), unkown(0) {}
 
         // Convenient
         quint64 total;
@@ -57,11 +65,26 @@ public:
         // Valid
         quint64 userlandPointer;
         quint64 defaultValue;
+        quint64 pointToKernelFunction;
+        quint64 pointToModule;
 
         // Invalid
         quint64 invalidAddress;
         quint64 pointToNXMemory;
-        quint64 pointsNotToKernelFunction;
+        quint64 unkown;
+    };
+
+    struct FunctionInfo
+    {
+        FunctionInfo() : source(UNKOWN), memory_function(0), system_function("") {}
+        FunctionInfo(FunctionSource source, const Function *f) :
+            source(source), memory_function(f), system_function("") {}
+        FunctionInfo(FunctionSource source, const QString &functionName) :
+            source(source), memory_function(0), system_function(functionName) {}
+
+        FunctionSource source;
+        const Function *memory_function;
+        const QString &system_function;
     };
 
     Detect(KernelSymbols &sym);
@@ -81,9 +104,10 @@ private:
 
     QString _current_file;
     QMultiHash<QString, ExecutableSection> *ExecutableSections;
-    QMultiHash<quint64, const Function *> *Functions;
+    QMultiHash<quint64, FunctionInfo> *Functions;
 
     const KernelSymbols &_sym;
+    quint64 _current_index;
 
     static QMultiHash<quint64, ExecutablePage> *ExecutablePages;
 
@@ -92,6 +116,7 @@ private:
     void verifyHashes(QMultiHash<quint64, ExecutablePage> *current);
     void buildFunctionList(MemoryMap *map);
     bool pointsToKernelFunction(MemoryMap *map, Instance &funcPointer);
+    bool pointsToModuleCode(Instance &functionPointer);
     void verifyFunctionPointer(MemoryMap *map, Instance &funcPointer,
                                FunctionPointerStats &stats);
     void verifyFunctionPointers(MemoryMap *map);

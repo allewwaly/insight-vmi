@@ -18,7 +18,8 @@ QMultiHash<quint64, Detect::ExecutablePage> *Detect::ExecutablePages = 0;
 
 Detect::Detect(KernelSymbols &sym) :
     _kernel_code_begin(0), _kernel_code_end(0), _kernel_data_exec_end(0),
-    _vsyscall_page(0), ExecutableSections(0), Functions(0), _sym(sym)
+    _vsyscall_page(0), ExecutableSections(0), Functions(0), _sym(sym),
+    _current_index(0)
 {
     // Get data from System.map
     _kernel_code_begin = _sym.memSpecs().systemMap.value("_text").address;
@@ -325,7 +326,7 @@ void Detect::buildFunctionList(MemoryMap *map)
     if (Functions)
         Functions->clear();
     else
-        Functions = new QMultiHash<quint64, const Function *>();
+        Functions = new QMultiHash<quint64, FunctionInfo>();
 
     NodeList roots = map->roots();
 
@@ -333,10 +334,26 @@ void Detect::buildFunctionList(MemoryMap *map)
         if (roots.at(i)->type()->type() == rtFunction) {
             const Function* f = dynamic_cast<const Function*>(roots.at(i)->type());
 
-            if (f)
-                Functions->insert(f->pcLow(), f);
+            if (f) {
+                Functions->insert(f->pcLow(), FunctionInfo(MEMORY_MAP, f));
+            }
         }
     }
+
+    // It seems like we do not have all functions within the map.
+    // Parser bug?
+    // However, we have the system map. Thus lets add the functions in there as well
+    SystemMapEntryList list = _sym.memSpecs().systemMapToList();
+
+
+    for (int i = 0; i < list.size(); ++i) {
+        if (list.at(i).type == QString("t").toAscii().at(0) ||
+                list.at(i).type == QString("T").toAscii().at(0)) {
+            Functions->insert(list.at(i).address, FunctionInfo(SYSTEM_MAP, list.at(i).name));
+        }
+    }
+
+
 }
 
 bool Detect::pointsToKernelFunction(MemoryMap *map, Instance &funcPointer)
@@ -346,6 +363,53 @@ bool Detect::pointsToKernelFunction(MemoryMap *map, Instance &funcPointer)
 
     if (Functions->contains((quint64)funcPointer.toPointer()))
         return true;
+
+    return false;
+}
+
+bool Detect::pointsToModuleCode(Instance &functionPointer)
+{
+    // Target
+    quint64 pointsTo = (quint64)functionPointer.toPointer();
+
+    VirtualMemory *vmem = _sym.memDumps().at(_current_index)->vmem();
+    const Variable *varModules = _sym.factory().findVarByName("modules");
+    const Structured *typeModule = dynamic_cast<const Structured *>
+            (_sym.factory().findBaseTypeByName("module"));
+    assert(varModules != 0);
+    assert(typeModule != 0);
+
+    // Don't depend on the rule engine
+    const int listOffset = typeModule->memberOffset("list");
+    Instance firstModule = varModules->toInstance(vmem).member("next", BaseType::trAny, -1, ksNone);
+    firstModule.setType(typeModule);
+    firstModule.addToAddress(-listOffset);
+
+    Instance currentModule;
+    quint64 currentModuleCore = 0;
+    quint64 currentModuleCoreSize = 0;
+
+    // Don't depend on the rule engine
+    currentModule = varModules->toInstance(vmem).member("next", BaseType::trAny, -1, ksNone);
+    currentModule.setType(typeModule);
+    currentModule.addToAddress(-listOffset);
+
+    do {
+        currentModuleCore = (quint64)currentModule.member("module_core").toPointer();
+        currentModuleCoreSize = (quint64)currentModule.member("core_text_size").toPointer();
+
+        if (pointsTo >= currentModuleCore &&
+            pointsTo <= (currentModuleCore + currentModuleCoreSize)) {
+            return true;
+        }
+
+        // Don't depend on the rule engine
+        currentModule = currentModule.member("list").member("next", BaseType::trAny, -1, ksNone);
+        currentModule.setType(typeModule);
+        currentModule.addToAddress(-listOffset);
+
+    } while (currentModule.address() != firstModule.address() &&
+             currentModule.address() != varModules->offset() - listOffset);
 
     return false;
 }
@@ -381,7 +445,8 @@ void Detect::verifyFunctionPointer(MemoryMap *map, Instance &funcPointer,
     // For NX
     struct PageTableEntries ptEntries;
     int pageSize = 0;
-    map->vmem()->virtualToPhysical(pointsTo, &pageSize, false, &ptEntries);
+    VirtualMemory *vmem = _sym.memDumps().at(_current_index)->vmem();
+    vmem->virtualToPhysical(pointsTo, &pageSize, false, &ptEntries);
 
     if (!ptEntries.isExecutable()) {
         // Points to is not executeable
@@ -389,10 +454,18 @@ void Detect::verifyFunctionPointer(MemoryMap *map, Instance &funcPointer,
         return;
     }
 
-    if (!pointsToKernelFunction(map, funcPointer)) {
-        stats.pointsNotToKernelFunction++;
+    if (pointsToKernelFunction(map, funcPointer)) {
+        stats.pointToKernelFunction++;
         return;
     }
+
+    if (pointsToModuleCode(funcPointer)) {
+        stats.pointToModule++;
+        return;
+    }
+
+    // Seems to be invalid
+    stats.unkown++;
 }
 
 void Detect::verifyFunctionPointers(MemoryMap *map)
@@ -471,11 +544,13 @@ void Detect::verifyFunctionPointers(MemoryMap *map)
     Console::out() << "\t Found " << Console::color(ctNumber)
                    << stats.defaultValue << Console::color(ctReset) << " pointer with default values." << endl;
     Console::out() << "\t Found " << Console::color(ctNumber)
-                   << stats.total - (stats.userlandPointer +  stats.defaultValue + stats.invalidAddress +
-                                     stats.pointToNXMemory + stats.pointsNotToKernelFunction)
+                   << stats.pointToKernelFunction
                    << Console::color(ctReset) << " point to the beginning of a function within kernelspace." << endl;
+    Console::out() << "\t Found " << Console::color(ctNumber)
+                   << stats.pointToModule
+                   << Console::color(ctReset) << " point into the code section of a module." << endl;
     Console::out() << "\t Detected " << Console::color(ctError)
-                   << stats.invalidAddress + stats.pointToNXMemory + stats.pointsNotToKernelFunction
+                   << stats.invalidAddress + stats.pointToNXMemory + stats.unkown
                    << Console::color(ctReset) << " invalid Function Pointers." << endl;
     Console::out() << "\t\t " << Console::color(ctError)
                    << stats.invalidAddress
@@ -484,8 +559,8 @@ void Detect::verifyFunctionPointers(MemoryMap *map)
                    << stats.pointToNXMemory
                    << Console::color(ctReset) << " point to a NX region." << endl;
     Console::out() << "\t\t " << Console::color(ctError)
-                   << stats.pointsNotToKernelFunction
-                   << Console::color(ctReset) << " point NOT to the beginning of a kernel function.\n" << endl;
+                   << stats.unkown
+                   << Console::color(ctReset) << " do neither point to module or kernel code.\n" << endl;
 }
 
 
@@ -522,6 +597,9 @@ void Detect::hiddenCode(int index)
     _first_page = begin;
     _current_page = begin;
     _final_page = end;
+
+    // Set index
+    _current_index = index;
 
     // Statistics
     quint64 processed_pages = 0;
