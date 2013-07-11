@@ -2,6 +2,7 @@
 #define DETECT_H
 
 #include "kernelsymbols.h"
+#include "function.h"
 
 class Detect : public LongOperation
 {
@@ -45,6 +46,24 @@ public:
         QByteArray data;
     };
 
+    struct FunctionPointerStats
+    {
+        FunctionPointerStats() : total(0), userlandPointer(0), defaultValue(0),
+            invalidAddress(0), pointToNXMemory(0), pointsNotToKernelFunction(0) {}
+
+        // Convenient
+        quint64 total;
+
+        // Valid
+        quint64 userlandPointer;
+        quint64 defaultValue;
+
+        // Invalid
+        quint64 invalidAddress;
+        quint64 pointToNXMemory;
+        quint64 pointsNotToKernelFunction;
+    };
+
     Detect(KernelSymbols &sym);
 
     void hiddenCode(int index);
@@ -62,14 +81,19 @@ private:
 
     QString _current_file;
     QMultiHash<QString, ExecutableSection> *ExecutableSections;
+    QMultiHash<quint64, const Function *> *Functions;
 
-    KernelSymbols &_sym;
+    const KernelSymbols &_sym;
 
     static QMultiHash<quint64, ExecutablePage> *ExecutablePages;
 
     void getExecutableSections(QString file);
     quint64 inVmap(quint64 address, VirtualMemory *vmem);
     void verifyHashes(QMultiHash<quint64, ExecutablePage> *current);
+    void buildFunctionList(MemoryMap *map);
+    bool pointsToKernelFunction(MemoryMap *map, Instance &funcPointer);
+    void verifyFunctionPointer(MemoryMap *map, Instance &funcPointer,
+                               FunctionPointerStats &stats);
     void verifyFunctionPointers(MemoryMap *map);
 };
 

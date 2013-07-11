@@ -18,7 +18,7 @@ QMultiHash<quint64, Detect::ExecutablePage> *Detect::ExecutablePages = 0;
 
 Detect::Detect(KernelSymbols &sym) :
     _kernel_code_begin(0), _kernel_code_end(0), _kernel_data_exec_end(0),
-    _vsyscall_page(0), ExecutableSections(0), _sym(sym)
+    _vsyscall_page(0), ExecutableSections(0), Functions(0), _sym(sym)
 {
     // Get data from System.map
     _kernel_code_begin = _sym.memSpecs().systemMap.value("_text").address;
@@ -320,12 +320,87 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
     ExecutablePages = current;
 }
 
+void Detect::buildFunctionList(MemoryMap *map)
+{
+    if (Functions)
+        Functions->clear();
+    else
+        Functions = new QMultiHash<quint64, const Function *>();
+
+    NodeList roots = map->roots();
+
+    for (int i = 0; i < roots.size(); ++i) {
+        if (roots.at(i)->type()->type() == rtFunction) {
+            const Function* f = dynamic_cast<const Function*>(roots.at(i)->type());
+
+            if (f)
+                Functions->insert(f->pcLow(), f);
+        }
+    }
+}
+
+bool Detect::pointsToKernelFunction(MemoryMap *map, Instance &funcPointer)
+{
+    if (!Functions)
+        buildFunctionList(map);
+
+    if (Functions->contains((quint64)funcPointer.toPointer()))
+        return true;
+
+    return false;
+}
+
+void Detect::verifyFunctionPointer(MemoryMap *map, Instance &funcPointer,
+                                   FunctionPointerStats &stats)
+{
+    // Target
+    quint64 pointsTo = (quint64)funcPointer.toPointer();
+
+    // Increase total count
+    stats.total++;
+
+    // Verify the function pointer and gather statistics
+    if (MemoryMapHeuristics::isUserLandAddress(pointsTo, _sym.memSpecs())) {
+        // Function Pointer points to userland
+        stats.userlandPointer++;
+        return;
+    }
+
+    if (MemoryMapHeuristics::isDefaultValue(pointsTo, _sym.memSpecs())) {
+        // Function pointer points to a default value
+        stats.defaultValue++;
+        return;
+    }
+
+    if (!MemoryMapHeuristics::isValidAddress(pointsTo, _sym.memSpecs())) {
+        // Function pointer points to an invalid address
+        stats.invalidAddress++;
+        return;
+    }
+
+    // For NX
+    struct PageTableEntries ptEntries;
+    int pageSize = 0;
+    map->vmem()->virtualToPhysical(pointsTo, &pageSize, false, &ptEntries);
+
+    if (!ptEntries.isExecutable()) {
+        // Points to is not executeable
+        stats.pointToNXMemory++;
+        return;
+    }
+
+    if (!pointsToKernelFunction(map, funcPointer)) {
+        stats.pointsNotToKernelFunction++;
+        return;
+    }
+}
+
 void Detect::verifyFunctionPointers(MemoryMap *map)
 {
     assert(map);
 
-    quint64 validPointers = 0;
-    quint64 invalidPointers = 0;
+    // Statistics
+    FunctionPointerStats stats;
 
     const QList<FuncPointersInNode> funcPointers = map->funcPointers();
 
@@ -366,10 +441,7 @@ void Detect::verifyFunctionPointers(MemoryMap *map)
                 }
 
                 // Verify Function Pointer
-                if (!MemoryMapHeuristics::isValidFunctionPointer(funcPointer))
-                    invalidPointers++;
-                else
-                    validPointers++;
+                verifyFunctionPointer(map, funcPointer, stats);
             }
         }
         else {
@@ -382,10 +454,7 @@ void Detect::verifyFunctionPointers(MemoryMap *map)
             }
 
             // Verify Function Pointer
-            if (!MemoryMapHeuristics::isValidFunctionPointer(node))
-                invalidPointers++;
-            else
-                validPointers++;
+            verifyFunctionPointer(map, node, stats);
         }
 
     }
@@ -395,10 +464,28 @@ void Detect::verifyFunctionPointers(MemoryMap *map)
 
     // Print Stats
     Console::out() << "\r\nProcessed " << Console::color(ctWarningLight)
-                   << invalidPointers+validPointers << Console::color(ctReset)
+                   << stats.total << Console::color(ctReset)
                    << " Function Pointers in " << elapsedTime() << " min" << endl;
+    Console::out() << "\t Found " << Console::color(ctNumber)
+                   << stats.userlandPointer << Console::color(ctReset) << " userland pointer." << endl;
+    Console::out() << "\t Found " << Console::color(ctNumber)
+                   << stats.defaultValue << Console::color(ctReset) << " pointer with default values." << endl;
+    Console::out() << "\t Found " << Console::color(ctNumber)
+                   << stats.total - (stats.userlandPointer +  stats.defaultValue + stats.invalidAddress +
+                                     stats.pointToNXMemory + stats.pointsNotToKernelFunction)
+                   << Console::color(ctReset) << " point to the beginning of a function within kernelspace." << endl;
     Console::out() << "\t Detected " << Console::color(ctError)
-                   << invalidPointers << Console::color(ctReset) << " invalid Function Pointers.\n" << endl;
+                   << stats.invalidAddress + stats.pointToNXMemory + stats.pointsNotToKernelFunction
+                   << Console::color(ctReset) << " invalid Function Pointers." << endl;
+    Console::out() << "\t\t " << Console::color(ctError)
+                   << stats.invalidAddress
+                   << Console::color(ctReset) << " point to an invalid address." << endl;
+    Console::out() << "\t\t " << Console::color(ctError)
+                   << stats.pointToNXMemory
+                   << Console::color(ctReset) << " point to a NX region." << endl;
+    Console::out() << "\t\t " << Console::color(ctError)
+                   << stats.pointsNotToKernelFunction
+                   << Console::color(ctReset) << " point NOT to the beginning of a kernel function.\n" << endl;
 }
 
 
