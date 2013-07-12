@@ -323,6 +323,8 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
 
 void Detect::buildFunctionList(MemoryMap *map)
 {
+    VirtualMemory *vmem = _sym.memDumps().at(_current_index)->vmem();
+
     if (Functions)
         Functions->clear();
     else
@@ -343,7 +345,7 @@ void Detect::buildFunctionList(MemoryMap *map)
     // It seems like we do not have all functions within the map.
     // Parser bug?
     // However, we have the system map. Thus lets add the functions in there as well
-    SystemMapEntryList list = _sym.memSpecs().systemMapToList();
+    SystemMapEntryList list = vmem->memSpecs().systemMapToList();
 
 
     for (int i = 0; i < list.size(); ++i) {
@@ -415,28 +417,31 @@ bool Detect::pointsToModuleCode(Instance &functionPointer)
 }
 
 void Detect::verifyFunctionPointer(MemoryMap *map, Instance &funcPointer,
-                                   FunctionPointerStats &stats)
+                                   FunctionPointerStats &stats, bool inUnion)
 {
     // Target
     quint64 pointsTo = (quint64)funcPointer.toPointer();
+
+    // vmem
+    VirtualMemory *vmem = _sym.memDumps().at(_current_index)->vmem();
 
     // Increase total count
     stats.total++;
 
     // Verify the function pointer and gather statistics
-    if (MemoryMapHeuristics::isUserLandAddress(pointsTo, _sym.memSpecs())) {
+    if (MemoryMapHeuristics::isUserLandAddress(pointsTo, vmem->memSpecs())) {
         // Function Pointer points to userland
         stats.userlandPointer++;
         return;
     }
 
-    if (MemoryMapHeuristics::isDefaultValue(pointsTo, _sym.memSpecs())) {
+    if (MemoryMapHeuristics::isDefaultValue(pointsTo, vmem->memSpecs())) {
         // Function pointer points to a default value
         stats.defaultValue++;
         return;
     }
 
-    if (!MemoryMapHeuristics::isValidAddress(pointsTo, _sym.memSpecs())) {
+    if (!MemoryMapHeuristics::isValidAddress(pointsTo, vmem->memSpecs())) {
         // Function pointer points to an invalid address
         stats.invalidAddress++;
         return;
@@ -445,12 +450,20 @@ void Detect::verifyFunctionPointer(MemoryMap *map, Instance &funcPointer,
     // For NX
     struct PageTableEntries ptEntries;
     int pageSize = 0;
-    VirtualMemory *vmem = _sym.memDumps().at(_current_index)->vmem();
     vmem->virtualToPhysical(pointsTo, &pageSize, false, &ptEntries);
 
     if (!ptEntries.isExecutable()) {
         // Points to is not executeable
         stats.pointToNXMemory++;
+        return;
+    }
+
+    if ((vmem->memSpecs().arch & vmem->memSpecs().ar_x86_64) &&
+            pointsTo >= vmem->memSpecs().pageOffset &&
+            pointsTo <= vmem->memSpecs().vmallocStart) {
+        // Points to direct mapping of physical memory.
+        // We ignore those for now.
+        stats.pointToPhysical++;
         return;
     }
 
@@ -464,13 +477,35 @@ void Detect::verifyFunctionPointer(MemoryMap *map, Instance &funcPointer,
         return;
     }
 
-    // Seems to be invalid
-    stats.unkown++;
+    // Well thats a function pointer that points to
+    // executeable memory that we cannot assign to anyone
+    if (inUnion)
+        stats.maliciousUnion++;
+    else {
+        // Some function pointer that have a union on there path
+        // are not detected by comparing their type with rtUnion
+        // We try to detect those by looking for parent names that
+        // start with a "."
+        QStringList p = funcPointer.parentNameComponents();
+
+        for (int i = 0; i < p.size(); ++i) {
+            if (p.at(i).startsWith(".")) {
+                // Parent was a union
+                stats.maliciousUnion++;
+                return;
+            }
+        }
+
+        stats.malicious++;
+    }
 }
 
 void Detect::verifyFunctionPointers(MemoryMap *map)
 {
     assert(map);
+
+    // Unions
+    bool inUnion = false;
 
     // Statistics
     FunctionPointerStats stats;
@@ -482,6 +517,7 @@ void Detect::verifyFunctionPointers(MemoryMap *map)
 
     for (int i = 0; i < funcPointers.size(); ++i) {
         Instance node = funcPointers[i].node->toInstance();
+        inUnion = false;
 
         if (!funcPointers[i].paths.empty()) {
             // Reconstruct each function pointer by following the path
@@ -496,6 +532,9 @@ void Detect::verifyFunctionPointers(MemoryMap *map)
                     if (t->type() & StructOrUnion) {
                         funcPointer = funcPointer.member(index, BaseType::trLexical, 0,
                                                          map->knowSrc());
+
+                        if (t->type() & rtUnion)
+                            inUnion = true;
                     }
                     else if (t->type() & rtArray) {
                         funcPointer = funcPointer.arrayElem(index);
@@ -514,7 +553,7 @@ void Detect::verifyFunctionPointers(MemoryMap *map)
                 }
 
                 // Verify Function Pointer
-                verifyFunctionPointer(map, funcPointer, stats);
+                verifyFunctionPointer(map, funcPointer, stats, inUnion);
             }
         }
         else {
@@ -527,7 +566,7 @@ void Detect::verifyFunctionPointers(MemoryMap *map)
             }
 
             // Verify Function Pointer
-            verifyFunctionPointer(map, node, stats);
+            verifyFunctionPointer(map, node, stats, inUnion);
         }
 
     }
@@ -540,36 +579,60 @@ void Detect::verifyFunctionPointers(MemoryMap *map)
                    << stats.total << Console::color(ctReset)
                    << " Function Pointers in " << elapsedTime() << " min" << endl;
     Console::out() << "\t Found " << Console::color(ctNumber)
-                   << stats.userlandPointer << Console::color(ctReset) << " userland pointer." << endl;
+                   << stats.userlandPointer << Console::color(ctReset)
+                   << " (" << Console::color(ctNumber)
+                   << QString("%1").arg((float)stats.userlandPointer * 100 / stats.total, 0, 'f', 2)
+                   << Console::color(ctReset) << "%) userland pointer." << endl;
     Console::out() << "\t Found " << Console::color(ctNumber)
-                   << stats.defaultValue << Console::color(ctReset) << " pointer with default values." << endl;
+                   << stats.defaultValue << Console::color(ctReset)
+                   << " (" << Console::color(ctNumber)
+                   << QString("%1").arg((float)stats.defaultValue * 100 / stats.total, 0, 'f', 2)
+                   << Console::color(ctReset) << "%) pointer with default values." << endl;
     Console::out() << "\t Found " << Console::color(ctNumber)
-                   << stats.pointToKernelFunction
-                   << Console::color(ctReset) << " point to the beginning of a function within kernelspace." << endl;
+                   << stats.pointToKernelFunction << Console::color(ctReset)
+                   << " (" << Console::color(ctNumber)
+                   << QString("%1").arg((float)stats.pointToKernelFunction * 100 / stats.total, 0, 'f', 2)
+                   << Console::color(ctReset) << "%) pointing to the beginning of a function within kernelspace." << endl;
     Console::out() << "\t Found " << Console::color(ctNumber)
-                   << stats.pointToModule
-                   << Console::color(ctReset) << " point into the code section of a module." << endl;
+                   << stats.pointToModule << Console::color(ctReset)
+                   << " (" << Console::color(ctNumber)
+                   << QString("%1").arg((float)stats.pointToModule * 100 / stats.total, 0, 'f', 2)
+                   << Console::color(ctReset) << "%) pointing into the code section of a module." << endl;
+    Console::out() << "\t Found " << Console::color(ctWarning)
+                   << stats.invalidAddress << Console::color(ctReset)
+                   << " (" << Console::color(ctWarning)
+                   << QString("%1").arg((float)stats.invalidAddress * 100 / stats.total, 0, 'f', 2)
+                   << Console::color(ctReset) << "%) pointing to an invalid address." << endl;
+    Console::out() << "\t Found " << Console::color(ctWarning)
+                   << stats.pointToNXMemory << Console::color(ctReset)
+                   << " (" << Console::color(ctWarning)
+                   << QString("%1").arg((float)stats.pointToNXMemory * 100 / stats.total, 0, 'f', 2)
+                   << Console::color(ctReset) << "%) pointing to a NX region." << endl;
+    Console::out() << "\t Found " << Console::color(ctWarning)
+                   << stats.pointToPhysical << Console::color(ctReset)
+                   << " (" << Console::color(ctWarning)
+                   << QString("%1").arg((float)stats.pointToPhysical * 100 / stats.total, 0, 'f', 2)
+                   << Console::color(ctReset) << "%) pointing into the directly mapped physical memory." << endl;
     Console::out() << "\t Detected " << Console::color(ctError)
-                   << stats.invalidAddress + stats.pointToNXMemory + stats.unkown
-                   << Console::color(ctReset) << " invalid Function Pointers." << endl;
+                   << stats.malicious + stats.maliciousUnion << Console::color(ctReset)
+                   << " (" << Console::color(ctError)
+                   << QString("%1").arg((float)(stats.malicious + stats.maliciousUnion) * 100 / stats.total, 0, 'f', 2)
+                   << Console::color(ctReset) << "%) presumably malicious function pointers." << endl;
     Console::out() << "\t\t " << Console::color(ctError)
-                   << stats.invalidAddress
-                   << Console::color(ctReset) << " point to an invalid address." << endl;
-    Console::out() << "\t\t " << Console::color(ctError)
-                   << stats.pointToNXMemory
-                   << Console::color(ctReset) << " point to a NX region." << endl;
-    Console::out() << "\t\t " << Console::color(ctError)
-                   << stats.unkown
-                   << Console::color(ctReset) << " do neither point to module or kernel code.\n" << endl;
+                   << stats.maliciousUnion << Console::color(ctReset)
+                   << " (" << Console::color(ctError)
+                   << QString("%1").arg((float)stats.maliciousUnion * 100 / (stats.maliciousUnion + stats.malicious), 0, 'f', 2)
+                   << Console::color(ctReset) << "%) of them are located within a union." << endl;
 }
 
 
 void Detect::hiddenCode(int index)
 {
-    quint64 begin = (_sym.memSpecs().pageOffset & ~(PAGE_SIZE - 1));
-    quint64 end = _sym.memSpecs().vaddrSpaceEnd();
-
     VirtualMemory *vmem = _sym.memDumps().at(index)->vmem();
+
+    quint64 begin = (vmem->memSpecs().pageOffset & ~(PAGE_SIZE - 1));
+    quint64 end = vmem->memSpecs().vaddrSpaceEnd();
+
     const Variable *varModules = _sym.factory().findVarByName("modules");
     const Structured *typeModule = dynamic_cast<const Structured *>
             (_sym.factory().findBaseTypeByName("module"));
@@ -621,10 +684,10 @@ void Detect::hiddenCode(int index)
     // This is due to the fact that the complete physical memory region
     // is mapped to ffff8800 00000000 - ffffc7ff ffffffff (=64 TB).
     // Thus we start in this case after the direct mapping
-    if ((_sym.memSpecs().arch & _sym.memSpecs().ar_x86_64))
+    if ((vmem->memSpecs().arch & vmem->memSpecs().ar_x86_64))
         begin = 0xffffc7ffffffffff + 1;
 
-    for (i = begin; i < end && i >= begin; i += ptEntries.nextPageOffset(_sym.memSpecs()))
+    for (i = begin; i < end && i >= begin; i += ptEntries.nextPageOffset(vmem->memSpecs()))
     {
         found = false;
         _current_page = i;
@@ -673,7 +736,7 @@ void Detect::hiddenCode(int index)
 
             // Create ByteArray
             QByteArray data;
-            data.resize(ptEntries.nextPageOffset(_sym.memSpecs()));
+            data.resize(ptEntries.nextPageOffset(vmem->memSpecs()));
 
             // Get data
             if ((quint64)vmem->readAtomic(i, data.data(), data.size()) != data.size()) {
@@ -813,7 +876,7 @@ void Detect::hiddenCode(int index)
                 else
                     Console::out() << ' ';
                 Console::out() << ") (Size: 0x"
-                               << hex << ptEntries.nextPageOffset(_sym.memSpecs()) << dec
+                               << hex << ptEntries.nextPageOffset(vmem->memSpecs()) << dec
                                << ")"
                                << endl;
 
