@@ -57,7 +57,8 @@ public:
     {
         FunctionPointerStats() : total(0), userlandPointer(0), defaultValue(0),
             pointToKernelFunction(0), pointToModule(0),
-            invalidAddress(0), pointToNXMemory(0), unkown(0) {}
+            invalidAddress(0), pointToNXMemory(0), pointToPhysical(0),
+            maliciousUnion(0), malicious(0) {}
 
         // Convenient
         quint64 total;
@@ -68,10 +69,17 @@ public:
         quint64 pointToKernelFunction;
         quint64 pointToModule;
 
-        // Invalid
+        // These seem to be invalid, but they are not
+        // critically for detection
         quint64 invalidAddress;
         quint64 pointToNXMemory;
-        quint64 unkown;
+        quint64 pointToPhysical;
+
+        // These pointer seem to be malicious, but are
+        // contained within a union.
+        quint64 maliciousUnion;
+        // Those are malicious.
+        quint64 malicious;
     };
 
     struct FunctionInfo
@@ -118,7 +126,7 @@ private:
     bool pointsToKernelFunction(MemoryMap *map, Instance &funcPointer);
     bool pointsToModuleCode(Instance &functionPointer);
     void verifyFunctionPointer(MemoryMap *map, Instance &funcPointer,
-                               FunctionPointerStats &stats);
+                               FunctionPointerStats &stats, bool inUnion=false);
     void verifyFunctionPointers(MemoryMap *map);
 };
 
