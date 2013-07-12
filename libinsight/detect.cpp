@@ -314,7 +314,7 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
         << "\t Detected " << Console::color(ctError) << changedDataPages << Console::color(ctReset)
         << " modified executable DATA pages." << endl
         << "\t Detected " << Console::color(ctError) << changedPages << Console::color(ctReset)
-        << " modified CODE pages." << endl;
+        << " modified CODE pages.\n" << endl;
 
     // Exchange
     delete(ExecutablePages);
@@ -495,6 +495,19 @@ void Detect::verifyFunctionPointer(MemoryMap *map, Instance &funcPointer,
                 return;
             }
         }
+
+        Console::out()
+                << Console::color(ctWarningLight)
+                << "WARNING:" << Console::color(ctReset)
+                << " Detected malicious function pointer '"
+                << funcPointer.fullName() << "' @ "
+                << Console::color(ctAddress) << "0x"
+                << hex << funcPointer.address() << dec
+                << Console::color(ctReset) << " pointing to "
+                << Console::color(ctAddress) << "0x"
+                << hex << pointsTo << dec
+                << Console::color(ctReset)
+                << endl;
 
         stats.malicious++;
     }
