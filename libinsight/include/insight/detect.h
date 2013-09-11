@@ -4,6 +4,8 @@
 #include "kernelsymbols.h"
 #include "function.h"
 
+#include <elf.h>
+
 class Detect : public LongOperation
 {
 public:
@@ -38,18 +40,6 @@ public:
         PageType type;
         QString module;
         QByteArray hash;
-        QByteArray data;
-    };
-
-    struct ExecutableSection
-    {
-        ExecutableSection() : name(""), address(0), offset(0), data() {}
-        ExecutableSection(QString name, quint64 address, quint64 offset, QByteArray data) :
-                          name(name), address(address), offset(offset), data(data) {}
-
-        QString name;
-        quint64 address;
-        quint64 offset;
         QByteArray data;
     };
 
@@ -111,23 +101,142 @@ private:
     quint64 _final_page;
 
     QString _current_file;
-    QMultiHash<QString, ExecutableSection> *ExecutableSections;
     QMultiHash<quint64, FunctionInfo> *Functions;
+
 
     const KernelSymbols &_sym;
     quint64 _current_index;
 
     static QMultiHash<quint64, ExecutablePage> *ExecutablePages;
 
-    void getExecutableSections(QString file);
     quint64 inVmap(quint64 address, VirtualMemory *vmem);
-    void verifyHashes(QMultiHash<quint64, ExecutablePage> *current);
     void buildFunctionList(MemoryMap *map);
     bool pointsToKernelFunction(MemoryMap *map, Instance &funcPointer);
     bool pointsToModuleCode(Instance &functionPointer);
     void verifyFunctionPointer(MemoryMap *map, Instance &funcPointer,
                                FunctionPointerStats &stats, bool inUnion=false);
     void verifyFunctionPointers(MemoryMap *map);
+};
+
+class PageVerifier : public LongOperation
+{
+public:
+
+    struct PageData{
+        QByteArray hash;
+        QByteArray content;
+    };
+
+    struct SegmentInfo{
+        SegmentInfo(): index(0), address(0), size(0) {}
+        SegmentInfo(char * i, unsigned int s): index(i), address(0), size(s) {}
+        SegmentInfo(char * i, quint64 a, unsigned int s): index(i), address(a), size(s) {}
+
+        char * index;
+        quint64 address;
+        unsigned int size;
+    };
+
+    struct elfParseData{
+        elfParseData() :
+            type(Detect::UNDEFINED),
+            symindex(0), strindex(0),
+            textSegment(), dataSegment(), vvarSegment(), dataNosaveSegment(), bssSegment(),
+            fentryAddress(0), genericUnrolledAddress(0),
+            percpuDataSegment(0), textSegmentData(), vvarSegmentData(), dataNosaveSegmentData(),
+            jumpTable(), currentModule()
+        {}
+        elfParseData(Instance curMod) :
+            type(Detect::UNDEFINED),
+            symindex(0), strindex(0),
+            textSegment(), dataSegment(), vvarSegment(), dataNosaveSegment(), bssSegment(),
+            fentryAddress(0), genericUnrolledAddress(0),
+            percpuDataSegment(0), textSegmentData(), vvarSegmentData(), dataNosaveSegmentData(),
+            jumpTable(), currentModule(curMod)
+        {}
+
+        Detect::PageType type;
+        unsigned int symindex;
+        unsigned int strindex;
+        unsigned int shstrindex;
+        SegmentInfo textSegment;
+        SegmentInfo dataSegment;
+        SegmentInfo vvarSegment;
+        SegmentInfo dataNosaveSegment;
+        SegmentInfo bssSegment;
+        unsigned int relsec;
+        quint64 fentryAddress;
+        quint64 genericUnrolledAddress;
+        unsigned int percpuDataSegment;
+        QList<PageData> textSegmentData;
+        QList<PageData> vvarSegmentData;
+        QList<PageData> dataNosaveSegmentData;
+        QByteArray jumpTable;
+        Instance currentModule;
+    };
+
+    PageVerifier(const KernelSymbols &sym);
+
+    void verifyHashes(QMultiHash<quint64, Detect::ExecutablePage> *current);
+    void operationProgress();
+
+private:
+    const KernelSymbols &_sym;
+    VirtualMemory *_vmem;
+
+    const unsigned char * const * ideal_nops;
+
+    quint64 _current_index;
+
+    QMultiHash<QString, elfParseData> * ParsedExecutables;
+    QHash<QString, quint64> _symTable;
+
+    QHash<quint64, qint32> _jumpEntries;
+
+    QString findModuleFile(QString moduleName);
+    char* readFile(QString fileName);
+    void writeSectionToFile(QString moduleName, quint32 sectionNumber, QByteArray data);
+    void writeModuleToFile(QString origFileName, Instance currentModule, char * buffer );
+    quint64 findMemAddressOfSegment(elfParseData context, QString sectionName);
+
+    int apply_relocate(char * fileContent, Elf32_Shdr *sechdrs, elfParseData context);
+    int apply_relocate_add(char * fileContent, Elf64_Shdr *sechdrs, elfParseData context);
+
+
+    void  add_nops(void *insns, quint8 len);
+
+    quint8 paravirt_patch_nop(void);
+    quint8 paravirt_patch_ignore(unsigned len);
+    quint8 paravirt_patch_insns(void *insnbuf, unsigned len,
+                                const char *start, const char *end);
+    quint8 paravirt_patch_jmp(void *insnbuf, quint64 target, quint64 addr, quint8 len);
+    quint8 paravirt_patch_call(void *insnbuf, quint64 target, quint16 tgt_clobbers,
+                               quint64 addr, quint16 site_clobbers, quint8 len);
+    quint8 paravirt_patch_default(quint32 type, quint16 clobbers, void *insnbuf,
+                                  quint64 addr, quint8 len);
+    quint32 paravirtNativePatch(quint32 type, quint16 clobbers, void *ibuf,
+                                 unsigned long addr, unsigned len);
+
+    quint64 get_call_destination(quint32 type);
+
+    void applyAltinstr(char * fileContent, SegmentInfo info, elfParseData context);
+    void applyParainstr(SegmentInfo info, elfParseData context);
+    void applyMcount(SegmentInfo info, elfParseData context, QByteArray &segmentData);
+    void applyTracepoints(SegmentInfo tracePoint, SegmentInfo rodata, elfParseData context, QByteArray &segmentData);
+    void applyJumpEntries(QByteArray &textSegmentContent, PageVerifier::elfParseData context, quint64 jumpStart = 0, quint64 jumpStop = 0);
+
+    SegmentInfo findElfSegmentWithName(char * elfEhdr, QString sectionName);
+    Instance findModuleByName(QString moduleName);
+    quint64 findElfAddressOfVariable(char * elfEhdr, elfParseData context, QString symbolName);
+
+    elfParseData parseKernelModule(QString fileName, Instance currentModule);
+    void loadElfModule(QString moduleName, Instance currentModule);
+
+    elfParseData parseKernel(QString fileName);
+    void loadElfKernel();
+
+    quint64 checkCodePage(QString moduleName, quint32 sectionNumber, Detect::ExecutablePage currentPage);
+
 };
 
 #endif // DETECT_H
