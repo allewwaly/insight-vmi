@@ -10,16 +10,27 @@
 #include <QRegExp>
 #include <QProcess>
 
+#include <QHash>
+#include <QDir>
+#include <QDirIterator>
+
+#include <errno.h>
+
 #include <limits>
 
-#define PAGE_SIZE 4096
+#define MODULE_PAGE_SIZE 4096
+#define KERNEL_CODEPAGE_SIZE 2097152
+
+#define MODULE_BASE_DIR "/local-home/kittel/projekte/insight/images/symbols/ubuntu-13.04-64-server/3.8.13-19-generic-dbg"
+#define KERNEL_IMAGE "/local-home/kittel/projekte/insight/images/symbols/ubuntu-13.04-64-server/linux-3.8.0/vmlinux"
+#define MEM_SAVE_DIR "/local-home/kittel/projekte/insight/memdump/"
 
 QMultiHash<quint64, Detect::ExecutablePage> *Detect::ExecutablePages = 0;
 
 Detect::Detect(KernelSymbols &sym) :
     _kernel_code_begin(0), _kernel_code_end(0), _kernel_data_exec_end(0),
-    _vsyscall_page(0), ExecutableSections(0), Functions(0), _sym(sym),
-    _current_index(0)
+    _vsyscall_page(0), Functions(0),
+    _sym(sym), _current_index(0)
 {
     // Get data from System.map
     _kernel_code_begin = _sym.memSpecs().systemMap.value("_text").address;
@@ -38,69 +49,1649 @@ Detect::Detect(KernelSymbols &sym) :
     }
 }
 
-void Detect::getExecutableSections(QString file)
+#define GENERIC_NOP1 0x90
+
+#define P6_NOP1 GENERIC_NOP1
+#define P6_NOP2 0x66,0x90
+#define P6_NOP3 0x0f,0x1f,0x00
+#define P6_NOP4 0x0f,0x1f,0x40,0
+#define P6_NOP5 0x0f,0x1f,0x44,0x00,0
+#define P6_NOP6 0x66,0x0f,0x1f,0x44,0x00,0
+#define P6_NOP7 0x0f,0x1f,0x80,0,0,0,0
+#define P6_NOP8 0x0f,0x1f,0x84,0x00,0,0,0,0
+#define P6_NOP5_ATOMIC P6_NOP5
+
+#define ASM_NOP_MAX 8
+
+static const unsigned char p6nops[] =
 {
-    QProcess helper;
+        P6_NOP1,
+        P6_NOP2,
+        P6_NOP3,
+        P6_NOP4,
+        P6_NOP5,
+        P6_NOP6,
+        P6_NOP7,
+        P6_NOP8,
+        P6_NOP5_ATOMIC
+};
 
-    // Regex
-    int pos = 0;
-    QRegExp regex("\\s*\\[\\s*[0-9]{1,2}\\]\\s*([\\.a-zA-Z0-9_-]+)\\s*[A-Za-z]+\\s*([0-9A-Fa-f]+)"
-                  "\\s*([0-9A-Fa-f]+)\\s*([0-9A-Fa-f]+)", Qt::CaseInsensitive);
+static const unsigned char * const p6_nops[ASM_NOP_MAX+2] =
+{
+        NULL,
+        p6nops,
+        p6nops + 1,
+        p6nops + 1 + 2,
+        p6nops + 1 + 2 + 3,
+        p6nops + 1 + 2 + 3 + 4,
+        p6nops + 1 + 2 + 3 + 4 + 5,
+        p6nops + 1 + 2 + 3 + 4 + 5 + 6,
+        p6nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
+        p6nops + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8,
+};
 
-    // Free old data
-    if (ExecutableSections != 0)
-        delete(ExecutableSections);
 
-    // Create HashMap
-    ExecutableSections = new QMultiHash<QString, ExecutableSection>();
+//TODO Use QT Types
+struct alt_instr {
+        qint32  instr_offset;       /* original instruction */
+        qint32  repl_offset;        /* offset to replacement instruction */
+        quint16 cpuid;              /* cpuid bit set for replacement */
+        quint8  instrlen;           /* length of original instruction */
+        quint8  replacementlen;     /* length of new instruction, <= instrlen */
+};
 
-    // Get Executable Sections
-    helper.start("/bin/bash -c \"readelf -a " + file + " | grep -B1 \\\"AX\\\"");
-    helper.waitForFinished();
+struct paravirt_patch_site {
+        quint8 *instr;              /* original instructions */
+        quint8 instrtype;           /* type of this instruction */
+        quint8 len;                 /* length of original instruction */
+        quint16 clobbers;           /* what registers you may clobber */
+};
 
-    QString output(helper.readAll());
+struct static_key {
+    quint32 enabled;
+};
 
-    // Open file
-    QFile f(file);
+struct jump_entry {
+    quint64 code;
+    quint64 target;
+    quint64 key;
+};
 
-    if (!f.open(QIODevice::ReadOnly))
-    {
-        debugerr("Could not open file " << file << "!");
-        return;
+struct tracepoint_func {
+    void *func;
+    void *data;
+};
+
+struct tracepoint {
+    const char *name;               /* Tracepoint name */
+    struct static_key key;
+    void (*regfunc)(void);
+    void (*unregfunc)(void);
+    struct tracepoint_func *funcs;
+};
+
+PageVerifier::PageVerifier(const KernelSymbols &sym) :
+    _sym(sym), _current_index(0), ParsedExecutables(0), _symTable(), _jumpEntries()
+{
+    ParsedExecutables = new QMultiHash<QString, elfParseData>();
+    _vmem = _sym.memDumps().at(_current_index)->vmem();
+
+    //TODO Find correct nops => http://lxr.free-electrons.com/source/arch/x86/kernel/alternative.c#L230
+    ideal_nops = p6_nops;
+}
+
+/**
+ * Find the file containing the module in elf format
+ */
+
+QString PageVerifier::findModuleFile(QString moduleName)
+{
+    moduleName = moduleName.trimmed();
+
+    //Some Filenames are not exactly the modulename. This is currently cheating but ok :-)
+    if (moduleName == "kvm_intel") moduleName = QString("kvm-intel");
+    if (moduleName == "i2c_piix4") moduleName = QString("i2c-piix4");
+
+    //TODO get basedir from config or parameter
+    QString baseDirName = QString(MODULE_BASE_DIR);
+
+    QDirIterator dirIt(baseDirName,QDirIterator::Subdirectories);
+    while (dirIt.hasNext()) {
+        dirIt.next();
+        if (QFileInfo(dirIt.filePath()).isFile())
+        {
+            if (QFileInfo(dirIt.filePath()).suffix() == "ko" && QFileInfo(dirIt.filePath()).baseName() == moduleName)
+            {
+                //Console::out() << moduleName << ": " << QFileInfo(dirIt.filePath()).baseName() << "\n" << endl;
+                return dirIt.filePath();
+            }
+        }
     }
 
-    // Extract data
-    while ((pos = regex.indexIn(output, pos)) != -1)
+    debugerr("" << moduleName << " Kernelmodule not found!");
+    return QString("");
+}
+
+/**
+  * Read a File to Memory
+  * Important: The buffer must be freed after it was used!
+  */
+char* PageVerifier::readFile(QString fileName){
+    char *source = NULL;
+    FILE *fp = fopen(fileName.toStdString().c_str(), "r+b");
+    if (fp != NULL) {
+        /* Go to the end of the file. */
+        if (fseek(fp, 0L, SEEK_END) == 0) {
+            /* Get the size of the file. */
+            long bufsize = ftell(fp);
+            if (bufsize == -1) { /* Error */ }
+
+            /* Allocate our buffer to that size. */
+            source = (char *)malloc(sizeof(char) * (bufsize + 1));
+
+            /* Go back to the start of the file. */
+            if (fseek(fp, 0L, SEEK_SET) == 0) { /* Error */ }
+
+            /* Read the entire file into memory. */
+            size_t newLen = fread(source, sizeof(char), bufsize, fp);
+            if (newLen == 0) {
+                debugerr("Error reading file");
+            } else {
+                source[++newLen] = '\0'; /* Just to be safe. */
+            }
+        }
+        fclose(fp);
+    }
+
+    return source;
+}
+
+void PageVerifier::writeSectionToFile(QString moduleName, quint32 sectionNumber, QByteArray data){
+    //MEM_SAVE_DIR
+
+    QString fileName = QString(MEM_SAVE_DIR).append(moduleName)
+                                            .append(QString::number(sectionNumber));
+    //Console::out() << "Filename:" << fileName << " Segment: " << QString::number(sectionNumber) << endl;
+    QFile file( fileName );
+    if ( file.open(QIODevice::ReadWrite) )
     {
-        quint64 address = regex.cap(2).toULongLong(0, 16);
-        quint64 offset = regex.cap(3).toULongLong(0, 16);
-        quint64 size = regex.cap(4).toULongLong(0, 16);
+        QDataStream stream( &file );
+        stream.writeRawData(data.data(), data.size());
+        file.close();
+    }
+}
 
-        QByteArray data;
-        data.resize(size);
+void PageVerifier::writeModuleToFile(QString origFileName, Instance currentModule, char * buffer ){
+    //MEM_SAVE_DIR
 
-        // Seek
-        if (!f.seek(offset))
+    quint32 size = 0;
+    //get original file size
+    QFile origMod(origFileName);
+           if (origMod.open(QIODevice::ReadOnly)){
+               size = origMod.size();
+           }
+
+    QString fileName = QString(MEM_SAVE_DIR).append(currentModule.member("name").toString().remove(QChar('"'), Qt::CaseInsensitive))
+            .append("complete");
+
+    QFile file( fileName );
+    if ( file.open(QIODevice::ReadWrite) )
+    {
+        QDataStream stream( &file );
+        stream.writeRawData(buffer, size);
+        file.close();
+    }
+}
+
+quint64 PageVerifier::findMemAddressOfSegment(elfParseData context, QString sectionName)
+{
+    //Find the address of the current section in the memory image
+    //Get Number of sections in kernel image
+    Instance attrs = context.currentModule.member("sect_attrs", BaseType::trAny);
+    uint attr_cnt = attrs.member("nsections").toUInt32();
+
+    //Now compare all section names until we find the correct section.
+    for (uint j = 0; j < attr_cnt; ++j) {
+        Instance attr = attrs.member("attrs").arrayElem(j);
+        if(attr.member("name").toString().remove(QChar('"'), Qt::CaseInsensitive).
+                compare(sectionName) == 0)
         {
-            debugerr("Could not seek to position " << offset << "!");
+            return attr.member("address").toULong();
+        }
+    }
+    return 0;
+}
+
+PageVerifier::SegmentInfo PageVerifier::findElfSegmentWithName(char * elfEhdr, QString sectionName)
+{
+    char * tempBuf = 0;
+
+    if(elfEhdr[4] == ELFCLASS32)
+    {
+        //TODO
+    }
+    else if(elfEhdr[4] == ELFCLASS64)
+    {
+        Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) elfEhdr;
+        Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (elfEhdr + elf64Ehdr->e_shoff);
+        for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
+        {
+            tempBuf =  elfEhdr + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + elf64Shdr[i].sh_name;
+
+            if (sectionName.compare(tempBuf) == 0){
+                return SegmentInfo(elfEhdr + elf64Shdr[i].sh_offset, elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size);
+                //printf("Found Strtab in Section %i: %s\n", i, tempBuf);
+            }
+        }
+    }
+    return SegmentInfo();
+}
+
+quint64 PageVerifier::findElfAddressOfVariable(char * elfEhdr, PageVerifier::elfParseData context, QString symbolName)
+{
+    if(elfEhdr[4] == ELFCLASS32)
+    {
+        //TODO
+    }
+    else if(elfEhdr[4] == ELFCLASS64)
+    {
+        Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) elfEhdr;
+        Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (elfEhdr + elf64Ehdr->e_shoff);
+
+        quint32 symSize = elf64Shdr[context.symindex].sh_size;
+        Elf64_Sym *symBase = (Elf64_Sym *) (elfEhdr + elf64Shdr[context.symindex].sh_offset);
+
+        for(Elf64_Sym * sym = symBase; sym < (Elf64_Sym *) (((char*) symBase) + symSize) ; sym++)
+        {
+            QString currentSymbolName = QString(&((elfEhdr + elf64Shdr[context.strindex].sh_offset)[sym->st_name]));
+            if(symbolName.compare(currentSymbolName) == 0)
+            {
+                return sym->st_value;
+            }
+        }
+    }
+    return 0;
+}
+
+/* Undefined instruction for dealing with missing ops pointers. */
+static const char ud2a[] = { 0x0f, 0x0b };
+
+quint8 PageVerifier::paravirt_patch_nop(void) { return 0; }
+
+quint8 PageVerifier::paravirt_patch_ignore(unsigned len) { return len; }
+
+quint8 PageVerifier::paravirt_patch_insns(void *insnbuf, unsigned len,
+                              const char *start, const char *end)
+{
+    quint8 insn_len = end - start;
+
+    if (insn_len > len || start == NULL)
+        insn_len = len;
+    else
+        memcpy(insnbuf, start, insn_len);
+
+    return insn_len;
+}
+
+quint8 PageVerifier::paravirt_patch_jmp(void *insnbuf, quint64 target, quint64 addr, quint8 len)
+{
+    if (len < 5) return len;
+
+    quint32 delta = target - (addr + 5);
+
+    *((char*) insnbuf) = 0xe9;
+    *((quint32*) ((char*) insnbuf + 1)) = delta;
+
+    Console::out() << "Patching jump @ " << hex << addr << dec << endl;
+
+    return 5;
+}
+
+quint8 PageVerifier::paravirt_patch_call(void *insnbuf, quint64 target, quint16 tgt_clobbers, quint64 addr, quint16 site_clobbers, quint8 len)
+{
+    if (tgt_clobbers & ~site_clobbers) return len;
+    if (len < 5) return len;
+
+    quint32 delta = target - (addr + 5);
+
+    *((char*) insnbuf) = 0xe8;
+    *((quint32*) ((char*) insnbuf + 1)) = delta;
+
+    return 5;
+}
+
+
+#define CLBR_ANY  ((1 << 4) - 1)
+
+quint64 PageVerifier::get_call_destination(quint32 type)
+{
+    //These structs contain a function pointers.
+    //In memory they are directly after each other.
+    //Thus type is an index into the resulting array.
+
+    Instance pv_init_ops = _sym.factory().findVarByName("pv_init_ops")->toInstance(_vmem, BaseType::trLexical, ksAll);
+    Instance pv_time_ops = _sym.factory().findVarByName("pv_time_ops")->toInstance(_vmem, BaseType::trLexical, ksAll);
+    Instance pv_cpu_ops = _sym.factory().findVarByName("pv_cpu_ops")->toInstance(_vmem, BaseType::trLexical, ksAll);
+    Instance pv_irq_ops = _sym.factory().findVarByName("pv_irq_ops")->toInstance(_vmem, BaseType::trLexical, ksAll);
+    Instance pv_apic_ops = _sym.factory().findVarByName("pv_apic_ops")->toInstance(_vmem, BaseType::trLexical, ksAll);
+    Instance pv_mmu_ops = _sym.factory().findVarByName("pv_mmu_ops")->toInstance(_vmem, BaseType::trLexical, ksAll);
+    Instance pv_lock_ops = _sym.factory().findVarByName("pv_lock_ops")->toInstance(_vmem, BaseType::trLexical, ksAll);
+
+    if(type < pv_init_ops.size()) return pv_init_ops.memberByOffset(type).toUInt64();
+    type -= pv_init_ops.size();
+    if(type < pv_time_ops.size()) return pv_time_ops.memberByOffset(type).toUInt64();
+    type -= pv_time_ops.size();
+    if(type < pv_cpu_ops.size()) return pv_cpu_ops.memberByOffset(type).toUInt64();
+    type -= pv_cpu_ops.size();
+    if(type < pv_irq_ops.size()) return pv_irq_ops.memberByOffset(type).toUInt64();
+    type -= pv_irq_ops.size();
+    if(type < pv_apic_ops.size()) return pv_apic_ops.memberByOffset(type).toUInt64();
+    type -= pv_apic_ops.size();
+    if(type < pv_mmu_ops.size()) return pv_mmu_ops.memberByOffset(type).toUInt64();
+    type -= pv_mmu_ops.size();
+    if(type < pv_lock_ops.size()) return pv_lock_ops.memberByOffset(type).toUInt64();
+
+    return 0;
+}
+
+/* Simple instruction patching code. */
+#define DEF_NATIVE(ops, name, code) 					\
+    extern const char start_##ops##_##name[], end_##ops##_##name[];	\
+    asm("start_" #ops "_" #name ": " code "; end_" #ops "_" #name ":")
+
+#define str(x) #x
+
+DEF_NATIVE(pv_irq_ops, irq_disable, "cli");
+DEF_NATIVE(pv_irq_ops, irq_enable, "sti");
+DEF_NATIVE(pv_irq_ops, restore_fl, "pushq %rdi; popfq");
+DEF_NATIVE(pv_irq_ops, save_fl, "pushfq; popq %rax");
+DEF_NATIVE(pv_cpu_ops, iret, "iretq");
+DEF_NATIVE(pv_mmu_ops, read_cr2, "movq %cr2, %rax");
+DEF_NATIVE(pv_mmu_ops, read_cr3, "movq %cr3, %rax");
+DEF_NATIVE(pv_mmu_ops, write_cr3, "movq %rdi, %cr3");
+DEF_NATIVE(pv_mmu_ops, flush_tlb_single, "invlpg (%rdi)");
+DEF_NATIVE(pv_cpu_ops, clts, "clts");
+DEF_NATIVE(pv_cpu_ops, wbinvd, "wbinvd");
+
+DEF_NATIVE(pv_cpu_ops, irq_enable_sysexit, "swapgs; sti; sysexit");
+DEF_NATIVE(pv_cpu_ops, usergs_sysret64, "swapgs; sysretq");
+DEF_NATIVE(pv_cpu_ops, usergs_sysret32, "swapgs; sysretl");
+DEF_NATIVE(pv_cpu_ops, swapgs, "swapgs");
+
+DEF_NATIVE(, mov32, "mov %edi, %eax");
+DEF_NATIVE(, mov64, "mov %rdi, %rax");
+
+quint8 PageVerifier::paravirt_patch_default(quint32 type, quint16 clobbers, void *insnbuf,
+                                quint64 addr, quint8 len)
+{
+    quint8 ret = 0;
+    //Get Memory of paravirt_patch_template + type
+    quint64 opfunc = get_call_destination(type);
+
+//    Console::out() << "Call address is: " << hex
+//                   << opfunc << " "
+//                   << dec << endl;
+
+    quint64 nopFuncAddress = 0;
+    quint64 ident32NopFuncAddress = 0;
+    quint64 ident64NopFuncAddress = 0;
+
+    BaseType* btFunc = 0;
+    const Function* func = 0;
+    btFunc = _sym.factory().typesByName().value("_paravirt_nop");
+    if( btFunc && btFunc->type() == rtFunction && btFunc->size() > 0)
+    {
+        func = dynamic_cast<const Function*>(btFunc);
+        nopFuncAddress = func->pcLow();
+    }
+    btFunc = _sym.factory().typesByName().value("_paravirt_ident_32");
+    if( btFunc && btFunc->type() == rtFunction && btFunc->size() > 0)
+    {
+        func = dynamic_cast<const Function*>(btFunc);
+        ident32NopFuncAddress = func->pcLow();
+    }
+    btFunc = _sym.factory().typesByName().value("_paravirt_ident_64");
+    if( btFunc && btFunc->type() == rtFunction && btFunc->size() > 0)
+    {
+        func = dynamic_cast<const Function*>(btFunc);
+        ident64NopFuncAddress = func->pcLow();
+    }
+
+
+    //Get pv_cpu_ops to check offsets in else clause
+    const Structured * pptS = dynamic_cast<const Structured*>(_sym.factory().findBaseTypeByName("paravirt_patch_template"));
+    qint64 pv_cpu_opsOffset = pptS->memberOffset("pv_cpu_ops");
+    Instance pv_cpu_ops = _sym.factory().findVarByName("pv_cpu_ops")->toInstance(_vmem, BaseType::trLexical, ksAll);
+
+    if (!opfunc)
+    {
+        // opfunc == NULL
+        /* If there's no function, patch it with a ud2a (BUG) */
+        //If this is a module this is a bug anyway so this should not happen.
+        //ret = paravirt_patch_insns(insnbuf, len, ud2a, ud2a+sizeof(ud2a));
+        //If this the kernel this can happen and is only filled with nops
+        ret = paravirt_patch_nop();
+    }
+    //TODO get address of Function Paravirt nop
+    else if (opfunc == nopFuncAddress)
+        /* If the operation is a nop, then nop the callsite */
+        ret = paravirt_patch_nop();
+
+    /* identity functions just return their single argument */
+    else if (opfunc == ident32NopFuncAddress)
+        ret = paravirt_patch_insns(insnbuf, len, start__mov32, end__mov32);
+    else if (opfunc == ident64NopFuncAddress)
+        ret = paravirt_patch_insns(insnbuf, len, start__mov64, end__mov64);
+
+    else if (type == pv_cpu_opsOffset + pv_cpu_ops.memberOffset("iret") ||
+             type == pv_cpu_opsOffset + pv_cpu_ops.memberOffset("irq_enable_sysexit") ||
+             type == pv_cpu_opsOffset + pv_cpu_ops.memberOffset("usergs_sysret32") ||
+             type == pv_cpu_opsOffset + pv_cpu_ops.memberOffset("usergs_sysret64"))
+        /* If operation requires a jmp, then jmp */
+        ret = paravirt_patch_jmp(insnbuf, opfunc, addr, len);
+    else
+    {
+        /* Otherwise call the function; assume target could
+           clobber any caller-save reg */
+        ret = paravirt_patch_call(insnbuf, opfunc, CLBR_ANY,
+                                  addr, clobbers, len);
+    }
+    return ret;
+}
+
+quint32 PageVerifier::paravirtNativePatch(quint32 type, quint16 clobbers, void *ibuf,
+                             unsigned long addr, unsigned len)
+{
+    quint32 ret = 0;
+
+    const Structured * pptS = dynamic_cast<const Structured*>(_sym.factory().findBaseTypeByName("paravirt_patch_template"));
+
+    qint64 pv_irq_opsOffset = pptS->memberOffset("pv_irq_ops");
+    Instance pv_irq_ops = _sym.factory().findVarByName("pv_irq_ops")->toInstance(_vmem, BaseType::trLexical, ksAll);
+    qint64 pv_cpu_opsOffset = pptS->memberOffset("pv_cpu_ops");
+    Instance pv_cpu_ops = _sym.factory().findVarByName("pv_cpu_ops")->toInstance(_vmem, BaseType::trLexical, ksAll);
+    qint64 pv_mmu_opsOffset = pptS->memberOffset("pv_mmu_ops");
+    Instance pv_mmu_ops = _sym.factory().findVarByName("pv_mmu_ops")->toInstance(_vmem, BaseType::trLexical, ksAll);
+
+
+#define PATCH_SITE(ops, x)		\
+    else if(type == ops##Offset + ops.memberOffset("" #x )) \
+    {                                                         \
+        ret = paravirt_patch_insns(ibuf, len, start_##ops##_##x, end_##ops##_##x);    \
+    }
+
+    if(false){}
+    PATCH_SITE(pv_irq_ops, restore_fl)
+    PATCH_SITE(pv_irq_ops, save_fl)
+    PATCH_SITE(pv_irq_ops, irq_enable)
+    PATCH_SITE(pv_irq_ops, irq_disable)
+    PATCH_SITE(pv_cpu_ops, iret)
+    PATCH_SITE(pv_cpu_ops, irq_enable_sysexit)
+    PATCH_SITE(pv_cpu_ops, usergs_sysret32)
+    PATCH_SITE(pv_cpu_ops, usergs_sysret64)
+    PATCH_SITE(pv_cpu_ops, swapgs)
+    PATCH_SITE(pv_mmu_ops, read_cr2)
+    PATCH_SITE(pv_mmu_ops, read_cr3)
+    PATCH_SITE(pv_mmu_ops, write_cr3)
+    PATCH_SITE(pv_cpu_ops, clts)
+    PATCH_SITE(pv_mmu_ops, flush_tlb_single)
+    PATCH_SITE(pv_cpu_ops, wbinvd)
+
+    else
+    {
+        ret = paravirt_patch_default(type, clobbers, ibuf, addr, len);
+    }
+#undef PATCH_SITE
+    return ret;
+}
+
+
+void  PageVerifier::add_nops(void *insns, quint8 len)
+{
+    while (len > 0) {
+        unsigned int noplen = len;
+        if (noplen > ASM_NOP_MAX)
+            noplen = ASM_NOP_MAX;
+        memcpy(insns, ideal_nops[noplen], noplen);
+        insns = (void *) ((char*) insns + noplen);
+        len -= noplen;
+    }
+}
+
+int PageVerifier::apply_relocate(char * fileContent, Elf32_Shdr *sechdrs, elfParseData context)
+{
+    Q_UNUSED(fileContent);
+    Q_UNUSED(sechdrs);
+    Q_UNUSED(context);
+    debugerr("Function apply_relocate currently not implemented");
+    //TODO i386 code
+    return 0;
+}
+
+/**
+  * Apply Relocations for kernel module based on elf headers.
+  * Taken directly out of module.c from linux kernel
+  * This function handles the x86_64 relocations.
+  */
+int PageVerifier::apply_relocate_add(char * fileContent, Elf64_Shdr *sechdrs, elfParseData context)
+{
+    Elf64_Rela *rel = (Elf64_Rela *) (fileContent + sechdrs[context.relsec].sh_offset);
+    Elf32_Word sectionId = sechdrs[context.relsec].sh_info;
+    QString sectionName = QString(fileContent + sechdrs[context.shstrindex].sh_offset + sechdrs[sectionId].sh_name);
+
+    //Elf64_Rela *rel = (void *)sechdrs[relsec].sh_addr;
+
+    Elf64_Sym *symBase = (Elf64_Sym *) (fileContent + sechdrs[context.symindex].sh_offset);
+    Elf64_Sym *sym;
+
+    void *locInElf = 0;
+    void *locInMem = 0;
+    void *locOfRelSectionInMem = 0;
+    void *locOfRelSectionInElf = 0;
+    quint64 val;
+    quint64 i;
+
+    void *sectionBaseElf = (void *) (fileContent + sechdrs[sectionId].sh_offset);
+    void *sectionBaseMem = 0;
+
+    sectionBaseMem = (void *) findMemAddressOfSegment(context, sectionName);
+
+    bool doPrint = false;
+
+    //if(sectionName.compare(".text") == 0) doPrint = true;
+
+    if(doPrint) Console::out() << "Section to Relocate: " << sectionName << dec << endl;
+
+    for (i = 0; i < sechdrs[context.relsec].sh_size / sizeof(*rel); i++) {
+        /* This is where to make the change */
+        //loc = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
+        //        + rel[i].r_offset;
+        locInElf = (void *) ((char*)sectionBaseElf + rel[i].r_offset);
+        locInMem = (void *) ((char*)sectionBaseMem + rel[i].r_offset);
+
+        /* This is the symbol it is referring to.  Note that all
+               undefined symbols have been resolved.  */
+        //sym = (Elf64_Sym *)sechdrs[symindex].sh_addr
+        //        + ELF64_R_SYM(rel[i].r_info);
+        //sym = (Elf64_Sym *) (fileContent + sechdrs[context.symindex].sh_offset)
+        //        + ELF64_R_SYM(rel[i].r_info);
+        sym = symBase + ELF64_R_SYM(rel[i].r_info);
+
+        Variable* v = NULL;
+        Instance symbol;
+
+        QString symbolName = QString(&((fileContent + sechdrs[context.strindex].sh_offset)[sym->st_name]));
+
+        /////////////////////////////////////////////////////////////////////
+        //if ((unsigned long) locInMem == 0xffffffffa0000006) doPrint = true;
+        //if (rel[i].r_offset == 0xf1f) doPrint = true;
+        //if (symbolName.compare("copy_user_generic_unrolled") == 0) doPrint = true;
+        //if(context.currentModule.member("name").toString().compare("\"drm\"") == 0 &&
+        //        sectionName.compare(".altinstructions") == 0 && i <= 1) doPrint = true;
+        /////////////////////////////////////////////////////////////////////
+
+        if(doPrint) Console::out() << endl;
+        if(doPrint) Console::out() << "Loc in Elf: " << hex << locInElf << dec << endl;
+        if(doPrint) Console::out() << "Loc in Mem: " << hex << locInMem << dec << endl;
+        if(doPrint) Console::out() << "Sym: " << hex << sym << " (Offset: 0x" << ELF64_R_SYM(rel[i].r_info) << " , Info: 0x" << sym->st_info << " )" << " Bind type: " << ELF64_ST_BIND(sym->st_info) << dec << endl;
+
+        if(doPrint) Console::out() << "Name of current Section: " << QString(fileContent + sechdrs[context.shstrindex].sh_offset + sechdrs[sectionId].sh_name) << endl;
+        //			Console::out() << "type " << (int)ELF64_R_TYPE(rel[i].r_info) << " st_value " << sym->st_value << " r_addend " << rel[i].r_addend << " loc " << hex << (u64)loc << dec << endl;
+
+        switch(sym->st_shndx){
+        case SHN_COMMON:
+            //printf("Sym Type: SHN_COMMON\n");
+            debugerr("This should not happen!");
+            continue; //TODO REMOVE
+            break;
+        case SHN_ABS:
+            //printf("Sym Type: SHN_ABS\n");
+            //printf("Nothing to do!\n");
+            continue; // TODO REMOVE
+            break;
+        case SHN_UNDEF:
+            //debugerr("Sym Type: SHN_UNDEF");
+
+            //Resolve Symbol and write to st_value
+            if(doPrint) Console::out() << "SHN_UNDEF: Trying to find symbol " << symbolName << endl;
+            if(doPrint) Console::out() << "System Map contains " << _sym.memSpecs().systemMap.count(symbolName) << " Versions of that symbol." << endl;
+
+
+            if(_symTable.contains(symbolName))
+            {
+                sym->st_value = _symTable.value(symbolName);
+                if(doPrint) Console::out() << "Found symbol @" << hex << sym->st_value << dec << endl;
+            }
+            //Try to find variable in system map
+            else if (_sym.memSpecs().systemMap.count(symbolName) > 0)
+            {
+                //Console::out() << "Found Variable in system.map: " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << endl;
+                //sym->st_value = _sym.memSpecs().systemMap.value(symbolName).address;
+                QList<SystemMapEntry> symbols = _sym.memSpecs().systemMap.values(symbolName);
+                for (QList<SystemMapEntry>::iterator i = symbols.begin(); i != symbols.end(); ++i)
+                {
+                    SystemMapEntry currentEntry = (*i);
+
+                    //ELF64_ST_BIND(sym->st_info) => 0: Local, 1: Global, 2: Weak
+                    //currentEntry.type => 'ascii' lowercase: local, uppercase: global
+                    if (ELF64_ST_BIND(sym->st_info) == 1 && currentEntry.type >= 0x41 && currentEntry.type <= 0x5a)
+                    {
+                        if(doPrint) Console::out() << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Global" << dec << endl;
+                        sym->st_value = currentEntry.address;
+                    }
+                    else if (ELF64_ST_BIND(sym->st_info) == 0 && currentEntry.type >= 0x61 && currentEntry.type <= 0x7a)
+                    {
+                        if(doPrint) Console::out() << "Symbol found in System Map: " << hex << currentEntry.address << " With type: Local" << dec << endl;
+                        sym->st_value = currentEntry.address;
+                    }
+                }
+            }
+            else
+            {
+                //Console::out() << "Variable not found in system.map: " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << endl;
+                //Try to find the variable by name in insight.
+                v = _sym.factory().findVarByName(symbolName);
+                if (!v)
+                {
+                    //debugerr("Variable " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << " not found! ERROR!");
+                    QList<BaseType*> types = _sym.factory().typesByName().values(symbolName);
+
+                    if(types.size() > 0)
+                    {
+                        BaseType* bt;
+                        //Console::out() << "Type found in insight: " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << endl;
+                        for(int k = 0 ; k < types.size() ; k++)
+                        {
+                            bt = types.at(k);
+                            //Console::out() << k << ": " << (bt && (bt->type() == rtFunction) ? "function" : "type") << " with size " <<  bt->size() << endl;
+                            // Only use the type if it is a function and got a defined size
+                            if( bt->type() == rtFunction && bt->size() > 0) { break; }
+
+                            if(k == types.size() - 1)
+                            {
+                                //Console::out() << "Function not found in insight: " << symbolName << endl;
+                                //TODO handle this case does this happen??
+                            }
+                        }
+                        const Function* func = dynamic_cast<const Function*>(bt);
+
+                        if (func) {
+                            sym->st_value = func->pcLow();
+                            if(doPrint) Console::out() << "Function found in: " << hex << sym->st_value << dec << endl;
+                            //TODO check if somewhere the startaddress is zero! bug!
+//                            Console::out() << Console::color(ctColHead) << "  Start Address:  "
+//                                 << Console::color(ctAddress) << QString("0x%1").arg(
+//                                                            func->pcLow(),
+//                                                            _sym.memSpecs().sizeofPointer << 1,
+//                                                            16,
+//                                                            QChar('0'))
+//                                 << Console::color(ctReset)
+//                                 << endl;
+                        }
+
+                    } //Else no type with with the given name found.
+                    continue;
+                }
+                //Console::out() << "Variable found in insight: " << &((fileContent + sechdrs[strindex].sh_offset)[sym->st_name]) << endl;
+                symbol = v->toInstance(_vmem, BaseType::trLexical, ksAll);
+                if(!symbol.isValid())
+                {
+                    debugerr("Symbol " << symbolName << " not found! ERROR!");
+                    continue;
+                }
+                //Console::out() << "Symbol found with address : 0x" << hex << symbol.address() << dec << endl;
+                sym->st_value = symbol.address();
+
+                if(doPrint) Console::out() << "Instance found: " << hex << sym->st_value << dec << endl;
+
+            }
+
+            break;
+        default:
+            if(doPrint) Console::out() << "default: " << endl;
+            //debugerr("Sym Type: default: " << sym->st_shndx);
+
+            //TODO this is not right yet.
+            /* Divert to percpu allocation if a percpu var. */
+            if (sym->st_shndx == context.percpuDataSegment)
+            {
+                locOfRelSectionInMem = context.currentModule.member("percpu").toPointer();
+                //sym->st_value += (unsigned long)mod_percpu(mod);
+                if(doPrint) Console::out() << "Per CPU variable" << endl;
+            }
+            else
+            {
+                QString relocSection = QString(&((fileContent + sechdrs[context.shstrindex].sh_offset)[sechdrs[sym->st_shndx].sh_name]));
+                locOfRelSectionInElf = (void *) findElfSegmentWithName(fileContent, relocSection).index;
+                locOfRelSectionInMem = (void *) findMemAddressOfSegment(context, relocSection);
+                if(doPrint) Console::out() << "SectionName: " << hex << relocSection << dec << endl;
+            }
+
+            //Only add the location of the section if it was not already added
+            if(doPrint) Console::out() << "old st_value: " << hex << sym->st_value << dec;
+            if(doPrint) Console::out() << " locOfRelSectionInMem: " << hex << locOfRelSectionInMem << dec;
+            if(doPrint) Console::out() << " locOfRelSectionInElf: " << hex << locOfRelSectionInElf << dec << endl;
+
+            if(sym->st_value < (long unsigned int) locOfRelSectionInMem)
+            {
+                sym->st_value += (long unsigned int) locOfRelSectionInMem;
+            }
+
+            break;
+        }
+
+        val = sym->st_value + rel[i].r_addend;
+
+        if(doPrint) Console::out() << "raddend: " << hex << rel[i].r_addend << dec << endl;
+        if(doPrint) Console::out() << "sym->value: " << hex << sym->st_value << dec << endl;
+        if(doPrint) Console::out() << "val: " << hex << val << dec << endl;
+
+        switch (ELF64_R_TYPE(rel[i].r_info)) {
+        case R_X86_64_NONE:
+            break;
+        case R_X86_64_64:
+            *(quint64 *)locInElf = val;
+            break;
+        case R_X86_64_32:
+            *(quint32 *)locInElf = val;
+            if (val != *(quint32 *)locInElf)
+                goto overflow;
+            break;
+        case R_X86_64_32S:
+            *(qint32 *)locInElf = val;
+            if(doPrint) Console::out() << " 32S final value: " << hex << (qint32) val << dec << endl;
+            if ((qint64)val != *(qint32 *)locInElf)
+                goto overflow;
+            break;
+        case R_X86_64_PC32:
+
+            //This line is from the original source the loc here is the location within the loaded module.
+            //val -= (u64)loc;
+            if(sectionName.compare(".altinstructions") == 0)
+            {
+                //This is later used to copy some memory
+                val = val - (quint64)locOfRelSectionInMem + (quint64)locOfRelSectionInElf - (quint64)locInElf;
+            }
+            else
+            {
+                //This is used as relocation in memory
+                val -= (quint64)locInMem;
+            }
+            if(doPrint) Console::out() << "PC32 final value: " << hex << (quint32) val << dec << endl;
+            *(quint32 *)locInElf = val;
+#if 0
+            if ((qint64)val != *(qint32 *)loc)
+                goto overflow;
+#endif
+            break;
+        default:
+            debugerr("Unknown rela relocation: " << ELF64_R_TYPE(rel[i].r_info));
+            return -ENOEXEC;
+        }
+        doPrint = false;
+    }
+    return 0;
+
+overflow:
+    Console::err() << "overflow in relocation type " << (int)ELF64_R_TYPE(rel[i].r_info) << " val " << hex << val << endl;
+    Console::err() << "likely not compiled with -mcmodel=kernel" << endl;
+    return -ENOEXEC;
+}
+
+void PageVerifier::applyAltinstr(char * fileContent, SegmentInfo info, elfParseData context)
+{
+    bool doPrint = false;
+    //if(context.type == Detect::KERNEL_CODE) doPrint = true;
+
+    struct alt_instr *start = (struct alt_instr*) info.index;
+    struct alt_instr *end = (struct alt_instr*) (info.index + info.size);
+
+    //if(context.currentModule.member("name").toString().compare("\"drm\"") == 0) doPrint = true;
+
+    quint8 * instr;
+    quint8 * replacement;
+    char insnbuf[255-1];
+
+    for(struct alt_instr * a = start ; a < end ; a++)
+    {
+        //if (!boot_cpu_has(a->cpuid)) continue;
+
+        Instance boot_cpu_data = _sym.factory().findVarByName("boot_cpu_data")->toInstance(_vmem, BaseType::trLexical, ksAll);
+        Instance x86_capability = boot_cpu_data.member("x86_capability");
+
+        if (!((x86_capability.arrayElem(a->cpuid / 32).toUInt32() >> (a->cpuid % 32)) & 0x1))
+        {
+            continue;
+        }
+
+        //doPrint = false;
+        //if(context.currentModule.member("name").toString().compare("\"drm\"") == 0) doPrint = true;
+        //if(context.type == Detect::KERNEL_CODE) doPrint = true;
+
+        instr = ((quint8 *)&a->instr_offset) + a->instr_offset;
+        replacement = ((quint8 *)&a->repl_offset) + a->repl_offset;
+
+        if(context.type == Detect::KERNEL_CODE)
+        {
+            instr -= (quint64)(context.textSegment.index - (quint64) fileContent);
+        }
+
+        if(doPrint) Console::out() << "Applying alternative at offset: " << hex << (void*) (instr - (quint8*) context.textSegment.index) << dec << endl;
+
+        if(doPrint) Console::out() << hex << "instr: @" << (void*) instr << " len: " << a->instrlen << " offset: " << (void*) (instr - (quint64) context.textSegment.index) <<
+                                      " replacement: @" << (void*) replacement << " len: " << a->replacementlen << " offset: " <<  (void*) (replacement - (quint64) findElfSegmentWithName(fileContent, ".altinstr_replacement").index) << dec << endl;
+
+        if(doPrint) Console::out() << "CPU ID is: " << hex << a->cpuid << dec << endl;
+
+        //TODO REMOVE
+        //#define boot_cpu_has(bit)       cpu_has(&boot_cpu_data, bit)
+        //test_cpu_cap(c, bit))
+        //test_bit(bit, (unsigned long *)((c)->x86_capability))
+
+        //#define BIT_WORD(nr)            ((nr) / BITS_PER_LONG)
+        //static inline int test_bit(int nr, const volatile unsigned long *addr)
+        //{
+        //      return 1UL & (addr[BIT_WORD(nr)] >> (nr & (BITS_PER_LONG-1)));
+        //}
+
+
+        memcpy(insnbuf, replacement, a->replacementlen);
+
+        // 0xe8 is a relative jump; fix the offset.
+        if (insnbuf[0] == (char) 0xe8 && a->replacementlen == 5)
+        {
+            SegmentInfo altinstr = findElfSegmentWithName(fileContent, ".altinstr_replacement");
+
+            //If replacement is in the altinstr_replace section fix the offset.
+            if(replacement >= (quint8 *)altinstr.index && replacement < (quint8 *)altinstr.index + altinstr.size)
+            {
+                quint64 altinstrSegmentInMem = 0;
+                quint64 textSegmentInMem = 0;
+
+                if(context.type == Detect::KERNEL_CODE)
+                {
+                    altinstrSegmentInMem = findElfSegmentWithName(fileContent, ".altinstr_replacement").address;
+                    textSegmentInMem = findElfSegmentWithName(fileContent, ".text").address;
+                }
+                else if(context.type == Detect::MODULE)
+                {
+                    altinstrSegmentInMem = findMemAddressOfSegment(context, ".altinstr_replacement");
+                    textSegmentInMem = findMemAddressOfSegment(context, ".text");
+                }
+
+                if(doPrint) Console::out() << hex << "Altinstr in Mem: " << altinstrSegmentInMem << " Text in Mem: " << textSegmentInMem << dec << endl;
+
+                //Adapt offset in ELF
+                *(qint32 *)(insnbuf + 1) -= (altinstr.index - context.textSegment.index) - (altinstrSegmentInMem - textSegmentInMem);
+
+                if(doPrint) Console::out() << "Offset: " << hex <<  altinstr.index - context.textSegment.index - (altinstrSegmentInMem - textSegmentInMem) << dec << endl;
+            }
+            *(qint32 *)(insnbuf + 1) += replacement - instr;
+        }
+
+        //add_nops
+        add_nops(insnbuf + a->replacementlen, a->instrlen - a->replacementlen);      //add_nops
+
+        memcpy(instr, insnbuf, a->instrlen);
+    }
+}
+
+void PageVerifier::applyParainstr(SegmentInfo info, elfParseData context)
+{
+    struct paravirt_patch_site *start = (struct paravirt_patch_site *) info.index;
+    struct paravirt_patch_site *end = (struct paravirt_patch_site *) (info.index + info.size);
+
+    char insnbuf[254];
+
+    //noreplace_paravirt is 0 in the kernel
+    //http://lxr.free-electrons.com/source/arch/x86/kernel/alternative.c#L45
+    //if (noreplace_paravirt) return;
+
+    quint64 textInMem = 0;
+    if(context.type == Detect::MODULE)
+    {
+        textInMem = findMemAddressOfSegment(context, ".text");
+    }
+    else
+    {
+        //This is the case, when we parse the kernel
+        textInMem = _sym.memSpecs().systemMap.value("_text").address;
+    }
+
+    for (struct paravirt_patch_site *p = start; p < end; p++) {
+        unsigned int used;
+
+        //BUG_ON(p->len > MAX_PATCH_LEN);
+        if(p->len > 254) debugerr("parainstructions: impossible length");
+
+        //p->instr points to text segment in memory
+        //let it point to the address in the elf binary
+
+        quint8 * instrInElf = p->instr;
+        instrInElf -= textInMem;
+        instrInElf += (quint64) context.textSegment.index;
+
+        /* prep the buffer with the original instructions */
+        memcpy(insnbuf, instrInElf, p->len);
+
+        //p->instrtype is use as an offset to an array of pointers. With insight we only use ist as Offset.
+        used = paravirtNativePatch(p->instrtype * 8, p->clobbers, insnbuf,
+                                   (unsigned long)p->instr, p->len);
+
+        if(p->len > 254) debugerr("parainstructions: impossible length");
+
+        /* Pad the rest with nops */
+        add_nops(insnbuf + used, p->len - used);      //add_nops
+        memcpy(instrInElf, insnbuf, p->len);   //memcpy
+    }
+}
+
+void PageVerifier::applyMcount(SegmentInfo info, PageVerifier::elfParseData context, QByteArray &segmentData){
+    //See ftrace_init_module in kernel/trace/ftrace.c
+
+    quint64 * mcountStart = (quint64 *)info.index;;
+    quint64 * mcountStop = (quint64 *) (info.index + info.size);
+
+    quint64 textSegmentInMem = 0;
+
+    if(context.type == Detect::KERNEL_CODE)
+    {
+        textSegmentInMem = context.textSegment.address;
+    }
+    else if(context.type == Detect::MODULE)
+    {
+        textSegmentInMem = findMemAddressOfSegment(context, ".text");
+    }
+
+    char * segmentPtr = segmentData.data();
+
+    for(quint64 * i = mcountStart; i < mcountStop; i++)
+    {
+        add_nops(segmentPtr + (*i) - textSegmentInMem, 5);
+    }
+}
+
+void PageVerifier::applyJumpEntries(QByteArray &textSegmentContent, PageVerifier::elfParseData context, quint64 jumpStart, quint64 jumpStop)
+{
+    //Apply the jump tables after the segments are adjacent
+    //jump_label_apply_nops() => http://lxr.free-electrons.com/source/arch/x86/kernel/module.c#L205
+    //the entry type is 0 for disable and 1 for enable
+
+    bool doPrint = false;
+
+    quint32 numberOfJumpEntries = 0;
+    quint64 textSegmentInMem = 0;
+
+    if(context.type == Detect::KERNEL_CODE)
+    {
+        numberOfJumpEntries = (jumpStop - jumpStart) / sizeof(struct jump_entry);
+        textSegmentInMem = context.textSegment.address;
+    }
+    else if(context.type == Detect::MODULE)
+    {
+        numberOfJumpEntries = context.currentModule.member("num_jump_entries").toUInt32();
+        textSegmentInMem = findMemAddressOfSegment(context, ".text");
+    }
+
+    struct jump_entry * startEntry = (struct jump_entry *) context.jumpTable.constData();
+    struct jump_entry * endEntry = (struct jump_entry *) (context.jumpTable.constData() + context.jumpTable.size());
+
+    for(quint32 i = 0 ; i < numberOfJumpEntries ; i++)
+    {
+        doPrint = false;
+        //if(context.currentModule.member("name").toString().compare("\"kvm\"") == 0) doPrint = true;
+
+        Instance jumpEntry;
+        if(context.type == Detect::KERNEL_CODE)
+        {
+            jumpEntry = Instance((size_t) jumpStart + i * sizeof(struct jump_entry),_sym.factory().findBaseTypeByName("jump_entry"), _vmem);
+
+            //Do not apply jump entries to .init.text
+            if (jumpEntry.member("code").toUInt64() > textSegmentInMem + context.textSegment.size)
+            {
+                continue;
+            }
+        }
+        else if(context.type == Detect::MODULE)
+        {
+            jumpEntry = context.currentModule.member("jump_entries").arrayElem(i);
+        }
+
+        quint64 keyAddress = jumpEntry.member("key").toUInt64();
+
+        if(doPrint) Console::out() << hex << "Code: " << jumpEntry.member("code").toUInt64() << " target: " << jumpEntry.member("target").toUInt64() << dec << endl;
+        if(doPrint) Console::out() << hex << "Code offset : " << jumpEntry.member("code").toUInt64() - textSegmentInMem << " target offset : " << jumpEntry.member("target").toUInt64() - textSegmentInMem << dec << endl;
+
+        Instance key = Instance((size_t) keyAddress,_sym.factory().findBaseTypeByName("static_key"), _vmem);
+        quint32 enabled = key.member("enabled").toUInt32();
+
+        if(doPrint) Console::out() << hex << "Key @ " << keyAddress << " is: " << enabled << dec << endl;
+
+        for (struct jump_entry * entry = startEntry ; entry < endEntry; entry++){
+            //Check if current elf entry is current kernel entry
+            if (jumpEntry.member("code").toUInt64() ==  entry->code)
+            {
+                quint64 patchOffset = entry->code - textSegmentInMem;
+
+                char * patchAddress = (char *) (patchOffset + (quint64) textSegmentContent.data());
+
+                if(doPrint) Console::out() << "Jump Entry @ " << hex << patchOffset << dec;
+                if(doPrint) Console::out() << " " << ((enabled) ? "enabled" : "disabled") << endl;
+
+                qint32 destination = entry->target - (entry->code + 5);
+                _jumpEntries.insert(patchOffset, destination);
+
+
+                if(enabled)
+                {
+                    if(doPrint) Console::out() << hex << "Patching jump @ : " << patchOffset << dec << endl;
+                    *patchAddress = (char) 0xe9;
+                    *((qint32*) (patchAddress + 1)) = destination;
+                }
+                else
+                {
+                    add_nops(patchAddress, 5);      //add_nops
+                }
+            }
+        }
+    }
+}
+
+void PageVerifier::applyTracepoints(SegmentInfo tracePoint, SegmentInfo rodata, PageVerifier::elfParseData context, QByteArray &segmentData){
+
+    //See tracepoints in kernel/tracepoint.c
+
+    quint64* tracepointStart = (quint64*) tracePoint.index;;
+    quint64* tracepointStop = (quint64*) (tracePoint.index + tracePoint.size);
+
+    //Console::out() << hex << "Start @ " << (quint64) tracepointStart << " Stop @ " << (quint64) tracepointStop << dec << endl;
+
+//    quint64 textSegmentInMem = 0;
+
+//    if(context.type == Detect::KERNEL_CODE)
+//    {
+//        textSegmentInMem = context.textSegment.address;
+//    }
+//    else if(context.type == Detect::MODULE)
+//    {
+//        textSegmentInMem = findMemAddressOfSegment(context, ".text");
+//    }
+
+    //char * segmentPtr = segmentData.data();
+
+    //qint64 dataSegmentOffset = - (quint64) context.dataSegment.address + (quint64) context.dataSegment.index;
+    //qint64 rodataOffset = - (quint64) rodata.address + (quint64) rodata.index;
+
+    quint64 counter= 0;
+
+    for(quint64* i = tracepointStart; i < tracepointStop; i++)
+    {
+        counter++;
+
+        //Copy the tracepoint structure from memory
+        //struct tracepoint tp;
+        //_vmem->readAtomic(*i, (char*) &tp, sizeof(struct tracepoint));
+
+        //struct tracepoint* tracepoint = (struct tracepoint*) (*i + dataSegmentOffset);
+
+        //Console::out() << " Name @ " << hex << QString(tracepoint->name + rodataOffset) <<
+        //                  " enabled in ELF: " << (quint32) tracepoint->key.enabled <<
+        //                  " enabled in Mem: " << (quint32) tp.key.enabled <<
+        //                  " funcs @ " << (quint64) tp.funcs <<
+        //                  endl;
+
+
+
+
+
+        //add_nops(segmentPtr + (*i) - textSegmentInMem, 5);
+    }
+
+    //Console::out() << "Counter is: " << counter << endl;
+}
+
+PageVerifier::elfParseData PageVerifier::parseKernelModule(QString fileName, Instance currentModule)
+{
+    char *tempBuf;
+    char * fileContent = readFile(fileName);
+
+    elfParseData context = elfParseData(currentModule);
+
+    if (!fileContent){
+        debugerr("Error loading file\n");
+        free(fileContent);
+        return context;
+    }
+    context.type = Detect::MODULE;
+
+    if(fileContent[4] == ELFCLASS32){
+
+        //TODO also implement for 32 bit guests
+//        if(!(_sym.memSpecs().arch & MemSpecs::Architecture::ar_i386))
+//        {
+//            debugerr("Kernel Modules ELF Binary has the wrong architecture!");
+//            return context;
+//        }
+
+//        Elf32_Ehdr *elf32Ehdr;
+//        Elf32_Shdr *elf32Shdr;
+//        Console::out() << "Class: ELF32" << endl;
+
+//        /* read the ELF header */
+//        elf32Ehdr = (Elf32_Ehdr *) fileContent;
+//        if (elf32Ehdr->e_type != ET_REL){
+//            debugerr("Not a relocatable module");
+//            free(fileContent);
+//            return context;
+//        }
+
+//        Console::out() << "Number of Ehdrs: " << elf32Ehdr->e_shnum << endl;
+
+//        context.shstrindex = elf32Ehdr->e_shstrndx;
+
+//        /* set the file pointer to the section header offset and read it */
+//        elf32Shdr = (Elf32_Shdr *) (fileContent + elf32Ehdr->e_shoff);
+
+//        /* find sections SHT_SYMTAB, SHT_STRTAB, ".text", ".exit.text", ".data..percpu"  */
+//        for(unsigned int i = 0; i < elf32Ehdr->e_shnum; i++)
+//        {
+//            tempBuf = fileContent + elf32Shdr[elf32Ehdr->e_shstrndx].sh_offset + elf32Shdr[i].sh_name;
+//            if ((elf32Shdr[i].sh_type == SHT_SYMTAB)){
+//                context.symindex = i;
+//                context.strindex =  elf32Shdr[i].sh_link;
+//            }
+//            else if (strcmp(tempBuf, ".text") == 0){
+//                context.textSegment = fileContent + elf32Shdr[i].sh_offset;
+//                context.textSegmentSize = elf32Shdr[i].sh_size;
+//            }
+//            else if (strcmp(tempBuf, ".exit.text") == 0){
+//                context.exitTextSegment = fileContent + elf32Shdr[i].sh_offset;
+//                context.exitTextSegmentSize = elf32Shdr[i].sh_size;
+//            }
+//            else if (strcmp(tempBuf, ".data..percpu") == 0){
+//                context.percpuDataSegment = i;
+//            }
+//        }
+
+//        ///* loop through every section */
+//        for(unsigned int i = 0; i < elf32Ehdr->e_shnum; i++)
+//        {
+
+//            /* if Elf32_Shdr.sh_addr isn't 0 the section will appear in memory*/
+//            tempBuf = fileContent + elf32Shdr[elf32Ehdr->e_shstrndx].sh_offset + elf32Shdr[i].sh_name;
+//            unsigned int infosec = elf32Shdr[i].sh_info;
+
+//            /* Not a valid relocation section? */
+//            if (infosec >= elf32Ehdr->e_shnum)
+//                continue;
+
+//            /* Don't bother with non-allocated sections */
+//            if (!(elf32Shdr[infosec].sh_flags & SHF_ALLOC))
+//                continue;
+
+//            if (elf32Shdr[i].sh_type == SHT_REL){
+//                Console::out() << "Section '" << tempBuf << "': apply_relocate" << endl;
+//                context.relsec = i;
+//                apply_relocate(fileContent, elf32Shdr, context);
+//            }
+//            else if (elf32Shdr[i].sh_type == SHT_RELA){
+//                //apply_relocate_add(info->sechdrs, info->strtab, info->index.sym, i, mod);
+//                Console::out() << "Section '" << tempBuf << "': apply_relocate_add" << endl;
+//            }
+//            //printf("Section '%s' with type: %i starts at 0x%08X and ends at 0x%08X\n", tempBuf, elf32Shdr[i].sh_type, elf32Shdr[i].sh_offset, elf32Shdr[i].sh_offset + elf32Shdr[i].sh_size);
+
+//        }
+
+
+    }else if(fileContent[4] == ELFCLASS64){
+        if(!(_sym.memSpecs().arch & MemSpecs::Architecture::ar_x86_64))
+        {
+            debugerr("Kernel Modules ELF Binary has the wrong architecture!");
+            return context;
+        }
+
+        Elf64_Ehdr *elf64Ehdr;
+        Elf64_Shdr *elf64Shdr;
+
+        /* read the ELF header */
+        elf64Ehdr = (Elf64_Ehdr *) fileContent;
+        if (elf64Ehdr->e_type != ET_REL){
+            debugerr("Not a relocatable module");
+            free(fileContent);
+            return context;
+        }
+
+        /* set the file pointer to the section header offset and read it */
+        elf64Shdr = (Elf64_Shdr *) (fileContent + elf64Ehdr->e_shoff);
+
+        context.shstrindex = elf64Ehdr->e_shstrndx;
+
+        /* find sections SHT_SYMTAB, SHT_STRTAB, ".text", ".exit.text" ".data..percpu"  */
+        for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
+        {
+            tempBuf = fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + elf64Shdr[i].sh_name;
+            if ((elf64Shdr[i].sh_type == SHT_SYMTAB)){
+                context.symindex = i;
+                context.strindex =  elf64Shdr[i].sh_link;
+                //Console::out() << "Found Symtab in Section " << i << ": " << tempBuf << endl << "Strtab in Section: " << elf64Shdr[i].sh_link << endl;
+            }
+            else if (strcmp(tempBuf, ".text") == 0){
+                context.textSegment = SegmentInfo(fileContent + elf64Shdr[i].sh_offset, elf64Shdr[i].sh_addr,elf64Shdr[i].sh_size);
+            }
+            else if (strcmp(tempBuf, ".data") == 0){
+                context.dataSegment = SegmentInfo(fileContent + elf64Shdr[i].sh_offset, elf64Shdr[i].sh_addr, elf64Shdr[i].sh_size);
+            }
+            else if (strcmp(tempBuf, ".data..percpu") == 0){
+                context.percpuDataSegment = i;
+            }
+            else if (strcmp(tempBuf, ".modinfo") == 0){
+                //parse .modinfo and load dependencies
+                char* modinfo = fileContent + elf64Shdr[i].sh_offset;
+                while (modinfo < (fileContent + elf64Shdr[i].sh_offset) + elf64Shdr[i].sh_size)
+                {
+                    if(!*modinfo) modinfo++;
+                    QString string = QString(modinfo);
+
+                    if(string.startsWith("depends"))
+                    {
+                        QStringList dependencies = string.split("=").at(1).split(',');
+
+                        for(int i = 0; i < dependencies.size(); i++)
+                        {
+                            if (dependencies.at(i).compare(""))
+                            {
+                                loadElfModule(dependencies.at(i), findModuleByName(dependencies.at(i)));
+                            }
+                        }
+                        break;
+                    }
+                    modinfo += string.length() + 1;
+                }
+
+            }
+        }
+
+        ///* loop through every section */
+        for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
+        {
+
+            /* if Elf64_Shdr.sh_addr isn't 0 the section will appear in memory*/
+            tempBuf = fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + elf64Shdr[i].sh_name;
+            unsigned int infosec = elf64Shdr[i].sh_info;
+
+            /* Not a valid relocation section? */
+            if (infosec >= elf64Ehdr->e_shnum)
+                continue;
+
+            /* Don't bother with non-allocated sections */
+            if (!(elf64Shdr[infosec].sh_flags & SHF_ALLOC))
+                continue;
+
+            if (elf64Shdr[i].sh_type == SHT_REL){
+                Console::out() << "Section '" << tempBuf << "': apply_relocate" << endl;
+                //TODO this is only in the i386 case!
+                //apply_relocate(fileContent, elf64Shdr, symindex, strindex, i);
+            }
+            else if (elf64Shdr[i].sh_type == SHT_RELA){
+
+                context.relsec = i;
+                apply_relocate_add(fileContent, elf64Shdr, context);
+                //Console::out() << "Section '" << tempBuf << "': apply_relocate_add" << endl;
+            }
+            //printf("Section '%s' with type: %i starts at 0x%08X and ends at 0x%08X\n", tempBuf, elf64Shdr[i].sh_type, elf64Shdr[i].sh_offset, elf64Shdr[i].sh_offset + elf64Shdr[i].sh_size);
+
+        }
+    }
+
+    //module_finalize  => http://lxr.free-electrons.com/source/arch/x86/kernel/module.c#L167
+
+    SegmentInfo info = findElfSegmentWithName(fileContent, ".altinstructions");
+    if (info.index) applyAltinstr(fileContent, info, context);
+
+    info = findElfSegmentWithName(fileContent, ".smp_locks");
+    if (info.index && context.textSegment.index) { //locks
+
+        //TODO implement correctly!
+        //Currently not required, as we are running on a single core machine
+
+//        qint32 *start = (qint32 *) info.index;
+//        qint32 *end = (qint32 *) (info.index + info.size);
+//        quint8 *text = (quint8 *) context.textSegment.index;
+//        quint8 *text_end = (quint8 *) context.textSegment.index + context.textSegment.size;
+
+//        const qint32 *poff;
+
+//        for (poff = start; poff < end; poff++)
+//        {
+//            quint8 *ptr = (quint8 *)poff + *poff;
+
+//            if (!*poff || ptr < text || ptr >= text_end) continue;
+
+//            /* turn lock prefix into DS segment override prefix */
+//            if (*ptr == 0xf0)
+//                memcpy(ptr, ((unsigned char []){0x3E}), 1);
+//        }
+    }
+
+    info = findElfSegmentWithName(fileContent, ".parainstructions");
+    if (info.index) applyParainstr(info, context);
+
+    //Content of text section in memory:
+    //same as the sections in the elf binary
+
+    QByteArray textSegmentContent = QByteArray();
+    textSegmentContent.append(context.textSegment.index, context.textSegment.size);
+
+    if(fileContent[4] == ELFCLASS32)
+    {
+        //TODO
+    }
+    else if(fileContent[4] == ELFCLASS64)
+    {
+        Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) fileContent;
+        Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (fileContent + elf64Ehdr->e_shoff);
+        for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
+        {
+            QString sectionName = QString(fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + elf64Shdr[i].sh_name);
+
+            if(elf64Shdr[i].sh_flags == (SHF_ALLOC | SHF_EXECINSTR) &&
+                    sectionName.compare(".text") != 0 &&
+                    sectionName.compare(".init.text") != 0)
+            {
+                textSegmentContent.append(fileContent + elf64Shdr[i].sh_offset, elf64Shdr[i].sh_size);
+            }
+        }
+    }
+    info = findElfSegmentWithName(fileContent, "__mcount_loc");
+    applyMcount(info, context, textSegmentContent);
+
+    //Save the jump_labels section for later reference.
+
+    info = findElfSegmentWithName(fileContent, "__jump_table");
+    if(info.index != 0) context.jumpTable.append(info.index, info.size);
+
+    applyJumpEntries(textSegmentContent, context);
+
+    //Console::out() << "The Module got " << textSegmentContent.size() / PAGE_SIZE << " pages." << endl;
+
+    // Hash
+    QCryptographicHash hash(QCryptographicHash::Sha1);
+
+    for(int i = 0 ; i <= textSegmentContent.size() / MODULE_PAGE_SIZE; i++)
+    {
+        PageData page = PageData();
+        hash.reset();
+        // Caclulate hash of one segment at the ith the offset
+        QByteArray segment = textSegmentContent.mid(i * MODULE_PAGE_SIZE, MODULE_PAGE_SIZE);
+        if (!segment.isEmpty())
+        {
+            segment = segment.leftJustified(MODULE_PAGE_SIZE, 0);
+            page.content = segment;
+            hash.addData(page.content);
+            page.hash = hash.result();
+            context.textSegmentData.append(page);
+        }
+        //Console::out() << "The " << i << "th segment got a hash of: " << segmentHashes.last().toHex() << " Sections." << endl;
+    }
+
+    //Initialize the symTable in the context for later reference
+    if(fileContent[4] == ELFCLASS32)
+    {
+        //TODO
+    }
+    else if(fileContent[4] == ELFCLASS64)
+    {
+        Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) fileContent;
+        Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (fileContent + elf64Ehdr->e_shoff);
+
+        quint32 symSize = elf64Shdr[context.symindex].sh_size;
+        Elf64_Sym *symBase = (Elf64_Sym *) (fileContent + elf64Shdr[context.symindex].sh_offset);
+
+        for(Elf64_Sym * sym = symBase; sym < (Elf64_Sym *) (((char*) symBase) + symSize) ; sym++)
+        {
+            if((ELF64_ST_TYPE(sym->st_info) & (STT_OBJECT | STT_FUNC)) && ELF64_ST_BIND(sym->st_info) & STB_GLOBAL)
+            {
+                QString symbolName = QString(&((fileContent + elf64Shdr[context.strindex].sh_offset)[sym->st_name]));
+                quint64 symbolAddress = sym->st_value;
+                _symTable.insert(symbolName, symbolAddress);
+            }
+        }
+    }
+
+
+
+    writeModuleToFile(fileName, currentModule, fileContent );
+    free(fileContent);
+    return context;
+}
+
+void PageVerifier::loadElfModule(QString moduleName, Instance currentModule){
+    if(!ParsedExecutables->contains(moduleName))
+    {
+        QString fileName = findModuleFile(moduleName);
+        if(fileName == "")
+        {
+            debugerr("File not found for module " << moduleName);
             return;
         }
 
-        // Read
-        if ((quint64)f.read(data.data(), size) != size)
-        {
-            debugerr("An error occurred while reading " << size << " bytes from pos " << offset << "!");
-            return;
-        }
+        elfParseData context = parseKernelModule(fileName, currentModule);
 
-        // Add this section
-        ExecutableSections->insert(regex.cap(1), ExecutableSection(regex.cap(1), address, offset, data));
-
-        //debugmsg("Added Section " << regex.cap(1) << " (address: " << std::hex << address << std::dec
-        //         << ", size: " << size << ", offset: " << offset << ")");
-
-        pos += regex.matchedLength();
+        ParsedExecutables->insert(moduleName, context);
     }
+}
+
+PageVerifier::elfParseData PageVerifier::parseKernel(QString fileName)
+{
+    char * fileContent = readFile(fileName);
+    elfParseData context = elfParseData();
+
+    if (!fileContent){
+        debugerr("Error loading file\n");
+        free(fileContent);
+        return context;
+    }
+
+    context.type = Detect::KERNEL_CODE;
+
+    context.textSegment = findElfSegmentWithName(fileContent, ".text");
+    context.dataSegment = findElfSegmentWithName(fileContent, ".data");
+    context.vvarSegment = findElfSegmentWithName(fileContent, ".vvar");
+    context.dataNosaveSegment = findElfSegmentWithName(fileContent, ".data_nosave");
+    context.bssSegment = findElfSegmentWithName(fileContent, ".bss");
+
+    /* read the ELF header */
+    Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) fileContent;
+
+    /* set the file pointer to the section header offset and read it */
+    Elf64_Shdr *elf64Shdr = (Elf64_Shdr *) (fileContent + elf64Ehdr->e_shoff);
+
+    context.shstrindex = elf64Ehdr->e_shstrndx;
+
+    /* find sections SHT_SYMTAB, SHT_STRTAB  */
+    for(unsigned int i = 0; i < elf64Ehdr->e_shnum; i++)
+    {
+        //char *tempBuf = fileContent + elf64Shdr[elf64Ehdr->e_shstrndx].sh_offset + elf64Shdr[i].sh_name;
+        if ((elf64Shdr[i].sh_type == SHT_SYMTAB)){
+            context.symindex = i;
+            context.strindex =  elf64Shdr[i].sh_link;
+            //Console::out() << "Found Symtab in Section " << i << ": " << tempBuf << endl << "Strtab in Section: " << elf64Shdr[i].sh_link << endl;
+        }
+    }
+
+    //Find "__fentry__" to nop calls out later
+    Elf64_Sym *symBase = (Elf64_Sym *) (fileContent + elf64Shdr[context.symindex].sh_offset);
+    Elf64_Sym *sym;
+    for (sym = symBase ; sym < (Elf64_Sym *) (fileContent +
+                                              elf64Shdr[context.symindex].sh_offset +
+                                              elf64Shdr[context.symindex].sh_size); sym++)
+    {
+         QString symbolName = QString(&((fileContent + elf64Shdr[context.strindex].sh_offset)[sym->st_name]));
+         if(symbolName.compare(QString("__fentry__")) == 0)
+         {
+             context.fentryAddress = sym->st_value;
+         }
+         if(symbolName.compare(QString("copy_user_generic_unrolled")) == 0)
+         {
+             context.genericUnrolledAddress = sym->st_value;
+         }
+    }
+
+
+
+    SegmentInfo info = findElfSegmentWithName(fileContent, ".altinstructions");
+    if (info.index) applyAltinstr(fileContent, info, context);
+
+
+    info = findElfSegmentWithName(fileContent, ".parainstructions");
+    if (info.index) applyParainstr(info, context);
+
+    QByteArray textSegmentContent = QByteArray();
+    textSegmentContent.append(context.textSegment.index, context.textSegment.size);
+
+    info = findElfSegmentWithName(fileContent, ".notes");
+    quint64 offset = (quint64) info.index - (quint64) context.textSegment.index;
+    textSegmentContent = textSegmentContent.leftJustified(offset, 0);
+    textSegmentContent.append(info.index, info.size);
+
+    info = findElfSegmentWithName(fileContent, "__ex_table");
+    offset = (quint64) info.index - (quint64) context.textSegment.index;
+    textSegmentContent = textSegmentContent.leftJustified(offset, 0);
+    textSegmentContent.append(info.index, info.size);
+
+
+    //Apply Ftrace changes
+    info = findElfSegmentWithName(fileContent, ".init.text");
+    qint64 initTextOffset = - (quint64)info.address + (quint64)info.index;
+    info.index = (char *)findElfAddressOfVariable(fileContent, context, "__start_mcount_loc") + initTextOffset;
+    info.size = (char *)findElfAddressOfVariable(fileContent, context, "__stop_mcount_loc") + initTextOffset - info.index ;
+    applyMcount(info, context, textSegmentContent);
+
+    //Apply Tracepoint changes
+//    SegmentInfo rodata = findElfSegmentWithName(fileContent, ".rodata");
+//    qint64 rodataOffset = - (quint64)rodata.address + (quint64)rodata.index;
+//    info.index = (char *)findElfAddressOfVariable(fileContent, context, "__start___tracepoints_ptrs") + rodataOffset;
+//    info.size = (char *)findElfAddressOfVariable(fileContent, context, "__stop___tracepoints_ptrs") + rodataOffset - info.index ;
+//    applyTracepoints(info, rodata, context, textSegmentContent);
+
+    info = findElfSegmentWithName(fileContent, ".data");
+    qint64 dataOffset = - (quint64)info.address + (quint64)info.index;
+    quint64 jumpStart = findElfAddressOfVariable(fileContent, context, "__start___jump_table");
+    quint64 jumpStop = findElfAddressOfVariable(fileContent, context, "__stop___jump_table");
+
+    info.index = (char *)jumpStart + dataOffset;
+    info.size = (char *)jumpStop + dataOffset - info.index ;
+
+    //Save the jump_labels section for later reference.
+    if(info.index != 0) context.jumpTable.append(info.index, info.size);
+
+    applyJumpEntries(textSegmentContent, context, jumpStart, jumpStop);
+
+    // Hash
+    QCryptographicHash hash(QCryptographicHash::Sha1);
+
+    for(int i = 0 ; i <= textSegmentContent.size() / KERNEL_CODEPAGE_SIZE; i++)
+    {
+        PageData page = PageData();
+        hash.reset();
+        // Caclulate hash of one segment at the ith the offset
+        QByteArray segment = textSegmentContent.mid(i * KERNEL_CODEPAGE_SIZE, KERNEL_CODEPAGE_SIZE);
+        if (!segment.isEmpty())
+        {
+            segment = segment.leftJustified(KERNEL_CODEPAGE_SIZE, 0);
+            page.content = segment;
+            hash.addData(page.content);
+            page.hash = hash.result();
+            context.textSegmentData.append(page);
+        }
+        //Console::out() << "The " << i << "th segment got a hash of: " << segmentHashes.last().toHex() << " Sections." << endl;
+    }
+
+    //TODO
+    //.data
+    //.vvar
+    QByteArray vvarSegmentContent = QByteArray();
+    vvarSegmentContent.append(context.vvarSegment.index, context.vvarSegment.size);
+    for(int i = 0 ; i <= vvarSegmentContent.size() / 0x1000; i++)
+    {
+        PageData page = PageData();
+        hash.reset();
+        // Caclulate hash of one segment at the ith the offset
+        QByteArray segment = vvarSegmentContent.mid(i * 0x1000, 0x1000);
+        if (!segment.isEmpty())
+        {
+            segment = segment.leftJustified(0x1000, 0);
+            page.content = segment;
+            hash.addData(page.content);
+            page.hash = hash.result();
+            context.vvarSegmentData.append(page);
+        }
+    }
+    //.data_nosave
+    QByteArray dataNosaveSegmentContent = QByteArray();
+    dataNosaveSegmentContent.append(context.vvarSegment.index, context.vvarSegment.size);
+    for(int i = 0 ; i <= dataNosaveSegmentContent.size() / 0x1000; i++)
+    {
+        PageData page = PageData();
+        hash.reset();
+        // Caclulate hash of one segment at the ith the offset
+        QByteArray segment = dataNosaveSegmentContent.mid(i * 0x1000, 0x1000);
+        if (!segment.isEmpty())
+        {
+            segment = segment.leftJustified(0x1000, 0);
+            page.content = segment;
+            hash.addData(page.content);
+            page.hash = hash.result();
+            context.dataNosaveSegmentData.append(page);
+        }
+    }
+    //.bss
+
+    free(fileContent);
+    return context;
+}
+
+void PageVerifier::loadElfKernel(){
+    if(!ParsedExecutables->contains(QString("kernel")))
+    {
+        elfParseData context = parseKernel(KERNEL_IMAGE);
+
+        ParsedExecutables->insert(QString("kernel"), context);
+    }
+}
+
+Instance PageVerifier::findModuleByName(QString moduleName){
+
+    const Variable *varModules = _sym.factory().findVarByName("modules");
+    const Structured *typeModule = dynamic_cast<const Structured *>
+            (_sym.factory().findBaseTypeByName("module"));
+    assert(varModules != 0);
+    assert(typeModule != 0);
+
+    // Don't depend on the rule engine
+    const int listOffset = typeModule->memberOffset("list");
+    Instance firstModule = varModules->toInstance(_vmem).member("next", BaseType::trAny, -1, ksNone);
+    firstModule.setType(typeModule);
+    firstModule.addToAddress(-listOffset);
+
+    // Does the page belong to a module?
+    // Don't depend on the rule engine
+    Instance currentModule = varModules->toInstance(_vmem).member("next", BaseType::trAny, -1, ksNone);
+    currentModule.setType(typeModule);
+    currentModule.addToAddress(-listOffset);
+
+    do
+    {
+        if(currentModule.member("name").toString().remove(QChar('"'), Qt::CaseInsensitive).compare(moduleName) ==0)
+        {
+            return currentModule;
+        }
+        currentModule = currentModule.member("list").member("next", BaseType::trAny, -1, ksNone);
+        currentModule.setType(typeModule);
+        currentModule.addToAddress(-listOffset);
+    } while (currentModule.address() != firstModule.address() &&
+             currentModule.address() != varModules->offset() - listOffset);
+    return Instance();
 }
 
 quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
@@ -155,151 +1746,396 @@ quint64 Detect::inVmap(quint64 address, VirtualMemory *vmem)
 }
 
 
-void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
+quint64 PageVerifier::checkCodePage(QString moduleName, quint32 sectionNumber, Detect::ExecutablePage currentPage)
 {
-    if (!ExecutablePages || !current) {
-        ExecutablePages = current;
+
+    quint32 changeCount = 0;
+    if (ParsedExecutables->value(moduleName).textSegmentData.size() <= (qint32) sectionNumber )
+    {
+
+        Console::out() << "Module: " << moduleName << " Section: " << hex << sectionNumber << dec << endl;
+        Console::out() << "Something is wrong here:" << ParsedExecutables->value(moduleName).textSegmentData.size() << " parsed Segments vs: " << sectionNumber << " segment in kernel" << endl;
+        return 1;
+    }
+
+    if(ParsedExecutables->value(moduleName).textSegmentData.at(sectionNumber).hash.toHex() != currentPage.hash.toHex())
+    {
+
+
+        if (ParsedExecutables->value(moduleName).textSegmentData.at(sectionNumber).content.size() != currentPage.data.size())
+        {
+            Console::out() << " Length of relocations: " << ParsedExecutables->value(moduleName).textSegmentData.at(sectionNumber).content.size()
+                           << " Length of page: " << currentPage.data.size() << endl;
+        }
+
+        for(qint32 i = 0 ; i < currentPage.data.size() ; i++)
+        {
+            QByteArray currentSegment = ParsedExecutables->value(moduleName).textSegmentData.at(sectionNumber).content;
+            if(currentSegment.at(i) != currentPage.data.at(i))
+            {
+                //Show first changed byte only
+                if(i>0 && currentSegment.at(i-1) != currentPage.data.at(i-1))
+                {
+                    continue;
+                }
+
+                //Check if this is a jumpEntry that should be disabled
+                if(currentSegment.at(i) == (char) 0xe9 &&
+                        currentPage.data.at(i) == (char) 0xf &&
+                        currentPage.data.at(i+1) == (char) 0x1f &&
+                        currentPage.data.at(i+2) == (char) 0x44 &&
+                        currentPage.data.at(i+3) == (char) 0x0 &&
+                        currentPage.data.at(i+4) == (char) 0x0 &&
+                        moduleName.compare(QString("kernel")) == 0)
+                {
+                    //Get destination from memory
+
+                    qint32 jmpDestInt = 0;
+                    const char * jmpDestPtr = currentSegment.constData();
+                    memcpy(&jmpDestInt, jmpDestPtr + i + 1, 4);
+
+                    quint64 address = sectionNumber * KERNEL_CODEPAGE_SIZE + i;
+                    Console::out() << "checking if jump is nopped out @ " << hex << address << dec << endl;
+
+
+                    if(_jumpEntries.contains(address))
+                    {
+                        if (*_jumpEntries.find(address) == jmpDestInt)
+                        {
+                            Console::out() << "Jump Entry not disabled (inconsistency)" << endl;
+                            i += 5;
+                            continue;
+                        }
+                    }
+                }
+
+                if(currentSegment.at(i-1) == (char) 0xe8 &&
+                        moduleName.compare(QString("kernel")) == 0)
+                {
+                    quint64 address = ParsedExecutables->value(moduleName).genericUnrolledAddress;
+
+                    qint32 jmpDestElfInt = 0;
+                    const char * jmpDestElfPtr = currentSegment.constData();
+                    memcpy(&jmpDestElfInt, jmpDestElfPtr + i + 1, 4);
+
+                    quint64 elfDestAddress = _sym.memSpecs().systemMap.value("_text").address + sectionNumber * KERNEL_CODEPAGE_SIZE + i + jmpDestElfInt + 5;
+
+                    if(address == elfDestAddress)
+                    {
+                        i += 4;
+                        continue;
+                    }
+                }
+
+//                if(currentSegment.at(i) == (char) 0xe9 &&
+//                        currentSegment.at(i+1) == (char) 0x0 &&
+//                        currentSegment.at(i+2) == (char) 0x0 &&
+//                        currentSegment.at(i+3) == (char) 0x0 &&
+//                        currentSegment.at(i+4) == (char) 0x0 &&
+//                        currentPage.data.at(i) == (char) 0xf &&
+//                        currentPage.data.at(i+1) == (char) 0x1f &&
+//                        currentPage.data.at(i+2) == (char) 0x44 &&
+//                        currentPage.data.at(i+3) == (char) 0x0 &&
+//                        currentPage.data.at(i+4) == (char) 0x0 &&
+//                        moduleName.compare(QString("kernel")) == 0)
+//                {
+//                    i += 5;
+//                    continue;
+//                }
+
+                //TODO after offset db000 in page 4 of kernel there is some upstart stuff
+                if(moduleName.compare(QString("kernel")) == 0 && sectionNumber == 3 && i > 0xdb000)
+                {
+                    Console::out() << "Unknown code @ " << hex << _sym.memSpecs().systemMap.value("_text").address + sectionNumber * KERNEL_CODEPAGE_SIZE + i << dec << endl;
+                    break;
+                }
+
+
+                Console::out() << "First change on section " << sectionNumber << " in byte 0x" << hex << i << " is 0x" << (unsigned char) currentSegment.at(i)
+                               << " should be 0x" << (unsigned char) currentPage.data.at(i) << dec << endl;
+                //Print 40 Bytes from should be
+                Console::out() << "The block is: " << hex << endl;
+                for (qint32 k = i-15 ; k < i + 15 ; k++)
+                {
+                    if (k < 0 || k >= currentSegment.size()) continue;
+                    if(k == i) Console::out() << " # ";
+                    Console::out() << (unsigned char) currentSegment.at(k) << " ";
+                }
+
+                Console::out() << dec << endl;
+                //Print 40 Bytes from is
+                Console::out() << "The block should be: " << hex << endl;
+                for (qint32 k = i-15 ; k < i + 15 ; k++)
+                {
+                    if (k < 0 || k >= currentPage.data.size()) continue;
+                    if(k == i) Console::out() << " # ";
+                    Console::out() << (unsigned char) currentPage.data.at(k) << " ";
+                }
+                Console::out() << dec << endl << endl;
+                changeCount++;
+            }
+        }
+        if (changeCount > 0)
+        {
+            Console::out() << moduleName << " Section: " << hex << sectionNumber << dec << " hash mismatch! " << changeCount << " inconsistent changes." << endl;
+        }
+    }
+    return changeCount;
+}
+
+void PageVerifier::verifyHashes(QMultiHash<quint64, Detect::ExecutablePage> *current)
+{
+
+    if (!current) {
         return;
     }
 
-    QList<ExecutablePage> currentPages = current->values();
-
-    // Stats
-    quint64 changedPages = 0;
-    quint64 changedDataPages = 0;
-    quint64 newPages = 0;
     quint64 totalVerified = 0;
-    quint64 firstChange = 0;
-    // quint64 changes = 0;
+    quint64 modulePages = 0;
+    quint64 kernelCodePages = 0;
+    quint64 kernelDataPages = 0;
+    quint64 kernelVvarPages = 0;
+    quint64 kernelBssPages = 0;
+    quint64 unknownKernelDataPages = 0;
+    quint64 vmapPages = 0;
+    quint64 vmapLazyPages = 0;
+    quint64 undefinedPages = 0;
+    quint64 changedPages = 0;
+    quint64 overallChanges = 0;
+    quint64 changedDataPages = 0;
+    quint64 uncheckedPages = 0;
 
-    // Prepare status output
-    _first_page = 1;
-    _current_page = 1;
-    _final_page = currentPages.size();
+    quint64 totalSize = 0;
+    quint64 totalVerifiedSize = 0;
+    quint64 moduleSize = 0;
+    quint64 kernelCodeSize = 0;
+    quint64 kernelDataSize = 0;
+    quint64 kernelVvarSize = 0;
+    quint64 kernelBssSize = 0;
+    quint64 unknownKernelDataSize = 0;
+    quint64 vmapSize = 0;
+    quint64 vmapLazySize = 0;
+    quint64 undefinedSize = 0;
+    quint64 changedSize = 0;
+    quint64 changedDataSize = 0;
+    quint64 uncheckedPagesSize = 0;
 
     // Start the Operation
     operationStarted();
 
-    // Hash
-    QCryptographicHash hash(QCryptographicHash::Sha1);
+    QList<Detect::ExecutablePage> sections = current->values();
 
-    // Load Kernel Sections
-    // getExecutableSections("<path>");
+    //Console::out() << "got list of all sections: " <<  sections.size() <<   " Sections" << endl;
 
-    // Compare all pages
-    for (int i = 0; i < currentPages.size(); ++i) {
-        // New page?
-        if (!ExecutablePages->contains(currentPages.at(i).address)) {
-            newPages++;
-            continue;
-        }
+    QList<quint64> addresses = QList<quint64>();
 
-        /*
-        if (currentPages.at(i).address >= _kernel_code_begin &&
-                currentPages.at(i).address <= _kernel_code_end)
+    for (int i = 0; i < sections.size(); ++i){
+        Detect::ExecutablePage currentPage = sections.at(i);
+        elfParseData context;
+
+        switch(currentPage.type)
         {
-            debugmsg("Trying to match " << std::hex << currentPages.at(i).address << std::dec << "...");
-            QList<ExecutableSection> sections = ExecutableSections->values();
+        case Detect::MODULE:
+        {
+            modulePages++;
+            moduleSize += currentPage.data.size();
 
-            for (int j = 0; j < sections.size(); ++j) {
+            //if(currentPage.module.compare("drm") != 0) return;
 
-                if (sections.at(j).address <= currentPages.at(i).address &&
-                        currentPages.at(i).address + currentPages.at(i).data.size() <= sections.at(j).address + sections.at(j).data.size()) {
+            QString moduleName = currentPage.module.remove(QChar('"'), Qt::CaseInsensitive);
+            //Console::out() << "Start Verification of module: " <<  moduleName << endl;
 
-                    hash.reset();
-                    hash.addData(sections.at(j).data.data() + (currentPages.at(i).address - _kernel_code_begin),
-                                 currentPages.at(i).data.size());
+            Instance currentModule = findModuleByName(moduleName);
+            if (!currentModule.isValid())
+            {
+                Console::out() << "Module not found" << endl;
+                continue;
+            }
 
-                    if (hash.result() == currentPages.at(i).hash) {
-                        debugmsg("MATCHED!");
-                    }
-                    /*
-                    for (int k = 0; k < currentPages.at(i).data.size(); ++k) {
-                        if (sections.at(j).data[(uint)(k + (currentPages.at(i).address - _kernel_code_begin))] !=
-                               currentPages.at(i).data[k]) {
-                        Console::out()
-                                << "\t" << hex << "0x" << (currentPages.at(i).address + k) << ": "
-                                << (quint8) sections.at(j).data[(uint)(k + (currentPages.at(i).address - _kernel_code_begin))]
-                                << " => "
-                                << (quint8) currentPages.at(i).data[k]
-                                << dec << endl;
-                        }
-                    }
-                    */
-                    /*
-                    break;
+            //Console::out() << "Found current Instance" << endl;
 
-                }
+            loadElfModule(moduleName, currentModule);
+
+            quint32 sectionNumber = (currentPage.address - (quint64)currentModule.member("module_core").toPointer()) / MODULE_PAGE_SIZE;
+
+            //Console::out() << "Done Parsing the elf binary. Got " << sectionNumber << " Sections" << endl;
+
+            quint64 changes = checkCodePage(moduleName, sectionNumber, currentPage);
+            if (changes > 0)
+            {
+                overallChanges += changes;
+                changedPages++;
+                changedSize += currentPage.data.size();
+            }
+            else
+            {
+                totalVerifiedSize += currentPage.data.size();
             }
         }
-        */
+            break;
+        case Detect::KERNEL_CODE:
+        {
+            kernelCodePages++;
+            kernelCodeSize += currentPage.data.size();
 
-        // Changed page?
-        if (ExecutablePages->value(currentPages.at(i).address).hash !=
-            currentPages.at(i).hash) {
+            // Get data from System.map
+            quint64 _kernel_code_begin = _sym.memSpecs().systemMap.value("_text").address;
 
-            // Find the first changed byte
-            firstChange = 0;
-            for (int j = 0; j < currentPages.at(i).data.size(); ++j) {
+            quint32 sectionNumber = (currentPage.address - _kernel_code_begin) / KERNEL_CODEPAGE_SIZE;
+            QString moduleName = QString("kernel");
+            loadElfKernel();
 
-                if (currentPages.at(i).data[j] !=
-                    ExecutablePages->value(currentPages.at(i).address).data[j]) {
-
-                    firstChange = j;
-                    break;
-                }
-            }
-
-
-            if (currentPages.at(i).type == KERNEL_CODE &&
-                currentPages.at(i).address + firstChange <= _kernel_code_end) {
+            quint64 changes = checkCodePage(moduleName, sectionNumber, currentPage);
+            if (changes > 0)
+            {
+                overallChanges += changes;
                 changedPages++;
-
-                Console::out()
-                        << "\r" << Console::color(ctWarningLight)
-                        << "WARNING:" << Console::color(ctReset)
-                        << " Detected modified CODE page @ "
-                        << Console::color(ctAddress) << "0x" << hex
-                        << currentPages.at(i).address
-                        << Console::color(ctReset)<< dec
-                        << " (" << currentPages.at(i).module << ")" << endl;
+                changedSize += currentPage.data.size();
             }
-            else {
+            else
+            {
+                totalVerifiedSize += currentPage.data.size();
+            }
+
+            writeSectionToFile("kernel", sectionNumber, currentPage.data);
+        }
+            break;
+        case Detect::KERNEL_DATA:
+
+
+            loadElfKernel();
+
+
+            //Check if page lies in kernels .data section
+            context = ParsedExecutables->value(QString("kernel"));
+            if (currentPage.address >= context.dataSegment.address && currentPage.address < context.dataSegment.address + context.dataSegment.size)
+            {
+                //Kernels .data page
+                //TODO compare
+                //Console::out() << "Got kernel data page @ " << hex << currentPage.address << " with size: " << currentPage.data.size() << dec << endl;
+                kernelDataPages++;
+                kernelDataSize += currentPage.data.size();
+
                 changedDataPages++;
-
-                Console::out()
-                        << "\r" << Console::color(ctWarningLight)
-                        << "WARNING:" << Console::color(ctReset)
-                        << " Detected modified executable DATA page @ "
-                        << Console::color(ctAddress) << "0x" << hex
-                        << currentPages.at(i).address
-                        << Console::color(ctReset)<< dec
-                        << " (" << currentPages.at(i).module << ")" << endl;
+                changedDataSize += currentPage.data.size();
             }
+            else if (currentPage.address >= context.bssSegment.address && currentPage.address < context.bssSegment.address + context.bssSegment.size)
+            {
+                //Kernels .bss page
+                //TODO compare
+                //Console::out() << "Got kernel data page @ " << hex << currentPage.address << " with size: " << currentPage.data.size() << dec << endl;
+                kernelBssPages++;
+                kernelBssSize += currentPage.data.size();
 
-            // Compare pages and print diffs
-            /*
-            changes = 0;
-            for (int j = 0; j < currentPages.at(i).data.size() && changes < 50; ++j) {
+                changedDataPages++;
+                changedDataSize += currentPage.data.size();
+            }
+            else if (currentPage.address >= context.dataNosaveSegment.address && currentPage.address < context.dataNosaveSegment.address + context.dataNosaveSegment.size)
+            {
+                //Kernels .data_nosave page
+                //TODO compare
+                //Console::out() << "Got kernel data page @ " << hex << currentPage.address << " with size: " << currentPage.data.size() << dec << endl;
+                kernelDataPages++;
+                kernelDataSize += currentPage.data.size();
 
-                if (currentPages.at(i).data[j] !=
-                    ExecutablePages->value(currentPages.at(i).address).data[j]) {
+                quint32 sectionNumber = (currentPage.address - context.dataNosaveSegment.address) / 0x1000;
+                if (context.dataNosaveSegmentData.size() <= (qint32) sectionNumber )
+                {
 
-                    Console::out()
-                            << "\t" << hex << "0x" << (currentPages.at(i).address + j) << ": "
-                            << (quint8) ExecutablePages->value(currentPages.at(i).address).data[j]
-                            << " => "
-                            << (quint8) currentPages.at(i).data[j]
-                            << dec << endl;
+                    Console::out() << "Data Nosave Section: " << hex << sectionNumber << dec << endl;
+                    Console::out() << "Something is wrong here:" << context.dataNosaveSegmentData.size() << " parsed Segments vs: " << sectionNumber << " segment in kernel" << endl;
+                    continue;
+                }
 
-                    changes += 1;
+                if(context.dataNosaveSegmentData.at(sectionNumber).hash.toHex() != currentPage.hash.toHex())
+                {
+                    Console::out() << "Data_nosave Section: " << hex << sectionNumber << " Hash mismatch." << dec << endl;
+
+                    changedDataPages++;
+                    changedDataSize += currentPage.data.size();
+                }
+                else
+                {
+                    totalVerifiedSize += currentPage.data.size();
                 }
             }
-            */
+            else if (currentPage.address >= context.vvarSegment.address && currentPage.address < context.vvarSegment.address + context.vvarSegment.size)
+            {
+                //Kernels .vvar page
+                //see /arch/x86/include/asm/vvar.h
+                //TODO compare
+                //Console::out() << "Got kernel data page @ " << hex << currentPage.address << " with size: " << currentPage.data.size() << dec << endl;
+                kernelVvarPages++;
+                kernelVvarSize += currentPage.data.size();
+
+                quint32 sectionNumber = (currentPage.address - context.vvarSegment.address) / 0x1000;
+                if (context.vvarSegmentData.size() <= (qint32) sectionNumber )
+                {
+
+                    Console::out() << "Vvar Section: " << hex << sectionNumber << dec << endl;
+                    Console::out() << "Something is wrong here:" << context.vvarSegmentData.size() << " parsed Segments vs: " << sectionNumber << " segment in kernel" << endl;
+                    continue;
+                }
+
+                if(context.vvarSegmentData.at(sectionNumber).hash.toHex() != currentPage.hash.toHex())
+                {
+                    Console::out() << "Vvar Section: " << hex << sectionNumber << " Hash mismatch. This is normal as this page contains data" << dec << endl;
+                    changedDataPages++;
+                    changedDataSize += currentPage.data.size();
+                }
+                else
+                {
+                    totalVerifiedSize += currentPage.data.size();
+                }
+            }
+            else
+            {
+                unknownKernelDataPages++;
+                unknownKernelDataSize += currentPage.data.size();
+                Console::out() << "Unknown data page @ " << hex << currentPage.address << " with size: " << currentPage.data.size() << dec << endl;
+            }
+
+            break;
+        case Detect::VMAP:
+            vmapPages++;
+            vmapSize += currentPage.data.size();
+
+            addresses.append(currentPage.address);
+
+            uncheckedPages++;
+            uncheckedPagesSize += currentPage.data.size();
+            break;
+        case Detect::VMAP_LAZY:
+            vmapLazyPages++;
+            vmapLazySize += currentPage.data.size();
+
+            Console::out() << "Unknown data page @ " << hex << currentPage.address << " with size: " << currentPage.data.size() << dec << endl;
+
+            uncheckedPages++;
+            uncheckedPagesSize += currentPage.data.size();
+            break;
+        case Detect::UNDEFINED:
+            undefinedPages++;
+            undefinedSize += currentPage.data.size();
+
+            uncheckedPages++;
+            uncheckedPagesSize += currentPage.data.size();
+            break;
+        default:
+            Console::out() << "Type: " << hex << currentPage.type << dec << " currently not implemented" << endl;
         }
 
         totalVerified++;
+        totalSize += currentPage.data.size();
     }
+
+    qSort(addresses);
+
+    for(int i = 0 ; i < addresses.size(); i++)
+    {
+        Console::out() << "Unknown data page @ " << hex << addresses.at(i) << dec << endl;
+    }
+
 
     // Finish
     operationStopped();
@@ -307,18 +2143,52 @@ void Detect::verifyHashes(QMultiHash<quint64, ExecutablePage> *current)
     // Print Stats
     Console::out()
         << "\r\nProcessed " << Console::color(ctWarningLight)
-        << totalVerified << Console::color(ctReset)
-        << " hashes in " << elapsedTime() << " min" << endl
-        << "\t Found " << Console::color(ctNumber)
-        << newPages << Console::color(ctReset) << " new pages." << endl
-        << "\t Detected " << Console::color(ctError) << changedDataPages << Console::color(ctReset)
-        << " modified executable DATA pages." << endl
-        << "\t Detected " << Console::color(ctError) << changedPages << Console::color(ctReset)
-        << " modified CODE pages.\n" << endl;
+           << totalVerified << Console::color(ctReset)
+           << " pages in " << elapsedTime() << " min"
+           << " ( In total: " << Console::color(ctNumber)
+           << totalSize / 1024 << Console::color(ctReset) << " kbytes, verified: " << Console::color(ctNumber)
+           << totalVerifiedSize / 1024 << Console::color(ctReset) << " kbytes)" << endl
+           << "\t Found " << Console::color(ctNumber)
+           << modulePages << Console::color(ctReset) << " module pages." << " ( " << Console::color(ctNumber)
+           << moduleSize / 1024 << Console::color(ctReset) << " kbytes )" << endl
+           << "\t Found " << Console::color(ctNumber)
+           << kernelCodePages << Console::color(ctReset) << " kernel code pages." << " ( " << Console::color(ctNumber)
+           << kernelCodeSize / 1024 << Console::color(ctReset) << " kbytes )" << endl
+           << "\t Found " << Console::color(ctNumber)
+           << kernelDataPages << Console::color(ctReset) << " kernel data pages." << " ( " << Console::color(ctNumber)
+           << kernelDataSize / 1024 << Console::color(ctReset) << " kbytes )" << endl
+           << "\t Found " << Console::color(ctNumber)
+           << kernelVvarPages << Console::color(ctReset) << " kernel vvar pages." << " ( " << Console::color(ctNumber)
+           << kernelVvarSize / 1024 << Console::color(ctReset) << " kbytes )" << endl
+           << "\t Found " << Console::color(ctNumber)
+           << kernelBssPages << Console::color(ctReset) << " kernel bss pages." << " ( " << Console::color(ctNumber)
+           << kernelBssSize / 1024 << Console::color(ctReset) << " kbytes )" << endl
+           << "\t Found " << Console::color(ctError)
+           << unknownKernelDataPages << Console::color(ctReset) << " unknown kernel data pages." << " ( " << Console::color(ctNumber)
+           << unknownKernelDataSize / 1024 << Console::color(ctReset) << " kbytes )" << endl
+           << "\t Found " << Console::color(ctNumber)
+           << vmapPages << Console::color(ctReset) << " additional vmap pages." << " ( " << Console::color(ctNumber)
+           << vmapSize / 1024 << Console::color(ctReset) << " kbytes )" << endl
+           << "\t Found " << Console::color(ctNumber)
+           << vmapLazyPages << Console::color(ctReset) << " additional vmap (lazy) pages." << " ( " << Console::color(ctNumber)
+           << vmapLazySize / 1024 << Console::color(ctReset) << " kbytes )" << endl
+           << "\t Found " << Console::color(ctError)
+           << undefinedPages << Console::color(ctReset) << " undefined pages." << " ( " << Console::color(ctNumber)
+           << undefinedSize / 1024 << Console::color(ctReset) << " kbytes )" << endl
+    //       << "\t Found " << Console::color(ctNumber)
+    //       << newPages << Console::color(ctReset) << " new pages." << endl
+           << "\t Detected " << Console::color(ctError) << changedDataPages << Console::color(ctReset)
+           << " modified executable DATA pages." << " ( " << Console::color(ctNumber)
+           << changedDataSize / 1024 << Console::color(ctReset) << " bytes )" << endl
+           << "\t Detected " << Console::color(ctError) << changedPages << Console::color(ctReset)
+           << " modified CODE pages." << " ( " << Console::color(ctNumber)
+           << changedSize / 1024 << Console::color(ctReset) << " bytes )" << endl
+           << "\t Overall " << Console::color(ctError) << overallChanges << Console::color(ctReset)
+           << " changes in CODE pages." << endl
+           << "\t Overall " << Console::color(ctError) << uncheckedPages << Console::color(ctReset)
+           << " unchecked pages." << " ( " << Console::color(ctNumber)
+           << uncheckedPagesSize / 1024 << Console::color(ctReset) << " kbytes )" << endl;
 
-    // Exchange
-    delete(ExecutablePages);
-    ExecutablePages = current;
 }
 
 void Detect::buildFunctionList(MemoryMap *map)
@@ -401,7 +2271,7 @@ bool Detect::pointsToModuleCode(Instance &functionPointer)
         currentModuleCoreSize = (quint64)currentModule.member("core_text_size").toPointer();
 
         if (pointsTo >= currentModuleCore &&
-            pointsTo <= (currentModuleCore + currentModuleCoreSize)) {
+                pointsTo <= (currentModuleCore + currentModuleCoreSize)) {
             return true;
         }
 
@@ -638,7 +2508,6 @@ void Detect::verifyFunctionPointers(MemoryMap *map)
                    << Console::color(ctReset) << "%) of them are located within a union." << endl;
 }
 
-
 void Detect::hiddenCode(int index)
 {
     VirtualMemory *vmem = _sym.memDumps().at(index)->vmem();
@@ -661,7 +2530,6 @@ void Detect::hiddenCode(int index)
     Instance currentModule;
     quint64 currentModuleCore = 0;
     quint64 currentModuleCoreSize = 0;
-
     bool found = false;
     quint64 i = 0;
     quint64 flags = 0;
@@ -790,55 +2658,58 @@ void Detect::hiddenCode(int index)
                 currentModuleCoreSize = (quint64)currentModule.member("core_text_size").toPointer();
 
                 if (i >= currentModuleCore &&
-                    i <= (currentModuleCore + currentModuleCoreSize)) {
+                        i <= (currentModuleCore + currentModuleCoreSize)) {
                     found = true;
                     currentHashes->insert(i, ExecutablePage(i, MODULE, currentModule.member("name").toString(),
                                                             hash.result(), data));
                     break;
                 }
-//                else {
-//                    // Check if address falls into any section of any module
-//                    Instance attrs = currentModule.member("sect_attrs", BaseType::trAny);
-//                    uint attr_cnt = attrs.member("nsections").toUInt32();
+                else {
+                    //TODO search if page is part of any module
+                    //currently all executable pages have already been found without that
 
-//                    quint64 prevSectAddr = 0, sectAddr;
-//                    QString prevSectName, sectName;
-//                    for (uint j = 0; j <= attr_cnt && !found; ++j) {
+                //                    // Check if address falls into any section of any module
+                //                    Instance attrs = currentModule.member("sect_attrs", BaseType::trAny);
+                //                    uint attr_cnt = attrs.member("nsections").toUInt32();
 
-//                        if (j < attr_cnt) {
-//                            Instance attr = attrs.member("attrs").arrayElem(j);
-//                            sectAddr = attr.member("address").toULong();
-//                            sectName = attr.member("name").toString();
-//                        }
-//                        else {
-//                            sectAddr = (prevSectAddr | 0xfffULL) + 1;
-//                        }
-//                        // Make sure we have a chance to contain this address
-//                        if (j == 0 && i < sectAddr) {
-//                            attr_cnt = 0;
-//                            break;
-//                        }
+                //                    quint64 prevSectAddr = 0, sectAddr;
+                //                    QString prevSectName, sectName;
+                //                    for (uint j = 0; j <= attr_cnt && !found; ++j) {
 
-//                        if (prevSectAddr <= i && i < sectAddr) {
-//                            Console::out()
-//                                    << "Page @ " << Console::color(ctAddress)
-//                                    << QString("0x%0%6 belongs to module %5%1%6, section %5%2%6 (0x%3 - 0x%4)")
-//                                       .arg(i, 0, 16)
-//                                       .arg(currentModule.member("name").toString())
-//                                       .arg(prevSectName)
-//                                       .arg(prevSectAddr, 0, 16)
-//                                       .arg(sectAddr-1, 0, 16)
-//                                       .arg(Console::color(ctString))
-//                                       .arg(Console::color(ctReset))
-//                                    << endl;
-//                            found = true;
-//                        }
+                //                        if (j < attr_cnt) {
+                //                            Instance attr = attrs.member("attrs").arrayElem(j);
+                //                            sectAddr = attr.member("address").toULong();
+                //                            sectName = attr.member("name").toString();
+                //                        }
+                //                        else {
+                //                            sectAddr = (prevSectAddr | 0xfffULL) + 1;
+                //                        }
+                //                        // Make sure we have a chance to contain this address
+                //                        if (j == 0 && i < sectAddr) {
+                //                            attr_cnt = 0;
+                //                            break;
+                //                        }
 
-//                        prevSectAddr = sectAddr;
-//                        prevSectName = sectName;
-//                    }
+                //                        if (prevSectAddr <= i && i < sectAddr) {
+                //                            Console::out()
+                //                                    << "Page @ " << Console::color(ctAddress)
+                //                                    << QString("0x%0%6 belongs to module %5%1%6, section %5%2%6 (0x%3 - 0x%4)")
+                //                                       .arg(i, 0, 16)
+                //                                       .arg(currentModule.member("name").toString())
+                //                                       .arg(prevSectName)
+                //                                       .arg(prevSectAddr, 0, 16)
+                //                                       .arg(sectAddr-1, 0, 16)
+                //                                       .arg(Console::color(ctString))
+                //                                       .arg(Console::color(ctReset))
+                //                                    << endl;
+                //                            found = true;
+                //                        }
 
-//                }
+                //                        prevSectAddr = sectAddr;
+                //                        prevSectName = sectName;
+                //                    }
+
+                }
 
                 // Don't depend on the rule engine
                 currentModule = currentModule.member("list").member("next", BaseType::trAny, -1, ksNone);
@@ -848,6 +2719,8 @@ void Detect::hiddenCode(int index)
             } while (currentModule.address() != firstModule.address() &&
                      currentModule.address() != varModules->offset() - listOffset &&
                      !found);
+
+            if(found) continue;
 
             // Check VMAP
             if ((flags = inVmap(i, vmem))) {
@@ -932,24 +2805,26 @@ void Detect::hiddenCode(int index)
                    << hidden_pages << Console::color(ctReset) << " hidden pages.\n" << endl;
 
     // Verify hashes
-    verifyHashes(currentHashes);
+    PageVerifier pageVerifier = PageVerifier(_sym);
+    pageVerifier.verifyHashes(currentHashes);
 
     // Verify function pointers?
     if (_sym.memDumps().at(index)->map())
         verifyFunctionPointers(_sym.memDumps().at(index)->map());
 }
 
+void PageVerifier::operationProgress(){}
 
 void Detect::operationProgress()
 {
     // Print Status
-//    QString out;
-//    out += QString("\rProcessed %1 of %2 pages (%3%), elapsed %4").arg((_current_page - _first_page) / PAGE_SIZE)
-//            .arg((_final_page - _first_page) / PAGE_SIZE)
-//            .arg((int)(((_current_page - _first_page) / (float)(_final_page - _first_page)) * 100))
-//            .arg(elapsedTime());
+    //    QString out;
+    //    out += QString("\rProcessed %1 of %2 pages (%3%), elapsed %4").arg((_current_page - _first_page) / PAGE_SIZE)
+    //            .arg((_final_page - _first_page) / PAGE_SIZE)
+    //            .arg((int)(((_current_page - _first_page) / (float)(_final_page - _first_page)) * 100))
+    //            .arg(elapsedTime());
 
-//    shellOut(out, false);
+    //    shellOut(out, false);
 }
 
 
