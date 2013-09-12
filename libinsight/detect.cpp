@@ -18,6 +18,8 @@
 
 #include <limits>
 
+#define PAGE_SIZE MODULE_PAGE_SIZE
+
 #define MODULE_PAGE_SIZE 4096
 #define KERNEL_CODEPAGE_SIZE 2097152
 
