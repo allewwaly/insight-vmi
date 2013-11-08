@@ -54,6 +54,10 @@ Detect::Detect(KernelSymbols &sym) :
     }
 }
 
+Detect::~Detect(){
+    delete Functions;
+}
+
 #define GENERIC_NOP1 0x90
 
 #define P6_NOP1 GENERIC_NOP1
@@ -1179,6 +1183,8 @@ void PageVerifier::applyJumpEntries(QByteArray &textSegmentContent, PageVerifier
     //the entry type is 0 for disable and 1 for enable
 
     bool doPrint = false;
+    bool addJumpEntries = false;
+    if(_jumpEntries.size() == 0) addJumpEntries = true;
 
     quint32 numberOfJumpEntries = 0;
     quint64 textSegmentInMem = 0;
@@ -1240,7 +1246,7 @@ void PageVerifier::applyJumpEntries(QByteArray &textSegmentContent, PageVerifier
                 if(doPrint) Console::out() << " " << ((enabled) ? "enabled" : "disabled") << endl;
 
                 qint32 destination = entry->target - (entry->code + 5);
-                _jumpEntries.insert(patchOffset, destination);
+                if(addJumpEntries)_jumpEntries.insert(patchOffset, destination);
 
 
                 if(enabled)
@@ -1471,6 +1477,12 @@ PageVerifier::elfParseData PageVerifier::parseKernelModule(QString fileName, Ins
         }
     }
 
+
+    //Save the jump_labels section for later reference.
+
+    info = findElfSegmentWithName(fileContent, "__jump_table");
+    if(info.index != 0) context.jumpTable.append(info.index, info.size);
+
     updateKernelModule(context);
 
     //Initialize the symTable in the context for later reference
@@ -1519,11 +1531,6 @@ void PageVerifier::updateKernelModule(elfParseData &context)
 
     SegmentInfo info = findElfSegmentWithName(fileContent, "__mcount_loc");
     applyMcount(info, context, context.textSegmentContent);
-
-    //Save the jump_labels section for later reference.
-
-    info = findElfSegmentWithName(fileContent, "__jump_table");
-    if(info.index != 0) context.jumpTable.append(info.index, info.size);
 
     applyJumpEntries(context.textSegmentContent, context);
 
@@ -3073,6 +3080,8 @@ void Detect::hiddenCode(int index)
     // Verify hashes
     PageVerifier pageVerifier = PageVerifier(_sym);
     pageVerifier.verifyHashes(currentHashes);
+
+    delete currentHashes;
 
     pageVerifier.verifyParavirtFuncs();
 
