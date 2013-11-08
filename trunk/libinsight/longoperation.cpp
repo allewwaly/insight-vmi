@@ -56,7 +56,8 @@ QString LongOperation::elapsedTime() const
     // Print out some timing statistics
     int s = (_duration / 1000) % 60;
     int m = _duration / (60*1000);
-    return QString("%1:%2").arg(m).arg(s, 2, 10, QChar('0'));
+    int msec = _duration % 1000;
+    return QString("%1:%2.%3").arg(m).arg(s, 2, 10, QChar('0')).arg(msec, 3, 10, QChar('0'));
 }
 
 
