@@ -86,6 +86,7 @@ public:
     };
 
     Detect(KernelSymbols &sym);
+    ~Detect();
 
     void hiddenCode(int index);
     void operationProgress();
@@ -139,22 +140,29 @@ public:
 
     struct elfParseData{
         elfParseData() :
-            type(Detect::UNDEFINED),
+            fileContent(0), type(Detect::UNDEFINED),
             symindex(0), strindex(0),
             textSegment(), dataSegment(), vvarSegment(), dataNosaveSegment(), bssSegment(),
             fentryAddress(0), genericUnrolledAddress(0),
-            percpuDataSegment(0), textSegmentData(), vvarSegmentData(), dataNosaveSegmentData(),
-            jumpTable(), currentModule()
+            percpuDataSegment(0), textSegmentData(), textSegmentInitialized(0),
+            vvarSegmentData(), dataNosaveSegmentData(), smpOffsets(),
+            jumpTable(), textSegmentContent(), currentModule()
         {}
         elfParseData(Instance curMod) :
-            type(Detect::UNDEFINED),
+            fileContent(0), type(Detect::UNDEFINED),
             symindex(0), strindex(0),
             textSegment(), dataSegment(), vvarSegment(), dataNosaveSegment(), bssSegment(),
             fentryAddress(0), genericUnrolledAddress(0),
-            percpuDataSegment(0), textSegmentData(), vvarSegmentData(), dataNosaveSegmentData(),
-            jumpTable(), currentModule(curMod)
+            percpuDataSegment(0), textSegmentData(), textSegmentInitialized(0),
+            vvarSegmentData(), dataNosaveSegmentData(), smpOffsets(),
+            jumpTable(), textSegmentContent(), currentModule(curMod)
         {}
+        ~elfParseData();
 
+
+        FILE * fp;
+        char * fileContent;
+        long fileContentSize;
         Detect::PageType type;
         unsigned int symindex;
         unsigned int strindex;
@@ -169,15 +177,20 @@ public:
         quint64 genericUnrolledAddress;
         unsigned int percpuDataSegment;
         QList<PageData> textSegmentData;
+        quint32 textSegmentInitialized;
         QList<PageData> vvarSegmentData;
         QList<PageData> dataNosaveSegmentData;
+        QList<quint64> smpOffsets;
         QByteArray jumpTable;
+        QByteArray textSegmentContent;
         Instance currentModule;
     };
 
     PageVerifier(const KernelSymbols &sym);
 
     void verifyHashes(QMultiHash<quint64, Detect::ExecutablePage> *current);
+    void verifyParavirtFuncs();
+
     void operationProgress();
 
 private:
@@ -188,19 +201,23 @@ private:
 
     quint64 _current_index;
 
-    QMultiHash<QString, elfParseData> * ParsedExecutables;
-    QHash<QString, quint64> _symTable;
+    static QMultiHash<QString, elfParseData> * ParsedExecutables;
+    static QHash<QString, quint64> _symTable;
+    static QHash<QString, quint64> _funcTable;
 
-    QHash<quint64, qint32> _jumpEntries;
+    static QHash<quint64, qint32> _jumpEntries;
+
+    static QList<quint64> _paravirtJump;
+    static QList<quint64> _paravirtCall;
 
     QString findModuleFile(QString moduleName);
-    char* readFile(QString fileName);
+    void readFile(QString fileName, elfParseData &context);
     void writeSectionToFile(QString moduleName, quint32 sectionNumber, QByteArray data);
     void writeModuleToFile(QString origFileName, Instance currentModule, char * buffer );
-    quint64 findMemAddressOfSegment(elfParseData context, QString sectionName);
+    quint64 findMemAddressOfSegment(elfParseData &context, QString sectionName);
 
-    int apply_relocate(char * fileContent, Elf32_Shdr *sechdrs, elfParseData context);
-    int apply_relocate_add(char * fileContent, Elf64_Shdr *sechdrs, elfParseData context);
+    int apply_relocate(Elf32_Shdr *sechdrs, elfParseData &context);
+    int apply_relocate_add(Elf64_Shdr *sechdrs, elfParseData &context);
 
 
     void  add_nops(void *insns, quint8 len);
@@ -219,23 +236,27 @@ private:
 
     quint64 get_call_destination(quint32 type);
 
-    void applyAltinstr(char * fileContent, SegmentInfo info, elfParseData context);
-    void applyParainstr(SegmentInfo info, elfParseData context);
-    void applyMcount(SegmentInfo info, elfParseData context, QByteArray &segmentData);
-    void applyTracepoints(SegmentInfo tracePoint, SegmentInfo rodata, elfParseData context, QByteArray &segmentData);
-    void applyJumpEntries(QByteArray &textSegmentContent, PageVerifier::elfParseData context, quint64 jumpStart = 0, quint64 jumpStop = 0);
+    void applyAltinstr(SegmentInfo info, elfParseData &context);
+    void applyParainstr(SegmentInfo info, elfParseData &context);
+    void applySmpLocks(SegmentInfo info, elfParseData &context);
+    void applyMcount(SegmentInfo info, elfParseData &context, QByteArray &segmentData);
+    void applyTracepoints(SegmentInfo tracePoint, SegmentInfo rodata, elfParseData &context, QByteArray &segmentData);
+    void applyJumpEntries(QByteArray &textSegmentContent, PageVerifier::elfParseData &context, quint64 jumpStart = 0, quint64 jumpStop = 0);
 
     SegmentInfo findElfSegmentWithName(char * elfEhdr, QString sectionName);
     Instance findModuleByName(QString moduleName);
-    quint64 findElfAddressOfVariable(char * elfEhdr, elfParseData context, QString symbolName);
+    quint64 findElfAddressOfVariable(char * elfEhdr, elfParseData &context, QString symbolName);
 
     elfParseData parseKernelModule(QString fileName, Instance currentModule);
+    void updateKernelModule(elfParseData &context);
     void loadElfModule(QString moduleName, Instance currentModule);
 
     elfParseData parseKernel(QString fileName);
     void loadElfKernel();
 
     quint64 checkCodePage(QString moduleName, quint32 sectionNumber, Detect::ExecutablePage currentPage);
+
+    void extractVDSOPage(quint64 address);
 
 };
 

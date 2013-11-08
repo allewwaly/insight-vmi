@@ -18,6 +18,9 @@
 
 #include <limits>
 
+#include <sys/types.h>
+#include <sys/mman.h>
+
 #define PAGE_SIZE MODULE_PAGE_SIZE
 
 #define MODULE_PAGE_SIZE 4096
@@ -63,6 +66,16 @@ Detect::Detect(KernelSymbols &sym) :
 #define P6_NOP8 0x0f,0x1f,0x84,0x00,0,0,0,0
 #define P6_NOP5_ATOMIC P6_NOP5
 
+#define K8_NOP1 GENERIC_NOP1
+#define K8_NOP2 0x66,K8_NOP1
+#define K8_NOP3 0x66,K8_NOP2
+#define K8_NOP4 0x66,K8_NOP3
+#define K8_NOP5 K8_NOP3,K8_NOP2
+#define K8_NOP6 K8_NOP3,K8_NOP3
+#define K8_NOP7 K8_NOP4,K8_NOP3
+#define K8_NOP8 K8_NOP4,K8_NOP4
+#define K8_NOP5_ATOMIC 0x66,K8_NOP4
+
 #define ASM_NOP_MAX 8
 
 static const unsigned char p6nops[] =
@@ -78,6 +91,19 @@ static const unsigned char p6nops[] =
         P6_NOP5_ATOMIC
 };
 
+static const unsigned char k8nops[] =
+{
+        K8_NOP1,
+        K8_NOP2,
+        K8_NOP3,
+        K8_NOP4,
+        K8_NOP5,
+        K8_NOP6,
+        K8_NOP7,
+        K8_NOP8,
+        K8_NOP5_ATOMIC
+};
+
 static const unsigned char * const p6_nops[ASM_NOP_MAX+2] =
 {
         NULL,
@@ -91,6 +117,21 @@ static const unsigned char * const p6_nops[ASM_NOP_MAX+2] =
         p6nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
         p6nops + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8,
 };
+
+static const unsigned char * const k8_nops[ASM_NOP_MAX+2] =
+{
+        NULL,
+        k8nops,
+        k8nops + 1,
+        k8nops + 1 + 2,
+        k8nops + 1 + 2 + 3,
+        k8nops + 1 + 2 + 3 + 4,
+        k8nops + 1 + 2 + 3 + 4 + 5,
+        k8nops + 1 + 2 + 3 + 4 + 5 + 6,
+        k8nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
+        k8nops + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8,
+};
+
 
 
 //TODO Use QT Types
@@ -132,14 +173,35 @@ struct tracepoint {
     struct tracepoint_func *funcs;
 };
 
+QMultiHash<QString, PageVerifier::elfParseData> * PageVerifier::ParsedExecutables = NULL;
+QHash<QString, quint64> PageVerifier::_symTable;
+QHash<QString, quint64> PageVerifier::_funcTable;
+
+QHash<quint64, qint32> PageVerifier::_jumpEntries;
+
+QList<quint64> PageVerifier::_paravirtJump;
+QList<quint64> PageVerifier::_paravirtCall;
+
 PageVerifier::PageVerifier(const KernelSymbols &sym) :
-    _sym(sym), _current_index(0), ParsedExecutables(0), _symTable(), _jumpEntries()
+    _sym(sym), _current_index(0)
+    //_symTable(), _funcTable(),
+    //_jumpEntries(), _paravirtJump(), _paravirtCall()
 {
-    ParsedExecutables = new QMultiHash<QString, elfParseData>();
+    if(PageVerifier::ParsedExecutables == NULL){
+        PageVerifier::ParsedExecutables = new QMultiHash<QString, elfParseData>();
+    }
     _vmem = _sym.memDumps().at(_current_index)->vmem();
 
     //TODO Find correct nops => http://lxr.free-electrons.com/source/arch/x86/kernel/alternative.c#L230
-    ideal_nops = p6_nops;
+    ideal_nops = k8_nops;
+}
+
+
+PageVerifier::elfParseData::~elfParseData(){
+    //if(this->fileContent != NULL){
+    //    munmap(this->fileContent, this->fileContentSize);
+    //}
+    //fclose(this->fp);
 }
 
 /**
@@ -150,9 +212,15 @@ QString PageVerifier::findModuleFile(QString moduleName)
 {
     moduleName = moduleName.trimmed();
 
-    //Some Filenames are not exactly the modulename. This is currently cheating but ok :-)
-    if (moduleName == "kvm_intel") moduleName = QString("kvm-intel");
-    if (moduleName == "i2c_piix4") moduleName = QString("i2c-piix4");
+//    //Some Filenames are not exactly the modulename. This is currently cheating but ok :-)
+//    if (moduleName == "kvm_intel") moduleName = QString("kvm-intel");
+//    else if (moduleName == "i2c_piix4") moduleName = QString("i2c-piix4");
+//    else if (moduleName == "snd_hda_codec") moduleName = QString("snd-hda-codec");
+//    else if (moduleName == "snd_hda_intel") moduleName = QString("snd-hda-intel");
+//    else if (moduleName == "snd_pcm") moduleName = QString("snd-pcm");
+//    else if (moduleName == "snd_timer") moduleName = QString("snd-timer");
+//    else if (moduleName == "snd_hwdep") moduleName = QString("snd-hwdep");
+//    else if (moduleName == "snd_page_alloc") moduleName = QString("snd-page-alloc");
 
     //TODO get basedir from config or parameter
     QString baseDirName = QString(MODULE_BASE_DIR);
@@ -162,7 +230,10 @@ QString PageVerifier::findModuleFile(QString moduleName)
         dirIt.next();
         if (QFileInfo(dirIt.filePath()).isFile())
         {
-            if (QFileInfo(dirIt.filePath()).suffix() == "ko" && QFileInfo(dirIt.filePath()).baseName() == moduleName)
+            if (QFileInfo(dirIt.filePath()).suffix() == "ko" &&
+                    (QFileInfo(dirIt.filePath()).baseName() == moduleName ||
+                     QFileInfo(dirIt.filePath()).baseName() == moduleName.replace(QString("_"), QString("-")) ||
+                     QFileInfo(dirIt.filePath()).baseName() == moduleName.replace(QString("-"), QString("_"))))
             {
                 //Console::out() << moduleName << ": " << QFileInfo(dirIt.filePath()).baseName() << "\n" << endl;
                 return dirIt.filePath();
@@ -178,34 +249,25 @@ QString PageVerifier::findModuleFile(QString moduleName)
   * Read a File to Memory
   * Important: The buffer must be freed after it was used!
   */
-char* PageVerifier::readFile(QString fileName){
-    char *source = NULL;
-    FILE *fp = fopen(fileName.toStdString().c_str(), "r+b");
-    if (fp != NULL) {
+void PageVerifier::readFile(QString fileName, elfParseData &context){
+    context.fp = fopen(fileName.toStdString().c_str(), "r+b");
+    if (context.fp != NULL) {
         /* Go to the end of the file. */
-        if (fseek(fp, 0L, SEEK_END) == 0) {
+        if (fseek(context.fp, 0L, SEEK_END) == 0) {
             /* Get the size of the file. */
-            long bufsize = ftell(fp);
-            if (bufsize == -1) { /* Error */ }
+            context.fileContentSize = ftell(context.fp);
+            if (context.fileContentSize == -1) { /* Error */ }
 
-            /* Allocate our buffer to that size. */
-            source = (char *)malloc(sizeof(char) * (bufsize + 1));
-
-            /* Go back to the start of the file. */
-            if (fseek(fp, 0L, SEEK_SET) == 0) { /* Error */ }
-
-            /* Read the entire file into memory. */
-            size_t newLen = fread(source, sizeof(char), bufsize, fp);
-            if (newLen == 0) {
-                debugerr("Error reading file");
-            } else {
-                source[++newLen] = '\0'; /* Just to be safe. */
+            //MMAP the file to memory
+            context.fileContent = (char*) mmap(0, context.fileContentSize, PROT_READ | PROT_WRITE, MAP_PRIVATE, fileno(context.fp), 0);
+            if (context.fileContent == MAP_FAILED) {
+                debugerr("MMAP failed!!!\n");
+                context.fileContent = NULL;
             }
         }
-        fclose(fp);
     }
 
-    return source;
+    return;
 }
 
 void PageVerifier::writeSectionToFile(QString moduleName, quint32 sectionNumber, QByteArray data){
@@ -221,6 +283,16 @@ void PageVerifier::writeSectionToFile(QString moduleName, quint32 sectionNumber,
         stream.writeRawData(data.data(), data.size());
         file.close();
     }
+}
+
+
+void PageVerifier::extractVDSOPage(quint64 address){
+    VirtualMemory *vmem = _sym.memDumps().at(0)->vmem();
+
+    QByteArray data;
+    data.resize(0x2000);
+    vmem->readAtomic(address + 0xffffffff80000000, data.data(), data.size());
+    writeSectionToFile("vdso", 0, data);
 }
 
 void PageVerifier::writeModuleToFile(QString origFileName, Instance currentModule, char * buffer ){
@@ -245,7 +317,7 @@ void PageVerifier::writeModuleToFile(QString origFileName, Instance currentModul
     }
 }
 
-quint64 PageVerifier::findMemAddressOfSegment(elfParseData context, QString sectionName)
+quint64 PageVerifier::findMemAddressOfSegment(elfParseData &context, QString sectionName)
 {
     //Find the address of the current section in the memory image
     //Get Number of sections in kernel image
@@ -260,6 +332,13 @@ quint64 PageVerifier::findMemAddressOfSegment(elfParseData context, QString sect
         {
             return attr.member("address").toULong();
         }
+    }
+
+    //If the searching for the .bss section
+    //This section is right after the modules struct
+    if (sectionName.compare(QString(".bss")) == 0)
+    {
+        return context.currentModule.address() + context.currentModule.size();
     }
     return 0;
 }
@@ -289,7 +368,7 @@ PageVerifier::SegmentInfo PageVerifier::findElfSegmentWithName(char * elfEhdr, Q
     return SegmentInfo();
 }
 
-quint64 PageVerifier::findElfAddressOfVariable(char * elfEhdr, PageVerifier::elfParseData context, QString symbolName)
+quint64 PageVerifier::findElfAddressOfVariable(char * elfEhdr, PageVerifier::elfParseData &context, QString symbolName)
 {
     if(elfEhdr[4] == ELFCLASS32)
     {
@@ -489,14 +568,25 @@ quint8 PageVerifier::paravirt_patch_default(quint32 type, quint16 clobbers, void
              type == pv_cpu_opsOffset + pv_cpu_ops.memberOffset("irq_enable_sysexit") ||
              type == pv_cpu_opsOffset + pv_cpu_ops.memberOffset("usergs_sysret32") ||
              type == pv_cpu_opsOffset + pv_cpu_ops.memberOffset("usergs_sysret64"))
+    {
         /* If operation requires a jmp, then jmp */
+        Console::out() << "Patching jump!" << endl;
         ret = paravirt_patch_jmp(insnbuf, opfunc, addr, len);
+        if (!_paravirtJump.contains(opfunc))
+        {
+            _paravirtJump.append(opfunc);
+        }
+    }
     else
     {
         /* Otherwise call the function; assume target could
            clobber any caller-save reg */
         ret = paravirt_patch_call(insnbuf, opfunc, CLBR_ANY,
                                   addr, clobbers, len);
+        if (!_paravirtCall.contains(opfunc))
+        {
+            _paravirtCall.append(opfunc);
+        }
     }
     return ret;
 }
@@ -560,9 +650,8 @@ void  PageVerifier::add_nops(void *insns, quint8 len)
     }
 }
 
-int PageVerifier::apply_relocate(char * fileContent, Elf32_Shdr *sechdrs, elfParseData context)
+int PageVerifier::apply_relocate(Elf32_Shdr *sechdrs, elfParseData &context)
 {
-    Q_UNUSED(fileContent);
     Q_UNUSED(sechdrs);
     Q_UNUSED(context);
     debugerr("Function apply_relocate currently not implemented");
@@ -575,8 +664,10 @@ int PageVerifier::apply_relocate(char * fileContent, Elf32_Shdr *sechdrs, elfPar
   * Taken directly out of module.c from linux kernel
   * This function handles the x86_64 relocations.
   */
-int PageVerifier::apply_relocate_add(char * fileContent, Elf64_Shdr *sechdrs, elfParseData context)
+int PageVerifier::apply_relocate_add(Elf64_Shdr *sechdrs, elfParseData &context)
 {
+    char * fileContent = context.fileContent;
+
     Elf64_Rela *rel = (Elf64_Rela *) (fileContent + sechdrs[context.relsec].sh_offset);
     Elf32_Word sectionId = sechdrs[context.relsec].sh_info;
     QString sectionName = QString(fileContent + sechdrs[context.shstrindex].sh_offset + sechdrs[sectionId].sh_name);
@@ -627,8 +718,8 @@ int PageVerifier::apply_relocate_add(char * fileContent, Elf64_Shdr *sechdrs, el
         /////////////////////////////////////////////////////////////////////
         //if ((unsigned long) locInMem == 0xffffffffa0000006) doPrint = true;
         //if (rel[i].r_offset == 0xf1f) doPrint = true;
-        //if (symbolName.compare("copy_user_generic_unrolled") == 0) doPrint = true;
-        //if(context.currentModule.member("name").toString().compare("\"drm\"") == 0 &&
+        //if (symbolName.compare("snd_pcm_set_sync") == 0) doPrint = true;
+        //if(context.currentModule.member("name").toString().compare("\"virtio_balloon\"") == 0 && rel[i].r_offset == 0xb43) doPrint = true;
         //        sectionName.compare(".altinstructions") == 0 && i <= 1) doPrint = true;
         /////////////////////////////////////////////////////////////////////
 
@@ -840,10 +931,12 @@ overflow:
     return -ENOEXEC;
 }
 
-void PageVerifier::applyAltinstr(char * fileContent, SegmentInfo info, elfParseData context)
+void PageVerifier::applyAltinstr(SegmentInfo info, elfParseData &context)
 {
     bool doPrint = false;
     //if(context.type == Detect::KERNEL_CODE) doPrint = true;
+
+    char * fileContent = context.fileContent;
 
     struct alt_instr *start = (struct alt_instr*) info.index;
     struct alt_instr *end = (struct alt_instr*) (info.index + info.size);
@@ -938,7 +1031,7 @@ void PageVerifier::applyAltinstr(char * fileContent, SegmentInfo info, elfParseD
     }
 }
 
-void PageVerifier::applyParainstr(SegmentInfo info, elfParseData context)
+void PageVerifier::applyParainstr(SegmentInfo info, elfParseData &context)
 {
     struct paravirt_patch_site *start = (struct paravirt_patch_site *) info.index;
     struct paravirt_patch_site *end = (struct paravirt_patch_site *) (info.index + info.size);
@@ -988,10 +1081,76 @@ void PageVerifier::applyParainstr(SegmentInfo info, elfParseData context)
     }
 }
 
-void PageVerifier::applyMcount(SegmentInfo info, PageVerifier::elfParseData context, QByteArray &segmentData){
+#define X86_FEATURE_UP          (3*32+ 9) /* smp kernel running on up */
+
+void PageVerifier::applySmpLocks(SegmentInfo info, elfParseData &context)
+{
+    bool doPrint = false;
+    //if(context.type == Detect::KERNEL_CODE) doPrint = true;
+
+    char * fileContent = context.fileContent;
+
+    if(context.currentModule.member("name").toString().compare("\"e1000\"") == 0) doPrint = false;
+
+    qint32 * smpLocksStart = (qint32 *) info.index;;
+    qint32 * smpLocksStop = (qint32 *) (info.index + info.size);
+
+    Instance x86_capability = _sym.factory().
+            findVarByName("boot_cpu_data")->
+            toInstance(_vmem, BaseType::trLexical, ksAll).
+            member("x86_capability");
+
+    unsigned char lock = 0;
+
+    if (!((x86_capability.arrayElem(X86_FEATURE_UP / 32).toUInt32() >> (X86_FEATURE_UP % 32)) & 0x1))
+    {
+        /* turn lock prefix into DS segment override prefix */
+        if(doPrint) Console::out() << " No smp" << endl;
+        lock = 0x3e;
+
+    }
+    else
+    {
+        /* turn DS segment override prefix into lock prefix */
+        if(doPrint) Console::out() << " Smp !" << endl;
+        lock = 0xf0;
+    }
+
+
+    quint64 smpLockSegmentInMem = 0;
+    quint64 textSegmentInMem = 0;
+
+    if(context.type == Detect::KERNEL_CODE)
+    {
+        smpLockSegmentInMem = findElfSegmentWithName(fileContent, ".smp_locks").address;
+        textSegmentInMem = findElfSegmentWithName(fileContent, ".text").address;
+    }
+    else if(context.type == Detect::MODULE)
+    {
+        smpLockSegmentInMem = findMemAddressOfSegment(context, ".smp_locks");
+        textSegmentInMem = findMemAddressOfSegment(context, ".text");
+    }
+
+    for(qint32 * poff = smpLocksStart; poff < smpLocksStop ; poff++)
+    {
+        quint8 *ptr = (quint8 *)poff + *poff;
+
+
+        //Adapt offset in ELF
+        qint32 offset = (info.index - context.textSegment.index) - (smpLockSegmentInMem - textSegmentInMem);
+        ptr -= offset;
+
+        if(doPrint) Console::out() << hex << "Applying SMP reloc @ " << (quint64) ptr << " ( " << (quint8) *ptr << " ) " << dec << endl;
+        *ptr = lock;
+
+        context.smpOffsets.append((quint64) ptr - (quint64) context.textSegment.index);
+    }
+}
+
+void PageVerifier::applyMcount(SegmentInfo info, PageVerifier::elfParseData &context, QByteArray &segmentData){
     //See ftrace_init_module in kernel/trace/ftrace.c
 
-    quint64 * mcountStart = (quint64 *)info.index;;
+    quint64 * mcountStart = (quint64 *) info.index;;
     quint64 * mcountStop = (quint64 *) (info.index + info.size);
 
     quint64 textSegmentInMem = 0;
@@ -1013,7 +1172,7 @@ void PageVerifier::applyMcount(SegmentInfo info, PageVerifier::elfParseData cont
     }
 }
 
-void PageVerifier::applyJumpEntries(QByteArray &textSegmentContent, PageVerifier::elfParseData context, quint64 jumpStart, quint64 jumpStop)
+void PageVerifier::applyJumpEntries(QByteArray &textSegmentContent, PageVerifier::elfParseData &context, quint64 jumpStart, quint64 jumpStop)
 {
     //Apply the jump tables after the segments are adjacent
     //jump_label_apply_nops() => http://lxr.free-electrons.com/source/arch/x86/kernel/module.c#L205
@@ -1099,9 +1258,12 @@ void PageVerifier::applyJumpEntries(QByteArray &textSegmentContent, PageVerifier
     }
 }
 
-void PageVerifier::applyTracepoints(SegmentInfo tracePoint, SegmentInfo rodata, PageVerifier::elfParseData context, QByteArray &segmentData){
+void PageVerifier::applyTracepoints(SegmentInfo tracePoint, SegmentInfo rodata, PageVerifier::elfParseData &context, QByteArray &segmentData){
 
     //See tracepoints in kernel/tracepoint.c
+    Q_UNUSED(rodata);
+    Q_UNUSED(context);
+    Q_UNUSED(segmentData);
 
     quint64* tracepointStart = (quint64*) tracePoint.index;;
     quint64* tracepointStop = (quint64*) (tracePoint.index + tracePoint.size);
@@ -1155,96 +1317,21 @@ void PageVerifier::applyTracepoints(SegmentInfo tracePoint, SegmentInfo rodata, 
 PageVerifier::elfParseData PageVerifier::parseKernelModule(QString fileName, Instance currentModule)
 {
     char *tempBuf;
-    char * fileContent = readFile(fileName);
 
     elfParseData context = elfParseData(currentModule);
 
-    if (!fileContent){
+    readFile(fileName, context);
+
+    char * fileContent = context.fileContent;
+
+    if (!context.fileContent){
         debugerr("Error loading file\n");
-        free(fileContent);
         return context;
     }
     context.type = Detect::MODULE;
 
     if(fileContent[4] == ELFCLASS32){
-
         //TODO also implement for 32 bit guests
-//        if(!(_sym.memSpecs().arch & MemSpecs::Architecture::ar_i386))
-//        {
-//            debugerr("Kernel Modules ELF Binary has the wrong architecture!");
-//            return context;
-//        }
-
-//        Elf32_Ehdr *elf32Ehdr;
-//        Elf32_Shdr *elf32Shdr;
-//        Console::out() << "Class: ELF32" << endl;
-
-//        /* read the ELF header */
-//        elf32Ehdr = (Elf32_Ehdr *) fileContent;
-//        if (elf32Ehdr->e_type != ET_REL){
-//            debugerr("Not a relocatable module");
-//            free(fileContent);
-//            return context;
-//        }
-
-//        Console::out() << "Number of Ehdrs: " << elf32Ehdr->e_shnum << endl;
-
-//        context.shstrindex = elf32Ehdr->e_shstrndx;
-
-//        /* set the file pointer to the section header offset and read it */
-//        elf32Shdr = (Elf32_Shdr *) (fileContent + elf32Ehdr->e_shoff);
-
-//        /* find sections SHT_SYMTAB, SHT_STRTAB, ".text", ".exit.text", ".data..percpu"  */
-//        for(unsigned int i = 0; i < elf32Ehdr->e_shnum; i++)
-//        {
-//            tempBuf = fileContent + elf32Shdr[elf32Ehdr->e_shstrndx].sh_offset + elf32Shdr[i].sh_name;
-//            if ((elf32Shdr[i].sh_type == SHT_SYMTAB)){
-//                context.symindex = i;
-//                context.strindex =  elf32Shdr[i].sh_link;
-//            }
-//            else if (strcmp(tempBuf, ".text") == 0){
-//                context.textSegment = fileContent + elf32Shdr[i].sh_offset;
-//                context.textSegmentSize = elf32Shdr[i].sh_size;
-//            }
-//            else if (strcmp(tempBuf, ".exit.text") == 0){
-//                context.exitTextSegment = fileContent + elf32Shdr[i].sh_offset;
-//                context.exitTextSegmentSize = elf32Shdr[i].sh_size;
-//            }
-//            else if (strcmp(tempBuf, ".data..percpu") == 0){
-//                context.percpuDataSegment = i;
-//            }
-//        }
-
-//        ///* loop through every section */
-//        for(unsigned int i = 0; i < elf32Ehdr->e_shnum; i++)
-//        {
-
-//            /* if Elf32_Shdr.sh_addr isn't 0 the section will appear in memory*/
-//            tempBuf = fileContent + elf32Shdr[elf32Ehdr->e_shstrndx].sh_offset + elf32Shdr[i].sh_name;
-//            unsigned int infosec = elf32Shdr[i].sh_info;
-
-//            /* Not a valid relocation section? */
-//            if (infosec >= elf32Ehdr->e_shnum)
-//                continue;
-
-//            /* Don't bother with non-allocated sections */
-//            if (!(elf32Shdr[infosec].sh_flags & SHF_ALLOC))
-//                continue;
-
-//            if (elf32Shdr[i].sh_type == SHT_REL){
-//                Console::out() << "Section '" << tempBuf << "': apply_relocate" << endl;
-//                context.relsec = i;
-//                apply_relocate(fileContent, elf32Shdr, context);
-//            }
-//            else if (elf32Shdr[i].sh_type == SHT_RELA){
-//                //apply_relocate_add(info->sechdrs, info->strtab, info->index.sym, i, mod);
-//                Console::out() << "Section '" << tempBuf << "': apply_relocate_add" << endl;
-//            }
-//            //printf("Section '%s' with type: %i starts at 0x%08X and ends at 0x%08X\n", tempBuf, elf32Shdr[i].sh_type, elf32Shdr[i].sh_offset, elf32Shdr[i].sh_offset + elf32Shdr[i].sh_size);
-
-//        }
-
-
     }else if(fileContent[4] == ELFCLASS64){
         if(!(_sym.memSpecs().arch & MemSpecs::Architecture::ar_x86_64))
         {
@@ -1259,7 +1346,6 @@ PageVerifier::elfParseData PageVerifier::parseKernelModule(QString fileName, Ins
         elf64Ehdr = (Elf64_Ehdr *) fileContent;
         if (elf64Ehdr->e_type != ET_REL){
             debugerr("Not a relocatable module");
-            free(fileContent);
             return context;
         }
 
@@ -1298,6 +1384,7 @@ PageVerifier::elfParseData PageVerifier::parseKernelModule(QString fileName, Ins
                     {
                         QStringList dependencies = string.split("=").at(1).split(',');
 
+                        //Console::out() << "Parsing dependencies:"<< endl;
                         for(int i = 0; i < dependencies.size(); i++)
                         {
                             if (dependencies.at(i).compare(""))
@@ -1305,6 +1392,7 @@ PageVerifier::elfParseData PageVerifier::parseKernelModule(QString fileName, Ins
                                 loadElfModule(dependencies.at(i), findModuleByName(dependencies.at(i)));
                             }
                         }
+                        //Console::out() << "Done Parsing dependencies:"<< endl;
                         break;
                     }
                     modinfo += string.length() + 1;
@@ -1337,7 +1425,7 @@ PageVerifier::elfParseData PageVerifier::parseKernelModule(QString fileName, Ins
             else if (elf64Shdr[i].sh_type == SHT_RELA){
 
                 context.relsec = i;
-                apply_relocate_add(fileContent, elf64Shdr, context);
+                apply_relocate_add(elf64Shdr, context);
                 //Console::out() << "Section '" << tempBuf << "': apply_relocate_add" << endl;
             }
             //printf("Section '%s' with type: %i starts at 0x%08X and ends at 0x%08X\n", tempBuf, elf64Shdr[i].sh_type, elf64Shdr[i].sh_offset, elf64Shdr[i].sh_offset + elf64Shdr[i].sh_size);
@@ -1348,41 +1436,19 @@ PageVerifier::elfParseData PageVerifier::parseKernelModule(QString fileName, Ins
     //module_finalize  => http://lxr.free-electrons.com/source/arch/x86/kernel/module.c#L167
 
     SegmentInfo info = findElfSegmentWithName(fileContent, ".altinstructions");
-    if (info.index) applyAltinstr(fileContent, info, context);
-
-    info = findElfSegmentWithName(fileContent, ".smp_locks");
-    if (info.index && context.textSegment.index) { //locks
-
-        //TODO implement correctly!
-        //Currently not required, as we are running on a single core machine
-
-//        qint32 *start = (qint32 *) info.index;
-//        qint32 *end = (qint32 *) (info.index + info.size);
-//        quint8 *text = (quint8 *) context.textSegment.index;
-//        quint8 *text_end = (quint8 *) context.textSegment.index + context.textSegment.size;
-
-//        const qint32 *poff;
-
-//        for (poff = start; poff < end; poff++)
-//        {
-//            quint8 *ptr = (quint8 *)poff + *poff;
-
-//            if (!*poff || ptr < text || ptr >= text_end) continue;
-
-//            /* turn lock prefix into DS segment override prefix */
-//            if (*ptr == 0xf0)
-//                memcpy(ptr, ((unsigned char []){0x3E}), 1);
-//        }
-    }
+    if (info.index) applyAltinstr(info, context);
 
     info = findElfSegmentWithName(fileContent, ".parainstructions");
     if (info.index) applyParainstr(info, context);
 
+    info = findElfSegmentWithName(fileContent, ".smp_locks");
+    if (info.index) applySmpLocks(info, context);
+
     //Content of text section in memory:
     //same as the sections in the elf binary
 
-    QByteArray textSegmentContent = QByteArray();
-    textSegmentContent.append(context.textSegment.index, context.textSegment.size);
+    context.textSegmentContent.clear();
+    context.textSegmentContent.append(context.textSegment.index, context.textSegment.size);
 
     if(fileContent[4] == ELFCLASS32)
     {
@@ -1400,41 +1466,12 @@ PageVerifier::elfParseData PageVerifier::parseKernelModule(QString fileName, Ins
                     sectionName.compare(".text") != 0 &&
                     sectionName.compare(".init.text") != 0)
             {
-                textSegmentContent.append(fileContent + elf64Shdr[i].sh_offset, elf64Shdr[i].sh_size);
+                context.textSegmentContent.append(fileContent + elf64Shdr[i].sh_offset, elf64Shdr[i].sh_size);
             }
         }
     }
-    info = findElfSegmentWithName(fileContent, "__mcount_loc");
-    applyMcount(info, context, textSegmentContent);
 
-    //Save the jump_labels section for later reference.
-
-    info = findElfSegmentWithName(fileContent, "__jump_table");
-    if(info.index != 0) context.jumpTable.append(info.index, info.size);
-
-    applyJumpEntries(textSegmentContent, context);
-
-    //Console::out() << "The Module got " << textSegmentContent.size() / PAGE_SIZE << " pages." << endl;
-
-    // Hash
-    QCryptographicHash hash(QCryptographicHash::Sha1);
-
-    for(int i = 0 ; i <= textSegmentContent.size() / MODULE_PAGE_SIZE; i++)
-    {
-        PageData page = PageData();
-        hash.reset();
-        // Caclulate hash of one segment at the ith the offset
-        QByteArray segment = textSegmentContent.mid(i * MODULE_PAGE_SIZE, MODULE_PAGE_SIZE);
-        if (!segment.isEmpty())
-        {
-            segment = segment.leftJustified(MODULE_PAGE_SIZE, 0);
-            page.content = segment;
-            hash.addData(page.content);
-            page.hash = hash.result();
-            context.textSegmentData.append(page);
-        }
-        //Console::out() << "The " << i << "th segment got a hash of: " << segmentHashes.last().toHex() << " Sections." << endl;
-    }
+    updateKernelModule(context);
 
     //Initialize the symTable in the context for later reference
     if(fileContent[4] == ELFCLASS32)
@@ -1455,20 +1492,70 @@ PageVerifier::elfParseData PageVerifier::parseKernelModule(QString fileName, Ins
             {
                 QString symbolName = QString(&((fileContent + elf64Shdr[context.strindex].sh_offset)[sym->st_name]));
                 quint64 symbolAddress = sym->st_value;
-                _symTable.insert(symbolName, symbolAddress);
+                if(!_symTable.contains(symbolName))
+                {
+                    _symTable.insert(symbolName, symbolAddress);
+                }
+            }
+            if((ELF64_ST_TYPE(sym->st_info) & STT_FUNC) && ELF64_ST_BIND(sym->st_info) & STB_GLOBAL)
+            {
+                QString symbolName = QString(&((fileContent + elf64Shdr[context.strindex].sh_offset)[sym->st_name]));
+                quint64 symbolAddress = sym->st_value;
+                if(!_funcTable.contains(symbolName))
+                {
+                    _funcTable.insert(symbolName, symbolAddress);
+                }
             }
         }
     }
 
-
-
-    writeModuleToFile(fileName, currentModule, fileContent );
-    free(fileContent);
+    //writeModuleToFile(fileName, currentModule, fileContent );
     return context;
 }
 
+void PageVerifier::updateKernelModule(elfParseData &context)
+{
+    char * fileContent = context.fileContent;
+
+    SegmentInfo info = findElfSegmentWithName(fileContent, "__mcount_loc");
+    applyMcount(info, context, context.textSegmentContent);
+
+    //Save the jump_labels section for later reference.
+
+    info = findElfSegmentWithName(fileContent, "__jump_table");
+    if(info.index != 0) context.jumpTable.append(info.index, info.size);
+
+    applyJumpEntries(context.textSegmentContent, context);
+
+    //Console::out() << "The Module got " << textSegmentContent.size() / PAGE_SIZE << " pages." << endl;
+
+    // Hash
+    QCryptographicHash hash(QCryptographicHash::Sha1);
+
+    context.textSegmentData.clear();
+
+    for(int i = 0 ; i <= context.textSegmentContent.size() / MODULE_PAGE_SIZE; i++)
+    {
+        PageData page = PageData();
+        hash.reset();
+        // Caclulate hash of one segment at the ith the offset
+        QByteArray segment = context.textSegmentContent.mid(i * MODULE_PAGE_SIZE, MODULE_PAGE_SIZE);
+        if (!segment.isEmpty())
+        {
+            segment = segment.leftJustified(MODULE_PAGE_SIZE, 0);
+            page.content = segment;
+            hash.addData(page.content);
+            page.hash = hash.result();
+            context.textSegmentData.append(page);
+        }
+        //Console::out() << "The " << i << "th segment got a hash of: " << segmentHashes.last().toHex() << " Sections." << endl;
+    }
+}
+
 void PageVerifier::loadElfModule(QString moduleName, Instance currentModule){
-    if(!ParsedExecutables->contains(moduleName))
+    //Console::out() << "Parsing Module: "<< moduleName << endl;
+
+    if(!ParsedExecutables->contains(moduleName.replace(QString("-"), QString("_"))))
     {
         QString fileName = findModuleFile(moduleName);
         if(fileName == "")
@@ -1479,18 +1566,55 @@ void PageVerifier::loadElfModule(QString moduleName, Instance currentModule){
 
         elfParseData context = parseKernelModule(fileName, currentModule);
 
-        ParsedExecutables->insert(moduleName, context);
+        ParsedExecutables->insert(moduleName.replace(QString("-"), QString("_")) , context);
+
+        return;
     }
+    elfParseData context = ParsedExecutables->value(moduleName.replace(QString("-"), QString("_")));
+    quint64 oldAddress = findMemAddressOfSegment(context, QString(".text"));
+
+    quint64 newAddress = 0;
+
+    Instance attrs = currentModule.member("sect_attrs", BaseType::trAny);
+    uint attr_cnt = attrs.member("nsections").toUInt32();
+
+    //Now compare all section names until we find the correct section.
+    for (uint j = 0; j < attr_cnt; ++j) {
+        Instance attr = attrs.member("attrs").arrayElem(j);
+        if(attr.member("name").toString().remove(QChar('"'), Qt::CaseInsensitive).
+                compare(QString(".text")) == 0)
+        {
+            newAddress = attr.member("address").toULong();
+        }
+    }
+
+    if (oldAddress != newAddress){
+        debugerr("Reloading module " << moduleName.replace(QString("-"), QString("_")));
+        //TODO implement this correct!!!
+        if(context.fileContent != NULL){
+            munmap(context.fileContent, context.fileContentSize);
+        }
+        fclose(context.fp);
+
+        ParsedExecutables->remove(moduleName.replace(QString("-"), QString("_")));
+        QString fileName = findModuleFile(moduleName);
+        context = parseKernelModule(fileName, currentModule);
+
+        ParsedExecutables->insert(moduleName.replace(QString("-"), QString("_")) , context);
+    }
+
 }
 
 PageVerifier::elfParseData PageVerifier::parseKernel(QString fileName)
 {
-    char * fileContent = readFile(fileName);
     elfParseData context = elfParseData();
 
-    if (!fileContent){
+    readFile(fileName, context);
+
+    char * fileContent = context.fileContent;
+
+    if (!context.fileContent){
         debugerr("Error loading file\n");
-        free(fileContent);
         return context;
     }
 
@@ -1542,11 +1666,14 @@ PageVerifier::elfParseData PageVerifier::parseKernel(QString fileName)
 
 
     SegmentInfo info = findElfSegmentWithName(fileContent, ".altinstructions");
-    if (info.index) applyAltinstr(fileContent, info, context);
+    if (info.index) applyAltinstr(info, context);
 
 
     info = findElfSegmentWithName(fileContent, ".parainstructions");
     if (info.index) applyParainstr(info, context);
+
+    info = findElfSegmentWithName(fileContent, ".smp_locks");
+    if (info.index) applySmpLocks(info, context);
 
     QByteArray textSegmentContent = QByteArray();
     textSegmentContent.append(context.textSegment.index, context.textSegment.size);
@@ -1600,6 +1727,17 @@ PageVerifier::elfParseData PageVerifier::parseKernel(QString fileName)
         QByteArray segment = textSegmentContent.mid(i * KERNEL_CODEPAGE_SIZE, KERNEL_CODEPAGE_SIZE);
         if (!segment.isEmpty())
         {
+            //Remember how long the contents of the text segment are,
+            //this is to identify the uninitialized data
+            if(segment.size() != KERNEL_CODEPAGE_SIZE)
+            {
+                if((segment.size()+1) % PAGE_SIZE != 0)
+                {
+                    quint32 size = segment.size();
+                    size += PAGE_SIZE - (size % PAGE_SIZE);
+                    context.textSegmentInitialized = i * KERNEL_CODEPAGE_SIZE + size;
+                }
+            }
             segment = segment.leftJustified(KERNEL_CODEPAGE_SIZE, 0);
             page.content = segment;
             hash.addData(page.content);
@@ -1649,7 +1787,30 @@ PageVerifier::elfParseData PageVerifier::parseKernel(QString fileName)
     }
     //.bss
 
-    free(fileContent);
+    //Initialize the symTable in the context for later reference
+    if(fileContent[4] == ELFCLASS32)
+    {
+        //TODO
+    }
+    else if(fileContent[4] == ELFCLASS64)
+    {
+        Elf64_Ehdr * elf64Ehdr = (Elf64_Ehdr *) fileContent;
+        Elf64_Shdr * elf64Shdr = (Elf64_Shdr *) (fileContent + elf64Ehdr->e_shoff);
+
+        quint32 symSize = elf64Shdr[context.symindex].sh_size;
+        Elf64_Sym *symBase = (Elf64_Sym *) (fileContent + elf64Shdr[context.symindex].sh_offset);
+
+        for(Elf64_Sym * sym = symBase; sym < (Elf64_Sym *) (((char*) symBase) + symSize) ; sym++)
+        {
+            if(ELF64_ST_TYPE(sym->st_info) & (STT_FUNC) || (ELF64_ST_TYPE(sym->st_info) == (STT_NOTYPE) && ELF64_ST_BIND(sym->st_info) & STB_GLOBAL))
+            {
+                QString symbolName = QString(&((fileContent + elf64Shdr[context.strindex].sh_offset)[sym->st_name]));
+                quint64 symbolAddress = sym->st_value;
+                _funcTable.insert(symbolName, symbolAddress);
+            }
+        }
+    }
+
     return context;
 }
 
@@ -1684,7 +1845,9 @@ Instance PageVerifier::findModuleByName(QString moduleName){
 
     do
     {
-        if(currentModule.member("name").toString().remove(QChar('"'), Qt::CaseInsensitive).compare(moduleName) ==0)
+        if(currentModule.member("name").toString().remove(QChar('"'), Qt::CaseInsensitive).compare(moduleName) == 0 ||
+                currentModule.member("name").toString().remove(QChar('"'), Qt::CaseInsensitive).compare(moduleName.replace(QString("_"), QString("-"))) == 0||
+                currentModule.member("name").toString().remove(QChar('"'), Qt::CaseInsensitive).compare(moduleName.replace(QString("-"), QString("_"))) == 0)
         {
             return currentModule;
         }
@@ -1752,27 +1915,34 @@ quint64 PageVerifier::checkCodePage(QString moduleName, quint32 sectionNumber, D
 {
 
     quint32 changeCount = 0;
-    if (ParsedExecutables->value(moduleName).textSegmentData.size() <= (qint32) sectionNumber )
+
+    moduleName = moduleName.replace(QString("-"), QString("_"));
+
+    elfParseData context = ParsedExecutables->value(moduleName);
+
+    //Console::out() << "Module: " << moduleName << " Context: " << hex << context.currentModule.member("name").toString() << dec << endl;
+
+    if (context.textSegmentData.size() <= (qint32) sectionNumber )
     {
 
         Console::out() << "Module: " << moduleName << " Section: " << hex << sectionNumber << dec << endl;
-        Console::out() << "Something is wrong here:" << ParsedExecutables->value(moduleName).textSegmentData.size() << " parsed Segments vs: " << sectionNumber << " segment in kernel" << endl;
+        Console::out() << "Something is wrong here:" << context.textSegmentData.size() << " parsed Segments vs: " << sectionNumber << " segment in kernel" << endl;
         return 1;
     }
 
-    if(ParsedExecutables->value(moduleName).textSegmentData.at(sectionNumber).hash.toHex() != currentPage.hash.toHex())
+    if(context.textSegmentData.at(sectionNumber).hash.toHex() != currentPage.hash.toHex())
     {
 
 
-        if (ParsedExecutables->value(moduleName).textSegmentData.at(sectionNumber).content.size() != currentPage.data.size())
+        if (context.textSegmentData.at(sectionNumber).content.size() != currentPage.data.size())
         {
-            Console::out() << " Length of relocations: " << ParsedExecutables->value(moduleName).textSegmentData.at(sectionNumber).content.size()
+            Console::out() << " Length of relocations: " << context.textSegmentData.at(sectionNumber).content.size()
                            << " Length of page: " << currentPage.data.size() << endl;
         }
 
         for(qint32 i = 0 ; i < currentPage.data.size() ; i++)
         {
-            QByteArray currentSegment = ParsedExecutables->value(moduleName).textSegmentData.at(sectionNumber).content;
+            QByteArray currentSegment = context.textSegmentData.at(sectionNumber).content;
             if(currentSegment.at(i) != currentPage.data.at(i))
             {
                 //Show first changed byte only
@@ -1781,13 +1951,28 @@ quint64 PageVerifier::checkCodePage(QString moduleName, quint32 sectionNumber, D
                     continue;
                 }
 
+                //Check for ATOMIC_NOP
+                if(i > 1 &&
+                        memcmp(currentSegment.constData()+i - 2,ideal_nops[5], 5) == 0 &&
+                        memcmp(currentPage.data.constData()+i - 2, ideal_nops[9], 5) == 0)
+                {
+                    i = i+5;
+                    continue;
+                }else if (i <= 1 && (((currentSegment.at(i) == (char) 0x66 && currentPage.data.at(i) == (char) 0x90) ||
+                                      (currentSegment.at(i) == (char) 0x90 && currentPage.data.at(i) == (char) 0x66))))
+                {
+                    continue;
+                }
+
                 //Check if this is a jumpEntry that should be disabled
                 if(currentSegment.at(i) == (char) 0xe9 &&
-                        currentPage.data.at(i) == (char) 0xf &&
-                        currentPage.data.at(i+1) == (char) 0x1f &&
-                        currentPage.data.at(i+2) == (char) 0x44 &&
-                        currentPage.data.at(i+3) == (char) 0x0 &&
-                        currentPage.data.at(i+4) == (char) 0x0 &&
+                        (memcmp(currentPage.data.constData()+i, ideal_nops[5], 5) == 0 ||
+                         memcmp(currentPage.data.constData()+i, ideal_nops[9], 5) == 0) &&
+//                        currentPage.data.at(i) == (char) 0xf &&
+//                        currentPage.data.at(i+1) == (char) 0x1f &&
+//                        currentPage.data.at(i+2) == (char) 0x44 &&
+//                        currentPage.data.at(i+3) == (char) 0x0 &&
+//                        currentPage.data.at(i+4) == (char) 0x0 &&
                         moduleName.compare(QString("kernel")) == 0)
                 {
                     //Get destination from memory
@@ -1797,36 +1982,38 @@ quint64 PageVerifier::checkCodePage(QString moduleName, quint32 sectionNumber, D
                     memcpy(&jmpDestInt, jmpDestPtr + i + 1, 4);
 
                     quint64 address = sectionNumber * KERNEL_CODEPAGE_SIZE + i;
-                    Console::out() << "checking if jump is nopped out @ " << hex << address << dec << endl;
-
-
                     if(_jumpEntries.contains(address))
                     {
                         if (*_jumpEntries.find(address) == jmpDestInt)
                         {
-                            Console::out() << "Jump Entry not disabled (inconsistency)" << endl;
+                            //Console::out() << "Jump Entry not disabled (inconsistency)" << endl;
                             i += 5;
                             continue;
                         }
                     }
                 }
 
-                if(currentSegment.at(i-1) == (char) 0xe8 &&
+                if(i > 0 && currentSegment.at(i-1) == (char) 0xe8 &&
                         moduleName.compare(QString("kernel")) == 0)
                 {
-                    quint64 address = ParsedExecutables->value(moduleName).genericUnrolledAddress;
-
                     qint32 jmpDestElfInt = 0;
                     const char * jmpDestElfPtr = currentSegment.constData();
                     memcpy(&jmpDestElfInt, jmpDestElfPtr + i + 1, 4);
 
                     quint64 elfDestAddress = _sym.memSpecs().systemMap.value("_text").address + sectionNumber * KERNEL_CODEPAGE_SIZE + i + jmpDestElfInt + 5;
 
-                    if(address == elfDestAddress)
+                    if(context.genericUnrolledAddress == elfDestAddress)
                     {
                         i += 4;
                         continue;
                     }
+                }
+
+                if(context.type == Detect::MODULE && context.smpOffsets.contains(i + sectionNumber * PAGE_SIZE) &&
+                        ((currentSegment.at(i) == (char) 0x3e && currentPage.data.at(i) == (char) 0xf0) ||
+                        (currentSegment.at(i) == (char) 0xf0 && currentPage.data.at(i) == (char) 0x3e)))
+                {
+                    continue;
                 }
 
 //                if(currentSegment.at(i) == (char) 0xe9 &&
@@ -1845,35 +2032,46 @@ quint64 PageVerifier::checkCodePage(QString moduleName, quint32 sectionNumber, D
 //                    continue;
 //                }
 
-                //TODO after offset db000 in page 4 of kernel there is some upstart stuff
-                if(moduleName.compare(QString("kernel")) == 0 && sectionNumber == 3 && i > 0xdb000)
+                //check for uninitialized content after initialized part of kernels text segment
+                if(moduleName.compare(QString("kernel")) == 0 && sectionNumber == (quint64) context.textSegmentData.size() - 1 && i >= (context.textSegmentInitialized % KERNEL_CODEPAGE_SIZE))
                 {
-                    Console::out() << "Unknown code @ " << hex << _sym.memSpecs().systemMap.value("_text").address + sectionNumber * KERNEL_CODEPAGE_SIZE + i << dec << endl;
+                    quint64 unkCodeAddress = _sym.memSpecs().systemMap.value("_text").address + sectionNumber * KERNEL_CODEPAGE_SIZE + i;
+                    int pageSize = 0;
+                    Console::out() << "Unknown code @ " << hex << unkCodeAddress
+                                   << " ( physical location: " << _sym.memDumps().at(_current_index)->vmem()->virtualToPhysical(unkCodeAddress, &pageSize) << " ) " << dec << endl;
+                    if(changeCount > 0)
+                    {
+                        Console::out() << "The Code Segment is fully intact but the rest of the page is uninitialized" << dec << endl;
+                    }
+
                     break;
                 }
 
 
-                Console::out() << "First change on section " << sectionNumber << " in byte 0x" << hex << i << " is 0x" << (unsigned char) currentSegment.at(i)
-                               << " should be 0x" << (unsigned char) currentPage.data.at(i) << dec << endl;
-                //Print 40 Bytes from should be
-                Console::out() << "The block is: " << hex << endl;
-                for (qint32 k = i-15 ; k < i + 15 ; k++)
-                {
-                    if (k < 0 || k >= currentSegment.size()) continue;
-                    if(k == i) Console::out() << " # ";
-                    Console::out() << (unsigned char) currentSegment.at(k) << " ";
-                }
+                if(changeCount == 0){
+                    Console::out() << "First change on section " << sectionNumber << " in byte 0x" << hex << i << " ( " << i + sectionNumber * currentSegment.size() <<  " ) is 0x" << (unsigned char) currentSegment.at(i)
+                                   << " should be 0x" << (unsigned char) currentPage.data.at(i) << dec << endl;
+                    //Print 40 Bytes from should be
 
-                Console::out() << dec << endl;
-                //Print 40 Bytes from is
-                Console::out() << "The block should be: " << hex << endl;
-                for (qint32 k = i-15 ; k < i + 15 ; k++)
-                {
-                    if (k < 0 || k >= currentPage.data.size()) continue;
-                    if(k == i) Console::out() << " # ";
-                    Console::out() << (unsigned char) currentPage.data.at(k) << " ";
+                    Console::out() << "The block is: " << hex << endl;
+                    for (qint32 k = i-15 ; (k < i + 15) && (k < currentPage.data.size()); k++)
+                    {
+                        if (k < 0 || k >= currentSegment.size()) continue;
+                        if(k == i) Console::out() << " # ";
+                        Console::out() << (unsigned char) currentSegment.at(k) << " ";
+                    }
+
+                    Console::out() << dec << endl;
+                    //Print 40 Bytes from is
+                    Console::out() << "The block should be: " << hex << endl;
+                    for (qint32 k = i-15 ; (k < i + 15) && (currentPage.data.size()) ; k++)
+                    {
+                        if (k < 0 || k >= currentPage.data.size()) continue;
+                        if(k == i) Console::out() << " # ";
+                        Console::out() << (unsigned char) currentPage.data.at(k) << " ";
+                    }
+                    Console::out() << dec << endl << endl;
                 }
-                Console::out() << dec << endl << endl;
                 changeCount++;
             }
         }
@@ -1883,6 +2081,53 @@ quint64 PageVerifier::checkCodePage(QString moduleName, quint32 sectionNumber, D
         }
     }
     return changeCount;
+}
+
+void PageVerifier::verifyParavirtFuncs()
+{
+
+    quint64 unknownJump = 0;
+    quint64 unknownCall = 0;
+
+    for(int i = 0 ; i < _paravirtJump.length(); i++)
+    {
+        if (_funcTable.values().contains(_paravirtJump.at(i)))
+        {
+            //Console::out() << "Found Paravirt Jump target " << _funcTable.key(_paravirtJump.at(i)) << endl;
+        }
+        else
+        {
+            Console::out() << "Could not find Jump target @ " << hex <<(quint64) _paravirtJump.at(i) << dec << endl;
+            unknownJump++;
+        }
+    }
+    Console::out() << endl;
+
+    for(int i = 0 ; i < _paravirtCall.length(); i++)
+    {
+        if (_funcTable.values().contains(_paravirtCall.at(i)))
+        {
+            //Console::out() << "Found Paravirt Function " << _funcTable.key(_paravirtCall.at(i)) << endl;
+        }
+        else
+        {
+            Console::out() << "Could not find function @ " << hex << (quint64) _paravirtCall.at(i) << dec << endl;
+            unknownCall++;
+        }
+    }
+
+    Console::out() << "Checking paravirt functions:" << endl;
+    Console::out()
+            << "\t Processed "
+            << Console::color(ctNumber) << _paravirtJump.length() << Console::color(ctReset)
+            << " paravirt jump entries. ("
+            << Console::color(ctWarningLight) << unknownJump << Console::color(ctReset)
+            << " unknown targets ) " << endl
+            << "\t Processed "
+            << Console::color(ctNumber) << _paravirtCall.length() << Console::color(ctReset)
+            << " paravirt call entries. ("
+            << Console::color(ctWarningLight) << unknownCall << Console::color(ctReset)
+            << " unknown targets ) " << endl;
 }
 
 void PageVerifier::verifyHashes(QMultiHash<quint64, Detect::ExecutablePage> *current)
@@ -1925,9 +2170,28 @@ void PageVerifier::verifyHashes(QMultiHash<quint64, Detect::ExecutablePage> *cur
     // Start the Operation
     operationStarted();
 
+//    extractVDSOPage(0x1c03000);
+
     QList<Detect::ExecutablePage> sections = current->values();
 
     //Console::out() << "got list of all sections: " <<  sections.size() <<   " Sections" << endl;
+
+    if(ParsedExecutables->contains(QString("kernel")))
+    {
+        QMutableHashIterator<QString, elfParseData> iter( *ParsedExecutables );
+        while( iter.hasNext() )
+        {
+            iter.next();
+            QString moduleName = iter.value().currentModule.member("name").toString();
+            if(moduleName.compare(QString("NULL")) != 0){
+                updateKernelModule(iter.value());
+                //Console::out()
+                //    << "\t Updated module "
+                //    << Console::color(ctWarningLight) << moduleName << Console::color(ctReset)
+                //    << " " << endl;
+            }
+        }
+    }
 
     QList<quint64> addresses = QList<quint64>();
 
@@ -1950,7 +2214,7 @@ void PageVerifier::verifyHashes(QMultiHash<quint64, Detect::ExecutablePage> *cur
             Instance currentModule = findModuleByName(moduleName);
             if (!currentModule.isValid())
             {
-                Console::out() << "Module not found" << endl;
+                Console::out() << "Module not found: " << moduleName<< endl;
                 continue;
             }
 
@@ -2051,7 +2315,7 @@ void PageVerifier::verifyHashes(QMultiHash<quint64, Detect::ExecutablePage> *cur
 
                 if(context.dataNosaveSegmentData.at(sectionNumber).hash.toHex() != currentPage.hash.toHex())
                 {
-                    Console::out() << "Data_nosave Section: " << hex << sectionNumber << " Hash mismatch." << dec << endl;
+                    //Console::out() << "Data_nosave Section: " << hex << sectionNumber << " Hash mismatch." << dec << endl;
 
                     changedDataPages++;
                     changedDataSize += currentPage.data.size();
@@ -2081,7 +2345,7 @@ void PageVerifier::verifyHashes(QMultiHash<quint64, Detect::ExecutablePage> *cur
 
                 if(context.vvarSegmentData.at(sectionNumber).hash.toHex() != currentPage.hash.toHex())
                 {
-                    Console::out() << "Vvar Section: " << hex << sectionNumber << " Hash mismatch. This is normal as this page contains data" << dec << endl;
+                    //Console::out() << "Vvar Section: " << hex << sectionNumber << " Hash mismatch. This is normal as this page contains data" << dec << endl;
                     changedDataPages++;
                     changedDataSize += currentPage.data.size();
                 }
@@ -2809,6 +3073,8 @@ void Detect::hiddenCode(int index)
     // Verify hashes
     PageVerifier pageVerifier = PageVerifier(_sym);
     pageVerifier.verifyHashes(currentHashes);
+
+    pageVerifier.verifyParavirtFuncs();
 
     // Verify function pointers?
     if (_sym.memDumps().at(index)->map())
