@@ -150,6 +150,8 @@ void MemoryMapBuilderCS::processFunctionPointer(const Instance &inst,
                                                 MemoryMapNode *node,
                                                 VariableTypeContainerList *path)
 {
+    // TODO inst is unused -check if it can be removed
+    Q_UNUSED(inst);
     assert(node);
 
     _map->_shared->functionPointersLock.lock();

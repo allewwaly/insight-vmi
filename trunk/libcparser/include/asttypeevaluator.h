@@ -140,7 +140,7 @@ typedef QStack<TransformedSymbol> TransformedSymStack;
 struct PointsToEvalState
 {
     PointsToEvalState(ASTTypeEvaluator* typeEval)
-        : sym(0), transformations(typeEval), srcNode(0), root(root),
+        : sym(0), transformations(typeEval), srcNode(0), root(0),
           prevNode(0), lastLinkTrans(typeEval), validLvalue(true)
     {}
 

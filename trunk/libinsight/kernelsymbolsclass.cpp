@@ -34,7 +34,8 @@ inline QScriptValue KernelSymbolsClass::listGeneric(QString filter, int index,
 		Instance (getInst)(const T*, VirtualMemory*))
 {
 	typedef QList<T*> ListT;
-	typedef QMultiHash<QString, T*> HashT;
+    //Currently unused -check if needed
+    //typedef QMultiHash<QString, T*> HashT;
 
     int count = 0;
     bool applyFilter = !filter.isEmpty();
