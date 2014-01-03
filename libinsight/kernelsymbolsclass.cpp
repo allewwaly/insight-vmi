@@ -16,7 +16,7 @@
 #include <QRegExp>
 
 KernelSymbolsClass::KernelSymbolsClass(const KernelSymbols *symbols,
-									   InstanceClass* instClass, QObject* parent)
+        InstanceClass* instClass, QObject* parent)
 	: QObject(parent), _instClass(instClass), _symbols(symbols)
 {
 	assert(instClass != 0);
