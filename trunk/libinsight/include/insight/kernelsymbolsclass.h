@@ -12,7 +12,7 @@
 #include <QScriptable>
 #include <QScriptValue>
 #include <QMultiHash>
-#include "instance_def.h"
+#include "instance.h"
 
 // Forward declaration
 class InstanceClass;

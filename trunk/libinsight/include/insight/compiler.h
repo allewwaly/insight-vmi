@@ -23,13 +23,13 @@
 #   define DECL_OVERRIDE Q_DECL_OVERRIDE
 #else
 #   if defined(__GNUC__)
-#       if (__GNUC__ * 100 + __GNUC_MINOR__) >= 407
-#           error "You are using GCC >= 4.7, this version is known to break the build!"
+//#       if (__GNUC__ * 100 + __GNUC_MINOR__) >= 407
+//#           error "You are using GCC >= 4.7, this version is known to break the build!"
 #           if defined(__GXX_EXPERIMENTAL_CXX0X__)
                 /* C++0x features supported in GCC 4.7: */
 #               define DECL_OVERRIDE override
 #           endif
-#       endif /* __GXX_EXPERIMENTAL_CXX0X__ */
+//#       endif /* __GXX_EXPERIMENTAL_CXX0X__ */
 #   endif /* __GNUC__ */
 #endif /* Q_DECL_OVERRIDE */
 
