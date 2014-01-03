@@ -89,7 +89,7 @@ uint Structured::hashMembers(quint32 memberIndex, quint32 nrMembers, bool *isVal
     // To place the member hashes at different bit positions
     uint rot = 0;
 
-    for (int i = memberIndex; i < (memberIndex + nrMembers) && valid; ++i)
+    for (quint32 i = memberIndex; i < (memberIndex + nrMembers) && valid; ++i)
     {
         const StructuredMember* member = _members[i];
         hash ^= rotl32(member->refType()->hash(&valid), rot);

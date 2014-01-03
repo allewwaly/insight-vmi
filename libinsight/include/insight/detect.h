@@ -74,15 +74,17 @@ public:
 
     struct FunctionInfo
     {
-        FunctionInfo() : source(UNKOWN), memory_function(0), system_function("") {}
+        FunctionInfo() : source(UNKOWN), memory_function(0), system_function(FunctionInfo::no_function) {}
         FunctionInfo(FunctionSource source, const Function *f) :
-            source(source), memory_function(f), system_function("") {}
+            source(source), memory_function(f), system_function(FunctionInfo::no_function) {}
         FunctionInfo(FunctionSource source, const QString &functionName) :
             source(source), memory_function(0), system_function(functionName) {}
 
         FunctionSource source;
         const Function *memory_function;
         const QString &system_function;
+
+        static QString no_function;
     };
 
     Detect(KernelSymbols &sym);

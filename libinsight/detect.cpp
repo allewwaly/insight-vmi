@@ -58,6 +58,8 @@ Detect::~Detect(){
     delete Functions;
 }
 
+QString Detect::FunctionInfo::no_function = QString("");
+
 #define GENERIC_NOP1 0x90
 
 #define P6_NOP1 GENERIC_NOP1
@@ -2040,7 +2042,7 @@ quint64 PageVerifier::checkCodePage(QString moduleName, quint32 sectionNumber, D
 //                }
 
                 //check for uninitialized content after initialized part of kernels text segment
-                if(moduleName.compare(QString("kernel")) == 0 && sectionNumber == (quint64) context.textSegmentData.size() - 1 && i >= (context.textSegmentInitialized % KERNEL_CODEPAGE_SIZE))
+                if(moduleName.compare(QString("kernel")) == 0 && sectionNumber == (quint64) context.textSegmentData.size() - 1 && i >= (qint32)  (context.textSegmentInitialized % KERNEL_CODEPAGE_SIZE))
                 {
                     quint64 unkCodeAddress = _sym.memSpecs().systemMap.value("_text").address + sectionNumber * KERNEL_CODEPAGE_SIZE + i;
                     int pageSize = 0;
@@ -2893,7 +2895,7 @@ void Detect::hiddenCode(int index)
             data.resize(ptEntries.nextPageOffset(vmem->memSpecs()));
 
             // Get data
-            if ((quint64)vmem->readAtomic(i, data.data(), data.size()) != data.size()) {
+            if ((quint64)vmem->readAtomic(i, data.data(), data.size()) != (quint64) data.size()) {
                 std::cout << "ERROR: Could not read data of page!" << std::endl;
                 return;
             }
